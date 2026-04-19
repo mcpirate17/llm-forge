@@ -13,6 +13,35 @@ from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TARGETS = ("research", "aria_core", "aria_designer")
+ALLOWLIST_PATH = Path(__file__).resolve().parent / "guardrail_allowlist.json"
+
+
+def _load_allowlist() -> dict[str, set[str]]:
+    if not ALLOWLIST_PATH.exists():
+        return {"god_files": set(), "god_functions": set(), "complexity": set()}
+    try:
+        raw = json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"god_files": set(), "god_functions": set(), "complexity": set()}
+    return {
+        "god_files": set(raw.get("god_files", [])),
+        "god_functions": set(raw.get("god_functions", [])),
+        "complexity": set(raw.get("complexity", [])),
+    }
+
+
+_ALLOWLIST = _load_allowlist()
+
+
+def _has_marker(text: str, marker: str) -> bool:
+    return f"# guardrail: {marker}" in text
+
+
+def _function_has_marker(node: ast.AST, source_lines: list[str], marker: str) -> bool:
+    start = getattr(node, "lineno", 1) - 1
+    end = getattr(node, "end_lineno", start + 1)
+    snippet = "\n".join(source_lines[max(start, 0) : min(end, len(source_lines))])
+    return _has_marker(snippet, marker)
 CODE_EXTS = {
     ".py",
     ".js",
@@ -84,8 +113,9 @@ def _iter_files(targets: Iterable[str], staged_only: bool) -> list[Path]:
 
 
 class _PyFunctionAnalyzer(ast.NodeVisitor):
-    def __init__(self, source_lines: list[str]) -> None:
+    def __init__(self, source_lines: list[str], rel_path: str = "") -> None:
         self.source_lines = source_lines
+        self.rel_path = rel_path
         self.issues: list[Issue] = []
         self._parents: list[ast.AST] = []
 
@@ -128,7 +158,14 @@ class _PyFunctionAnalyzer(ast.NodeVisitor):
             for child in ast.iter_child_nodes(node)
         )
 
-        if length > 100 and not is_route_registration:
+        fn_key = f"{self.rel_path}::{qualname}" if self.rel_path else qualname
+        allow_god_fn = fn_key in _ALLOWLIST["god_functions"] or _function_has_marker(
+            node, self.source_lines, "allow-god-function"
+        )
+        allow_complexity = fn_key in _ALLOWLIST["complexity"] or _function_has_marker(
+            node, self.source_lines, "allow-complexity"
+        )
+        if length > 100 and not is_route_registration and not allow_god_fn:
             self.issues.append(
                 Issue(
                     kind="god_function",
@@ -140,7 +177,11 @@ class _PyFunctionAnalyzer(ast.NodeVisitor):
                     metric={"lines": length, "lineno": node.lineno},
                 )
             )
-        if (branches > 20 or max_nesting > 5) and not is_route_registration:
+        if (
+            (branches > 20 or max_nesting > 5)
+            and not is_route_registration
+            and not allow_complexity
+        ):
             self.issues.append(
                 Issue(
                     kind="complexity",
@@ -247,7 +288,10 @@ def collect_issues(
         except UnicodeDecodeError:
             text = path.read_text(encoding="latin-1")
         lines = text.splitlines()
-        if len(lines) > 1250:
+        allow_god_file = rel in _ALLOWLIST["god_files"] or _has_marker(
+            text, "allow-god-file"
+        )
+        if len(lines) > 1250 and not allow_god_file:
             issues.append(
                 Issue(
                     kind="god_file",
@@ -276,7 +320,7 @@ def collect_issues(
                     )
                 )
                 continue
-            analyzer = _PyFunctionAnalyzer(lines)
+            analyzer = _PyFunctionAnalyzer(lines, rel_path=rel)
             analyzer.visit(tree)
             for issue in analyzer.issues:
                 issue.path = rel
