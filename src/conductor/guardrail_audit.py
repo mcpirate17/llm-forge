@@ -42,6 +42,8 @@ def _function_has_marker(node: ast.AST, source_lines: list[str], marker: str) ->
     end = getattr(node, "end_lineno", start + 1)
     snippet = "\n".join(source_lines[max(start, 0) : min(end, len(source_lines))])
     return _has_marker(snippet, marker)
+
+
 CODE_EXTS = {
     ".py",
     ".js",
