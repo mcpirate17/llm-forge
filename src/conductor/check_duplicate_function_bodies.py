@@ -117,15 +117,38 @@ def main() -> int:
         for fn in _functions(path, _read_ref(path, "HEAD")):
             existing_by_digest.setdefault(fn.digest, fn)
 
+    # Build a staged-snapshot view: for any path that's staged, the truth is
+    # what's in the index, NOT HEAD. This makes split refactors (move function
+    # X from foo.py to bar/foo_part.py + remove from foo.py) recognized as
+    # moves rather than duplications. Without this, the hook blocks every
+    # god-file split that the guardrail-audit hook simultaneously demands.
+    staged_paths = set(_staged_python_files())
+    staged_digests_by_path: dict[str, set[str]] = {}
+    for path in staged_paths:
+        staged_digests_by_path[path] = {
+            fn.digest for fn in _functions(path, _read_index(path))
+        }
+
+    def _digest_still_present(path: str, digest: str) -> bool:
+        if path in staged_paths:
+            return digest in staged_digests_by_path[path]
+        # path not staged — what's in HEAD is what's on disk.
+        return True
+
     duplicate_pairs: list[tuple[FunctionBody, FunctionBody]] = []
-    for path in _staged_python_files():
+    for path in staged_paths:
         head_digests = {fn.digest for fn in _functions(path, _read_ref(path, "HEAD"))}
         for fn in _functions(path, _read_index(path)):
             if fn.digest in head_digests:
                 continue
             existing = existing_by_digest.get(fn.digest)
-            if existing and existing.path != fn.path:
-                duplicate_pairs.append((fn, existing))
+            if not existing or existing.path == fn.path:
+                continue
+            # If the original location's staged version no longer has this
+            # function body, treat it as a move, not a duplication.
+            if not _digest_still_present(existing.path, fn.digest):
+                continue
+            duplicate_pairs.append((fn, existing))
 
     if not duplicate_pairs:
         return 0
