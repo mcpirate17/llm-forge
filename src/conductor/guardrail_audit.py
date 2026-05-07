@@ -199,7 +199,7 @@ class _PyFunctionAnalyzer(ast.NodeVisitor):
                     },
                 )
             )
-        if self._looks_like_python_hot_loop(node):
+        if self._looks_like_python_hot_loop(node) and not allow_complexity:
             self.issues.append(
                 Issue(
                     kind="native_hotspot_candidate",
