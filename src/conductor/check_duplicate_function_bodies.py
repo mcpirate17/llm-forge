@@ -42,12 +42,16 @@ def _tracked_python_files(ref: str) -> list[str]:
 
 
 def _staged_python_files() -> list[str]:
+    # Include D (deleted) so the move-detector recognizes the removal-side
+    # of a split refactor (delete foo.py + add foo/foo_part.py). Without D,
+    # the deleted source path is treated as "still on disk" and the hook
+    # falsely flags every moved body as a duplication.
     proc = _git(
         [
             "diff",
             "--cached",
             "--name-only",
-            "--diff-filter=ACMR",
+            "--diff-filter=ACMRD",
             "-z",
             "--",
             *ROOTS,
