@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT_DIR = ROOT / "tasks" / "codex_journal"
+DEFAULT_MAX_STATUS = 80
 SECRETISH_RE = re.compile(
     r"(?i)\b(api[_-]?key|token|password|passwd|secret|credential)\b\s*[:=]\s*\S+"
 )
@@ -60,13 +61,26 @@ def _redact(text: str) -> str:
     return SECRETISH_RE.sub(lambda m: f"{m.group(1)}=<redacted>", text)
 
 
-def _status_lines() -> list[str]:
+def _status_lines(paths: list[str]) -> list[str]:
     lines = []
-    for line in _run_git(["status", "--short"]).splitlines():
+    args = ["status", "--short"]
+    if paths:
+        args.extend(["--", *paths])
+    for line in _run_git(args).splitlines():
         path = line[3:] if len(line) > 3 else line
         if not _is_protected(path) and not SECRETISH_PATH_RE.search(path):
             lines.append(line)
     return lines
+
+
+def _capped_status_lines(status: list[str], max_status: int) -> list[str]:
+    if max_status < 0 or len(status) <= max_status:
+        return status
+    omitted = len(status) - max_status
+    return [
+        *status[:max_status],
+        f"... {omitted} more non-protected changes omitted; use --path or --max-status to include them.",
+    ]
 
 
 def _bullet_lines(items: list[str], empty: str) -> str:
@@ -75,10 +89,16 @@ def _bullet_lines(items: list[str], empty: str) -> str:
     return "\n".join(f"- `{_redact(item)}`" for item in items)
 
 
-def build_entry(note: str, tests: list[str]) -> str:
+def build_entry(
+    note: str,
+    tests: list[str],
+    *,
+    paths: list[str] | None = None,
+    max_status: int = DEFAULT_MAX_STATUS,
+) -> str:
     branch = _run_git(["branch", "--show-current"]) or "(unknown)"
     head = _run_git(["rev-parse", "--short", "HEAD"]) or "(unknown)"
-    status = _status_lines()
+    status = _capped_status_lines(_status_lines(paths or []), max_status)
     timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
     safe_note = _redact(note.strip()) if note.strip() else "No manual note provided."
     safe_tests = [_redact(test.strip()) for test in tests if test.strip()]
@@ -118,6 +138,18 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_OUT_DIR,
         help="Directory for daily Markdown journal files.",
     )
+    parser.add_argument(
+        "--path",
+        action="append",
+        default=[],
+        help="Limit changed-file capture to this pathspec. May be passed more than once.",
+    )
+    parser.add_argument(
+        "--max-status",
+        type=int,
+        default=DEFAULT_MAX_STATUS,
+        help="Maximum changed-file lines to record. Use -1 for no cap.",
+    )
     return parser.parse_args()
 
 
@@ -126,7 +158,12 @@ def main() -> int:
     out_dir = args.out_dir if args.out_dir.is_absolute() else ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{datetime.now().date().isoformat()}.md"
-    entry = build_entry(args.note, args.test)
+    entry = build_entry(
+        args.note,
+        args.test,
+        paths=args.path,
+        max_status=args.max_status,
+    )
     with out_path.open("a", encoding="utf-8") as fh:
         fh.write(entry)
     print(out_path.relative_to(ROOT))
