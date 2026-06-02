@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""Pre-commit hook: research/notes/ is for .md knowledge artifacts only.
+"""Pre-commit hook: reject the retired research/notes/ tree.
 
-Rejects new commits that add .json/.jsonl/.csv files at the top level of
-research/notes/. Tool outputs go to research/reports/ (auto-pruned 14d).
-
-Subdirs (mixer_fingerprint/, archive/) are exempt because they hold runtime
-output and archival snapshots respectively.
+Durable research notes now live in the Obsidian vault. Persistent JSON inputs
+belong under research/data/, and disposable tool outputs belong under
+research/reports/ or tasks/audit/.
 """
 
 from __future__ import annotations
@@ -13,7 +11,7 @@ from __future__ import annotations
 import re
 import sys
 
-FORBIDDEN_RE = re.compile(r"^research/notes/[^/]+\.(json|jsonl|csv)$")
+FORBIDDEN_RE = re.compile(r"^research/notes(?:/|$)")
 
 
 def main() -> int:
@@ -22,7 +20,8 @@ def main() -> int:
         return 0
     for f in bad:
         sys.stderr.write(
-            f"research/notes/ is .md-only: {f} — write tool outputs to research/reports/\n"
+            f"research/notes/ is retired: {f} — use Obsidian for notes, "
+            "research/data/ for persistent inputs, or research/reports/ for outputs\n"
         )
     return 1
 

@@ -14,7 +14,7 @@ from radon.complexity import cc_rank, cc_visit
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PATHS = ("research", "aria_core", "aria_designer")
-DEFAULT_EXCLUDES = ("*/rust/*", "*/tests/*", "research/notes/*")
+DEFAULT_EXCLUDES = ("*/rust/*", "*/tests/*")
 DEFAULT_BASELINE = REPO_ROOT / "conductor" / "radon_complexity_baseline.json"
 RANKS = ("A", "B", "C", "D", "E", "F")
 
