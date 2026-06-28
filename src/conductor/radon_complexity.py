@@ -9,9 +9,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from radon.complexity import cc_rank, cc_visit
-
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PATHS = ("research", "aria_core", "aria_designer")
 DEFAULT_EXCLUDES = ("*/rust/*", "*/tests/*")
@@ -45,6 +42,8 @@ def _block_key(path: str, block: Any) -> str:
 def _scan(
     paths: list[str], excludes: list[str]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    from radon.complexity import cc_rank, cc_visit
+
     findings: list[dict[str, Any]] = []
     parse_errors: list[dict[str, Any]] = []
     for path in _iter_python_files(paths, excludes):
