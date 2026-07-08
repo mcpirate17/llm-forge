@@ -45,7 +45,8 @@
     "research/scientist/runner/control_start.py",
     "research/synthesis/_templates_routing_gated.py",
     "research/tools/small_ar_story_calibration.py",
-    "research/tools/train_predictors.py"
+    "research/tools/train_predictors.py",
+    "research/tools/native_adaptive_hydra_train.py"
   ],
   "god_functions": [
     "research/eval/associative_recall.py::associative_recall_score",
@@ -471,7 +472,11 @@
     "research/tools/train_predictors.py::_build_model_registry",
     "research/tools/train_predictors.py::_gbm_metrics_report",
     "research/tools/train_predictors.py::_ensemble_metrics_report",
-    "research/tools/validate_micro_train_native_optimizer_cutover.py::run_validation"
+    "research/tools/validate_micro_train_native_optimizer_cutover.py::run_validation",
+    "research/tools/native_adaptive_hydra_train.py::_gate_aux_loss",
+    "research/tools/native_adaptive_hydra_train.py::_train_step",
+    "research/tools/native_adaptive_hydra_train.py::main",
+    "research/tools/native_adaptive_hydra_train.py::run"
   ],
   "complexity": [
     "research/__main__.py::main",
