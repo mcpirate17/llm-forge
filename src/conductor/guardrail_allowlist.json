@@ -46,7 +46,8 @@
     "research/synthesis/_templates_routing_gated.py",
     "research/tools/small_ar_story_calibration.py",
     "research/tools/train_predictors.py",
-    "research/tools/native_adaptive_hydra_train.py"
+    "research/tools/native_adaptive_hydra_train.py",
+    "research/tools/scaling_blimp_study.py"
   ],
   "god_functions": [
     "research/eval/associative_recall.py::associative_recall_score",
