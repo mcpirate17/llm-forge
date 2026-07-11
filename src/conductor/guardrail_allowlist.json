@@ -1,5 +1,7 @@
 {
   "god_files": [
+    "audit/orchestrator/orchestrate.py",
+    "audit/orchestrator/test_orchestrator.py",
     "research/dashboard/src/components/ComponentAnalyticsDashboard.js",
     "research/dashboard/src/components/CampaignView.js",
     "research/arch_builder.py",
@@ -51,6 +53,7 @@
     "research/tools/novel_architecture_investor_report.py"
   ],
   "god_functions": [
+    "audit/orchestrator/orchestrate.py::main",
     "research/eval/associative_recall.py::associative_recall_score",
     "research/eval/binding_curriculum.py::curriculum_binding_range_profile",
     "research/eval/cross_task_eval.py::evaluate_cross_task_robustness",
