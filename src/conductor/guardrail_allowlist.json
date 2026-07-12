@@ -48,7 +48,8 @@
     "research/tools/train_predictors.py",
     "research/tools/native_adaptive_hydra_train.py",
     "research/tools/scaling_blimp_study.py",
-    "research/tools/novel_architecture_investor_report.py"
+    "research/tools/novel_architecture_investor_report.py",
+    "research/tests/test_composite_extra_branches.py"
   ],
   "god_functions": [
     "research/eval/associative_recall.py::associative_recall_score",
