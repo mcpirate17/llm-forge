@@ -49,7 +49,8 @@
     "research/tools/native_adaptive_hydra_train.py",
     "research/tools/scaling_blimp_study.py",
     "research/tools/novel_architecture_investor_report.py",
-    "research/tests/test_composite_extra_branches.py"
+    "research/tests/test_composite_extra_branches.py",
+    "research/tools/_scaling_lanes.py"
   ],
   "god_functions": [
     "research/eval/associative_recall.py::associative_recall_score",
@@ -479,7 +480,12 @@
     "research/tools/native_adaptive_hydra_train.py::_gate_aux_loss",
     "research/tools/native_adaptive_hydra_train.py::_train_step",
     "research/tools/native_adaptive_hydra_train.py::main",
-    "research/tools/native_adaptive_hydra_train.py::run"
+    "research/tools/native_adaptive_hydra_train.py::run",
+    "research/tools/_scaling_cfg.py::add_arm_cli_args",
+    "research/tools/_scaling_lanes.py::_build_lane_factory",
+    "research/tools/scaling_blimp_study.py::_cfg_from_args",
+    "research/tools/scaling_blimp_study.py::_prepare_cell_model",
+    "research/tools/scaling_blimp_study.py::_run_loop_while"
   ],
   "complexity": [
     "research/__main__.py::main",
