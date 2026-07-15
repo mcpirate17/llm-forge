@@ -485,7 +485,18 @@
     "research/tools/_scaling_lanes.py::_build_lane_factory",
     "research/tools/scaling_blimp_study.py::_cfg_from_args",
     "research/tools/scaling_blimp_study.py::_prepare_cell_model",
-    "research/tools/scaling_blimp_study.py::_run_loop_while"
+    "research/tools/scaling_blimp_study.py::_run_loop_while",
+    "component_fab/equation_fab.py::_evaluate_assembly_candidate",
+    "component_fab/equation_fab.py::_run_assembly_cycle",
+    "component_fab/equation_fab.py::run_equation_fab",
+    "component_fab/math_lab/mixer.py::run_mixer_lab",
+    "component_fab/mixer/adaptation.py::adapt_mixer_distribution",
+    "component_fab/mixer/generator.py::_mutate_once",
+    "component_fab/mixer_evidence.py::_terminal",
+    "component_fab/mixer_fab.py::_evaluate",
+    "component_fab/mixer_fab.py::main",
+    "component_fab/mixer_fab.py::run_mixer_fab",
+    "component_fab/mixer_training.py::run_persisted_mixer_binding_component_training"
   ],
   "complexity": [
     "research/__main__.py::main",
