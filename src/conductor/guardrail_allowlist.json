@@ -496,7 +496,9 @@
     "component_fab/mixer_fab.py::_evaluate",
     "component_fab/mixer_fab.py::main",
     "component_fab/mixer_fab.py::run_mixer_fab",
-    "component_fab/mixer_training.py::run_persisted_mixer_binding_component_training"
+    "component_fab/mixer_training.py::run_persisted_mixer_binding_component_training",
+    "component_fab/tools/run_equation_binding_smoke.py::run_smoke",
+    "component_fab/tools/run_equation_campaign_screen.py::run_campaign_and_screen"
   ],
   "complexity": [
     "research/__main__.py::main",
