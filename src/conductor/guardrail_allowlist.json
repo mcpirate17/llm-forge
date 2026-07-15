@@ -504,7 +504,8 @@
     "component_fab/harness/mixer_signal_localization.py::localize_mixer_program",
     "component_fab/harness/mixer_signal_localization.py::run_matched_state_activation_patching",
     "component_fab/harness/range_binding_probe.py::range_binding_gate",
-    "research/tools/_scaling_arg_parser.py::_build_arg_parser"
+    "research/tools/_scaling_arg_parser.py::_build_arg_parser",
+    "research/synthesis/nm_composite.py::__init__"
   ],
   "complexity": [
     "research/__main__.py::main",
