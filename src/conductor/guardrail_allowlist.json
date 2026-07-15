@@ -50,7 +50,8 @@
     "research/tools/scaling_blimp_study.py",
     "research/tools/novel_architecture_investor_report.py",
     "research/tests/test_composite_extra_branches.py",
-    "research/tools/_scaling_lanes.py"
+    "research/tools/_scaling_lanes.py",
+    "component_fab/harness/mixer_signal_localization.py"
   ],
   "god_functions": [
     "research/eval/associative_recall.py::associative_recall_score",
@@ -498,7 +499,12 @@
     "component_fab/mixer_fab.py::run_mixer_fab",
     "component_fab/mixer_training.py::run_persisted_mixer_binding_component_training",
     "component_fab/tools/run_equation_binding_smoke.py::run_smoke",
-    "component_fab/tools/run_equation_campaign_screen.py::run_campaign_and_screen"
+    "component_fab/tools/run_equation_campaign_screen.py::run_campaign_and_screen",
+    "component_fab/harness/mixer_signal_localization.py::compare_localization_reports",
+    "component_fab/harness/mixer_signal_localization.py::localize_mixer_program",
+    "component_fab/harness/mixer_signal_localization.py::run_matched_state_activation_patching",
+    "component_fab/harness/range_binding_probe.py::range_binding_gate",
+    "research/tools/_scaling_arg_parser.py::_build_arg_parser"
   ],
   "complexity": [
     "research/__main__.py::main",
