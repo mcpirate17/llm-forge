@@ -100,8 +100,6 @@ def run_jscpd(check: bool) -> int:
         "npx",
         "--no-install",
         "jscpd",
-        "--config",
-        ".jscpd.json",
         "--noTips",
     ]
     if not check:
