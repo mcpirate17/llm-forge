@@ -55,6 +55,7 @@
     "component_fab/equation_fab.py"
   ],
   "god_functions": [
+    "component_fab/architecture_fab.py::run_architecture_fab",
     "research/eval/associative_recall.py::associative_recall_score",
     "research/eval/binding_curriculum.py::curriculum_binding_range_profile",
     "research/eval/cross_task_eval.py::evaluate_cross_task_robustness",
