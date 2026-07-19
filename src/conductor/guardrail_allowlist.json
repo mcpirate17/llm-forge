@@ -53,6 +53,7 @@
     "research/tools/_scaling_lanes.py",
     "component_fab/harness/mixer_signal_localization.py",
     "component_fab/equation_fab.py",
+    "component_fab/equations/operator_expression.py",
     "component_fab/mixer_fab.py"
   ],
   "god_functions": [
