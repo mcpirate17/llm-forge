@@ -4,11 +4,14 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable
+
+from conductor.run_duplicate_audit import should_skip_python
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -104,7 +107,10 @@ def _iter_files(targets: Iterable[str], staged_only: bool) -> list[Path]:
             base = ROOT / target
             if not base.exists():
                 continue
-            candidates.extend(p for p in base.rglob("*") if p.is_file())
+            if base.is_file():
+                candidates.append(base)
+            else:
+                candidates.extend(p for p in base.rglob("*") if p.is_file())
     out: list[Path] = []
     for path in candidates:
         if not path.exists() or _should_skip(path):
@@ -256,7 +262,21 @@ class _PyFunctionAnalyzer(ast.NodeVisitor):
         return False
 
 
-def _run_tool(command: list[str]) -> tuple[int, str]:
+def _resolve_tool_command(tool: str, *args: str) -> list[str]:
+    """Prefer the executable installed beside the running Python interpreter."""
+
+    # Keep the environment's bin directory even when ``python`` is a symlink to
+    # the system interpreter; resolving it would escape the active environment.
+    sibling = Path(sys.executable).with_name(tool)
+    resolved = shutil.which(str(sibling)) or shutil.which(tool)
+    return [resolved or tool, *args]
+
+
+def _run_tool(
+    command: list[str],
+    *,
+    timeout_seconds: int = 120,
+) -> tuple[int, str]:
     try:
         proc = subprocess.run(
             command,
@@ -264,22 +284,53 @@ def _run_tool(command: list[str]) -> tuple[int, str]:
             capture_output=True,
             text=True,
             check=False,
-            timeout=120,
+            timeout=timeout_seconds,
         )
     except FileNotFoundError:
         return 127, f"missing tool: {command[0]}"
     except subprocess.TimeoutExpired as exc:
         stdout = exc.stdout or ""
         stderr = exc.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
         return 124, f"timed out: {' '.join(command)}\n{stdout}\n{stderr}".strip()
     return proc.returncode, (proc.stdout + proc.stderr).strip()
+
+
+def _record_incomplete_tool(
+    issues: list[Issue],
+    tool_failures: list[str],
+    *,
+    tool: str,
+    returncode: int,
+    output: str,
+) -> None:
+    detail = output.splitlines()[0] if output else f"unexpected exit {returncode}"
+    tool_failures.append(f"{tool}: {detail}")
+    issues.append(
+        Issue(
+            kind="audit_incomplete",
+            severity="critical",
+            path="tooling",
+            symbol=tool,
+            message=f"{tool} audit did not complete: {detail}",
+            recommendation=(
+                "Restore the pinned audit tool or fix its execution before trusting "
+                "this report."
+            ),
+            metric={"exit_code": returncode},
+        )
+    )
 
 
 def collect_issues(
     targets: Iterable[str], staged_only: bool = False
 ) -> tuple[list[Issue], dict[str, Any]]:
+    target_list = tuple(targets)
     issues: list[Issue] = []
-    files = _iter_files(targets, staged_only=staged_only)
+    files = _iter_files(target_list, staged_only=staged_only)
     file_count = 0
     py_count = 0
     for path in files:
@@ -330,59 +381,86 @@ def collect_issues(
 
     dead_code_hits: list[str] = []
     duplicate_hits: list[str] = []
+    tool_failures: list[str] = []
+    python_targets = [
+        path.relative_to(ROOT).as_posix()
+        for path in files
+        if path.suffix == ".py" and not should_skip_python(path)
+    ]
     vulture_rc = 0
     pylint_rc = 0
     if not staged_only:
-        vulture_cmd = [
+        vulture_cmd = _resolve_tool_command(
             "vulture",
-            *targets,
-            "vulture_whitelist.py",
+            *target_list,
+            "research/tools/vulture_whitelist.py",
             "--min-confidence",
             "80",
             "--exclude",
             "*/.venv/*,*/node_modules/*,*/__pycache__/*,*/.run/*,*/tests/*,*/migrations/*",
-        ]
-        vulture_rc, vulture_out = _run_tool(vulture_cmd)
-        dead_code_hits = [
-            line
-            for line in vulture_out.splitlines()
-            if line.strip() and "missing tool:" not in line
-        ]
-        for line in dead_code_hits[:25]:
-            issues.append(
-                Issue(
-                    kind="dead_code",
-                    severity="high",
-                    path=line.split(":", 1)[0],
-                    symbol=None,
-                    message=line,
-                    recommendation="Delete, wire in, or explicitly whitelist if intentionally dynamic.",
-                    metric={},
+        )
+        vulture_rc, vulture_out = _run_tool(vulture_cmd, timeout_seconds=300)
+        if vulture_rc in {0, 3}:
+            dead_code_hits = [line for line in vulture_out.splitlines() if line.strip()]
+            for line in dead_code_hits[:25]:
+                issues.append(
+                    Issue(
+                        kind="dead_code",
+                        severity="high",
+                        path=line.split(":", 1)[0],
+                        symbol=None,
+                        message=line,
+                        recommendation=(
+                            "Delete, wire in, or explicitly whitelist if "
+                            "intentionally dynamic."
+                        ),
+                        metric={},
+                    )
                 )
+        else:
+            _record_incomplete_tool(
+                issues,
+                tool_failures,
+                tool="vulture",
+                returncode=vulture_rc,
+                output=vulture_out,
             )
 
-        pylint_cmd = [
+        pylint_cmd = _resolve_tool_command(
             "pylint",
-            *targets,
+            *python_targets,
             "--disable=all",
             "--enable=duplicate-code",
             "--min-similarity-lines=10",
-        ]
-        pylint_rc, pylint_out = _run_tool(pylint_cmd)
-        duplicate_hits = [
-            line for line in pylint_out.splitlines() if "duplicate-code" in line
-        ]
-        for line in duplicate_hits[:25]:
-            issues.append(
-                Issue(
-                    kind="duplicate_code",
-                    severity="medium",
-                    path="multiple",
-                    symbol=None,
-                    message=line.strip(),
-                    recommendation="Collapse repeated logic into one implementation or delete stale variants.",
-                    metric={},
+            "--jobs=0",
+        )
+        pylint_rc, pylint_out = _run_tool(pylint_cmd, timeout_seconds=600)
+        if pylint_rc in {0, 8}:
+            duplicate_hits = [
+                line for line in pylint_out.splitlines() if "duplicate-code" in line
+            ]
+            for line in duplicate_hits[:25]:
+                issues.append(
+                    Issue(
+                        kind="duplicate_code",
+                        severity="medium",
+                        path="multiple",
+                        symbol=None,
+                        message=line.strip(),
+                        recommendation=(
+                            "Collapse repeated logic into one implementation or "
+                            "delete stale variants."
+                        ),
+                        metric={},
+                    )
                 )
+        else:
+            _record_incomplete_tool(
+                issues,
+                tool_failures,
+                tool="pylint",
+                returncode=pylint_rc,
+                output=pylint_out,
             )
 
     return issues, {
@@ -392,6 +470,8 @@ def collect_issues(
         "pylint_exit_code": pylint_rc,
         "dead_code_hits": len(dead_code_hits),
         "duplicate_hits": len(duplicate_hits),
+        "audit_complete": not tool_failures,
+        "tool_failures": tool_failures,
     }
 
 
@@ -412,6 +492,7 @@ def build_markdown_report(issues: list[Issue], summary: dict[str, Any]) -> str:
         "native_hotspot_candidate",
         "dead_code",
         "complexity",
+        "audit_incomplete",
     )
     exact_targets = critical[:20]
     fast_wins = _group(issues, "dead_code", "duplicate_code", "complexity")[:10]
@@ -496,6 +577,11 @@ def build_markdown_report(issues: list[Issue], summary: dict[str, Any]) -> str:
             f"- files scanned: {summary['files_scanned']}",
             f"- dead code hits reported by vulture: {summary['dead_code_hits']}",
             f"- duplicate-code hits reported by pylint: {summary['duplicate_hits']}",
+            f"- external tool audit complete: {summary['audit_complete']}",
+            *(
+                [f"- tool failure: {failure}" for failure in summary["tool_failures"]]
+                or ["- tool failures: none"]
+            ),
             f"- critical findings: {sum(1 for issue in issues if issue.severity == 'critical')}",
             f"- high findings: {sum(1 for issue in issues if issue.severity == 'high')}",
         ]
