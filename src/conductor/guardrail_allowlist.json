@@ -3,6 +3,7 @@
     "component_fab/equation_fab.py",
     "component_fab/equations/operator_expression.py",
     "component_fab/harness/composite_hrr_lane.py",
+    "component_fab/harness/domain_cdma_triton/deep_domain_branch.py",
     "component_fab/harness/mixer_signal_localization.py",
     "component_fab/mixer_fab.py",
     "component_fab/tests/test_cdma_hrr_role_address.py",
