@@ -13,6 +13,8 @@
     "research/dashboard/src/components/Discoveries.js",
     "research/dashboard/src/components/ReportDetail.js",
     "research/meta_analysis/metadata_db.py",
+    "research/model_explorer/model_data.js",
+    "research/model_explorer/vendor/katex/katex.min.js",
     "research/runtime/native/cython/aria_bridge.c",
     "research/runtime/native/src/runner_abi.c",
     "research/scientist/api_routes/_strategy_recommendations.py",
