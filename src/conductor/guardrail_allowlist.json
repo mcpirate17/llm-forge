@@ -39,6 +39,7 @@
     "research/synthesis/compiler_ops_routing.py",
     "research/synthesis/kernels.py",
     "research/synthesis/primitives.py",
+    "research/synthesis/star_slot_banks.py",
     "research/tests/test_api_integration.py",
     "research/tests/test_component_graphs.py",
     "research/tests/test_composite_extra_branches.py",
