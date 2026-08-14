@@ -60,6 +60,7 @@
     "research/tools/novel_architecture_investor_report.py",
     "research/tools/proper_component_knockout_ablation.py",
     "research/tools/run_cdma_hrrrole_nano_screen.py",
+    "research/tools/run_visualizer/static/vendor/uplot.iife.min.js",
     "research/tools/scaling_blimp_study.py",
     "research/tools/small_ar_story_calibration.py",
     "research/tools/train_predictors.py",
