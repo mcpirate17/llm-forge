@@ -51,6 +51,7 @@
     "research/tests/test_runtime_events.py",
     "research/tests/test_synthesis_native_hotpaths.py",
     "research/tools/_scaling_lanes.py",
+    "research/tools/adjudicate_w7_pdhd_factorial.py",
     "research/tools/ar_validation_story_calibration.py",
     "research/tools/backfill.py",
     "research/tools/backpopulate_screening_metrics.py",
@@ -65,7 +66,8 @@
     "research/tools/scaling_blimp_study.py",
     "research/tools/small_ar_story_calibration.py",
     "research/tools/train_predictors.py",
-    "research/tools/train_tropical_gate_120m_pretrain.py"
+    "research/tools/train_tropical_gate_120m_pretrain.py",
+    "research/tools/w7_decode_carrier_fusion_receipt.py"
   ],
   "god_functions": [
     "component_fab/architecture/phenotype_evaluator.py::_measure_seed",
@@ -382,11 +384,13 @@
     "research/synthesis/native_bound_segments.py::_op_inputs_and_config",
     "research/synthesis/native_bound_segments.py::build_bound_native_chain_segments",
     "research/synthesis/nm_composite.py::__init__",
+    "research/synthesis/rope_ledger_deliberator.py::_round",
     "research/synthesis/true_routing_ops.py::_dispatch_to_experts",
     "research/synthesis/validator.py::validate_graph",
     "research/synthesis/workflow_converter.py::graph_to_workflow",
     "research/synthesis/workflow_converter.py::workflow_to_computation_graph",
     "research/tests/test_ablation_api.py::test_knockout_rule_evidence_is_visible_in_rollups_and_drilldown",
+    "research/tests/test_adjudicate_w7_pdhd_factorial.py::test_end_to_end_valid_science_is_distinct_from_invalid_evidence",
     "research/tests/test_api_integration.py::setUpClass",
     "research/tests/test_api_integration.py::test_api_program_lineage_endpoint_returns_chain",
     "research/tests/test_api_integration.py::test_api_report_schema",
@@ -432,6 +436,12 @@
     "research/tools/_scaling_cfg.py::add_arm_cli_args",
     "research/tools/_scaling_lanes.py::_build_lane_factory",
     "research/tools/_scaling_lanes.py::_build_nm_composite_gated",
+    "research/tools/adjudicate_w7_pdhd_factorial.py::_extract_language_values",
+    "research/tools/adjudicate_w7_pdhd_factorial.py::_extract_runtime",
+    "research/tools/adjudicate_w7_pdhd_factorial.py::_promotion_gates",
+    "research/tools/adjudicate_w7_pdhd_factorial.py::_validate_construction_rows",
+    "research/tools/adjudicate_w7_pdhd_factorial.py::_validate_preregistration",
+    "research/tools/adjudicate_w7_pdhd_factorial.py::build_adjudication",
     "research/tools/analyze_v9_metric_spearman.py::main",
     "research/tools/ar_curriculum_active_priority.py::main",
     "research/tools/ar_curriculum_controls.py::write_report",
@@ -586,7 +596,12 @@
     "research/tools/train_tropical_gate_120m_pretrain.py::run_eval_suite",
     "research/tools/train_tropical_gate_120m_pretrain.py::train",
     "research/tools/validate_micro_train_native_optimizer_cutover.py::run_validation",
-    "research/tools/validate_mor_refine_kernel.py::main"
+    "research/tools/validate_mor_refine_kernel.py::main",
+    "research/tools/w7_decode_carrier_fusion_receipt.py::_checkpoint_localization_trace",
+    "research/tools/w7_decode_carrier_fusion_receipt.py::_validate_exact_contract",
+    "research/tools/w7_decode_carrier_fusion_receipt.py::sequential_fusion_oracle",
+    "research/tools/w7_trident_stage0.py::_validate_w7_model",
+    "research/tools/w7_trident_stage0.py::build_stage0_receipt"
   ],
   "complexity": [
     "research/__main__.py::main",
