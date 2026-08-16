@@ -9,13 +9,13 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 from conductor.run_duplicate_audit import should_skip_python
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TARGETS = ("research", "aria_core", "aria_designer")
+DEFAULT_TARGETS = ("research", "aria_core", "aria_designer", "component_fab")
 ALLOWLIST_PATH = Path(__file__).resolve().parent / "guardrail_allowlist.json"
 
 
@@ -89,21 +89,42 @@ def _should_skip(path: Path) -> bool:
     return any(part in SKIP_PARTS for part in path.parts)
 
 
-def _iter_files(targets: Iterable[str], staged_only: bool) -> list[Path]:
+def _git_changed_paths(
+    targets: tuple[str, ...], *, staged_only: bool, from_ref: str | None
+) -> list[str]:
+    if staged_only == (from_ref is not None):
+        raise ValueError("select exactly one of staged_only or from_ref")
+    diff_args = ["git", "diff"]
     if staged_only:
-        proc = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        diff_args.append("--cached")
+    else:
+        diff_args.append(f"{from_ref}...HEAD")
+    diff_args.extend(["--name-only", "--diff-filter=ACMR", "-z", "--", *targets])
+    proc = subprocess.run(
+        diff_args,
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    )
+    return [path for path in proc.stdout.decode("utf-8", "replace").split("\0") if path]
+
+
+def _iter_files(
+    targets: Iterable[str],
+    staged_only: bool = False,
+    from_ref: str | None = None,
+) -> list[Path]:
+    target_list = tuple(targets)
+    if staged_only or from_ref is not None:
         candidates = [
-            ROOT / line.strip() for line in proc.stdout.splitlines() if line.strip()
+            ROOT / path
+            for path in _git_changed_paths(
+                target_list, staged_only=staged_only, from_ref=from_ref
+            )
         ]
     else:
         candidates = []
-        for target in targets:
+        for target in target_list:
             base = ROOT / target
             if not base.exists():
                 continue
@@ -113,11 +134,34 @@ def _iter_files(targets: Iterable[str], staged_only: bool) -> list[Path]:
                 candidates.extend(p for p in base.rglob("*") if p.is_file())
     out: list[Path] = []
     for path in candidates:
-        if not path.exists() or _should_skip(path):
+        if (not staged_only and from_ref is None and not path.exists()) or _should_skip(
+            path
+        ):
             continue
         if path.suffix.lower() in CODE_EXTS:
             out.append(path)
     return sorted(set(out))
+
+
+def _read_candidate_text(path: Path, *, staged_only: bool, from_ref: str | None) -> str:
+    rel = path.relative_to(ROOT).as_posix()
+    if staged_only or from_ref is not None:
+        revision = f":{rel}" if staged_only else f"HEAD:{rel}"
+        proc = subprocess.run(
+            ["git", "show", revision],
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        )
+        raw = proc.stdout
+        try:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return raw.decode("latin-1")
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return path.read_text(encoding="latin-1")
 
 
 class _PyFunctionAnalyzer(ast.NodeVisitor):
@@ -325,21 +369,14 @@ def _record_incomplete_tool(
     )
 
 
-def collect_issues(
-    targets: Iterable[str], staged_only: bool = False
-) -> tuple[list[Issue], dict[str, Any]]:
-    target_list = tuple(targets)
+def _structural_issues(
+    files: list[Path], *, staged_only: bool, from_ref: str | None
+) -> tuple[list[Issue], int]:
     issues: list[Issue] = []
-    files = _iter_files(target_list, staged_only=staged_only)
-    file_count = 0
     py_count = 0
     for path in files:
-        file_count += 1
         rel = path.relative_to(ROOT).as_posix()
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            text = path.read_text(encoding="latin-1")
+        text = _read_candidate_text(path, staged_only=staged_only, from_ref=from_ref)
         lines = text.splitlines()
         allow_god_file = rel in _ALLOWLIST["god_files"] or _has_marker(
             text, "allow-god-file"
@@ -352,126 +389,171 @@ def collect_issues(
                     path=rel,
                     symbol=None,
                     message=f"File is {len(lines)} lines (>1250).",
-                    recommendation="Split by responsibility boundaries and isolate orchestration from pure logic.",
+                    recommendation=(
+                        "Split by responsibility boundaries and isolate "
+                        "orchestration from pure logic."
+                    ),
                     metric={"lines": len(lines)},
                 )
             )
-        if path.suffix == ".py":
-            py_count += 1
-            try:
-                tree = ast.parse(text, filename=rel)
-            except SyntaxError as exc:
-                issues.append(
-                    Issue(
-                        kind="syntax_error",
-                        severity="critical",
-                        path=rel,
-                        symbol=None,
-                        message=f"Syntax error: {exc.msg}",
-                        recommendation="Fix parse errors before merge.",
-                        metric={"lineno": exc.lineno},
-                    )
+        if path.suffix != ".py":
+            continue
+        py_count += 1
+        try:
+            tree = ast.parse(text, filename=rel)
+        except SyntaxError as exc:
+            issues.append(
+                Issue(
+                    kind="syntax_error",
+                    severity="critical",
+                    path=rel,
+                    symbol=None,
+                    message=f"Syntax error: {exc.msg}",
+                    recommendation="Fix parse errors before merge.",
+                    metric={"lineno": exc.lineno},
                 )
-                continue
-            analyzer = _PyFunctionAnalyzer(lines, rel_path=rel)
-            analyzer.visit(tree)
-            for issue in analyzer.issues:
-                issue.path = rel
-            issues.extend(analyzer.issues)
+            )
+            continue
+        analyzer = _PyFunctionAnalyzer(lines, rel_path=rel)
+        analyzer.visit(tree)
+        for issue in analyzer.issues:
+            issue.path = rel
+        issues.extend(analyzer.issues)
+    return issues, py_count
 
-    dead_code_hits: list[str] = []
-    duplicate_hits: list[str] = []
+
+def _vulture_issues(
+    target_list: tuple[str, ...],
+    issues: list[Issue],
+    tool_failures: list[str],
+) -> tuple[int, list[str]]:
+    command = _resolve_tool_command(
+        "vulture",
+        *target_list,
+        "research/tools/vulture_whitelist.py",
+        "--min-confidence",
+        "80",
+        "--exclude",
+        "*/.venv/*,*/node_modules/*,*/__pycache__/*,*/.run/*,*/tests/*,*/migrations/*",
+    )
+    returncode, output = _run_tool(command, timeout_seconds=300)
+    if returncode not in {0, 3}:
+        _record_incomplete_tool(
+            issues,
+            tool_failures,
+            tool="vulture",
+            returncode=returncode,
+            output=output,
+        )
+        return returncode, []
+    hits = [line for line in output.splitlines() if line.strip()]
+    for line in hits[:25]:
+        issues.append(
+            Issue(
+                kind="dead_code",
+                severity="high",
+                path=line.split(":", 1)[0],
+                symbol=None,
+                message=line,
+                recommendation=(
+                    "Delete, wire in, or explicitly whitelist if intentionally dynamic."
+                ),
+                metric={},
+            )
+        )
+    return returncode, hits
+
+
+def _pylint_duplicate_issues(
+    python_targets: list[str],
+    issues: list[Issue],
+    tool_failures: list[str],
+) -> tuple[int, list[str]]:
+    command = _resolve_tool_command(
+        "pylint",
+        *python_targets,
+        "--disable=all",
+        "--enable=duplicate-code",
+        "--min-similarity-lines=10",
+        "--jobs=0",
+    )
+    returncode, output = _run_tool(command, timeout_seconds=600)
+    if returncode not in {0, 8}:
+        _record_incomplete_tool(
+            issues,
+            tool_failures,
+            tool="pylint",
+            returncode=returncode,
+            output=output,
+        )
+        return returncode, []
+    hits = [line for line in output.splitlines() if "duplicate-code" in line]
+    for line in hits[:25]:
+        issues.append(
+            Issue(
+                kind="duplicate_code",
+                severity="medium",
+                path="multiple",
+                symbol=None,
+                message=line.strip(),
+                recommendation=(
+                    "Collapse repeated logic into one implementation or delete stale variants."
+                ),
+                metric={},
+            )
+        )
+    return returncode, hits
+
+
+def _external_issues(
+    target_list: tuple[str, ...], files: list[Path], issues: list[Issue]
+) -> dict[str, Any]:
     tool_failures: list[str] = []
     python_targets = [
         path.relative_to(ROOT).as_posix()
         for path in files
         if path.suffix == ".py" and not should_skip_python(path)
     ]
-    vulture_rc = 0
-    pylint_rc = 0
-    if not staged_only:
-        vulture_cmd = _resolve_tool_command(
-            "vulture",
-            *target_list,
-            "research/tools/vulture_whitelist.py",
-            "--min-confidence",
-            "80",
-            "--exclude",
-            "*/.venv/*,*/node_modules/*,*/__pycache__/*,*/.run/*,*/tests/*,*/migrations/*",
-        )
-        vulture_rc, vulture_out = _run_tool(vulture_cmd, timeout_seconds=300)
-        if vulture_rc in {0, 3}:
-            dead_code_hits = [line for line in vulture_out.splitlines() if line.strip()]
-            for line in dead_code_hits[:25]:
-                issues.append(
-                    Issue(
-                        kind="dead_code",
-                        severity="high",
-                        path=line.split(":", 1)[0],
-                        symbol=None,
-                        message=line,
-                        recommendation=(
-                            "Delete, wire in, or explicitly whitelist if "
-                            "intentionally dynamic."
-                        ),
-                        metric={},
-                    )
-                )
-        else:
-            _record_incomplete_tool(
-                issues,
-                tool_failures,
-                tool="vulture",
-                returncode=vulture_rc,
-                output=vulture_out,
-            )
-
-        pylint_cmd = _resolve_tool_command(
-            "pylint",
-            *python_targets,
-            "--disable=all",
-            "--enable=duplicate-code",
-            "--min-similarity-lines=10",
-            "--jobs=0",
-        )
-        pylint_rc, pylint_out = _run_tool(pylint_cmd, timeout_seconds=600)
-        if pylint_rc in {0, 8}:
-            duplicate_hits = [
-                line for line in pylint_out.splitlines() if "duplicate-code" in line
-            ]
-            for line in duplicate_hits[:25]:
-                issues.append(
-                    Issue(
-                        kind="duplicate_code",
-                        severity="medium",
-                        path="multiple",
-                        symbol=None,
-                        message=line.strip(),
-                        recommendation=(
-                            "Collapse repeated logic into one implementation or "
-                            "delete stale variants."
-                        ),
-                        metric={},
-                    )
-                )
-        else:
-            _record_incomplete_tool(
-                issues,
-                tool_failures,
-                tool="pylint",
-                returncode=pylint_rc,
-                output=pylint_out,
-            )
-
-    return issues, {
-        "files_scanned": file_count,
-        "python_files_scanned": py_count,
+    vulture_rc, dead_code_hits = _vulture_issues(target_list, issues, tool_failures)
+    pylint_rc, duplicate_hits = _pylint_duplicate_issues(
+        python_targets, issues, tool_failures
+    )
+    return {
         "vulture_exit_code": vulture_rc,
         "pylint_exit_code": pylint_rc,
         "dead_code_hits": len(dead_code_hits),
         "duplicate_hits": len(duplicate_hits),
         "audit_complete": not tool_failures,
         "tool_failures": tool_failures,
+    }
+
+
+def collect_issues(
+    targets: Iterable[str],
+    staged_only: bool = False,
+    from_ref: str | None = None,
+) -> tuple[list[Issue], dict[str, Any]]:
+    if staged_only and from_ref is not None:
+        raise ValueError("staged_only and from_ref are mutually exclusive")
+    target_list = tuple(targets)
+    files = _iter_files(target_list, staged_only=staged_only, from_ref=from_ref)
+    issues, py_count = _structural_issues(
+        files, staged_only=staged_only, from_ref=from_ref
+    )
+    metrics: dict[str, Any] = {
+        "vulture_exit_code": 0,
+        "pylint_exit_code": 0,
+        "dead_code_hits": 0,
+        "duplicate_hits": 0,
+        "audit_complete": True,
+        "tool_failures": [],
+    }
+    if not staged_only and from_ref is None:
+        metrics.update(_external_issues(target_list, files, issues))
+    return issues, {
+        "files_scanned": len(files),
+        "python_files_scanned": py_count,
+        **metrics,
     }
 
 
@@ -484,16 +566,7 @@ def _group(issues: list[Issue], *kinds: str) -> list[Issue]:
 
 
 def build_markdown_report(issues: list[Issue], summary: dict[str, Any]) -> str:
-    critical = _group(
-        issues,
-        "god_file",
-        "god_function",
-        "syntax_error",
-        "native_hotspot_candidate",
-        "dead_code",
-        "complexity",
-        "audit_incomplete",
-    )
+    critical = _critical_issues(issues)
     exact_targets = critical[:20]
     fast_wins = _group(issues, "dead_code", "duplicate_code", "complexity")[:10]
     structural = _group(issues, "god_file", "god_function")[:10]
@@ -589,18 +662,40 @@ def build_markdown_report(issues: list[Issue], summary: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def main() -> int:
+def _critical_issues(issues: list[Issue]) -> list[Issue]:
+    return _group(
+        issues,
+        "god_file",
+        "god_function",
+        "syntax_error",
+        "native_hotspot_candidate",
+        "dead_code",
+        "complexity",
+        "audit_incomplete",
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Guardrail audit and blocking checks")
     parser.add_argument("--targets", nargs="*", default=list(DEFAULT_TARGETS))
-    parser.add_argument("--staged-only", action="store_true")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--staged-only", action="store_true")
+    source.add_argument(
+        "--from-ref",
+        help="Audit files changed from the merge base with REF to HEAD",
+    )
     parser.add_argument(
         "--check", action="store_true", help="Exit non-zero on critical/high findings"
     )
     parser.add_argument("--markdown-out", type=str, default="")
     parser.add_argument("--json-out", type=str, default="")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    issues, summary = collect_issues(args.targets, staged_only=args.staged_only)
+    issues, summary = collect_issues(
+        args.targets,
+        staged_only=args.staged_only,
+        from_ref=args.from_ref,
+    )
     payload = {"summary": summary, "issues": [asdict(issue) for issue in issues]}
     report = build_markdown_report(issues, summary)
 
@@ -617,7 +712,7 @@ def main() -> int:
         out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     if args.check:
-        blockers = [i for i in issues if i.severity == "critical"]
+        blockers = [i for i in issues if i.severity in {"critical", "high"}]
         return 1 if blockers else 0
     return 0
 

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import fnmatch
 import subprocess
 import sys
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+from typing import Sequence
 
 
+ROOT = Path(__file__).resolve().parents[1]
 PROTECTED_PATTERNS = (
     "*.db",
     "*.db-wal",
@@ -27,9 +30,16 @@ PROTECTED_PATTERNS = (
 )
 
 
-def _staged_deletes() -> list[str]:
+def _deleted_paths(from_ref: str | None = None) -> list[str]:
+    args = ["git", "diff"]
+    if from_ref is None:
+        args.append("--cached")
+    else:
+        args.append(f"{from_ref}...HEAD")
+    args.extend(["--name-only", "--diff-filter=D", "-z"])
     proc = subprocess.run(
-        ["git", "diff", "--cached", "--name-only", "--diff-filter=D", "-z"],
+        args,
+        cwd=ROOT,
         capture_output=True,
         check=True,
     )
@@ -41,11 +51,18 @@ def _is_protected(path: str) -> bool:
     return any(fnmatch.fnmatchcase(posix, pattern) for pattern in PROTECTED_PATTERNS)
 
 
-def main() -> int:
-    blocked = [path for path in _staged_deletes() if _is_protected(path)]
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Block protected data deletions")
+    parser.add_argument(
+        "--from-ref",
+        help="Check deletions from the merge base with REF to HEAD",
+    )
+    args = parser.parse_args(argv)
+
+    blocked = [path for path in _deleted_paths(args.from_ref) if _is_protected(path)]
     if not blocked:
         return 0
-    print("BLOCKED protected data deletion in staged changes:", file=sys.stderr)
+    print("BLOCKED protected data deletion in candidate changes:", file=sys.stderr)
     for path in blocked:
         print(f"  - {path}", file=sys.stderr)
     print(

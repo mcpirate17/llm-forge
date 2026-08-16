@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from typing import Any
 from pathlib import Path
 from pathlib import PurePosixPath
 
@@ -28,6 +29,9 @@ AUDIT_DIR = ROOT / "tasks" / "audit"
 # after a deliberate refactor changes the known clone set.
 JSCPD_BASELINE_PATH = ROOT / "conductor" / "jscpd_duplication_baseline.json"
 PMD_CPD_BASELINE_PATH = ROOT / "conductor" / "pmd_cpd_duplication_baseline.json"
+JSCPD_BASELINE_RELATIVE = Path("conductor/jscpd_duplication_baseline.json")
+PMD_CPD_BASELINE_RELATIVE = Path("conductor/pmd_cpd_duplication_baseline.json")
+AUDIT_ERROR_EXIT_CODE = 2
 
 DEFAULT_SOURCE_DIRS = (
     "research",
@@ -38,7 +42,11 @@ DEFAULT_SOURCE_DIRS = (
 )
 
 GENERATED_ARTIFACT_GLOBS = ("aria_designer/workflows/generated/**",)
-JSCPD_INDEX_CONFIG_PATHS = (".gitignore", "package.json")
+JSCPD_INDEX_CONFIG_PATHS = (
+    ".gitignore",
+    "package.json",
+    JSCPD_BASELINE_RELATIVE.as_posix(),
+)
 
 JSCPD_SOURCE_SUFFIXES = frozenset(
     {
@@ -80,9 +88,13 @@ PMD_EXCLUDES = (
 )
 
 
-def should_skip_python(path: Path) -> bool:
-    rel = path.relative_to(ROOT).as_posix()
-    parts = set(path.relative_to(ROOT).parts)
+class DuplicateAuditError(RuntimeError):
+    """The analyzer evidence was incomplete or structurally invalid."""
+
+
+def should_skip_python(path: Path, *, root: Path = ROOT) -> bool:
+    rel = path.relative_to(root).as_posix()
+    parts = set(path.relative_to(root).parts)
     if path.name.startswith("."):
         return True
     if {"tests", "__pycache__", "node_modules", "build", "dist"} & parts:
@@ -100,13 +112,19 @@ def should_skip_python(path: Path) -> bool:
     return rel.startswith(skip_prefixes)
 
 
-def python_file_list(name: str, paths: tuple[str, ...] = DEFAULT_SOURCE_DIRS) -> Path:
-    AUDIT_DIR.mkdir(parents=True, exist_ok=True)
-    file_list = AUDIT_DIR / name
+def python_file_list(
+    name: str,
+    paths: tuple[str, ...] = DEFAULT_SOURCE_DIRS,
+    *,
+    root: Path = ROOT,
+) -> Path:
+    audit_dir = root / "tasks" / "audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    file_list = audit_dir / name
     files: list[str] = []
-    for source in existing(paths):
-        for path in (ROOT / source).rglob("*.py"):
-            if not should_skip_python(path):
+    for source in existing(paths, root=root):
+        for path in (root / source).rglob("*.py"):
+            if not should_skip_python(path, root=root):
                 files.append(str(path))
     file_list.write_text("\n".join(sorted(files)) + "\n", encoding="utf-8")
     return file_list
@@ -239,13 +257,91 @@ def _write_baseline(path: Path, entries: list[dict]) -> None:
         check=False,
         capture_output=True,
     )
-    print(f"Wrote {len(keyed)} baseline entries to {path.relative_to(ROOT)}")
+    print(f"Wrote {len(keyed)} baseline entries to {_display_path(path)}")
+
+
+def _display_path(path: Path) -> str:
+    try:
+        return path.relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _baseline_entries(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.is_file():
+        raise DuplicateAuditError(f"required baseline report is missing: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise DuplicateAuditError(
+            f"baseline is not valid JSON ({path}): {exc}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise DuplicateAuditError(f"baseline root must be an object: {path}")
+    expected_keys = {"_comment", "count", "entries"}
+    actual_keys = set(payload)
+    if actual_keys != expected_keys:
+        raise DuplicateAuditError(
+            f"baseline keys are invalid ({path}): expected {sorted(expected_keys)}, "
+            f"got {sorted(actual_keys)}"
+        )
+    count = payload["count"]
+    entries = payload["entries"]
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise DuplicateAuditError(
+            f"baseline count must be a non-negative integer ({path}); got {count!r}"
+        )
+    if not isinstance(entries, dict):
+        raise DuplicateAuditError(f"baseline entries must be an object: {path}")
+    if count != len(entries):
+        raise DuplicateAuditError(
+            f"baseline count mismatch ({path}): declared {count}, found {len(entries)}"
+        )
+    validated: dict[str, dict[str, Any]] = {}
+    for key, entry in entries.items():
+        if not isinstance(key, str) or not key:
+            raise DuplicateAuditError(
+                f"baseline contains an invalid entry key: {key!r}"
+            )
+        if not isinstance(entry, dict) or set(entry) != {"files", "lines"}:
+            raise DuplicateAuditError(
+                f"baseline entry {key!r} must contain exactly 'files' and 'lines'"
+            )
+        files = entry["files"]
+        lines = entry["lines"]
+        if (
+            not isinstance(files, list)
+            or len(files) != 2
+            or not all(isinstance(item, str) and item for item in files)
+            or files != sorted(files)
+        ):
+            raise DuplicateAuditError(
+                f"baseline entry {key!r} has invalid sorted file-pair metadata"
+            )
+        if isinstance(lines, bool) or not isinstance(lines, int) or lines <= 0:
+            raise DuplicateAuditError(
+                f"baseline entry {key!r} has invalid line count {lines!r}"
+            )
+        pair, separator, digest = key.rpartition("::")
+        if (
+            not separator
+            or pair != "::".join(files)
+            or len(digest) != 16
+            or any(character not in "0123456789abcdef" for character in digest)
+        ):
+            raise DuplicateAuditError(
+                f"baseline entry key does not match its file pair/hash schema: {key!r}"
+            )
+        validated[key] = entry
+    return validated
 
 
 def _check_against_baseline(path: Path, entries: list[dict], *, tool_name: str) -> int:
-    baseline: dict[str, dict] = {}
-    if path.exists():
-        baseline = json.loads(path.read_text(encoding="utf-8")).get("entries", {})
+    try:
+        baseline = _baseline_entries(path)
+    except DuplicateAuditError as exc:
+        print(f"ERROR: {tool_name}: {exc}", file=sys.stderr)
+        return AUDIT_ERROR_EXIT_CODE
     current = {entry["key"]: entry for entry in entries}
     new_keys = sorted(set(current) - set(baseline))
     print(
@@ -266,7 +362,7 @@ def _check_against_baseline(path: Path, entries: list[dict], *, tool_name: str) 
     print(
         "Refactor to remove the duplication, or if it's a deliberate/"
         "pre-existing pattern being adopted with reviewer approval, rerun "
-        f"with --save-baseline to record it in {path.relative_to(ROOT)}."
+        f"with --save-baseline to record it in {_display_path(path)}."
     )
     return 1
 
@@ -289,6 +385,31 @@ def run(cmd: list[str], *, allow_findings: bool = False, cwd: Path = ROOT) -> in
     return 0
 
 
+def _run_report_command(
+    cmd: list[str], *, cwd: Path, tool_name: str
+) -> subprocess.CompletedProcess[str]:
+    """Run an analyzer whose report is required as trustworthy evidence."""
+    print("+ " + " ".join(cmd), flush=True)
+    try:
+        completed = subprocess.run(
+            cmd,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+    except OSError as exc:
+        raise DuplicateAuditError(f"{tool_name} could not execute: {exc}") from exc
+    if completed.returncode:
+        detail = (completed.stderr or completed.stdout).strip()
+        suffix = f": {detail}" if detail else ""
+        raise DuplicateAuditError(
+            f"{tool_name} exited {completed.returncode}; report rejected{suffix}"
+        )
+    return completed
+
+
 def _run_jscpd_paths(
     check: bool,
     paths: list[str],
@@ -296,11 +417,7 @@ def _run_jscpd_paths(
     cwd: Path,
     executable: str | None = None,
 ) -> int:
-    cmd = (
-        [executable, "--noTips"]
-        if executable
-        else ["npx", "--no-install", "jscpd", "--noTips"]
-    )
+    cmd = [_resolve_jscpd_executable(cwd, executable), "--noTips"]
     if not check:
         cmd.extend(
             [
@@ -327,11 +444,7 @@ def _jscpd_collect_duplicates(
         return []
     with tempfile.TemporaryDirectory(prefix="llm-jscpd-json-") as tmp:
         out_dir = Path(tmp)
-        cmd = (
-            [executable, "--noTips"]
-            if executable
-            else ["npx", "--no-install", "jscpd", "--noTips"]
-        )
+        cmd = [_resolve_jscpd_executable(cwd, executable), "--noTips"]
         cmd.extend(
             [
                 "--reporters",
@@ -344,26 +457,70 @@ def _jscpd_collect_duplicates(
             ]
         )
         cmd.extend(paths)
-        print("+ " + " ".join(cmd), flush=True)
-        subprocess.run(cmd, cwd=cwd, check=False)
+        _run_report_command(cmd, cwd=cwd, tool_name="jscpd")
         report = out_dir / "jscpd-report.json"
-        if not report.exists():
-            return []
-        data = json.loads(report.read_text(encoding="utf-8"))
-        entries = []
-        for dup in data.get("duplicates", []):
-            first = dup["firstFile"]["name"]
-            second = dup["secondFile"]["name"]
-            fragment = dup.get("fragment", "")
+        if not report.is_file():
+            raise DuplicateAuditError(
+                f"jscpd exited successfully but did not produce {report.name}"
+            )
+        try:
+            data = json.loads(report.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise DuplicateAuditError(f"jscpd report is not valid JSON: {exc}") from exc
+        if not isinstance(data, dict) or not isinstance(data.get("duplicates"), list):
+            raise DuplicateAuditError(
+                "jscpd report must be an object containing a duplicates array"
+            )
+        entries: list[dict] = []
+        for index, dup in enumerate(data["duplicates"]):
+            if not isinstance(dup, dict):
+                raise DuplicateAuditError(f"jscpd duplicate {index} must be an object")
+            first_file = dup.get("firstFile")
+            second_file = dup.get("secondFile")
+            first = first_file.get("name") if isinstance(first_file, dict) else None
+            second = second_file.get("name") if isinstance(second_file, dict) else None
+            fragment = dup.get("fragment")
+            lines = dup.get("lines")
+            if not isinstance(first, str) or not first:
+                raise DuplicateAuditError(
+                    f"jscpd duplicate {index} has an invalid firstFile.name"
+                )
+            if not isinstance(second, str) or not second:
+                raise DuplicateAuditError(
+                    f"jscpd duplicate {index} has an invalid secondFile.name"
+                )
+            if not isinstance(fragment, str) or not fragment:
+                raise DuplicateAuditError(
+                    f"jscpd duplicate {index} has an invalid fragment"
+                )
+            if isinstance(lines, bool) or not isinstance(lines, int) or lines <= 0:
+                raise DuplicateAuditError(
+                    f"jscpd duplicate {index} has an invalid line count {lines!r}"
+                )
             entries.append(
                 {
                     "key": _stable_dup_key(first, second, fragment),
                     "firstFile": first,
                     "secondFile": second,
-                    "lines": dup.get("lines"),
+                    "lines": lines,
                 }
             )
         return entries
+
+
+def _resolve_jscpd_executable(cwd: Path, executable: str | None) -> str:
+    """Resolve one analyzer binary without npm/global-package ambiguity."""
+    if executable:
+        return executable
+    local = cwd / "node_modules" / ".bin" / "jscpd"
+    if local.is_file():
+        return str(local.resolve())
+    resolved = shutil.which("jscpd")
+    if resolved:
+        return resolved
+    raise DuplicateAuditError(
+        "jscpd executable is unavailable; install the repository-pinned analyzer"
+    )
 
 
 def run_jscpd(
@@ -388,27 +545,49 @@ def run_jscpd(
             exact_paths=JSCPD_INDEX_CONFIG_PATHS,
         ) as snapshot:
             paths = existing(DEFAULT_SOURCE_DIRS, root=snapshot)
-            entries = _jscpd_collect_duplicates(
-                paths, cwd=snapshot, executable=str(executable.resolve())
-            )
+            try:
+                entries = _jscpd_collect_duplicates(
+                    paths, cwd=snapshot, executable=str(executable.resolve())
+                )
+            except DuplicateAuditError as exc:
+                print(f"ERROR: jscpd: {exc}", file=sys.stderr)
+                return AUDIT_ERROR_EXIT_CODE
+            if not save_baseline:
+                return _check_against_baseline(
+                    snapshot / JSCPD_BASELINE_RELATIVE,
+                    entries,
+                    tool_name="jscpd",
+                )
         if save_baseline:
-            _write_baseline(JSCPD_BASELINE_PATH, entries)
+            _write_baseline(root / JSCPD_BASELINE_RELATIVE, entries)
             return 0
-        return _check_against_baseline(JSCPD_BASELINE_PATH, entries, tool_name="jscpd")
+
+    if not (save_baseline or check):
+        code = _run_jscpd_paths(
+            check, existing(DEFAULT_SOURCE_DIRS, root=root), cwd=root
+        )
+        if code:
+            return code
+        return run_jscpd_generated()
+
+    try:
+        entries = _jscpd_collect_duplicates(
+            existing(DEFAULT_SOURCE_DIRS, root=root), cwd=root
+        )
+    except DuplicateAuditError as exc:
+        print(f"ERROR: jscpd: {exc}", file=sys.stderr)
+        return AUDIT_ERROR_EXIT_CODE
 
     if save_baseline:
-        entries = _jscpd_collect_duplicates(existing(DEFAULT_SOURCE_DIRS), cwd=root)
-        _write_baseline(JSCPD_BASELINE_PATH, entries)
+        _write_baseline(root / JSCPD_BASELINE_RELATIVE, entries)
         return 0
 
     if check:
-        entries = _jscpd_collect_duplicates(existing(DEFAULT_SOURCE_DIRS), cwd=root)
-        return _check_against_baseline(JSCPD_BASELINE_PATH, entries, tool_name="jscpd")
+        return _check_against_baseline(
+            root / JSCPD_BASELINE_RELATIVE, entries, tool_name="jscpd"
+        )
 
-    code = _run_jscpd_paths(check, existing(DEFAULT_SOURCE_DIRS), cwd=ROOT)
-    if code:
-        return code
-    return run_jscpd_generated()
+    raise AssertionError("unreachable jscpd mode")
 
 
 def run_vulture(
@@ -567,20 +746,88 @@ def _relativize(path_str: str, root: Path) -> str:
         return path_str
 
 
-def _pmd_collect_duplicates(files: list[str], *, relativize_root: Path) -> list[dict]:
-    """Run PMD CPD with the XML reporter and return normalized clone entries.
+def _parse_pmd_report(report: Path, relativize_root: Path) -> list[dict]:
+    if not report.is_file():
+        raise DuplicateAuditError(
+            f"pmd-cpd exited successfully but did not produce {report.name}"
+        )
+    try:
+        tree = ET.parse(report)
+    except (OSError, UnicodeError, ET.ParseError) as exc:
+        raise DuplicateAuditError(f"pmd-cpd report is not valid XML: {exc}") from exc
+    report_root = tree.getroot()
+    ns = {"cpd": "https://pmd-code.org/schema/cpd-report"}
+    if report_root.tag != f"{{{ns['cpd']}}}pmd-cpd":
+        raise DuplicateAuditError(
+            f"pmd-cpd report has unexpected root element {report_root.tag!r}"
+        )
+    errors = report_root.findall("cpd:error", ns)
+    if errors:
+        first_error = errors[0]
+        detail = first_error.get("msg") or (first_error.text or "").strip()
+        raise DuplicateAuditError(
+            f"pmd-cpd report contains {len(errors)} analyzer error(s): "
+            f"{detail or 'no detail provided'}"
+        )
+    return [
+        _pmd_duplicate_entry(dup, index, ns, relativize_root)
+        for index, dup in enumerate(report_root.findall("cpd:duplication", ns))
+    ]
 
-    PMD's own ``--relativize-paths-with`` flag is a no-op with the XML
-    reporter in the pinned PMD version (paths come back exactly as given in
-    the file-list), so paths are relativized here instead.
-    """
+
+def _pmd_duplicate_entry(
+    duplication: ET.Element,
+    index: int,
+    namespace: dict[str, str],
+    relativize_root: Path,
+) -> dict:
+    file_elements = duplication.findall("cpd:file", namespace)
+    if len(file_elements) < 2:
+        raise DuplicateAuditError(
+            f"pmd-cpd duplication {index} contains fewer than two files"
+        )
+    first_path = file_elements[0].get("path")
+    second_path = file_elements[1].get("path")
+    if not first_path or not second_path:
+        raise DuplicateAuditError(
+            f"pmd-cpd duplication {index} contains an empty file path"
+        )
+    fragment_el = duplication.find("cpd:codefragment", namespace)
+    fragment = (fragment_el.text or "") if fragment_el is not None else ""
+    if not fragment:
+        raise DuplicateAuditError(f"pmd-cpd duplication {index} has no code fragment")
+    lines_raw = duplication.get("lines")
+    try:
+        lines = int(lines_raw) if lines_raw is not None else 0
+    except ValueError as exc:
+        raise DuplicateAuditError(
+            f"pmd-cpd duplication {index} has invalid lines {lines_raw!r}"
+        ) from exc
+    if lines <= 0:
+        raise DuplicateAuditError(
+            f"pmd-cpd duplication {index} has invalid lines {lines_raw!r}"
+        )
+    first = _relativize(first_path, relativize_root)
+    second = _relativize(second_path, relativize_root)
+    return {
+        "key": _stable_dup_key(first, second, fragment),
+        "firstFile": first,
+        "secondFile": second,
+        "lines": lines,
+    }
+
+
+def _pmd_collect_duplicates(
+    files: list[str], *, relativize_root: Path, cwd: Path = ROOT
+) -> list[dict]:
+    """Run PMD CPD with the XML reporter and return normalized clone entries."""
     if not files:
         return []
     with tempfile.TemporaryDirectory(prefix="llm-pmd-xml-") as tmp:
         file_list = Path(tmp) / "files.txt"
         file_list.write_text("\n".join(files) + "\n", encoding="utf-8")
         report = Path(tmp) / "cpd-report.xml"
-        cmd = [
+        command = [
             "npx",
             "--no-install",
             "pmd",
@@ -601,79 +848,74 @@ def _pmd_collect_duplicates(files: list[str], *, relativize_root: Path) -> list[
             "--no-fail-on-violation",
         ]
         for pattern in PMD_EXCLUDES:
-            cmd.extend(["--exclude", pattern])
-        print("+ " + " ".join(cmd), flush=True)
-        subprocess.run(cmd, cwd=ROOT, check=False)
-        if not report.exists():
-            return []
-        try:
-            tree = ET.parse(report)
-        except ET.ParseError:
-            return []
-        root = tree.getroot()
-        if root is None:
-            return []
-        ns = {"cpd": "https://pmd-code.org/schema/cpd-report"}
-        entries = []
-        for dup in root.findall("cpd:duplication", ns):
-            file_elements = dup.findall("cpd:file", ns)
-            if len(file_elements) < 2:
-                continue
-            first = _relativize(file_elements[0].get("path", ""), relativize_root)
-            second = _relativize(file_elements[1].get("path", ""), relativize_root)
-            fragment_el = dup.find("cpd:codefragment", ns)
-            fragment = (fragment_el.text or "") if fragment_el is not None else ""
-            entries.append(
-                {
-                    "key": _stable_dup_key(first, second, fragment),
-                    "firstFile": first,
-                    "secondFile": second,
-                    "lines": int(dup.get("lines", 0)),
-                }
-            )
-        return entries
+            command.extend(["--exclude", pattern])
+        _run_report_command(command, cwd=cwd, tool_name="pmd-cpd")
+        return _parse_pmd_report(report, relativize_root)
 
 
 def run_pmd_python(
-    check: bool, index_snapshot: bool = False, save_baseline: bool = False
+    check: bool,
+    index_snapshot: bool = False,
+    save_baseline: bool = False,
+    *,
+    root: Path = ROOT,
 ) -> int:
     if index_snapshot:
         with materialized_index_sources(
             DEFAULT_SOURCE_DIRS,
             frozenset({".py"}),
-            root=ROOT,
+            root=root,
             skip=_skip_pmd_source,
+            exact_paths=(PMD_CPD_BASELINE_RELATIVE.as_posix(),),
         ) as snapshot:
-            files = _pmd_snapshot_file_list(ROOT, snapshot)
-            entries = _pmd_collect_duplicates(files, relativize_root=snapshot)
+            files = _pmd_snapshot_file_list(root, snapshot)
+            try:
+                entries = _pmd_collect_duplicates(
+                    files, relativize_root=snapshot, cwd=root
+                )
+            except DuplicateAuditError as exc:
+                print(f"ERROR: pmd-cpd: {exc}", file=sys.stderr)
+                return AUDIT_ERROR_EXIT_CODE
+            if not save_baseline:
+                return _check_against_baseline(
+                    snapshot / PMD_CPD_BASELINE_RELATIVE,
+                    entries,
+                    tool_name="pmd-cpd",
+                )
         if save_baseline:
-            _write_baseline(PMD_CPD_BASELINE_PATH, entries)
+            _write_baseline(root / PMD_CPD_BASELINE_RELATIVE, entries)
             return 0
-        return _check_against_baseline(
-            PMD_CPD_BASELINE_PATH, entries, tool_name="pmd-cpd"
-        )
 
     if save_baseline:
-        file_list = python_file_list("duplication-python-files.txt")
+        file_list = python_file_list("duplication-python-files.txt", root=root)
         files = [
             line for line in file_list.read_text(encoding="utf-8").splitlines() if line
         ]
-        entries = _pmd_collect_duplicates(files, relativize_root=ROOT)
-        _write_baseline(PMD_CPD_BASELINE_PATH, entries)
+        try:
+            entries = _pmd_collect_duplicates(files, relativize_root=root, cwd=root)
+        except DuplicateAuditError as exc:
+            print(f"ERROR: pmd-cpd: {exc}", file=sys.stderr)
+            return AUDIT_ERROR_EXIT_CODE
+        _write_baseline(root / PMD_CPD_BASELINE_RELATIVE, entries)
         return 0
 
     if check:
-        file_list = python_file_list("duplication-python-files.txt")
+        file_list = python_file_list("duplication-python-files.txt", root=root)
         files = [
             line for line in file_list.read_text(encoding="utf-8").splitlines() if line
         ]
-        entries = _pmd_collect_duplicates(files, relativize_root=ROOT)
+        try:
+            entries = _pmd_collect_duplicates(files, relativize_root=root, cwd=root)
+        except DuplicateAuditError as exc:
+            print(f"ERROR: pmd-cpd: {exc}", file=sys.stderr)
+            return AUDIT_ERROR_EXIT_CODE
         return _check_against_baseline(
-            PMD_CPD_BASELINE_PATH, entries, tool_name="pmd-cpd"
+            root / PMD_CPD_BASELINE_RELATIVE, entries, tool_name="pmd-cpd"
         )
 
-    report = AUDIT_DIR / "duplication-pmd-python.txt"
-    file_list = python_file_list("duplication-python-files.txt")
+    audit_dir = root / "tasks" / "audit"
+    report = audit_dir / "duplication-pmd-python.txt"
+    file_list = python_file_list("duplication-python-files.txt", root=root)
     cmd = [
         "npx",
         "--no-install",
@@ -687,7 +929,7 @@ def run_pmd_python(
         "80",
         "--skip-duplicate-files",
         "--relativize-paths-with",
-        str(ROOT),
+        str(root),
         "--format",
         "text",
         "--report-file",
@@ -696,8 +938,8 @@ def run_pmd_python(
     ]
     for pattern in PMD_EXCLUDES:
         cmd.extend(["--exclude", pattern])
-    AUDIT_DIR.mkdir(parents=True, exist_ok=True)
-    return run(cmd)
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    return run(cmd, cwd=root)
 
 
 def run_nicad_python(

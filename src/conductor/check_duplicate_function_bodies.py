@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import ast
 import hashlib
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
 
 
-ROOTS = ("research", "aria_core", "aria_designer")
+ROOT = Path(__file__).resolve().parents[1]
+ROOTS = ("research", "aria_core", "aria_designer", "component_fab")
 SKIP_PARTS = {"tests", "test", ".venv", "node_modules", "__pycache__", "migrations"}
 MIN_BODY_LINES = 8
 
@@ -23,7 +26,7 @@ class FunctionBody:
 
 
 def _git(args: list[str]) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(["git", *args], capture_output=True, check=False)
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, check=False)
 
 
 def _skip(path: str) -> bool:
@@ -33,7 +36,8 @@ def _skip(path: str) -> bool:
 def _tracked_python_files(ref: str) -> list[str]:
     proc = _git(["ls-tree", "-r", "--name-only", ref, "--", *ROOTS])
     if proc.returncode != 0:
-        return []
+        detail = proc.stderr.decode("utf-8", "replace").strip()
+        raise RuntimeError(f"git ls-tree failed: {detail or proc.returncode}")
     return [
         path
         for path in proc.stdout.decode("utf-8", "replace").splitlines()
@@ -41,15 +45,19 @@ def _tracked_python_files(ref: str) -> list[str]:
     ]
 
 
-def _staged_python_files() -> list[str]:
+def _changed_python_files(base_ref: str | None = None) -> list[str]:
     # Include D (deleted) so the move-detector recognizes the removal-side
     # of a split refactor (delete foo.py + add foo/foo_part.py). Without D,
     # the deleted source path is treated as "still on disk" and the hook
     # falsely flags every moved body as a duplication.
-    proc = _git(
+    args = ["diff"]
+    if base_ref is None:
+        args.append("--cached")
+    else:
+        args.extend([base_ref, "HEAD"])
+    args.extend(
         [
-            "diff",
-            "--cached",
+            "--no-renames",
             "--name-only",
             "--diff-filter=ACMRD",
             "-z",
@@ -57,13 +65,29 @@ def _staged_python_files() -> list[str]:
             *ROOTS,
         ]
     )
+    proc = _git(args)
     if proc.returncode != 0:
-        return []
+        detail = proc.stderr.decode("utf-8", "replace").strip()
+        raise RuntimeError(f"git diff failed: {detail or proc.returncode}")
     return [
         path
         for path in proc.stdout.decode("utf-8", "replace").split("\0")
         if path.endswith(".py") and not _skip(path)
     ]
+
+
+def _staged_python_files() -> list[str]:
+    return _changed_python_files()
+
+
+def _merge_base(from_ref: str) -> str:
+    proc = _git(["merge-base", from_ref, "HEAD"])
+    if proc.returncode != 0:
+        detail = proc.stderr.decode("utf-8", "replace").strip()
+        raise RuntimeError(
+            f"cannot resolve merge base for {from_ref!r}: {detail or proc.returncode}"
+        )
+    return proc.stdout.decode("utf-8", "replace").strip()
 
 
 def _read_ref(path: str, ref: str) -> str:
@@ -115,35 +139,38 @@ def _functions(path: str, content: str) -> list[FunctionBody]:
     return found
 
 
-def main() -> int:
+def _duplicate_pairs(
+    from_ref: str | None = None,
+) -> list[tuple[FunctionBody, FunctionBody]]:
+    base_ref = _merge_base(from_ref) if from_ref is not None else "HEAD"
     existing_by_digest: dict[str, FunctionBody] = {}
-    for path in _tracked_python_files("HEAD"):
-        for fn in _functions(path, _read_ref(path, "HEAD")):
+    for path in _tracked_python_files(base_ref):
+        for fn in _functions(path, _read_ref(path, base_ref)):
             existing_by_digest.setdefault(fn.digest, fn)
 
-    # Build a staged-snapshot view: for any path that's staged, the truth is
-    # what's in the index, NOT HEAD. This makes split refactors (move function
-    # X from foo.py to bar/foo_part.py + remove from foo.py) recognized as
-    # moves rather than duplications. Without this, the hook blocks every
-    # god-file split that the guardrail-audit hook simultaneously demands.
-    staged_paths = set(_staged_python_files())
-    staged_digests_by_path: dict[str, set[str]] = {}
-    for path in staged_paths:
-        staged_digests_by_path[path] = {
-            fn.digest for fn in _functions(path, _read_index(path))
-        }
+    # Build the exact candidate snapshot. Local pre-commit reads the index;
+    # CI range checks read HEAD. In either mode, changed/deleted source paths
+    # are represented in the snapshot so split refactors count as moves.
+    changed_paths = set(_changed_python_files(base_ref if from_ref else None))
+    candidate_functions_by_path: dict[str, list[FunctionBody]] = {}
+    for path in changed_paths:
+        content = _read_ref(path, "HEAD") if from_ref else _read_index(path)
+        candidate_functions_by_path[path] = _functions(path, content)
+    candidate_digests_by_path = {
+        path: {fn.digest for fn in functions}
+        for path, functions in candidate_functions_by_path.items()
+    }
 
     def _digest_still_present(path: str, digest: str) -> bool:
-        if path in staged_paths:
-            return digest in staged_digests_by_path[path]
-        # path not staged — what's in HEAD is what's on disk.
+        if path in changed_paths:
+            return digest in candidate_digests_by_path[path]
         return True
 
     duplicate_pairs: list[tuple[FunctionBody, FunctionBody]] = []
-    for path in staged_paths:
-        head_digests = {fn.digest for fn in _functions(path, _read_ref(path, "HEAD"))}
-        for fn in _functions(path, _read_index(path)):
-            if fn.digest in head_digests:
+    for path in changed_paths:
+        base_digests = {fn.digest for fn in _functions(path, _read_ref(path, base_ref))}
+        for fn in candidate_functions_by_path[path]:
+            if fn.digest in base_digests:
                 continue
             existing = existing_by_digest.get(fn.digest)
             if not existing or existing.path == fn.path:
@@ -153,11 +180,25 @@ def main() -> int:
             if not _digest_still_present(existing.path, fn.digest):
                 continue
             duplicate_pairs.append((fn, existing))
+    return duplicate_pairs
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Block copied Python function bodies")
+    parser.add_argument(
+        "--from-ref",
+        help="Check files changed from the merge base with REF to HEAD",
+    )
+    args = parser.parse_args(argv)
+
+    duplicate_pairs = _duplicate_pairs(args.from_ref)
 
     if not duplicate_pairs:
         return 0
 
-    print("BLOCKED duplicate function body in staged Python changes:", file=sys.stderr)
+    print(
+        "BLOCKED duplicate function body in candidate Python changes:", file=sys.stderr
+    )
     for new, old in duplicate_pairs:
         print(
             f"  - {new.path}:{new.lineno} {new.name} duplicates "
