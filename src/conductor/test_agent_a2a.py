@@ -68,10 +68,10 @@ def _inbound_message(
     }
 
 
-def _gate_payload() -> dict[str, Any]:
+def _gate_payload(gate: int | float = 3) -> dict[str, Any]:
     return {
         "kind": "gate-review-request",
-        "gate": 3,
+        "gate": gate,
         "fingerprint": FINGERPRINT,
         "artifact_paths": ["research/reports/x/gate_3.json"],
     }
@@ -206,8 +206,22 @@ def test_mark_read_clears_unread_view(tmp_path: Path) -> None:
     assert len(store.rows(unread_only=False, limit=10)) == 1
 
 
-def test_validate_data_payload_accepts_gate_review_request() -> None:
-    assert validate_data_payload(_gate_payload()) == "gate-review-request"
+@pytest.mark.parametrize("gate", [1, 2, 3, 4, 5, 7, 7.0])
+def test_validate_data_payload_accepts_supported_gate_review_requests(
+    gate: int | float,
+) -> None:
+    assert validate_data_payload(_gate_payload(gate)) == "gate-review-request"
+
+
+@pytest.mark.parametrize("gate", [0, 6, 6.0, 8, -1, 6.5])
+def test_validate_data_payload_rejects_unsupported_gate_review_requests(
+    gate: int | float,
+) -> None:
+    with pytest.raises(A2aError, match="requires integer gate"):
+        validate_data_payload(_gate_payload(gate))
+
+
+def test_validate_data_payload_accepts_coordination() -> None:
     assert validate_data_payload({"kind": "coordination"}) == "coordination"
 
 
@@ -220,12 +234,6 @@ def test_validate_data_payload_accepts_gate_review_request() -> None:
         {
             "kind": "gate-review-request",
             "gate": True,
-            "fingerprint": FINGERPRINT,
-            "artifact_paths": ["a"],
-        },
-        {
-            "kind": "gate-review-request",
-            "gate": 0,
             "fingerprint": FINGERPRINT,
             "artifact_paths": ["a"],
         },

@@ -104,6 +104,7 @@ KNOWN_AGENTS: Final[dict[str, int]] = {
     "antigravity": 7314,
 }
 DATA_KINDS: Final = frozenset({"gate-review-request", "coordination"})
+REVIEW_GATES: Final = frozenset({1, 2, 3, 4, 5, 7})
 
 
 class A2aError(RuntimeError):
@@ -353,10 +354,11 @@ def validate_data_payload(payload: Any) -> str:
         if (
             isinstance(gate, bool)
             or not isinstance(gate, int | float)
-            or gate != int(gate)
-            or not 1 <= gate <= 5
+            or gate not in REVIEW_GATES
         ):
-            raise A2aError("gate-review-request requires integer gate 1..5")
+            raise A2aError(
+                "gate-review-request requires integer gate in {1, 2, 3, 4, 5, 7}"
+            )
         fingerprint = payload.get("fingerprint")
         if not isinstance(fingerprint, str) or not HEX64_RE.match(fingerprint):
             raise A2aError("gate-review-request requires 64-hex fingerprint")
