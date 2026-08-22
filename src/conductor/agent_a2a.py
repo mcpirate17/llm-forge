@@ -101,6 +101,7 @@ KNOWN_AGENTS: Final[dict[str, int]] = {
     "glm-5.3": 7311,
     "fable-nmf6": 7312,
     "claude-opus-5": 7313,
+    "antigravity": 7314,
 }
 DATA_KINDS: Final = frozenset({"gate-review-request", "coordination"})
 
