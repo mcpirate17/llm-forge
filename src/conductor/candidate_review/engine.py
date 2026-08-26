@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import fcntl
+import hmac
 import json
 import os
+import secrets
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -63,6 +65,8 @@ SPECIAL_CHECKS = {
 TRAILER_TREE = "Governance-Tree"
 TRAILER_POLICY = "Governance-Policy"
 TRAILER_RECEIPT = "Governance-Receipt"
+INHERITED_LOCK_FD_ENV = "LLM_GOVERNANCE_COMMIT_LOCK_FD"
+INHERITED_LOCK_TOKEN_ENV = "LLM_GOVERNANCE_COMMIT_LOCK_TOKEN"
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,12 +218,83 @@ def _engine_integrity(ctx: ReviewContext) -> tuple[dict[str, object], CheckResul
     }, result
 
 
+def _governance_lock_path(repo: Path) -> Path:
+    return git_common_dir(repo) / "governance" / "commit-review.lock"
+
+
+def _inherited_lock_fd(lock_path: Path) -> int | None:
+    raw = os.environ.get(INHERITED_LOCK_FD_ENV)
+    if raw is None:
+        return None
+    try:
+        file_descriptor = int(raw)
+        if file_descriptor <= 2:
+            return None
+        inherited = os.fstat(file_descriptor)
+        expected = lock_path.stat()
+        if (inherited.st_dev, inherited.st_ino) != (expected.st_dev, expected.st_ino):
+            return None
+        fcntl.flock(file_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (OSError, ValueError):
+        return None
+    return file_descriptor
+
+
+def _is_ancestor_process(process_id: int) -> bool:
+    current = os.getpid()
+    visited: set[int] = set()
+    while current > 1 and current not in visited:
+        if current == process_id:
+            return True
+        visited.add(current)
+        try:
+            status = Path(f"/proc/{current}/status").read_text(encoding="utf-8")
+            parent_line = next(
+                line for line in status.splitlines() if line.startswith("PPid:")
+            )
+            current = int(parent_line.split(":", 1)[1].strip())
+        except (OSError, StopIteration, ValueError):
+            return False
+    return current == process_id
+
+
+def _inherited_lock_token_valid(lock_path: Path) -> bool:
+    token = os.environ.get(INHERITED_LOCK_TOKEN_ENV, "")
+    if len(token) != 64 or any(
+        character not in "0123456789abcdef" for character in token
+    ):
+        return False
+    try:
+        payload = json.loads(lock_path.read_text(encoding="utf-8"))
+        owner = payload.get("pid")
+        recorded = payload.get("token")
+    except (OSError, AttributeError, json.JSONDecodeError):
+        return False
+    if (
+        not isinstance(owner, int)
+        or owner <= 1
+        or not isinstance(recorded, str)
+        or not hmac.compare_digest(recorded, token)
+        or not _is_ancestor_process(owner)
+    ):
+        return False
+    try:
+        with lock_path.open("a+", encoding="utf-8") as verifier:
+            try:
+                fcntl.flock(verifier.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(verifier.fileno(), fcntl.LOCK_UN)
+    except OSError:
+        return False
+    return False
+
+
 @contextmanager
-def governance_lock(
-    repo: Path, *, exclusive: bool, timeout_seconds: float = 30.0
-) -> Iterator[Path]:
-    common = git_common_dir(repo)
-    lock_path = common / "governance" / "commit-review.lock"
+def _held_governance_lock(
+    repo: Path, *, exclusive: bool, timeout_seconds: float, lease_token: str = ""
+) -> Iterator[tuple[Path, int]]:
+    lock_path = _governance_lock_path(repo)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+", encoding="utf-8") as handle:
         operation = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
@@ -237,14 +312,41 @@ def governance_lock(
         handle.seek(0)
         handle.truncate()
         handle.write(
-            f"pid={os.getpid()} acquired={datetime.now(timezone.utc).isoformat()}\n"
+            json.dumps(
+                {
+                    "pid": os.getpid(),
+                    "token": lease_token,
+                    "acquired": datetime.now(timezone.utc).isoformat(),
+                },
+                sort_keys=True,
+            )
+            + "\n"
         )
         handle.flush()
         os.fsync(handle.fileno())
         try:
-            yield lock_path
+            yield lock_path, handle.fileno()
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def governance_lock(
+    repo: Path, *, exclusive: bool, timeout_seconds: float = 30.0
+) -> Iterator[Path]:
+    """Hold the shared governance lock, reusing a verified commit-wrapper lease."""
+
+    lock_path = _governance_lock_path(repo)
+    if not exclusive and (
+        _inherited_lock_fd(lock_path) is not None
+        or _inherited_lock_token_valid(lock_path)
+    ):
+        yield lock_path
+        return
+    with _held_governance_lock(
+        repo, exclusive=exclusive, timeout_seconds=timeout_seconds
+    ) as (held_path, _file_descriptor):
+        yield held_path
 
 
 def _cache_key(
@@ -756,5 +858,20 @@ def run_locked_git_commit(repo: Path, args: Sequence[str]) -> int:
         raise ValueError(
             "commit mutex wrapper accepts only arguments beginning with 'commit'"
         )
-    with governance_lock(repo, exclusive=True, timeout_seconds=60.0):
-        return subprocess.run(["git", *args], cwd=repo, check=False).returncode
+    lease_token = secrets.token_hex(32)
+    with _held_governance_lock(
+        repo,
+        exclusive=True,
+        timeout_seconds=60.0,
+        lease_token=lease_token,
+    ) as (_lock_path, file_descriptor):
+        environment = os.environ.copy()
+        environment[INHERITED_LOCK_FD_ENV] = str(file_descriptor)
+        environment[INHERITED_LOCK_TOKEN_ENV] = lease_token
+        return subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            env=environment,
+            pass_fds=(file_descriptor,),
+            check=False,
+        ).returncode

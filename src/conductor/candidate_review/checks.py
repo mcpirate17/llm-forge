@@ -785,10 +785,19 @@ def check_ownership(ctx: ReviewContext) -> CheckResult:
     )
 
 
+def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
+    from conductor.candidate_review.verification import (
+        check_mutation_evidence as verify_mutation_receipts,
+    )
+
+    return verify_mutation_receipts(ctx)
+
+
 BUILTIN_CHECKS: dict[str, Callable[[ReviewContext], CheckResult]] = {
     "candidate-integrity": check_candidate_integrity,
     "config-parse": check_config_and_notebooks,
     "dependency-integrity": check_dependency_integrity,
+    "mutation-evidence": check_mutation_evidence,
     "ownership": check_ownership,
     "python-ast": check_python_ast,
     "secret-scan": check_secrets,

@@ -32,6 +32,7 @@ from conductor.candidate_review.checks import (
     check_performance_evidence,
     check_python_ast,
     check_research_evidence,
+    check_mutation_evidence,
     check_secrets,
     files_for_policy,
     run_builtin,
@@ -63,6 +64,7 @@ from conductor.candidate_review.git_source import (
 )
 from conductor.candidate_review.model import (
     Candidate,
+    Change,
     CheckResult,
     CheckStatus,
     Finding,
@@ -1194,3 +1196,282 @@ def test_human_sarif_and_junit_reports_preserve_identity_and_findings(
     )
     assert json.loads(sarif_path.read_text(encoding="utf-8"))["version"] == "2.1.0"
     assert ET.parse(junit_path).getroot().attrib["id"] == receipt.receipt_id
+
+
+def _change(path: str, *, classes: tuple[str, ...] = ()) -> Change:
+    return Change(
+        status="A",
+        path=path,
+        old_path=None,
+        old_mode="000000",
+        new_mode="100644",
+        old_oid="0" * 40,
+        new_oid="1" * 40,
+        classes=classes,
+    )
+
+
+def test_javascript_spec_and_native_tests_are_classified_as_tests() -> None:
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    spec = policy.classify_change(_change("aria_designer/e2e/designer.spec.js"))
+    native = policy.classify_change(_change("research/runtime/native/test_kernel.c"))
+    production = policy.classify_change(_change("research/tools/mixer_fingerprint.py"))
+    assert "test" in spec.classes
+    assert "test" in native.classes
+    assert "test" not in production.classes
+
+
+def test_mutation_evidence_skips_when_no_tests_changed(tmp_path: Path) -> None:
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    context = ReviewContext(
+        repo=tmp_path,
+        snapshot=tmp_path,
+        candidate=Candidate(
+            kind="index",
+            tree_oid="a" * 40,
+            base_tree_oid="b" * 40,
+            base_commit_oid="c" * 40,
+            commit_oid=None,
+            target_ref="HEAD",
+            changes=(
+                _change(
+                    "research/tools/mixer_fingerprint.py", classes=("python", "source")
+                ),
+            ),
+        ),
+        entries=(),
+        policy=policy,
+        surface="manual",
+        profile="fast",
+        owner=None,
+        runtime_dir=tmp_path / "runtime",
+    )
+    result = check_mutation_evidence(context)
+    assert result.status == CheckStatus.SKIPPED
+
+
+def test_mutation_evidence_fails_closed_without_registry(tmp_path: Path) -> None:
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    context = ReviewContext(
+        repo=tmp_path,
+        snapshot=tmp_path,
+        candidate=Candidate(
+            kind="index",
+            tree_oid="a" * 40,
+            base_tree_oid="b" * 40,
+            base_commit_oid="c" * 40,
+            commit_oid=None,
+            target_ref="HEAD",
+            changes=(
+                _change(
+                    "research/tests/test_unregistered.py",
+                    classes=("python", "source", "test"),
+                ),
+            ),
+        ),
+        entries=(),
+        policy=policy,
+        surface="manual",
+        profile="fast",
+        owner=None,
+        runtime_dir=tmp_path / "runtime",
+    )
+    result = check_mutation_evidence(context)
+    assert result.status == CheckStatus.FAILED
+    assert {finding.rule_id for finding in result.findings} == {
+        "mutation-registry-missing"
+    }
+
+
+def test_mutation_evidence_fails_closed_without_receipt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    snapshot = tmp_path / "snapshot"
+    registry = snapshot / "conductor/mutation_campaigns/registry.json"
+    registry.parent.mkdir(parents=True)
+    registry.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        "conductor.mutation_testing.verify_evidence",
+        lambda *_args, **_kwargs: {
+            "status": "FAIL",
+            "checked_test_paths": ["research/tests/test_unregistered.py"],
+            "evidence": [],
+            "missing_evidence": [
+                {
+                    "path": "research/tests/test_unregistered.py",
+                    "reason": "no registered campaign ranks this test file",
+                    "receipt_rejections": [],
+                }
+            ],
+            "malformed_receipts": [],
+        },
+    )
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    context = ReviewContext(
+        repo=tmp_path,
+        snapshot=snapshot,
+        candidate=Candidate(
+            kind="index",
+            tree_oid="a" * 40,
+            base_tree_oid="b" * 40,
+            base_commit_oid="c" * 40,
+            commit_oid=None,
+            target_ref="HEAD",
+            changes=(
+                _change(
+                    "research/tests/test_unregistered.py",
+                    classes=("python", "source", "test"),
+                ),
+            ),
+        ),
+        entries=(),
+        policy=policy,
+        surface="manual",
+        profile="fast",
+        owner=None,
+        runtime_dir=tmp_path / "runtime",
+    )
+    result = check_mutation_evidence(context)
+    assert result.status == CheckStatus.FAILED
+    assert result.findings[0].rule_id == "missing-mutation-receipt"
+    assert result.findings[0].path == "research/tests/test_unregistered.py"
+
+
+def test_mutation_evidence_reports_unavailable_and_malformed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    snapshot = tmp_path / "snapshot"
+    registry = snapshot / "conductor/mutation_campaigns/registry.json"
+    registry.parent.mkdir(parents=True)
+    registry.write_text("{}", encoding="utf-8")
+    from conductor.mutation_testing import CampaignError
+
+    monkeypatch.setattr(
+        "conductor.mutation_testing.verify_evidence",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            CampaignError("broken registry")
+        ),
+    )
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    context = ReviewContext(
+        repo=tmp_path,
+        snapshot=snapshot,
+        candidate=Candidate(
+            kind="index",
+            tree_oid="a" * 40,
+            base_tree_oid="b" * 40,
+            base_commit_oid="c" * 40,
+            commit_oid=None,
+            target_ref="HEAD",
+            changes=(
+                _change(
+                    "research/tests/test_unregistered.py",
+                    classes=("python", "source", "test"),
+                ),
+            ),
+        ),
+        entries=(),
+        policy=policy,
+        surface="manual",
+        profile="fast",
+        owner=None,
+        runtime_dir=tmp_path / "runtime",
+    )
+    result = check_mutation_evidence(context)
+    assert result.status == CheckStatus.FAILED
+    assert result.findings[0].rule_id == "mutation-evidence-unavailable"
+
+    monkeypatch.setattr(
+        "conductor.mutation_testing.verify_evidence",
+        lambda *_args, **_kwargs: {
+            "status": "FAIL",
+            "checked_test_paths": ["research/tests/test_unregistered.py"],
+            "evidence": [],
+            "missing_evidence": ["not-a-dict"],
+            "malformed_receipts": ["receipt.json: truncated"],
+        },
+    )
+    result = check_mutation_evidence(context)
+    assert {finding.rule_id for finding in result.findings} == {
+        "malformed-mutation-receipt"
+    }
+
+
+def test_locked_commit_reuses_mutex_in_precommit_hook(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    probe = repo / "probe.txt"
+    probe.write_text("baseline\n", encoding="utf-8")
+    _commit_all(repo, "baseline")
+
+    source_root = Path(review_engine.__file__).resolve().parents[2]
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    hook.write_text(
+        f"""#!{sys.executable}
+import os
+import sys
+from pathlib import Path
+sys.path.insert(0, {str(source_root)!r})
+from conductor.candidate_review.engine import governance_lock
+inherited_fd = os.environ.pop("LLM_GOVERNANCE_COMMIT_LOCK_FD", None)
+if inherited_fd is not None:
+    try:
+        os.close(int(inherited_fd))
+    except OSError:
+        pass
+with governance_lock(Path.cwd(), exclusive=False, timeout_seconds=0.2):
+    pass
+""",
+        encoding="utf-8",
+    )
+    hook.chmod(0o755)
+    probe.write_text("candidate\n", encoding="utf-8")
+    _git(repo, "add", "probe.txt")
+
+    assert run_locked_git_commit(repo, ["commit", "-m", "candidate"]) == 0
+    assert _git(repo, "show", "HEAD:probe.txt") == "candidate"
+
+
+def test_inherited_lock_descriptor_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    lock_path = review_engine._governance_lock_path(repo)  # noqa: SLF001
+    assert review_engine._is_ancestor_process(os.getppid())  # noqa: SLF001
+    assert not review_engine._is_ancestor_process(-1)  # noqa: SLF001
+    lock_path.parent.mkdir(parents=True)
+    lock_path.touch()
+
+    monkeypatch.delenv(review_engine.INHERITED_LOCK_FD_ENV, raising=False)
+    assert review_engine._inherited_lock_fd(lock_path) is None  # noqa: SLF001
+    monkeypatch.setenv(review_engine.INHERITED_LOCK_FD_ENV, "not-an-integer")
+    assert review_engine._inherited_lock_fd(lock_path) is None  # noqa: SLF001
+    monkeypatch.setenv(review_engine.INHERITED_LOCK_FD_ENV, "1")
+    assert review_engine._inherited_lock_fd(lock_path) is None  # noqa: SLF001
+
+    unrelated = tmp_path / "unrelated.lock"
+    with unrelated.open("w", encoding="utf-8") as handle:
+        monkeypatch.setenv(review_engine.INHERITED_LOCK_FD_ENV, str(handle.fileno()))
+        assert review_engine._inherited_lock_fd(lock_path) is None  # noqa: SLF001
+
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        monkeypatch.setenv(review_engine.INHERITED_LOCK_FD_ENV, str(handle.fileno()))
+        assert (
+            review_engine._inherited_lock_fd(lock_path)  # noqa: SLF001
+            == handle.fileno()
+        )
+
+    monkeypatch.setenv(review_engine.INHERITED_LOCK_TOKEN_ENV, "short")
+    assert not review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001
+    token = "a" * 64
+    monkeypatch.setenv(review_engine.INHERITED_LOCK_TOKEN_ENV, token)
+    lock_path.write_text("not json\n", encoding="utf-8")
+    assert not review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001
+    lock_path.write_text(
+        json.dumps({"pid": os.getpid(), "token": "b" * 64}), encoding="utf-8"
+    )
+    assert not review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001
+
+    with review_engine._held_governance_lock(  # noqa: SLF001
+        repo, exclusive=True, timeout_seconds=1.0, lease_token=token
+    ):
+        assert review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001

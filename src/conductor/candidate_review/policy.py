@@ -241,10 +241,28 @@ def _intrinsic_classes(
         classes.update({"dependency", "node_dependency"})
     if path.name in {"Cargo.toml", "Cargo.lock"}:
         classes.update({"dependency", "rust_dependency"})
+    name = path.name
     if (
         "test" in path.parts
-        or path.name.startswith("test_")
-        or path.name.endswith("_test.py")
+        or name.startswith("test_")
+        or name.endswith(
+            (
+                "_test.py",
+                "_test.c",
+                "_test.cc",
+                "_test.cpp",
+                "_test.cxx",
+                ".test.js",
+                ".test.jsx",
+                ".test.ts",
+                ".test.tsx",
+                ".spec.js",
+                ".spec.jsx",
+                ".spec.ts",
+                ".spec.tsx",
+                "Test.java",
+            )
+        )
     ):
         classes.add("test")
     if (mode_override or change.new_mode) == "120000":

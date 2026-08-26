@@ -196,6 +196,94 @@ def _has_property_evidence(ctx: ReviewContext, tests: set[str]) -> bool:
     return False
 
 
+def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
+    """Require current mutation PASS receipts for every changed test file."""
+
+    started = time.perf_counter()
+    test_paths = [
+        change.path for change in ctx.live_changes if "test" in change.classes
+    ]
+    if not test_paths:
+        return CheckResult(
+            check_id="mutation-evidence",
+            status=CheckStatus.SKIPPED,
+            duration_ms=0,
+            skipped_reason="no matching candidate test changes",
+        )
+    registry = ctx.snapshot / "conductor/mutation_campaigns/registry.json"
+    if not registry.is_file():
+        finding = Finding(
+            check_id="mutation-evidence",
+            rule_id="mutation-registry-missing",
+            severity=Severity.CRITICAL,
+            message=(
+                "candidate snapshot lacks conductor/mutation_campaigns/registry.json; "
+                "changed tests cannot prove mutation evidence"
+            ),
+            help=(
+                "Include the mutation registry, campaign, and PASS receipt in the "
+                "same candidate as the test file."
+            ),
+        )
+        return _result("mutation-evidence", started, [finding], files=test_paths)
+    from conductor.mutation_testing import CampaignError, verify_evidence
+
+    try:
+        payload = verify_evidence(registry, test_paths, repo_root=ctx.snapshot)
+    except CampaignError as exc:
+        finding = Finding(
+            check_id="mutation-evidence",
+            rule_id="mutation-evidence-unavailable",
+            severity=Severity.CRITICAL,
+            message=f"mutation evidence could not be verified: {exc}",
+        )
+        return _result("mutation-evidence", started, [finding], files=test_paths)
+    findings: list[Finding] = []
+    for missing in payload.get("missing_evidence", []):
+        if not isinstance(missing, dict):
+            continue
+        path_name = str(missing.get("path", ""))
+        findings.append(
+            Finding(
+                check_id="mutation-evidence",
+                rule_id="missing-mutation-receipt",
+                severity=Severity.CRITICAL,
+                message=(
+                    f"{path_name}: {missing.get('reason', 'missing mutation evidence')}"
+                ),
+                path=path_name or None,
+                help=(
+                    "Scaffold with `python -m conductor.mutation_coverage scaffold "
+                    "PATH --source SRC`, register the campaign, obtain Tim's "
+                    "authority, then `make mutation-run` and keep the PASS receipt."
+                ),
+                evidence={
+                    "receipt_rejections": missing.get("receipt_rejections", []),
+                },
+            )
+        )
+    for malformed in payload.get("malformed_receipts", []):
+        findings.append(
+            Finding(
+                check_id="mutation-evidence",
+                rule_id="malformed-mutation-receipt",
+                severity=Severity.CRITICAL,
+                message=f"malformed mutation receipt: {malformed}",
+            )
+        )
+    return _result(
+        "mutation-evidence",
+        started,
+        findings,
+        files=test_paths,
+        metrics={
+            "checked_test_paths": payload.get("checked_test_paths", []),
+            "covered_tests": len(payload.get("evidence", [])),
+            "missing_tests": len(payload.get("missing_evidence", [])),
+        },
+    )
+
+
 def check_test_evidence(ctx: ReviewContext) -> tuple[CheckResult, TestSelection]:
     started = time.perf_counter()
     selection = select_tests(ctx)
