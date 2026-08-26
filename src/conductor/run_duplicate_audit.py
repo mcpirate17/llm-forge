@@ -47,6 +47,7 @@ JSCPD_INDEX_CONFIG_PATHS = (
     "package.json",
     JSCPD_BASELINE_RELATIVE.as_posix(),
 )
+JSCPD_GENERATED_EVIDENCE_IGNORE = "**/conductor/mutation_campaigns/receipts/**"
 
 JSCPD_SOURCE_SUFFIXES = frozenset(
     {
@@ -444,7 +445,36 @@ def _jscpd_collect_duplicates(
         return []
     with tempfile.TemporaryDirectory(prefix="llm-jscpd-json-") as tmp:
         out_dir = Path(tmp)
-        cmd = [_resolve_jscpd_executable(cwd, executable), "--noTips"]
+        try:
+            package = json.loads((cwd / "package.json").read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise DuplicateAuditError(
+                f"cannot load jscpd package config: {exc}"
+            ) from exc
+        config = package.get("jscpd") if isinstance(package, dict) else None
+        if not isinstance(config, dict):
+            raise DuplicateAuditError("package.json must contain a jscpd object")
+        ignore = config.get("ignore", [])
+        if not isinstance(ignore, list) or not all(
+            isinstance(pattern, str) and pattern for pattern in ignore
+        ):
+            raise DuplicateAuditError("package.json jscpd.ignore must be a string list")
+        portable_ignore = [
+            pattern if pattern.startswith("**/") else f"**/{pattern}"
+            for pattern in ignore
+        ]
+        config = {
+            **config,
+            "ignore": [*portable_ignore, JSCPD_GENERATED_EVIDENCE_IGNORE],
+        }
+        config_path = out_dir / "jscpd.config.json"
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+        cmd = [
+            _resolve_jscpd_executable(cwd, executable),
+            "--noTips",
+            "--config",
+            str(config_path),
+        ]
         cmd.extend(
             [
                 "--reporters",

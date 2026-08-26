@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import sqlite3
@@ -9,7 +10,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path, PurePosixPath
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from conductor.candidate_review.checks import (
     ReviewContext,
@@ -31,10 +32,70 @@ TEST_PROPERTY_TEXT = re.compile(
     r"hypothesis|@(?:pytest\.)?mark\.parametrize|@pytest\.mark\.(?:property|invariant)|"
     r"def test_.*(?:property|invariant|boundary|roundtrip|adversarial)"
 )
+ZERO_OID = "0" * 40
 
 
 def _graph_database(repo: Path) -> Path:
     return repo / ".code-review-graph" / "graph.db"
+
+
+def _python_test_labels(source: str, path: str) -> set[str]:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        raise RuntimeError(f"cannot parse test definitions in {path}: {exc}") from exc
+    labels: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name.startswith("test_"):
+                labels.add(node.name)
+            continue
+        if not isinstance(node, ast.ClassDef) or not node.name.startswith("Test"):
+            continue
+        for child in node.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
+                child.name.startswith("test_")
+            ):
+                labels.add(f"{node.name}::{child.name}")
+    return labels
+
+
+def _new_test_nodeids(ctx: ReviewContext) -> dict[str, tuple[str, ...]]:
+    """Return newly introduced test definitions without treating edits as new tests."""
+
+    added: dict[str, tuple[str, ...]] = {}
+    for change in ctx.live_changes:
+        if "test" not in change.classes:
+            continue
+        path = change.path
+        if not path.endswith(".py"):
+            if change.old_mode == "000000" or change.old_oid == ZERO_OID:
+                added[path] = (path,)
+            continue
+        try:
+            new_source = (ctx.snapshot / path).read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise RuntimeError(f"cannot read candidate test {path}: {exc}") from exc
+        new_labels = _python_test_labels(new_source, path)
+        old_labels: set[str] = set()
+        if change.old_mode != "000000" and change.old_oid != ZERO_OID:
+            proc = subprocess.run(
+                ["git", "cat-file", "blob", change.old_oid],
+                cwd=ctx.repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if proc.returncode:
+                detail = (proc.stderr or proc.stdout).strip()
+                raise RuntimeError(f"cannot read base test blob for {path}: {detail}")
+            old_labels = _python_test_labels(
+                proc.stdout, change.old_path or change.path
+            )
+        labels = sorted(new_labels - old_labels)
+        if labels:
+            added[path] = tuple(f"{path}::{label}" for label in labels)
+    return added
 
 
 def _graph_test_paths(
@@ -196,8 +257,108 @@ def _has_property_evidence(ctx: ReviewContext, tests: set[str]) -> bool:
     return False
 
 
+def _mutation_receipt_findings(payload: Mapping[str, object]) -> list[Finding]:
+    findings: list[Finding] = []
+    missing_rows = payload.get("missing_evidence", [])
+    if not isinstance(missing_rows, list):
+        missing_rows = []
+    for missing in missing_rows:
+        if not isinstance(missing, dict):
+            continue
+        path_name = str(missing.get("path", ""))
+        findings.append(
+            Finding(
+                check_id="mutation-evidence",
+                rule_id="missing-mutation-receipt",
+                severity=Severity.CRITICAL,
+                message=(
+                    f"{path_name}: {missing.get('reason', 'missing mutation evidence')}"
+                ),
+                path=path_name or None,
+                help=(
+                    "Scaffold with `python -m conductor.mutation_coverage scaffold "
+                    "PATH --source SRC`, register the campaign, obtain Tim's "
+                    "authority, then `make mutation-run` and keep the PASS receipt."
+                ),
+                evidence={
+                    "receipt_rejections": missing.get("receipt_rejections", []),
+                },
+            )
+        )
+    malformed_rows = payload.get("malformed_receipts", [])
+    if not isinstance(malformed_rows, list):
+        malformed_rows = []
+    for malformed in malformed_rows:
+        findings.append(
+            Finding(
+                check_id="mutation-evidence",
+                rule_id="malformed-mutation-receipt",
+                severity=Severity.CRITICAL,
+                message=f"malformed mutation receipt: {malformed}",
+            )
+        )
+    return findings
+
+
+def _new_test_value_findings(
+    ctx: ReviewContext,
+    payload: Mapping[str, object],
+    new_nodeids: Mapping[str, Sequence[str]],
+) -> list[Finding]:
+    findings: list[Finding] = []
+    evidence_rows = payload.get("evidence", [])
+    if not isinstance(evidence_rows, list):
+        return findings
+    evidence_by_path = {
+        row.get("path"): row
+        for row in evidence_rows
+        if isinstance(row, dict) and isinstance(row.get("path"), str)
+    }
+    from conductor.mutation_value import admission_errors
+
+    for path, nodeids in new_nodeids.items():
+        evidence = evidence_by_path.get(path)
+        if not isinstance(evidence, dict):
+            continue
+        receipt_name = evidence.get("receipt")
+        if not isinstance(receipt_name, str):
+            continue
+        try:
+            receipt = json.loads((ctx.snapshot / receipt_name).read_text("utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            findings.append(
+                Finding(
+                    check_id="mutation-evidence",
+                    rule_id="test-value-receipt-unavailable",
+                    severity=Severity.CRITICAL,
+                    message=f"{path}: cannot load test-value receipt: {exc}",
+                    path=path,
+                )
+            )
+            continue
+        for error in admission_errors(
+            receipt.get("test_value") if isinstance(receipt, dict) else None,
+            nodeids,
+        ):
+            findings.append(
+                Finding(
+                    check_id="mutation-evidence",
+                    rule_id="new-test-value-not-admitted",
+                    severity=Severity.CRITICAL,
+                    message=f"{path}: {error}",
+                    path=path,
+                    help=(
+                        "Bind the new test to a critical/high active-source contract, "
+                        "record batch-level per-test attribution, and retain it as "
+                        "CORE or explicitly justified INTENTIONAL_REDUNDANCY."
+                    ),
+                )
+            )
+    return findings
+
+
 def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
-    """Require current mutation PASS receipts for every changed test file."""
+    """Require mutation PASS receipts and value admission for new tests."""
 
     started = time.perf_counter()
     test_paths = [
@@ -238,39 +399,20 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
             message=f"mutation evidence could not be verified: {exc}",
         )
         return _result("mutation-evidence", started, [finding], files=test_paths)
-    findings: list[Finding] = []
-    for missing in payload.get("missing_evidence", []):
-        if not isinstance(missing, dict):
-            continue
-        path_name = str(missing.get("path", ""))
+    findings = _mutation_receipt_findings(payload)
+    try:
+        new_nodeids = _new_test_nodeids(ctx)
+    except RuntimeError as exc:
         findings.append(
             Finding(
                 check_id="mutation-evidence",
-                rule_id="missing-mutation-receipt",
+                rule_id="new-test-definition-unavailable",
                 severity=Severity.CRITICAL,
-                message=(
-                    f"{path_name}: {missing.get('reason', 'missing mutation evidence')}"
-                ),
-                path=path_name or None,
-                help=(
-                    "Scaffold with `python -m conductor.mutation_coverage scaffold "
-                    "PATH --source SRC`, register the campaign, obtain Tim's "
-                    "authority, then `make mutation-run` and keep the PASS receipt."
-                ),
-                evidence={
-                    "receipt_rejections": missing.get("receipt_rejections", []),
-                },
+                message=f"new test definitions could not be verified: {exc}",
             )
         )
-    for malformed in payload.get("malformed_receipts", []):
-        findings.append(
-            Finding(
-                check_id="mutation-evidence",
-                rule_id="malformed-mutation-receipt",
-                severity=Severity.CRITICAL,
-                message=f"malformed mutation receipt: {malformed}",
-            )
-        )
+        new_nodeids = {}
+    findings.extend(_new_test_value_findings(ctx, payload, new_nodeids))
     return _result(
         "mutation-evidence",
         started,
@@ -280,6 +422,9 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
             "checked_test_paths": payload.get("checked_test_paths", []),
             "covered_tests": len(payload.get("evidence", [])),
             "missing_tests": len(payload.get("missing_evidence", [])),
+            "new_test_nodeids": [
+                nodeid for nodeids in new_nodeids.values() for nodeid in nodeids
+            ],
         },
     )
 

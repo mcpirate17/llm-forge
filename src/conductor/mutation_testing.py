@@ -1,9 +1,7 @@
 """Fail-closed, language-neutral orchestration for explicit mutation campaigns.
 
-The framework deliberately does not generate mutants. A campaign names small,
-reviewable patch files and the exact tests that must detect them. Every baseline
-and mutant runs in a disposable snapshot of the current worktree, never in the
-shared checkout.
+The framework does not generate mutants. Campaigns bind reviewed patches to exact
+tests, and every run uses a disposable snapshot rather than the shared checkout.
 """
 
 from __future__ import annotations
@@ -32,6 +30,15 @@ from conductor.mutation_scope import (
     _safe_relative_path,
     _test_scope_errors,
     _test_scopes_payload,
+)
+from conductor.mutation_value import (
+    ValueAnalysisSpec,
+    ValueEvidenceError,
+    analyze_test_value,
+    collect_pytest_junit_batch,
+    load_value_analysis,
+    test_value_receipt_errors,
+    value_inspection_payload,
 )
 
 
@@ -97,6 +104,7 @@ class Campaign:
     environment: Mapping[str, str]
     host_read_dependencies: tuple[str, ...]
     test_scopes: Mapping[str, TestFileScope] = field(default_factory=dict)
+    value_analysis: ValueAnalysisSpec | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -383,6 +391,15 @@ def load_campaign(path: Path, *, repo_root: Path = REPO_ROOT) -> Campaign:
         ranked_tests=ranked_tests,
         repo_root=repo_root,
     )
+    try:
+        value_analysis = load_value_analysis(
+            payload.get("value_analysis"),
+            ranked_nodeids=[test.nodeid for test in ranked_tests],
+            mutation_ids=[mutation.mutation_id for mutation in planned],
+            source_paths=list(source_sha256),
+        )
+    except ValueEvidenceError as exc:
+        raise CampaignError(f"invalid value_analysis: {exc}") from exc
     campaign = Campaign(
         manifest_path=manifest_path,
         manifest_sha256=_sha256(manifest_path),
@@ -413,6 +430,7 @@ def load_campaign(path: Path, *, repo_root: Path = REPO_ROOT) -> Campaign:
             )
         ),
         test_scopes=test_scopes,
+        value_analysis=value_analysis,
     )
     _validate_cross_references(campaign)
     return campaign
@@ -562,6 +580,7 @@ def inspect_campaign(
             for test in campaign.ranked_tests
         ],
         "test_scopes": _test_scopes_payload(campaign),
+        "value_analysis": value_inspection_payload(campaign.value_analysis),
         "planned_mutations": [
             {
                 "id": mutation.mutation_id,
@@ -682,6 +701,40 @@ def _run_command(
     )
 
 
+def _run_campaign_command(
+    campaign: Campaign,
+    *,
+    snapshot_root: Path,
+    report_name: str,
+) -> tuple[CommandResult, Mapping[str, Any] | None]:
+    """Run one batch, adding per-test evidence with no test-mutant Cartesian loop."""
+
+    if campaign.value_analysis is None:
+        return (
+            _run_command(
+                campaign.test_argv,
+                cwd=snapshot_root,
+                timeout_seconds=campaign.timeout_seconds,
+                environment=campaign.environment,
+            ),
+            None,
+        )
+    try:
+        return collect_pytest_junit_batch(
+            argv=campaign.test_argv,
+            report_path=snapshot_root / ".mutation-value" / f"{report_name}.xml",
+            ranked_nodeids=[test.nodeid for test in campaign.ranked_tests],
+            run_command=lambda argv: _run_command(
+                argv,
+                cwd=snapshot_root,
+                timeout_seconds=campaign.timeout_seconds,
+                environment=campaign.environment,
+            ),
+        )
+    except ValueEvidenceError as exc:
+        raise CampaignError(f"cannot instrument value analysis: {exc}") from exc
+
+
 def _apply_mutation(mutation: Mutation, snapshot_root: Path) -> None:
     actual_patch_sha256 = _sha256(mutation.patch_file)
     if actual_patch_sha256 != mutation.patch_sha256:
@@ -784,6 +837,7 @@ def run_campaign(
         "baseline": None,
         "mutants": [],
         "mutation_score": None,
+        "test_value": None,
     }
     if receipt_path is None:
         output_path = _default_receipt_path(campaign, repo_root)
@@ -798,23 +852,38 @@ def run_campaign(
         raise CampaignError("receipt path must be inside the repository") from exc
 
     try:
-        with isolated_snapshot(repo_root) as snapshot:
-            if drift := source_drift(campaign, snapshot.worktree):
-                raise CampaignError(f"snapshot source hashes drifted: {drift}")
-            _link_mutation_patches(campaign, snapshot.worktree, repo_root)
-            _link_host_dependencies(campaign, snapshot.worktree, repo_root)
-            baseline = _run_command(
-                campaign.test_argv,
-                cwd=snapshot.worktree,
-                timeout_seconds=campaign.timeout_seconds,
-                environment=campaign.environment,
-            )
-            receipt["baseline"] = baseline.as_dict()
+        baseline_reports: list[Mapping[str, Any]] = []
+        baseline_results: list[dict[str, Any]] = []
+        repetitions = (
+            campaign.value_analysis.baseline_repetitions
+            if campaign.value_analysis is not None
+            else 1
+        )
+        for repetition in range(1, repetitions + 1):
+            with isolated_snapshot(repo_root) as snapshot:
+                if drift := source_drift(campaign, snapshot.worktree):
+                    raise CampaignError(f"snapshot source hashes drifted: {drift}")
+                _link_mutation_patches(campaign, snapshot.worktree, repo_root)
+                _link_host_dependencies(campaign, snapshot.worktree, repo_root)
+                baseline, report = _run_campaign_command(
+                    campaign,
+                    snapshot_root=snapshot.worktree,
+                    report_name=f"baseline-{repetition}",
+                )
+            baseline_results.append(baseline.as_dict())
+            if report is not None:
+                baseline_reports.append(report)
             if baseline.timed_out or baseline.returncode != 0:
+                receipt["baseline"] = baseline_results[0]
+                receipt["baseline_repetitions"] = baseline_results
                 receipt["status"] = "BASELINE_FAILED"
                 _atomic_json(output_path, receipt)
                 raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+        receipt["baseline"] = baseline_results[0]
+        if campaign.value_analysis is not None:
+            receipt["baseline_repetitions"] = baseline_results
 
+        mutant_reports: dict[str, Mapping[str, Any]] = {}
         for mutation in selected:
             with isolated_snapshot(repo_root) as snapshot:
                 if drift := source_drift(campaign, snapshot.worktree):
@@ -822,11 +891,10 @@ def run_campaign(
                 _link_mutation_patches(campaign, snapshot.worktree, repo_root)
                 _link_host_dependencies(campaign, snapshot.worktree, repo_root)
                 _apply_mutation(mutation, snapshot.worktree)
-                result = _run_command(
-                    campaign.test_argv,
-                    cwd=snapshot.worktree,
-                    timeout_seconds=campaign.timeout_seconds,
-                    environment=campaign.environment,
+                result, report = _run_campaign_command(
+                    campaign,
+                    snapshot_root=snapshot.worktree,
+                    report_name=f"mutant-{len(receipt['mutants']) + 1}",
                 )
             outcome = (
                 "TIMED_OUT"
@@ -835,16 +903,18 @@ def run_campaign(
                 if result.returncode == 0
                 else "KILLED"
             )
-            receipt["mutants"].append(
-                {
-                    "id": mutation.mutation_id,
-                    "patch_sha256": mutation.patch_sha256,
-                    "allowed_paths": list(mutation.allowed_paths),
-                    "expected_killers": list(mutation.expected_killers),
-                    "outcome": outcome,
-                    "test_result": result.as_dict(),
-                }
-            )
+            row: dict[str, Any] = {
+                "id": mutation.mutation_id,
+                "patch_sha256": mutation.patch_sha256,
+                "allowed_paths": list(mutation.allowed_paths),
+                "expected_killers": list(mutation.expected_killers),
+                "outcome": outcome,
+                "test_result": result.as_dict(),
+            }
+            if report is not None:
+                row["test_attribution"] = report
+                mutant_reports[mutation.mutation_id] = report
+            receipt["mutants"].append(row)
             _atomic_json(output_path, receipt)
     except CampaignError as exc:
         if receipt["status"] == "RUNNING":
@@ -869,12 +939,25 @@ def run_campaign(
         row["id"] for row in receipt["mutants"] if row["outcome"] == "SURVIVED"
     ]
     receipt["classification_required"] = list(receipt["survivors"])
-    receipt["status"] = (
+    mutation_status = (
         "PASS"
         if killed == len(selected) and not survived and not timed_out
         else "FAIL"
         if survived
         else "ERROR"
+    )
+    if campaign.value_analysis is not None:
+        receipt["test_value"] = analyze_test_value(
+            campaign.value_analysis,
+            baseline_reports=baseline_reports,
+            mutant_reports=mutant_reports,
+            mutant_outcomes={row["id"]: row["outcome"] for row in receipt["mutants"]},
+        )
+    receipt["status"] = (
+        mutation_status
+        if receipt["test_value"] is None
+        or receipt["test_value"].get("status") == "PASS"
+        else "FAIL"
     )
     receipt["receipt_path"] = receipt_relative
     _atomic_json(output_path, receipt)
@@ -977,6 +1060,14 @@ def _receipt_errors(
                 errors.append(f"mutant {mutation.mutation_id} patch hash mismatch")
     if receipt.get("mutation_score") != 1.0:
         errors.append("mutation score is not 1.0")
+    if campaign.value_analysis is not None:
+        errors.extend(
+            test_value_receipt_errors(
+                receipt.get("test_value"),
+                expected_nodeids=[test.nodeid for test in campaign.ranked_tests],
+                expected_repetitions=campaign.value_analysis.baseline_repetitions,
+            )
+        )
     if source_drift(campaign, repo_root):
         errors.append("current source hashes drifted")
     return errors

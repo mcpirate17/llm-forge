@@ -1290,6 +1290,11 @@ def test_mutation_evidence_fails_closed_without_receipt(
     registry = snapshot / "conductor/mutation_campaigns/registry.json"
     registry.parent.mkdir(parents=True)
     registry.write_text("{}", encoding="utf-8")
+    test_path = snapshot / "research/tests/test_unregistered.py"
+    test_path.parent.mkdir(parents=True, exist_ok=True)
+    test_path.write_text(
+        "def test_new_contract():\n    assert True\n", encoding="utf-8"
+    )
     monkeypatch.setattr(
         "conductor.mutation_testing.verify_evidence",
         lambda *_args, **_kwargs: {
@@ -1337,20 +1342,15 @@ def test_mutation_evidence_fails_closed_without_receipt(
     assert result.findings[0].path == "research/tests/test_unregistered.py"
 
 
-def test_mutation_evidence_reports_unavailable_and_malformed(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def _new_test_value_context(tmp_path: Path) -> tuple[ReviewContext, Path]:
     snapshot = tmp_path / "snapshot"
     registry = snapshot / "conductor/mutation_campaigns/registry.json"
     registry.parent.mkdir(parents=True)
     registry.write_text("{}", encoding="utf-8")
-    from conductor.mutation_testing import CampaignError
-
-    monkeypatch.setattr(
-        "conductor.mutation_testing.verify_evidence",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            CampaignError("broken registry")
-        ),
+    test_path = snapshot / "research/tests/test_unregistered.py"
+    test_path.parent.mkdir(parents=True, exist_ok=True)
+    test_path.write_text(
+        "def test_new_contract():\n    assert True\n", encoding="utf-8"
     )
     policy = load_policy(Path("conductor/candidate_policy.toml"))
     context = ReviewContext(
@@ -1377,6 +1377,25 @@ def test_mutation_evidence_reports_unavailable_and_malformed(
         owner=None,
         runtime_dir=tmp_path / "runtime",
     )
+    receipt_path = (
+        snapshot / "conductor/mutation_campaigns/receipts/new_test_value_receipt.json"
+    )
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    return context, receipt_path
+
+
+def test_mutation_evidence_reports_unavailable_and_malformed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    context, receipt_path = _new_test_value_context(tmp_path)
+    from conductor.mutation_testing import CampaignError
+
+    monkeypatch.setattr(
+        "conductor.mutation_testing.verify_evidence",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            CampaignError("broken registry")
+        ),
+    )
     result = check_mutation_evidence(context)
     assert result.status == CheckStatus.FAILED
     assert result.findings[0].rule_id == "mutation-evidence-unavailable"
@@ -1395,6 +1414,60 @@ def test_mutation_evidence_reports_unavailable_and_malformed(
     assert {finding.rule_id for finding in result.findings} == {
         "malformed-mutation-receipt"
     }
+
+    receipt_path.write_text(
+        json.dumps({"status": "PASS", "test_value": None}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "conductor.mutation_testing.verify_evidence",
+        lambda *_args, **_kwargs: {
+            "status": "PASS",
+            "checked_test_paths": ["research/tests/test_unregistered.py"],
+            "evidence": [
+                {
+                    "path": "research/tests/test_unregistered.py",
+                    "campaign_id": "new_test_value",
+                    "receipt": (
+                        "conductor/mutation_campaigns/receipts/"
+                        "new_test_value_receipt.json"
+                    ),
+                    "scope": {},
+                }
+            ],
+            "missing_evidence": [],
+            "malformed_receipts": [],
+        },
+    )
+    result = check_mutation_evidence(context)
+    assert {finding.rule_id for finding in result.findings} == {
+        "new-test-value-not-admitted"
+    }
+
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "status": "PASS",
+                "test_value": {
+                    "schema_version": "llm.mutation-testing.test-value.v1",
+                    "status": "PASS",
+                    "tests": [
+                        {
+                            "nodeid": (
+                                "research/tests/test_unregistered.py::test_new_contract"
+                            ),
+                            "classification": "CORE",
+                        }
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = check_mutation_evidence(context)
+    assert result.findings == []
+    assert result.metrics["new_test_nodeids"] == [
+        "research/tests/test_unregistered.py::test_new_contract"
+    ]
 
 
 def test_locked_commit_reuses_mutex_in_precommit_hook(tmp_path: Path) -> None:
