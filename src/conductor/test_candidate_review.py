@@ -1548,3 +1548,32 @@ def test_inherited_lock_descriptor_validation(
         repo, exclusive=True, timeout_seconds=1.0, lease_token=token
     ):
         assert review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001
+
+
+def test_changed_coverage_judges_each_risk_class_on_its_own_lines() -> None:
+    """A low-risk shortfall must not be judged at the high-risk bar.
+
+    The old rule picked one threshold for the whole candidate from *whether any
+    changed path was high-risk*, so a single conductor/** file raised the bar to
+    90% for every changed line. Measured on the W7 slices 2026-08-29: the bar and
+    the shortfall came from different paths entirely.
+    """
+    from conductor.candidate_review.verification import _risk_buckets
+
+    per_file = {
+        "conductor/agent_a2a.py": {"covered": 95, "measurable": 100},
+        "research/synthesis/wavelet.py": {"covered": 80, "measurable": 100},
+    }
+    risk_of = {"conductor/agent_a2a.py": "high", "research/synthesis/wavelet.py": "low"}
+    buckets = _risk_buckets(per_file, risk_of)
+    assert buckets["high"] == {"covered": 95, "measurable": 100}
+    assert buckets["other"] == {"covered": 80, "measurable": 100}
+    # 95% clears 90; 80% clears 75. Pooled it would be 87.5%, which fails the 90
+    # bar the old rule would have applied to both -- the case the change fixes.
+    pooled = (95 + 80) * 100.0 / 200
+    assert pooled < 90.0
+
+    # An unclassified path is treated as other-risk: never silently promoted to
+    # the lenient side, never silently held to the strict one.
+    assert _risk_buckets(per_file, {})["other"]["measurable"] == 200
+    assert _risk_buckets(per_file, {})["high"]["measurable"] == 0
