@@ -28,7 +28,7 @@ def _registry(repo: Path) -> Path:
             {
                 "schema_version": 1,
                 "enforcement": "changed_tests",
-                "test_patterns": ["**/test_*.py", "**/*.spec.js"],
+                "test_patterns": list(mutation_coverage.CANONICAL_TEST_PATTERNS),
                 "receipt_directories": ["conductor/mutation_campaigns/receipts"],
                 "campaigns": [
                     {"manifest": "conductor/mutation_campaigns/placeholder.json"}
@@ -61,8 +61,8 @@ def test_discover_and_changed_paths_include_untracked_tests(tmp_path: Path) -> N
     subprocess.run(["git", "commit", "-qm", "tracked test"], cwd=repo, check=True)
     untracked = repo / "research/tests/test_new.py"
     untracked.write_text("def test_new():\n    assert True\n", encoding="utf-8")
-    (repo / "research/tools/not_a_test.py").parent.mkdir(parents=True, exist_ok=True)
-    (repo / "research/tools/not_a_test.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "research/tools/not_module.py").parent.mkdir(parents=True, exist_ok=True)
+    (repo / "research/tools/not_module.py").write_text("x = 1\n", encoding="utf-8")
 
     discovered = mutation_coverage.discover_test_paths(registry, repo_root=repo)
     assert discovered == (
@@ -169,6 +169,9 @@ def test_safe_relative_path_and_registry_errors(tmp_path: Path) -> None:
         mutation_coverage._registry_patterns(bad, repo)
     bad.write_text('{"test_patterns": []}\n', encoding="utf-8")
     with pytest.raises(CampaignError, match="test_patterns"):
+        mutation_coverage._registry_patterns(bad, repo)
+    bad.write_text('{"test_patterns": ["never-a-test"]}\n', encoding="utf-8")
+    with pytest.raises(CampaignError, match="canonical inventory"):
         mutation_coverage._registry_patterns(bad, repo)
 
 
@@ -408,7 +411,10 @@ def test_wait_for_idle_and_host_dependencies(
             "duplicate nodeids",
         ),
         ({**raw, "planned_mutations": None}, "planned_mutations"),
-        ({**raw, "expected_mutations": 9}, "planned mutation"),
+        (
+            {**raw, "expected_mutations": len(raw["planned_mutations"]) + 1},
+            "planned mutation",
+        ),
     ]
     for body, match in cases:
         path = tmp_path / "case.json"

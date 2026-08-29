@@ -34,9 +34,11 @@ from conductor.candidate_review.git_source import (
 )
 from conductor.candidate_review.model import sha256_json, write_json_atomic
 from conductor.candidate_review.ownership import (
+    OwnershipClaim,
     OwnershipError,
     create_claim,
     load_claims,
+    paths_overlap,
     release_claim,
 )
 from conductor.candidate_review.policy import PolicyError, load_policy
@@ -287,6 +289,59 @@ def release_claim_command(args: argparse.Namespace) -> int:
     return 0
 
 
+COMPACT_JUSTIFICATION_CHARS = 72
+
+
+def _claims_overlapping(
+    claims: Sequence[OwnershipClaim], targets: Sequence[str]
+) -> list[OwnershipClaim]:
+    if not targets:
+        return list(claims)
+    return [
+        claim
+        for claim in claims
+        if any(paths_overlap(t, p) for t in targets for p in claim.paths)
+    ]
+
+
+def _dir_summary(paths: Sequence[str]) -> str:
+    """``conductor/(3) research/tools/(5)`` — directories with counts, sorted."""
+    counts: dict[str, int] = {}
+    for path in paths:
+        parent = str(PurePosixPath(path).parent)
+        key = "." if parent == "." else parent + "/"
+        counts[key] = counts.get(key, 0) + 1
+    return " ".join(f"{key}({n})" for key, n in sorted(counts.items()))
+
+
+def compact_claims_text(
+    claims: Sequence[OwnershipClaim],
+    digest: str,
+    *,
+    now: datetime,
+    with_paths: bool = False,
+) -> str:
+    """One line per active claim: id owner expiry path-count dirs justification.
+
+    The full JSON store is ~60 KB on a busy tree (~15k tokens). Full path lists
+    only with *with_paths*; use ``--path`` to answer "is X claimed" instead.
+    """
+    active = [claim for claim in claims if claim.active(now)]
+    expired = len(claims) - len(active)
+    lines = [f"claims: {len(active)} active, {expired} expired, sha256 {digest[:12]}"]
+    for claim in active:
+        just = claim.justification.strip().replace("\n", " ")
+        if len(just) > COMPACT_JUSTIFICATION_CHARS:
+            just = just[: COMPACT_JUSTIFICATION_CHARS - 1] + "…"
+        lines.append(
+            f"{claim.claim_id}  {claim.owner:<14} exp {claim.expiry:%m-%d %H:%MZ}  "
+            f"{len(claim.paths):>2} paths  {_dir_summary(claim.paths)}  {just}"
+        )
+        if with_paths:
+            lines.append("    " + " ".join(claim.paths))
+    return "\n".join(lines)
+
+
 def claims_command(args: argparse.Namespace) -> int:
     repo = repository_root(Path(args.repo))
     try:
@@ -294,9 +349,20 @@ def claims_command(args: argparse.Namespace) -> int:
     except (OSError, OwnershipError) as exc:
         print(f"ownership claims unavailable: {exc}", file=sys.stderr)
         return 1
+    selected = _claims_overlapping(claims, args.path or [])
+    if args.compact:
+        print(
+            compact_claims_text(
+                selected,
+                digest,
+                now=datetime.now(timezone.utc),
+                with_paths=bool(args.paths or args.path),
+            )
+        )
+        return 0
     print(
         json.dumps(
-            {"sha256": digest, "claims": [asdict(item) for item in claims]}, indent=2
+            {"sha256": digest, "claims": [asdict(item) for item in selected]}, indent=2
         )
     )
     return 0
@@ -382,6 +448,21 @@ def _parser() -> argparse.ArgumentParser:
     release.set_defaults(func=release_claim_command)
     claims = subparsers.add_parser("claims", help="Show structured ownership claims")
     claims.add_argument("--repo", default=".")
+    claims.add_argument(
+        "--compact",
+        action="store_true",
+        help="one line per active claim instead of the full JSON store",
+    )
+    claims.add_argument(
+        "--path",
+        action="append",
+        help="only claims overlapping this repo-relative path (repeatable)",
+    )
+    claims.add_argument(
+        "--paths",
+        action="store_true",
+        help="with --compact: also list every claimed path (implied by --path)",
+    )
     claims.set_defaults(func=claims_command)
     fix = subparsers.add_parser(
         "fix", help="Explicitly mutate only named worktree paths"

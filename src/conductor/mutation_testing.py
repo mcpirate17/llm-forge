@@ -1,7 +1,9 @@
 """Fail-closed, language-neutral orchestration for explicit mutation campaigns.
 
-The framework does not generate mutants. Campaigns bind reviewed patches to exact
-tests, and every run uses a disposable snapshot rather than the shared checkout.
+The framework deliberately does not generate mutants. A campaign names small,
+reviewable patch files and the exact tests that must detect them. Every baseline
+and mutant runs in a disposable snapshot of the current worktree, never in the
+shared checkout.
 """
 
 from __future__ import annotations
@@ -12,14 +14,15 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
-import shutil
 import subprocess
+import sys
 import time
 from typing import Any, Iterable, Mapping, Sequence
 
 from audit.orchestrator.snapshot_worktree import isolated_snapshot
+from conductor import mutation_testing_support as _support
 from conductor.mutation_scope import (
     CampaignError,
     TestFileScope,
@@ -44,10 +47,22 @@ from conductor.mutation_value import (
 
 SCHEMA_VERSION = 1
 REGISTRY_SCHEMA_VERSION = 1
-RECEIPT_SCHEMA = "llm.mutation-testing.receipt.v2"
+RECEIPT_SCHEMA = "llm.mutation-testing.receipt.v3"
+LEGACY_RECEIPT_SCHEMA = "llm.mutation-testing.receipt.v2"
+LEGACY_RECEIPT_ANCHOR_COMMIT = "61343f575215dd222a74fc2c060d0328692ded5e"
+LEGACY_RECEIPT_ANCHOR_TREE = "b01877ba62c32445f7649450f9b395dd70de306a"
+LEGACY_RECEIPT_PREFIX = "conductor/mutation_campaigns/receipts/"
+CANONICAL_TEST_PATTERNS = _support.CANONICAL_TEST_PATTERNS
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 OUTPUT_TAIL_CHARS = 12_000
 REPO_ROOT = Path(__file__).resolve().parents[1]
+RUNNER_COMPONENT_PATHS = (
+    "audit/orchestrator/snapshot_worktree.py",
+    "conductor/mutation_scope.py",
+    "conductor/mutation_testing.py",
+    "conductor/mutation_testing_support.py",
+    "conductor/mutation_value.py",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -477,6 +492,21 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _runner_components_sha256() -> dict[str, str]:
+    """Bind every first-party module that can affect mutation execution."""
+
+    root = Path(__file__).resolve().parents[1]
+    components: dict[str, str] = {}
+    for relative in RUNNER_COMPONENT_PATHS:
+        path = root / relative
+        if not path.is_file() or path.is_symlink():
+            raise CampaignError(
+                f"mutation runner component is missing or unsafe: {relative}"
+            )
+        components[relative] = _sha256(path)
+    return components
+
+
 def source_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
     """Return every absent or hash-drifted source bound by the campaign."""
 
@@ -613,20 +643,25 @@ def _wait_for_idle(campaign: Campaign, wait_seconds: int) -> list[dict[str, Any]
 def _link_host_dependencies(
     campaign: Campaign, snapshot_root: Path, host_root: Path
 ) -> None:
-    for relative in campaign.host_read_dependencies:
-        source = host_root / relative
-        if not source.exists():
-            raise CampaignError(f"host read dependency is missing: {relative}")
-        destination = snapshot_root / relative
-        if destination.exists() or destination.is_symlink():
-            raise CampaignError(
-                f"snapshot already contains host read dependency path: {relative}"
-            )
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if source.is_file():
-            shutil.copy2(source, destination)
-        else:
-            destination.symlink_to(source, target_is_directory=True)
+    _support.link_host_dependencies(
+        campaign,
+        snapshot_root,
+        host_root,
+        materialize=_materialize,
+        error_type=CampaignError,
+    )
+
+
+def _materialize(source: Path, destination: Path) -> None:
+    """Place a host path inside the snapshot as real files, never a symlink.
+
+    Receipt builders authenticate their inputs with repository-containment
+    checks (``repo in target.resolve().parents``); a symlink resolves back to
+    the host checkout and fails them even when the bytes are right. Hard links
+    keep large read-only inputs (checkpoints, databases) free; a cross-device
+    link error falls back to a byte copy.
+    """
+    _support.materialize(source, destination)
 
 
 def _link_mutation_patches(
@@ -634,27 +669,35 @@ def _link_mutation_patches(
 ) -> None:
     """Copy reviewed patch artifacts into snapshots without staging them."""
 
-    if snapshot_root.resolve() == host_root.resolve():
-        return
-    for mutation in campaign.mutations:
-        source = mutation.patch_file.resolve()
-        try:
-            relative = source.relative_to(host_root.resolve())
-        except ValueError as exc:
-            raise CampaignError(
-                f"mutation patch is outside the host repository: {source}"
-            ) from exc
-        destination = snapshot_root / relative
-        if destination.exists() or destination.is_symlink():
-            actual = _sha256(destination) if destination.is_file() else None
-            if actual != mutation.patch_sha256:
-                raise CampaignError(
-                    f"snapshot mutation patch hash drifted for {relative}: "
-                    f"expected {mutation.patch_sha256}, got {actual}"
-                )
-            continue
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
+    _support.link_mutation_patches(
+        campaign,
+        snapshot_root,
+        host_root,
+        sha256=_sha256,
+        error_type=CampaignError,
+    )
+
+
+_BARE_INTERPRETERS = frozenset({"python", "python3"})
+
+
+def _pin_interpreter(argv: Sequence[str]) -> list[str]:
+    """Resolve a bare ``python`` argv[0] to the runner's own interpreter.
+
+    A bare name resolves through the invoking shell's PATH, so the same manifest
+    ran under whichever venv the agent happened to have active (torch 2.12.1 in
+    the project ``.venv`` vs 2.13.0 in ``~/venvs/llm``), and the receipt could not
+    tell. Evidence must bind the interpreter the runner itself was started with.
+    """
+    return _support.pin_interpreter(
+        argv, bare_interpreters=_BARE_INTERPRETERS, executable=sys.executable
+    )
+
+
+def _torch_version(interpreter: str) -> str | None:
+    """Best-effort torch version of ``interpreter`` for receipt provenance."""
+
+    return _support.torch_version(interpreter)
 
 
 def _run_command(
@@ -664,40 +707,14 @@ def _run_command(
     timeout_seconds: int,
     environment: Mapping[str, str],
 ) -> CommandResult:
-    env = os.environ.copy()
-    env.update(environment)
-    started = time.monotonic()
-    try:
-        proc = subprocess.run(
-            list(argv),
-            cwd=cwd,
-            env=env,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-        )
-    except subprocess.TimeoutExpired as exc:
-        duration = time.monotonic() - started
-        stdout = (
-            exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        )
-        stderr = (
-            exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        )
-        return CommandResult(
-            returncode=None,
-            timed_out=True,
-            duration_seconds=duration,
-            stdout_tail=stdout[-OUTPUT_TAIL_CHARS:],
-            stderr_tail=stderr[-OUTPUT_TAIL_CHARS:],
-        )
-    return CommandResult(
-        returncode=proc.returncode,
-        timed_out=False,
-        duration_seconds=time.monotonic() - started,
-        stdout_tail=proc.stdout[-OUTPUT_TAIL_CHARS:],
-        stderr_tail=proc.stderr[-OUTPUT_TAIL_CHARS:],
+    return _support.run_command(
+        argv,
+        cwd=cwd,
+        timeout_seconds=timeout_seconds,
+        environment=environment,
+        pin_argv=_pin_interpreter,
+        result_factory=CommandResult,
+        output_tail_chars=OUTPUT_TAIL_CHARS,
     )
 
 
@@ -736,53 +753,13 @@ def _run_campaign_command(
 
 
 def _apply_mutation(mutation: Mutation, snapshot_root: Path) -> None:
-    actual_patch_sha256 = _sha256(mutation.patch_file)
-    if actual_patch_sha256 != mutation.patch_sha256:
-        raise CampaignError(
-            f"mutation {mutation.mutation_id!r} patch changed after campaign load: "
-            f"expected {mutation.patch_sha256}, got {actual_patch_sha256}"
-        )
-    for command in (
-        ["git", "apply", "--check", str(mutation.patch_file)],
-        ["git", "apply", str(mutation.patch_file)],
-    ):
-        proc = subprocess.run(
-            command,
-            cwd=snapshot_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if proc.returncode != 0:
-            raise CampaignError(
-                f"mutation {mutation.mutation_id!r} patch failed: "
-                f"{(proc.stderr or proc.stdout).strip()[:2000]}"
-            )
-    changed = subprocess.run(
-        ["git", "diff", "--name-only"],
-        cwd=snapshot_root,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
-    changed_paths = tuple(sorted(path for path in changed if path))
-    if changed_paths != mutation.allowed_paths:
-        raise CampaignError(
-            f"mutation {mutation.mutation_id!r} changed {changed_paths}, "
-            f"expected exactly {mutation.allowed_paths}"
-        )
+    _support.apply_mutation(
+        mutation, snapshot_root, sha256=_sha256, error_type=CampaignError
+    )
 
 
 def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    try:
-        temporary.write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
+    _support.atomic_json(path, payload)
 
 
 def _default_receipt_path(campaign: Campaign, repo_root: Path) -> Path:
@@ -818,12 +795,14 @@ def run_campaign(
         detail = ", ".join(f"pid={row['pid']}" for row in blockers)
         raise CampaignError(f"resource gate is BUSY after wait: {detail}")
 
+    runner_components = _runner_components_sha256()
     receipt: dict[str, Any] = {
         "schema_version": RECEIPT_SCHEMA,
         "campaign_id": campaign.campaign_id,
         "manifest": campaign.manifest_path.relative_to(repo_root).as_posix(),
         "manifest_sha256": campaign.manifest_sha256,
-        "runner_sha256": _sha256(Path(__file__)),
+        "runner_sha256": runner_components["conductor/mutation_testing.py"],
+        "runner_components_sha256": runner_components,
         "language": campaign.language,
         "mutation_engine": campaign.mutation_engine,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -831,6 +810,8 @@ def run_campaign(
         "source_sha256": dict(campaign.source_sha256),
         "test_scopes": _test_scopes_payload(campaign),
         "test_argv": list(campaign.test_argv),
+        "interpreter": _pin_interpreter(campaign.test_argv)[0],
+        "torch_version": _torch_version(_pin_interpreter(campaign.test_argv)[0]),
         "expected_campaign_mutations": campaign.expected_mutations,
         "selected_mutations": [mutation.mutation_id for mutation in selected],
         "complete_campaign": len(selected) == campaign.expected_mutations,
@@ -1002,7 +983,11 @@ def _load_registry(path: Path, repo_root: Path) -> Mapping[str, Any]:
         )
     if payload.get("enforcement") != "changed_tests":
         raise CampaignError("registry enforcement must be 'changed_tests'")
-    _require_string_list(payload.get("test_patterns"), "registry.test_patterns")
+    patterns = _require_string_list(
+        payload.get("test_patterns"), "registry.test_patterns"
+    )
+    if patterns != CANONICAL_TEST_PATTERNS:
+        raise CampaignError("registry.test_patterns must match the canonical inventory")
     _require_string_list(
         payload.get("receipt_directories"), "registry.receipt_directories"
     )
@@ -1012,17 +997,33 @@ def _load_registry(path: Path, repo_root: Path) -> Mapping[str, Any]:
     return payload
 
 
-def _is_test_path(path: str, patterns: Sequence[str]) -> bool:
-    candidate = PurePosixPath(path)
-    return any(candidate.match(pattern) for pattern in patterns)
-
-
 def _receipt_errors(
-    receipt: Mapping[str, Any], campaign: Campaign, repo_root: Path
+    receipt: Mapping[str, Any],
+    campaign: Campaign,
+    repo_root: Path,
+    receipt_path: Path | None = None,
+    receipt_bytes: bytes | None = None,
+    anchor_repo: Path | None = None,
 ) -> list[str]:
     errors: list[str] = []
     expected_manifest = campaign.manifest_path.relative_to(repo_root).as_posix()
-    if receipt.get("schema_version") != RECEIPT_SCHEMA:
+    schema = receipt.get("schema_version")
+    anchored_legacy = schema == LEGACY_RECEIPT_SCHEMA
+    if anchored_legacy:
+        errors.extend(
+            _support.legacy_receipt_anchor_errors(
+                receipt_path,
+                receipt_bytes,
+                repo_root,
+                anchor_repo or repo_root,
+                anchor_commit=LEGACY_RECEIPT_ANCHOR_COMMIT,
+                anchor_tree=LEGACY_RECEIPT_ANCHOR_TREE,
+                receipt_prefix=LEGACY_RECEIPT_PREFIX,
+                manifest_path=expected_manifest,
+                manifest_sha256=campaign.manifest_sha256,
+            )
+        )
+    elif schema != RECEIPT_SCHEMA:
         errors.append("receipt schema is not current")
     if receipt.get("status") != "PASS":
         errors.append(f"status={receipt.get('status')!r}")
@@ -1032,6 +1033,19 @@ def _receipt_errors(
         errors.append("manifest path mismatch")
     if receipt.get("manifest_sha256") != campaign.manifest_sha256:
         errors.append("manifest hash mismatch")
+    if not anchored_legacy:
+        try:
+            runner_components = _runner_components_sha256()
+        except CampaignError as exc:
+            errors.append(str(exc))
+        else:
+            if (
+                receipt.get("runner_sha256")
+                != runner_components["conductor/mutation_testing.py"]
+            ):
+                errors.append("runner hash mismatch")
+            if receipt.get("runner_components_sha256") != runner_components:
+                errors.append("runner component hash map mismatch")
     if receipt.get("source_sha256") != dict(campaign.source_sha256):
         errors.append("source hash map mismatch")
     if receipt.get("test_scopes", {}) != _test_scopes_payload(campaign):
@@ -1078,16 +1092,12 @@ def verify_evidence(
     paths: Sequence[str],
     *,
     repo_root: Path = REPO_ROOT,
+    anchor_repo: Path | None = None,
 ) -> dict[str, Any]:
     """Require current full-campaign PASS receipts for every changed test path."""
 
     payload = _load_registry(registry_path, repo_root)
-    patterns = _require_string_list(payload.get("test_patterns"), "test_patterns")
-    normalized = tuple(
-        _safe_relative_path(path, "candidate path")
-        for path in paths
-        if _is_test_path(path.replace("\\", "/"), patterns)
-    )
+    normalized = tuple(_safe_relative_path(path, "candidate path") for path in paths)
     campaign_rows = payload.get("campaigns")
     assert isinstance(campaign_rows, list)
     campaigns: list[Campaign] = []
@@ -1098,25 +1108,13 @@ def verify_evidence(
         )
         campaigns.append(load_campaign(repo_root / manifest, repo_root=repo_root))
 
-    receipt_paths: list[Path] = []
-    for relative in _require_string_list(
-        payload.get("receipt_directories"), "receipt_directories"
-    ):
-        directory = repo_root / _safe_relative_path(relative, "receipt directory")
-        if directory.is_dir():
-            receipt_paths.extend(sorted(directory.glob("*.json")))
-
-    receipts: list[tuple[Path, Mapping[str, Any]]] = []
-    malformed: list[str] = []
-    for path in receipt_paths:
-        try:
-            parsed = _require_mapping(
-                json.loads(path.read_text(encoding="utf-8")), f"receipt {path}"
-            )
-        except (CampaignError, OSError, UnicodeError, json.JSONDecodeError) as exc:
-            malformed.append(f"{path.relative_to(repo_root)}: {exc}")
-            continue
-        receipts.append((path, parsed))
+    receipts, malformed = _support.load_receipts(
+        repo_root,
+        _require_string_list(payload.get("receipt_directories"), "receipt_directories"),
+        safe_relative=_safe_relative_path,
+        require_mapping=_require_mapping,
+        error_type=CampaignError,
+    )
 
     evidence: list[dict[str, Any]] = []
     missing: list[dict[str, Any]] = []
@@ -1140,12 +1138,19 @@ def verify_evidence(
                 )
                 continue
             campaign_receipts = [
-                (path, receipt)
-                for path, receipt in receipts
+                (path, receipt, raw_bytes)
+                for path, receipt, raw_bytes in receipts
                 if receipt.get("campaign_id") == campaign.campaign_id
             ]
-            for path, receipt in reversed(campaign_receipts):
-                errors = _receipt_errors(receipt, campaign, repo_root)
+            for path, receipt, raw_bytes in reversed(campaign_receipts):
+                errors = _receipt_errors(
+                    receipt,
+                    campaign,
+                    repo_root,
+                    path,
+                    raw_bytes,
+                    anchor_repo or repo_root,
+                )
                 if not errors:
                     accepted = (campaign, path)
                     break
@@ -1174,15 +1179,7 @@ def verify_evidence(
                     "scope": _test_scopes_payload(campaign)[test_path],
                 }
             )
-    return {
-        "schema_version": "llm.mutation-testing.evidence-check.v1",
-        "status": "PASS" if not missing else "FAIL",
-        "enforcement": "changed_tests",
-        "checked_test_paths": list(sorted(set(normalized))),
-        "evidence": evidence,
-        "missing_evidence": missing,
-        "malformed_receipts": malformed,
-    }
+    return _support.evidence_result(normalized, evidence, missing, malformed)
 
 
 def _json_print(payload: Mapping[str, Any]) -> None:

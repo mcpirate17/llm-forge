@@ -1,0 +1,105 @@
+schema_version = 1
+
+# kind = index | catalog | clean
+# index: chunk-embed on CPU. catalog: inventory only. clean: kill-candidate, never auto-delete.
+
+[[source]]
+id = "cards"
+kind = "index"
+root = "research/notes"
+glob = "kb_*.md"
+chunk = "whole"
+
+[[source]]
+id = "notes"
+kind = "index"
+root = "research/notes"
+glob = "*.md"
+exclude_globs = ["kb_*.md", "current_work_archive*.md"]
+chunk = "heading"
+
+[[source]]
+id = "archives"
+kind = "index"
+root = ".current_work.archive"
+glob = "*.md"
+chunk = "heading"
+
+[[source]]
+id = "note-archives"
+kind = "index"
+root = "research/notes"
+glob = "current_work_archive*.md"
+chunk = "heading"
+
+[[source]]
+id = "vault-unique"
+kind = "index"
+absolute_root = "/home/tim/Documents/CodexVault"
+include_dirs = [
+  "dashboards",
+  "runbooks",
+  "decisions",
+  "claude",
+  "plain_language",
+  "inbox",
+]
+glob = "*.md"
+chunk = "heading"
+
+[[source]]
+id = "codex-memories"
+kind = "index"
+absolute_root = "/home/tim/.codex/memories"
+glob = "*.md"
+exclude_dir_names = [".git", ".code-review-graph"]
+chunk = "heading"
+
+[[source]]
+id = "claude-tasks"
+kind = "index"
+absolute_root = "/home/tim/.claude/tasks"
+glob = "*.json"
+chunk = "whole"
+
+[[source]]
+id = "repo-skills"
+kind = "index"
+roots = [".claude/commands", ".claude/skills", ".agents/skills"]
+glob = "*.md"
+chunk = "heading"
+
+[[source]]
+id = "code-graph"
+kind = "catalog"
+note = "Live graph is ~3k files / ~38k nodes. Embed via 7317 (openai provider, qwen3-embed-cpu). Do not markdown-card the tree."
+
+[[source]]
+id = "mnt-data-llm"
+kind = "catalog"
+absolute_root = "/mnt/data/llm"
+note = "Canonical corpora. hf_finefineweb at /mnt/data is a symlink here. Never embed."
+
+[[source]]
+id = "mnt-data-comfy"
+kind = "catalog"
+absolute_root = "/mnt/data/Comfy"
+note = "~234 GB image-gen. Not LLM knowledge."
+
+[[source]]
+id = "codex-worktrees"
+kind = "clean"
+root = ".codex/worktrees"
+note = "~35 GB scratch worktrees. Kill after confirming no unlanded work."
+
+[[source]]
+id = "codex-home-sessions"
+kind = "clean"
+absolute_root = "/home/tim/.codex/sessions"
+note = "~3 GB session logs. Index is memories/, not raw sessions."
+
+[[source]]
+id = "reports-old"
+kind = "clean"
+root = "research/reports"
+note = "205 GB. Subdirs >14d are immortal because prune is root-files-only. hyper_mor ckpt trees are REVIEW not kill."

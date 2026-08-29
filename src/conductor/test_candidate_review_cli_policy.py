@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -407,7 +407,44 @@ def test_policy_primitives_and_classification_fail_closed(tmp_path: Path) -> Non
         assert expected <= classes
 
 
+def _assert_fingerprint_short_circuits_pathless_exception(
+    policy: review_policy.Policy, exception: review_policy.ExceptionPolicy
+) -> None:
+    pathless = Finding(
+        check_id="research-integrity",
+        rule_id="incomplete-result-provenance",
+        severity=Severity.HIGH,
+        message="research decision path lacks exact identity/provenance fields: baseline",
+    ).finalize()
+    assert pathless.path is None
+    fingerprint_exception = replace(
+        exception,
+        exception_id="pathless-probe",
+        check_id="research-integrity",
+        rule_id="incomplete-result-provenance",
+        path="conductor/candidate_policy.toml",
+        fingerprint=pathless.fingerprint,
+    )
+    review_policy.apply_exceptions(
+        replace(policy, exceptions=(fingerprint_exception,)), [pathless]
+    )
+    assert pathless.exception_id == "pathless-probe"
+
+    unrelated = Finding(
+        check_id="research-integrity",
+        rule_id="incomplete-result-provenance",
+        severity=Severity.HIGH,
+        message="a different finding entirely",
+    ).finalize()
+    unmatched = replace(fingerprint_exception, exception_id="pathless-probe-2")
+    review_policy.apply_exceptions(
+        replace(policy, exceptions=(unmatched,)), [unrelated]
+    )
+    assert unrelated.exception_id is None
+
+
 def test_baselines_and_exceptions_are_exact_and_auditable(tmp_path: Path) -> None:
+    utc_today = datetime.now(timezone.utc).date()
     baseline = tmp_path / "baseline.json"
     baseline.write_text("{}\n", encoding="utf-8")
     policy = load_policy(Path("conductor/candidate_policy.toml"))
@@ -440,7 +477,7 @@ def test_baselines_and_exceptions_are_exact_and_auditable(tmp_path: Path) -> Non
         fingerprint=finding.fingerprint,
         owner="governance",
         justification="Specific temporary test-only exception.",
-        expires=date.today() + timedelta(days=1),
+        expires=utc_today + timedelta(days=1),
     )
     review_policy.apply_exceptions(replace(policy, exceptions=(exception,)), [finding])
     assert finding.exception_id == "owned"
@@ -471,7 +508,7 @@ def test_baselines_and_exceptions_are_exact_and_auditable(tmp_path: Path) -> Non
                     replace(
                         exception,
                         exception_id="expired",
-                        expires=date.today() - timedelta(days=1),
+                        expires=utc_today - timedelta(days=1),
                     ),
                 ),
             )
@@ -484,11 +521,13 @@ def test_baselines_and_exceptions_are_exact_and_auditable(tmp_path: Path) -> Non
                     replace(
                         exception,
                         exception_id="too-long",
-                        expires=date.today() + timedelta(days=91),
+                        expires=utc_today + timedelta(days=91),
                     ),
                 ),
             )
         )
+
+    _assert_fingerprint_short_circuits_pathless_exception(policy, exception)
 
 
 def test_ownership_state_rejects_tampering_and_broad_claims(tmp_path: Path) -> None:

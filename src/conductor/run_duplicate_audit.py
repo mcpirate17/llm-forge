@@ -213,6 +213,25 @@ def _skip_vulture_source(path: PurePosixPath) -> bool:
     )
 
 
+def _relativize_jscpd_name(file_entry: object, cwd: Path) -> str | None:
+    """Repo-relative posix path for a jscpd firstFile/secondFile entry.
+
+    jscpd's JSON reporter only populates ``fragment`` (the duplicated text
+    ``_stable_dup_key`` hashes for identity) when invoked with ``--absolute``,
+    which reports absolute paths instead of bare basenames; convert back to
+    a repo-relative path so findings match the rest of the governance tooling.
+    """
+    if not isinstance(file_entry, dict):
+        return None
+    name = file_entry.get("name")
+    if not isinstance(name, str) or not name:
+        return None
+    try:
+        return Path(name).resolve().relative_to(cwd.resolve()).as_posix()
+    except ValueError:
+        return name
+
+
 def _stable_dup_key(first_path: str, second_path: str, fragment: str) -> str:
     """Content-hash identity for a clone pair, stable across unrelated line drift.
 
@@ -418,7 +437,7 @@ def _run_jscpd_paths(
     cwd: Path,
     executable: str | None = None,
 ) -> int:
-    cmd = [_resolve_jscpd_executable(cwd, executable), "--noTips"]
+    cmd = [_resolve_jscpd_executable(cwd, executable)]
     if not check:
         cmd.extend(
             [
@@ -471,7 +490,7 @@ def _jscpd_collect_duplicates(
         config_path.write_text(json.dumps(config), encoding="utf-8")
         cmd = [
             _resolve_jscpd_executable(cwd, executable),
-            "--noTips",
+            "--absolute",
             "--config",
             str(config_path),
         ]
@@ -507,8 +526,8 @@ def _jscpd_collect_duplicates(
                 raise DuplicateAuditError(f"jscpd duplicate {index} must be an object")
             first_file = dup.get("firstFile")
             second_file = dup.get("secondFile")
-            first = first_file.get("name") if isinstance(first_file, dict) else None
-            second = second_file.get("name") if isinstance(second_file, dict) else None
+            first = _relativize_jscpd_name(first_file, cwd)
+            second = _relativize_jscpd_name(second_file, cwd)
             fragment = dup.get("fragment")
             lines = dup.get("lines")
             if not isinstance(first, str) or not first:
@@ -698,7 +717,6 @@ def run_jscpd_generated() -> int:
         "--silent",
         "--threshold",
         "100",
-        "--noTips",
         *generated_paths,
     ]
     print("== jscpd-generated ==", flush=True)

@@ -3,15 +3,20 @@
 
 Replaces ``conductor.agent_mailbox``: each agent identity serves an Agent Card
 and a JSON-RPC ``message/send`` endpoint on 127.0.0.1, addressed by a fixed
-per-agent port from the shared registry.  Delivery is synchronous and terminal
-— a down peer is reported as ``failed`` immediately instead of burning async
-retries.  Discovery is card probing, so there is no shared mutable bridge
-state to clobber.
+per-agent port from the shared registry.  Delivery is synchronous-first with
+store-and-forward: an unreachable peer queues the message in the sender's own
+store (``delivery_status='queued'``) for later redelivery via the ``flush``
+command, an automatic flush before each new send to the same peer (ordering
+preserved), or the auto-flush that runs when ``peers`` probes a recipient as
+up.  A peer that is reachable but rejects a message stays a terminal
+``failed`` — only transport-level unreachability queues.  Discovery is card
+probing, so there is no shared mutable bridge state to clobber.
 
-Channel-of-record invariants are unchanged: ``.current_work.md`` remains the
-coordination log, and the append-only review receipts written by the nm_f6
-runners remain the only authoritative verdicts.  This module is transport
-plus discovery, nothing more.
+Channel-of-record invariants are unchanged: structured claims and bounded
+``conductor.handoff`` entries coordinate workspace activity, while append-only
+review receipts written by the nm_f6 runners remain the only authoritative
+verdicts.  This module is transport plus discovery, nothing more; it never
+authorizes direct ``.current_work.md`` ingestion.
 
 Trust model: the registry file (0600) holds one token per agent; any local
 process holding a recipient's token is inside the fleet trust domain.  Sender
@@ -103,6 +108,7 @@ KNOWN_AGENTS: Final[dict[str, int]] = {
     "claude-opus-5": 7313,
     "antigravity": 7314,
     "fable-helm": 7315,
+    "grok": 7316,
 }
 DATA_KINDS: Final = frozenset({"gate-review-request", "coordination"})
 REVIEW_GATES: Final = frozenset({1, 2, 3, 4, 5, 7})
@@ -279,8 +285,8 @@ class A2aStore:
         reason: str | None,
         received_at: str | None,
     ) -> None:
-        if status not in ("delivered", "failed"):
-            raise A2aError(f"non-terminal outbound status {status!r}")
+        if status not in ("delivered", "failed", "queued"):
+            raise A2aError(f"unknown outbound status {status!r}")
         with self.connect() as connection:
             cursor = connection.execute(
                 """
@@ -317,6 +323,20 @@ class A2aStore:
         if row is None:
             raise A2aError(f"unknown message {message_id!r}")
         return row
+
+    def queued_outbound(self, to_name: str | None = None) -> list[sqlite3.Row]:
+        """Outbound messages awaiting redelivery, oldest first."""
+        query = (
+            "SELECT * FROM messages "
+            "WHERE direction='outbound' AND delivery_status='queued'"
+        )
+        params: tuple[str, ...] = ()
+        if to_name is not None:
+            query += " AND recipient=?"
+            params = (to_name,)
+        query += " ORDER BY created_at"
+        with self.connect() as connection:
+            return list(connection.execute(query, params).fetchall())
 
     def rows(self, unread_only: bool, limit: int) -> list[sqlite3.Row]:
         query = "SELECT * FROM messages WHERE direction='inbound'"
@@ -535,29 +555,21 @@ def fetch_card(record: AgentRecord, timeout: float) -> dict[str, Any]:
     return card
 
 
-def send_message(
+def _deliver_wire(
+    record: AgentRecord,
     from_name: str,
-    to_name: str,
+    message_id: str,
     body: str,
     data_payload: dict[str, Any] | None,
-    state_dir: Path,
-) -> dict[str, Any]:
-    records = load_registry(state_dir)
-    if from_name not in records:
-        raise A2aError(f"unknown sender {from_name!r}; registered: {sorted(records)}")
-    if to_name not in records:
-        raise A2aError(f"unknown recipient {to_name!r}; registered: {sorted(records)}")
-    if len(body.encode()) > MAX_BODY_BYTES:
-        raise A2aError(f"body exceeds {MAX_BODY_BYTES} bytes")
-    if data_payload is not None:
-        validate_data_payload(data_payload)
-    record = records[to_name]
-    message_id = str(uuid.uuid4())
+) -> None:
+    """Push one message over the wire; raises on any non-delivery.
+
+    ``httpx.TransportError`` means the peer is unreachable (queueable);
+    ``A2aError`` means the peer answered and rejected (terminal).
+    """
     parts: list[Part] = [new_text_part(body)]
-    data_json: str | None = None
     if data_payload is not None:
         parts.append(new_data_part(data_payload))
-        data_json = json.dumps(data_payload, ensure_ascii=False, sort_keys=True)
     message = Message(
         message_id=message_id,
         role=Role.ROLE_USER,
@@ -571,7 +583,58 @@ def send_message(
         "method": "SendMessage",
         "params": {"message": MessageToDict(message)},
     }
+    fetch_card(record, timeout=PROBE_TIMEOUT_S)
+    response = httpx.post(
+        f"{record.base_url}{DEFAULT_RPC_URL}",
+        json=request,
+        headers={
+            TOKEN_HEADER: record.token,
+            VERSION_HEADER: PROTOCOL_VERSION_1_0,
+        },
+        timeout=SEND_TIMEOUT_S,
+    )
+    payload = response.json()
+    if response.status_code != 200 or "error" in payload:
+        reason = payload.get("error", {}).get("message", response.text[:200])
+        raise A2aError(f"peer rejected message: {reason}")
+    # Result is a SendMessageResponse; the reply message sits under "message".
+    result = payload.get("result", {}).get("message", {})
+    receipts = [
+        p
+        for p in result.get("parts", [])
+        if isinstance(p.get("data"), dict)
+        and p["data"].get("kind") == "delivery-receipt"
+    ]
+    if not receipts or receipts[0]["data"].get("message_id") != message_id:
+        raise A2aError("peer ack did not echo the message_id")
+
+
+def send_message(
+    from_name: str,
+    to_name: str,
+    body: str,
+    data_payload: dict[str, Any] | None,
+    state_dir: Path,
+    queue_on_unreachable: bool = True,
+) -> dict[str, Any]:
+    records = load_registry(state_dir)
+    if from_name not in records:
+        raise A2aError(f"unknown sender {from_name!r}; registered: {sorted(records)}")
+    if to_name not in records:
+        raise A2aError(f"unknown recipient {to_name!r}; registered: {sorted(records)}")
+    if len(body.encode()) > MAX_BODY_BYTES:
+        raise A2aError(f"body exceeds {MAX_BODY_BYTES} bytes")
+    if data_payload is not None:
+        validate_data_payload(data_payload)
+    record = records[to_name]
+    message_id = str(uuid.uuid4())
+    data_json: str | None = None
+    if data_payload is not None:
+        data_json = json.dumps(data_payload, ensure_ascii=False, sort_keys=True)
     store = A2aStore(state_dir, from_name)
+    # Preserve ordering: anything already queued for this peer goes first.
+    if store.queued_outbound(to_name):
+        flush_queued(state_dir, from_name=from_name, to_name=to_name)
     store.record_outbound(
         message_id=message_id,
         sender=from_name,
@@ -580,36 +643,89 @@ def send_message(
         data_json=data_json,
     )
     try:
-        fetch_card(record, timeout=PROBE_TIMEOUT_S)
-        response = httpx.post(
-            f"{record.base_url}{DEFAULT_RPC_URL}",
-            json=request,
-            headers={
-                TOKEN_HEADER: record.token,
-                VERSION_HEADER: PROTOCOL_VERSION_1_0,
-            },
-            timeout=SEND_TIMEOUT_S,
-        )
-        payload = response.json()
-        if response.status_code != 200 or "error" in payload:
-            reason = payload.get("error", {}).get("message", response.text[:200])
-            raise A2aError(f"peer rejected message: {reason}")
-        # Result is a SendMessageResponse; the reply message sits under "message".
-        result = payload.get("result", {}).get("message", {})
-        receipts = [
-            p
-            for p in result.get("parts", [])
-            if isinstance(p.get("data"), dict)
-            and p["data"].get("kind") == "delivery-receipt"
-        ]
-        if not receipts or receipts[0]["data"].get("message_id") != message_id:
-            raise A2aError("peer ack did not echo the message_id")
+        _deliver_wire(record, from_name, message_id, body, data_payload)
         store.mark_outbound(message_id, "delivered", None, _utc_now())
+    except httpx.TransportError as exc:
+        reason = f"peer unreachable: {exc}"
+        if queue_on_unreachable:
+            store.mark_outbound(message_id, "queued", reason[:500], None)
+        else:
+            store.mark_outbound(message_id, "failed", reason[:500], None)
+            raise A2aError(reason) from exc
     except (A2aError, httpx.HTTPError) as exc:
-        reason = str(exc) if isinstance(exc, A2aError) else f"peer unreachable: {exc}"
+        reason = str(exc) if isinstance(exc, A2aError) else f"peer error: {exc}"
         store.mark_outbound(message_id, "failed", reason[:500], None)
         raise A2aError(reason) from exc
     return _outbound_row(store, message_id)
+
+
+def flush_queued(
+    state_dir: Path,
+    from_name: str | None = None,
+    to_name: str | None = None,
+) -> list[dict[str, Any]]:
+    """Redeliver queued outbound messages whose recipients are now reachable.
+
+    Per recipient, messages go oldest-first; the first transport failure
+    stops that recipient's flush so ordering is never violated.  A peer that
+    answers and rejects marks that message terminally ``failed``.  Returns a
+    summary row per attempted message.
+    """
+    records = load_registry(state_dir)
+    if from_name is not None:
+        senders = [from_name]
+    else:
+        senders = sorted(
+            d.name
+            for d in state_dir.iterdir()
+            if d.is_dir() and d.name in records and (d / "store.sqlite").is_file()
+        )
+    results: list[dict[str, Any]] = []
+    for sender in senders:
+        store = A2aStore(state_dir, sender)
+        unreachable: set[str] = set()
+        for row in store.queued_outbound(to_name):
+            recipient = row["recipient"]
+            if recipient in unreachable:
+                continue
+            if recipient not in records:
+                store.mark_outbound(
+                    row["message_id"], "failed", "recipient no longer registered", None
+                )
+                results.append({"message_id": row["message_id"], "status": "failed"})
+                continue
+            data_payload = json.loads(row["data_json"]) if row["data_json"] else None
+            try:
+                _deliver_wire(
+                    records[recipient],
+                    sender,
+                    row["message_id"],
+                    row["body"],
+                    data_payload,
+                )
+                store.mark_outbound(row["message_id"], "delivered", None, _utc_now())
+                status = "delivered"
+            except httpx.TransportError as exc:
+                store.mark_outbound(
+                    row["message_id"],
+                    "queued",
+                    f"still unreachable at {_utc_now()}: {exc}"[:500],
+                    None,
+                )
+                unreachable.add(recipient)
+                status = "queued"
+            except (A2aError, httpx.HTTPError) as exc:
+                store.mark_outbound(row["message_id"], "failed", str(exc)[:500], None)
+                status = "failed"
+            results.append(
+                {
+                    "message_id": row["message_id"],
+                    "sender": sender,
+                    "recipient": recipient,
+                    "status": status,
+                }
+            )
+    return results
 
 
 def _outbound_row(store: A2aStore, message_id: str) -> dict[str, Any]:
@@ -675,6 +791,19 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="optional structured payload (JSON object with a kind)",
     )
+    send_parser.add_argument(
+        "--no-queue",
+        action="store_true",
+        help="fail terminally when the peer is unreachable instead of queueing",
+    )
+
+    flush_parser = sub.add_parser(
+        "flush", help="redeliver queued messages to now-reachable peers"
+    )
+    flush_parser.add_argument(
+        "--as-name", help="flush only this sender's queue (default: all local stores)"
+    )
+    flush_parser.add_argument("--to", help="flush only messages to this recipient")
 
     inbox_parser = sub.add_parser("inbox", help="list received messages")
     inbox_parser.add_argument("--as-name", required=True)
@@ -697,6 +826,33 @@ def _message_body(args: argparse.Namespace) -> str:
     if args.body_file is not None:
         return args.body_file.read_text()
     return sys.stdin.read()
+
+
+def _cmd_send(args: argparse.Namespace) -> int:
+    data_payload = None
+    if args.data_file is not None:
+        loaded = json.loads(args.data_file.read_text())
+        if not isinstance(loaded, dict):
+            raise A2aError("--data-file must contain a JSON object")
+        data_payload = loaded
+    row = send_message(
+        args.from_name,
+        args.to,
+        _message_body(args),
+        data_payload,
+        args.state_dir,
+        queue_on_unreachable=not args.no_queue,
+    )
+    print(json.dumps(row, ensure_ascii=False, sort_keys=True))
+    if row["delivery_status"] == "delivered":
+        return 0
+    return 3 if row["delivery_status"] == "queued" else 2
+
+
+def _cmd_flush(args: argparse.Namespace) -> int:
+    results = flush_queued(args.state_dir, from_name=args.as_name, to_name=args.to)
+    print(json.dumps(results, ensure_ascii=False, indent=2, sort_keys=True))
+    return 3 if any(r["status"] == "queued" for r in results) else 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -724,21 +880,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
 
         if args.command == "send":
-            data_payload = None
-            if args.data_file is not None:
-                loaded = json.loads(args.data_file.read_text())
-                if not isinstance(loaded, dict):
-                    raise A2aError("--data-file must contain a JSON object")
-                data_payload = loaded
-            row = send_message(
-                args.from_name,
-                args.to,
-                _message_body(args),
-                data_payload,
-                args.state_dir,
-            )
-            print(json.dumps(row, ensure_ascii=False, sort_keys=True))
-            return 0 if row["delivery_status"] == "delivered" else 2
+            return _cmd_send(args)
+
+        if args.command == "flush":
+            return _cmd_flush(args)
 
         if args.command == "inbox":
             if args.limit < 1 or args.limit > 10_000:
@@ -771,7 +916,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
 
         if args.command == "peers":
-            print(json.dumps(list_peers(args.state_dir), indent=2, sort_keys=True))
+            peers = list_peers(args.state_dir)
+            print(json.dumps(peers, indent=2, sort_keys=True))
+            # Auto-flush any queued messages now that we know who is up;
+            # stdout stays a plain peer list for existing consumers.
+            if any(p["status"] == "up" for p in peers):
+                flushed = flush_queued(args.state_dir)
+                delivered = sum(1 for r in flushed if r["status"] == "delivered")
+                if delivered:
+                    print(
+                        f"agent-a2a: flushed {delivered} queued message(s)",
+                        file=sys.stderr,
+                    )
             return 0
 
         if args.command == "status":

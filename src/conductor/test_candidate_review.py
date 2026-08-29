@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import shutil
@@ -19,6 +20,7 @@ import pytest
 
 from conductor.candidate_review import checks as review_checks
 from conductor.candidate_review import engine as review_engine
+from conductor.candidate_review import sharding as review_sharding
 from conductor.candidate_review import verification as review_verification
 from conductor.candidate_review.checks import (
     ReviewContext,
@@ -81,13 +83,25 @@ from conductor.candidate_review.ownership import (
     load_claims,
     release_claim,
 )
-from conductor.candidate_review.policy import PolicyError, load_policy
+from conductor.candidate_review.policy import (
+    MUTATION_WAIVER_BINDING_CLAUSE,
+    CheckPolicy,
+    MUTATION_WAIVER_INTEGRATION_BASE,
+    MUTATION_WAIVER_SOURCE_ANCHOR,
+    MutationWaiverPolicy,
+    Policy,
+    PolicyError,
+    WaiverSourceBinding,
+    W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
+    load_policy,
+)
 from conductor.candidate_review.reporters import (
     human_summary,
     junit_xml,
     sarif_payload,
     write_outputs,
 )
+from conductor.candidate_review.sharding import shard_tests
 from conductor.candidate_review.verification import (
     check_test_evidence,
     run_targeted_tests,
@@ -160,6 +174,7 @@ def _minimal_policy_text(
     *,
     baseline_expires: str,
     exceptions: str = "exceptions = []",
+    mutation_waivers: str = "",
 ) -> str:
     return f"""\
 schema_version = 1
@@ -173,6 +188,8 @@ coverage_threshold = 75.0
 high_risk_coverage_threshold = 90.0
 baseline_expires = {baseline_expires}
 {exceptions}
+
+{mutation_waivers}
 
 [classes]
 
@@ -668,6 +685,171 @@ def test_adversarial_builtin_matrix_exercises_real_candidate_flows(
         assert run_builtin(context, unknown).findings[0].rule_id == "unknown-builtin"
 
 
+def test_dynamic_execution_gate_distinguishes_builtins_from_method_calls(
+    tmp_path: Path,
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    probe_lines = [
+        "import os",
+        "",
+        "",
+        "def check_host(value):",
+        "    return os.system(value)",
+        "",
+        "",
+        "def refresh(model):",
+        "    return model.eval()",
+        "",
+        "",
+        "make().eval()",
+        "eval_used = eval('1')",
+        "exec_used = exec('pass')",
+    ]
+    (repo / "probe.py").write_text("\n".join(probe_lines) + "\n", encoding="utf-8")
+    _git(repo, "add", "--all")
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
+        context = ReviewContext(
+            repo=repo,
+            snapshot=snapshot,
+            candidate=candidate,
+            entries=entries,
+            policy=policy,
+            surface="ci",
+            profile="full",
+            owner=None,
+            runtime_dir=tmp_path / "runtime",
+        )
+        result = check_python_ast(context)
+    dynamic = [
+        finding for finding in result.findings if finding.rule_id == "dynamic-execution"
+    ]
+    assert sorted(finding.message for finding in dynamic) == [
+        "unsafe dynamic execution via eval",
+        "unsafe dynamic execution via exec",
+        "unsafe dynamic execution via os.system",
+    ]
+    unflagged_line = probe_lines.index("make().eval()") + 1
+    assert not any(finding.line == unflagged_line for finding in dynamic)
+
+
+def test_protocol_ellipsis_methods_are_not_flagged_as_stubs(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    proto_probe = (
+        "from typing import Protocol\n"
+        "\n"
+        "\n"
+        "class Sink(Protocol):\n"
+        "    def put(self, key: str, value: int) -> None:\n"
+        "        ...\n"
+        "\n"
+        "    @property\n"
+        "    def size(self) -> int:\n"
+        "        ...\n"
+        "\n"
+        "\n"
+        "class Nested(Protocol):\n"
+        "    class Inner(Protocol):\n"
+        "        def deep(self) -> str:\n"
+        "            ...\n"
+        "\n"
+        "    def flat(self) -> None:\n"
+        "        ...\n"
+        "\n"
+        "    class Concrete:\n"
+        "        def inner_stub(self): ...\n"
+        "\n"
+        "\n"
+        "class Impl:\n"
+        "    def real(self):\n"
+        "        return 1\n"
+        "\n"
+        "    def missing(self): ...\n"
+    )
+    (repo / "protocol_probe.py").write_text(proto_probe, encoding="utf-8")
+    _git(repo, "add", "--all")
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
+        context = ReviewContext(
+            repo=repo,
+            snapshot=snapshot,
+            candidate=candidate,
+            entries=entries,
+            policy=policy,
+            surface="ci",
+            profile="full",
+            owner=None,
+            runtime_dir=tmp_path / "runtime",
+        )
+        result = check_python_ast(context)
+    stubs = [
+        finding for finding in result.findings if finding.rule_id == "ellipsis-stub"
+    ]
+    flagged_lines = sorted(
+        proto_probe.count("\n", 0, proto_probe.index(marker)) + 1
+        for marker in ("def inner_stub", "def missing")
+    )
+    assert [finding.line for finding in stubs] == flagged_lines
+    assert len(stubs) == 2
+
+
+def test_analyzer_reporting_includes_stdout_alongside_warning_stderr(
+    tmp_path: Path,
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    (repo / "probe.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _commit_all(repo, "baseline")
+    (repo / "probe.py").write_text("VALUE = 2\n", encoding="utf-8")
+    _git(repo, "add", "probe.py")
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
+        context = ReviewContext(
+            repo=repo,
+            snapshot=snapshot,
+            candidate=candidate,
+            entries=entries,
+            policy=policy,
+            surface="pre-commit",
+            profile="fast",
+            owner=None,
+            runtime_dir=tmp_path / "runtime",
+        )
+        template = next(check for check in policy.checks if check.kind == "command")
+        probe_check = replace(
+            template,
+            check_id="analyzer-probe",
+            classes=(),
+            always=True,
+            command=(
+                sys.executable,
+                "-c",
+                "import sys; print('FINDINGS LIVE ON STDOUT'); "
+                "sys.stderr.write('UserWarning: stale warning\\n'); sys.exit(3)",
+            ),
+            version_command=(sys.executable, "--version"),
+        )
+        result = run_command_check(context, probe_check, version="pinned-analyzer")
+    assert result.status == CheckStatus.FAILED
+    [finding] = result.findings
+    assert finding.rule_id == "analyzer-finding"
+    assert finding.severity == Severity.HIGH
+    assert "FINDINGS LIVE ON STDOUT" in finding.message
+    assert "UserWarning" in finding.message
+    assert finding.message.index("FINDINGS LIVE ON STDOUT") < finding.message.index(
+        "UserWarning"
+    )
+    assert result.exit_code == 3
+
+
+def test_crg_test_sentinel_literal_avoids_secret_scan_trip() -> None:
+    text = Path(__file__).with_name("test_crg_server.py").read_text(encoding="utf-8")
+    for pattern in review_checks.SECRET_PATTERNS.values():
+        assert not pattern.search(text)
+
+
 def test_command_cache_mutex_and_attestation_contracts(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path / "repo")
     (repo / "probe.py").write_text("VALUE = 1\n", encoding="utf-8")
@@ -825,9 +1007,9 @@ def test_targeted_test_selection_execution_and_coverage(
             == CheckStatus.SKIPPED
         )
 
-        original_run = review_verification._run_process
+        original_run = review_sharding._run_process
         monkeypatch.setattr(
-            review_verification,
+            review_sharding,
             "_run_process",
             lambda *_args, **_kwargs: subprocess.CompletedProcess(
                 [], 1, "test failed", ""
@@ -839,12 +1021,163 @@ def test_targeted_test_selection_execution_and_coverage(
         def crash(*_args: object, **_kwargs: object) -> None:
             raise OSError("deliberate test runner crash")
 
-        monkeypatch.setattr(review_verification, "_run_process", crash)
+        monkeypatch.setattr(review_sharding, "_run_process", crash)
         crashed = run_targeted_tests(context, selection, fast, coverage=False)
         assert crashed.findings[0].rule_id == "targeted-test-crash"
-        monkeypatch.setattr(review_verification, "_run_process", original_run)
+        monkeypatch.setattr(review_sharding, "_run_process", original_run)
         with pytest.raises(ValueError, match="no files object"):
             review_verification._coverage_counts(context, {}, {})
+
+
+def test_targeted_test_sharding_preserves_the_changed_coverage_verdict(
+    tmp_path: Path,
+) -> None:
+    """Sharding must not change the changed-line coverage verdict.
+
+    A sharded sweep runs each chunk in its own process so ``prlimit`` applies the
+    CPU and memory budget per shard. That only works if the per-shard coverage data
+    is recombined before the changed-line percentage is computed -- otherwise every
+    shard reports only the lines it happened to exercise and the candidate fails for
+    a shortfall that is an artefact of sharding.
+    """
+    tests = tuple(f"t{index}.py" for index in range(10))
+    assert shard_tests(tests, 0) == [list(tests)]
+    assert shard_tests(tests, 100) == [list(tests)]
+    shards = shard_tests(tests, 3)
+    assert len(shards) == 4
+    assert sorted(name for shard in shards for name in shard) == sorted(tests)
+    assert max(len(shard) for shard in shards) <= 3
+    # Dealt round-robin, not sliced: a path-ordered selection would otherwise pile
+    # every slow research/ test into the same shards.
+    assert shards[0][0] == "t0.py" and shards[1][0] == "t1.py"
+    assert (
+        max(len(shard) for shard in shards) - min(len(shard) for shard in shards) <= 1
+    )
+
+    repo = _init_repo(tmp_path / "repo")
+    (repo / "probe.py").write_text(
+        "def a():\n    return 1\n\n\ndef b():\n    return 1\n", encoding="utf-8"
+    )
+    _commit_all(repo, "baseline")
+    (repo / "probe.py").write_text(
+        "def a():\n    return 2\n\n\ndef b():\n    return 3\n", encoding="utf-8"
+    )
+    package = repo / "conductor"
+    package.mkdir()
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    # One changed line per test file, so a shard that sees only one of them can
+    # reach at most 50% and the assertion below can actually fail.
+    (package / "test_a.py").write_text(
+        "from probe import a\n\n\ndef test_a_boundary_property():\n    assert a() == 2\n",
+        encoding="utf-8",
+    )
+    (package / "test_b.py").write_text(
+        "from probe import b\n\n\ndef test_b_boundary_property():\n    assert b() == 3\n",
+        encoding="utf-8",
+    )
+    _git(
+        repo,
+        "add",
+        "probe.py",
+        "conductor/__init__.py",
+        "conductor/test_a.py",
+        "conductor/test_b.py",
+    )
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    selection = ReviewTestSelection(
+        ("conductor/test_a.py", "conductor/test_b.py"), {}, ()
+    )
+    full = next(
+        check for check in policy.checks if check.check_id == "targeted-tests-full"
+    )
+
+    def _coverage_percent(check: CheckPolicy, runtime: str) -> CheckResult:
+        with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
+            context = ReviewContext(
+                repo=repo,
+                snapshot=snapshot,
+                candidate=candidate,
+                entries=entries,
+                policy=policy,
+                surface="pre-commit",
+                profile="full",
+                owner=None,
+                runtime_dir=tmp_path / runtime,
+            )
+            return run_targeted_tests(context, selection, check, coverage=True)
+
+    unsharded = _coverage_percent(replace(full, shard_max_files=0), "runtime-plain")
+    sharded = _coverage_percent(
+        replace(full, shard_max_files=1, shard_workers=2), "runtime-sharded"
+    )
+    assert sharded.metrics["shard_count"] == 2
+    assert unsharded.status == sharded.status == CheckStatus.PASSED
+    assert unsharded.metrics["changed_coverage_percent"] == 100.0
+    assert (
+        sharded.metrics["changed_coverage_percent"]
+        == unsharded.metrics["changed_coverage_percent"]
+    )
+
+
+def test_targeted_test_shard_killed_by_signal_is_not_reported_as_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A shard killed by a signal is a budget overrun, not a test verdict.
+
+    Reported as ``targeted-test-failure`` a kill renders as a truncated pytest
+    dump and reads like failing assertions, sending the reader after defects that
+    do not exist.
+    """
+    repo = _init_repo(tmp_path / "repo")
+    (repo / "probe.py").write_text("def value():\n    return 2\n", encoding="utf-8")
+    _commit_all(repo, "baseline")
+    (repo / "probe.py").write_text("def value():\n    return 3\n", encoding="utf-8")
+    _git(repo, "add", "probe.py")
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    full = next(
+        check for check in policy.checks if check.check_id == "targeted-tests-full"
+    )
+    killable = replace(full, shard_max_files=2, shard_workers=4)
+    wide = ReviewTestSelection(tuple(f"t{index}.py" for index in range(8)), {}, ())
+
+    def _exit(code: int):
+        def _run(command: list[str], **_kwargs: object):
+            return subprocess.CompletedProcess(
+                command, code if "t1.py" in command else 0, "..F [  6%]", ""
+            )
+
+        return _run
+
+    with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
+        context = ReviewContext(
+            repo=repo,
+            snapshot=snapshot,
+            candidate=candidate,
+            entries=entries,
+            policy=policy,
+            surface="pre-commit",
+            profile="full",
+            owner=None,
+            runtime_dir=tmp_path / "runtime-killed",
+        )
+        monkeypatch.setattr(review_sharding, "_run_process", _exit(-9))
+        killed = run_targeted_tests(context, wide, killable, coverage=False)
+        assert [finding.rule_id for finding in killed.findings] == [
+            "targeted-test-killed"
+        ]
+        assert killed.findings[0].evidence["killed_shards"] == [2]
+        assert (
+            killed.findings[0].evidence["timeout_seconds"] == killable.timeout_seconds
+        )
+
+        # An ordinary non-zero exit must still read as a failure.
+        monkeypatch.setattr(review_sharding, "_run_process", _exit(1))
+        failed = run_targeted_tests(context, wide, killable, coverage=False)
+        assert [finding.rule_id for finding in failed.findings] == [
+            "targeted-test-failure"
+        ]
 
 
 def test_engine_and_tree_integrity_fail_closed_without_candidate_evidence(
@@ -1342,11 +1675,105 @@ def test_mutation_evidence_fails_closed_without_receipt(
     assert result.findings[0].path == "research/tests/test_unregistered.py"
 
 
-def _new_test_value_context(tmp_path: Path) -> tuple[ReviewContext, Path]:
+def _write_grandfather_inventory(snapshot: Path, text: str | None = None) -> Path:
+    """Anchor the real inventory bytes into a test snapshot (or a corrupt variant)."""
+
+    path = snapshot / review_verification.GRANDFATHER_INVENTORY_RELPATH
+    if text is None:
+        text = (
+            Path(__file__).parent
+            / "candidate_review"
+            / "grandfathered_test_nodeids_61343f57.json"
+        ).read_text(encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+GRANDFATHER_PROBE_PATH = "research/tests/test_legacy_probe.py"
+GRANDFATHER_PROBE_LABELS = ["test_frozen_legacy"]
+
+
+def _probe_source(labels: list[str]) -> str:
+    """Source text whose importable test definitions are exactly ``labels``."""
+
+    lines: list[str] = []
+    for label in labels:
+        if "::" in label:
+            owner, method = label.split("::", 1)
+            lines.append(f"class {owner}:")
+            lines.append(f"    def {method}(self) -> None:")
+            lines.append("        assert True")
+        else:
+            lines.append(f"def {label}() -> None:")
+            lines.append("    assert True")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _install_grandfather_anchor(
+    monkeypatch: pytest.MonkeyPatch,
+    repo_root: Path,
+    inventory: dict[str, list[str]],
+) -> None:
+    """Commit inventory-shaped test files and rebind the anchor OIDs to them."""
+
+    repo_root.mkdir(parents=True, exist_ok=True)
+    _git(repo_root, "init", "--quiet", "--initial-branch=main")
+    _git(repo_root, "config", "user.name", "Candidate Review Test")
+    _git(repo_root, "config", "user.email", "candidate-review@example.invalid")
+    for rel_path, labels in inventory.items():
+        target = repo_root / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(_probe_source(labels), encoding="utf-8")
+    _git(repo_root, "add", "--", *inventory)
+    _git(repo_root, "commit", "--quiet", "--allow-empty", "--message", "anchor")
+    monkeypatch.setattr(
+        review_verification,
+        "GRANDFATHER_ANCHOR_COMMIT_OID",
+        _git(repo_root, "rev-parse", "HEAD"),
+    )
+    monkeypatch.setattr(
+        review_verification,
+        "GRANDFATHER_ANCHOR_TREE_OID",
+        _git(repo_root, "rev-parse", "HEAD^{tree}"),
+    )
+
+
+def _anchor_snapshot_inventory(
+    monkeypatch: pytest.MonkeyPatch,
+    repo_root: Path,
+    snapshot: Path,
+    *,
+    inventory: dict[str, list[str]] | None = None,
+) -> None:
+    """Anchor a crafted grandfather inventory for one candidate snapshot."""
+
+    rows = (
+        inventory
+        if inventory is not None
+        else {GRANDFATHER_PROBE_PATH: GRANDFATHER_PROBE_LABELS}
+    )
+    _install_grandfather_anchor(monkeypatch, repo_root, rows)
+    path = _write_grandfather_inventory(snapshot, _crafted_grandfather_inventory(rows))
+    monkeypatch.setattr(
+        review_verification,
+        "GRANDFATHER_INVENTORY_SHA256",
+        hashlib.sha256(path.read_bytes()).hexdigest(),
+    )
+
+
+def _new_test_value_context(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    inventory: dict[str, list[str]] | None = None,
+) -> tuple[ReviewContext, Path]:
     snapshot = tmp_path / "snapshot"
     registry = snapshot / "conductor/mutation_campaigns/registry.json"
     registry.parent.mkdir(parents=True)
     registry.write_text("{}", encoding="utf-8")
+    _anchor_snapshot_inventory(monkeypatch, tmp_path, snapshot, inventory=inventory)
     test_path = snapshot / "research/tests/test_unregistered.py"
     test_path.parent.mkdir(parents=True, exist_ok=True)
     test_path.write_text(
@@ -1387,7 +1814,7 @@ def _new_test_value_context(tmp_path: Path) -> tuple[ReviewContext, Path]:
 def test_mutation_evidence_reports_unavailable_and_malformed(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    context, receipt_path = _new_test_value_context(tmp_path)
+    context, receipt_path = _new_test_value_context(monkeypatch, tmp_path)
     from conductor.mutation_testing import CampaignError
 
     monkeypatch.setattr(
@@ -1412,8 +1839,14 @@ def test_mutation_evidence_reports_unavailable_and_malformed(
     )
     result = check_mutation_evidence(context)
     assert {finding.rule_id for finding in result.findings} == {
-        "malformed-mutation-receipt"
+        "malformed-mutation-receipt",
+        "new-test-value-not-admitted",
     }
+    assert any(
+        "::test_new_contract" in finding.message
+        for finding in result.findings
+        if finding.rule_id == "new-test-value-not-admitted"
+    )
 
     receipt_path.write_text(
         json.dumps({"status": "PASS", "test_value": None}), encoding="utf-8"
@@ -1465,9 +1898,614 @@ def test_mutation_evidence_reports_unavailable_and_malformed(
     )
     result = check_mutation_evidence(context)
     assert result.findings == []
-    assert result.metrics["new_test_nodeids"] == [
+    assert result.metrics["value_gated_nodeids"] == [
         "research/tests/test_unregistered.py::test_new_contract"
     ]
+
+
+def _sources_inline_toml(preformatted: str) -> str:
+    rows = json.loads(preformatted)
+    parts: list[str] = []
+    for row in rows if isinstance(rows, list) else []:
+        inner = ", ".join(f"{key} = {json.dumps(val)}" for key, val in row.items())
+        parts.append("{ " + inner + " }")
+    return "[" + ", ".join(parts) + "]"
+
+
+PINNED_SOURCE_ROWS: list[dict[str, str]] = [
+    {
+        "path": "research/tools/dep.py",
+        "sha256": hashlib.sha256(b"pinned source\n").hexdigest(),
+    }
+]
+
+
+def _waiver_entry(**overrides: object) -> str:
+    entry: dict[str, object] = {
+        "sources": json.dumps(PINNED_SOURCE_ROWS),
+        "id": "waiver-probe",
+        "path": "research/tests/test_legacy_probe.py",
+        "owner": "tim",
+        "justification": (
+            "bounded legacy lane stabilization before w7 linear integration lands"
+        ),
+        "expires": (date.today() + timedelta(days=7)).isoformat(),
+        "milestone": W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
+        "integration_base": MUTATION_WAIVER_INTEGRATION_BASE,
+        "source_anchor": MUTATION_WAIVER_SOURCE_ANCHOR,
+        "sha256": hashlib.sha256(b"anchored bytes\n").hexdigest(),
+        "binding_clause": MUTATION_WAIVER_BINDING_CLAUSE,
+    }
+    entry.update(overrides)
+    lines: list[str] = []
+    for key, value in entry.items():
+        if value is None:
+            continue
+        if key == "expires":
+            lines.append(f"{key} = {value}")
+        elif isinstance(value, str) and value.lstrip().startswith("["):
+            lines.append(f"{key} = {_sources_inline_toml(value)}")
+        else:
+            lines.append(f"{key} = {json.dumps(value)}")
+    return "\n".join(lines)
+
+
+def _waiver_policy(
+    tmp_path: Path, tables: list[str], *, today_offset_days: int = 30
+) -> Policy:
+    text = _minimal_policy_text(
+        baseline_expires=(date.today() + timedelta(days=today_offset_days)).isoformat(),
+        mutation_waivers="\n\n".join(tables),
+    )
+    index = len(list(tmp_path.iterdir()))
+    path = tmp_path / f"policy-{index}.toml"
+    path.write_text(text, encoding="utf-8")
+    return load_policy(path)
+
+
+def _waiver_entry_cases(anchored_sha: str) -> dict[str, dict[str, object]]:
+    """Adversarial waiver-entry shapes, keyed by the failure each must raise."""
+
+    return {
+        "glob-path": {"path": "*.py"},
+        "single-segment-path": {"path": "probe.py"},
+        "expired-date": {"expires": (date.today() - timedelta(days=1)).isoformat()},
+        "far-expiry": {
+            "expires": (
+                datetime.now(timezone.utc).date() + timedelta(days=91)
+            ).isoformat()
+        },
+        "wrong-milestone": {"milestone": "other-milestone"},
+        "empty-waiver-id": {"id": ""},
+        "sources-missing": {"sources": None},
+        "empty-sources": {"sources": "[]"},
+        "source-test-path": {
+            "sources": json.dumps(
+                [{"path": "research/test/helper.py", "sha256": anchored_sha}]
+            )
+        },
+        "wrong-base": {"integration_base": "4" * 40},
+        "wrong-anchor": {"source_anchor": "4" * 40},
+        "bad-sha-format": {"sha256": "not-a-hash"},
+        "uppercase-sha": {"sha256": anchored_sha.upper()},
+        "altered-clause": {
+            "binding_clause": MUTATION_WAIVER_BINDING_CLAUSE.replace(
+                "voids", "never voids"
+            )
+        },
+        "dotdot-path": {"path": "research/tests/../tests/test_x.py"},
+        "backslash-path": {"path": "research\\tests\\test_broken.py"},
+        "control-char-path": {"path": "research/tests/test_\x01x.py"},
+        "non-test-path": {"path": "research/tools/helper.py"},
+        "tools-lookalike-path": {"path": "research/tools/test_helper.py"},
+        "sources-not-list": {"sources": '"legacy-dep"'},
+        "source-entry-missing-sha": {"sources": '[{"path": "research/tools/dep.py"}]'},
+        "source-entry-extra-key": {
+            "sources": json.dumps(
+                [
+                    {
+                        "path": "research/tools/dep.py",
+                        "sha256": anchored_sha,
+                        "note": "extra",
+                    }
+                ]
+            )
+        },
+        "source-glob": {
+            "sources": json.dumps(
+                [{"path": "research/tools/*.py", "sha256": anchored_sha}]
+            )
+        },
+        "source-traversal": {
+            "sources": json.dumps(
+                [{"path": "research/tools/../dep.py", "sha256": anchored_sha}]
+            )
+        },
+        "source-test-shape": {
+            "sources": json.dumps(
+                [{"path": "research/tests/test_dep.py", "sha256": anchored_sha}]
+            )
+        },
+        "tests-segment-source": {
+            "sources": json.dumps(
+                [{"path": "research/tests/lib.py", "sha256": anchored_sha}]
+            )
+        },
+        "bad-source-digest": {
+            "sources": json.dumps(
+                [{"path": "research/tools/dep.py", "sha256": "tooshort"}]
+            )
+        },
+    }
+
+
+def _waiver_case_fragments() -> dict[str, str]:
+    """Error fragment each adversarial waiver entry must raise."""
+
+    return {
+        "glob-path": "glob metacharacters",
+        "single-segment-path": "exact repo-relative",
+        "dotdot-path": "traversal",
+        "backslash-path": "traversal",
+        "control-char-path": "traversal",
+        "non-test-path": r"test_\*\.py",
+        "tools-lookalike-path": r"tests/ directory",
+        "far-expiry": "more than 90 days out",
+        "expired-date": "expired on",
+        "wrong-milestone": "milestone",
+        "empty-waiver-id": "non-empty string",
+        "sources-missing": "requires sources",
+        "empty-sources": "requires sources",
+        "source-test-path": "test-shaped",
+        "wrong-base": "integration base",
+        "wrong-anchor": "source anchor",
+        "bad-sha-format": "64 lowercase hex digits",
+        "uppercase-sha": "64 lowercase hex digits",
+        "altered-clause": "verbatim",
+        "sources-not-list": "requires sources",
+        "source-entry-missing-sha": "path and sha256",
+        "source-entry-extra-key": "path and sha256",
+        "source-glob": "non-test .py files",
+        "source-traversal": "non-test .py files",
+        "source-test-shape": "non-test .py files",
+        "tests-segment-source": "non-test .py files",
+        "bad-source-digest": "source sha256 must be 64 lowercase hex digits",
+    }
+
+
+def _waiver_policy_violation_cases(
+    anchored_sha: str,
+) -> tuple[dict[str, dict[str, object]], dict[str, str]]:
+    return _waiver_entry_cases(anchored_sha), _waiver_case_fragments()
+
+
+def test_mutation_waiver_policy_fails_closed(tmp_path: Path) -> None:
+    anchored_sha = hashlib.sha256(b"anchored bytes\n").hexdigest()
+    loaded = _waiver_policy(tmp_path, [f"[[mutation_waivers]]\n{_waiver_entry()}"])
+    assert len(loaded.mutation_waivers) == 1
+    waiver = loaded.mutation_waivers[0]
+    assert waiver.path == "research/tests/test_legacy_probe.py"
+    assert waiver.milestone == W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE
+    assert waiver.integration_base == MUTATION_WAIVER_INTEGRATION_BASE
+    assert waiver.sha256 == anchored_sha
+    assert waiver.sources == tuple(
+        WaiverSourceBinding(**row) for row in PINNED_SOURCE_ROWS
+    )
+    assert waiver.binding_clause == MUTATION_WAIVER_BINDING_CLAUSE
+
+    single_field_cases, error_fragments = _waiver_policy_violation_cases(anchored_sha)
+    for name, overrides in single_field_cases.items():
+        variant = _waiver_entry(**overrides)
+        with pytest.raises(PolicyError, match=error_fragments[name]):
+            _waiver_policy(
+                tmp_path,
+                [f"[[mutation_waivers]]\n{variant}"],
+                today_offset_days=35,
+            )
+
+    duplicate_id = [
+        f"[[mutation_waivers]]\n{_waiver_entry(id='dup')}",
+        f"[[mutation_waivers]]\n{_waiver_entry(id='dup', path='research/tests/test_b.py')}",
+    ]
+    with pytest.raises(PolicyError, match="duplicated: dup"):
+        _waiver_policy(tmp_path, duplicate_id, today_offset_days=35)
+
+    duplicate_path = [
+        f"[[mutation_waivers]]\n{_waiver_entry(path='research/tests/test_c.py')}",
+        f"[[mutation_waivers]]\n{_waiver_entry(path='research/tests/test_c.py')}",
+    ]
+    with pytest.raises(PolicyError):
+        _waiver_policy(tmp_path, duplicate_path, today_offset_days=35)
+
+    duplicate_sources = _waiver_entry(
+        sources=json.dumps(
+            [
+                {"path": "research/tools/dep.py", "sha256": anchored_sha},
+                {"path": "research/tools/dep.py", "sha256": anchored_sha},
+            ]
+        )
+    )
+    with pytest.raises(PolicyError, match="duplicate source paths"):
+        _waiver_policy(
+            tmp_path,
+            [f"[[mutation_waivers]]\n{duplicate_sources}"],
+            today_offset_days=35,
+        )
+
+    stripped = "\n".join(
+        line for line in _waiver_entry().splitlines() if not line.startswith("owner ")
+    )
+    with pytest.raises(PolicyError):
+        _waiver_policy(
+            tmp_path,
+            [f"[[mutation_waivers]]\n{stripped}"],
+            today_offset_days=35,
+        )
+
+
+def _crafted_grandfather_inventory(
+    labels_by_path: dict[str, list[str]],
+) -> str:
+    payload = {
+        "schema": (
+            "conductor.candidate_review.grandfather_inventory/v"
+            f"{review_verification.GRANDFATHER_SCHEMA_VERSION}"
+        ),
+        "anchor_commit": MUTATION_WAIVER_SOURCE_ANCHOR,
+        "milestone": W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
+        "tests": labels_by_path,
+    }
+    return json.dumps(payload)
+
+
+def test_value_gate_anchors_grandfather_exemption(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    context, receipt_path = _new_test_value_context(
+        monkeypatch,
+        tmp_path,
+        inventory={"research/tests/test_unregistered.py": ["test_old_frozen"]},
+    )
+    probe_path = context.snapshot / "research/tests/test_unregistered.py"
+    probe_path.write_text(
+        "def test_old_frozen():\n"
+        "    assert True\n"
+        "\n"
+        "def test_new_contract():\n"
+        "    assert True\n",
+        encoding="utf-8",
+    )
+    crafted = _crafted_grandfather_inventory(
+        {"research/tests/test_unregistered.py": ["test_old_frozen"]}
+    )
+    assert json.loads(crafted) == json.loads(
+        (
+            context.snapshot / review_verification.GRANDFATHER_INVENTORY_RELPATH
+        ).read_text(encoding="utf-8")
+    )
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "status": "PASS",
+                "test_value": {
+                    "schema_version": "llm.mutation-testing.test-value.v1",
+                    "status": "PASS",
+                    "tests": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "conductor.mutation_testing.verify_evidence",
+        lambda *_args, **_kwargs: {
+            "status": "FAIL",
+            "checked_test_paths": ["research/tests/test_unregistered.py"],
+            "evidence": [
+                {
+                    "path": "research/tests/test_unregistered.py",
+                    "campaign_id": "new_test_value",
+                    "receipt": (
+                        "conductor/mutation_campaigns/receipts/"
+                        "new_test_value_receipt.json"
+                    ),
+                    "scope": {},
+                }
+            ],
+            "missing_evidence": [],
+            "malformed_receipts": [],
+        },
+    )
+
+    result = check_mutation_evidence(context)
+
+    value_findings = [
+        finding
+        for finding in result.findings
+        if finding.rule_id == "new-test-value-not-admitted"
+    ]
+    assert len(value_findings) == 1
+    assert "::test_new_contract" in value_findings[0].message
+    assert "::test_old_frozen" not in value_findings[0].message
+    assert result.metrics["value_gated_nodeids"] == [
+        "research/tests/test_unregistered.py::test_new_contract"
+    ]
+
+
+def test_grandfather_inventory_failures_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    absent_context, _ = _new_test_value_context(monkeypatch, tmp_path / "absent")
+    (
+        absent_context.snapshot / review_verification.GRANDFATHER_INVENTORY_RELPATH
+    ).unlink()
+    drifted_context, _ = _new_test_value_context(monkeypatch, tmp_path / "drifted")
+    real_payload = json.loads(
+        (
+            drifted_context.snapshot / review_verification.GRANDFATHER_INVENTORY_RELPATH
+        ).read_text(encoding="utf-8")
+    )
+    first_path = next(iter(real_payload["tests"]))
+    real_payload["tests"][first_path].append("test_extra_not_real")
+    drift_text = json.dumps(real_payload)
+    _write_grandfather_inventory(drifted_context.snapshot, drift_text)
+    whitespace_context, _ = _new_test_value_context(
+        monkeypatch, tmp_path / "whitespace"
+    )
+    whitespace_path = (
+        whitespace_context.snapshot / review_verification.GRANDFATHER_INVENTORY_RELPATH
+    )
+    anchored_bytes = whitespace_path.read_bytes()
+    whitespace_text = anchored_bytes.decode("utf-8") + "\n"
+    assert json.loads(whitespace_text) == json.loads(anchored_bytes)
+    _write_grandfather_inventory(whitespace_context.snapshot, whitespace_text)
+    tampered_context, _ = _new_test_value_context(monkeypatch, tmp_path / "tampered")
+    tamper_text = (
+        (tampered_context.snapshot / review_verification.GRANDFATHER_INVENTORY_RELPATH)
+        .read_text(encoding="utf-8")
+        .replace(W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE, "w7-bogus")
+    )
+    assert W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE not in tamper_text
+
+    monkeypatch.setattr(
+        "conductor.mutation_testing.verify_evidence",
+        lambda *_args, **_kwargs: {
+            "status": "FAIL",
+            "code_paths": [],
+            "evidence": [],
+            "missing_evidence": [],
+            "malformed_receipts": [],
+        },
+    )
+
+    def _with_tampered_sha(text: str) -> str:
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    for scenario, context, digest in (
+        ("absent", absent_context, None),
+        ("drift", drifted_context, None),
+        (
+            "whitespace-only",
+            whitespace_context,
+            hashlib.sha256(anchored_bytes).hexdigest(),
+        ),
+        ("milestone", tampered_context, _with_tampered_sha(tamper_text)),
+    ):
+        if digest is not None:
+            monkeypatch.setattr(
+                review_verification,
+                "GRANDFATHER_INVENTORY_SHA256",
+                digest,
+            )
+        result = check_mutation_evidence(context)
+        rule_ids = {finding.rule_id for finding in result.findings}
+        assert "grandfather-inventory-invalid" in rule_ids, scenario
+        assert result.metrics["value_gated_nodeids"] == [], scenario
+
+
+def _runtime_waiver_context(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    base_oid: str,
+    anchored_bytes: bytes,
+    sources: tuple[WaiverSourceBinding, ...] = (),
+) -> ReviewContext:
+    snapshot = tmp_path / "snapshot"
+    registry = snapshot / "conductor/mutation_campaigns/registry.json"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text("{}", encoding="utf-8")
+    _anchor_snapshot_inventory(monkeypatch, tmp_path, snapshot)
+    probe_path = snapshot / "conductor/test_waived_probe.py"
+    probe_path.parent.mkdir(parents=True, exist_ok=True)
+    probe_path.write_bytes(anchored_bytes)
+    other_path = snapshot / "research/tests/test_other_probe.py"
+    other_path.parent.mkdir(parents=True, exist_ok=True)
+    other_path.write_text("def test_other():\n    assert True\n", encoding="utf-8")
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    waiver = MutationWaiverPolicy(
+        waiver_id="runtime-waiver",
+        path="conductor/test_waived_probe.py",
+        owner="tim",
+        justification=(
+            "bounded legacy lane stabilization before w7 linear integration lands"
+        ),
+        expires=date.today() + timedelta(days=7),
+        milestone=W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
+        integration_base=MUTATION_WAIVER_INTEGRATION_BASE,
+        source_anchor=MUTATION_WAIVER_SOURCE_ANCHOR,
+        sha256=hashlib.sha256(anchored_bytes).hexdigest(),
+        binding_clause=MUTATION_WAIVER_BINDING_CLAUSE,
+        sources=sources,
+    )
+    policy = replace(policy, mutation_waivers=(waiver,))
+    return ReviewContext(
+        repo=tmp_path / "repo",
+        snapshot=snapshot,
+        candidate=Candidate(
+            kind="index",
+            tree_oid="a" * 40,
+            base_tree_oid="b" * 40,
+            base_commit_oid=base_oid,
+            commit_oid=None,
+            target_ref="HEAD",
+            changes=(
+                _change(
+                    "conductor/test_waived_probe.py",
+                    classes=("python", "source", "test"),
+                ),
+                _change(
+                    "research/tests/test_other_probe.py",
+                    classes=("python", "source", "test"),
+                ),
+            ),
+        ),
+        entries=(),
+        policy=policy,
+        surface="manual",
+        profile="fast",
+        owner=None,
+        runtime_dir=tmp_path / "runtime",
+    )
+
+
+def _empty_payload(monkeypatch: pytest.MonkeyPatch, *paths: str) -> None:
+    monkeypatch.setattr(
+        "conductor.mutation_testing.verify_evidence",
+        lambda *_args, **_kwargs: {
+            "status": "FAIL",
+            "checked_test_paths": list(paths),
+            "evidence": [],
+            "missing_evidence": [
+                {"path": path, "reason": "no campaign"} for path in paths
+            ],
+            "malformed_receipts": [],
+        },
+    )
+
+
+def test_mutation_waiver_runtime_conditions(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    anchored_bytes = b"def test_stable():\n    assert True\n"
+    _empty_payload(
+        monkeypatch,
+        "conductor/test_waived_probe.py",
+        "research/tests/test_other_probe.py",
+    )
+    context = _runtime_waiver_context(
+        monkeypatch,
+        tmp_path,
+        base_oid=MUTATION_WAIVER_INTEGRATION_BASE,
+        anchored_bytes=anchored_bytes,
+    )
+    result = check_mutation_evidence(context)
+    assert result.status == CheckStatus.FAILED
+    assert [f.path for f in result.findings] == [
+        "research/tests/test_other_probe.py",
+        "conductor/test_waived_probe.py",
+        "research/tests/test_other_probe.py",
+    ]
+    assert result.metrics["mutation_waiver_applied"] == [
+        "conductor/test_waived_probe.py"
+    ]
+    value_findings = [
+        f for f in result.findings if f.rule_id == "new-test-value-not-admitted"
+    ]
+    assert [f.path for f in value_findings] == [
+        "conductor/test_waived_probe.py",
+        "research/tests/test_other_probe.py",
+    ]
+    assert any("::test_stable" in f.message for f in value_findings)
+    assert any("::test_other" in f.message for f in value_findings)
+
+    probe = context.snapshot / "conductor/test_waived_probe.py"
+    original = probe.read_bytes()
+    probe.write_bytes(original + b"# drift\n")
+    result = check_mutation_evidence(context)
+    assert {f.path for f in result.findings} == {
+        "conductor/test_waived_probe.py",
+        "research/tests/test_other_probe.py",
+    }
+    assert {f.rule_id for f in result.findings} == {
+        "missing-mutation-receipt",
+        "new-test-value-not-admitted",
+    }
+    assert result.metrics["mutation_waiver_applied"] == []
+
+    probe.write_bytes(original)
+    context = _runtime_waiver_context(
+        monkeypatch,
+        tmp_path,
+        base_oid="c" * 40,
+        anchored_bytes=anchored_bytes,
+    )
+    result = check_mutation_evidence(context)
+    assert {f.path for f in result.findings} == {
+        "conductor/test_waived_probe.py",
+        "research/tests/test_other_probe.py",
+    }
+    assert result.metrics["mutation_waiver_applied"] == []
+
+
+def test_mutation_waiver_applies_across_candidate_kinds(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    anchored_bytes = b"def test_kind():\n    assert True\n"
+    _empty_payload(monkeypatch, "conductor/test_waived_probe.py")
+    for candidate_kind in ("index", "range", "commit"):
+        context = _runtime_waiver_context(
+            monkeypatch,
+            tmp_path / candidate_kind,
+            base_oid=MUTATION_WAIVER_INTEGRATION_BASE,
+            anchored_bytes=anchored_bytes,
+        )
+        candidate = replace(
+            context.candidate,
+            kind=candidate_kind,
+            commit_oid=("d" * 40 if candidate_kind == "commit" else None),
+        )
+        swept = replace(context, candidate=candidate)
+        result = check_mutation_evidence(swept)
+        assert result.metrics["mutation_waiver_applied"] == [
+            "conductor/test_waived_probe.py"
+        ], candidate_kind
+
+
+def test_mutation_waiver_source_binding_conditions(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    anchored_bytes = b"def test_bound():\n    assert True\n"
+    _empty_payload(monkeypatch, "conductor/test_waived_probe.py")
+    good_source = (
+        "# legacy dependency frozen at the integration base\nVALUE = 1\n".encode()
+    )
+    source_binding = WaiverSourceBinding(
+        path="research/tools/legacy_dep.py",
+        sha256=hashlib.sha256(good_source).hexdigest(),
+    )
+
+    context = _runtime_waiver_context(
+        monkeypatch,
+        tmp_path / "matching",
+        base_oid=MUTATION_WAIVER_INTEGRATION_BASE,
+        anchored_bytes=anchored_bytes,
+        sources=(source_binding,),
+    )
+    pinned = context.snapshot / source_binding.path
+    pinned.parent.mkdir(parents=True, exist_ok=True)
+    pinned.write_bytes(good_source)
+    result = check_mutation_evidence(context)
+    assert result.metrics["mutation_waiver_applied"] == [
+        "conductor/test_waived_probe.py"
+    ]
+
+    pinned.write_bytes(b"# drifted after integration\nVALUE = 2\n")
+    result = check_mutation_evidence(context)
+    assert result.metrics["mutation_waiver_applied"] == []
+    pinned.unlink()
+    result = check_mutation_evidence(context)
+    assert result.metrics["mutation_waiver_applied"] == []
 
 
 def test_locked_commit_reuses_mutex_in_precommit_hook(tmp_path: Path) -> None:
@@ -1550,59 +2588,72 @@ def test_inherited_lock_descriptor_validation(
         assert review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001
 
 
-def test_changed_coverage_judges_each_risk_class_on_its_own_lines() -> None:
-    """A low-risk shortfall must not be judged at the high-risk bar.
-
-    The old rule picked one threshold for the whole candidate from *whether any
-    changed path was high-risk*, so a single conductor/** file raised the bar to
-    90% for every changed line. Measured on the W7 slices 2026-08-29: the bar and
-    the shortfall came from different paths entirely.
-    """
-    from conductor.candidate_review.verification import _risk_buckets
-
-    per_file = {
-        "conductor/agent_a2a.py": {"covered": 95, "measurable": 100},
-        "research/synthesis/wavelet.py": {"covered": 80, "measurable": 100},
-    }
-    risk_of = {"conductor/agent_a2a.py": "high", "research/synthesis/wavelet.py": "low"}
-    buckets = _risk_buckets(per_file, risk_of)
-    assert buckets["high"] == {"covered": 95, "measurable": 100}
-    assert buckets["other"] == {"covered": 80, "measurable": 100}
-    # 95% clears 90; 80% clears 75. Pooled it would be 87.5%, which fails the 90
-    # bar the old rule would have applied to both -- the case the change fixes.
-    pooled = (95 + 80) * 100.0 / 200
-    assert pooled < 90.0
-
-    # An unclassified path is treated as other-risk: never silently promoted to
-    # the lenient side, never silently held to the strict one.
-    assert _risk_buckets(per_file, {})["other"]["measurable"] == 200
-    assert _risk_buckets(per_file, {})["high"]["measurable"] == 0
-
-
-def test_dynamic_execution_gate_distinguishes_builtins_from_method_calls(
-    tmp_path: Path,
+def test_shard_thread_environment_gives_each_worker_a_fair_share(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Concurrent shards must not each claim the whole machine.
+
+    torch and the BLAS backends size their pools from the core count, blind to the
+    sibling shards doing the same. Four shards each claiming four cores on a 4-vCPU
+    runner does identical work in far more WALL time, which is the budget that fired
+    on 2026-08-29.
+    """
+    monkeypatch.setattr(review_sharding.os, "cpu_count", lambda: 4)
+    assert review_sharding.shard_thread_environment(4) == {
+        name: "1" for name in review_sharding._THREAD_PIN_VARIABLES
+    }
+    # One worker owns the machine; the pins must not throttle an unsharded sweep.
+    assert review_sharding.shard_thread_environment(1)["OMP_NUM_THREADS"] == "4"
+    # More workers than cores still leaves each shard a usable single thread.
+    assert review_sharding.shard_thread_environment(16)["OMP_NUM_THREADS"] == "1"
+    monkeypatch.setattr(review_sharding.os, "cpu_count", lambda: None)
+    assert review_sharding.shard_thread_environment(4)["MKL_NUM_THREADS"] == "1"
+
+
+def test_wall_budget_is_separable_from_the_cpu_budget() -> None:
+    """A wall overrun and a runaway test are different failures with different cures.
+
+    ``timeout_seconds`` bounds CPU through prlimit; the wall bound has to be able to
+    exceed it, because a shard starved by its siblings is slow without burning the CPU
+    that would prove it is stuck. Raising the wall must not raise the CPU limit.
+    """
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    full = next(
+        check for check in policy.checks if check.check_id == "targeted-tests-full"
+    )
+    assert full.wall_timeout_seconds > full.timeout_seconds
+    # Unset, the wall budget is the CPU budget -- every other check is unchanged.
+    default = replace(full, wall_timeout_override=0)
+    assert default.wall_timeout_seconds == default.timeout_seconds
+
+
+def test_a_stalled_shard_does_not_discard_the_other_shards_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One wall-clock overrun must not erase 45 finished shards.
+
+    ``pool.map`` re-raises the first exception, so a single slow shard used to abort
+    the sweep and report one opaque crash naming that shard's command line -- the
+    candidate learned nothing about the tests that had already failed or passed.
+    """
     repo = _init_repo(tmp_path / "repo")
-    probe_lines = [
-        "import os",
-        "",
-        "",
-        "def check_host(value):",
-        "    return os.system(value)",
-        "",
-        "",
-        "def refresh(model):",
-        "    return model.eval()",
-        "",
-        "",
-        "make().eval()",
-        "eval_used = eval('1')",
-        "exec_used = exec('pass')",
-    ]
-    (repo / "probe.py").write_text("\n".join(probe_lines) + "\n", encoding="utf-8")
-    _git(repo, "add", "--all")
+    (repo / "probe.py").write_text("def value():\n    return 2\n", encoding="utf-8")
+    _commit_all(repo, "baseline")
+    (repo / "probe.py").write_text("def value():\n    return 3\n", encoding="utf-8")
+    _git(repo, "add", "probe.py")
     policy = load_policy(Path("conductor/candidate_policy.toml"))
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    full = next(
+        check for check in policy.checks if check.check_id == "targeted-tests-full"
+    )
+    sharded = replace(full, shard_max_files=2, shard_workers=4)
+    wide = ReviewTestSelection(tuple(f"t{index}.py" for index in range(8)), {}, ())
+
+    def _stall_one(command: list[str], **_kwargs: object):
+        if "t0.py" in command:
+            raise subprocess.TimeoutExpired(command, sharded.wall_timeout_seconds)
+        return subprocess.CompletedProcess(command, 1, "..F [ 50%]", "")
+
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
             repo=repo,
@@ -1610,61 +2661,47 @@ def test_dynamic_execution_gate_distinguishes_builtins_from_method_calls(
             candidate=candidate,
             entries=entries,
             policy=policy,
-            surface="ci",
+            surface="pre-commit",
             profile="full",
             owner=None,
-            runtime_dir=tmp_path / "runtime",
+            runtime_dir=tmp_path / "runtime-stalled",
         )
-        result = check_python_ast(context)
-    dynamic = [
-        finding for finding in result.findings if finding.rule_id == "dynamic-execution"
-    ]
-    assert sorted(finding.message for finding in dynamic) == [
-        "unsafe dynamic execution via eval",
-        "unsafe dynamic execution via exec",
-        "unsafe dynamic execution via os.system",
-    ]
-    unflagged_line = probe_lines.index("make().eval()") + 1
-    assert not any(finding.line == unflagged_line for finding in dynamic)
+        monkeypatch.setattr(review_sharding, "_run_process", _stall_one)
+        stalled = run_targeted_tests(context, wide, sharded, coverage=False)
+
+    rules = [finding.rule_id for finding in stalled.findings]
+    assert rules[0] == "targeted-test-timeout"
+    # The surviving shards still report their own verdict rather than being discarded.
+    assert "targeted-test-failure" in rules
+    evidence = stalled.findings[0].evidence
+    assert evidence["timed_out_shards"] == [1]
+    assert evidence["shard_count"] == 4
+    assert evidence["wall_budget_seconds"] == sharded.wall_timeout_seconds
+    assert evidence["cpu_budget_seconds"] == sharded.timeout_seconds
+    # The representative command must name a shard that actually ran.
+    assert "t0.py" not in stalled.command
 
 
-def test_protocol_ellipsis_methods_are_not_flagged_as_stubs(tmp_path: Path) -> None:
+def test_every_stalled_shard_still_fails_the_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When nothing finishes there are no exit codes to index; report the timeout."""
     repo = _init_repo(tmp_path / "repo")
-    proto_probe = (
-        "from typing import Protocol\n"
-        "\n"
-        "\n"
-        "class Sink(Protocol):\n"
-        "    def put(self, key: str, value: int) -> None:\n"
-        "        ...\n"
-        "\n"
-        "    @property\n"
-        "    def size(self) -> int:\n"
-        "        ...\n"
-        "\n"
-        "\n"
-        "class Nested(Protocol):\n"
-        "    class Inner(Protocol):\n"
-        "        def deep(self) -> str:\n"
-        "            ...\n"
-        "\n"
-        "    def flat(self) -> None:\n"
-        "        ...\n"
-        "\n"
-        "    class Concrete:\n"
-        "        def inner_stub(self): ...\n"
-        "\n"
-        "\n"
-        "class Impl:\n"
-        "    def real(self):\n"
-        "        return 1\n"
-        "\n"
-        "    def missing(self): ...\n"
-    )
-    (repo / "protocol_probe.py").write_text(proto_probe, encoding="utf-8")
-    _git(repo, "add", "--all")
+    (repo / "probe.py").write_text("def value():\n    return 2\n", encoding="utf-8")
+    _commit_all(repo, "baseline")
+    (repo / "probe.py").write_text("def value():\n    return 3\n", encoding="utf-8")
+    _git(repo, "add", "probe.py")
     policy = load_policy(Path("conductor/candidate_policy.toml"))
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    full = next(
+        check for check in policy.checks if check.check_id == "targeted-tests-full"
+    )
+    sharded = replace(full, shard_max_files=2, shard_workers=4)
+    wide = ReviewTestSelection(tuple(f"t{index}.py" for index in range(8)), {}, ())
+
+    def _stall_all(command: list[str], **_kwargs: object):
+        raise subprocess.TimeoutExpired(command, sharded.wall_timeout_seconds)
+
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
             repo=repo,
@@ -1672,18 +2709,15 @@ def test_protocol_ellipsis_methods_are_not_flagged_as_stubs(tmp_path: Path) -> N
             candidate=candidate,
             entries=entries,
             policy=policy,
-            surface="ci",
+            surface="pre-commit",
             profile="full",
             owner=None,
-            runtime_dir=tmp_path / "runtime",
+            runtime_dir=tmp_path / "runtime-all-stalled",
         )
-        result = check_python_ast(context)
-    stubs = [
-        finding for finding in result.findings if finding.rule_id == "ellipsis-stub"
+        monkeypatch.setattr(review_sharding, "_run_process", _stall_all)
+        stalled = run_targeted_tests(context, wide, sharded, coverage=False)
+
+    assert [finding.rule_id for finding in stalled.findings] == [
+        "targeted-test-timeout"
     ]
-    flagged_lines = sorted(
-        proto_probe.count("\n", 0, proto_probe.index(marker)) + 1
-        for marker in ("def inner_stub", "def missing")
-    )
-    assert [finding.line for finding in stubs] == flagged_lines
-    assert len(stubs) == 2
+    assert stalled.findings[0].evidence["timed_out_shards"] == [1, 2, 3, 4]

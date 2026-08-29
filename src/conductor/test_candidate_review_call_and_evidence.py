@@ -1,0 +1,161 @@
+"""Two governance-gate defects that produced false blocking findings.
+
+1. ``_call_name`` returned the bare attribute name when a call's receiver could
+   not be resolved, so ``model.to(device).eval()`` — the standard PyTorch
+   eval-mode idiom — resolved to ``"eval"`` and raised a CRITICAL
+   ``dynamic-execution`` finding.
+2. ``_has_property_evidence`` was a plain regex over test text and never
+   consulted mutation evidence, despite backing a rule named
+   ``missing-property-or-mutation-evidence``.
+"""
+
+from __future__ import annotations
+
+import ast
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from conductor.candidate_review import verification
+from conductor.candidate_review.checks import _call_name, _PythonVisitor
+
+
+def _call_node(expression: str) -> ast.expr:
+    parsed = ast.parse(expression).body[0]
+    assert isinstance(parsed, ast.Expr)
+    call = parsed.value
+    assert isinstance(call, ast.Call)
+    return call.func
+
+
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        # Bare builtins stay resolvable — these are the real detections.
+        ("eval(payload)", "eval"),
+        ("exec(payload)", "exec"),
+        # Dotted from a Name root stays resolvable.
+        ("os.system(cmd)", "os.system"),
+        ("pickle.load(handle)", "pickle.load"),
+        ("yaml.load(stream)", "yaml.load"),
+        ("obj.eval()", "obj.eval"),
+        ("self.eval()", "self.eval"),
+        ("torch.nn.Module.eval(model)", "torch.nn.Module.eval"),
+        # Unresolvable receivers must NOT collapse to the bare attribute.
+        ("model.to(device).eval()", ""),
+        ("build().exec()", ""),
+        ("registry['key'].eval()", ""),
+        ("(a + b).eval()", ""),
+    ],
+)
+def test_call_name_never_guesses_a_builtin_from_an_unresolvable_receiver(
+    expression: str, expected: str
+) -> None:
+    assert _call_name(_call_node(expression)) == expected
+
+
+def _rule_ids(source: str) -> set[str]:
+    visitor = _PythonVisitor("m.py", source.splitlines(), hot_path=False)
+    visitor.visit(ast.parse(source))
+    return {finding.rule_id for finding in visitor.findings}
+
+
+@pytest.mark.parametrize(
+    ("source", "flagged"),
+    [
+        ("def f(model, device):\n    return model.to(device).eval()\n", False),
+        ("def f(model):\n    return model.eval()\n", False),
+        ("def f(payload):\n    return eval(payload)\n", True),
+        ("def f(payload):\n    return exec(payload)\n", True),
+        ("import os\n\n\ndef f(cmd):\n    return os.system(cmd)\n", True),
+    ],
+)
+def test_dynamic_execution_flags_real_calls_only(source: str, flagged: bool) -> None:
+    assert ("dynamic-execution" in _rule_ids(source)) is flagged
+
+
+@dataclass
+class _Ctx:
+    """Minimal stand-in for the fields ``_has_property_evidence`` reads."""
+
+    snapshot: Path
+
+
+def _write_registry(root: Path) -> None:
+    registry = root / "conductor" / "mutation_campaigns" / "registry.json"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text('{"campaigns": []}', encoding="utf-8")
+
+
+def test_property_regex_still_satisfies_the_gate(tmp_path: Path) -> None:
+    test_path = tmp_path / "test_thing.py"
+    test_path.write_text(
+        "import pytest\n\n\n@pytest.mark.parametrize('n', [1])\ndef test_thing(n):\n"
+        "    assert n\n",
+        encoding="utf-8",
+    )
+    assert verification._has_property_evidence(_Ctx(tmp_path), {"test_thing.py"})
+
+
+def test_mutation_evidence_satisfies_the_gate_without_property_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A campaign PASS is stronger than a decorator and must count."""
+    (tmp_path / "test_thing.py").write_text(
+        "def test_thing():\n    assert True\n", encoding="utf-8"
+    )
+    _write_registry(tmp_path)
+    ctx = _Ctx(tmp_path)
+    assert not verification._has_property_evidence(ctx, {"test_thing.py"})
+
+    def _verify(_registry: Path, paths: Any, **_kw: Any) -> dict[str, Any]:
+        return {"evidence": [{"path": path} for path in paths]}
+
+    monkeypatch.setattr("conductor.mutation_testing.verify_evidence", _verify)
+    assert verification._has_property_evidence(ctx, {"test_thing.py"})
+
+
+@pytest.mark.parametrize(
+    ("covered_path", "expected"),
+    [
+        ("test_thing.py", True),
+        ("test_unrelated.py", False),
+    ],
+)
+def test_mutation_evidence_must_cover_a_selected_test(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    covered_path: str,
+    expected: bool,
+) -> None:
+    _write_registry(tmp_path)
+
+    def _verify(_registry: Path, _paths: Any, **_kw: Any) -> dict[str, Any]:
+        return {"evidence": [{"path": covered_path}]}
+
+    monkeypatch.setattr("conductor.mutation_testing.verify_evidence", _verify)
+    assert (
+        verification._has_mutation_evidence(_Ctx(tmp_path), {"test_thing.py"})
+        is expected
+    )
+
+
+def test_missing_registry_is_not_mutation_evidence(tmp_path: Path) -> None:
+    assert not verification._has_mutation_evidence(_Ctx(tmp_path), {"test_thing.py"})
+
+
+def test_broken_registry_does_not_claim_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A CampaignError belongs to the mutation-evidence check, not to this one."""
+    from conductor.mutation_testing import CampaignError
+
+    _write_registry(tmp_path)
+
+    def _raise(_registry: Path, _paths: Any, **_kw: Any) -> dict[str, Any]:
+        raise CampaignError("registry is broken")
+
+    monkeypatch.setattr("conductor.mutation_testing.verify_evidence", _raise)
+    assert not verification._has_mutation_evidence(_Ctx(tmp_path), {"test_thing.py"})

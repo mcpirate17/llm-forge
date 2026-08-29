@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import socket
@@ -23,6 +24,7 @@ from conductor.agent_a2a import (
     A2aStore,
     AgentRecord,
     build_app,
+    flush_queued,
     init_registry,
     list_peers,
     load_registry,
@@ -380,7 +382,23 @@ def test_live_self_send_journals_both_directions(
     assert len(store.rows(unread_only=True, limit=10)) == 1
 
 
-def test_live_offline_peer_fails_fast_with_reason(
+def test_live_offline_peer_queues_by_default(
+    live_server: tuple[str, int, str, Path],
+) -> None:
+    up, _port, down, state_dir = live_server
+    row = send_message(
+        from_name=up,
+        to_name=down,
+        body="anyone there?",
+        data_payload=None,
+        state_dir=state_dir,
+    )
+    assert row["delivery_status"] == "queued"
+    assert "peer unreachable" in row["status_reason"]
+    assert A2aStore(state_dir, up).counts().get("queued") == 1
+
+
+def test_live_offline_peer_no_queue_fails_fast_with_reason(
     live_server: tuple[str, int, str, Path],
 ) -> None:
     up, _port, down, state_dir = live_server
@@ -391,6 +409,7 @@ def test_live_offline_peer_fails_fast_with_reason(
             body="anyone there?",
             data_payload=None,
             state_dir=state_dir,
+            queue_on_unreachable=False,
         )
     rows = A2aStore(state_dir, up).counts()
     assert rows.get("failed") == 1
@@ -400,6 +419,86 @@ def test_live_offline_peer_fails_fast_with_reason(
             "SELECT status_reason FROM messages WHERE delivery_status='failed'"
         ).fetchone()
     assert failed and failed["status_reason"]
+
+
+@contextlib.contextmanager
+def _spawn_serve(state_dir: Path, name: str, port: int) -> Iterator[None]:
+    """Run a second live serve subprocess until the context exits."""
+    log = state_dir / f"serve-{name}.log"
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "conductor.agent_a2a",
+            "--state-dir",
+            str(state_dir),
+            "serve",
+            "--name",
+            name,
+        ],
+        cwd=os.getcwd(),
+        stdout=log.open("w"),
+        stderr=subprocess.STDOUT,
+    )
+    try:
+        deadline = time.monotonic() + 20.0
+        url = f"http://127.0.0.1:{port}{AGENT_CARD_WELL_KNOWN_PATH}"
+        while time.monotonic() < deadline:
+            try:
+                if httpx.get(url, timeout=0.5).status_code == 200:
+                    break
+            except httpx.HTTPError:
+                time.sleep(0.2)
+        else:
+            raise AssertionError(f"{name} never came up: {log.read_text()}")
+        yield
+    finally:
+        process.terminate()
+        process.wait(timeout=10)
+
+
+def test_live_flush_delivers_queued_in_order(
+    live_server: tuple[str, int, str, Path],
+) -> None:
+    up, _port, down, state_dir = live_server
+    q1 = send_message(up, down, "queued 1", None, state_dir)
+    q2 = send_message(up, down, "queued 2", None, state_dir)
+    assert (q1["delivery_status"], q2["delivery_status"]) == ("queued", "queued")
+    down_port = load_registry(state_dir)[down].port
+    with _spawn_serve(state_dir, down, down_port):
+        results = flush_queued(state_dir, from_name=up)
+        assert [r["status"] for r in results] == ["delivered", "delivered"]
+        inbox = A2aStore(state_dir, down).rows(unread_only=True, limit=10)
+    ids = [r["message_id"] for r in inbox]
+    # Oldest-first redelivery: q1 lands before q2 (inbox lists newest first).
+    assert ids.index(q1["message_id"]) > ids.index(q2["message_id"])
+    assert A2aStore(state_dir, up).counts().get("queued") is None
+
+
+def test_live_send_flushes_queued_backlog_first(
+    live_server: tuple[str, int, str, Path],
+) -> None:
+    up, _port, down, state_dir = live_server
+    q1 = send_message(up, down, "backlog", None, state_dir)
+    assert q1["delivery_status"] == "queued"
+    down_port = load_registry(state_dir)[down].port
+    with _spawn_serve(state_dir, down, down_port):
+        fresh = send_message(up, down, "fresh", None, state_dir)
+        assert fresh["delivery_status"] == "delivered"
+        inbox = A2aStore(state_dir, down).rows(unread_only=True, limit=10)
+    store = A2aStore(state_dir, up)
+    with store.connect() as connection:
+        statuses = {
+            row["message_id"]: row["delivery_status"]
+            for row in connection.execute(
+                "SELECT message_id, delivery_status FROM messages "
+                "WHERE direction='outbound'"
+            )
+        }
+    assert statuses[q1["message_id"]] == "delivered"
+    ids = [r["message_id"] for r in inbox]
+    # Backlog delivered before the fresh message (inbox is newest-first).
+    assert ids.index(q1["message_id"]) > ids.index(fresh["message_id"])
 
 
 def test_live_peers_probe_reports_up_and_down(

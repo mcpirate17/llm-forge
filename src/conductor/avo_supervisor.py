@@ -11,13 +11,15 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import sys
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Final
 
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
-ACTIVE_STATE_PATH: Final[Path] = ROOT / "conductor" / "active_state.json"
+AVO_STATE_PATH: Final[Path] = ROOT / "conductor" / "avo_runtime_state.json"
 
 DEFAULT_STRATEGY_PIVOTS: Final[tuple[str, ...]] = (
     "PIVOT-ARCH: Shift focus from macro architecture to micro-architectural scheduling (instruction overlap, memory fence reduction).",
@@ -43,7 +45,7 @@ class StagnationReport:
 class StagnationSupervisor:
     """Monitors variation step outcomes and generates steering directives on stagnation."""
 
-    def __init__(self, patience: int = 4, state_path: Path = ACTIVE_STATE_PATH) -> None:
+    def __init__(self, patience: int = 4, state_path: Path = AVO_STATE_PATH) -> None:
         self.patience = patience
         self.state_path = state_path
 
@@ -57,16 +59,31 @@ class StagnationSupervisor:
             return 0
 
     def save_rejection_count(self, count: int) -> None:
-        if not self.state_path.exists():
-            return
         try:
-            data = json.loads(self.state_path.read_text(encoding="utf-8"))
+            data: dict[str, Any] = {}
+            if self.state_path.exists():
+                loaded = json.loads(self.state_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    data = loaded
             data["stagnation_counter"] = count
             data["last_updated"] = dt.datetime.now(dt.timezone.utc).isoformat()
-            self.state_path.write_text(
-                json.dumps(data, indent=2) + "\n", encoding="utf-8"
+            self.state_path.parent.mkdir(parents=True, exist_ok=True)
+            fd, raw_temp = tempfile.mkstemp(
+                dir=self.state_path.parent,
+                prefix=f".{self.state_path.name}.",
+                suffix=".tmp",
             )
-        except (OSError, json.JSONDecodeError):
+            temporary = Path(raw_temp)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    json.dump(data, handle, indent=2)
+                    handle.write("\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, self.state_path)
+            finally:
+                temporary.unlink(missing_ok=True)
+        except (OSError, json.JSONDecodeError, TypeError):
             pass
 
     def record_step(

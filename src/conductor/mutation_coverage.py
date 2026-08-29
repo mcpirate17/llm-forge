@@ -15,7 +15,12 @@ import subprocess
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
 
-from conductor.mutation_testing import CampaignError, REPO_ROOT, verify_evidence
+from conductor.mutation_testing import (
+    CANONICAL_TEST_PATTERNS,
+    CampaignError,
+    REPO_ROOT,
+    verify_evidence,
+)
 
 
 SKIP_DIRECTORY_NAMES = frozenset(
@@ -80,6 +85,8 @@ def _registry_patterns(registry_path: Path, repo_root: Path) -> tuple[str, ...]:
         raise CampaignError(
             "registry.test_patterns must be a list of non-empty strings"
         )
+    if tuple(patterns) != CANONICAL_TEST_PATTERNS:
+        raise CampaignError("registry.test_patterns must match the canonical inventory")
     return tuple(patterns)
 
 
@@ -233,6 +240,44 @@ def _python_test_nodeids(path: Path, relative: str) -> tuple[str, ...]:
     return tuple(nodeids)
 
 
+def _scaffold_source_hashes(
+    relative: str,
+    target: Path,
+    sources: Sequence[str],
+    repo_root: Path,
+) -> dict[str, str]:
+    source_sha256 = {relative: _sha256(target)}
+    for raw_source in sources:
+        source_rel = _safe_relative_path(
+            raw_source.replace("\\", "/"), "scaffold source path"
+        )
+        source_file = repo_root / source_rel
+        if not source_file.is_file():
+            raise CampaignError(f"scaffold source path does not exist: {source_rel}")
+        source_sha256[source_rel] = _sha256(source_file)
+    return source_sha256
+
+
+def _scaffold_ranked_tests(
+    target: Path, relative: str
+) -> tuple[tuple[str, ...], list[dict[str, Any]]]:
+    nodeids = (
+        _python_test_nodeids(target, relative)
+        if relative.endswith(".py")
+        else (relative,)
+    )
+    ranked_tests = [
+        {
+            "rank": index,
+            "nodeid": nodeid,
+            "contract": "replace with the behavioral contract this test enforces",
+            "rationale": "rank by the damage a silent defect would do",
+        }
+        for index, nodeid in enumerate(nodeids, start=1)
+    ]
+    return nodeids, ranked_tests
+
+
 def scaffold_campaign(
     test_path: str,
     *,
@@ -250,29 +295,8 @@ def scaffold_campaign(
     target = repo_root / relative
     if not target.is_file():
         raise CampaignError(f"scaffold test path does not exist: {relative}")
-    source_sha256: dict[str, str] = {relative: _sha256(target)}
-    for raw_source in sources:
-        source_rel = _safe_relative_path(
-            raw_source.replace("\\", "/"), "scaffold source path"
-        )
-        source_file = repo_root / source_rel
-        if not source_file.is_file():
-            raise CampaignError(f"scaffold source path does not exist: {source_rel}")
-        source_sha256[source_rel] = _sha256(source_file)
-    nodeids = (
-        _python_test_nodeids(target, relative)
-        if relative.endswith(".py")
-        else (relative,)
-    )
-    ranked_tests = [
-        {
-            "rank": index,
-            "nodeid": nodeid,
-            "contract": "replace with the behavioral contract this test enforces",
-            "rationale": "rank by the damage a silent defect would do",
-        }
-        for index, nodeid in enumerate(nodeids, start=1)
-    ]
+    source_sha256 = _scaffold_source_hashes(relative, target, sources, repo_root)
+    nodeids, ranked_tests = _scaffold_ranked_tests(target, relative)
     campaign_id = PurePosixPath(relative).stem
     planned_target = next(
         (path for path in source_sha256 if path != relative), relative
@@ -318,11 +342,20 @@ def scaffold_campaign(
     destination.write_text(
         json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8"
     )
+    manifest_rel = destination.resolve().relative_to(repo_root.resolve()).as_posix()
+    patches_dir = f"conductor/mutation_campaigns/patches/{payload['campaign_id']}"
+    receipt_rel = f"conductor/mutation_campaigns/receipts/{payload['campaign_id']}_<YYYYMMDD>.json"
     return {
         "status": "NOT_READY",
-        "manifest": destination.resolve().relative_to(repo_root.resolve()).as_posix(),
+        "manifest": manifest_rel,
         "campaign_id": payload["campaign_id"],
         "ranked_tests": len(ranked_tests),
+        "suggested_governance_claim": (
+            'make governance-claim OWNER="<your-hook-owner>" CLAIM_PATHS="'
+            f'{manifest_rel} {patches_dir}/<mutant>.patch {receipt_rel}" '
+            'CLAIM_JUSTIFICATION="<agent> <batch>: mutation coverage for '
+            f'{relative}"  # one entry PER patch file; date the receipt path'
+        ),
         "next_steps": [
             "Review and replace placeholder contracts, then add one first-order patch.",
             "Register the manifest in conductor/mutation_campaigns/registry.json.",

@@ -1,4 +1,10 @@
-"""Manifest validation and complete per-file test-scope inventory."""
+"""Manifest validation and complete per-file test-scope inventory.
+
+Complete scopes prove the current test inventory, while ranked tests identify
+the subset whose mutation and value attribution the campaign claims. Release
+admission independently discovers post-anchor tests and requires receipt value
+evidence for them; this generic loader deliberately contains no release anchor.
+"""
 
 from __future__ import annotations
 
@@ -90,12 +96,15 @@ def _load_test_scopes(
     ranked_tests: Sequence[_RankedNode],
     repo_root: Path,
 ) -> Mapping[str, TestFileScope]:
-    """Load explicit test-file scopes while permitting legacy partial manifests."""
+    """Load scopes and require every ranked test to belong to a declared scope.
+
+    A complete Python scope must remain the exact current AST inventory in
+    source order. Ranked tests may be a non-empty subset of that inventory so
+    mutation/value attribution is not confused with inventory completeness.
+    """
 
     raw_scopes = _require_mapping(value, "test_scopes")
-    ranked_by_path: dict[str, list[str]] = {}
-    for test in ranked_tests:
-        ranked_by_path.setdefault(test.nodeid.split("::", 1)[0], []).append(test.nodeid)
+    ranked_paths = {test.nodeid.split("::", 1)[0] for test in ranked_tests}
     scopes: dict[str, TestFileScope] = {}
     for raw_path, raw_scope in raw_scopes.items():
         path = _safe_relative_path(raw_path, "test_scopes path")
@@ -120,12 +129,6 @@ def _load_test_scopes(
             raise CampaignError(
                 f"test_scopes[{path}] contains nodeids from another file: {wrong_file}"
             )
-        ranked = tuple(ranked_by_path.get(path, ()))
-        if set(nodeids) != set(ranked):
-            raise CampaignError(
-                f"test_scopes[{path}].nodeids must contain exactly ranked_tests for "
-                f"that file; scope={list(nodeids)}, ranked={list(ranked)}"
-            )
         if path not in source_sha256:
             raise CampaignError(f"test_scopes[{path}] is not bound in source_sha256")
         if inventory != "python_ast":
@@ -147,7 +150,19 @@ def _load_test_scopes(
                     f"{path}: missing={missing}, extra={extra}, "
                     f"expected_order={list(discovered)}"
                 )
+        if mode == "complete" and path not in ranked_paths:
+            raise CampaignError(
+                f"complete test_scopes[{path}] must contain at least one ranked test"
+            )
         scopes[path] = TestFileScope(path, mode, inventory, nodeids)
+    scoped_nodeids = {nodeid for scope in scopes.values() for nodeid in scope.nodeids}
+    ranked_nodeids = {test.nodeid for test in ranked_tests}
+    missing_ranked = sorted(ranked_nodeids - scoped_nodeids)
+    if missing_ranked:
+        raise CampaignError(
+            "ranked_tests nodeids are missing from declared test_scopes: "
+            f"{missing_ranked}"
+        )
     return scopes
 
 

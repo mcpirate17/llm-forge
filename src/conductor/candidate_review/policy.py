@@ -35,6 +35,7 @@ ALLOWED_TOP_LEVEL = {
     "checks",
     "baselines",
     "exceptions",
+    "mutation_waivers",
 }
 ALLOWED_CHECK_KEYS = {
     "kind",
@@ -45,11 +46,14 @@ ALLOWED_CHECK_KEYS = {
     "version_command",
     "severity",
     "timeout_seconds",
+    "wall_timeout_seconds",
     "memory_mb",
     "always",
     "cache",
     "run_on_deletions",
     "max_output_chars",
+    "shard_max_files",
+    "shard_workers",
 }
 ALLOWED_EXCEPTION_KEYS = {
     "id",
@@ -60,6 +64,45 @@ ALLOWED_EXCEPTION_KEYS = {
     "owner",
     "justification",
     "expires",
+}
+MUTATION_WAIVER_INTEGRATION_BASE = "58da5608d75cea374c908d7e87ef7b4fd5319a3d"
+MUTATION_WAIVER_SOURCE_ANCHOR = "61343f575215dd222a74fc2c060d0328692ded5e"
+W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE = "w7-trident-linear-integration"
+MUTATION_WAIVER_BINDING_CLAUSE = (
+    "Any future edit to this test file or any pinned source file, or revival "
+    "of its lane, voids this waiver and requires a mutation campaign before "
+    "renewal."
+)
+WAIVER_SHA256_PATTERN = re.compile(r"\A[0-9a-f]{64}\Z")
+TEST_NAME_SUFFIXES = (
+    "_test.py",
+    "_test.c",
+    "_test.cc",
+    "_test.cpp",
+    "_test.cxx",
+    ".test.js",
+    ".test.jsx",
+    ".test.ts",
+    ".test.tsx",
+    ".spec.js",
+    ".spec.jsx",
+    ".spec.ts",
+    ".spec.tsx",
+    "Test.java",
+)
+
+ALLOWED_WAIVER_KEYS = {
+    "id",
+    "path",
+    "owner",
+    "justification",
+    "expires",
+    "milestone",
+    "integration_base",
+    "source_anchor",
+    "sha256",
+    "binding_clause",
+    "sources",
 }
 VALID_CLASSES = {
     "binary",
@@ -106,6 +149,22 @@ class CheckPolicy:
     cache: bool
     run_on_deletions: bool
     max_output_chars: int
+    shard_max_files: int = 0
+    shard_workers: int = 1
+    # 0 means "same as timeout_seconds"; read via `wall_timeout_seconds`.
+    wall_timeout_override: int = 0
+
+    @property
+    def wall_timeout_seconds(self) -> int:
+        """Wall budget for one subprocess, independent of its CPU budget.
+
+        `timeout_seconds` bounds CPU via prlimit AND wall via subprocess timeout.
+        Those measure different failures: a looping test burns CPU, while a shard
+        sharing 4 vCPU with 3 siblings is slow in wall time having done nothing
+        wrong. Raising this does NOT relax hang detection -- the CPU limit is
+        untouched and still fires on a runaway.
+        """
+        return self.wall_timeout_override or self.timeout_seconds
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,9 +191,32 @@ class ExceptionPolicy:
             return False
         if self.rule_id and self.rule_id != finding.rule_id:
             return False
-        if self.fingerprint and self.fingerprint != finding.fingerprint:
-            return False
+        if self.fingerprint:
+            return self.fingerprint == finding.fingerprint
         return finding.path is not None and fnmatch.fnmatchcase(finding.path, self.path)
+
+
+@dataclass(frozen=True, slots=True)
+class WaiverSourceBinding:
+    """One exact pinned source dependency of a waived legacy test lane."""
+
+    path: str
+    sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class MutationWaiverPolicy:
+    waiver_id: str
+    path: str
+    owner: str
+    justification: str
+    expires: date
+    milestone: str
+    integration_base: str
+    source_anchor: str
+    sha256: str
+    binding_clause: str
+    sources: tuple[WaiverSourceBinding, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +241,7 @@ class Policy:
     checks: tuple[CheckPolicy, ...]
     baselines: tuple[BaselinePolicy, ...]
     exceptions: tuple[ExceptionPolicy, ...]
+    mutation_waivers: tuple[MutationWaiverPolicy, ...] = ()
 
     def classify_change(self, change: Change) -> Change:
         candidate_paths = tuple(
@@ -203,6 +286,17 @@ def _matches_any(path: str, patterns: Iterable[str]) -> bool:
     return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
 
 
+def _is_test_path(rel_path: str) -> bool:
+    """The runtime test-path rule: tests/ segment, test_ prefix, or test suffix."""
+
+    path = PurePosixPath(rel_path)
+    return (
+        "test" in path.parts
+        or path.name.startswith("test_")
+        or path.name.endswith(TEST_NAME_SUFFIXES)
+    )
+
+
 def _intrinsic_classes(
     change: Change,
     *,
@@ -241,29 +335,7 @@ def _intrinsic_classes(
         classes.update({"dependency", "node_dependency"})
     if path.name in {"Cargo.toml", "Cargo.lock"}:
         classes.update({"dependency", "rust_dependency"})
-    name = path.name
-    if (
-        "test" in path.parts
-        or name.startswith("test_")
-        or name.endswith(
-            (
-                "_test.py",
-                "_test.c",
-                "_test.cc",
-                "_test.cpp",
-                "_test.cxx",
-                ".test.js",
-                ".test.jsx",
-                ".test.ts",
-                ".test.tsx",
-                ".spec.js",
-                ".spec.jsx",
-                ".spec.ts",
-                ".spec.tsx",
-                "Test.java",
-            )
-        )
-    ):
+    if _is_test_path(str(path)):
         classes.add("test")
     if (mode_override or change.new_mode) == "120000":
         classes.add("symlink")
@@ -285,6 +357,14 @@ def _string_tuple(
 def _positive_int(value: Any, *, field: str, maximum: int | None = None) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
         raise PolicyError(f"{field} must be a positive integer")
+    if maximum is not None and value > maximum:
+        raise PolicyError(f"{field} must be <= {maximum}, got {value}")
+    return value
+
+
+def _non_negative_int(value: Any, *, field: str, maximum: int | None = None) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise PolicyError(f"{field} must be a non-negative integer")
     if maximum is not None and value > maximum:
         raise PolicyError(f"{field} must be <= {maximum}, got {value}")
     return value
@@ -383,6 +463,19 @@ def _parse_check(check_id: str, raw: Any) -> CheckPolicy:
             raw.get("max_output_chars", 12000),
             field=f"checks.{check_id}.max_output_chars",
         ),
+        shard_max_files=_non_negative_int(
+            raw.get("shard_max_files", 0),
+            field=f"checks.{check_id}.shard_max_files",
+        ),
+        shard_workers=_positive_int(
+            raw.get("shard_workers", 1),
+            field=f"checks.{check_id}.shard_workers",
+            maximum=32,
+        ),
+        wall_timeout_override=_non_negative_int(
+            raw.get("wall_timeout_seconds", 0),
+            field=f"checks.{check_id}.wall_timeout_seconds",
+        ),
     )
 
 
@@ -424,6 +517,172 @@ def _parse_exception(raw: Any) -> ExceptionPolicy:
         justification=justification,
         expires=_date_value(raw["expires"], field="exceptions.expires"),
     )
+
+
+def _parse_mutation_waiver(raw: Any) -> MutationWaiverPolicy:
+    if not isinstance(raw, dict):
+        raise PolicyError("each mutation_waivers entry must be a table")
+    unknown = set(raw) - ALLOWED_WAIVER_KEYS
+    if unknown:
+        raise PolicyError(f"mutation waiver has unknown keys: {sorted(unknown)}")
+    required = {
+        "id",
+        "path",
+        "owner",
+        "justification",
+        "expires",
+        "milestone",
+        "integration_base",
+        "source_anchor",
+        "sha256",
+        "binding_clause",
+    }
+    missing = required - set(raw)
+    if missing:
+        raise PolicyError(
+            f"mutation waiver is missing required keys: {sorted(missing)}"
+        )
+    waiver_id = raw["id"]
+    if not isinstance(waiver_id, str) or not waiver_id.strip():
+        raise PolicyError("mutation waiver id must be a non-empty string")
+    path = str(raw["path"])
+    parts = PurePosixPath(path).parts
+    if (
+        any(meta in path for meta in "*?[")
+        or path.startswith("/")
+        or "\\" in path
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in path)
+        or parts != tuple(path.split("/"))
+        or len(parts) < 2
+        or any(part in {".", ".."} for part in parts)
+        or not path.endswith(".py")
+        or not any(part == "tests" for part in parts[:-1])
+        or not parts[-1].startswith("test_")
+    ):
+        raise PolicyError(
+            f"mutation waiver path must be one exact repo-relative test file "
+            f"path (test_*.py) under a real tests/ directory with no glob "
+            f"metacharacters or traversal: {path!r}"
+        )
+    owner = str(raw["owner"]).strip()
+    justification = str(raw["justification"]).strip()
+    if len(owner) < 2 or len(justification) < 20:
+        raise PolicyError(
+            f"mutation waiver {raw['id']!r} owner/justification is not specific enough"
+        )
+    if str(raw["milestone"]) != W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE:
+        raise PolicyError(
+            f"mutation waiver {raw['id']!r} pins an unknown milestone; expected "
+            f"{W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE!r}"
+        )
+    if str(raw["integration_base"]) != MUTATION_WAIVER_INTEGRATION_BASE:
+        raise PolicyError(
+            f"mutation waiver {raw['id']!r} pins an unexpected integration base"
+        )
+    if str(raw["source_anchor"]) != MUTATION_WAIVER_SOURCE_ANCHOR:
+        raise PolicyError(
+            f"mutation waiver {raw['id']!r} pins an unexpected source anchor"
+        )
+    sha256_value = str(raw["sha256"])
+    if not WAIVER_SHA256_PATTERN.match(sha256_value):
+        raise PolicyError(
+            f"mutation waiver {raw['id']!r} sha256 must be 64 lowercase hex digits"
+        )
+    if str(raw["binding_clause"]) != MUTATION_WAIVER_BINDING_CLAUSE:
+        raise PolicyError(
+            f"mutation waiver {raw['id']!r} binding clause must match the canonical "
+            f"void-on-edit clause verbatim"
+        )
+    return MutationWaiverPolicy(
+        waiver_id=waiver_id,
+        path=path,
+        owner=owner,
+        justification=justification,
+        expires=_date_value(raw["expires"], field="mutation_waivers.expires"),
+        milestone=str(raw["milestone"]),
+        integration_base=str(raw["integration_base"]),
+        source_anchor=str(raw["source_anchor"]),
+        sha256=sha256_value,
+        binding_clause=str(raw["binding_clause"]),
+        sources=_parse_waiver_sources(raw.get("sources"), waiver_id=waiver_id),
+    )
+
+
+def _parse_waiver_sources(
+    raw: Any, *, waiver_id: str
+) -> tuple[WaiverSourceBinding, ...]:
+    if not isinstance(raw, list) or not raw:
+        raise PolicyError(
+            f"mutation waiver {waiver_id!r} requires sources: a non-empty array "
+            "of {path = ..., sha256 = ...} tables pinning its production inputs"
+        )
+    bindings: list[WaiverSourceBinding] = []
+    seen_paths: set[str] = set()
+    for entry in raw:
+        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
+            raise PolicyError(
+                f"mutation waiver {waiver_id!r} source entries need exactly "
+                f"path and sha256 keys"
+            )
+        src_path = str(entry["path"])
+        parts = PurePosixPath(src_path).parts
+        if (
+            any(meta in src_path for meta in "*?[")
+            or src_path.startswith("/")
+            or "\\" in src_path
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in src_path)
+            or parts != tuple(src_path.split("/"))
+            or len(parts) < 2
+            or any(part in {".", ".."} for part in parts)
+            or not src_path.endswith(".py")
+            or parts[-1].startswith("test_")
+            or "tests" in parts[:-1]
+        ):
+            raise PolicyError(
+                f"mutation waiver {waiver_id!r} source paths must be exact "
+                f"repo-relative non-test .py files: {src_path!r}"
+            )
+        if _is_test_path(src_path):
+            raise PolicyError(
+                f"mutation waiver {waiver_id!r} source path is test-shaped "
+                f"(tests/ segment, test_ prefix, or test suffix) and cannot be "
+                f"pinned as production source: {src_path!r}"
+            )
+        digest = str(entry["sha256"])
+        if not WAIVER_SHA256_PATTERN.match(digest):
+            raise PolicyError(
+                f"mutation waiver {waiver_id!r} source sha256 must be 64 lowercase "
+                f"hex digits"
+            )
+        if src_path in seen_paths:
+            raise PolicyError(
+                f"mutation waiver {waiver_id!r} pins duplicate source paths"
+            )
+        seen_paths.add(src_path)
+        bindings.append(WaiverSourceBinding(path=src_path, sha256=digest))
+    return tuple(bindings)
+
+
+def _parse_mutation_waivers(raw: Any) -> tuple[MutationWaiverPolicy, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise PolicyError("mutation_waivers must be an array of tables")
+    waivers = tuple(_parse_mutation_waiver(entry) for entry in raw)
+    identifiers = [waiver.waiver_id for waiver in waivers]
+    duplicated = sorted({name for name in identifiers if identifiers.count(name) > 1})
+    if duplicated:
+        raise PolicyError(
+            "mutation waiver identifiers must be unique; duplicated: "
+            + ", ".join(duplicated)
+        )
+    paths = [waiver.path for waiver in waivers]
+    if len(paths) != len(set(paths)):
+        raise PolicyError(
+            "mutation waiver paths must be unique; split overlapping lanes into "
+            "separate exact-path entries"
+        )
+    return waivers
 
 
 def _parse_baselines(raw: Any) -> tuple[BaselinePolicy, ...]:
@@ -546,6 +805,7 @@ def load_policy(path: Path) -> Policy:
         ),
         baselines=_parse_baselines(baselines_raw),
         exceptions=tuple(_parse_exception(value) for value in exceptions_raw),
+        mutation_waivers=_parse_mutation_waivers(raw.get("mutation_waivers")),
     )
     _validate_policy(policy)
     return policy
@@ -573,6 +833,15 @@ def _validate_policy(policy: Policy) -> None:
         if (exception.expires - today).days > 90:
             raise PolicyError(
                 f"exception {exception.exception_id} expires more than 90 days out"
+            )
+    for waiver in policy.mutation_waivers:
+        if waiver.expires < today:
+            raise PolicyError(
+                f"mutation waiver {waiver.waiver_id} expired on {waiver.expires}"
+            )
+        if (waiver.expires - today).days > 90:
+            raise PolicyError(
+                f"mutation waiver {waiver.waiver_id} expires more than 90 days out"
             )
 
 

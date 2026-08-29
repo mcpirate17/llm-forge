@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from conductor.candidate_review.checks import ReviewContext, _result, files_for_policy
 from conductor.candidate_review.model import (
@@ -134,7 +134,10 @@ def _expand_command(
 
 
 def _environment(
-    ctx: ReviewContext, *, include_git_metadata: bool = True
+    ctx: ReviewContext,
+    *,
+    include_git_metadata: bool = True,
+    extra: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     allowed = {
         "CUDA_VISIBLE_DEVICES",
@@ -181,6 +184,9 @@ def _environment(
     node_bin = ctx.repo / "node_modules" / ".bin"
     if node_bin.is_dir():
         environment["PATH"] = f"{node_bin}{os.pathsep}{environment.get('PATH', '')}"
+    if extra:
+        # Last, so a caller's pin beats the `allowed` passthrough of the same key.
+        environment.update(extra)
     return environment
 
 
@@ -209,7 +215,13 @@ def _run_process(
     memory_mb: int,
     limit_resources: bool = True,
     include_git_metadata: bool = True,
+    extra_env: Mapping[str, str] | None = None,
+    wall_timeout_seconds: int | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    # `timeout_seconds` is the CPU budget (prlimit); the wall budget defaults to it but
+    # is separable, because a process starved by concurrent siblings is slow in wall
+    # time without burning the CPU that would prove it is actually stuck.
+    wall = wall_timeout_seconds or timeout_seconds
     actual = (
         _limited_command(command, memory_mb=memory_mb, timeout_seconds=timeout_seconds)
         if limit_resources
@@ -218,11 +230,13 @@ def _run_process(
     return subprocess.run(
         actual,
         cwd=ctx.snapshot,
-        env=_environment(ctx, include_git_metadata=include_git_metadata),
+        env=_environment(
+            ctx, include_git_metadata=include_git_metadata, extra=extra_env
+        ),
         capture_output=True,
         text=True,
         errors="replace",
-        timeout=timeout_seconds,
+        timeout=wall,
         check=False,
     )
 
@@ -309,16 +323,15 @@ def run_command_check(
     findings: list[Finding] = []
     if completed.returncode:
         crash = completed.returncode in {126, 127} or completed.returncode < 0
+        analyzer_output = "\n".join(
+            part for part in (stdout_tail.strip(), stderr_tail.strip()) if part
+        )
         findings.append(
             Finding(
                 check_id=check.check_id,
                 rule_id="analyzer-crash" if crash else "analyzer-finding",
                 severity=Severity.CRITICAL if crash else check.severity,
-                message=(
-                    stderr_tail
-                    or stdout_tail
-                    or f"analyzer exited {completed.returncode}"
-                ).strip(),
+                message=analyzer_output or f"analyzer exited {completed.returncode}",
                 evidence={"exit_code": completed.returncode},
             )
         )

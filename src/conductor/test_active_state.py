@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import pytest
 
 from conductor import active_state
 
@@ -32,27 +35,45 @@ def test_generate_and_save_active_state(tmp_path: Path, monkeypatch) -> None:
     payload = json.loads(target_json.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 1
     assert len(payload["standing_mandates"]) >= 3
+    assert any("MEMORY_RETRIEVE" in item for item in payload["standing_mandates"])
+    assert any("handoff append" in item for item in payload["standing_mandates"])
+    assert any(
+        "LOCAL_AI_CLERICAL_ONLY" in item for item in payload["standing_mandates"]
+    )
+    assert any(
+        "zero approval authority" in item for item in payload["standing_mandates"]
+    )
     assert state.schema_version == 1
+    assert not list(tmp_path.glob(".active_state.json.*.tmp"))
 
 
-def test_error_and_cli_paths_fail_closed(tmp_path: Path, monkeypatch, capsys) -> None:
-    unreadable = tmp_path / "active-state-directory"
-    unreadable.mkdir()
-    monkeypatch.setattr(active_state, "CURRENT_WORK_PATH", unreadable)
-    assert active_state.parse_top_headings() == []
+def test_validate_active_state_rejects_expired_claim() -> None:
+    now = datetime.now(timezone.utc)
+    state = active_state.ActiveState(
+        last_updated=now.isoformat(),
+        active_claims=[
+            {
+                "claim_id": "claim-expired",
+                "expires_at": (now - timedelta(seconds=1)).isoformat(),
+            }
+        ],
+    )
 
-    def fail_claims(_root: Path):
-        raise OSError("claim store unavailable")
+    with pytest.raises(active_state.ActiveStateError, match="expired claim"):
+        active_state.validate_active_state(state, now=now)
 
-    monkeypatch.setattr("conductor.candidate_review.ownership.load_claims", fail_claims)
-    assert active_state.parse_active_claims() == []
 
-    saved: list[bool] = []
-    monkeypatch.setattr(active_state, "save_active_state", lambda: saved.append(True))
-    assert active_state.main(["update"]) == 0
-    assert saved == [True]
+def test_failed_generation_does_not_overwrite_last_good_state(
+    tmp_path: Path, monkeypatch
+) -> None:
+    target = tmp_path / "active_state.json"
+    target.write_text('{"last_good": true}\n', encoding="utf-8")
 
-    state = active_state.ActiveState(active_headings=["heading"])
-    monkeypatch.setattr(active_state, "generate_active_state", lambda: state)
-    assert active_state.main(["dump"]) == 0
-    assert json.loads(capsys.readouterr().out)["active_headings"] == ["heading"]
+    def fail() -> active_state.ActiveState:
+        raise active_state.ActiveStateError("claim store unreadable")
+
+    monkeypatch.setattr(active_state, "generate_active_state", fail)
+    with pytest.raises(active_state.ActiveStateError, match="claim store unreadable"):
+        active_state.save_active_state(target)
+
+    assert json.loads(target.read_text(encoding="utf-8")) == {"last_good": True}

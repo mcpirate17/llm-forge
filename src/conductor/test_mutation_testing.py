@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import dataclasses
 from contextlib import contextmanager
 from dataclasses import replace
 import json
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 from typing import Iterator
 
@@ -14,30 +16,33 @@ from conductor import mutation_testing
 
 CAMPAIGN_PATH = (
     mutation_testing.REPO_ROOT
-    / "conductor/mutation_campaigns/mutation_framework_self.json"
+    / "conductor/mutation_campaigns/nm_f6_phase22_20m_active.json"
 )
 
 
 def _campaign_payload() -> dict[str, object]:
-    payload = json.loads(CAMPAIGN_PATH.read_text(encoding="utf-8"))
-    payload.pop("test_scopes", None)
-    return payload
+    return json.loads(CAMPAIGN_PATH.read_text(encoding="utf-8"))
 
 
-def test_self_campaign_ranks_all_tests_and_materializes_three_mutations() -> None:
+def test_campaign_ranks_every_test_contiguously_and_materializes_six_mutations() -> (
+    None
+):
     campaign = mutation_testing.load_campaign(CAMPAIGN_PATH)
 
-    assert [test.rank for test in campaign.ranked_tests] == list(range(1, 22))
-    assert campaign.expected_mutations == 3
-    assert len(campaign.planned_mutations) == 3
+    assert len(campaign.ranked_tests) == 28
+    assert [test.rank for test in campaign.ranked_tests] == list(range(1, 29))
+    assert campaign.expected_mutations == 5
+    assert len(campaign.planned_mutations) == 5
     assert [mutation.mutation_id for mutation in campaign.mutations] == [
-        "authorization_bypass_first_order",
-        "timeout_as_kill_first_order",
-        "complete_python_scope_first_order",
+        "launcher_pack_mode_first_order",
+        "accumulation_normalization_first_order",
+        "lane_slots_first_order",
+        "phase_activation_boundary_first_order",
+        "phase22_aux_gradient_first_order",
     ]
 
 
-def test_self_campaign_inspection_reports_three_materialized_patches(
+def test_inspection_reports_ready_with_six_materialized_patches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     campaign = mutation_testing.load_campaign(CAMPAIGN_PATH)
@@ -47,8 +52,8 @@ def test_self_campaign_inspection_reports_three_materialized_patches(
     result = mutation_testing.inspect_campaign(campaign)
 
     assert result["status"] == "READY"
-    assert result["materialized_mutations"] == 3
-    assert result["expected_mutations"] == 3
+    assert result["materialized_mutations"] == 5
+    assert result["expected_mutations"] == 5
     assert result["resource_status"] == "IDLE"
     assert all(row["materialized"] for row in result["planned_mutations"])
 
@@ -94,8 +99,7 @@ def test_baseline_must_execute_every_ranked_test(tmp_path: Path) -> None:
     assert isinstance(baseline["argv"], list)
     assert isinstance(ranked, list)
     assert isinstance(ranked[-1], dict)
-    baseline["argv"].remove("conductor/test_mutation_testing.py")
-    baseline["argv"].extend(row["nodeid"] for row in ranked[:-1])
+    baseline["argv"].remove(ranked[-1]["nodeid"])
     path = tmp_path / "campaign.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -126,6 +130,119 @@ def test_complete_python_scope_rejects_omitted_test_node(tmp_path: Path) -> None
             },
             source_sha256={relative: mutation_testing._sha256(test_path)},  # noqa: SLF001
             ranked_tests=ranked,
+            repo_root=tmp_path,
+        )
+
+
+def test_complete_python_scope_allows_ranked_subset_of_full_inventory(
+    tmp_path: Path,
+) -> None:
+    relative = "pkg/test_contract.py"
+    test_path = tmp_path / relative
+    test_path.parent.mkdir(parents=True)
+    test_path.write_text(
+        "def test_ranked():\n    assert True\n\ndef test_inventory_only():\n    assert True\n",
+        encoding="utf-8",
+    )
+    ranked_nodeid = f"{relative}::test_ranked"
+    inventory = (
+        ranked_nodeid,
+        f"{relative}::test_inventory_only",
+    )
+
+    scopes = mutation_testing._load_test_scopes(  # noqa: SLF001
+        {
+            relative: {
+                "mode": "complete",
+                "inventory": "python_ast",
+                "nodeids": list(inventory),
+            }
+        },
+        source_sha256={relative: mutation_testing._sha256(test_path)},  # noqa: SLF001
+        ranked_tests=(
+            mutation_testing.RankedTest(
+                1, ranked_nodeid, "ranked attribution", "ranked attribution"
+            ),
+        ),
+        repo_root=tmp_path,
+    )
+
+    assert scopes[relative].nodeids == inventory
+
+
+def test_test_scope_rejects_ranked_node_missing_from_declared_scope(
+    tmp_path: Path,
+) -> None:
+    relative = "pkg/test_contract.py"
+    test_path = tmp_path / relative
+    test_path.parent.mkdir(parents=True)
+    test_path.write_text("def test_declared():\n    assert True\n", encoding="utf-8")
+    missing_nodeid = f"{relative}::test_omitted_ranked"
+
+    with pytest.raises(
+        mutation_testing.CampaignError,
+        match="ranked_tests nodeids are missing.*test_omitted_ranked",
+    ):
+        mutation_testing._load_test_scopes(  # noqa: SLF001
+            {
+                relative: {
+                    "mode": "complete",
+                    "inventory": "python_ast",
+                    "nodeids": [f"{relative}::test_declared"],
+                }
+            },
+            source_sha256={relative: mutation_testing._sha256(test_path)},  # noqa: SLF001
+            ranked_tests=(
+                mutation_testing.RankedTest(
+                    1, missing_nodeid, "ranked membership", "ranked membership"
+                ),
+            ),
+            repo_root=tmp_path,
+        )
+
+
+def test_complete_python_scope_rejects_file_without_ranked_test(
+    tmp_path: Path,
+) -> None:
+    ranked_relative = "pkg/test_ranked.py"
+    unranked_relative = "pkg/test_unranked.py"
+    ranked_path = tmp_path / ranked_relative
+    unranked_path = tmp_path / unranked_relative
+    ranked_path.parent.mkdir(parents=True)
+    ranked_path.write_text("def test_ranked():\n    assert True\n", encoding="utf-8")
+    unranked_path.write_text(
+        "def test_unranked():\n    assert True\n", encoding="utf-8"
+    )
+    ranked_nodeid = f"{ranked_relative}::test_ranked"
+
+    with pytest.raises(
+        mutation_testing.CampaignError,
+        match="complete test_scopes.*test_unranked.py.*at least one ranked test",
+    ):
+        mutation_testing._load_test_scopes(  # noqa: SLF001
+            {
+                ranked_relative: {
+                    "mode": "complete",
+                    "inventory": "python_ast",
+                    "nodeids": [ranked_nodeid],
+                },
+                unranked_relative: {
+                    "mode": "complete",
+                    "inventory": "python_ast",
+                    "nodeids": [f"{unranked_relative}::test_unranked"],
+                },
+            },
+            source_sha256={
+                ranked_relative: mutation_testing._sha256(ranked_path),  # noqa: SLF001
+                unranked_relative: mutation_testing._sha256(  # noqa: SLF001
+                    unranked_path
+                ),
+            },
+            ranked_tests=(
+                mutation_testing.RankedTest(
+                    1, ranked_nodeid, "ranked attribution", "ranked attribution"
+                ),
+            ),
             repo_root=tmp_path,
         )
 
@@ -236,7 +353,7 @@ def _write_registry(tmp_path: Path) -> Path:
             {
                 "schema_version": 1,
                 "enforcement": "changed_tests",
-                "test_patterns": ["test_*.py"],
+                "test_patterns": list(mutation_testing.CANONICAL_TEST_PATTERNS),
                 "receipt_directories": ["receipts"],
                 "campaigns": [{"manifest": "campaign.json"}],
             }
@@ -255,6 +372,10 @@ def _write_pass_receipt(tmp_path: Path, campaign: mutation_testing.Campaign) -> 
         "campaign_id": campaign.campaign_id,
         "manifest": "campaign.json",
         "manifest_sha256": campaign.manifest_sha256,
+        "runner_sha256": mutation_testing._runner_components_sha256()[  # noqa: SLF001
+            "conductor/mutation_testing.py"
+        ],
+        "runner_components_sha256": mutation_testing._runner_components_sha256(),  # noqa: SLF001
         "source_sha256": dict(campaign.source_sha256),
         "test_scopes": mutation_testing._test_scopes_payload(campaign),  # noqa: SLF001
         "complete_campaign": True,
@@ -270,6 +391,72 @@ def _write_pass_receipt(tmp_path: Path, campaign: mutation_testing.Campaign) -> 
         "mutation_score": 1.0,
     }
     (receipts / "pass.json").write_text(json.dumps(receipt), encoding="utf-8")
+
+
+def _anchored_v2_receipt(
+    tmp_path: Path,
+    campaign: mutation_testing.Campaign,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    registered: bool = True,
+) -> tuple[Path, dict[str, object]]:
+    """Create one immutable local Git anchor for legacy-receipt tests."""
+    _write_pass_receipt(tmp_path, campaign)
+    payload = json.loads((tmp_path / "receipts/pass.json").read_text(encoding="utf-8"))
+    payload["schema_version"] = mutation_testing.LEGACY_RECEIPT_SCHEMA
+    payload["runner_sha256"] = "legacy-runner"
+    payload.pop("runner_components_sha256")
+    receipt = (
+        tmp_path / "conductor/mutation_campaigns/receipts/legacy_campaign_20260827.json"
+    )
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    anchor_registry = tmp_path / "conductor/mutation_campaigns/registry.json"
+    anchor_registry.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "enforcement": "changed_tests",
+                "test_patterns": list(mutation_testing.CANONICAL_TEST_PATTERNS),
+                "receipt_directories": ["conductor/mutation_campaigns/receipts"],
+                "campaigns": ([{"manifest": "campaign.json"}] if registered else []),
+            }
+        ),
+        encoding="utf-8",
+    )
+    commands = (
+        ["git", "init", "--quiet"],
+        ["git", "config", "user.name", "Mutation Test"],
+        ["git", "config", "user.email", "mutation@example.invalid"],
+        [
+            "git",
+            "add",
+            "--",
+            str(receipt.relative_to(tmp_path)),
+            str(anchor_registry.relative_to(tmp_path)),
+            "campaign.json",
+        ],
+        ["git", "commit", "--quiet", "-m", "legacy receipt anchor"],
+    )
+    for command in commands:
+        subprocess.run(command, cwd=tmp_path, check=True, capture_output=True)
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    tree = subprocess.run(
+        ["git", "rev-parse", "HEAD^{tree}"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    monkeypatch.setattr(mutation_testing, "LEGACY_RECEIPT_ANCHOR_COMMIT", commit)
+    monkeypatch.setattr(mutation_testing, "LEGACY_RECEIPT_ANCHOR_TREE", tree)
+    return receipt, payload
 
 
 def _prepare_fake_run(
@@ -450,6 +637,34 @@ def test_untracked_mutation_patches_are_linked_into_snapshot(tmp_path: Path) -> 
         assert mutation_testing._sha256(linked) == mutation.patch_sha256  # noqa: SLF001
 
 
+def test_host_read_dependencies_are_materialized_not_symlinked(tmp_path: Path) -> None:
+    host = tmp_path / "host"
+    (host / "reports" / "screen").mkdir(parents=True)
+    (host / "reports" / "screen" / "receipt.json").write_text("{}", encoding="utf-8")
+    (host / "notes").mkdir()
+    (host / "notes" / "plan.md").write_text("# plan\n", encoding="utf-8")
+    snapshot = tmp_path / "snapshot"
+    snapshot.mkdir()
+    campaign = dataclasses.replace(
+        mutation_testing.load_campaign(
+            mutation_testing.REPO_ROOT
+            / "conductor/mutation_campaigns/mutation_framework_self.json"
+        ),
+        host_read_dependencies=("reports/screen", "notes/plan.md"),
+    )
+
+    mutation_testing._link_host_dependencies(campaign, snapshot, host)  # noqa: SLF001
+
+    nested = snapshot / "reports" / "screen" / "receipt.json"
+    flat = snapshot / "notes" / "plan.md"
+    for linked in (nested, flat, snapshot / "reports" / "screen"):
+        assert linked.exists()
+        assert not linked.is_symlink()
+    assert snapshot.resolve() in nested.resolve().parents
+    assert nested.read_text(encoding="utf-8") == "{}"
+    assert flat.read_text(encoding="utf-8") == "# plan\n"
+
+
 def test_manifest_rejects_patch_path_escape(tmp_path: Path) -> None:
     payload = _campaign_payload()
     mutations = payload["mutations"]
@@ -514,6 +729,205 @@ def test_mandatory_evidence_accepts_current_complete_receipts(
     assert result["missing_evidence"] == []
 
 
+def test_mandatory_evidence_rejects_non_utf8_receipts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    campaign = _temporary_campaign(tmp_path)
+    registry = _write_registry(tmp_path)
+    monkeypatch.setattr(mutation_testing, "load_campaign", lambda *_a, **_k: campaign)
+    _write_pass_receipt(tmp_path, campaign)
+    receipt = tmp_path / "receipts/pass.json"
+    payload = receipt.read_text(encoding="utf-8")
+    receipt.write_bytes(payload.encode("utf-16"))
+
+    result = mutation_testing.verify_evidence(
+        registry,
+        ["test_one.py"],
+        repo_root=tmp_path,
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["evidence"] == []
+    assert len(result["malformed_receipts"]) == 1
+    assert "utf-8" in result["malformed_receipts"][0]
+
+
+def test_legacy_receipt_requires_exact_git_anchored_path_and_bytes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    campaign = _temporary_campaign(tmp_path)
+    receipt_path, payload = _anchored_v2_receipt(tmp_path, campaign, monkeypatch)
+
+    assert (
+        mutation_testing._receipt_errors(  # noqa: SLF001
+            payload,
+            campaign,
+            tmp_path,
+            receipt_path,
+            receipt_path.read_bytes(),
+            tmp_path,
+        )
+        == []
+    )
+
+    anchored_bytes = receipt_path.read_bytes()
+    receipt_path.write_text(
+        receipt_path.read_text(encoding="utf-8") + "\n", encoding="utf-8"
+    )
+    assert (
+        mutation_testing._receipt_errors(  # noqa: SLF001
+            payload,
+            campaign,
+            tmp_path,
+            receipt_path,
+            anchored_bytes,
+            tmp_path,
+        )
+        == []
+    )
+    errors = mutation_testing._receipt_errors(  # noqa: SLF001
+        payload,
+        campaign,
+        tmp_path,
+        receipt_path,
+        receipt_path.read_bytes(),
+        tmp_path,
+    )
+    assert "legacy receipt parsed bytes differ from the anchor" in errors
+
+    receipt_path.write_bytes(anchored_bytes)
+    alias = receipt_path.parent / "alias"
+    alias.symlink_to(receipt_path.parent, target_is_directory=True)
+    errors = mutation_testing._receipt_errors(  # noqa: SLF001
+        payload,
+        campaign,
+        tmp_path,
+        alias / receipt_path.name,
+        anchored_bytes,
+        tmp_path,
+    )
+    assert "legacy receipt path has a symlink component" in errors
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "missing_path",
+        "wrong_tree",
+        "outside_prefix",
+        "wrong_repo",
+        "unregistered",
+        "replace_ref",
+    ],
+)
+def test_legacy_receipt_anchor_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    failure: str,
+) -> None:
+    campaign = _temporary_campaign(tmp_path)
+    receipt_path, payload = _anchored_v2_receipt(
+        tmp_path, campaign, monkeypatch, registered=failure != "unregistered"
+    )
+    expected = ""
+    raw_bytes = receipt_path.read_bytes()
+    anchor_repo = tmp_path
+    if failure == "missing_path":
+        receipt_path = None
+        expected = "legacy receipt path or parsed bytes are unavailable"
+    elif failure == "wrong_tree":
+        monkeypatch.setattr(mutation_testing, "LEGACY_RECEIPT_ANCHOR_TREE", "0" * 40)
+        expected = "legacy receipt anchor tree mismatch"
+    elif failure == "outside_prefix":
+        outside = tmp_path / "receipts/legacy.json"
+        outside.parent.mkdir(exist_ok=True)
+        outside.write_text(json.dumps(payload), encoding="utf-8")
+        receipt_path = outside
+        raw_bytes = outside.read_bytes()
+        expected = "legacy receipt path is outside the anchored receipt directory"
+    elif failure == "wrong_repo":
+        anchor_repo = tmp_path / "not-a-repository"
+        anchor_repo.mkdir()
+        expected = "legacy receipt anchor repository is unavailable"
+    elif failure == "unregistered":
+        expected = "legacy receipt campaign was not registered at the anchor"
+    else:
+        receipt_path.write_bytes(raw_bytes + b"\n")
+        subprocess.run(["git", "add", "--", "."], cwd=tmp_path, check=True)
+        replacement_tree = subprocess.run(
+            ["git", "write-tree"],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        subprocess.run(
+            [
+                "git",
+                "replace",
+                mutation_testing.LEGACY_RECEIPT_ANCHOR_TREE,
+                replacement_tree,
+            ],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+        raw_bytes = receipt_path.read_bytes()
+        expected = "legacy receipt parsed bytes differ from the anchor"
+
+    errors = mutation_testing._receipt_errors(  # noqa: SLF001
+        payload,
+        campaign,
+        tmp_path,
+        receipt_path,
+        None if receipt_path is None else raw_bytes,
+        anchor_repo,
+    )
+    assert expected in errors
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement", "expected_error"),
+    [
+        ("runner_sha256", "0" * 64, "runner hash mismatch"),
+        (
+            "runner_components_sha256",
+            None,
+            "runner component hash map mismatch",
+        ),
+        ("runner_components_sha256", {}, "runner component hash map mismatch"),
+        ("runner_components_sha256", [], "runner component hash map mismatch"),
+    ],
+)
+def test_mandatory_evidence_rejects_runner_provenance_drift(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+    expected_error: str,
+) -> None:
+    campaign = _temporary_campaign(tmp_path)
+    registry = _write_registry(tmp_path)
+    monkeypatch.setattr(mutation_testing, "load_campaign", lambda *_a, **_k: campaign)
+    _write_pass_receipt(tmp_path, campaign)
+    receipt_path = tmp_path / "receipts/pass.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if replacement is None:
+        receipt.pop(field)
+    else:
+        receipt[field] = replacement
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    result = mutation_testing.verify_evidence(
+        registry,
+        ["test_one.py"],
+        repo_root=tmp_path,
+    )
+
+    assert result["status"] == "FAIL"
+    assert expected_error in result["missing_evidence"][0]["receipt_rejections"][0]
+
+
 def test_mandatory_evidence_rejects_legacy_file_scope(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -556,6 +970,15 @@ def test_mandatory_evidence_rejects_unregistered_changed_test(
             "receipt_rejections": [],
         }
     ]
+    narrowed = json.loads(registry.read_text(encoding="utf-8"))
+    narrowed["test_patterns"] = ["never-a-test"]
+    registry.write_text(json.dumps(narrowed), encoding="utf-8")
+    with pytest.raises(mutation_testing.CampaignError, match="canonical inventory"):
+        mutation_testing.verify_evidence(
+            registry,
+            ["example/tests/test_unregistered.py"],
+            repo_root=tmp_path,
+        )
 
 
 @pytest.mark.parametrize(
@@ -565,7 +988,7 @@ def test_mandatory_evidence_rejects_unregistered_changed_test(
         ("empty", "may not be empty"),
         ("duplicate", "contains duplicates"),
         ("wrong_file", "another file"),
-        ("rank_mismatch", "exactly ranked_tests"),
+        ("rank_mismatch", "ranked_tests nodeids are missing"),
         ("unbound", "not bound"),
         ("unsupported", "inventory is unsupported"),
         ("wrong_suffix", "requires a .py file"),
@@ -628,3 +1051,15 @@ def test_complete_scope_manifest_validation_fails_closed(
             ranked_tests=ranked,
             repo_root=tmp_path,
         )
+
+
+def test_pin_interpreter_resolves_bare_python_to_the_runner_interpreter() -> None:
+    import sys
+
+    from conductor.mutation_testing import _pin_interpreter
+
+    assert _pin_interpreter(["python", "-m", "pytest"])[0] == sys.executable
+    assert _pin_interpreter(["python3", "-m", "pytest"])[0] == sys.executable
+    absolute = "/home/tim/venvs/llm/bin/python"
+    assert _pin_interpreter([absolute, "-m", "pytest"])[0] == absolute
+    assert _pin_interpreter([]) == []

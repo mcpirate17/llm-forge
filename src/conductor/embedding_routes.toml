@@ -1,0 +1,46 @@
+schema_version = 1
+
+[policy]
+primary_route = "local-qwen3"
+fallback_routes = ["paid-openai-compatible"]
+
+[[route]]
+route_id = "local-qwen3"
+backend_kind = "ollama-local"
+protocol = "ollama-embed"
+priority = 10
+normalization = "l2-client"
+tokenizer_policy = "backend-default"
+truncation_policy = "unicode-prefix"
+max_input_chars = 2000
+device_policy = "gpu-guest-or-cpu"
+paid = false
+endpoint = "http://127.0.0.1:11434/api/embed"
+model = "qwen3-embed-cpu"
+model_revision = "sha256:06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439"
+dimension = 1024
+max_request_usd = 0.0
+
+# Provider-neutral paid fallback. It becomes eligible only after the operator
+# supplies an approved endpoint/model/revision/dimension/cost and sets the
+# explicit enable flag. The endpoint may belong to any provider that implements
+# the OpenAI embeddings wire protocol.
+[[route]]
+route_id = "paid-openai-compatible"
+backend_kind = "paid"
+protocol = "openai-embeddings"
+priority = 20
+normalization = "l2-client"
+tokenizer_policy = "provider-declared"
+truncation_policy = "unicode-prefix"
+max_input_chars = 2000
+device_policy = "remote"
+paid = true
+endpoint_env = "WORKSPACE_EMBED_PAID_BASE_URL"
+api_key_env = "WORKSPACE_EMBED_PAID_API_KEY"
+enabled_env = "WORKSPACE_EMBED_PAID_ENABLED"
+model_env = "WORKSPACE_EMBED_PAID_MODEL"
+model_revision_env = "WORKSPACE_EMBED_PAID_MODEL_REVISION"
+dimension_env = "WORKSPACE_EMBED_PAID_DIMENSION"
+cost_per_million_tokens_env = "WORKSPACE_EMBED_PAID_COST_PER_MILLION_TOKENS"
+max_request_usd = 0.05

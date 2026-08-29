@@ -11,8 +11,10 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import re
 import sys
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Final
@@ -23,6 +25,10 @@ CURRENT_WORK_PATH: Final[Path] = ROOT / ".current_work.md"
 CLAIMS_PATH: Final[Path] = ROOT / ".agents" / "claims" / "claims.json"
 
 HEADING_RE: Final = re.compile(r"^##\s+(.+)$")
+
+
+class ActiveStateError(RuntimeError):
+    """The compact coordination state could not be generated or validated."""
 
 
 @dataclass
@@ -39,7 +45,9 @@ class ActiveState:
             "GRAPH_GATE: Call code-review-graph MCP before any Edit/Write.",
             "EAGER_REQUIRED: Paired comparisons and loss-sensitive probes use --compile-mode default.",
             "CLAIM_REQUIRED: Create narrow claim before editing (make governance-claim).",
+            'MEMORY_RETRIEVE: Do not dump .current_work.md into context and do not write research into it. Query `python -m conductor.memory_index query "<task>" --top-k 8` and `python -m conductor.kb_retrieve query "<task>" --top-k 5`. Status ≤12 lines via `python -m conductor.handoff append`. Findings: research/notes then `memory_index index`. Code: code-review-graph MCP.',
             "AVO_USER_GATED: Autonomous variation (AVO) loops are user-invoked only. When a task is a continuous-improvement goal (iterative metric optimization, variation/evolution loops), prompt Tim first — 'This is a continuous-improvement goal — invoke AVO?' — and wait for his answer before starting any loop.",
+            "LOCAL_AI_CLERICAL_ONLY: Local models have zero approval authority. Use them only for notes, summaries, organization, or compaction. Never use local output to approve, authorize, sign off, promote, launch, resume, continue, or spend optimizer/GPU on work or runs. Only Tim or a runtime-verified frontier model may approve where policy permits; multi-hour training still requires Tim's explicit approval.",
         ]
     )
     active_headings: list[str] = field(default_factory=list)
@@ -72,26 +80,23 @@ def parse_top_headings(limit: int = 4) -> list[str]:
 
 def parse_active_claims() -> list[dict[str, Any]]:
     """Read unexpired claims from the governance ownership store."""
-    try:
-        from conductor.candidate_review.ownership import load_claims
+    from conductor.candidate_review.ownership import load_claims
 
-        claims, _ = load_claims(ROOT)
-        now = dt.datetime.now(dt.timezone.utc)
-        active: list[dict[str, Any]] = []
-        for c in claims:
-            if c.active(now):
-                active.append(
-                    {
-                        "claim_id": c.claim_id,
-                        "owner": c.owner,
-                        "paths": list(c.paths),
-                        "justification": c.justification,
-                        "expires_at": c.expires_at,
-                    }
-                )
-        return active
-    except Exception:
-        return []
+    claims, _ = load_claims(ROOT)
+    now = dt.datetime.now(dt.timezone.utc)
+    active: list[dict[str, Any]] = []
+    for claim in claims:
+        if claim.active(now):
+            active.append(
+                {
+                    "claim_id": claim.claim_id,
+                    "owner": claim.owner,
+                    "paths": list(claim.paths),
+                    "justification": claim.justification,
+                    "expires_at": claim.expires_at,
+                }
+            )
+    return active
 
 
 def generate_active_state() -> ActiveState:
@@ -104,11 +109,80 @@ def generate_active_state() -> ActiveState:
     )
 
 
-def save_active_state(path: Path = ACTIVE_STATE_PATH) -> ActiveState:
-    """Generate and write active_state.json."""
-    state = generate_active_state()
+def validate_active_state(
+    state: ActiveState,
+    *,
+    now: dt.datetime | None = None,
+) -> None:
+    """Reject stale or malformed authorization data before it reaches a session."""
+    if state.schema_version != 1:
+        raise ActiveStateError(
+            f"unsupported active-state schema: {state.schema_version!r} (expected 1)"
+        )
+    reference = now or dt.datetime.now(dt.timezone.utc)
+    if reference.tzinfo is None:
+        raise ActiveStateError("active-state validation time must include a timezone")
+    try:
+        updated = dt.datetime.fromisoformat(state.last_updated)
+    except ValueError as exc:
+        raise ActiveStateError(
+            f"active-state last_updated is invalid: {state.last_updated!r}"
+        ) from exc
+    if updated.tzinfo is None:
+        raise ActiveStateError("active-state last_updated must include a timezone")
+    if updated.astimezone(dt.timezone.utc) > reference.astimezone(
+        dt.timezone.utc
+    ) + dt.timedelta(minutes=1):
+        raise ActiveStateError("active-state last_updated is implausibly in the future")
+    if len(state.active_headings) > 4:
+        raise ActiveStateError(
+            f"active-state contains {len(state.active_headings)} headings (maximum 4)"
+        )
+    for claim in state.active_claims:
+        try:
+            expiry = dt.datetime.fromisoformat(str(claim["expires_at"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ActiveStateError(
+                "active-state claim has an invalid expires_at"
+            ) from exc
+        if expiry.tzinfo is None or expiry.astimezone(
+            dt.timezone.utc
+        ) <= reference.astimezone(dt.timezone.utc):
+            raise ActiveStateError(
+                f"active-state contains expired claim {claim.get('claim_id', '<unknown>')}"
+            )
+
+
+def _write_state_atomic(path: Path, payload: dict[str, Any]) -> None:
+    """Write one validated state snapshot without exposing a partial JSON file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state.to_dict(), indent=2) + "\n", encoding="utf-8")
+    fd, raw_temporary = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    temporary = Path(raw_temporary)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def save_active_state(path: Path = ACTIVE_STATE_PATH) -> ActiveState:
+    """Generate, validate, and atomically write ``active_state.json``."""
+    state = generate_active_state()
+    validate_active_state(state)
+    _write_state_atomic(path, state.to_dict())
     return state
 
 

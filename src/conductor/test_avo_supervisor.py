@@ -32,3 +32,13 @@ def test_supervisor_triggers_stagnation_alert(tmp_path: Path) -> None:
     assert "PIVOT" in report.strategy_hint
     assert report.alert_payload is not None
     assert report.alert_payload["kind"] == "stagnation-alert"
+
+
+def test_supervisor_creates_runtime_state_atomically(tmp_path: Path) -> None:
+    state_path = tmp_path / "avo_runtime_state.json"
+    sup = avo_supervisor.StagnationSupervisor(patience=4, state_path=state_path)
+    report = sup.record_step(improved=False)
+
+    assert report.consecutive_rejections == 1
+    assert json.loads(state_path.read_text(encoding="utf-8"))["stagnation_counter"] == 1
+    assert not list(tmp_path.glob(".avo_runtime_state.json.*.tmp"))
