@@ -16,6 +16,7 @@ from conductor.candidate_review.checks import (
     TestSelection,
     _result,
 )
+from conductor.candidate_review import external_invariants
 from conductor.candidate_review.command_runner import _run_process, _tail
 from conductor.candidate_review.git_source import (
     GitSourceError,
@@ -739,6 +740,75 @@ def _evidence_index(
     return index, findings
 
 
+def _manifest_for_campaign(snapshot: Path, campaign_id: object) -> dict[str, object]:
+    """The manifest declaring ``campaign_id``, or an empty mapping if unresolvable."""
+
+    if not isinstance(campaign_id, str):
+        return {}
+    registry = snapshot / "conductor/mutation_campaigns/registry.json"
+    try:
+        rows = json.loads(registry.read_text("utf-8")).get("campaigns", [])
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {}
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("manifest"), str):
+            continue
+        try:
+            payload = json.loads((snapshot / row["manifest"]).read_text("utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        if payload.get("campaign_id") == campaign_id:
+            return payload
+    return {}
+
+
+def _external_invariant_admissions(
+    ctx: ReviewContext,
+    path: str,
+    nodeids: Sequence[str],
+    evidence: Mapping[str, object],
+) -> tuple[frozenset[str], list[Finding]]:
+    """Nodeids admitted as verified external invariants, plus findings for the rest.
+
+    Fails closed in every direction: an unresolvable manifest, an undeclared nodeid, a
+    stale torch pin or an unmeasurable coverage run all leave the nodeid gated, and a
+    waiver that was declared but did not verify says which condition failed rather than
+    falling through to a generic "has no value classification".
+    """
+
+    manifest = _manifest_for_campaign(ctx.snapshot, evidence.get("campaign_id"))
+    declarations = manifest.get("external_invariants")
+    if not isinstance(declarations, list) or not declarations:
+        return frozenset(), []
+    outcomes = external_invariants.evaluate(
+        ctx.snapshot,
+        ctx.runtime_dir,
+        [row for row in declarations if isinstance(row, Mapping)],
+        nodeids,
+    )
+    admitted = {outcome.nodeid for outcome in outcomes if outcome.admitted}
+    findings = [
+        Finding(
+            check_id="mutation-evidence",
+            rule_id="external-invariant-not-verified",
+            severity=Severity.CRITICAL,
+            message=(
+                f"{path}: {outcome.nodeid} declares an external-invariant waiver "
+                f"that did not verify: {outcome.reason}"
+            ),
+            path=path,
+            help=(
+                "A waiver is verified, not asserted: the nodeid must execute no "
+                "repository source outside test files, the pinned torch version must "
+                "equal the installed one, and the justification must be non-empty."
+            ),
+        )
+        for outcome in outcomes
+        if not outcome.admitted
+    ]
+    return frozenset(admitted), findings
+
+
 def _new_test_value_findings(
     ctx: ReviewContext,
     payload: Mapping[str, object],
@@ -803,9 +873,13 @@ def _new_test_value_findings(
                 )
             )
             continue
+        waived, waiver_findings = _external_invariant_admissions(
+            ctx, path, nodeids, evidence
+        )
+        findings.extend(waiver_findings)
         for error in admission_errors(
             receipt.get("test_value") if isinstance(receipt, dict) else None,
-            nodeids,
+            [nodeid for nodeid in nodeids if nodeid not in waived],
         ):
             findings.append(
                 Finding(
