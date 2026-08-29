@@ -1577,3 +1577,113 @@ def test_changed_coverage_judges_each_risk_class_on_its_own_lines() -> None:
     # the lenient side, never silently held to the strict one.
     assert _risk_buckets(per_file, {})["other"]["measurable"] == 200
     assert _risk_buckets(per_file, {})["high"]["measurable"] == 0
+
+
+def test_dynamic_execution_gate_distinguishes_builtins_from_method_calls(
+    tmp_path: Path,
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    probe_lines = [
+        "import os",
+        "",
+        "",
+        "def check_host(value):",
+        "    return os.system(value)",
+        "",
+        "",
+        "def refresh(model):",
+        "    return model.eval()",
+        "",
+        "",
+        "make().eval()",
+        "eval_used = eval('1')",
+        "exec_used = exec('pass')",
+    ]
+    (repo / "probe.py").write_text("\n".join(probe_lines) + "\n", encoding="utf-8")
+    _git(repo, "add", "--all")
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
+        context = ReviewContext(
+            repo=repo,
+            snapshot=snapshot,
+            candidate=candidate,
+            entries=entries,
+            policy=policy,
+            surface="ci",
+            profile="full",
+            owner=None,
+            runtime_dir=tmp_path / "runtime",
+        )
+        result = check_python_ast(context)
+    dynamic = [
+        finding for finding in result.findings if finding.rule_id == "dynamic-execution"
+    ]
+    assert sorted(finding.message for finding in dynamic) == [
+        "unsafe dynamic execution via eval",
+        "unsafe dynamic execution via exec",
+        "unsafe dynamic execution via os.system",
+    ]
+    unflagged_line = probe_lines.index("make().eval()") + 1
+    assert not any(finding.line == unflagged_line for finding in dynamic)
+
+
+def test_protocol_ellipsis_methods_are_not_flagged_as_stubs(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    proto_probe = (
+        "from typing import Protocol\n"
+        "\n"
+        "\n"
+        "class Sink(Protocol):\n"
+        "    def put(self, key: str, value: int) -> None:\n"
+        "        ...\n"
+        "\n"
+        "    @property\n"
+        "    def size(self) -> int:\n"
+        "        ...\n"
+        "\n"
+        "\n"
+        "class Nested(Protocol):\n"
+        "    class Inner(Protocol):\n"
+        "        def deep(self) -> str:\n"
+        "            ...\n"
+        "\n"
+        "    def flat(self) -> None:\n"
+        "        ...\n"
+        "\n"
+        "    class Concrete:\n"
+        "        def inner_stub(self): ...\n"
+        "\n"
+        "\n"
+        "class Impl:\n"
+        "    def real(self):\n"
+        "        return 1\n"
+        "\n"
+        "    def missing(self): ...\n"
+    )
+    (repo / "protocol_probe.py").write_text(proto_probe, encoding="utf-8")
+    _git(repo, "add", "--all")
+    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
+        context = ReviewContext(
+            repo=repo,
+            snapshot=snapshot,
+            candidate=candidate,
+            entries=entries,
+            policy=policy,
+            surface="ci",
+            profile="full",
+            owner=None,
+            runtime_dir=tmp_path / "runtime",
+        )
+        result = check_python_ast(context)
+    stubs = [
+        finding for finding in result.findings if finding.rule_id == "ellipsis-stub"
+    ]
+    flagged_lines = sorted(
+        proto_probe.count("\n", 0, proto_probe.index(marker)) + 1
+        for marker in ("def inner_stub", "def missing")
+    )
+    assert [finding.line for finding in stubs] == flagged_lines
+    assert len(stubs) == 2

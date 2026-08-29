@@ -387,6 +387,7 @@ class _PythonVisitor(ast.NodeVisitor):
         self.hot_path = hot_path
         self.findings: list[Finding] = []
         self.loop_depth = 0
+        self.protocol_depth = 0
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._visit_function(node)
@@ -416,7 +417,7 @@ class _PythonVisitor(ast.NodeVisitor):
             and isinstance(body[0], ast.Expr)
             and isinstance(body[0].value, ast.Constant)
         ):
-            if body[0].value.value is Ellipsis:
+            if body[0].value.value is Ellipsis and not self.protocol_depth:
                 self._add(
                     "ellipsis-stub",
                     Severity.HIGH,
@@ -424,6 +425,17 @@ class _PythonVisitor(ast.NodeVisitor):
                     "ellipsis-only function is a stub",
                 )
         self.generic_visit(node)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        enclosing = self.protocol_depth
+        if any(
+            _call_name(base).rsplit(".", 1)[-1] == "Protocol" for base in node.bases
+        ):
+            self.protocol_depth = 1
+        else:
+            self.protocol_depth = 0
+        self.generic_visit(node)
+        self.protocol_depth = enclosing
 
     def visit_For(self, node: ast.For) -> None:
         self.loop_depth += 1
@@ -444,12 +456,18 @@ class _PythonVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         name = _call_name(node.func)
-        if name in {"eval", "exec", "os.system"}:
+        if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec"}:
+            flagged = node.func.id
+        elif name == "os.system":
+            flagged = name
+        else:
+            flagged = None
+        if flagged is not None:
             self._add(
                 "dynamic-execution",
                 Severity.CRITICAL,
                 node,
-                f"unsafe dynamic execution via {name}",
+                f"unsafe dynamic execution via {flagged}",
             )
         if name in {"pickle.load", "pickle.loads", "dill.load", "dill.loads"}:
             self._add(
@@ -529,11 +547,25 @@ class _PythonVisitor(ast.NodeVisitor):
 
 
 def _call_name(node: ast.expr) -> str:
+    """Resolve a call target to its dotted name, or "" when it cannot be resolved.
+
+    An attribute whose receiver is not itself a resolvable dotted name — a call,
+    subscript, literal — is deliberately NOT reported under its bare attribute
+    name. ``model.to(device).eval()`` is ``torch.nn.Module.eval``, not the ``eval``
+    builtin; returning ``"eval"`` for it raised a CRITICAL dynamic-execution
+    finding on the standard PyTorch idiom and made every model-evaluation script
+    in the repo untrackable.
+
+    Every name this module matches (``eval``, ``exec``, ``os.system``,
+    ``pickle.load``, ``yaml.load``, ``NotImplementedError``, …) is either a bare
+    builtin — an ``ast.Name``, still resolved above — or dotted from a ``Name``
+    root, so refusing the bare-attribute guess loses no real detection.
+    """
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
         prefix = _call_name(node.value)
-        return f"{prefix}.{node.attr}" if prefix else node.attr
+        return f"{prefix}.{node.attr}" if prefix else ""
     return ""
 
 
