@@ -9,7 +9,7 @@ import subprocess
 from typing import Any, Callable
 
 
-HookCall = Callable[[dict[str, Any], Path | None], subprocess.CompletedProcess[str]]
+HookCall = Callable[[dict[str, Any], Path], subprocess.CompletedProcess[str]]
 RunCommand = Callable[..., subprocess.CompletedProcess[str]]
 
 

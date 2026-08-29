@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -7,7 +9,15 @@ import pytest
 from conductor import local_ai_policy as policy
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+def _run_hook(hook: Path, payload: dict[str, object]) -> dict[str, object]:
+    completed = subprocess.run(
+        [str(hook)],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return json.loads(completed.stdout)["hookSpecificOutput"]
 
 
 def test_only_user_or_frontier_may_approve() -> None:
@@ -112,16 +122,32 @@ def test_hook_ignores_mentions_embeddings_and_non_inference_commands() -> None:
     ],
 )
 def test_every_agent_shell_hook_reaches_shared_policy(
+    hook_repo: Path,
     config_path: str,
     hook_path: str,
 ) -> None:
-    config = (REPO_ROOT / config_path).read_text(encoding="utf-8")
-    hook = (REPO_ROOT / hook_path).read_text(encoding="utf-8")
+    config = (hook_repo / config_path).read_text(encoding="utf-8")
+    hook = hook_repo / hook_path
 
-    assert Path(hook_path).name in config
-    assert "conductor.current_work_guard" in hook
+    assert hook.name in config
+    assert "conductor.current_work_guard" in hook.read_text(encoding="utf-8")
+    denial = _run_hook(
+        hook, {"tool_name": "Read", "tool_input": {"file_path": ".current_work.md"}}
+    )
+    assert denial["permissionDecision"] == "deny"
 
 
-def test_qwen_clerk_hook_declares_local_runtime() -> None:
-    hook = (REPO_ROOT / ".qwen/hooks/pre-edit.sh").read_text(encoding="utf-8")
-    assert "LOCAL_AI_RUNTIME=1" in hook
+def test_qwen_clerk_hook_declares_local_runtime(hook_repo: Path) -> None:
+    hook = hook_repo / ".qwen/hooks/pre-edit.sh"
+    assert "LOCAL_AI_RUNTIME=1" in hook.read_text(encoding="utf-8")
+    verdict = _run_hook(
+        hook,
+        {
+            "tool_name": "run_shell_command",
+            "tool_input": {
+                "command": "python -m conductor.agent_a2a send --to codex-phase22 "
+                "--body 'FINAL VERDICT: PASS'"
+            },
+        },
+    )
+    assert verdict["permissionDecisionReason"] == policy.DENY_REASON

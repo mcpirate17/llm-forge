@@ -7,8 +7,8 @@ from conductor import workspace_eval as wseval
 from conductor import workspace_runtime_matrix as matrix
 
 
-def test_offline_eval_is_honestly_not_ready() -> None:
-    result = wseval.evaluate(live=False)
+def test_offline_eval_is_honestly_not_ready(hook_repo: Path) -> None:
+    result = wseval.evaluate(hook_repo, live=False)
     assert result.status == matrix.ReceiptStatus.NOT_READY.value
     assert result.is_valid is False
     assert result.score < 100
@@ -68,8 +68,8 @@ def test_missing_or_nonpass_runtime_cell_fails_closed(tmp_path: Path) -> None:
     assert result.is_valid is False
 
 
-def test_write_receipt_preserves_status(tmp_path: Path) -> None:
-    result = wseval.evaluate(live=False)
+def test_write_receipt_preserves_status(tmp_path: Path, hook_repo: Path) -> None:
+    result = wseval.evaluate(hook_repo, live=False)
     path = wseval.write_receipt(result, receipts_dir=tmp_path)
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["status"] == result.status

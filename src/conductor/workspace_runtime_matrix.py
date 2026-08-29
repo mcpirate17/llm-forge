@@ -252,10 +252,10 @@ def check_hook_configs(repo: Path = ROOT) -> CellReceipt:
 
 def _hook_call(
     payload: dict[str, Any],
-    program: Path | None = None,
+    program: Path,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(program or ROOT / ".codex" / "hooks" / "pre-edit.sh")],
+        [str(program)],
         input=json.dumps(payload),
         text=True,
         capture_output=True,
@@ -274,10 +274,12 @@ def _grok_inspect_argv() -> list[str]:
     return ["grok", "inspect", "--json"]
 
 
-def _check_hook_sources(failures: list[str], evidence: dict[str, Any]) -> None:
+def _check_hook_sources(
+    root: Path, failures: list[str], evidence: dict[str, Any]
+) -> None:
     """Validate each native raw guard and every referenced hook program."""
     _runtime_support.check_hook_sources(
-        ROOT,
+        root,
         failures,
         evidence,
         hook_call=_hook_call,
@@ -285,20 +287,24 @@ def _check_hook_sources(failures: list[str], evidence: dict[str, Any]) -> None:
     )
 
 
-def _check_hook_noops(failures: list[str], evidence: dict[str, Any]) -> None:
+def _check_hook_noops(
+    root: Path, failures: list[str], evidence: dict[str, Any]
+) -> None:
     """Exercise destructive-command denials and bounded post-hook no-ops."""
     _runtime_support.check_hook_noops(
-        ROOT,
+        root,
         failures,
         evidence,
         hook_call=_hook_call,
     )
 
 
-def _check_preamble_and_grok(failures: list[str], evidence: dict[str, Any]) -> None:
+def _check_preamble_and_grok(
+    root: Path, failures: list[str], evidence: dict[str, Any]
+) -> None:
     """Validate the injected preamble and Grok's trusted project hook discovery."""
     _runtime_support.check_preamble_and_grok(
-        ROOT,
+        root,
         failures,
         evidence,
         run_command=_run,
@@ -307,7 +313,8 @@ def _check_preamble_and_grok(failures: list[str], evidence: dict[str, Any]) -> N
     )
 
 
-def check_hook_programs() -> CellReceipt:
+def check_hook_programs(root: Path = ROOT) -> CellReceipt:
+    """Exercise the hook suites rooted at ``root`` against the control matrix."""
     cases: tuple[tuple[str, dict[str, Any], bool], ...] = (
         (
             "codex-read-deny",
@@ -349,15 +356,16 @@ def check_hook_programs() -> CellReceipt:
     )
     failures: list[str] = []
     evidence: dict[str, Any] = {}
+    program = root / ".codex" / "hooks" / "pre-edit.sh"
     for name, payload, expect_deny in cases:
-        result = _hook_call(payload)
+        result = _hook_call(payload, program)
         denied = "BLOCKED:" in result.stdout
         evidence[name] = {"returncode": result.returncode, "denied": denied}
         if result.returncode != 0 or denied is not expect_deny:
             failures.append(name)
-    _check_hook_sources(failures, evidence)
-    _check_hook_noops(failures, evidence)
-    _check_preamble_and_grok(failures, evidence)
+    _check_hook_sources(root, failures, evidence)
+    _check_hook_noops(root, failures, evidence)
+    _check_preamble_and_grok(root, failures, evidence)
     return CellReceipt(
         "hook-program-controls",
         ReceiptStatus.FAIL_CLOSED if failures else ReceiptStatus.PASS,
@@ -682,7 +690,7 @@ def reconcile_launcher_logs(output_dir: Path) -> CellReceipt:
     )
 
 
-def reconcile_receipt(output_dir: Path) -> dict[str, Any]:
+def reconcile_receipt(output_dir: Path, repo: Path = ROOT) -> dict[str, Any]:
     """Recompute bounded local evidence without making another model call."""
     path = output_dir / "receipt.json"
     payload = _load_json(path)
@@ -693,8 +701,8 @@ def reconcile_receipt(output_dir: Path) -> dict[str, Any]:
     replacements = {
         cell.cell_id: cell
         for cell in (
-            check_hook_configs(),
-            check_hook_programs(),
+            check_hook_configs(repo),
+            check_hook_programs(repo),
             reconcile_launcher_logs(output_dir),
         )
     }

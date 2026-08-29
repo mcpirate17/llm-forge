@@ -148,7 +148,7 @@ def evaluate(
     cells = [
         matrix.check_active_state(repo_root),
         matrix.check_hook_configs(repo_root),
-        matrix.check_hook_programs(),
+        matrix.check_hook_programs(repo_root),
         matrix.check_launcher_programs(),
     ]
     if live:

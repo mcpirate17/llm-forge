@@ -186,8 +186,9 @@ def test_extract_reported_tokens_from_jsonl() -> None:
     assert matrix.extract_reported_tokens(output) == 25
 
 
-def test_hook_program_controls_pass() -> None:
-    assert matrix.check_hook_programs().status is matrix.ReceiptStatus.PASS
+def test_hook_program_controls_pass(hook_repo: Path) -> None:
+    cell = matrix.check_hook_programs(hook_repo)
+    assert cell.status is matrix.ReceiptStatus.PASS, cell.detail
 
 
 def test_grok_inspect_command_is_injectable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -214,7 +215,9 @@ def test_launcher_specs_cover_required_programs() -> None:
         assert "--verbose" in next(spec for spec in specs if spec.name == name).argv
 
 
-def test_reconcile_receipt_uses_preserved_terminal_usage(tmp_path: Path) -> None:
+def test_reconcile_receipt_uses_preserved_terminal_usage(
+    tmp_path: Path, hook_repo: Path
+) -> None:
     launchers = tmp_path / "launchers"
     launchers.mkdir()
     for index, name in enumerate(matrix.REQUIRED_LAUNCHERS, start=1):
@@ -253,7 +256,7 @@ def test_reconcile_receipt_uses_preserved_terminal_usage(tmp_path: Path) -> None
         encoding="utf-8",
     )
 
-    payload = matrix.reconcile_receipt(tmp_path)
+    payload = matrix.reconcile_receipt(tmp_path, repo=hook_repo)
 
     assert payload["status"] == "PASS"
     assert payload["cells"][0]["evidence"]["reported_tokens"] == 165
