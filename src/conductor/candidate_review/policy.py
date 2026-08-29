@@ -65,7 +65,15 @@ ALLOWED_EXCEPTION_KEYS = {
     "justification",
     "expires",
 }
-MUTATION_WAIVER_INTEGRATION_BASE = "58da5608d75cea374c908d7e87ef7b4fd5319a3d"
+# Moved 2026-08-29 from 58da5608 to d3697f22. Waivers activate only when the
+# candidate's base commit equals this value, so the constant and the 100
+# [[mutation_waivers]] must move together -- which is the point: relocating the
+# integration point is a reviewed code change, not a data edit that quietly
+# re-activates a hundred waivers. #48 through #52 landed on w7 after the waivers
+# were authored, so their original base is no longer any candidate's base and
+# every waiver was inactive. The per-file sha256 and pinned-source bindings are
+# untouched and still enforced.
+MUTATION_WAIVER_INTEGRATION_BASE = "d3697f22c2cb974dbae2d2dc4847c99d0de92224"
 MUTATION_WAIVER_SOURCE_ANCHOR = "61343f575215dd222a74fc2c060d0328692ded5e"
 W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE = "w7-trident-linear-integration"
 MUTATION_WAIVER_BINDING_CLAUSE = (
