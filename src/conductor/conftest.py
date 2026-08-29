@@ -131,4 +131,5 @@ def hook_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         f"{python} -m conductor.grok_inspect_stub {shlex.quote(str(root))}",
     )
     monkeypatch.setattr(active_state, "ROOT", root)
+    active_state.save_active_state(root / "conductor" / "active_state.json")
     return root

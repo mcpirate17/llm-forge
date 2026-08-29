@@ -160,7 +160,15 @@ def check_preamble_and_grok(
 ) -> None:
     """Validate the injected preamble and Grok's trusted project hook discovery."""
     preamble = run_command(
-        ["python", "-m", "conductor.session_preamble", "hook"], timeout=30
+        [
+            "python",
+            "-m",
+            "conductor.session_preamble",
+            "hook",
+            "--state",
+            str(root / "conductor" / "active_state.json"),
+        ],
+        timeout=30,
     )
     preamble_ok = preamble.returncode == 0 and "MISSION:" in preamble.stdout
     evidence["session-preamble"] = {
