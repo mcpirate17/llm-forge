@@ -1063,3 +1063,32 @@ def test_pin_interpreter_resolves_bare_python_to_the_runner_interpreter() -> Non
     absolute = "/home/tim/venvs/llm/bin/python"
     assert _pin_interpreter([absolute, "-m", "pytest"])[0] == absolute
     assert _pin_interpreter([]) == []
+
+
+def test_self_campaign_ranks_all_tests_and_materializes_three_mutations() -> None:
+    campaign = mutation_testing.load_campaign(CAMPAIGN_PATH)
+
+    assert [test.rank for test in campaign.ranked_tests] == list(range(1, 22))
+    assert campaign.expected_mutations == 3
+    assert len(campaign.planned_mutations) == 3
+    assert [mutation.mutation_id for mutation in campaign.mutations] == [
+        "authorization_bypass_first_order",
+        "timeout_as_kill_first_order",
+        "complete_python_scope_first_order",
+    ]
+
+
+def test_self_campaign_inspection_reports_three_materialized_patches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    campaign = mutation_testing.load_campaign(CAMPAIGN_PATH)
+    monkeypatch.setattr(mutation_testing, "source_drift", lambda *_args: [])
+    monkeypatch.setattr(mutation_testing, "blocking_processes", lambda *_args: [])
+
+    result = mutation_testing.inspect_campaign(campaign)
+
+    assert result["status"] == "READY"
+    assert result["materialized_mutations"] == 3
+    assert result["expected_mutations"] == 3
+    assert result["resource_status"] == "IDLE"
+    assert all(row["materialized"] for row in result["planned_mutations"])

@@ -77,3 +77,26 @@ def test_failed_generation_does_not_overwrite_last_good_state(
         active_state.save_active_state(target)
 
     assert json.loads(target.read_text(encoding="utf-8")) == {"last_good": True}
+
+
+def test_error_and_cli_paths_fail_closed(tmp_path: Path, monkeypatch, capsys) -> None:
+    unreadable = tmp_path / "active-state-directory"
+    unreadable.mkdir()
+    monkeypatch.setattr(active_state, "CURRENT_WORK_PATH", unreadable)
+    assert active_state.parse_top_headings() == []
+
+    def fail_claims(_root: Path):
+        raise OSError("claim store unavailable")
+
+    monkeypatch.setattr("conductor.candidate_review.ownership.load_claims", fail_claims)
+    assert active_state.parse_active_claims() == []
+
+    saved: list[bool] = []
+    monkeypatch.setattr(active_state, "save_active_state", lambda: saved.append(True))
+    assert active_state.main(["update"]) == 0
+    assert saved == [True]
+
+    state = active_state.ActiveState(active_headings=["heading"])
+    monkeypatch.setattr(active_state, "generate_active_state", lambda: state)
+    assert active_state.main(["dump"]) == 0
+    assert json.loads(capsys.readouterr().out)["active_headings"] == ["heading"]

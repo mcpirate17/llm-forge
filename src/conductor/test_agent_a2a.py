@@ -511,3 +511,25 @@ def test_live_peers_probe_reports_up_and_down(
     assert {s for s in peers[up]["skills"]} >= {"coordination"}
     assert peers[down]["status"] == "down"
     assert peers[down]["reason"]
+
+
+def test_live_offline_peer_fails_fast_with_reason(
+    live_server: tuple[str, int, str, Path],
+) -> None:
+    up, _port, down, state_dir = live_server
+    with pytest.raises(A2aError, match="peer unreachable"):
+        send_message(
+            from_name=up,
+            to_name=down,
+            body="anyone there?",
+            data_payload=None,
+            state_dir=state_dir,
+        )
+    rows = A2aStore(state_dir, up).counts()
+    assert rows.get("failed") == 1
+    outbound = A2aStore(state_dir, up)
+    with outbound.connect() as connection:
+        failed = connection.execute(
+            "SELECT status_reason FROM messages WHERE delivery_status='failed'"
+        ).fetchone()
+    assert failed and failed["status_reason"]
