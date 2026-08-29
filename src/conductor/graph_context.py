@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import re
 import shutil
 import sqlite3
@@ -231,41 +232,70 @@ def _rel_path(repo: Path, path_str: str) -> str:
     return path_str
 
 
+def _ripgrep_hits(repo: Path, pattern: str) -> list[tuple[str, int]] | None:
+    """``(file, line)`` hits from ripgrep, or ``None`` when it timed out."""
+    try:
+        proc = subprocess.run(
+            ["rg", "-n", "--glob", "*.py", pattern, "."],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    hits: list[tuple[str, int]] = []
+    for line in proc.stdout.splitlines():
+        parts = line.split(":", 2)
+        if len(parts) >= 2:
+            hits.append(
+                (PurePosixPath(parts[0].lstrip("./")).as_posix(), int(parts[1]))
+            )
+    return hits
+
+
+def _scan_hits(repo: Path, regex: re.Pattern[str]) -> list[tuple[str, int]]:
+    """``(file, line)`` hits from a walk of ``*.py`` files under ``repo``.
+
+    Hidden directories (``.git``, ``.venv``, ``.code-review-graph``) are pruned,
+    matching ripgrep's default.
+    """
+    hits: list[tuple[str, int]] = []
+    for dirpath, dirnames, filenames in os.walk(repo):
+        dirnames[:] = sorted(name for name in dirnames if not name.startswith("."))
+        for name in sorted(filenames):
+            if not name.endswith(".py"):
+                continue
+            path = Path(dirpath, name)
+            relative = path.relative_to(repo).as_posix()
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            hits.extend(
+                (relative, lineno)
+                for lineno, line in enumerate(lines, 1)
+                if regex.search(line)
+            )
+    return hits
+
+
 def find_syntactic_callers(
     repo: Path, symbol_name: str, target_file_rel: str
 ) -> list[GraphRelationship]:
-    """Fallback search using ripgrep or file scan for callers that graph index missed."""
-    results: list[GraphRelationship] = []
+    """Call sites the graph index missed: ripgrep when installed, else a file scan."""
     norm_target = PurePosixPath(target_file_rel).as_posix()
     pattern = rf"\b{re.escape(symbol_name)}\("
-
-    if shutil.which("rg"):
-        try:
-            proc = subprocess.run(
-                ["rg", "-n", "--glob", "*.py", pattern, "."],
-                cwd=repo,
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-            for line in proc.stdout.splitlines():
-                parts = line.split(":", 2)
-                if len(parts) >= 2:
-                    file_path = PurePosixPath(parts[0].lstrip("./")).as_posix()
-                    if file_path != norm_target and not file_path.startswith(".venv/"):
-                        lineno = parts[1]
-                        results.append(
-                            GraphRelationship(
-                                qualified_name=f"{file_path}:{lineno}",
-                                kind="calls (syntactic)",
-                                file_path=file_path,
-                            )
-                        )
-        except Exception:
-            pass
-
-    return results
+    hits = _ripgrep_hits(repo, pattern) if shutil.which("rg") else None
+    if hits is None:
+        hits = _scan_hits(repo, re.compile(pattern))
+    return [
+        GraphRelationship(
+            qualified_name=f"{file_path}:{lineno}",
+            kind="calls (syntactic)",
+            file_path=file_path,
+        )
+        for file_path, lineno in hits
+        if file_path != norm_target and not file_path.startswith(".venv/")
+    ]
 
 
 def query_graph_relationships(
