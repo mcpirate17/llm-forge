@@ -1053,6 +1053,26 @@ def _pytest_command(tests: Sequence[str], coverage_file: Path | None) -> list[st
     return prefix
 
 
+def _risk_buckets(
+    per_file: Mapping[str, Mapping[str, int]], risk_of: Mapping[str, str]
+) -> dict[str, dict[str, int]]:
+    """Split measured changed lines into high-risk and everything else.
+
+    A path with no recorded risk counts as other-risk: it is never silently
+    promoted to the lenient side by being unknown, nor held to the strict bar it
+    was never classified into.
+    """
+    buckets = {
+        "high": {"covered": 0, "measurable": 0},
+        "other": {"covered": 0, "measurable": 0},
+    }
+    for path, counts in per_file.items():
+        bucket = "high" if risk_of.get(path) == "high" else "other"
+        buckets[bucket]["covered"] += counts["covered"]
+        buckets[bucket]["measurable"] += counts["measurable"]
+    return buckets
+
+
 def _evaluate_changed_coverage(
     ctx: ReviewContext, coverage_file: Path
 ) -> tuple[list[Finding], dict[str, object]]:
@@ -1097,32 +1117,57 @@ def _evaluate_changed_coverage(
     changed = changed_line_numbers(ctx.repo, ctx.candidate, source_paths)
     covered, measurable, per_file = _coverage_counts(ctx, payload, changed)
     percent = 100.0 if measurable == 0 else covered * 100.0 / measurable
-    threshold = (
-        ctx.policy.high_risk_coverage_threshold
-        if any(change.risk == "high" for change in ctx.live_changes)
-        else ctx.policy.coverage_threshold
-    )
+    # Evaluate each risk class against its own bar, using the lines actually
+    # MEASURED rather than whether any changed path happens to be high-risk.
+    # The old rule let a single conductor/** file raise the bar for every changed
+    # line in the candidate, so a shortfall in low-risk code was judged at 90 --
+    # measured 2026-08-29 on the W7 slices, where the bar and the shortfall came
+    # from different paths entirely.
+    risk_of = {change.path: change.risk for change in ctx.live_changes}
+    buckets = _risk_buckets(per_file, risk_of)
+
     findings: list[Finding] = []
-    if percent < threshold:
-        findings.append(
-            Finding(
-                check_id="targeted-tests-full",
-                rule_id="changed-code-coverage",
-                severity=Severity.HIGH,
-                message=f"changed-code coverage is {percent:.1f}%, below {threshold:.1f}%",
-                evidence={
-                    "covered": covered,
-                    "measurable": measurable,
-                    "per_file": per_file,
-                },
-            )
-        )
-    return findings, {
+    metrics: dict[str, object] = {
         "changed_coverage_percent": round(percent, 2),
-        "changed_coverage_threshold": threshold,
         "changed_lines_measurable": measurable,
         "changed_lines_covered": covered,
     }
+    for bucket, threshold in (
+        ("high", ctx.policy.high_risk_coverage_threshold),
+        ("other", ctx.policy.coverage_threshold),
+    ):
+        counts = buckets[bucket]
+        if counts["measurable"] == 0:
+            continue
+        pct = counts["covered"] * 100.0 / counts["measurable"]
+        metrics[f"changed_coverage_percent_{bucket}"] = round(pct, 2)
+        metrics[f"changed_coverage_threshold_{bucket}"] = threshold
+        metrics[f"changed_lines_measurable_{bucket}"] = counts["measurable"]
+        metrics[f"changed_lines_covered_{bucket}"] = counts["covered"]
+        if pct < threshold:
+            findings.append(
+                Finding(
+                    check_id="targeted-tests-full",
+                    rule_id="changed-code-coverage",
+                    severity=Severity.HIGH,
+                    message=(
+                        f"changed-code coverage for {bucket}-risk lines is "
+                        f"{pct:.1f}%, below {threshold:.1f}%"
+                    ),
+                    evidence={
+                        "risk_class": bucket,
+                        "covered": counts["covered"],
+                        "measurable": counts["measurable"],
+                        "per_file": {
+                            path: c
+                            for path, c in per_file.items()
+                            if ("high" if risk_of.get(path) == "high" else "other")
+                            == bucket
+                        },
+                    },
+                )
+            )
+    return findings, metrics
 
 
 def _coverage_counts(
