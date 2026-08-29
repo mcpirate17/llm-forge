@@ -54,6 +54,7 @@ production code, re-REFUSES on the next run without anyone re-measuring.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -110,7 +111,7 @@ def _is_test_infrastructure(relative: str) -> bool:
 
 def _measure(
     snapshot: Path, runtime_dir: Path, label: str, pytest_args: list[str]
-) -> tuple[frozenset[tuple[str, int]], str | None]:
+) -> tuple[frozenset[tuple[str, int]], frozenset[str], str | None]:
     """Repository source LINES executed by one pytest invocation.
 
     Line granularity, not file: the test module imports its subject at module scope, so
@@ -123,8 +124,18 @@ def _measure(
     """
     data_file = runtime_dir / f"external_invariant_{label}.coverage"
     report = runtime_dir / f"external_invariant_{label}.json"
-    for stale in (data_file, report):
+    natives = runtime_dir / f"external_invariant_{label}_native.json"
+    # The project's coverage config may exclude regions (# pragma: no cover). An
+    # excluded line RUNS and records nothing, so it subtracts to empty and reads as
+    # external. Measure with exclusions emptied, not with the project's rcfile.
+    rcfile = runtime_dir / "external_invariant_coverage.rc"
+    rcfile.write_text("[report]\nexclude_lines =\n", encoding="utf-8")
+    for stale in (data_file, report, natives):
         stale.unlink(missing_ok=True)
+    env = dict(os.environ)
+    env["COVERAGE_RCFILE"] = str(rcfile)
+    env["EXTERNAL_INVARIANT_NATIVE_REPORT"] = str(natives)
+    env["EXTERNAL_INVARIANT_REPO_ROOT"] = str(snapshot.resolve())
     run = subprocess.run(
         [
             sys.executable,
@@ -141,9 +152,12 @@ def _measure(
             "--rootdir=.",
             "-p",
             "no:cacheprovider",
+            "-p",
+            "conductor.candidate_review._external_invariant_probe",
             *pytest_args,
         ],
         cwd=snapshot,
+        env=env,
         capture_output=True,
         text=True,
         timeout=COVERAGE_TIMEOUT_SECONDS,
@@ -151,7 +165,7 @@ def _measure(
     )
     if run.returncode != 0:
         tail = (run.stdout or run.stderr or "").strip()[-300:]
-        return frozenset(), f"{label} run failed under coverage: {tail}"
+        return frozenset(), frozenset(), f"{label} run failed under coverage: {tail}"
     export = subprocess.run(
         [
             sys.executable,
@@ -163,13 +177,14 @@ def _measure(
             str(report),
         ],
         cwd=snapshot,
+        env=env,
         capture_output=True,
         text=True,
         timeout=COVERAGE_TIMEOUT_SECONDS,
         check=False,
     )
     if export.returncode != 0 or not report.is_file():
-        return frozenset(), "coverage produced no report"
+        return frozenset(), frozenset(), "coverage produced no report"
     payload = json.loads(report.read_text("utf-8"))
     executed: set[tuple[str, int]] = set()
     for measured, entry in (payload.get("files") or {}).items():
@@ -183,7 +198,17 @@ def _measure(
         if _is_test_infrastructure(relative):
             continue
         executed.update((relative, int(line)) for line in lines)
-    return frozenset(executed), None
+    try:
+        native = frozenset(json.loads(natives.read_text("utf-8")))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        # The probe must have written; a missing report means the measurement is
+        # incomplete, and an incomplete measurement cannot grant a waiver.
+        return (
+            frozenset(executed),
+            frozenset(),
+            "the native-extension probe produced no report",
+        )
+    return frozenset(executed), native, None
 
 
 def evaluate(
@@ -237,11 +262,14 @@ def evaluate(
             # subtract an import-only baseline (collect-only imports but runs nothing)
             # rather than demanding the module import nothing -- which no real test
             # module can satisfy.
-            baseline, error = _measure(
+            baseline, _, error = _measure(
                 snapshot, runtime_dir, "import", ["--collect-only", module]
             )
+            native: frozenset[str] = frozenset()
             if error is None:
-                executed, error = _measure(snapshot, runtime_dir, "call", [nodeid])
+                executed, native, error = _measure(
+                    snapshot, runtime_dir, "call", [nodeid]
+                )
                 executed = frozenset(executed - baseline)
         except (
             subprocess.TimeoutExpired,
@@ -255,6 +283,19 @@ def evaluate(
             continue
         if error is not None:
             outcomes.append(WaiverOutcome(nodeid, False, error))
+            continue
+        if native:
+            # Coverage cannot see inside a compiled artifact, so a native-backed repo
+            # module loaded during the run means the subtraction proves nothing.
+            # Refuse rather than admit on an unmeasurable claim.
+            outcomes.append(
+                WaiverOutcome(
+                    nodeid,
+                    False,
+                    "it loads repository native extensions, which coverage cannot "
+                    f"trace, so externality cannot be established: {sorted(native)[:3]}",
+                )
+            )
             continue
         if executed:
             outcomes.append(

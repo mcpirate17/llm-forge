@@ -39,14 +39,20 @@ def _declaration(
 
 def _stub_measure(
     calls: Mapping[str, tuple[frozenset[tuple[str, int]], str | None]],
+    native: frozenset[str] = frozenset(),
 ) -> object:
-    """A ``_measure`` replacement keyed by invocation label ("import"/"call")."""
+    """A ``_measure`` replacement keyed by invocation label ("import"/"call").
+
+    Cases supply ``(lines, error)``; the native-artifact set is threaded in separately
+    so a case can exercise the compiled-artifact refusal without restating it.
+    """
 
     def _fake(
         snapshot: Path, runtime_dir: Path, label: str, pytest_args: list[str]
-    ) -> tuple[frozenset[tuple[str, int]], str | None]:
+    ) -> tuple[frozenset[tuple[str, int]], frozenset[str], str | None]:
         assert label in calls, f"unexpected _measure label {label!r}"
-        return calls[label]
+        lines, error = calls[label]
+        return lines, (native if label == "call" else frozenset()), error
 
     return _fake
 
@@ -54,7 +60,7 @@ def _stub_measure(
 def _never_measure() -> object:
     def _fake(
         snapshot: Path, runtime_dir: Path, label: str, pytest_args: list[str]
-    ) -> tuple[frozenset[tuple[str, int]], str | None]:
+    ) -> tuple[frozenset[tuple[str, int]], frozenset[str], str | None]:
         raise AssertionError(f"_measure must not run for label {label!r}")
 
     return _fake
@@ -63,7 +69,7 @@ def _never_measure() -> object:
 def _raising_measure(exc: BaseException) -> object:
     def _fake(
         snapshot: Path, runtime_dir: Path, label: str, pytest_args: list[str]
-    ) -> tuple[frozenset[tuple[str, int]], str | None]:
+    ) -> tuple[frozenset[tuple[str, int]], frozenset[str], str | None]:
         raise exc
 
     return _fake
@@ -215,6 +221,35 @@ def test_evaluate_ignores_declaration_with_non_string_nodeid(
         tmp_path=tmp_path,
     )
     assert outcomes == []
+
+
+def test_evaluate_refuses_when_a_native_artifact_is_mapped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A compiled artifact makes the line subtraction meaningless, so refuse.
+
+    Coverage traces Python only. If the test reached repository logic through a
+    ``ctypes.CDLL``, a torch JIT extension or a Triton kernel, the subtraction comes
+    back empty for a test that is exercising repository code -- the false admission
+    the whole check exists to prevent.
+    """
+
+    monkeypatch.setattr(
+        external_invariants, "_installed_torch_version", lambda: TORCH_VERSION
+    )
+    monkeypatch.setattr(
+        external_invariants,
+        "_measure",
+        _stub_measure(
+            {"import": (frozenset(), None), "call": (frozenset(), None)},
+            native=frozenset({"compiled-cache::research_native_thing.so"}),
+        ),
+    )
+
+    outcomes = external_invariants.evaluate(tmp_path, tmp_path, [_declaration()], GATED)
+
+    assert [outcome.admitted for outcome in outcomes] == [False]
+    assert "native extensions" in outcomes[0].reason
 
 
 def test_evaluate_refuses_when_measurement_reports_explicit_error(
