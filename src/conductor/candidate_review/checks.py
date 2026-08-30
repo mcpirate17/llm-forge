@@ -1084,6 +1084,65 @@ def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
 BUILTIN_CHECKS["duplicate-function-bodies"] = check_duplicate_function_bodies
 
 
+def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
+    """Tier-1 gate: no change ships with a reachable branch no test drives.
+
+    The mutation gate asks whether a test notices a corrupted line. This asks what
+    that cannot answer -- whether the changed code does anything, and whether the
+    tests can tell. Only REACHABLE_BUT_UNTESTED is a finding: a construct that
+    changes behaviour in a regime the tests never reach. Sampling cannot prove the
+    converse, so "nothing moved" is reported by the CLI and never blocks here.
+
+    It runs against the candidate snapshot, not the working tree, because that is
+    the tree that ships.
+    """
+    started = time.perf_counter()
+    from conductor import slop_gate
+
+    modules = [
+        change.path
+        for change in ctx.live_changes
+        if change.path.endswith(".py")
+        and "test" not in change.classes
+        and not Path(change.path).name.startswith("test_")
+    ]
+    if not modules:
+        return _result("equivalence-probe", started, (), files=())
+
+    _, summary = slop_gate.run("HEAD", ctx.snapshot, only=modules)
+    findings = [
+        Finding(
+            check_id="equivalence-probe",
+            rule_id=item["rule"],
+            severity=Severity.LOW,
+            path=item["module"],
+            line=item["lineno"],
+            message=(
+                f"{item['qualname']}: {item['description']} changes the result only "
+                f"under {item.get('amplifier')} (relative change "
+                f"{item.get('max_diff_amplified'):.3e}); no test drives that regime. "
+                "Cover it or remove the construct."
+            ),
+            evidence={k: item[k] for k in ("qualname", "verdict", "amplifier") if k in item},
+        )
+        for item in summary["blocking"]
+    ]
+    return _result(
+        "equivalence-probe",
+        started,
+        findings,
+        files=modules,
+        metrics={
+            "modules_probed": summary["modules_probed"],
+            "advisory": len(summary["advisory"]),
+            "without_drivers": len(summary["modules_without_drivers"]),
+        },
+    )
+
+
+BUILTIN_CHECKS["equivalence-probe"] = check_equivalence_probe
+
+
 def files_for_policy(ctx: ReviewContext, check: CheckPolicy) -> list[str]:
     class_filter = set(check.classes)
     excluded = set(check.exclude_classes)

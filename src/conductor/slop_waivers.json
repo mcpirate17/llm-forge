@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "note": "A waiver downgrades one REACHABLE_BUT_UNTESTED finding to advisory. It is an admission that a reachable branch is knowingly untested, so it carries a reason and names the exact rule and function -- never a bare path.",
+  "waivers": []
+}

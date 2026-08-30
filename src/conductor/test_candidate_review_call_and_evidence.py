@@ -159,3 +159,66 @@ def test_broken_registry_does_not_claim_evidence(
 
     monkeypatch.setattr("conductor.mutation_testing.verify_evidence", _raise)
     assert not verification._has_mutation_evidence(_Ctx(tmp_path), {"test_thing.py"})
+
+
+@dataclass(frozen=True)
+class _StubChange:
+    path: str
+    classes: tuple[str, ...] = ("python",)
+
+
+@dataclass(frozen=True)
+class _StubContext:
+    snapshot: Path
+    live_changes: tuple[_StubChange, ...]
+
+
+def _blocking(module: str = "lane.py") -> dict[str, Any]:
+    return {
+        "module": module, "qualname": "Lane.forward", "rule": "drop_where",
+        "lineno": 12, "verdict": "REACHABLE_BUT_UNTESTED",
+        "description": "torch.where(...) collapsed", "amplifier": "params_x1e3",
+        "max_diff_amplified": 0.97,
+    }
+
+
+def test_equivalence_probe_reports_only_reachable_untested_branches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Advisory verdicts must not become review findings.
+
+    A clean differential sweep cannot prove equivalence, so surfacing it as a
+    finding would block a change on a claim the probe never established.
+    """
+    from conductor import slop_gate
+    from conductor.candidate_review.checks import check_equivalence_probe
+
+    summary = {"modules_probed": 1, "modules_without_drivers": [],
+               "blocking": [_blocking()], "advisory": [_blocking("other.py")]}
+    monkeypatch.setattr(slop_gate, "run", lambda base, root, only=(): (1, summary))
+    result = check_equivalence_probe(
+        _StubContext(tmp_path, (_StubChange("lane.py"),))
+    )
+    assert [f.path for f in result.findings] == ["lane.py"]
+    assert result.metrics["advisory"] == 1
+
+
+def test_equivalence_probe_never_probes_a_test_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A test file is a driver, not a target; probing it would drive it with itself."""
+    from conductor import slop_gate
+    from conductor.candidate_review.checks import check_equivalence_probe
+
+    seen: list[list[str]] = []
+
+    def _run(base: str, root: Path, only: Any = ()) -> tuple[int, dict[str, Any]]:
+        seen.append(list(only))
+        return 0, {"modules_probed": 0, "modules_without_drivers": [],
+                   "blocking": [], "advisory": []}
+
+    monkeypatch.setattr(slop_gate, "run", _run)
+    check_equivalence_probe(
+        _StubContext(tmp_path, (_StubChange("lane.py"), _StubChange("test_lane.py")))
+    )
+    assert seen == [["lane.py"]]
