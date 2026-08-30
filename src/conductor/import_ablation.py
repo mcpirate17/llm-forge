@@ -34,7 +34,7 @@ import pathlib
 import subprocess
 import sys
 import tempfile
-from typing import Iterator, Sequence
+from typing import Sequence
 
 __all__ = ["ImportSite", "import_sites", "ablate_source", "classify", "main"]
 

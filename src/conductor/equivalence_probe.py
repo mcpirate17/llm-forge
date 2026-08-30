@@ -36,7 +36,7 @@ import pathlib
 import sys
 from typing import Any, Callable, Sequence
 
-from conductor.equivalence_ablations import Ablation, generate_ablations
+from conductor.equivalence_ablations import generate_ablations
 
 __all__ = ["Verdict", "AblationResult", "probe_function", "probe_module"]
 
