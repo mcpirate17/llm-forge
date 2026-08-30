@@ -11,6 +11,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+from conductor.audit_root import (
+    AuditRootError,
+    print_audit_provenance,
+    resolve_audit_root,
+)
 from conductor.run_duplicate_audit import should_skip_python
 
 
@@ -512,7 +517,7 @@ def _external_issues(
     python_targets = [
         path.relative_to(ROOT).as_posix()
         for path in files
-        if path.suffix == ".py" and not should_skip_python(path)
+        if path.suffix == ".py" and not should_skip_python(path, root=ROOT)
     ]
     vulture_rc, dead_code_hits = _vulture_issues(target_list, issues, tool_failures)
     pylint_rc, duplicate_hits = _pylint_duplicate_issues(
@@ -689,7 +694,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--markdown-out", type=str, default="")
     parser.add_argument("--json-out", type=str, default="")
+    parser.add_argument(
+        "--root",
+        help=(
+            "Repository tree to audit. Defaults to the Git worktree containing "
+            "the current working directory, never the checkout that supplied "
+            "the imported conductor module."
+        ),
+    )
     args = parser.parse_args(argv)
+
+    global ROOT
+    try:
+        ROOT = resolve_audit_root(args.root)
+    except AuditRootError as exc:
+        print(f"ERROR: guardrail-audit: {exc}", file=sys.stderr)
+        return 2
+    print_audit_provenance("guardrail-audit", ROOT)
 
     issues, summary = collect_issues(
         args.targets,

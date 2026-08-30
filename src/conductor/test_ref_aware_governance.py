@@ -36,6 +36,10 @@ def governance_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(guardrail_audit, "ROOT", tmp_path)
     monkeypatch.setattr(check_protected_deletes, "ROOT", tmp_path)
     monkeypatch.setattr(check_duplicate_function_bodies, "ROOT", tmp_path)
+    # check_protected_deletes.main() now resolves its scan root from cwd's Git
+    # toplevel (conductor/audit_root.py), not from the ROOT monkeypatch above,
+    # so tests that drive it through main() need cwd inside this fake repo.
+    monkeypatch.chdir(tmp_path)
     return tmp_path
 
 

@@ -17,6 +17,11 @@ from typing import Any
 from pathlib import Path
 from pathlib import PurePosixPath
 
+from conductor.changed_files_cli import (
+    add_changed_files_arguments,
+    resolve_changed_files,
+)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -471,8 +476,29 @@ def _baseline_entries(path: Path) -> dict[str, dict[str, Any]]:
     return validated
 
 
+def _print_dup_keys(current: dict[str, dict], keys: list[str]) -> None:
+    for key in keys[:20]:
+        entry = current[key]
+        print(
+            f"  {entry['firstFile']}  <->  {entry['secondFile']}"
+            f"  ({entry['lines']} lines)"
+        )
+    if len(keys) > 20:
+        print(f"  ... and {len(keys) - 20} more")
+
+
+def _causes_dup_pair(entry: dict, changed_files: frozenset[str]) -> bool:
+    """A duplicate *pair* is caused by the candidate if either side changed."""
+    return bool(changed_files.intersection((entry["firstFile"], entry["secondFile"])))
+
+
 def _check_against_baseline(
-    path: Path, entries: list[dict], *, tool_name: str, root: Path = ROOT
+    path: Path,
+    entries: list[dict],
+    *,
+    tool_name: str,
+    root: Path = ROOT,
+    changed_files: frozenset[str] | None = None,
 ) -> int:
     try:
         baseline = _baseline_entries(path)
@@ -487,15 +513,39 @@ def _check_against_baseline(
     )
     if not new_keys:
         return 0
-    print(f"ERROR: {tool_name} found {len(new_keys)} new duplicate pair(s):")
-    for key in new_keys[:20]:
-        entry = current[key]
+
+    if changed_files is None:
+        # Legacy mode: no attribution requested, every new pair blocks.
+        print(f"ERROR: {tool_name} found {len(new_keys)} new duplicate pair(s):")
+        _print_dup_keys(current, new_keys)
         print(
-            f"  {entry['firstFile']}  <->  {entry['secondFile']}"
-            f"  ({entry['lines']} lines)"
+            "Refactor to remove the duplication, or if it's a deliberate/"
+            "pre-existing pattern being adopted with reviewer approval, rerun "
+            f"with --save-baseline to record it in {_display_path(path, root=root)}."
         )
-    if len(new_keys) > 20:
-        print(f"  ... and {len(new_keys) - 20} more")
+        return 1
+
+    caused_keys = [
+        key for key in new_keys if _causes_dup_pair(current[key], changed_files)
+    ]
+    inherited_keys = [key for key in new_keys if key not in set(caused_keys)]
+
+    if inherited_keys:
+        print(
+            f"{tool_name}: {len(inherited_keys)} new duplicate pair(s) are "
+            "INHERITED (pre-existing debt outside this candidate's changed "
+            "files; NOT blocking this candidate):"
+        )
+        _print_dup_keys(current, inherited_keys)
+
+    if not caused_keys:
+        return 0
+
+    print(
+        f"ERROR: {tool_name} found {len(caused_keys)} new duplicate pair(s) "
+        "CAUSED by this candidate's changed files:"
+    )
+    _print_dup_keys(current, caused_keys)
     print(
         "Refactor to remove the duplication, or if it's a deliberate/"
         "pre-existing pattern being adopted with reviewer approval, rerun "
@@ -696,6 +746,7 @@ def run_jscpd(
     save_baseline: bool = False,
     *,
     root: Path = ROOT,
+    changed_files: frozenset[str] | None = None,
 ) -> int:
     if index_snapshot:
         executable = root / "node_modules" / ".bin" / "jscpd"
@@ -725,6 +776,7 @@ def run_jscpd(
                     entries,
                     tool_name="jscpd",
                     root=snapshot,
+                    changed_files=changed_files,
                 )
         if save_baseline:
             _write_baseline(root / JSCPD_BASELINE_RELATIVE, entries, root=root)
@@ -765,6 +817,7 @@ def run_jscpd(
                 entries,
                 tool_name="jscpd",
                 root=scan_root,
+                changed_files=changed_files,
             )
 
     if save_baseline:
@@ -1050,6 +1103,7 @@ def run_pmd_python(
     save_baseline: bool = False,
     *,
     root: Path = ROOT,
+    changed_files: frozenset[str] | None = None,
 ) -> int:
     if index_snapshot:
         with materialized_index_sources(
@@ -1073,6 +1127,7 @@ def run_pmd_python(
                     entries,
                     tool_name="pmd-cpd",
                     root=snapshot,
+                    changed_files=changed_files,
                 )
         if save_baseline:
             _write_baseline(root / PMD_CPD_BASELINE_RELATIVE, entries, root=root)
@@ -1106,6 +1161,7 @@ def run_pmd_python(
             entries,
             tool_name="pmd-cpd",
             root=root,
+            changed_files=changed_files,
         )
 
     audit_dir = root / "tasks" / "audit"
@@ -1204,7 +1260,9 @@ def main() -> int:
             "refactor changes the known clone set; never to hide a new one."
         ),
     )
+    add_changed_files_arguments(parser)
     args = parser.parse_args()
+    changed_files = resolve_changed_files(args)
 
     selected = args.tool or ["jscpd", "pmd-python"]
     if args.index_snapshot and not (args.check or args.save_baseline):
@@ -1233,12 +1291,21 @@ def main() -> int:
     _print_audit_provenance(root, index_snapshot=args.index_snapshot)
     for name in selected:
         print(f"== {name} ==", flush=True)
-        code = TOOLS[name](
-            args.check,
-            args.index_snapshot,
-            args.save_baseline,
-            root=root,
-        )
+        if name in baseline_supported:
+            code = TOOLS[name](
+                args.check,
+                args.index_snapshot,
+                args.save_baseline,
+                root=root,
+                changed_files=changed_files,
+            )
+        else:
+            code = TOOLS[name](
+                args.check,
+                args.index_snapshot,
+                args.save_baseline,
+                root=root,
+            )
         if code:
             return code
     return 0

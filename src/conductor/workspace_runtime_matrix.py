@@ -11,6 +11,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
@@ -19,6 +20,11 @@ from pathlib import Path
 from typing import Any, Final, Iterable
 
 from conductor.active_state import save_active_state
+from conductor.audit_root import (
+    AuditRootError,
+    print_audit_provenance,
+    resolve_audit_root,
+)
 from conductor.candidate_review.model import write_json_atomic
 from conductor.candidate_review.ownership import load_claims
 from conductor.local_ai_policy import CLERK_SYSTEM_PROMPT
@@ -28,9 +34,9 @@ from conductor import workspace_runtime_support as _runtime_support
 from conductor.workspace_runtime_types import CellReceipt, LauncherSpec, ReceiptStatus
 
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT: Final[Path] = (
-    ROOT / "research" / "reports" / "workspace_reliability_20260823"
-)
+# Relative to --root (see main()), not to Path(__file__) -- a caller in a
+# different worktree must not write receipts into some other checkout.
+DEFAULT_OUTPUT: Final[Path] = Path("research/reports/workspace_reliability_20260823")
 EMBED_MODEL: Final[str] = "qwen3-embed-cpu"
 CLERK_MODEL: Final[str] = "qwen3.5:9b"
 CLERK_NUM_CTX: Final[int] = 2048
@@ -655,8 +661,8 @@ def extract_reported_tokens(output: str) -> int:
     return max(totals, default=0)
 
 
-def launcher_specs() -> tuple[LauncherSpec, ...]:
-    return _launcher_smokes.launcher_specs(ROOT, REQUIRED_LAUNCHERS)
+def launcher_specs(root: Path = ROOT) -> tuple[LauncherSpec, ...]:
+    return _launcher_smokes.launcher_specs(root, REQUIRED_LAUNCHERS)
 
 
 def _launcher_runtime() -> _launcher_smokes.LauncherRuntime:
@@ -673,10 +679,10 @@ def _launcher_runtime() -> _launcher_smokes.LauncherRuntime:
     )
 
 
-def run_launcher_smokes(output_dir: Path) -> CellReceipt:
+def run_launcher_smokes(output_dir: Path, *, root: Path = ROOT) -> CellReceipt:
     return _launcher_smokes.run_launcher_smokes(
         output_dir,
-        launcher_specs(),
+        launcher_specs(root),
         _launcher_runtime(),
     )
 
@@ -974,9 +980,9 @@ def _adjudicate_clerk_attempt(
     return ok, evidence
 
 
-def run_clerk_canary(output_dir: Path) -> CellReceipt:
+def run_clerk_canary(output_dir: Path, *, root: Path = ROOT) -> CellReceipt:
     try:
-        preflight = clerk_gpu_preflight()
+        preflight = clerk_gpu_preflight(root)
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         return CellReceipt(
             "local-clerk-canary",
@@ -1012,12 +1018,12 @@ def run_clerk_canary(output_dir: Path) -> CellReceipt:
     )
 
 
-def reconcile_clerk_evidence(output_dir: Path) -> dict[str, Any]:
+def reconcile_clerk_evidence(output_dir: Path, *, root: Path = ROOT) -> dict[str, Any]:
     """Run and replace only the clerk cell, preserving launcher evidence."""
 
     return _reconcile_cell(
         output_dir,
-        run_clerk_canary(output_dir),
+        run_clerk_canary(output_dir, root=root),
         archive_name="receipt.pre_clerk_reconcile.json",
         archive_provenance_prefix="clerk_reconcile",
         provenance_update={
@@ -1096,37 +1102,38 @@ def build_receipt(
     graph_evidence: Path | None,
     run_launchers: bool,
     run_clerk: bool,
+    root: Path = ROOT,
 ) -> WorkspaceReceipt:
     output_dir.mkdir(parents=True, exist_ok=True)
     cells = [
-        check_active_state(),
-        check_hook_configs(),
-        check_hook_programs(),
+        check_active_state(root),
+        check_hook_configs(root),
+        check_hook_programs(root),
         check_launcher_programs(),
         check_embedding_canary(),
         check_retrievers(),
         load_graph_evidence(graph_evidence),
-        run_launcher_smokes(output_dir)
+        run_launcher_smokes(output_dir, root=root)
         if run_launchers
         else CellReceipt(
             "launcher-real-smokes", ReceiptStatus.NOT_READY, "launcher calls not run"
         ),
-        run_clerk_canary(output_dir)
+        run_clerk_canary(output_dir, root=root)
         if run_clerk
         else CellReceipt(
             "local-clerk-canary", ReceiptStatus.NOT_READY, "clerk call not run"
         ),
     ]
-    head = _run(["git", "rev-parse", "HEAD"], timeout=10).stdout.strip()
+    head = _run(["git", "rev-parse", "HEAD"], timeout=10, cwd=root).stdout.strip()
     return WorkspaceReceipt(
         schema_version=1,
         generated_at=datetime.now(timezone.utc).isoformat(),
         status=aggregate_status(cells),
         cells=tuple(cells),
         provenance={
-            "repo": str(ROOT),
+            "repo": str(root),
             "git_head": head,
-            "claim_store_sha256": load_claims(ROOT)[1],
+            "claim_store_sha256": load_claims(root)[1],
             "allowed_models": [EMBED_MODEL, CLERK_MODEL],
             "prohibited_model_fragments": list(PROHIBITED_MODEL_FRAGMENTS),
             "launcher_call_budget": MAX_LAUNCHER_CALLS,
@@ -1138,7 +1145,12 @@ def build_receipt(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT,
+        help="Relative paths resolve against --root (or its default).",
+    )
     parser.add_argument("--graph-evidence", type=Path)
     parser.add_argument("--run-launchers", action="store_true")
     parser.add_argument("--run-clerk", action="store_true")
@@ -1157,32 +1169,50 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="run and replace only the local clerk cell",
     )
+    parser.add_argument(
+        "--root",
+        help=(
+            "Repository tree to evaluate. Defaults to the Git worktree containing "
+            "the current working directory, never the checkout that supplied "
+            "the imported conductor module."
+        ),
+    )
     args = parser.parse_args(argv)
+
+    try:
+        root = resolve_audit_root(args.root)
+    except AuditRootError as exc:
+        print(f"ERROR: workspace-runtime-matrix: {exc}", file=sys.stderr)
+        return 2
+    print_audit_provenance("workspace-runtime-matrix", root)
+    output_dir = root / args.output
+
     if args.reconcile_launcher_logs:
-        payload = reconcile_receipt(args.output)
-        payload["receipt"] = str(args.output / "receipt.json")
+        payload = reconcile_receipt(output_dir, repo=root)
+        payload["receipt"] = str(output_dir / "receipt.json")
         print(json.dumps(payload, indent=2))
         return 0 if payload["status"] == ReceiptStatus.PASS.value else 2
     if args.reconcile_graph_evidence is not None:
         payload = reconcile_graph_evidence(
-            args.output,
+            output_dir,
             args.reconcile_graph_evidence,
         )
-        payload["receipt"] = str(args.output / "receipt.json")
+        payload["receipt"] = str(output_dir / "receipt.json")
         print(json.dumps(payload, indent=2))
         return 0 if payload["status"] == ReceiptStatus.PASS.value else 2
     if args.reconcile_clerk:
-        payload = reconcile_clerk_evidence(args.output)
-        payload["receipt"] = str(args.output / "receipt.json")
+        payload = reconcile_clerk_evidence(output_dir, root=root)
+        payload["receipt"] = str(output_dir / "receipt.json")
         print(json.dumps(payload, indent=2))
         return 0 if payload["status"] == ReceiptStatus.PASS.value else 2
     receipt = build_receipt(
-        output_dir=args.output,
+        output_dir=output_dir,
         graph_evidence=args.graph_evidence,
         run_launchers=args.run_launchers,
         run_clerk=args.run_clerk,
+        root=root,
     )
-    path = args.output / "receipt.json"
+    path = output_dir / "receipt.json"
     write_json_atomic(path, receipt.to_dict())
     payload = receipt.to_dict()
     payload["receipt"] = str(path)

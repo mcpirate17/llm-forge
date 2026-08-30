@@ -9,6 +9,7 @@ shared checkout.
 from __future__ import annotations
 
 import argparse
+import ast
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
@@ -119,6 +120,10 @@ class Campaign:
     environment: Mapping[str, str]
     host_read_dependencies: tuple[str, ...]
     test_scopes: Mapping[str, TestFileScope] = field(default_factory=dict)
+    # Optional per-symbol pins. A path here is checked symbol-by-symbol instead
+    # of whole-file, so an edit outside the pinned functions does not drift the
+    # campaign. Absent means the old whole-file behaviour, unchanged.
+    source_symbols: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
     value_analysis: ValueAnalysisSpec | None = None
 
 
@@ -406,6 +411,9 @@ def load_campaign(path: Path, *, repo_root: Path = REPO_ROOT) -> Campaign:
         ranked_tests=ranked_tests,
         repo_root=repo_root,
     )
+    source_symbols = _load_source_symbols(
+        payload.get("source_symbols", {}), source_sha256=source_sha256
+    )
     try:
         value_analysis = load_value_analysis(
             payload.get("value_analysis"),
@@ -426,6 +434,7 @@ def load_campaign(path: Path, *, repo_root: Path = REPO_ROOT) -> Campaign:
         ),
         expected_mutations=expected_mutations,
         source_sha256=source_sha256,
+        source_symbols=source_symbols,
         ranked_tests=ranked_tests,
         planned_mutations=planned,
         mutations=mutations,
@@ -507,11 +516,158 @@ def _runner_components_sha256() -> dict[str, str]:
     return components
 
 
+RUNNER_LINEAGE_PATH = "conductor/mutation_runner_lineage.json"
+
+
+def _lineage_accepts(recorded: object, repo_root: Path) -> bool:
+    """True when `recorded` runner hashes are declared receipt-compatible with today's.
+
+    Every receipt pins the whole-file sha256 of five runner components, so ANY edit to
+    the runner voids every receipt in the repository at once. Measured 2026-08-30: one
+    added comment line dropped coverage from 505 to 74, rejecting 431 test paths. That
+    is the same over-broad-pin pathology per-symbol source pins exist to fix, one level
+    up -- a content pin over a whole file where only a narrow semantic surface decides
+    what a receipt MEANS.
+
+    An entry in `conductor/mutation_runner_lineage.json` narrows it, and only that:
+    it rewrites no receipt, names its justification and the diff it covers, is proven
+    by re-running a sample under both runners rather than asserted, and deleting it
+    restores strict whole-file behaviour immediately. It is NOT the frozen legacy v2
+    git anchor, which stays frozen.
+
+    Fail-closed: an absent, unreadable or malformed lineage file accepts nothing.
+    """
+    if not isinstance(recorded, dict):
+        return False
+    path = repo_root / RUNNER_LINEAGE_PATH
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if payload.get("schema_version") != 1:
+        return False
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        return False
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("runner_components_sha256") == recorded:
+            return True
+    return False
+
+
+def _load_source_symbols(
+    value: object, *, source_sha256: Mapping[str, str]
+) -> dict[str, dict[str, str]]:
+    """Validate the optional per-symbol pin table.
+
+    Fail-closed on every shape error. A malformed entry that silently degraded to "no
+    pins" would turn a narrowed pin into no pin at all, which is the one outcome worse
+    than the over-broad whole-file hash it replaces.
+    """
+    table = _require_mapping(value, "source_symbols")
+    parsed: dict[str, dict[str, str]] = {}
+    for raw_path, raw_symbols in table.items():
+        relative = _safe_relative_path(raw_path, "source_symbols key")
+        if relative not in source_sha256:
+            raise CampaignError(
+                f"source_symbols[{relative!r}] is not bound in source_sha256; "
+                "a symbolically pinned file must still declare the file it belongs to"
+            )
+        symbols = _require_mapping(raw_symbols, f"source_symbols[{relative!r}]")
+        if not symbols:
+            raise CampaignError(
+                f"source_symbols[{relative!r}] is empty; omit the path instead of "
+                "pinning nothing, which would silently disable drift detection for it"
+            )
+        entry: dict[str, str] = {}
+        for raw_symbol, raw_digest in symbols.items():
+            symbol = _require_string(raw_symbol, f"source_symbols[{relative!r}] key")
+            digest = _require_string(
+                raw_digest, f"source_symbols[{relative!r}][{symbol!r}]"
+            )
+            if not SHA256_RE.fullmatch(digest):
+                raise CampaignError(
+                    f"source_symbols[{relative!r}][{symbol!r}] must be a lowercase SHA-256 digest"
+                )
+            entry[symbol] = digest
+        parsed[relative] = entry
+    return parsed
+
+
+def symbol_hashes(path: Path) -> dict[str, str]:
+    """AST hash per top-level symbol, and per method, in a Python file.
+
+    `ast.dump(..., include_attributes=False)` drops line and column numbers, so a
+    comment, a docstring reflow, an import added above, or any edit to a NEIGHBOURING
+    function leaves a symbol's hash untouched. Only a change to that symbol's own
+    syntax tree moves it. That is the whole point: a campaign pins the functions its
+    mutants actually touch, and edits elsewhere in the file stop voiding it.
+
+    Raises rather than returning a partial map: a file that cannot be parsed must not
+    silently produce "no drift".
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise CampaignError(f"cannot inventory symbols in {path}: {exc}") from exc
+
+    hashes: dict[str, str] = {}
+
+    def record(qualname: str, node: ast.AST) -> None:
+        dumped = ast.dump(node, annotate_fields=True, include_attributes=False)
+        hashes[qualname] = hashlib.sha256(dumped.encode("utf-8")).hexdigest()
+
+    definition = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+    for node in tree.body:
+        if not isinstance(node, definition):
+            continue
+        record(node.name, node)
+        if isinstance(node, ast.ClassDef):
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    record(f"{node.name}.{child.name}", child)
+    return hashes
+
+
+def symbol_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
+    """Per-symbol drift for paths the campaign pins symbolically."""
+    drift: list[dict[str, Any]] = []
+    for relative, pinned in campaign.source_symbols.items():
+        path = root / relative
+        if not path.is_file() or path.is_symlink():
+            drift.append({"path": relative, "symbol": None, "reason": "absent or symlink"})
+            continue
+        current = symbol_hashes(path)
+        for symbol, expected in pinned.items():
+            actual = current.get(symbol)
+            if actual != expected:
+                drift.append(
+                    {
+                        "path": relative,
+                        "symbol": symbol,
+                        "expected_sha256": expected,
+                        "actual_sha256": actual,
+                        "reason": "symbol removed" if actual is None else "symbol changed",
+                    }
+                )
+    return drift
+
+
 def source_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
-    """Return every absent or hash-drifted source bound by the campaign."""
+    """Return every absent or hash-drifted source bound by the campaign.
+
+    A path pinned symbolically in `source_symbols` is checked symbol-by-symbol and is
+    NOT whole-file hashed -- that is what stops an unrelated edit from voiding the
+    campaign. Everything else keeps the whole-file pin, so nothing changes for a
+    manifest that does not opt in.
+    """
 
     drift: list[dict[str, Any]] = []
     for relative, expected in campaign.source_sha256.items():
+        if relative in campaign.source_symbols:
+            continue
         path = root / relative
         actual = _sha256(path) if path.is_file() and not path.is_symlink() else None
         if actual != expected:
@@ -523,7 +679,7 @@ def source_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
                     "is_symlink": path.is_symlink(),
                 }
             )
-    return drift
+    return drift + symbol_drift(campaign, root)
 
 
 def _ps_output() -> str:
@@ -808,6 +964,7 @@ def run_campaign(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "status": "RUNNING",
         "source_sha256": dict(campaign.source_sha256),
+        "source_symbols": {k: dict(v) for k, v in campaign.source_symbols.items()},
         "test_scopes": _test_scopes_payload(campaign),
         "test_argv": list(campaign.test_argv),
         "interpreter": _pin_interpreter(campaign.test_argv)[0],
@@ -1039,15 +1196,24 @@ def _receipt_errors(
         except CampaignError as exc:
             errors.append(str(exc))
         else:
-            if (
-                receipt.get("runner_sha256")
+            recorded = receipt.get("runner_components_sha256")
+            if recorded != runner_components and not _lineage_accepts(
+                recorded, repo_root
+            ):
+                errors.append("runner component hash map mismatch")
+            elif (
+                recorded == runner_components
+                and receipt.get("runner_sha256")
                 != runner_components["conductor/mutation_testing.py"]
             ):
+                # Only meaningful when the map itself matches; a lineage-accepted
+                # receipt necessarily carries the older runner sha too.
                 errors.append("runner hash mismatch")
-            if receipt.get("runner_components_sha256") != runner_components:
-                errors.append("runner component hash map mismatch")
     if receipt.get("source_sha256") != dict(campaign.source_sha256):
         errors.append("source hash map mismatch")
+    expected_symbols = {k: dict(v) for k, v in campaign.source_symbols.items()}
+    if receipt.get("source_symbols", {}) != expected_symbols:
+        errors.append("source symbol map mismatch")
     if receipt.get("test_scopes", {}) != _test_scopes_payload(campaign):
         errors.append("test scope map mismatch")
     if receipt.get("complete_campaign") is not True:
@@ -1128,7 +1294,17 @@ def verify_evidence(
                 for ranked in campaign.ranked_tests
             )
         ]
-        accepted: tuple[Campaign, Path] | None = None
+        # Collect EVERY valid receipt across EVERY campaign ranking this path, then
+        # take the newest. The old loop broke at the first campaign in registry order
+        # that had any valid receipt, so a second campaign covering the same test file
+        # was silently invisible -- its receipts never even appeared in the rejection
+        # reasons. 9 test paths are claimed by two campaigns each, so "which evidence
+        # counts" was decided by position in registry.json.
+        #
+        # Newest is by the receipt's own generated_at, not filename order. The previous
+        # `reversed(...)` over a lexicographic glob was a filename-shaped proxy for
+        # recency that quietly disagrees with it whenever a campaign_id sorts oddly.
+        candidates: list[tuple[str, Campaign, Path]] = []
         rejection_reasons: list[str] = []
         for campaign in matching:
             scope_errors = _test_scope_errors(campaign, test_path)
@@ -1142,7 +1318,7 @@ def verify_evidence(
                 for path, receipt, raw_bytes in receipts
                 if receipt.get("campaign_id") == campaign.campaign_id
             ]
-            for path, receipt, raw_bytes in reversed(campaign_receipts):
+            for path, receipt, raw_bytes in campaign_receipts:
                 errors = _receipt_errors(
                     receipt,
                     campaign,
@@ -1151,12 +1327,16 @@ def verify_evidence(
                     raw_bytes,
                     anchor_repo or repo_root,
                 )
-                if not errors:
-                    accepted = (campaign, path)
-                    break
-                rejection_reasons.append(f"{path.name}: {', '.join(errors)}")
-            if accepted is not None:
-                break
+                if errors:
+                    rejection_reasons.append(f"{path.name}: {', '.join(errors)}")
+                    continue
+                # Missing generated_at sorts oldest rather than crashing; a receipt
+                # without one is still evidence, just never preferred over a dated peer.
+                candidates.append((str(receipt.get("generated_at") or ""), campaign, path))
+        accepted: tuple[Campaign, Path] | None = None
+        if candidates:
+            newest = max(candidates, key=lambda item: (item[0], item[2].name))
+            accepted = (newest[1], newest[2])
         if accepted is None:
             missing.append(
                 {
@@ -1186,6 +1366,123 @@ def _json_print(payload: Mapping[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
+def _registry_campaigns(registry_path: Path, *, repo_root: Path) -> list[Campaign]:
+    """Every campaign the registry lists, loaded and validated."""
+    payload = _load_registry(registry_path, repo_root)
+    rows = payload.get("campaigns")
+    if not isinstance(rows, list):
+        raise CampaignError("registry.campaigns must be a list")
+    campaigns: list[Campaign] = []
+    for index, raw in enumerate(rows):
+        row = _require_mapping(raw, f"registry.campaigns[{index}]")
+        manifest = _safe_relative_path(
+            row.get("manifest"), f"registry.campaigns[{index}].manifest"
+        )
+        campaigns.append(load_campaign(repo_root / manifest, repo_root=repo_root))
+    return campaigns
+
+
+def repin_campaigns(
+    registry_path: Path,
+    *,
+    campaign_ids: Sequence[str] | None = None,
+    run: bool = False,
+    allow_mutations: bool = False,
+    repo_root: Path = REPO_ROOT,
+) -> dict[str, Any]:
+    """Re-pin every drifted campaign and, with `run`, regenerate its receipt.
+
+    A re-pin without a re-run produces a manifest whose recorded digests describe the
+    current tree while its receipt describes an older one -- a receipt that was never
+    regenerated, which is not evidence. So `--run` is what makes this command finish
+    the job, and it refuses without explicit mutation authorization.
+
+    Without `--run` this is a REPORT and changes nothing on disk, so it is always safe
+    to ask "what is drifted?".
+    """
+    if run and not allow_mutations:
+        raise CampaignError(
+            "repin --run executes mutants and requires --allow-mutations"
+        )
+    campaigns = _registry_campaigns(registry_path, repo_root=repo_root)
+    wanted = set(campaign_ids or [])
+    drifted: list[dict[str, Any]] = []
+    for campaign in campaigns:
+        if wanted and campaign.campaign_id not in wanted:
+            continue
+        drift = source_drift(campaign, repo_root)
+        if drift:
+            drifted.append({"campaign_id": campaign.campaign_id, "drift": drift})
+
+    if not drifted:
+        return {"status": "CLEAN", "drifted": [], "rerun": []}
+    if not run:
+        return {
+            "status": "DRIFTED",
+            "drifted": drifted,
+            "rerun": [],
+            "hint": "re-run with --run --allow-mutations to re-pin AND regenerate receipts",
+        }
+
+    rerun: list[dict[str, Any]] = []
+    for entry in drifted:
+        campaign_id = str(entry["campaign_id"])
+        manifest = next(
+            c.manifest_path for c in campaigns if c.campaign_id == campaign_id
+        )
+        _repin_manifest(manifest, repo_root=repo_root)
+        refreshed = load_campaign(manifest, repo_root=repo_root)
+        remaining = source_drift(refreshed, repo_root)
+        if remaining:
+            rerun.append(
+                {
+                    "campaign_id": campaign_id,
+                    "status": "REFUSED",
+                    "reason": "still drifted after re-pin",
+                    "drift": remaining,
+                }
+            )
+            continue
+        result = run_campaign(refreshed, allow_mutations=True)
+        rerun.append({"campaign_id": campaign_id, "status": result["status"]})
+    failed = [item for item in rerun if item["status"] != "PASS"]
+    return {
+        "status": "REPINNED" if not failed else "FAILED",
+        "drifted": drifted,
+        "rerun": rerun,
+    }
+
+
+def _repin_manifest(manifest_path: Path, *, repo_root: Path) -> None:
+    """Rewrite drifted digests in place by targeted substitution.
+
+    Never `json.dumps(..., sort_keys=True)`: that reorders
+    `value_analysis.mutation_contracts`, whose key order must match
+    `planned_mutations`, and the loader then refuses the campaign. Measured 2026-08-30.
+    """
+    text = manifest_path.read_text(encoding="utf-8")
+    payload = json.loads(text)
+    for relative, recorded in dict(payload.get("source_sha256", {})).items():
+        if relative in payload.get("source_symbols", {}):
+            continue
+        path = repo_root / relative
+        if not path.is_file():
+            continue
+        actual = _sha256(path)
+        if actual != recorded and text.count(recorded) == 1:
+            text = text.replace(recorded, actual)
+    for relative, symbols in dict(payload.get("source_symbols", {})).items():
+        path = repo_root / relative
+        if not path.is_file():
+            continue
+        current = symbol_hashes(path)
+        for symbol, recorded in dict(symbols).items():
+            actual = current.get(symbol)
+            if actual and actual != recorded and text.count(recorded) == 1:
+                text = text.replace(recorded, actual)
+    manifest_path.write_text(text, encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for inspection and explicitly authorized execution."""
 
@@ -1208,6 +1505,36 @@ def main(argv: list[str] | None = None) -> int:
         dest="mutation_ids",
         help="run only this mutant id (repeatable); still runs the baseline first",
     )
+    repin_parser = subparsers.add_parser(
+        "repin",
+        help="re-pin drifted campaigns and, with --run, regenerate their receipts",
+    )
+    repin_parser.add_argument(
+        "--registry",
+        type=Path,
+        default=Path("conductor/mutation_campaigns/registry.json"),
+    )
+    repin_parser.add_argument(
+        "--campaign",
+        action="append",
+        dest="campaign_ids",
+        help="limit to this campaign id (repeatable); default is every drifted campaign",
+    )
+    repin_parser.add_argument(
+        "--run",
+        action="store_true",
+        help=(
+            "after re-pinning, RE-RUN each campaign so its receipt is regenerated. "
+            "Without this the command reports what drifted and changes nothing: a "
+            "re-pin alone produces a manifest whose receipt was never regenerated, "
+            "which is not evidence."
+        ),
+    )
+    repin_parser.add_argument(
+        "--allow-mutations",
+        action="store_true",
+        help="required with --run; mutant execution is explicitly authorized, never implied",
+    )
     verify_parser = subparsers.add_parser(
         "verify-evidence",
         help="require current full-campaign PASS receipts for changed tests",
@@ -1220,6 +1547,15 @@ def main(argv: list[str] | None = None) -> int:
     verify_parser.add_argument("paths", nargs="*")
     args = parser.parse_args(argv)
     try:
+        if args.command == "repin":
+            result = repin_campaigns(
+                args.registry,
+                campaign_ids=args.campaign_ids,
+                run=args.run,
+                allow_mutations=args.allow_mutations,
+            )
+            _json_print(result)
+            return 0 if result["status"] in ("CLEAN", "REPINNED") else 1
         if args.command == "verify-evidence":
             result = verify_evidence(args.registry, args.paths)
             _json_print(result)

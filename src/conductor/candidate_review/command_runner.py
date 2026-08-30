@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import sys
 import time
+import warnings
+from pathlib import Path
 from typing import Mapping, Sequence
 
 from conductor.candidate_review.checks import ReviewContext, _result, files_for_policy
@@ -112,8 +114,28 @@ def prepare_candidate_git_environment(ctx: ReviewContext) -> None:
     )
 
 
+def _changed_files_file(
+    ctx: ReviewContext, check_id: str, files: Sequence[str]
+) -> Path:
+    """Write the check's changed-file list to a scratch file and return its path.
+
+    Some analyzers (jscpd, vulture) always scan the whole tree against a
+    baseline rather than operating on ``{files}`` directly, so their
+    ``--changed-file(s)`` attribution flag needs a path on disk, not an
+    inline argument list that could run into thousands of entries.
+    """
+    ctx.runtime_dir.mkdir(parents=True, exist_ok=True)
+    path = ctx.runtime_dir / f"changed-files-{check_id}.txt"
+    path.write_text("\n".join(files) + ("\n" if files else ""), encoding="utf-8")
+    return path
+
+
 def _expand_command(
-    template: Sequence[str], ctx: ReviewContext, files: Sequence[str]
+    template: Sequence[str],
+    ctx: ReviewContext,
+    files: Sequence[str],
+    *,
+    check_id: str = "command",
 ) -> list[str]:
     substitutions = {
         "{repo}": str(ctx.repo),
@@ -122,6 +144,10 @@ def _expand_command(
         "{tree}": ctx.candidate.tree_oid,
         "{python}": sys.executable,
     }
+    if any("{changed_files_file}" in item for item in template):
+        substitutions["{changed_files_file}"] = str(
+            _changed_files_file(ctx, check_id, files)
+        )
     output: list[str] = []
     for item in template:
         if item == "{files}":
@@ -195,6 +221,19 @@ def _limited_command(
 ) -> list[str]:
     prlimit = shutil.which("prlimit")
     if not prlimit:
+        # Returning the bare command drops the CPU and address-space budget for every
+        # analyzer and every test shard -- silently, with no finding and no log line.
+        # That is exactly the "green locally, red in CI" shape the 2026-08-29 reset
+        # exists to remove, so say it out loud. It is a warning rather than a raise
+        # because the caller may be a developer probe on a box without util-linux;
+        # `make gate` declares prlimit in [tools] and refuses to start without it.
+        warnings.warn(
+            "prlimit is unavailable: running analyzers WITHOUT a CPU or address-space "
+            "budget. Timeouts still apply as wall clock only. Install util-linux, or "
+            "use `make gate`, which refuses to run when a declared tool is missing.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return command
     address_space = memory_mb * 1024 * 1024
     cpu_seconds = max(timeout_seconds, 1)
@@ -248,7 +287,7 @@ def _tail(value: str, maximum: int) -> str:
 def tool_version(
     ctx: ReviewContext, check: CheckPolicy
 ) -> tuple[str | None, str | None]:
-    command = _expand_command(check.version_command, ctx, ())
+    command = _expand_command(check.version_command, ctx, (), check_id=check.check_id)
     try:
         completed = _run_process(
             command,
@@ -294,7 +333,7 @@ def run_command_check(
             help="Install the pinned analyzer; required checks never skip on missing tools.",
         )
         return _result(check.check_id, started, [finding], files=files)
-    command = _expand_command(check.command, ctx, files)
+    command = _expand_command(check.command, ctx, files, check_id=check.check_id)
     try:
         completed = _run_process(
             command,

@@ -36,6 +36,7 @@ ALLOWED_TOP_LEVEL = {
     "baselines",
     "exceptions",
     "mutation_waivers",
+    "tools",
 }
 ALLOWED_CHECK_KEYS = {
     "kind",
@@ -52,6 +53,7 @@ ALLOWED_CHECK_KEYS = {
     "cache",
     "run_on_deletions",
     "max_output_chars",
+    "attribution",
     "shard_max_files",
     "shard_workers",
 }
@@ -157,6 +159,11 @@ class CheckPolicy:
     cache: bool
     run_on_deletions: bool
     max_output_chars: int
+    # "candidate": every finding blocks (default, fail-closed) -- the check judges
+    # the candidate as a whole. "diff": a finding blocks only when it names a path
+    # the candidate changed; anything else this check reports is pre-existing tree
+    # debt, recorded and counted but not a wall in front of unrelated work.
+    attribution: str = "candidate"
     shard_max_files: int = 0
     shard_workers: int = 1
     # 0 means "same as timeout_seconds"; read via `wall_timeout_seconds`.
@@ -173,6 +180,24 @@ class CheckPolicy:
         untouched and still fires on a runaway.
         """
         return self.wall_timeout_override or self.timeout_seconds
+
+
+@dataclass(frozen=True, slots=True)
+class ToolPolicy:
+    """One external binary the gate depends on, declared so it can never degrade.
+
+    `expected_version` is CI's pin. A local version that differs is reported, not
+    refused -- a version skew is worth knowing about but is not the failure that
+    cost five days; a *missing* tool is.
+    """
+
+    tool_id: str
+    executable: str
+    version_command: tuple[str, ...]
+    expected_version: str
+    required_profiles: tuple[str, ...]
+    provided_by: str
+    rationale: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,6 +275,7 @@ class Policy:
     baselines: tuple[BaselinePolicy, ...]
     exceptions: tuple[ExceptionPolicy, ...]
     mutation_waivers: tuple[MutationWaiverPolicy, ...] = ()
+    tools: tuple[ToolPolicy, ...] = ()
 
     def classify_change(self, change: Change) -> Change:
         candidate_paths = tuple(
@@ -387,6 +413,21 @@ def _float_percent(value: Any, *, field: str) -> float:
     return result
 
 
+VALID_ATTRIBUTIONS = {"candidate", "diff"}
+
+
+def _attribution_value(value: Any, *, field: str) -> str:
+    """Validate a check's blocking-attribution mode.
+
+    Unknown values are refused rather than defaulted, because silently reading a
+    typo as "candidate" would quietly make a check block on inherited debt again --
+    the exact failure this field exists to end.
+    """
+    if not isinstance(value, str) or value not in VALID_ATTRIBUTIONS:
+        raise PolicyError(f"{field} must be one of {sorted(VALID_ATTRIBUTIONS)}")
+    return value
+
+
 def _bool_value(value: Any, *, field: str) -> bool:
     if not isinstance(value, bool):
         raise PolicyError(f"{field} must be a boolean")
@@ -460,6 +501,9 @@ def _parse_check(check_id: str, raw: Any) -> CheckPolicy:
             raw.get("memory_mb", 2048),
             field=f"checks.{check_id}.memory_mb",
             maximum=65536,
+        ),
+        attribution=_attribution_value(
+            raw.get("attribution", "candidate"), field=f"checks.{check_id}.attribution"
         ),
         always=_bool_value(raw.get("always", False), field=f"checks.{check_id}.always"),
         cache=_bool_value(raw.get("cache", True), field=f"checks.{check_id}.cache"),
@@ -693,6 +737,51 @@ def _parse_mutation_waivers(raw: Any) -> tuple[MutationWaiverPolicy, ...]:
     return waivers
 
 
+def _parse_tools(raw: Any) -> tuple[ToolPolicy, ...]:
+    """Parse the declared external tool set.
+
+    Every binary the gate depends on is declared here so `make gate` can refuse to
+    start when one is absent, instead of degrading. `command_runner` already fails
+    closed for policy `command` checks, but only mid-review -- and `prlimit` was
+    exempt even from that, silently dropping the CPU and address-space budget.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, dict):
+        raise PolicyError("tools must be a table")
+    required_keys = {
+        "executable",
+        "version_command",
+        "expected_version",
+        "required_profiles",
+        "provided_by",
+        "rationale",
+    }
+    tools: list[ToolPolicy] = []
+    for tool_id, value in raw.items():
+        if not isinstance(value, dict) or set(value) != required_keys:
+            raise PolicyError(
+                f"tools.{tool_id} has an invalid schema; required keys: {sorted(required_keys)}"
+            )
+        tools.append(
+            ToolPolicy(
+                tool_id=tool_id,
+                executable=str(value["executable"]),
+                version_command=_string_tuple(
+                    value["version_command"], field=f"tools.{tool_id}.version_command"
+                ),
+                expected_version=str(value["expected_version"]),
+                required_profiles=_string_tuple(
+                    value["required_profiles"],
+                    field=f"tools.{tool_id}.required_profiles",
+                ),
+                provided_by=str(value["provided_by"]),
+                rationale=str(value["rationale"]),
+            )
+        )
+    return tuple(tools)
+
+
 def _parse_baselines(raw: Any) -> tuple[BaselinePolicy, ...]:
     if not isinstance(raw, dict):
         raise PolicyError("baselines must be a table")
@@ -814,6 +903,7 @@ def load_policy(path: Path) -> Policy:
         baselines=_parse_baselines(baselines_raw),
         exceptions=tuple(_parse_exception(value) for value in exceptions_raw),
         mutation_waivers=_parse_mutation_waivers(raw.get("mutation_waivers")),
+        tools=_parse_tools(raw.get("tools")),
     )
     _validate_policy(policy)
     return policy

@@ -49,6 +49,27 @@ class PreambleError(ValueError):
     """Rejected session preamble."""
 
 
+def _exposure_line() -> str:
+    """Cheap EXPOSED summary for the inject. Degrades visibly rather than crashing the
+    hook or silently disappearing -- see ``workspace_hygiene.cheap_exposure_counts``
+    for why the branch-staleness check (needs ``gh``, ~10s over this repo's branch
+    count) is excluded from this hook-safe path.
+    """
+    try:
+        from research.tools.workspace_hygiene import cheap_exposure_counts
+
+        counts = cheap_exposure_counts()
+    except (ImportError, RuntimeError, OSError) as exc:
+        return (
+            f"EXPOSED: unavailable ({exc}). python -m research.tools.workspace_hygiene"
+        )
+    return (
+        f"EXPOSED: {counts['local_only_commits']} local-only commit(s), "
+        f"{counts['stale_dirty_files']} stale dirty file(s), branches skipped (needs gh). "
+        "python -m research.tools.workspace_hygiene"
+    )
+
+
 def load_state(
     path: Path = ACTIVE_STATE_PATH,
     *,
@@ -74,7 +95,7 @@ def load_state(
     return payload
 
 
-def compact_state(state: dict[str, Any]) -> str:
+def compact_state(state: dict[str, Any], *, include_exposure: bool = True) -> str:
     mandates = state.get("standing_mandates")
     mandate_ids: list[str] = []
     if isinstance(mandates, list):
@@ -98,6 +119,8 @@ def compact_state(state: dict[str, Any]) -> str:
         "MANDATES: " + (", ".join(mandate_ids) if mandate_ids else "none"),
         f"CLAIMS: {n_claims} active. Inspect with `make governance-claims`.",
     ]
+    if include_exposure:
+        lines.append(_exposure_line())
     if heading_lines:
         lines.append("HEADINGS:")
         lines.extend(heading_lines)

@@ -6,11 +6,17 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 from datetime import date
 from pathlib import Path
 from typing import Sequence
+
+from conductor.changed_files_cli import (
+    add_changed_files_arguments,
+    resolve_changed_files,
+)
 
 FINDING = re.compile(
     r"^(?P<path>.+?):(?P<line>\d+): (?P<message>.+ \(\d+% confidence\))$"
@@ -116,10 +122,23 @@ def _validate_entry(key: str, entry: object) -> dict[str, object]:
     return dict(entry)
 
 
-def run_audit(baseline_path: Path, paths: Sequence[str]) -> int:
+def run_audit(
+    baseline_path: Path,
+    paths: Sequence[str],
+    *,
+    changed_files: frozenset[str] | None = None,
+) -> int:
     baseline = _load_baseline(baseline_path)
+    executable = shutil.which("vulture")
+    if executable is None:
+        raise VultureAuditError(
+            "vulture is not installed or not on PATH, so dead-code findings cannot "
+            "be produced and the baseline cannot be trusted. It is a declared "
+            "dependency (pyproject.toml); install it with "
+            "`uv pip install --python <venv> vulture`."
+        )
     command = [
-        "vulture",
+        executable,
         *paths,
         "research/tools/vulture_whitelist.py",
         "--min-confidence",
@@ -146,28 +165,49 @@ def run_audit(baseline_path: Path, paths: Sequence[str]) -> int:
         f"Vulture findings={len(findings)} baseline={len(baseline)} "
         f"new={len(new)} resolved={len(resolved)}"
     )
-    for key in new:
+
+    if changed_files is None:
+        caused, inherited = new, []
+    else:
+        caused = [key for key in new if findings[key]["path"] in changed_files]
+        inherited = [key for key in new if key not in set(caused)]
+
+    for key in caused:
         finding = findings[key]
         print(f"NEW {finding['path']}:{finding['line']}: {finding['message']}")
+    if inherited:
+        print(
+            f"{len(inherited)} new finding(s) are INHERITED (pre-existing debt "
+            "outside this candidate's changed files; NOT blocking this "
+            "candidate):"
+        )
+        for key in inherited:
+            finding = findings[key]
+            print(
+                f"  INHERITED {finding['path']}:{finding['line']}: {finding['message']}"
+            )
+
     if resolved:
         raise VultureAuditError(
             "Vulture baseline contains resolved findings and must be narrowed: "
             + ", ".join(resolved)
         )
-    return 1 if new else 0
+    return 1 if caused else 0
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", required=True, type=Path)
+    add_changed_files_arguments(parser)
     parser.add_argument("paths", nargs="+")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    changed_files = resolve_changed_files(args)
     try:
-        return run_audit(args.baseline, args.paths)
+        return run_audit(args.baseline, args.paths, changed_files=changed_files)
     except VultureAuditError as exc:
         print(f"Vulture audit incomplete: {exc}", file=sys.stderr)
         return 2

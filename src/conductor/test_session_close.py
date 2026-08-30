@@ -85,6 +85,16 @@ def test_release_specific_claim_id(session_repo: Path) -> None:
     assert claims[0].claim_id == c2.claim_id
 
 
+@pytest.mark.host_path(
+    "conductor.active_state.generate_active_state() takes no repo argument -- "
+    "parse_active_claims()/load_claims(ROOT) always reads THIS worktree's real "
+    "git-common-dir governance/ownership-claims.json (shared across linked "
+    "worktrees by design, CLAUDE.md), never the session_repo tmp_path fixture "
+    "close_session() is otherwise isolated to. Pre-existing test-isolation gap "
+    "surfaced by the deliverable-5 path guard, not introduced by it; fixing it "
+    "needs generate_active_state/parse_active_claims/parse_top_headings to "
+    "accept a repo param, which is out of this deliverable's scope."
+)
 def test_close_session_full_flow(session_repo: Path) -> None:
     c1 = create_claim(
         session_repo,
@@ -150,6 +160,10 @@ def test_close_session_validation_errors(
         close_session(session_repo, owner=owner, title=title, body=body)
 
 
+@pytest.mark.host_path(
+    "same generate_active_state() repo-isolation gap as test_close_session_full_flow "
+    "-- reads the real worktree's git-common-dir governance/ownership-claims.json"
+)
 def test_main_cli(session_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     c1 = create_claim(
         session_repo,
@@ -198,6 +212,10 @@ def test_main_cli_error(session_repo: Path, capsys: pytest.CaptureFixture[str]) 
     assert "session-close FAILED" in err
 
 
+@pytest.mark.host_path(
+    "same generate_active_state() repo-isolation gap as test_close_session_full_flow "
+    "-- reads the real worktree's git-common-dir governance/ownership-claims.json"
+)
 def test_close_session_memory_index_sync(
     session_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -163,3 +163,125 @@ def test_vulture_baseline_schema_and_entry_failures_are_blocking(
 
 def test_vulture_main_returns_audit_error_for_missing_baseline(tmp_path: Path) -> None:
     assert main(["--baseline", str(tmp_path / "missing.json"), "source.py"]) == 2
+
+
+def _stub_vulture_output(monkeypatch: pytest.MonkeyPatch, stdout: str) -> None:
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, stdout=stdout, stderr=""
+        ),
+    )
+
+
+def test_vulture_changed_file_caused_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_baseline({})), encoding="utf-8")
+    _stub_vulture_output(
+        monkeypatch,
+        "changed.py:5: unused variable 'value' (100% confidence)\n",
+    )
+
+    exit_code = run_audit(
+        baseline, ["changed.py"], changed_files=frozenset({"changed.py"})
+    )
+
+    assert exit_code == 1
+
+
+def test_vulture_inherited_finding_does_not_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_baseline({})), encoding="utf-8")
+    _stub_vulture_output(
+        monkeypatch,
+        "untouched.py:5: unused variable 'value' (100% confidence)\n",
+    )
+
+    exit_code = run_audit(
+        baseline, ["untouched.py"], changed_files=frozenset({"changed.py"})
+    )
+
+    assert exit_code == 0
+
+
+def test_vulture_no_changed_files_blocks_every_new_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_baseline({})), encoding="utf-8")
+    _stub_vulture_output(
+        monkeypatch,
+        "untouched.py:5: unused variable 'value' (100% confidence)\n",
+    )
+
+    exit_code = run_audit(baseline, ["untouched.py"], changed_files=None)
+
+    assert exit_code == 1
+
+
+def test_vulture_no_new_findings_exits_zero_either_way(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    message = "unused variable 'value' (100% confidence)"
+    key, entry = _entry("known.py", message)
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_baseline({key: entry})), encoding="utf-8")
+    _stub_vulture_output(monkeypatch, f"known.py:5: {message}\n")
+
+    assert run_audit(baseline, ["known.py"], changed_files=None) == 0
+    assert run_audit(baseline, ["known.py"], changed_files=frozenset({"known.py"})) == 0
+
+
+def test_vulture_changed_baseline_only_file_not_reported_as_caused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A --changed-file naming a *baselined* (non-new) finding's file must not
+    spuriously attribute an unrelated NEW finding on a different file."""
+    known_message = "unused variable 'known' (100% confidence)"
+    key, entry = _entry("baselined.py", known_message)
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_baseline({key: entry})), encoding="utf-8")
+    _stub_vulture_output(
+        monkeypatch,
+        f"baselined.py:5: {known_message}\n"
+        "unrelated.py:9: unused variable 'other' (100% confidence)\n",
+    )
+
+    exit_code = run_audit(
+        baseline,
+        ["baselined.py", "unrelated.py"],
+        # "baselined.py" is changed, but its only finding is already in the
+        # baseline (not new); it must not cause unrelated.py's NEW finding.
+        changed_files=frozenset({"baselined.py"}),
+    )
+
+    assert exit_code == 0
+
+
+def test_run_audit_reports_a_missing_vulture_as_an_audit_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An absent `vulture` binary is an audit error, not a raw OSError.
+
+    run_audit shells out to `vulture`, so before 2026-08-30 a missing tool escaped
+    as FileNotFoundError from Popen -- an exception this module never documents and
+    no caller catches. It surfaced as two tests failing with a traceback through
+    subprocess._execute_child, which reads as a logic defect rather than an absent
+    dependency, and that is exactly how it was misread. The tool being missing must
+    fail loud in this module's own currency, and say how to fix it.
+    """
+    monkeypatch.setattr(
+        "conductor.candidate_review.vulture_audit.shutil.which", lambda _name: None
+    )
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_baseline({})), encoding="utf-8")
+    source = tmp_path / "candidate.py"
+    source.write_text("def live():\n    return 1\n", encoding="utf-8")
+
+    with pytest.raises(VultureAuditError, match="not installed or not on PATH"):
+        run_audit(baseline, [str(source)])

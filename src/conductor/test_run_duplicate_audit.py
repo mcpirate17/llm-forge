@@ -186,12 +186,14 @@ def test_main_passes_cwd_git_root_to_selected_tool(
         save_baseline: bool,
         *,
         root: Path,
+        changed_files: frozenset[str] | None = None,
     ) -> int:
         seen.update(
             check=check,
             index_snapshot=index_snapshot,
             save_baseline=save_baseline,
             root=root,
+            changed_files=changed_files,
         )
         return 0
 
@@ -209,10 +211,69 @@ def test_main_passes_cwd_git_root_to_selected_tool(
         "index_snapshot": False,
         "save_baseline": False,
         "root": repo.resolve(),
+        "changed_files": None,
     }
     output = capsys.readouterr().out
     assert f"audit-root: {repo.resolve()}" in output
     assert "mode: worktree" in output
+
+
+def test_main_threads_changed_file_cli_flags_to_baseline_supported_tool(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--changed-file (repeatable) and --changed-files-from both reach the
+    tool as one merged frozenset; a tool outside baseline_supported (nicad
+    -python) never receives changed_files at all."""
+    repo = _init_repo(tmp_path)
+    changed_files_from = tmp_path / "changed.txt"
+    changed_files_from.write_text("c/three.py\n", encoding="utf-8")
+    seen: dict[str, object] = {}
+
+    def fake_pmd(
+        check: bool,
+        index_snapshot: bool,
+        save_baseline: bool,
+        *,
+        root: Path,
+        changed_files: frozenset[str] | None = None,
+    ) -> int:
+        seen["pmd-python"] = changed_files
+        return 0
+
+    def fake_nicad(
+        check: bool,
+        index_snapshot: bool,
+        save_baseline: bool,
+        *,
+        root: Path,
+    ) -> int:
+        seen["nicad-python"] = "called-without-changed-files-kwarg"
+        return 0
+
+    monkeypatch.chdir(repo)
+    monkeypatch.setitem(run_duplicate_audit.TOOLS, "pmd-python", fake_pmd)
+    monkeypatch.setitem(run_duplicate_audit.TOOLS, "nicad-python", fake_nicad)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_duplicate_audit",
+            "--tool",
+            "pmd-python",
+            "--tool",
+            "nicad-python",
+            "--check",
+            "--changed-file",
+            "a/one.py",
+            "--changed-files-from",
+            str(changed_files_from),
+        ],
+    )
+
+    assert run_duplicate_audit.main() == 0
+    assert seen["pmd-python"] == frozenset({"a/one.py", "c/three.py"})
+    assert seen["nicad-python"] == "called-without-changed-files-kwarg"
 
 
 def test_jscpd_live_scan_uses_git_visible_sources(
@@ -492,6 +553,124 @@ def test_baseline_count_and_entry_keys_are_validated(
         )
         == run_duplicate_audit.AUDIT_ERROR_EXIT_CODE
     )
+
+
+def _dup_entry(first: str, second: str, fragment: str, *, lines: int = 10) -> dict:
+    return {
+        "key": run_duplicate_audit._stable_dup_key(first, second, fragment),
+        "firstFile": first,
+        "secondFile": second,
+        "lines": lines,
+    }
+
+
+def test_check_against_baseline_without_changed_files_blocks_every_new_pair(
+    tmp_path: Path,
+) -> None:
+    """Legacy mode (no --changed-file at all): every new pair blocks, as today."""
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    left = _dup_entry("a/one.py", "b/two.py", "LEFT_SENTINEL = 1")
+    right = _dup_entry("c/three.py", "d/four.py", "RIGHT_SENTINEL = 1")
+
+    exit_code = run_duplicate_audit._check_against_baseline(
+        baseline, [left, right], tool_name="test-analyzer"
+    )
+
+    assert exit_code == 1
+
+
+def test_check_against_baseline_caused_via_left_side_blocks(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    entry = _dup_entry("a/one.py", "b/two.py", "LEFT_SENTINEL = 1")
+
+    exit_code = run_duplicate_audit._check_against_baseline(
+        baseline,
+        [entry],
+        tool_name="test-analyzer",
+        changed_files=frozenset({"a/one.py"}),
+    )
+
+    assert exit_code == 1
+
+
+def test_check_against_baseline_caused_via_right_side_blocks(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    entry = _dup_entry("a/one.py", "b/two.py", "RIGHT_SENTINEL = 1")
+
+    exit_code = run_duplicate_audit._check_against_baseline(
+        baseline,
+        [entry],
+        tool_name="test-analyzer",
+        changed_files=frozenset({"b/two.py"}),
+    )
+
+    assert exit_code == 1
+
+
+def test_check_against_baseline_inherited_via_neither_side_does_not_block(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    entry = _dup_entry("a/one.py", "b/two.py", "NEITHER_SENTINEL = 1")
+
+    exit_code = run_duplicate_audit._check_against_baseline(
+        baseline,
+        [entry],
+        tool_name="test-analyzer",
+        changed_files=frozenset({"z/unrelated.py"}),
+    )
+
+    assert exit_code == 0
+
+
+def test_check_against_baseline_no_new_findings_exits_zero_either_way(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    entry = _dup_entry("a/one.py", "b/two.py", "ALREADY_KNOWN = 1")
+    _write_baseline(baseline, [entry])
+
+    assert (
+        run_duplicate_audit._check_against_baseline(
+            baseline, [entry], tool_name="test-analyzer", changed_files=None
+        )
+        == 0
+    )
+    assert (
+        run_duplicate_audit._check_against_baseline(
+            baseline,
+            [entry],
+            tool_name="test-analyzer",
+            changed_files=frozenset({"a/one.py"}),
+        )
+        == 0
+    )
+
+
+def test_check_against_baseline_changed_baseline_only_file_not_reported_as_caused(
+    tmp_path: Path,
+) -> None:
+    """A --changed-file naming a *baseline* (non-new) pair must not spuriously
+    attribute an unrelated NEW pair to the candidate."""
+    baseline_only = _dup_entry("a/one.py", "b/two.py", "ALREADY_KNOWN = 1")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [baseline_only])
+    unrelated_new = _dup_entry("c/three.py", "d/four.py", "BRAND_NEW = 1")
+
+    exit_code = run_duplicate_audit._check_against_baseline(
+        baseline,
+        [baseline_only, unrelated_new],
+        tool_name="test-analyzer",
+        # "a/one.py" only ever appears in the baseline-only pair, never in a
+        # NEW one -- it must not cause unrelated_new to be marked CAUSED.
+        changed_files=frozenset({"a/one.py"}),
+    )
+
+    assert exit_code == 0
 
 
 def test_jscpd_index_check_reads_staged_baseline(tmp_path: Path, monkeypatch) -> None:

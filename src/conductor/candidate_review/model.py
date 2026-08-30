@@ -86,6 +86,16 @@ class Finding:
     evidence: dict[str, Any] = field(default_factory=dict)
     fingerprint: str = ""
     exception_id: str | None = None
+    # True when this finding is pre-existing tree debt rather than something the
+    # candidate caused: its check is declared `attribution = "diff"` and the finding
+    # names a path outside the candidate's changed files (or names no path at all).
+    # Inherited findings are reported and counted but never block -- a candidate that
+    # cannot pass by doing its own work well is a candidate whose author routes around
+    # the gate, which is exactly how the 2026-08 branch fan-out happened.
+    # Deliberately excluded from `finalize`'s fingerprint: the same defect must keep
+    # one identity whether or not this particular candidate touched its file, so
+    # exceptions and baselines stay stable.
+    inherited: bool = False
 
     def finalize(self) -> Finding:
         if not self.fingerprint:

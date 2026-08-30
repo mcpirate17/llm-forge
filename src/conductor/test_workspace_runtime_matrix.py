@@ -395,7 +395,9 @@ def test_ollama_model_rows_and_token_metrics_fail_closed() -> None:
         matrix._ollama_model_rows("connection failed")
 
 
-def _ready_clerk_preflight() -> matrix.ClerkGpuPreflight:
+def _ready_clerk_preflight(
+    *_args: object, **_kwargs: object
+) -> matrix.ClerkGpuPreflight:
     return matrix.ClerkGpuPreflight(True, (), (), ())
 
 
@@ -408,7 +410,9 @@ def test_clerk_canary_defers_without_loading_during_avo(
         (),
         (),
     )
-    monkeypatch.setattr(matrix, "clerk_gpu_preflight", lambda: preflight)
+    monkeypatch.setattr(
+        matrix, "clerk_gpu_preflight", lambda *_args, **_kwargs: preflight
+    )
     monkeypatch.setattr(
         matrix,
         "_http_json",
@@ -544,7 +548,7 @@ def test_reconcile_clerk_preserves_expensive_cells(
     monkeypatch.setattr(
         matrix,
         "run_clerk_canary",
-        lambda _output: matrix.CellReceipt(
+        lambda _output, **_kwargs: matrix.CellReceipt(
             "local-clerk-canary",
             matrix.ReceiptStatus.PASS,
             "fixed",
@@ -558,3 +562,122 @@ def test_reconcile_clerk_preserves_expensive_cells(
     assert payload["cells"][0]["status"] == "PASS"
     assert payload["cells"][1]["evidence"] == {"tokens": 99}
     assert (tmp_path / "receipt.pre_clerk_reconcile.json").is_file()
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+
+
+def _init_repo(repo: Path) -> None:
+    repo.mkdir(parents=True, exist_ok=True)
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.email", "governance-tests@example.invalid")
+    _git(repo, "config", "user.name", "Governance Tests")
+    _git(repo, "config", "commit.gpgsign", "false")
+    _git(repo, "commit", "--allow-empty", "-m", "base")
+
+
+def _stub_build_receipt(
+    calls: list[Path],
+) -> object:
+    def build_receipt(**kwargs: object) -> matrix.WorkspaceReceipt:
+        calls.append(kwargs["root"])
+        return matrix.WorkspaceReceipt(
+            schema_version=1,
+            generated_at="t",
+            status=matrix.ReceiptStatus.PASS,
+            cells=(),
+            provenance={},
+        )
+
+    return build_receipt
+
+
+def test_explicit_root_scans_the_named_repo_not_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "target"
+    decoy = tmp_path / "decoy"
+    _init_repo(target)
+    _init_repo(decoy)
+
+    calls: list[Path] = []
+    monkeypatch.setattr(matrix, "build_receipt", _stub_build_receipt(calls))
+    monkeypatch.chdir(decoy)
+
+    assert matrix.main(["--root", str(target), "--output", "out"]) == 0
+    assert calls == [target.resolve()]
+
+
+def test_default_root_uses_cwd_toplevel_not_module_location(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The bug: Path(__file__)-derived resolution always points at the
+    checkout that supplied the imported module, never this throwaway repo.
+    Capturing the root actually passed to build_receipt() proves main()
+    followed cwd instead.
+    """
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+
+    calls: list[Path] = []
+    monkeypatch.setattr(matrix, "build_receipt", _stub_build_receipt(calls))
+    monkeypatch.chdir(repo)
+
+    assert matrix.main(["--output", "out"]) == 0
+    assert calls == [repo.resolve()]
+    assert calls[0] != matrix.ROOT
+
+
+def test_cwd_outside_worktree_refuses_rather_than_falling_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    outside = tmp_path / "not_a_repo"
+    outside.mkdir()
+    calls: list[Path] = []
+    monkeypatch.setattr(matrix, "build_receipt", _stub_build_receipt(calls))
+    monkeypatch.chdir(outside)
+
+    assert matrix.main([]) == 2
+    assert calls == []
+
+
+def test_resolved_root_is_printed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    monkeypatch.setattr(matrix, "build_receipt", _stub_build_receipt([]))
+    monkeypatch.chdir(repo)
+
+    assert matrix.main(["--output", "out"]) == 0
+    out = capsys.readouterr().out
+    assert f"root={repo.resolve()}" in out
+
+
+def test_root_mismatch_warns(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    target = tmp_path / "target"
+    decoy = tmp_path / "decoy"
+    _init_repo(target)
+    _init_repo(decoy)
+    monkeypatch.setattr(matrix, "build_receipt", _stub_build_receipt([]))
+    monkeypatch.chdir(decoy)
+
+    assert matrix.main(["--root", str(target), "--output", "out"]) == 0
+    err = capsys.readouterr().err
+    assert "WARNING" in err
+    assert str(target.resolve()) in err
+
+
+def test_default_output_relative_path_resolves_against_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    monkeypatch.setattr(matrix, "build_receipt", _stub_build_receipt([]))
+    monkeypatch.chdir(repo)
+
+    assert matrix.main([]) == 0
+    assert (repo / matrix.DEFAULT_OUTPUT / "receipt.json").is_file()

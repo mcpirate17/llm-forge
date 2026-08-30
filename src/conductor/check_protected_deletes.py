@@ -8,6 +8,12 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Sequence
 
+from conductor.audit_root import (
+    AuditRootError,
+    print_audit_provenance,
+    resolve_audit_root,
+)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTECTED_PATTERNS = (
@@ -57,7 +63,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--from-ref",
         help="Check deletions from the merge base with REF to HEAD",
     )
+    parser.add_argument(
+        "--root",
+        help=(
+            "Repository tree to check. Defaults to the Git worktree containing "
+            "the current working directory, never the checkout that supplied "
+            "the imported conductor module."
+        ),
+    )
     args = parser.parse_args(argv)
+
+    global ROOT
+    try:
+        ROOT = resolve_audit_root(args.root)
+    except AuditRootError as exc:
+        print(f"ERROR: check-protected-deletes: {exc}", file=sys.stderr)
+        return 2
+    print_audit_provenance("check-protected-deletes", ROOT)
 
     blocked = [path for path in _deleted_paths(args.from_ref) if _is_protected(path)]
     if not blocked:

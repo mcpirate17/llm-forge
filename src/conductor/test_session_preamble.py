@@ -11,6 +11,24 @@ import pytest
 from conductor import session_preamble as preamble
 
 
+@pytest.fixture(autouse=True)
+def _isolated_exposure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the EXPOSED line out of live shared state.
+
+    `compact_state` gained an exposure summary that calls
+    `workspace_hygiene.cheap_exposure_counts`, which reads the repository's SHARED
+    `.git/governance/ownership-claims.json`. That is correct in production and wrong
+    in a test: no tmp_path fixture can isolate it, and the path guard rightly refuses
+    it (governance reset deliverable 5).
+
+    Stubbed rather than disabled via `include_exposure=False`, so the CLI paths still
+    exercise the line's presence and its contribution to the MAX_INJECT_CHARS budget.
+    """
+    monkeypatch.setattr(
+        preamble, "_exposure_line", lambda: "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s)."
+    )
+
+
 def _install_active_state_stub(
     monkeypatch: pytest.MonkeyPatch,
     save_active_state: Callable[[Path], object],

@@ -19,8 +19,16 @@ from pathlib import Path
 import pytest
 
 from conductor import active_state
+from research.tests._path_guard import register as _register_path_guard
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Register the path guard (deliverable 5): fail a test that reads outside
+    the exported tree, skip one that reads a declared-absent artifact. See
+    research/tests/_path_guard.py."""
+    _register_path_guard(config)
 
 # (agent, read tool, shell tool, extra exports in the pre-edit hook)
 _AGENTS: tuple[tuple[str, str, str, str], ...] = (

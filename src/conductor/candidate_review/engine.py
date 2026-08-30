@@ -8,6 +8,7 @@ import json
 import os
 import secrets
 import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
@@ -677,13 +678,53 @@ def _test_and_special_results(
     return selection
 
 
+def candidate_changed_paths(ctx: ReviewContext) -> set[str]:
+    """Every path this candidate touched, old names included.
+
+    A rename must count under both names, or the finding on the renamed-from path
+    reads as inherited and a real regression walks through.
+    """
+    paths: set[str] = set()
+    for change in ctx.candidate.changes:
+        for path in (change.path, change.old_path):
+            if path:
+                paths.add(path)
+    return paths
+
+
+def mark_inherited(
+    ctx: ReviewContext, findings: Sequence[Finding], changed: set[str]
+) -> None:
+    """Flag findings that are pre-existing tree debt rather than this candidate's doing.
+
+    Only checks declaring `attribution = "diff"` participate; everything else keeps
+    blocking exactly as before, so this narrows nothing by default. For a "diff"
+    check, a finding blocks when it names a changed path, and is inherited when it
+    names an unchanged path or no path at all -- a pathless finding from a check whose
+    job is judging changed files is, by construction, a whole-tree aggregate.
+
+    Why this exists: a PR adding one new module was blocked by an unused variable in
+    a file it never opened and a note duplicating http_transport.py. Compliance was
+    unachievable by doing your own work well, so agents routed around the gate --
+    force-push, then a 13-branch fan-out, then a three-day merge. A gate that blocks
+    on debt you did not create does not get obeyed; it gets bypassed.
+    """
+    attribution = {check.check_id: check.attribution for check in ctx.policy.checks}
+    for finding in findings:
+        if attribution.get(finding.check_id, "candidate") != "diff":
+            continue
+        finding.inherited = finding.path is None or finding.path not in changed
+
+
 def _review_findings(
     ctx: ReviewContext, results: Sequence[CheckResult]
 ) -> tuple[list[Finding], str]:
     findings = [finding for result in results for finding in result.findings]
     apply_exceptions(ctx.policy, findings)
+    mark_inherited(ctx, findings, candidate_changed_paths(ctx))
     blocking = any(
         finding.exception_id is None
+        and not finding.inherited
         and SEVERITY_RANK[finding.severity] >= SEVERITY_RANK[ctx.policy.block_at]
         for finding in findings
     )
@@ -853,10 +894,78 @@ def append_attestation(message_file: Path, repo: Path) -> dict[str, str]:
     return desired
 
 
+def snapshot_working_tree(repo: Path, owner: str) -> str | None:
+    """Commit the entire working tree to a ref before anything can discard it.
+
+    `git commit` fires pre-commit, whose `staged_files_only` writes a patch and then
+    runs `git checkout -- .` across the WHOLE worktree to isolate the staged content.
+    That wipes every unstaged tracked modification, including files belonging to other
+    agents working in the same checkout, and it never captures untracked files at all.
+    If the process dies between the checkout and the restore -- OOM, prlimit kill,
+    Ctrl-C during a multi-minute review -- the only copy left is a patch file under
+    ~/.cache/pre-commit/.
+
+    So take a real snapshot first. A private GIT_INDEX_FILE keeps the repository's
+    shared index untouched (writing to it is itself a way to destroy a peer's staged
+    work), and the result is an ordinary commit object reachable from
+    refs/snapshots/<owner>/<timestamp>, recoverable with git checkout long after the
+    patch cache has been pruned.
+
+    Returns the ref, or None if the snapshot could not be taken -- the caller decides
+    whether that is fatal. It never raises: failing to snapshot must not be a new way
+    to fail a commit.
+    """
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ref = f"refs/snapshots/{owner}/{stamp}"
+    # In a linked worktree `.git` is a FILE pointing at the real gitdir, so the index
+    # path has to be resolved by git rather than assembled from the repo root.
+    try:
+        git_dir = Path(
+            subprocess.run(
+                ["git", "rev-parse", "--absolute-git-dir"],
+                cwd=repo, capture_output=True, text=True, check=True,
+            ).stdout.strip()
+        )
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    index_file = git_dir / f"governance-snapshot-index-{os.getpid()}"
+    environment = {**os.environ, "GIT_INDEX_FILE": str(index_file)}
+
+    def run(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args], cwd=repo, env=environment, capture_output=True, text=True, check=True
+        )
+
+    try:
+        head = run("rev-parse", "HEAD").stdout.strip()
+        run("read-tree", head)
+        # -A picks up untracked files too; pre-commit's isolation never captures them.
+        run("add", "-A")
+        tree = run("write-tree").stdout.strip()
+        message = f"governance-commit snapshot for {owner} at {stamp}"
+        commit = run("commit-tree", tree, "-p", head, "-m", message).stdout.strip()
+        run("update-ref", ref, commit)
+        return ref
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    finally:
+        index_file.unlink(missing_ok=True)
+
+
 def run_locked_git_commit(repo: Path, args: Sequence[str]) -> int:
     if not args or args[0] != "commit":
         raise ValueError(
             "commit mutex wrapper accepts only arguments beginning with 'commit'"
+        )
+    owner = os.environ.get("GOVERNANCE_OWNER", "unknown")
+    snapshot_ref = snapshot_working_tree(repo, owner)
+    if snapshot_ref:
+        print(f"governance-commit: working tree snapshotted to {snapshot_ref}", file=sys.stderr)
+    else:
+        print(
+            "governance-commit: WARNING -- could not snapshot the working tree; "
+            "uncommitted work is not recoverable if this commit's hooks discard it",
+            file=sys.stderr,
         )
     lease_token = secrets.token_hex(32)
     with _held_governance_lock(
