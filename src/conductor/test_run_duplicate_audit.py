@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -147,6 +148,118 @@ def _snapshot_texts(command: list[str], cwd: object = None) -> list[str]:
         for path in directory.rglob("*")
         if path.is_file()
     ]
+
+
+def test_resolve_audit_root_explicit_path_wins(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    explicit = tmp_path / "exported-candidate"
+    explicit.mkdir()
+
+    assert (
+        run_duplicate_audit._resolve_audit_root(Path("..") / explicit.name, cwd=repo)
+        == explicit.resolve()
+    )
+
+
+def test_resolve_audit_root_fails_closed_outside_git(tmp_path: Path) -> None:
+    outside = tmp_path / "not-a-worktree"
+    outside.mkdir()
+
+    with pytest.raises(
+        run_duplicate_audit.DuplicateAuditError,
+        match="cannot resolve audit root.*pass --root explicitly",
+    ):
+        run_duplicate_audit._resolve_audit_root(None, cwd=outside)
+
+
+def test_main_passes_cwd_git_root_to_selected_tool(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = _init_repo(tmp_path)
+    seen: dict[str, object] = {}
+
+    def fake_jscpd(
+        check: bool,
+        index_snapshot: bool,
+        save_baseline: bool,
+        *,
+        root: Path,
+    ) -> int:
+        seen.update(
+            check=check,
+            index_snapshot=index_snapshot,
+            save_baseline=save_baseline,
+            root=root,
+        )
+        return 0
+
+    monkeypatch.chdir(repo)
+    monkeypatch.setitem(run_duplicate_audit.TOOLS, "jscpd", fake_jscpd)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_duplicate_audit", "--tool", "jscpd", "--check"],
+    )
+
+    assert run_duplicate_audit.main() == 0
+    assert seen == {
+        "check": True,
+        "index_snapshot": False,
+        "save_baseline": False,
+        "root": repo.resolve(),
+    }
+    output = capsys.readouterr().out
+    assert f"audit-root: {repo.resolve()}" in output
+    assert "mode: worktree" in output
+
+
+def test_jscpd_live_scan_uses_git_visible_sources(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _init_repo(tmp_path)
+    _configure_jscpd(repo)
+    nested_ignore = repo / "research" / ".gitignore"
+    nested_ignore.write_text("reports/\n", encoding="utf-8")
+    _git(repo, "add", "research/.gitignore")
+
+    ignored_dir = repo / "research" / "reports"
+    ignored_dir.mkdir()
+    ignored = [ignored_dir / "ignored_a.py", ignored_dir / "ignored_b.py"]
+    visible = [repo / "research" / "visible_a.py", repo / "conductor" / "visible_b.py"]
+    for path in [*ignored, *visible]:
+        path.write_text("DUPLICATE_INDEX_SENTINEL = 1\n", encoding="utf-8")
+
+    seen: list[str] = []
+
+    def fake_collect(
+        paths: list[str], *, cwd: Path, executable: str | None = None
+    ) -> list[dict]:
+        del executable
+        for source_dir in paths:
+            seen.extend(
+                path.relative_to(cwd).as_posix()
+                for path in (cwd / source_dir).rglob("*")
+                if path.is_file()
+            )
+        first, second = [path.relative_to(repo).as_posix() for path in visible]
+        fragment = "DUPLICATE_INDEX_SENTINEL = 1"
+        return [
+            {
+                "key": run_duplicate_audit._stable_dup_key(first, second, fragment),
+                "firstFile": first,
+                "secondFile": second,
+                "lines": 10,
+            }
+        ]
+
+    monkeypatch.setattr(run_duplicate_audit, "_jscpd_collect_duplicates", fake_collect)
+
+    assert run_duplicate_audit.run_jscpd(check=True, root=repo) == 1
+    assert {path.relative_to(repo).as_posix() for path in visible} <= set(seen)
+    assert not ({path.relative_to(repo).as_posix() for path in ignored} & set(seen))
 
 
 def test_materialized_sources_are_exact_index_blobs(tmp_path: Path) -> None:

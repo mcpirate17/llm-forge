@@ -19,7 +19,6 @@ from pathlib import PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
-AUDIT_DIR = ROOT / "tasks" / "audit"
 
 # Duplication baselines: grandfather pre-existing clone pairs so the staged
 # gate only fails on NEW duplication introduced by a commit, not on repo-wide
@@ -27,8 +26,6 @@ AUDIT_DIR = ROOT / "tasks" / "audit"
 # pattern as conductor/guardrail_allowlist.json and
 # conductor/radon_complexity_baseline.json). Refresh with --save-baseline
 # after a deliberate refactor changes the known clone set.
-JSCPD_BASELINE_PATH = ROOT / "conductor" / "jscpd_duplication_baseline.json"
-PMD_CPD_BASELINE_PATH = ROOT / "conductor" / "pmd_cpd_duplication_baseline.json"
 JSCPD_BASELINE_RELATIVE = Path("conductor/jscpd_duplication_baseline.json")
 PMD_CPD_BASELINE_RELATIVE = Path("conductor/pmd_cpd_duplication_baseline.json")
 AUDIT_ERROR_EXIT_CODE = 2
@@ -93,6 +90,58 @@ class DuplicateAuditError(RuntimeError):
     """The analyzer evidence was incomplete or structurally invalid."""
 
 
+def _resolve_audit_root(
+    explicit_root: str | Path | None, *, cwd: Path | None = None
+) -> Path:
+    """Prefer an explicit root, otherwise use cwd's Git worktree."""
+    invocation_cwd = (cwd or Path.cwd()).resolve()
+    if explicit_root is not None:
+        candidate = Path(explicit_root).expanduser()
+        candidate = candidate if candidate.is_absolute() else invocation_cwd / candidate
+        try:
+            root = candidate.resolve(strict=True)
+        except OSError as exc:
+            message = f"explicit audit root does not exist ({candidate}): {exc}"
+            raise DuplicateAuditError(message) from exc
+        if not root.is_dir():
+            raise DuplicateAuditError(f"explicit audit root is not a directory: {root}")
+        return root
+
+    completed = subprocess.run(
+        ["git", "-C", str(invocation_cwd), "rev-parse", "--show-toplevel"],
+        check=False,
+        capture_output=True,
+        text=True,
+        errors="replace",
+    )
+    resolved = completed.stdout.strip()
+    if completed.returncode or not resolved:
+        detail = completed.stderr.strip() or f"git exited {completed.returncode}"
+        raise DuplicateAuditError(
+            "cannot resolve audit root from the current working directory "
+            f"({invocation_cwd}): {detail}; pass --root explicitly"
+        )
+    root = Path(resolved).resolve()
+    return root
+
+
+def _git_head(root: Path) -> str:
+    completed = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+        errors="replace",
+    )
+    head = completed.stdout.strip()
+    return head if completed.returncode == 0 and head else "unavailable"
+
+
+def _print_audit_provenance(root: Path, *, index_snapshot: bool) -> None:
+    mode = "index-snapshot" if index_snapshot else "worktree"
+    print(f"audit-root: {root} | git-head: {_git_head(root)} | mode: {mode}")
+
+
 def should_skip_python(path: Path, *, root: Path = ROOT) -> bool:
     rel = path.relative_to(root).as_posix()
     parts = set(path.relative_to(root).parts)
@@ -137,6 +186,72 @@ def existing(paths: tuple[str, ...], *, root: Path = ROOT) -> list[str]:
 
 def _existing_absolute(paths: tuple[str, ...], *, root: Path) -> list[str]:
     return [str(root / path) for path in paths if (root / path).exists()]
+
+
+def _live_jscpd_sources(*, root: Path) -> list[str] | None:
+    """Return Git-visible sources, or None for a caller-materialized export."""
+    worktree = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if worktree.returncode or worktree.stdout.strip() != b"true":
+        return None
+
+    completed = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+            *DEFAULT_SOURCE_DIRS,
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode:
+        detail = completed.stderr.decode("utf-8", "replace").strip()
+        suffix = f": {detail}" if detail else ""
+        raise DuplicateAuditError(f"git could not enumerate JSCPD sources{suffix}")
+
+    def include(candidate: str) -> bool:
+        disk_path = root / candidate
+        return bool(
+            candidate
+            and PurePosixPath(candidate).suffix.lower() in JSCPD_SOURCE_SUFFIXES
+            and disk_path.is_file()
+            and not disk_path.is_symlink()
+        )
+
+    candidates = completed.stdout.decode("utf-8", "surrogateescape").split("\0")
+    return sorted({candidate for candidate in candidates if include(candidate)})
+
+
+@contextmanager
+def materialized_live_jscpd_sources(
+    sources: list[str] | None, *, root: Path
+) -> Iterator[Path]:
+    """Yield directory-shaped JSCPD input containing only Git-visible files."""
+    if sources is None:
+        yield root
+        return
+
+    selected = set(sources) | set(JSCPD_INDEX_CONFIG_PATHS)
+    with tempfile.TemporaryDirectory(prefix="llm-live-jscpd-sources-") as temporary:
+        snapshot = Path(temporary)
+        for relative in sorted(selected):
+            source = root / relative
+            if not source.is_file() or source.is_symlink():
+                continue
+            destination = snapshot / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+        yield snapshot
 
 
 def _tracked_index_sources(
@@ -247,7 +362,7 @@ def _stable_dup_key(first_path: str, second_path: str, fragment: str) -> str:
     return f"{a}::{b}::{digest}"
 
 
-def _write_baseline(path: Path, entries: list[dict]) -> None:
+def _write_baseline(path: Path, entries: list[dict], *, root: Path = ROOT) -> None:
     keyed: dict[str, dict] = {}
     for entry in entries:
         keyed[entry["key"]] = {
@@ -273,16 +388,16 @@ def _write_baseline(path: Path, entries: list[dict]) -> None:
     # regenerating a baseline doesn't leave a formatting-only diff behind.
     subprocess.run(
         ["npx", "--no-install", "biome", "check", "--write", str(path)],
-        cwd=ROOT,
+        cwd=root,
         check=False,
         capture_output=True,
     )
-    print(f"Wrote {len(keyed)} baseline entries to {_display_path(path)}")
+    print(f"Wrote {len(keyed)} baseline entries to {_display_path(path, root=root)}")
 
 
-def _display_path(path: Path) -> str:
+def _display_path(path: Path, *, root: Path = ROOT) -> str:
     try:
-        return path.relative_to(ROOT).as_posix()
+        return path.relative_to(root).as_posix()
     except ValueError:
         return str(path)
 
@@ -356,7 +471,9 @@ def _baseline_entries(path: Path) -> dict[str, dict[str, Any]]:
     return validated
 
 
-def _check_against_baseline(path: Path, entries: list[dict], *, tool_name: str) -> int:
+def _check_against_baseline(
+    path: Path, entries: list[dict], *, tool_name: str, root: Path = ROOT
+) -> int:
     try:
         baseline = _baseline_entries(path)
     except DuplicateAuditError as exc:
@@ -382,7 +499,7 @@ def _check_against_baseline(path: Path, entries: list[dict], *, tool_name: str) 
     print(
         "Refactor to remove the duplication, or if it's a deliberate/"
         "pre-existing pattern being adopted with reviewer approval, rerun "
-        f"with --save-baseline to record it in {_display_path(path)}."
+        f"with --save-baseline to record it in {_display_path(path, root=root)}."
     )
     return 1
 
@@ -435,6 +552,7 @@ def _run_jscpd_paths(
     paths: list[str],
     *,
     cwd: Path,
+    audit_dir: Path,
     executable: str | None = None,
 ) -> int:
     cmd = [_resolve_jscpd_executable(cwd, executable)]
@@ -444,7 +562,7 @@ def _run_jscpd_paths(
                 "--reporters",
                 "json",
                 "--output",
-                str(AUDIT_DIR / "duplication-jscpd"),
+                str(audit_dir / "duplication-jscpd"),
                 "--silent",
                 "--threshold",
                 "100",
@@ -606,35 +724,52 @@ def run_jscpd(
                     snapshot / JSCPD_BASELINE_RELATIVE,
                     entries,
                     tool_name="jscpd",
+                    root=snapshot,
                 )
         if save_baseline:
-            _write_baseline(root / JSCPD_BASELINE_RELATIVE, entries)
+            _write_baseline(root / JSCPD_BASELINE_RELATIVE, entries, root=root)
             return 0
 
-    if not (save_baseline or check):
-        code = _run_jscpd_paths(
-            check, existing(DEFAULT_SOURCE_DIRS, root=root), cwd=root
-        )
-        if code:
-            return code
-        return run_jscpd_generated()
-
     try:
-        entries = _jscpd_collect_duplicates(
-            existing(DEFAULT_SOURCE_DIRS, root=root), cwd=root
-        )
+        live_sources = _live_jscpd_sources(root=root)
+        executable = _resolve_jscpd_executable(root, None)
     except DuplicateAuditError as exc:
         print(f"ERROR: jscpd: {exc}", file=sys.stderr)
         return AUDIT_ERROR_EXIT_CODE
 
-    if save_baseline:
-        _write_baseline(root / JSCPD_BASELINE_RELATIVE, entries)
-        return 0
+    with materialized_live_jscpd_sources(live_sources, root=root) as scan_root:
+        scan_paths = existing(DEFAULT_SOURCE_DIRS, root=scan_root)
+        if not (save_baseline or check):
+            code = _run_jscpd_paths(
+                check,
+                scan_paths,
+                cwd=scan_root,
+                audit_dir=root / "tasks" / "audit",
+                executable=executable,
+            )
+            if code:
+                return code
+            return run_jscpd_generated(root=root)
 
-    if check:
-        return _check_against_baseline(
-            root / JSCPD_BASELINE_RELATIVE, entries, tool_name="jscpd"
-        )
+        try:
+            entries = _jscpd_collect_duplicates(
+                scan_paths, cwd=scan_root, executable=executable
+            )
+        except DuplicateAuditError as exc:
+            print(f"ERROR: jscpd: {exc}", file=sys.stderr)
+            return AUDIT_ERROR_EXIT_CODE
+
+        if check:
+            return _check_against_baseline(
+                scan_root / JSCPD_BASELINE_RELATIVE,
+                entries,
+                tool_name="jscpd",
+                root=scan_root,
+            )
+
+    if save_baseline:
+        _write_baseline(root / JSCPD_BASELINE_RELATIVE, entries, root=root)
+        return 0
 
     raise AssertionError("unreachable jscpd mode")
 
@@ -673,16 +808,17 @@ def run_vulture(
     return analyze(existing(VULTURE_SOURCE_DIRS, root=root))
 
 
-def run_jscpd_generated() -> int:
+def run_jscpd_generated(*, root: Path = ROOT) -> int:
+    audit_dir = root / "tasks" / "audit"
     generated_paths = [
         pattern.rsplit("/**", 1)[0]
         for pattern in GENERATED_ARTIFACT_GLOBS
-        if (ROOT / pattern.rsplit("/**", 1)[0]).exists()
+        if (root / pattern.rsplit("/**", 1)[0]).exists()
     ]
     if not generated_paths:
         return 0
-    AUDIT_DIR.mkdir(parents=True, exist_ok=True)
-    generated_config = AUDIT_DIR / "duplication-jscpd-generated-config.json"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    generated_config = audit_dir / "duplication-jscpd-generated-config.json"
     generated_config.write_text(
         json.dumps(
             {
@@ -713,23 +849,30 @@ def run_jscpd_generated() -> int:
         "--reporters",
         "json",
         "--output",
-        str(AUDIT_DIR / "duplication-jscpd-generated"),
+        str(audit_dir / "duplication-jscpd-generated"),
         "--silent",
         "--threshold",
         "100",
         *generated_paths,
     ]
     print("== jscpd-generated ==", flush=True)
-    return run(cmd, allow_findings=True)
+    return run(cmd, allow_findings=True, cwd=root)
 
 
 def run_pylint(
-    check: bool, index_snapshot: bool = False, save_baseline: bool = False
+    check: bool,
+    index_snapshot: bool = False,
+    save_baseline: bool = False,
+    *,
+    root: Path = ROOT,
 ) -> int:
     del index_snapshot, save_baseline
-    report = AUDIT_DIR / "duplication-pylint.txt"
+    audit_dir = root / "tasks" / "audit"
+    report = audit_dir / "duplication-pylint.txt"
     file_list = python_file_list(
-        "duplication-python-files.txt", ("research", "aria_core", "aria_designer")
+        "duplication-python-files.txt",
+        ("research", "aria_core", "aria_designer"),
+        root=root,
     )
     files = [
         line for line in file_list.read_text(encoding="utf-8").splitlines() if line
@@ -745,11 +888,11 @@ def run_pylint(
         "--jobs=0",
         "--output-format=text",
     ]
-    print(f"Writing {report.relative_to(ROOT)}", flush=True)
-    AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"Writing {report.relative_to(root)}", flush=True)
+    audit_dir.mkdir(parents=True, exist_ok=True)
     with report.open("w", encoding="utf-8") as handle:
         completed = subprocess.run(
-            cmd, cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT, check=False
+            cmd, cwd=root, stdout=handle, stderr=subprocess.STDOUT, check=False
         )
     if completed.returncode and check:
         return completed.returncode
@@ -929,9 +1072,10 @@ def run_pmd_python(
                     snapshot / PMD_CPD_BASELINE_RELATIVE,
                     entries,
                     tool_name="pmd-cpd",
+                    root=snapshot,
                 )
         if save_baseline:
-            _write_baseline(root / PMD_CPD_BASELINE_RELATIVE, entries)
+            _write_baseline(root / PMD_CPD_BASELINE_RELATIVE, entries, root=root)
             return 0
 
     if save_baseline:
@@ -944,7 +1088,7 @@ def run_pmd_python(
         except DuplicateAuditError as exc:
             print(f"ERROR: pmd-cpd: {exc}", file=sys.stderr)
             return AUDIT_ERROR_EXIT_CODE
-        _write_baseline(root / PMD_CPD_BASELINE_RELATIVE, entries)
+        _write_baseline(root / PMD_CPD_BASELINE_RELATIVE, entries, root=root)
         return 0
 
     if check:
@@ -958,7 +1102,10 @@ def run_pmd_python(
             print(f"ERROR: pmd-cpd: {exc}", file=sys.stderr)
             return AUDIT_ERROR_EXIT_CODE
         return _check_against_baseline(
-            root / PMD_CPD_BASELINE_RELATIVE, entries, tool_name="pmd-cpd"
+            root / PMD_CPD_BASELINE_RELATIVE,
+            entries,
+            tool_name="pmd-cpd",
+            root=root,
         )
 
     audit_dir = root / "tasks" / "audit"
@@ -991,7 +1138,11 @@ def run_pmd_python(
 
 
 def run_nicad_python(
-    check: bool, index_snapshot: bool = False, save_baseline: bool = False
+    check: bool,
+    index_snapshot: bool = False,
+    save_baseline: bool = False,
+    *,
+    root: Path = ROOT,
 ) -> int:
     del index_snapshot, save_baseline
     nicad = command_path("nicad")
@@ -1002,9 +1153,9 @@ def run_nicad_python(
         )
         return 127 if check else 0
 
-    nicad_dir = AUDIT_DIR / "nicad"
+    nicad_dir = root / "tasks" / "audit" / "nicad"
     nicad_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [nicad, "functions", "py", str(ROOT / "research"), "notests-report"]
+    cmd = [nicad, "functions", "py", str(root / "research"), "notests-report"]
     return run(cmd, allow_findings=not check, cwd=nicad_dir)
 
 
@@ -1019,6 +1170,14 @@ TOOLS = {
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--root",
+        help=(
+            "Repository tree to audit. Defaults to the Git worktree containing "
+            "the current working directory, never the checkout that supplied "
+            "the imported conductor module."
+        ),
+    )
     parser.add_argument(
         "--tool",
         action="append",
@@ -1066,9 +1225,20 @@ def main() -> int:
             f"{', '.join(sorted(baseline_supported))}; "
             f"got {', '.join(sorted(unsupported_baseline))}"
         )
+    try:
+        root = _resolve_audit_root(args.root)
+    except DuplicateAuditError as exc:
+        print(f"ERROR: audit-root: {exc}", file=sys.stderr)
+        return AUDIT_ERROR_EXIT_CODE
+    _print_audit_provenance(root, index_snapshot=args.index_snapshot)
     for name in selected:
         print(f"== {name} ==", flush=True)
-        code = TOOLS[name](args.check, args.index_snapshot, args.save_baseline)
+        code = TOOLS[name](
+            args.check,
+            args.index_snapshot,
+            args.save_baseline,
+            root=root,
+        )
         if code:
             return code
     return 0

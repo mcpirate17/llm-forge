@@ -63,7 +63,8 @@ def _mapped_native_artifacts(repo: Path) -> set[str]:
     return found
 
 
-def pytest_sessionfinish(session, exitstatus) -> None:  # noqa: ARG001
+def pytest_sessionfinish(session, exitstatus) -> None:
+    del session, exitstatus
     report = os.environ.get("EXTERNAL_INVARIANT_NATIVE_REPORT")
     root = os.environ.get("EXTERNAL_INVARIANT_REPO_ROOT")
     if not report or not root:
