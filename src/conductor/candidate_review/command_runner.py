@@ -9,8 +9,8 @@ import subprocess
 import sys
 import time
 import warnings
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from conductor.candidate_review.checks import ReviewContext, _result, files_for_policy
 from conductor.candidate_review.model import (
@@ -166,6 +166,7 @@ def _environment(
     extra: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     allowed = {
+        "CARGO_HOME",
         "CUDA_VISIBLE_DEVICES",
         "HTTPS_PROXY",
         "HTTP_PROXY",
@@ -177,6 +178,8 @@ def _environment(
         "PATH",
         "REQUESTS_CA_BUNDLE",
         "ROCR_VISIBLE_DEVICES",
+        "RUSTUP_HOME",
+        "RUSTUP_TOOLCHAIN",
         "SSL_CERT_FILE",
         "TERM",
         "TZ",
