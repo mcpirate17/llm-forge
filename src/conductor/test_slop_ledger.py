@@ -223,3 +223,24 @@ def test_a_missing_ledger_is_a_first_run_not_a_crash(tmp_path):
     stub = tmp_path / "stub.json"
     stub.write_text("")
     assert sl.load(stub)["items"] == []
+
+
+def test_the_ledger_scope_covers_every_module_it_speaks_for(tmp_path):
+    """`scope` is what the ledger covers, not what the last sweep touched.
+
+    Recording the sweep's scope made a two-module run overwrite the record of a
+    164-module one: the file claimed to cover 1 module while holding 1,543 items from
+    164. `last_sweep_scope` keeps the narrower fact, which is the one `diff` needs.
+    """
+    ledger = tmp_path / "ledger.json"
+    sl.save(sl.aggregate([
+        _f("conductor/a.py", "run", "NOT_EXERCISED"),
+        _f("conductor/b.py", "run", "NOT_EXERCISED"),
+    ]), ["conductor/a.py", "conductor/b.py"], ledger)
+
+    sl.save(sl.aggregate([_f("conductor/a.py", "run", "NOT_EXERCISED")]),
+            ["conductor/a.py"], ledger)
+
+    written = json.loads(ledger.read_text())
+    assert written["scope"] == ["conductor/a.py", "conductor/b.py"]
+    assert written["last_sweep_scope"] == ["conductor/a.py"]

@@ -116,11 +116,17 @@ def save(
     previous = previous if previous is not None else load(path)
     in_scope = set(scope)
     kept = [i for i in previous.get("items", []) if i.get("module") not in in_scope]
+    merged = sorted(kept + list(items), key=lambda i: (i["module"], i["qualname"]))
     payload = {
         "schema_version": 1,
         "generated_at": _dt.datetime.now(_dt.UTC).isoformat(),
-        "scope": sorted(in_scope),
-        "items": sorted(kept + list(items), key=lambda i: (i["module"], i["qualname"])),
+        # Every module the ledger speaks for, not just the ones this sweep touched.
+        # Recording the sweep's scope here let a two-module run overwrite the record
+        # of a 164-module one, so the file claimed to cover 1 module while holding
+        # 1,543 items from 164. `diff` needs the narrower fact, so it is kept too.
+        "scope": sorted({i["module"] for i in merged}),
+        "last_sweep_scope": sorted(in_scope),
+        "items": merged,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n")
