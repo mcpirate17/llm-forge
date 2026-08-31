@@ -36,7 +36,8 @@ import pathlib
 import sys
 from typing import Any, Callable, Sequence
 
-from conductor.equivalence_ablations import generate_ablations
+from conductor.native_ablations import Ablation as NativeAblation
+from conductor.native_ablations import ablations as native_ablations
 
 __all__ = ["Verdict", "AblationResult", "probe_function", "probe_module"]
 
@@ -170,13 +171,11 @@ def _amplify_parameters(value: Any, factor: float) -> Any:
 # ------------------------------------------------------------------- compilation
 
 
-def _load_function_ast(path: pathlib.Path, qualname: str) -> tuple[ast.AST, ast.AST]:
-    """Return (module_tree, function_node) for a dotted ``Class.method`` or ``func``."""
-    tree = ast.parse(path.read_text())
-    parts = qualname.split(".")
+def _node_for_qualname(tree: ast.AST, qualname: str, where: object) -> ast.AST:
+    """The function node a dotted ``Class.method`` or ``func`` names, in ``tree``."""
     scope: Any = tree
     node: Any = None
-    for part in parts:
+    for part in qualname.split("."):
         node = next(
             (n for n in ast.iter_child_nodes(scope)
              if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
@@ -184,11 +183,17 @@ def _load_function_ast(path: pathlib.Path, qualname: str) -> tuple[ast.AST, ast.
             None,
         )
         if node is None:
-            raise LookupError(f"{qualname!r} not found in {path}")
+            raise LookupError(f"{qualname!r} not found in {where}")
         scope = node
     if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
         raise LookupError(f"{qualname!r} is not a function")
-    return tree, node
+    return node
+
+
+def _load_function_ast(path: pathlib.Path, qualname: str) -> tuple[ast.AST, ast.AST]:
+    """Return (module_tree, function_node) for a dotted ``Class.method`` or ``func``."""
+    tree = ast.parse(path.read_text())
+    return tree, _node_for_qualname(tree, qualname, path)
 
 
 def _compile_variant(fn_ast: ast.AST, module: Any, name: str) -> Callable[..., Any]:
@@ -409,12 +414,17 @@ def probe_function(
     module_path: pathlib.Path, qualname: str, test_args: Sequence[str],
     module_name: str | None = None, noise: float = 1e-6,
     extra_rules: Sequence[str] = (), calls: list[tuple] | None = None,
+    ablations: Sequence[NativeAblation] | None = None, source: str | None = None,
 ) -> list[AblationResult]:
     """Ablate every construct in one function and classify each by differential value."""
     module_name = module_name or _module_name_for(module_path)
     module = importlib.import_module(module_name)
-    module_tree, fn_ast = _load_function_ast(module_path, qualname)
-    ablations = generate_ablations(fn_ast, module_tree, extra_rules)
+    if source is None:
+        source = module_path.read_text()
+    if ablations is None:
+        ablations = [a for a in native_ablations(source, extra=list(extra_rules))
+                     if a.qualname == qualname]
+    fn_ast = _node_for_qualname(ast.parse(source), qualname, module_path)
     if not ablations:
         return []
 
@@ -424,13 +434,19 @@ def probe_function(
     results: list[AblationResult] = []
     for ablation in ablations:
         base = AblationResult(qualname, ablation.rule, ablation.description,
-                              ablation.lineno, Verdict.NOT_EXERCISED, len(calls))
+                              ablation.line, Verdict.NOT_EXERCISED, len(calls))
         if not calls:
             results.append(base)
             continue
         try:
-            variant = _compile_variant(ablation.tree, module, fn_ast.name)
-        except SyntaxError as exc:
+            # The engine edits module source, so the variant is read back out of the
+            # mutated module rather than handed over as a tree. Rules like
+            # ablate_function_to_none and drop_decorator rewrite the definition
+            # itself, which no function-scoped AST swap can express.
+            mutated = _node_for_qualname(
+                ast.parse(ablation.apply(source)), qualname, module_path)
+            variant = _compile_variant(mutated, module, fn_ast.name)
+        except (SyntaxError, LookupError) as exc:
             base.verdict, base.detail = Verdict.UNCOMPILABLE, str(exc)
             results.append(base)
             continue
@@ -488,13 +504,21 @@ def probe_module(
     module = importlib.import_module(module_name)
     # One driver run for the whole module rather than one per function.
     recorded = _record_many(module, targets, test_args)
+    # One parse for the whole module too: the engine walks the tree once and returns
+    # every function's ablations, so asking per function would reparse it per target.
+    source = module_path.read_text()
+    by_qualname: dict[str, list[NativeAblation]] = {}
+    for ablation in native_ablations(source, extra=list(extra_rules)):
+        by_qualname.setdefault(ablation.qualname, []).append(ablation)
     out: list[AblationResult] = []
     for qualname in targets:
         try:
             out += probe_function(module_path, qualname, test_args,
                                   module_name=module_name, noise=noise,
                                   extra_rules=extra_rules,
-                                  calls=recorded.get(qualname, []))
+                                  calls=recorded.get(qualname, []),
+                                  ablations=by_qualname.get(qualname, []),
+                                  source=source)
         except LookupError:
             continue
     return out
@@ -506,7 +530,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("tests", nargs="+", help="pytest targets that drive the module")
     parser.add_argument("--function", action="append", default=[])
     parser.add_argument("--rule", action="append", default=[], dest="extra_rules",
-                        help="enable an OPTIONAL_RULES entry, e.g. body_to_passthrough")
+                        help="enable an opt-in rule, e.g. ablate_function_to_passthrough")
     parser.add_argument("--noise", type=float, default=1e-6,
                         help="relative difference below which a change is round-off")
     parser.add_argument("--json", type=pathlib.Path)

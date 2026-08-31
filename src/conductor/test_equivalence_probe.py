@@ -151,15 +151,17 @@ def test_inert_guard_is_reported_as_no_difference(workspace: pathlib.Path) -> No
 def test_expensive_unproven_rules_are_off_unless_asked_for(
     workspace: pathlib.Path,
 ) -> None:
-    """body_to_passthrough was 44.6% of a sweep's ablations and never discriminated.
+    """ablate_function_to_passthrough was 44.6% of a sweep's ablations and never
+    discriminated (it was `body_to_passthrough` before the engine moved to Rust).
 
     Over 26 real modules it returned 72 LIVE verdicts and no non-LIVE verdict at all.
     Most functions are not identities, so that is the expected shape -- but a rule that
     has not yet distinguished anything must not tax every run by default.
     """
-    assert "body_to_passthrough" not in _verdicts(workspace, "scaled")
-    opted_in = _verdicts(workspace, "scaled", extra_rules=("body_to_passthrough",))
-    assert opted_in["body_to_passthrough"] == Verdict.LIVE
+    assert "ablate_function_to_passthrough" not in _verdicts(workspace, "scaled")
+    opted_in = _verdicts(
+        workspace, "scaled", extra_rules=("ablate_function_to_passthrough",))
+    assert opted_in["ablate_function_to_passthrough"] == Verdict.LIVE
 
     # The bare `OPTIONAL_RULES[name]` lookup already raises KeyError, so the explicit
     # guard only earns its place by reporting EVERY unknown name at once instead of
@@ -373,3 +375,37 @@ def test_batching_bounds_recorder_memory_without_losing_a_target(
     recorded = ep._record_many(module, targets, ["test_fixture_mod.py"], batch=1)
     assert len(runs) == len(targets), "batch=1 must run the drivers once per target"
     assert set(recorded) == set(targets), "batching dropped a target"
+
+
+def test_whole_function_knockout_reaches_the_probe(workspace: pathlib.Path) -> None:
+    """"Delete the whole function -- does anything miss it?" is the question the other
+    rules cannot ask.
+
+    Every other rule removes a construct *inside* a function, so a function whose body
+    is entirely decorative gets a clean verdict from each of them individually. This
+    rule existed in the engine from the start and never fired, because the probe
+    generated its ablations with the Python rule set (8 rules) rather than the engine's
+    (25). Asserting it reaches the probe is what stops that regressing.
+    """
+    assert "ablate_function_to_none" in _verdicts(workspace, "scaled")
+
+
+def test_the_probe_uses_the_native_engine_not_the_python_one(
+    workspace: pathlib.Path,
+) -> None:
+    """The two rule sets differ 25 to 8, and the probe must be on the larger one.
+
+    Pinned by a rule the Python engine never had, so this fails if the import is
+    quietly reverted rather than merely renamed.
+    """
+    import slop_core
+
+    from conductor.equivalence_ablations import RULES as PYTHON_RULES
+
+    native_default, _ = slop_core.rule_names()
+    assert "ablate_function_to_none" in native_default
+    assert len(native_default) > len(PYTHON_RULES)
+    # and the probe is on the larger set, not merely able to reach it. Pinned on a
+    # rule the Python engine never had, so a quiet revert of the import fails here
+    # rather than silently shrinking the sweep back to 8 rules.
+    assert "ablate_function_to_none" in _verdicts(workspace, "scaled")

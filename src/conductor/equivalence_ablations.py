@@ -1,5 +1,18 @@
 """Ablation rules: neuter one construct to identity, leave everything else alone.
 
+SUPERSEDED (2026-08-31). `equivalence_probe.probe_function` now generates ablations
+with the native engine (`conductor.native_ablations` -> `slop_core`), which carries
+these eight rules plus seventeen this module cannot express -- whole-function
+knockout, decorator removal, parameter pinning and the rest of the tensor family.
+Nothing on a production route imports this module any more; only its own direct tests
+do. Three of its mutants were retired in `claude_equivalence_probe_20260830` for that
+reason, recorded there with the reason rather than deleted quietly.
+
+Kept, not deleted, so the removal is a decision someone takes with the diff in front
+of them rather than a side effect of the switch. Do not add rules here -- add them to
+`research/runtime/native/rust/slop-core/src/rules.rs`, or the two engines diverge and
+the sweep silently reports whichever one it happens to be wired to.
+
 A mutation-testing patch asks "if I corrupt this, does a test notice?". An ablation
 asks the narrower question this module exists for: "if I simply REMOVE this, does
 anything change at all?". Removal is the right operator for finding decorative code,
