@@ -19,13 +19,17 @@ so a clean sweep is a lead for a human, never a licence to delete.
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 import pathlib
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import TYPE_CHECKING, Iterable, Sequence
+
+if TYPE_CHECKING:  # pragma: no cover - the native class has no Python definition
+    from slop_core import TestIndex
+else:
+    TestIndex = "TestIndex"
 
 BLOCKING = ("REACHABLE_BUT_UNTESTED",)
 ADVISORY = ("NO_DIFFERENCE_OBSERVED", "WITHIN_NUMERIC_NOISE")
@@ -33,6 +37,20 @@ UNTESTED = "NOT_EXERCISED"
 UNREACHED = "NOT_REACHED_BY_DRIVERS"
 WAIVERS = pathlib.Path("conductor/slop_waivers.json")
 PER_MODULE_TIMEOUT = 180
+
+
+def build_index(root: pathlib.Path) -> TestIndex:
+    """The native test index, imported at the point of use.
+
+    Deliberately not a module-level import. `conductor.repo_index` refuses to load
+    without the built extension -- correctly, since a partial index would report
+    modules as having no driver tests -- but importing this module is not the same as
+    running the gate. A module-level import made every test that so much as imports
+    `slop_gate` fail to collect on a machine without the extension, CI included.
+    """
+    from conductor.repo_index import build
+
+    return build(root)
 
 
 @dataclass(frozen=True)
@@ -68,28 +86,22 @@ def changed_modules(base: str, root: pathlib.Path) -> list[str]:
     )
 
 
-def drivers_for(module: str, root: pathlib.Path) -> list[str]:
-    """Test files that import ``module``, which are what can drive it with real data."""
-    dotted = module[:-3].replace("/", ".")
-    hits: list[str] = []
-    for test in root.rglob("test_*.py"):
-        if ".git" in test.parts:
-            continue
-        try:
-            tree = ast.parse(test.read_text())
-        except (OSError, SyntaxError):
-            continue
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module == dotted:
-                hits.append(str(test.relative_to(root)))
-                break
-            if isinstance(node, ast.Import) and any(a.name == dotted for a in node.names):
-                hits.append(str(test.relative_to(root)))
-                break
-    return sorted(hits)
+def drivers_for(module: str, root: pathlib.Path,
+                index: TestIndex | None = None) -> list[str]:
+    """Test files that import ``module``, which are what can drive it with real data.
+
+    Answered from the native index. The scan this replaces re-walked and re-parsed
+    every ``test_*.py`` in the repository on every call -- 1.12 s a module over 1,064
+    files -- and matched an ``ImportFrom`` only on its ``module`` field, so
+    ``from conductor import slop_gate`` never resolved. That is the dominant idiom
+    here: 224 modules were reported as having no driver tests when they have some,
+    and a module with no drivers is skipped by the gate entirely.
+    """
+    return (index or build_index(root)).drivers_for(module)
 
 
-def refine_unexercised(findings: list[dict], root: pathlib.Path) -> list[dict]:
+def refine_unexercised(findings: list[dict], root: pathlib.Path,
+                       index: TestIndex | None = None) -> list[dict]:
     """Split "the probe never ran this" into the two things it can mean.
 
     A function the driver tests never call is either a real coverage hole or a miss in
@@ -98,23 +110,22 @@ def refine_unexercised(findings: list[dict], root: pathlib.Path) -> list[dict]:
     Measured over 59 such functions the split was 33 to 26, so reporting them as one
     bucket buries a genuine hole under a harness limitation and vice versa.
     """
+    index = index or build_index(root)
     for finding in findings:
         if finding.get("verdict") != UNTESTED:
             continue
         name = finding.get("qualname", "").split(".")[-1]
         if not name:
             continue
-        named_by = subprocess.run(
-            ["git", "grep", "-l", "-w", "-F", name, "--", "*/test_*.py", "test_*.py"],
-            cwd=root, capture_output=True, text=True,
-        ).stdout.split()
+        named_by = index.named_by(name)
         if named_by:
             finding["verdict"] = UNREACHED
             finding["named_by"] = named_by[:4]
     return findings
 
 
-def probe(module: str, tests: Sequence[str], root: pathlib.Path) -> list[dict]:
+def probe(module: str, tests: Sequence[str], root: pathlib.Path,
+          index: TestIndex | None = None) -> list[dict]:
     report = root / ".slop_gate_report.json"
     try:
         subprocess.run(
@@ -128,7 +139,7 @@ def probe(module: str, tests: Sequence[str], root: pathlib.Path) -> list[dict]:
     if not report.is_file():
         return []
     try:
-        return refine_unexercised(json.loads(report.read_text()), root)
+        return refine_unexercised(json.loads(report.read_text()), root, index)
     finally:
         report.unlink(missing_ok=True)
 
@@ -136,16 +147,19 @@ def probe(module: str, tests: Sequence[str], root: pathlib.Path) -> list[dict]:
 def run(base: str, root: pathlib.Path, only: Iterable[str] = ()) -> tuple[int, dict]:
     waivers = load_waivers(root / WAIVERS)
     modules = list(only) or changed_modules(base, root)
+    # One pass over the test tree answers both the driver question for every module
+    # and the "does anything name this?" question for every unreached function.
+    index = build_index(root)
     blocking: list[dict] = []
     advisory: list[dict] = []
     skipped: list[str] = []
     untested: list[dict] = []
     for module in modules:
-        tests = drivers_for(module, root)
+        tests = drivers_for(module, root, index)
         if not tests:
             skipped.append(module)
             continue
-        for finding in probe(module, tests, root):
+        for finding in probe(module, tests, root, index):
             finding["module"] = module
             if finding["verdict"] in BLOCKING:
                 if any(w.covers(module, finding["rule"], finding["qualname"])

@@ -49,12 +49,36 @@ def test_drivers_are_the_tests_that_import_the_module(repo: pathlib.Path) -> Non
     assert slop_gate.drivers_for("lane.py", repo) == ["test_lane.py"]
 
 
+def test_the_run_builds_one_index_and_shares_it(
+    repo: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The index is built once per run, not once per module.
+
+    Both spellings return the same answers, so nothing about the report distinguishes
+    them -- the only observable is how many times the tree was walked. Rebuilding per
+    module is the O(repository)-per-module cost the index exists to remove, and it
+    would come back silently.
+    """
+    (repo / "lane.py").write_text("VALUE = 1\n")
+    (repo / "other.py").write_text("VALUE = 2\n")
+    (repo / "third.py").write_text("VALUE = 3\n")
+    (repo / "test_lane.py").write_text("from lane import VALUE\n")
+
+    builds = []
+    real = slop_gate.build_index
+    monkeypatch.setattr(slop_gate, "build_index",
+                        lambda root: (builds.append(root), real(root))[1])
+    monkeypatch.setattr(slop_gate, "probe", lambda m, t, r, i=None: [])
+    slop_gate.run("HEAD", repo, only=["lane.py", "other.py", "third.py"])
+    assert len(builds) == 1, f"the test tree was walked {len(builds)} times for 3 modules"
+
+
 def test_a_reachable_untested_branch_blocks(
     repo: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(slop_gate, "drivers_for", lambda m, r: ["test_lane.py"])
+    monkeypatch.setattr(slop_gate, "drivers_for", lambda m, r, i=None: ["test_lane.py"])
     monkeypatch.setattr(slop_gate, "probe",
-                        lambda m, t, r: [_finding("REACHABLE_BUT_UNTESTED")])
+                        lambda m, t, r, i=None: [_finding("REACHABLE_BUT_UNTESTED")])
     code, summary = slop_gate.run("HEAD", repo, only=["lane.py"])
     assert code == 1
     assert len(summary["blocking"]) == 1
@@ -64,8 +88,8 @@ def test_advisory_verdicts_never_block(
     repo: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Sampling cannot prove equivalence, so a clean sweep is a lead, not a verdict."""
-    monkeypatch.setattr(slop_gate, "drivers_for", lambda m, r: ["test_lane.py"])
-    monkeypatch.setattr(slop_gate, "probe", lambda m, t, r: [
+    monkeypatch.setattr(slop_gate, "drivers_for", lambda m, r, i=None: ["test_lane.py"])
+    monkeypatch.setattr(slop_gate, "probe", lambda m, t, r, i=None: [
         _finding("NO_DIFFERENCE_OBSERVED"), _finding("WITHIN_NUMERIC_NOISE")])
     code, summary = slop_gate.run("HEAD", repo, only=["lane.py"])
     assert code == 0
@@ -78,8 +102,8 @@ def test_a_waiver_downgrades_only_the_rule_it_names(
     (repo / slop_gate.WAIVERS).write_text(json.dumps({"waivers": [
         {"module": "lane.py", "rule": "drop_where", "qualname": "Lane.forward",
          "reason": "covered by the integration probe, not the unit tests"}]}))
-    monkeypatch.setattr(slop_gate, "drivers_for", lambda m, r: ["test_lane.py"])
-    monkeypatch.setattr(slop_gate, "probe", lambda m, t, r: [
+    monkeypatch.setattr(slop_gate, "drivers_for", lambda m, r, i=None: ["test_lane.py"])
+    monkeypatch.setattr(slop_gate, "probe", lambda m, t, r, i=None: [
         _finding("REACHABLE_BUT_UNTESTED", rule="drop_where"),
         _finding("REACHABLE_BUT_UNTESTED", rule="drop_clamp_min")])
     code, summary = slop_gate.run("HEAD", repo, only=["lane.py"])
@@ -114,7 +138,7 @@ def test_unreached_is_separated_from_genuinely_untested(
 def test_a_module_with_no_driver_is_reported_not_silently_passed(
     repo: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(slop_gate, "drivers_for", lambda m, r: [])
+    monkeypatch.setattr(slop_gate, "drivers_for", lambda m, r, i=None: [])
     code, summary = slop_gate.run("HEAD", repo, only=["lane.py"])
     assert code == 0
     assert summary["modules_without_drivers"] == ["lane.py"]
