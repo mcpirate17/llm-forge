@@ -302,3 +302,74 @@ def test_unary_call_rule_needs_a_one_argument_callee() -> None:
                if a.rule == "drop_unary_call"]
     assert any("unary" in d for d in dropped)
     assert not any("binary" in d for d in dropped)
+
+
+def test_a_module_probe_shares_one_driver_run_across_its_functions(
+    workspace: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Driver runs must scale with batches, not with functions.
+
+    The driver suite does not care which function is being watched, so running it
+    once per public function was pure repetition -- a measured mean of 11.0 public
+    functions per module across this repo, worst case 174.
+    """
+    import pytest as _pytest
+
+    from conductor import equivalence_probe as ep
+
+    runs = []
+    real_main = _pytest.main
+    monkeypatch.setattr(
+        _pytest, "main", lambda *a, **k: (runs.append(a), real_main(*a, **k))[1]
+    )
+    module_path = workspace / "fixture_mod.py"
+    targets = ep.public_functions(module_path)
+    assert len(targets) > 1, "fixture must have several targets for this to mean anything"
+
+    ep.probe_module(module_path, ["test_fixture_mod.py"])
+    assert len(runs) == 1, f"expected one shared driver run, got {len(runs)}"
+
+
+def test_recorders_are_removed_after_a_shared_run(
+    workspace: pathlib.Path,
+) -> None:
+    """Every patched site must be restored, or the next probe records through a
+    stale recorder and reports a clean verdict from a measurement that never ran."""
+    from conductor import equivalence_probe as ep
+
+    module = importlib.import_module("fixture_mod")
+    targets = ep.public_functions(workspace / "fixture_mod.py")
+    ep._record_many(module, targets, ["test_fixture_mod.py"])
+
+    for qualname in targets:
+        owner = module
+        for part in qualname.split(".")[:-1]:
+            owner = getattr(owner, part)
+        bound = getattr(owner, qualname.split(".")[-1], None)
+        assert not getattr(bound, "__equivalence_recorder__", False), (
+            f"{qualname} left wrapped in a recorder"
+        )
+
+
+def test_batching_bounds_recorder_memory_without_losing_a_target(
+    workspace: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A batch smaller than the target list costs an extra driver run, never a
+    dropped target -- a target silently skipped would read as NOT_EXERCISED, a
+    clean verdict for a function whose tests do drive it."""
+    import pytest as _pytest
+
+    from conductor import equivalence_probe as ep
+
+    module = importlib.import_module("fixture_mod")
+    targets = ep.public_functions(workspace / "fixture_mod.py")
+    assert len(targets) >= 2
+
+    runs = []
+    real_main = _pytest.main
+    monkeypatch.setattr(
+        _pytest, "main", lambda *a, **k: (runs.append(a), real_main(*a, **k))[1]
+    )
+    recorded = ep._record_many(module, targets, ["test_fixture_mod.py"], batch=1)
+    assert len(runs) == len(targets), "batch=1 must run the drivers once per target"
+    assert set(recorded) == set(targets), "batching dropped a target"
