@@ -51,6 +51,15 @@ AMPLIFIERS: tuple[tuple[str, float], ...] = (
 # `tanh` output is bounded however large its input grows, so a guard that only fires
 # when that router saturates stays invisible. Reaching it means scaling the WEIGHTS,
 # which is why parameter amplification is a separate lever rather than a larger factor.
+# Repeats of the baseline-against-itself control. Three, because the blocking count
+# over seven modules was 13 / 10 / 7 on identical code with a single control.
+CONTROL_REPEATS = 3
+# How far a reproduced effect must clear the function's own jitter before it blocks.
+# Not a taste: over five repeats of the same seven modules the two findings that held
+# 5/5 both measured control == 0.0, so they clear any margin, while the one that
+# appeared 1/5 sat at 1.22e-6 against a control of 2.91e-7 -- a ratio of 4.2. A bar of
+# 10 separates those two populations; it does not merely make the flake go away.
+CONTROL_MARGIN = 10.0
 PARAM_AMPLIFIERS: tuple[tuple[str, float], ...] = (
     ("params_x50", 50.0), ("params_x1e3", 1e3), ("params_zero", 0.0),
 )
@@ -64,6 +73,10 @@ class Verdict(str):
     BASELINE_UNUSABLE = "BASELINE_UNUSABLE"
     NO_DIFFERENCE_OBSERVED = "NO_DIFFERENCE_OBSERVED"
     UNCOMPILABLE = "UNCOMPILABLE"
+    # The function does not return the same value twice for the same input, so no
+    # difference under it can be attributed to an ablation. A property of the code
+    # under test, not of the probe -- reported, never silently folded into "clean".
+    NONDETERMINISTIC = "NONDETERMINISTIC"
 
 
 @dataclasses.dataclass
@@ -78,6 +91,9 @@ class AblationResult:
     max_diff_recorded: float | None = None
     max_diff_amplified: float | None = None
     amplifier: str | None = None
+    # Worst difference the baseline shows against ITSELF on the same inputs. Only
+    # measured for a candidate finding, so it stays None on the clean path.
+    max_diff_control: float | None = None
     detail: str = ""
 
     def as_dict(self) -> dict[str, Any]:
@@ -196,10 +212,20 @@ def _load_function_ast(path: pathlib.Path, qualname: str) -> tuple[ast.AST, ast.
     return tree, _node_for_qualname(tree, qualname, path)
 
 
-def _compile_variant(fn_ast: ast.AST, module: Any, name: str) -> Callable[..., Any]:
-    """Compile one function definition against the real module globals."""
+def _compile_variant(
+    fn_ast: ast.AST, module: Any, name: str, decorators: bool = False
+) -> Callable[..., Any]:
+    """Compile one function definition against the real module globals.
+
+    Decorators are dropped by default, and deliberately: re-evaluating `@app.route`
+    or `@register` once per ablation would re-run its side effect against the live
+    module. The exception is the rule that ablates the decorator itself, which cannot
+    measure anything if both ends are compiled without it -- there, BOTH ends are
+    compiled with decorators so the comparison stays fair.
+    """
     stripped = copy.deepcopy(fn_ast)
-    stripped.decorator_list = []
+    if not decorators:
+        stripped.decorator_list = []
     holder = ast.Module(body=[stripped], type_ignores=[])
     ast.fix_missing_locations(holder)
     namespace: dict[str, Any] = {}
@@ -445,12 +471,19 @@ def probe_function(
             # itself, which no function-scoped AST swap can express.
             mutated = _node_for_qualname(
                 ast.parse(ablation.apply(source)), qualname, module_path)
-            variant = _compile_variant(mutated, module, fn_ast.name)
+            # For the decorator rule the decorator IS the construct under test, so
+            # both ends have to carry it -- otherwise the ablation and the baseline
+            # compile to the same object and every decorator reads as decorative.
+            decorated = ablation.rule == "drop_decorator"
+            against = (_compile_variant(fn_ast, module, fn_ast.name, decorators=True)
+                       if decorated else baseline)
+            variant = _compile_variant(
+                mutated, module, fn_ast.name, decorators=decorated)
         except (SyntaxError, LookupError) as exc:
             base.verdict, base.detail = Verdict.UNCOMPILABLE, str(exc)
             results.append(base)
             continue
-        recorded, usable = _sweep(baseline, variant, calls)
+        recorded, usable = _sweep(against, variant, calls)
         base.max_diff_recorded = recorded
         base.usable_calls = usable
         if not usable:
@@ -462,15 +495,64 @@ def probe_function(
             base.verdict = Verdict.LIVE
             results.append(base)
             continue
-        amplified, which = _sweep_amplified(baseline, variant, calls)
+        amplified, which = _sweep_amplified(against, variant, calls)
         base.max_diff_amplified, base.amplifier = amplified, which
         if amplified > noise:
+            # This verdict is the one that blocks a merge, so it has to be
+            # ATTRIBUTABLE to the ablation. Measured on the first real sweep: 11 of
+            # 16 structural findings in research/eval differed only in an
+            # `elapsed_ms` wall-clock field, which changes between any two calls.
+            # The amplified sweep scored that jitter as an infinite relative change
+            # because the `==` fallback in _difference is all-or-nothing and never
+            # meets a noise threshold. Re-running the baseline against ITSELF
+            # separates instability from effect; it costs one extra sweep and is
+            # paid only when a finding is about to be reported.
+            # The single sweep above is a SCREEN, not a verdict: it is one sample of
+            # a quantity that varies between runs whenever the function under test
+            # does. Repeating the same seven modules gave blocking counts of
+            # 13 / 10 / 7 on unchanged code. So a candidate has to clear two bars:
+            #   * REPRODUCE -- the smallest effect seen over several repeats, not a
+            #     lucky largest one;
+            #   * EXCEED THE FUNCTION'S OWN JITTER -- the largest difference the
+            #     unmodified function shows against ITSELF over the same repeats.
+            # Both are paid only here, on a candidate finding, so the clean path
+            # keeps its single sweep.
+            effect = min(_sweep_amplified(against, variant, calls)[0]
+                         for _ in range(CONTROL_REPEATS))
+            control = max(_sweep_amplified(against, against, calls)[0]
+                          for _ in range(CONTROL_REPEATS))
+            base.max_diff_amplified = effect
+            base.max_diff_control = control
+            if effect <= max(noise, control * CONTROL_MARGIN):
+                base.verdict = Verdict.NONDETERMINISTIC
+                base.detail = (
+                    "the unmodified function disagrees with itself by as much as the "
+                    "ablation does, so the difference is not attributable to it")
+                results.append(base)
+                continue
             base.verdict = Verdict.REACHABLE_BUT_UNTESTED
         elif max(recorded, amplified) > 0.0:
             base.verdict = Verdict.WITHIN_NUMERIC_NOISE
         else:
             base.verdict = Verdict.NO_DIFFERENCE_OBSERVED
         results.append(base)
+
+    # Jitter belongs to the FUNCTION, not to one ablation. Three control repeats is
+    # still a small sample, and _run_binding_intermediate_on -- unstable enough to be
+    # caught 39 times over five runs -- cleared its own control by luck in 1 run of 6.
+    # Every ablation of this function measured the same underlying instability, so
+    # pool them: the worst jitter any of them saw is the floor all of them must clear.
+    # Costs nothing; the controls are already measured.
+    floor = max((r.max_diff_control or 0.0) for r in results) if results else 0.0
+    if floor > 0.0:
+        for r in results:
+            if (r.verdict == Verdict.REACHABLE_BUT_UNTESTED
+                    and (r.max_diff_amplified or 0.0) <= floor * CONTROL_MARGIN):
+                r.verdict = Verdict.NONDETERMINISTIC
+                r.detail = (
+                    "another ablation of this function measured the unmodified code "
+                    f"disagreeing with itself by {floor:.3e}, which this difference "
+                    "does not clear")
     return results
 
 

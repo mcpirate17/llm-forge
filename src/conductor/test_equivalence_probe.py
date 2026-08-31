@@ -25,6 +25,10 @@ from conductor.equivalence_ablations import generate_ablations
 from conductor.equivalence_probe import Verdict, probe_function
 
 MODULE = '''
+import dataclasses
+import functools
+import time
+
 import torch
 
 
@@ -79,11 +83,56 @@ def validated(x):
     if x < 0:
         raise ValueError("x must be non-negative")
     return x * 2
+
+
+def doubling(fn):
+    """A decorator that changes the result, so removing it has to read LIVE."""
+
+    @functools.wraps(fn)
+    def inner(*a, **k):
+        return fn(*a, **k) * 2
+
+    return inner
+
+
+@doubling
+def decorated(x):
+    return x.sum()
+
+
+@dataclasses.dataclass
+class Timing:
+    """A result object carrying a wall-clock field, as the real one did.
+
+    A DATACLASS, not a dict, and that is the whole point: `_difference` recurses into
+    a dict and compares the fields numerically, but for an arbitrary object it falls
+    back to `==`, which is all-or-nothing. So a microsecond of timing jitter is
+    scored as an INFINITE relative change and can never meet a noise threshold.
+    """
+
+    total: float = 0.0
+    elapsed_ms: float = 0.0
+
+
+def timed(x, scale=1.0):
+    """The shape that produced 11 of 16 false findings in the first real sweep.
+
+    Two calls with the same input never agree, because one field is a clock.
+    """
+    total = float((x * scale).sum())
+    # The RECORDED calls agree, so the probe gets past its first screen, and only the
+    # amplified regime reaches the branch that reads a clock. That is why the real
+    # findings all read max_diff_recorded=0.0 with max_diff_amplified=inf.
+    if abs(total) > 1e3:
+        return Timing(total=total, elapsed_ms=time.perf_counter() * 1e3)
+    return Timing(total=total, elapsed_ms=0.0)
 '''
 
 TESTS = '''
 import torch
-from fixture_mod import Lane, load_bearing, renormalised, scaled, validated
+from fixture_mod import (
+    Lane, decorated, load_bearing, renormalised, scaled, timed, validated,
+)
 
 
 def test_scaled():
@@ -102,6 +151,14 @@ def test_renormalised():
 
 def test_load_bearing():
     assert load_bearing(torch.tensor([-1.0, 2.0])).tolist() == [0.0, 2.0]
+
+
+def test_decorated():
+    assert decorated(torch.ones(4)) == 8.0
+
+
+def test_timed():
+    assert timed(torch.ones(4)).total == 4.0
 
 
 def test_validated_rejects_negative():
@@ -409,3 +466,119 @@ def test_the_probe_uses_the_native_engine_not_the_python_one(
     # rule the Python engine never had, so a quiet revert of the import fails here
     # rather than silently shrinking the sweep back to 8 rules.
     assert "ablate_function_to_none" in _verdicts(workspace, "scaled")
+
+
+def test_a_function_that_disagrees_with_itself_yields_no_blocking_finding(
+    workspace: pathlib.Path,
+) -> None:
+    """The false-positive class the first real sweep was almost entirely made of.
+
+    `timed` returns a wall-clock field, so the unmodified function already differs
+    from itself between two calls. Before the control existed this was reported as
+    REACHABLE_BUT_UNTESTED with an INFINITE relative change -- the strongest verdict
+    the probe can issue, on a difference that is not attributable to the ablation at
+    all. Sixteen of eighteen findings over seven real modules were this.
+    """
+    verdicts = _verdicts(workspace, "timed")
+    assert verdicts, "the fixture produced no ablations"
+    assert Verdict.REACHABLE_BUT_UNTESTED not in verdicts.values()
+    assert Verdict.NONDETERMINISTIC in verdicts.values()
+
+
+def test_the_jitter_control_reports_rather_than_swallows(
+    workspace: pathlib.Path,
+) -> None:
+    """An unstable return value is a real defect in the code under test.
+
+    It defeats every differential tool, not just this one, so it gets a verdict of
+    its own and reaches the report. Folding it into NO_DIFFERENCE_OBSERVED would
+    have made the probe quietly less capable and told nobody.
+    """
+    results = probe_function(
+        workspace / "fixture_mod.py", "timed", ["test_fixture_mod.py"],
+        module_name="fixture_mod",
+    )
+    unstable = [r for r in results if r.verdict == Verdict.NONDETERMINISTIC]
+    assert unstable, "instability must be reported, not silently dropped"
+    assert all(r.max_diff_control and r.max_diff_control > 0.0 for r in unstable), (
+        "a NONDETERMINISTIC verdict must carry the control measurement that earned it"
+    )
+
+
+def test_the_control_does_not_suppress_a_deterministic_finding(
+    workspace: pathlib.Path,
+) -> None:
+    """The discriminating half: a control that suppresses everything is worthless.
+
+    `Lane.forward` is stable, so its control measures zero and the saturation-only
+    guard -- reachable only by amplifying the PARAMETERS -- must still block. Without
+    this, dropping every finding on the floor would pass the test above.
+    """
+    results = probe_function(
+        workspace / "fixture_mod.py", "Lane.forward", ["test_fixture_mod.py"],
+        module_name="fixture_mod",
+    )
+    blocking = [r for r in results if r.verdict == Verdict.REACHABLE_BUT_UNTESTED]
+    assert blocking, "a stable function's real finding must survive the control"
+    assert all(r.max_diff_control == 0.0 for r in blocking), (
+        "a stable function must measure zero jitter, so the finding is attributable"
+    )
+
+
+def test_the_jitter_floor_is_pooled_across_the_functions_ablations(
+    workspace: pathlib.Path,
+) -> None:
+    """Three control repeats per ablation is still a small sample.
+
+    A real function unstable enough to be caught 39 times over five runs cleared its
+    own per-ablation control by luck in 1 run of 6, and that run reported a finding
+    the other five did not. Every ablation of a function measures the SAME underlying
+    instability, so the worst jitter any of them saw is the floor all of them clear.
+    """
+    results = probe_function(
+        workspace / "fixture_mod.py", "timed", ["test_fixture_mod.py"],
+        module_name="fixture_mod",
+    )
+    floor = max((r.max_diff_control or 0.0) for r in results)
+    assert floor > 0.0, "the fixture must actually jitter for this test to mean anything"
+    survivors = [r for r in results if r.verdict == Verdict.REACHABLE_BUT_UNTESTED]
+    assert not survivors, (
+        "no ablation may block on a difference under the function's own jitter floor: "
+        f"{[(r.rule, r.max_diff_amplified) for r in survivors]}"
+    )
+
+
+def test_repeated_probes_of_unchanged_code_agree(workspace: pathlib.Path) -> None:
+    """Reproducibility is the property that makes a verdict fit to gate on.
+
+    Over seven real modules the blocking count was 13 / 10 / 7 on identical code
+    before this; afterwards the finding set was byte-identical across eight
+    consecutive runs. A gate whose findings move on their own cannot be enforced.
+    """
+    runs = [
+        {r.rule: r.verdict for r in probe_function(
+            workspace / "fixture_mod.py", "timed", ["test_fixture_mod.py"],
+            module_name="fixture_mod")}
+        for _ in range(3)
+    ]
+    assert runs[0] == runs[1] == runs[2], f"verdicts moved between runs: {runs}"
+    # Agreeing is not enough on its own -- three runs that all block would agree too.
+    # The classification has to be the right one, every time.
+    for run in runs:
+        assert Verdict.REACHABLE_BUT_UNTESTED not in run.values(), run
+
+
+def test_a_decorator_ablation_reaches_the_probe(workspace: pathlib.Path) -> None:
+    """`drop_decorator` shipped in the engine but had never once been measured.
+
+    It emitted an EMPTY qualname, because a decorator is a sibling of the definition
+    it applies to rather than a node inside it, and probe_function filters ablations
+    with `qualname == target`. So every decorator ablation was generated and then
+    silently discarded -- a rule in the default set, counted in the rule total,
+    contributing nothing. Here the decorator doubles the result, so it must read LIVE.
+    """
+    verdicts = _verdicts(workspace, "decorated")
+    assert "drop_decorator" in verdicts, (
+        f"the decorator ablation never reached the probe: {sorted(verdicts)}"
+    )
+    assert verdicts["drop_decorator"] == Verdict.LIVE

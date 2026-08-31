@@ -13,7 +13,7 @@ import time
 import tokenize
 import tomllib
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -1097,7 +1097,7 @@ def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
     the tree that ships.
     """
     started = time.perf_counter()
-    from conductor import slop_gate
+    from conductor import slop_gate, slop_ledger
 
     modules = [
         change.path
@@ -1110,11 +1110,32 @@ def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
         return _result("equivalence-probe", started, (), files=())
 
     _, summary = slop_gate.run("HEAD", ctx.snapshot, only=modules)
+
+    # The gate already paid for this measurement, so hand it to the backlog rather
+    # than discarding it. A run ARTIFACT, not a ledger write: this check runs against
+    # a candidate snapshot and concurrently with other reviews, and a review that
+    # mutates a tracked file dirties the tree it is reviewing. `make slop-backlog`
+    # folds these in, which is what keeps the backlog current between full sweeps.
+    _record_for_backlog(summary, ctx)
+
+    # Severity follows the tier, which is what makes this check enforceable: a
+    # finding in shipped code blocks, one in a one-off research script reports. The
+    # tier comes from slop_ledger.aggregate rather than a second copy of the prefix
+    # list, so the gate and the backlog can never disagree about what ships.
+    tiers = {
+        (item["module"], item["qualname"]): item["tier"]
+        for item in slop_ledger.aggregate(
+            slop_ledger.findings_from_summary({"blocking": summary["blocking"]}))
+    }
     findings = [
         Finding(
             check_id="equivalence-probe",
             rule_id=item["rule"],
-            severity=Severity.LOW,
+            severity=(
+                Severity.HIGH
+                if tiers.get((item["module"], item["qualname"])) == "shipped"
+                else Severity.LOW
+            ),
             path=item["module"],
             line=item["lineno"],
             message=(
@@ -1138,6 +1159,26 @@ def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
             "without_drivers": len(summary["modules_without_drivers"]),
         },
     )
+
+
+def _record_for_backlog(summary: dict, ctx: ReviewContext) -> None:
+    """Drop this run's summary where `make slop-backlog` will find it.
+
+    Best effort by design: a full disk or a read-only checkout must not fail a code
+    review over bookkeeping. Nothing downstream reads a partial write, because the
+    file is renamed into place only once it is complete.
+    """
+    from conductor.slop_ledger import GATE_FINDINGS
+
+    try:
+        GATE_FINDINGS.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
+        final = GATE_FINDINGS / f"gate-{stamp}.json"
+        tmp = final.with_suffix(".json.part")
+        tmp.write_text(json.dumps(summary, indent=2) + "\n")
+        tmp.rename(final)
+    except OSError:
+        pass
 
 
 BUILTIN_CHECKS["equivalence-probe"] = check_equivalence_probe

@@ -39,6 +39,12 @@ except ImportError as exc:  # pragma: no cover - exercised only on an unbuilt tr
 
 LEDGER = pathlib.Path("conductor/slop_ledger.json")
 REPORT = pathlib.Path("research/reports/slop_backlog.md")
+# Where `make gate`'s equivalence-probe check leaves the summary it already computed.
+# The check must not write the ledger itself: it runs against a candidate snapshot, it
+# runs concurrently with other reviews, and a review that mutates a TRACKED file
+# dirties the tree it is reviewing. So it drops a run artifact here -- gitignored,
+# auto-pruned with the rest of research/reports -- and the ledger folds them in.
+GATE_FINDINGS = pathlib.Path("research/reports/gate_findings")
 
 # Paths whose code ships, and whose findings are therefore worth acting on.
 #
@@ -62,7 +68,29 @@ VERDICT_MEANING = {
     "NOT_REACHED_BY_DRIVERS": "named by a test the driver selection did not pick",
     "NO_DIFFERENCE_OBSERVED": "removing it changed nothing this probe could observe",
     "WITHIN_NUMERIC_NOISE": "removing it moved only the last bits",
+    "NONDETERMINISTIC": "the function disagrees with itself, so nothing is attributable",
 }
+
+
+def merge_summaries(summaries: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """One summary out of many, so a sweep and every gate run fold in together.
+
+    The gate probes the two or three modules a change touched; a sweep probes
+    hundreds. Both produce the same shape, and the ledger wants their union -- that is
+    what keeps the backlog current between sweeps instead of only at one.
+    """
+    merged: dict[str, Any] = {
+        "blocking": [], "advisory": [], "untested": [],
+        "modules_without_drivers": [], "modules_probed": 0,
+    }
+    without: set[str] = set()
+    for summary in summaries:
+        for bucket in ("blocking", "advisory", "untested"):
+            merged[bucket].extend(summary.get(bucket, []))
+        without.update(summary.get("modules_without_drivers", []))
+        merged["modules_probed"] += summary.get("modules_probed", 0)
+    merged["modules_without_drivers"] = sorted(without)
+    return merged
 
 
 def findings_from_summary(summary: dict[str, Any]) -> list[dict[str, Any]]:
@@ -207,7 +235,9 @@ def render(
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="conductor.slop_ledger")
     parser.add_argument(
-        "findings", type=pathlib.Path, help="a slop_gate --json summary"
+        "findings", type=pathlib.Path, nargs="+",
+        help="one or more slop_gate --json summaries; a sweep and any gate run "
+             "artifacts from research/reports/gate_findings are folded together",
     )
     parser.add_argument("--ledger", type=pathlib.Path, default=LEDGER)
     parser.add_argument("--report", type=pathlib.Path, default=REPORT)
@@ -216,7 +246,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    summary = json.loads(args.findings.read_text())
+    summary = merge_summaries([json.loads(f.read_text()) for f in args.findings])
     findings = findings_from_summary(summary)
     items = aggregate(findings)
     scope = sorted(

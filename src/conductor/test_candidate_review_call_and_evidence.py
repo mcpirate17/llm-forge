@@ -161,6 +161,23 @@ def test_broken_registry_does_not_claim_evidence(
     assert not verification._has_mutation_evidence(_Ctx(tmp_path), {"test_thing.py"})
 
 
+@pytest.fixture(autouse=True)
+def _backlog_drop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Keep the gate's backlog artifact out of the real repository.
+
+    `check_equivalence_probe` writes a run artifact wherever GATE_FINDINGS points, so
+    without this every test that calls it drops a file into
+    research/reports/gate_findings with the FIXTURE module names in it -- and
+    `make slop-backlog` then folds `lane.py` and `other.py` into the tracked ledger.
+    That happened; the ledger picked up four fixture paths.
+    """
+    from conductor import slop_ledger
+
+    drop = tmp_path / "autouse_gate_findings"
+    monkeypatch.setattr(slop_ledger, "GATE_FINDINGS", drop)
+    return drop
+
+
 @dataclass(frozen=True)
 class _StubChange:
     path: str
@@ -222,3 +239,81 @@ def test_equivalence_probe_never_probes_a_test_file(
         _StubContext(tmp_path, (_StubChange("lane.py"), _StubChange("test_lane.py")))
     )
     assert seen == [["lane.py"]]
+
+
+def test_severity_follows_the_tier_so_only_shipped_code_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The decision that makes this check enforceable rather than advisory.
+
+    The first real sweep put 86% of its findings in one-off research scripts. Blocking
+    on those would make the gate unusable; blocking on none of them makes it
+    decorative. So severity follows the tier, and the tier comes from the same prefix
+    list the backlog uses -- the gate and the report cannot disagree about what ships.
+    """
+    from conductor import slop_gate
+    from conductor.candidate_review.checks import check_equivalence_probe
+    from conductor.candidate_review.model import Severity
+
+    shipped = _blocking("conductor/lane.py")
+    script = _blocking("research/tools/one_off.py")
+    summary = {"modules_probed": 2, "modules_without_drivers": [],
+               "blocking": [shipped, script], "advisory": []}
+    monkeypatch.setattr(slop_gate, "run", lambda base, root, only=(): (1, summary))
+    result = check_equivalence_probe(
+        _StubContext(tmp_path, (_StubChange("conductor/lane.py"),
+                                _StubChange("research/tools/one_off.py"))))
+    by_path = {f.path: f.severity for f in result.findings}
+    assert by_path["conductor/lane.py"] == Severity.HIGH
+    assert by_path["research/tools/one_off.py"] == Severity.LOW
+
+
+def test_the_gate_hands_its_findings_to_the_backlog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _backlog_drop: Path
+) -> None:
+    """The gate already paid for the measurement; discarding it was the whole gap.
+
+    It writes a run ARTIFACT rather than the ledger: this check runs against a
+    candidate snapshot and concurrently with other reviews, so a tracked-file write
+    would dirty the tree under review.
+    """
+    import json as _json
+
+    from conductor import slop_gate
+    from conductor.candidate_review.checks import check_equivalence_probe
+
+    drop = _backlog_drop
+    summary = {"modules_probed": 1, "modules_without_drivers": [],
+               "blocking": [_blocking("conductor/lane.py")], "advisory": []}
+    monkeypatch.setattr(slop_gate, "run", lambda base, root, only=(): (1, summary))
+
+    check_equivalence_probe(
+        _StubContext(tmp_path, (_StubChange("conductor/lane.py"),)))
+
+    written = list(drop.glob("*.json"))
+    assert len(written) == 1, f"expected one run artifact, got {written}"
+    assert _json.loads(written[0].read_text())["blocking"] == summary["blocking"]
+    assert not list(drop.glob("*.part")), "a partial write must not be left behind"
+
+
+def test_a_backlog_write_failure_does_not_fail_the_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bookkeeping must never be able to fail a code review.
+
+    A read-only checkout or a full disk is not a reason to reject a change, and the
+    finding the reviewer needs has already been computed by this point.
+    """
+    from conductor import slop_gate, slop_ledger
+    from conductor.candidate_review.checks import check_equivalence_probe
+
+    blocked = tmp_path / "unwritable"
+    blocked.write_text("not a directory")
+    monkeypatch.setattr(slop_ledger, "GATE_FINDINGS", blocked / "nested")
+    summary = {"modules_probed": 1, "modules_without_drivers": [],
+               "blocking": [_blocking("conductor/lane.py")], "advisory": []}
+    monkeypatch.setattr(slop_gate, "run", lambda base, root, only=(): (1, summary))
+
+    result = check_equivalence_probe(
+        _StubContext(tmp_path, (_StubChange("conductor/lane.py"),)))
+    assert [f.path for f in result.findings] == ["conductor/lane.py"]

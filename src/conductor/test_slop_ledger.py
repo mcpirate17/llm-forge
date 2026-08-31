@@ -244,3 +244,45 @@ def test_the_ledger_scope_covers_every_module_it_speaks_for(tmp_path):
     written = json.loads(ledger.read_text())
     assert written["scope"] == ["conductor/a.py", "conductor/b.py"]
     assert written["last_sweep_scope"] == ["conductor/a.py"]
+
+
+def test_a_sweep_and_a_gate_run_fold_into_one_backlog() -> None:
+    """What keeps the ledger current between full sweeps.
+
+    A full sweep covers hundreds of modules and is run by hand; the gate covers the
+    two or three a change touched and runs constantly. The backlog wants the union,
+    or it is only ever as fresh as the last sweep somebody remembered to run.
+    """
+    merged = sl.merge_summaries([
+        {"blocking": [{"module": "a.py"}], "untested": [{"module": "c.py"}],
+         "modules_without_drivers": ["x.py"], "modules_probed": 2},
+        {"advisory": [{"module": "b.py"}],
+         "modules_without_drivers": ["x.py", "y.py"], "modules_probed": 3},
+    ])
+    assert merged["blocking"] == [{"module": "a.py"}]
+    assert merged["advisory"] == [{"module": "b.py"}]
+    assert merged["untested"] == [{"module": "c.py"}]
+    assert merged["modules_probed"] == 5
+    # Deduplicated: the same module skipped by both runs is one hole, not two.
+    assert merged["modules_without_drivers"] == ["x.py", "y.py"]
+
+
+def test_the_cli_folds_every_summary_it_is_given(tmp_path) -> None:
+    """A one-file CLI silently drops the gate's contribution on the floor."""
+    import json as _json
+
+    sweep = tmp_path / "sweep.json"
+    gate = tmp_path / "gate.json"
+    sweep.write_text(_json.dumps({
+        "modules_probed": 1, "modules_without_drivers": [], "advisory": [],
+        "blocking": [_f("conductor/swept.py", "swept", "REACHABLE_BUT_UNTESTED")], "untested": []}))
+    gate.write_text(_json.dumps({
+        "modules_probed": 1, "modules_without_drivers": [], "advisory": [],
+        "blocking": [_f("conductor/from_gate.py", "gated", "REACHABLE_BUT_UNTESTED")], "untested": []}))
+    ledger = tmp_path / "ledger.json"
+    report = tmp_path / "report.md"
+
+    assert sl.main([str(sweep), str(gate), "--ledger", str(ledger),
+                    "--report", str(report)]) == 0
+    modules = {i["module"] for i in _json.loads(ledger.read_text())["items"]}
+    assert modules == {"conductor/swept.py", "conductor/from_gate.py"}

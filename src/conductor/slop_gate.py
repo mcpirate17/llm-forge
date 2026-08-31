@@ -11,6 +11,11 @@ over every changed module paired with the tests that import it, and reports:
                             withdrawn as "equivalent" months later.
     NO_DIFFERENCE_OBSERVED  advisory. Nothing this probe could do changed the result.
     WITHIN_NUMERIC_NOISE    advisory. Only the last bits moved.
+    NONDETERMINISTIC        advisory. The function disagrees with ITSELF on a repeat
+                            call, so no difference under it is attributable to the
+                            ablation. Worth fixing in the code under test -- an
+                            unstable return value defeats every differential tool --
+                            but it is not evidence about this construct.
 
 Advisory verdicts are deliberately not blocking: sampling cannot prove equivalence,
 so a clean sweep is a lead for a human, never a licence to delete.
@@ -36,7 +41,7 @@ else:
     TestIndex = "TestIndex"
 
 BLOCKING = ("REACHABLE_BUT_UNTESTED",)
-ADVISORY = ("NO_DIFFERENCE_OBSERVED", "WITHIN_NUMERIC_NOISE")
+ADVISORY = ("NO_DIFFERENCE_OBSERVED", "WITHIN_NUMERIC_NOISE", "NONDETERMINISTIC")
 UNTESTED = "NOT_EXERCISED"
 UNREACHED = "NOT_REACHED_BY_DRIVERS"
 WAIVERS = pathlib.Path("conductor/slop_waivers.json")
