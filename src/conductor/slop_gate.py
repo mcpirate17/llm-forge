@@ -19,10 +19,14 @@ so a clean sweep is a lead for a human, never a licence to delete.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
+import os
 import pathlib
+import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterable, Sequence
 
@@ -37,6 +41,24 @@ UNTESTED = "NOT_EXERCISED"
 UNREACHED = "NOT_REACHED_BY_DRIVERS"
 WAIVERS = pathlib.Path("conductor/slop_waivers.json")
 PER_MODULE_TIMEOUT = 180
+# Beyond this the sweep is bounded by memory and disk, not cores; an explicit --jobs
+# can still go higher when the caller knows the machine.
+MAX_AUTO_JOBS = 8
+
+
+def _worker_count(jobs: int | None, pending: int) -> int:
+    """How many probes to run at once.
+
+    Each probe is a child interpreter that imports torch and runs a test module, so
+    the ceiling is memory and core contention rather than the GIL. A quarter of the
+    cores is deliberately conservative: the children are themselves threaded, and
+    oversubscribing turns a parallel sweep into a slower serial one. `--jobs` overrides.
+    """
+    if jobs is not None:
+        if jobs < 1:
+            raise ValueError(f"--jobs must be at least 1, got {jobs}")
+        return min(jobs, pending)
+    return max(1, min((os.cpu_count() or 4) // 4, pending, MAX_AUTO_JOBS))
 
 
 def build_index(root: pathlib.Path) -> TestIndex:
@@ -126,7 +148,16 @@ def refine_unexercised(findings: list[dict], root: pathlib.Path,
 
 def probe(module: str, tests: Sequence[str], root: pathlib.Path,
           index: TestIndex | None = None) -> list[dict]:
-    report = root / ".slop_gate_report.json"
+    # A private directory per probe, not a fixed report path. Two probes running at
+    # once against a shared name is one reading the other's findings and attributing
+    # them to the wrong module -- silently, because both files parse.
+    #
+    # A directory rather than mkstemp because `report.is_file()` below is what
+    # distinguishes "the probe wrote findings" from "the probe wrote nothing", and
+    # mkstemp would leave a 0-byte file that passes that check and then fails to
+    # parse.
+    workdir = pathlib.Path(tempfile.mkdtemp(prefix=".slop_gate-", dir=root))
+    report = workdir / "report.json"
     try:
         subprocess.run(
             [sys.executable, "-m", "conductor.equivalence_probe", module, *tests,
@@ -134,17 +165,20 @@ def probe(module: str, tests: Sequence[str], root: pathlib.Path,
             cwd=root, capture_output=True, text=True, timeout=PER_MODULE_TIMEOUT,
         )
     except subprocess.TimeoutExpired:
+        shutil.rmtree(workdir, ignore_errors=True)
         return [{"qualname": "<module>", "rule": "timeout", "lineno": 0,
                  "verdict": "TIMEOUT", "description": "probe exceeded its budget"}]
     if not report.is_file():
+        shutil.rmtree(workdir, ignore_errors=True)
         return []
     try:
         return refine_unexercised(json.loads(report.read_text()), root, index)
     finally:
-        report.unlink(missing_ok=True)
+        shutil.rmtree(workdir, ignore_errors=True)
 
 
-def run(base: str, root: pathlib.Path, only: Iterable[str] = ()) -> tuple[int, dict]:
+def run(base: str, root: pathlib.Path, only: Iterable[str] = (),
+        jobs: int | None = None) -> tuple[int, dict]:
     waivers = load_waivers(root / WAIVERS)
     modules = list(only) or changed_modules(base, root)
     # One pass over the test tree answers both the driver question for every module
@@ -154,12 +188,30 @@ def run(base: str, root: pathlib.Path, only: Iterable[str] = ()) -> tuple[int, d
     advisory: list[dict] = []
     skipped: list[str] = []
     untested: list[dict] = []
+
+    driven: list[tuple[str, list[str]]] = []
     for module in modules:
         tests = drivers_for(module, root, index)
-        if not tests:
+        if tests:
+            driven.append((module, tests))
+        else:
             skipped.append(module)
-            continue
-        for finding in probe(module, tests, root, index):
+
+    # Threads, not processes: probe() is a subprocess.run, so the worker holds no GIL
+    # while the real work happens in a child interpreter. Findings are collected and
+    # then walked in module order, so a parallel run reports identically to a serial
+    # one -- the report is evidence, and evidence that reorders itself between runs
+    # is hard to diff and easy to distrust.
+    findings_by_module: dict[str, list[dict]] = {}
+    if driven:
+        workers = _worker_count(jobs, len(driven))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(probe, m, t, root, index): m for m, t in driven}
+            for future in concurrent.futures.as_completed(futures):
+                findings_by_module[futures[future]] = future.result()
+
+    for module, _ in driven:
+        for finding in findings_by_module.get(module, []):
             finding["module"] = module
             if finding["verdict"] in BLOCKING:
                 if any(w.covers(module, finding["rule"], finding["qualname"])
@@ -210,6 +262,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--module", action="append", default=[],
                         help="probe these modules instead of the changed set")
     parser.add_argument("--json", type=pathlib.Path)
+    parser.add_argument("--jobs", type=int, default=None,
+                        help="probe this many modules at once (default: a quarter of "
+                             "the cores, capped at 8). Each probe is a child "
+                             "interpreter, so oversubscribing slows the sweep down.")
     parser.add_argument("--enforce", action="store_true",
                         help="fail on REACHABLE_BUT_UNTESTED. Off by default while the "
                              "probe is alpha: its ablation set is still growing, so a "
@@ -217,7 +273,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                              "written yesterday rather than a defect in the code.")
     args = parser.parse_args(argv)
 
-    code, summary = run(args.base, args.root, args.module)
+    code, summary = run(args.base, args.root, args.module, args.jobs)
     if args.json:
         args.json.write_text(json.dumps(summary, indent=2) + "\n")
     _render(summary)
