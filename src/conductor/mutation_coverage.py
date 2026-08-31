@@ -9,19 +9,27 @@ from __future__ import annotations
 
 import argparse
 import ast
-import hashlib
 import json
-import subprocess
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, Sequence
+from typing import Any
+
+from research_runtime_native import (
+    is_mutation_test_path_native,
+    mutation_git_paths_native,
+    mutation_registry_patterns_native,
+    mutation_test_inventory_native,
+    normalize_mutation_path_native,
+    plan_mutation_scaffold_native,
+    should_skip_mutation_path_native,
+)
 
 from conductor.mutation_testing import (
     CANONICAL_TEST_PATTERNS,
-    CampaignError,
     REPO_ROOT,
+    CampaignError,
     verify_evidence,
 )
-
 
 SKIP_DIRECTORY_NAMES = frozenset(
     {
@@ -48,78 +56,59 @@ COVERAGE_SCHEMA = "llm.mutation-testing.coverage.v1"
 DEFAULT_REGISTRY = Path("conductor/mutation_campaigns/registry.json")
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    digest.update(path.read_bytes())
-    return digest.hexdigest()
+def _native_or_campaign[T](operation: Callable[..., T], *args: object) -> T:
+    try:
+        return operation(*args)
+    except ValueError as exc:
+        raise CampaignError(str(exc)) from exc
 
 
 def _safe_relative_path(value: str, label: str) -> str:
-    text = value.replace("\\", "/")
-    path = PurePosixPath(text)
-    if path.is_absolute() or ".." in path.parts or text.startswith("./"):
-        raise CampaignError(f"{label} must be a normalized repository-relative path")
-    if not text.strip():
-        raise CampaignError(f"{label} must be a non-empty string")
-    return path.as_posix()
+    return _native_or_campaign(normalize_mutation_path_native, value, label)
 
 
 def _registry_patterns(registry_path: Path, repo_root: Path) -> tuple[str, ...]:
-    resolved = registry_path.resolve()
-    try:
-        resolved.relative_to(repo_root.resolve())
-    except ValueError as exc:
-        raise CampaignError("mutation registry must be inside the repository") from exc
-    try:
-        payload = json.loads(resolved.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise CampaignError(f"cannot load mutation registry {resolved}: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise CampaignError("registry must be a JSON object")
-    patterns = payload.get("test_patterns")
-    if (
-        not isinstance(patterns, list)
-        or not patterns
-        or not all(isinstance(item, str) and item for item in patterns)
-    ):
-        raise CampaignError(
-            "registry.test_patterns must be a list of non-empty strings"
+    return tuple(
+        _native_or_campaign(
+            mutation_registry_patterns_native,
+            str(repo_root),
+            str(registry_path),
+            list(CANONICAL_TEST_PATTERNS),
         )
-    if tuple(patterns) != CANONICAL_TEST_PATTERNS:
-        raise CampaignError("registry.test_patterns must match the canonical inventory")
-    return tuple(patterns)
+    )
 
 
 def is_test_path(path: str, patterns: Sequence[str]) -> bool:
     """Return whether a repository-relative path matches mutation test patterns."""
 
-    candidate = PurePosixPath(path.replace("\\", "/"))
-    return any(candidate.match(pattern) for pattern in patterns)
+    # The native hot path implements the canonical repository glob surface.
+    # Preserve ``PurePosixPath.match`` semantics for the less common character-
+    # class syntax instead of silently narrowing this public helper's contract.
+    if any("[" in pattern for pattern in patterns):
+        candidate = PurePosixPath(path.replace("\\", "/"))
+        return any(candidate.match(pattern.replace("\\", "/")) for pattern in patterns)
+    return _native_or_campaign(
+        is_mutation_test_path_native,
+        path,
+        list(patterns),
+    )
 
 
 def _git_paths(repo_root: Path, args: Sequence[str]) -> tuple[str, ...]:
-    completed = subprocess.run(
-        ["git", *args],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if completed.returncode:
-        detail = completed.stderr.strip() or completed.stdout.strip()
-        raise CampaignError(f"git {' '.join(args)} failed: {detail}")
     return tuple(
-        line.replace("\\", "/")
-        for line in completed.stdout.splitlines()
-        if line.strip()
+        _native_or_campaign(
+            mutation_git_paths_native,
+            str(repo_root),
+            list(args),
+        )
     )
 
 
 def _should_skip(relative: PurePosixPath) -> bool:
-    parts = relative.parts
-    if any(part in SKIP_DIRECTORY_NAMES for part in parts):
-        return True
-    return "research" in parts and "cache" in parts
+    return should_skip_mutation_path_native(
+        str(relative),
+        sorted(SKIP_DIRECTORY_NAMES),
+    )
 
 
 def discover_test_paths(
@@ -131,25 +120,17 @@ def discover_test_paths(
     """Return git-visible test files matching the mutation registry patterns."""
 
     registry = registry_path or (repo_root / DEFAULT_REGISTRY)
-    patterns = _registry_patterns(registry, repo_root)
-    tracked = _git_paths(repo_root, ["ls-files"])
-    untracked: tuple[str, ...] = ()
-    if include_untracked:
-        untracked = _git_paths(
-            repo_root, ["ls-files", "--others", "--exclude-standard"]
+    return tuple(
+        _native_or_campaign(
+            mutation_test_inventory_native,
+            str(repo_root),
+            str(registry),
+            list(CANONICAL_TEST_PATTERNS),
+            sorted(SKIP_DIRECTORY_NAMES),
+            "all",
+            include_untracked,
         )
-    discovered: list[str] = []
-    seen: set[str] = set()
-    for raw in (*tracked, *untracked):
-        posix = PurePosixPath(raw.replace("\\", "/"))
-        path = posix.as_posix()
-        if path in seen or _should_skip(posix):
-            continue
-        if not is_test_path(path, patterns):
-            continue
-        seen.add(path)
-        discovered.append(path)
-    return tuple(sorted(discovered))
+    )
 
 
 def git_changed_test_paths(
@@ -160,19 +141,17 @@ def git_changed_test_paths(
     """Return mutation-eligible tests that differ from HEAD, including untracked."""
 
     registry = registry_path or (repo_root / DEFAULT_REGISTRY)
-    patterns = _registry_patterns(registry, repo_root)
-    names = {
-        *_git_paths(repo_root, ["diff", "--name-only", "HEAD"]),
-        *_git_paths(repo_root, ["ls-files", "--others", "--exclude-standard"]),
-    }
-    selected: list[str] = []
-    for raw in names:
-        path = raw.replace("\\", "/")
-        posix = PurePosixPath(path)
-        if _should_skip(posix) or not is_test_path(path, patterns):
-            continue
-        selected.append(path)
-    return tuple(sorted(selected))
+    return tuple(
+        _native_or_campaign(
+            mutation_test_inventory_native,
+            str(repo_root),
+            str(registry),
+            list(CANONICAL_TEST_PATTERNS),
+            sorted(SKIP_DIRECTORY_NAMES),
+            "changed",
+            True,
+        )
+    )
 
 
 def coverage_report(
@@ -240,44 +219,6 @@ def _python_test_nodeids(path: Path, relative: str) -> tuple[str, ...]:
     return tuple(nodeids)
 
 
-def _scaffold_source_hashes(
-    relative: str,
-    target: Path,
-    sources: Sequence[str],
-    repo_root: Path,
-) -> dict[str, str]:
-    source_sha256 = {relative: _sha256(target)}
-    for raw_source in sources:
-        source_rel = _safe_relative_path(
-            raw_source.replace("\\", "/"), "scaffold source path"
-        )
-        source_file = repo_root / source_rel
-        if not source_file.is_file():
-            raise CampaignError(f"scaffold source path does not exist: {source_rel}")
-        source_sha256[source_rel] = _sha256(source_file)
-    return source_sha256
-
-
-def _scaffold_ranked_tests(
-    target: Path, relative: str
-) -> tuple[tuple[str, ...], list[dict[str, Any]]]:
-    nodeids = (
-        _python_test_nodeids(target, relative)
-        if relative.endswith(".py")
-        else (relative,)
-    )
-    ranked_tests = [
-        {
-            "rank": index,
-            "nodeid": nodeid,
-            "contract": "replace with the behavioral contract this test enforces",
-            "rationale": "rank by the damage a silent defect would do",
-        }
-        for index, nodeid in enumerate(nodeids, start=1)
-    ]
-    return nodeids, ranked_tests
-
-
 def scaffold_campaign(
     test_path: str,
     *,
@@ -295,46 +236,21 @@ def scaffold_campaign(
     target = repo_root / relative
     if not target.is_file():
         raise CampaignError(f"scaffold test path does not exist: {relative}")
-    source_sha256 = _scaffold_source_hashes(relative, target, sources, repo_root)
-    nodeids, ranked_tests = _scaffold_ranked_tests(target, relative)
-    campaign_id = PurePosixPath(relative).stem
-    planned_target = next(
-        (path for path in source_sha256 if path != relative), relative
+    nodeids = (
+        _python_test_nodeids(target, relative)
+        if relative.endswith(".py")
+        else (relative,)
     )
-    payload: dict[str, Any] = {
-        "schema_version": 1,
-        "campaign_id": f"{campaign_id}_scaffold",
-        "title": f"Scaffolded campaign for {relative}",
-        "language": "python" if relative.endswith(".py") else "unknown",
-        "mutation_engine": "reviewed_unified_diff",
-        "expected_ranked_tests": len(ranked_tests),
-        "expected_mutations": 1,
-        "source_sha256": source_sha256,
-        "ranked_tests": ranked_tests,
-        "planned_mutations": [
-            {
-                "id": "first_order_placeholder",
-                "target_path": planned_target,
-                "contract": "replace with the first-order defect this test must kill",
-                "description": (
-                    "Materialize one reviewed unified diff. Do not generate mutants "
-                    "automatically and do not edit the shared checkout."
-                ),
-                "expected_killers": [ranked_tests[0]["nodeid"]],
-            }
-        ],
-        "mutations": [],
-        "baseline": {
-            "argv": ["python", "-m", "pytest", "-q", "-o", "addopts=", *nodeids],
-            "timeout_seconds": 120,
-        },
-        "resource_gate": {
-            "blocked_process_substrings": [],
-            "poll_seconds": 30,
-        },
-        "environment": {},
-        "host_read_dependencies": [],
-    }
+    payload = json.loads(
+        _native_or_campaign(
+            plan_mutation_scaffold_native,
+            str(repo_root),
+            relative,
+            list(sources),
+            list(nodeids),
+        )
+    )
+    campaign_id = payload["campaign_id"].removesuffix("_scaffold")
     destination = output_path or (
         repo_root / "conductor/mutation_campaigns" / f"{campaign_id}_scaffold.json"
     )
@@ -349,7 +265,7 @@ def scaffold_campaign(
         "status": "NOT_READY",
         "manifest": manifest_rel,
         "campaign_id": payload["campaign_id"],
-        "ranked_tests": len(ranked_tests),
+        "ranked_tests": len(payload["ranked_tests"]),
         "suggested_governance_claim": (
             'make governance-claim OWNER="<your-hook-owner>" CLAIM_PATHS="'
             f'{manifest_rel} {patches_dir}/<mutant>.patch {receipt_rel}" '

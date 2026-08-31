@@ -40,13 +40,37 @@ def _registry(repo: Path) -> Path:
     return registry
 
 
-def test_is_test_path_matches_python_and_javascript_specs() -> None:
+def test_is_test_path_matches_python_and_javascript_specs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native_calls: list[tuple[str, tuple[str, ...]]] = []
+    native_match = mutation_coverage.is_mutation_test_path_native
+
+    def tracked_native_match(path: str, patterns: list[str]) -> bool:
+        native_calls.append((path, tuple(patterns)))
+        return native_match(path, patterns)
+
+    monkeypatch.setattr(
+        mutation_coverage,
+        "is_mutation_test_path_native",
+        tracked_native_match,
+    )
     patterns = ("**/test_*.py", "**/*.spec.js")
     assert mutation_coverage.is_test_path("research/tests/test_foo.py", patterns)
     assert mutation_coverage.is_test_path(
         "aria_designer/e2e/designer.spec.js", patterns
     )
     assert not mutation_coverage.is_test_path("research/tools/foo.py", patterns)
+    assert len(native_calls) == 3
+
+    extended_patterns = ("**/test_[fb]oo.py",)
+    assert mutation_coverage.is_test_path(
+        "research/tests/test_foo.py", extended_patterns
+    )
+    assert not mutation_coverage.is_test_path(
+        "research/tests/test_zoo.py", extended_patterns
+    )
+    assert len(native_calls) == 3
 
 
 def test_discover_and_changed_paths_include_untracked_tests(tmp_path: Path) -> None:
@@ -149,11 +173,11 @@ def test_scaffold_rejects_missing_test(tmp_path: Path) -> None:
 
 def test_safe_relative_path_and_registry_errors(tmp_path: Path) -> None:
     with pytest.raises(CampaignError, match="normalized"):
-        mutation_coverage._safe_relative_path("../escape.py", "path")  # noqa: SLF001
+        mutation_coverage._safe_relative_path("../escape.py", "path")
     with pytest.raises(CampaignError, match="normalized"):
-        mutation_coverage._safe_relative_path("/abs.py", "path")  # noqa: SLF001
+        mutation_coverage._safe_relative_path("/abs.py", "path")
     with pytest.raises(CampaignError, match="non-empty"):
-        mutation_coverage._safe_relative_path("   ", "path")  # noqa: SLF001
+        mutation_coverage._safe_relative_path("   ", "path")
     outside = tmp_path / "outside.json"
     outside.write_text("{}", encoding="utf-8")
     with pytest.raises(CampaignError, match="inside the repository"):
@@ -179,11 +203,9 @@ def test_git_failure_and_cache_skip(tmp_path: Path) -> None:
     not_git = tmp_path / "not-git"
     not_git.mkdir()
     with pytest.raises(CampaignError, match="git"):
-        mutation_coverage._git_paths(not_git, ["status"])  # noqa: SLF001
-    assert mutation_coverage._should_skip(  # noqa: SLF001
-        Path("research/cache/foo/test_x.py")
-    )
-    assert mutation_coverage._should_skip(Path(".venv/lib/test_x.py"))  # noqa: SLF001
+        mutation_coverage._git_paths(not_git, ["status"])
+    assert mutation_coverage._should_skip(Path("research/cache/foo/test_x.py"))
+    assert mutation_coverage._should_skip(Path(".venv/lib/test_x.py"))
 
 
 def test_verify_changed_and_scaffold_parse_errors(
@@ -361,25 +383,25 @@ def test_wait_for_idle_and_host_dependencies(
         "blocking_processes",
         lambda *_a, **_k: [{"pid": 1, "command": "busy", "matched": ["busy"]}],
     )
-    blockers = mutation_testing._wait_for_idle(obj, 0)  # noqa: SLF001
+    blockers = mutation_testing._wait_for_idle(obj, 0)
     assert blockers
     with pytest.raises(mutation_testing.CampaignError, match="missing"):
-        mutation_testing._link_host_dependencies(obj, tmp_path, tmp_path)  # noqa: SLF001
+        mutation_testing._link_host_dependencies(obj, tmp_path, tmp_path)
     host = tmp_path / "host"
     host.mkdir()
     (host / "dep.txt").write_text("x\n", encoding="utf-8")
     snap = tmp_path / "snap"
     snap.mkdir()
-    mutation_testing._link_host_dependencies(obj, snap, host)  # noqa: SLF001
+    mutation_testing._link_host_dependencies(obj, snap, host)
     assert (snap / "dep.txt").read_text(encoding="utf-8") == "x\n"
     assert (snap / "dep.txt").is_file()
     assert not (snap / "dep.txt").is_symlink()
     with pytest.raises(mutation_testing.CampaignError, match="already contains"):
-        mutation_testing._link_host_dependencies(obj, snap, host)  # noqa: SLF001
+        mutation_testing._link_host_dependencies(obj, snap, host)
     with pytest.raises(mutation_testing.CampaignError, match="at least one"):
-        mutation_testing._select_mutations(obj, [])  # noqa: SLF001
+        mutation_testing._select_mutations(obj, [])
     with pytest.raises(mutation_testing.CampaignError, match="duplicate"):
-        mutation_testing._select_mutations(obj, ["m1", "m1"])  # noqa: SLF001
+        mutation_testing._select_mutations(obj, ["m1", "m1"])
     inspected = mutation_testing.inspect_campaign(obj, repo_root=tmp_path)
     assert inspected["status"] == "NOT_READY"
     raw = json.loads(
@@ -443,7 +465,7 @@ def test_inspect_cli_returns_not_ready(tmp_path: Path) -> None:
 def test_run_command_timeout_and_ps_scan() -> None:
     from conductor import mutation_testing
 
-    result = mutation_testing._run_command(  # noqa: SLF001
+    result = mutation_testing._run_command(
         ["sleep", "1"],
         cwd=mutation_testing.REPO_ROOT,
         timeout_seconds=0.01,
@@ -454,6 +476,6 @@ def test_run_command_timeout_and_ps_scan() -> None:
     blockers = mutation_testing.blocking_processes(["this-string-will-not-match-xyz"])
     assert blockers == []
     with pytest.raises(mutation_testing.CampaignError, match="non-empty string"):
-        mutation_testing._require_string("", "label")  # noqa: SLF001
+        mutation_testing._require_string("", "label")
     with pytest.raises(mutation_testing.CampaignError, match="list of non-empty"):
-        mutation_testing._require_string_list(["", "x"], "label")  # noqa: SLF001
+        mutation_testing._require_string_list(["", "x"], "label")
