@@ -140,7 +140,8 @@ def render_text(
     if name and summary:
         clipped = summary[:MAX_A2A_CHARS]
         body += (
-            f"\nA2A unread ({name}); ack: "
+            f"\nA2A compact ({name}); retrieve only when needed: "
+            f"`python -m conductor.agent_a2a show --as-name {name} <id>`; ack: "
             f"`python -m conductor.agent_a2a read --as-name {name} <id>`\n"
             f"{clipped}"
         )

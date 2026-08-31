@@ -87,7 +87,9 @@ class PhaseResult:
     evidence: dict[str, object] = field(default_factory=dict)
 
 
-def _run(command: list[str], *, cwd: Path | None = None, timeout: int = 60) -> subprocess.CompletedProcess[str]:
+def _run(
+    command: list[str], *, cwd: Path | None = None, timeout: int = 60
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
         cwd=str(cwd) if cwd else None,
@@ -136,9 +138,11 @@ def probe_tool(tool: ToolPolicy, search_path: str) -> ToolStatus:
         except (OSError, subprocess.TimeoutExpired):
             completed = None
         if completed is not None and completed.returncode == 0:
-            version = (completed.stdout + completed.stderr).strip().splitlines()[0][:120] if (
-                completed.stdout or completed.stderr
-            ) else ""
+            version = (
+                (completed.stdout + completed.stderr).strip().splitlines()[0][:120]
+                if (completed.stdout or completed.stderr)
+                else ""
+            )
     matches = bool(version) and tool.expected_version in version
     return ToolStatus(
         tool_id=tool.tool_id,
@@ -180,13 +184,22 @@ def preflight_tools(
                             "node_modules/.bin is absent -- run `npm ci --ignore-scripts`, "
                             "which is what CI does before the review."
                         ),
-                        evidence={"missing": [item.tool_id for item in missing], "node_modules": False},
+                        evidence={
+                            "missing": [item.tool_id for item in missing],
+                            "node_modules": False,
+                        },
                     ),
                     statuses,
                 )
-    drifted = [status for status in statuses if status.found and status.expected_version and not status.matches_expected]
+    drifted = [
+        status
+        for status in statuses
+        if status.found and status.expected_version and not status.matches_expected
+    ]
     if missing:
-        names = ", ".join(f"{status.executable} (from {status.provided_by})" for status in missing)
+        names = ", ".join(
+            f"{status.executable} (from {status.provided_by})" for status in missing
+        )
         return (
             PhaseResult(
                 name="tool-preflight",
@@ -199,7 +212,8 @@ def preflight_tools(
     detail = f"{len(statuses)} declared tool(s) present"
     if drifted:
         detail += f"; {len(drifted)} at a version other than CI's pin: " + ", ".join(
-            f"{status.executable}={status.version!r} want {status.expected_version!r}" for status in drifted
+            f"{status.executable}={status.version!r} want {status.expected_version!r}"
+            for status in drifted
         )
     return (
         PhaseResult(
@@ -225,21 +239,39 @@ def export_tree(repo: Path, ref: str, destination: Path) -> PhaseResult:
     """
     destination.mkdir(parents=True, exist_ok=True)
     archive = destination.parent / "export.tar"
-    completed = _run(["git", "archive", "--format=tar", "-o", str(archive), ref], cwd=repo, timeout=600)
+    completed = _run(
+        ["git", "archive", "--format=tar", "-o", str(archive), ref],
+        cwd=repo,
+        timeout=600,
+    )
     if completed.returncode != 0:
         raise GateRefusal(f"git archive {ref} failed: {completed.stderr.strip()}")
     with tarfile.open(archive, "r") as handle:
         handle.extractall(destination, filter="data")
     archive.unlink(missing_ok=True)
     if (destination / ".git").exists():
-        raise GateRefusal("export contains a .git directory; it is not a clean-clone surface")
-    tracked = len([line for line in _git(["ls-tree", "-r", "--name-only", ref], repo=repo).splitlines() if line])
+        raise GateRefusal(
+            "export contains a .git directory; it is not a clean-clone surface"
+        )
+    tracked = len(
+        [
+            line
+            for line in _git(
+                ["ls-tree", "-r", "--name-only", ref], repo=repo
+            ).splitlines()
+            if line
+        ]
+    )
     exported = sum(1 for path in destination.rglob("*") if path.is_file())
     return PhaseResult(
         name="export",
         ok=True,
         detail=f"exported {exported} file(s) from {ref} ({tracked} tracked)",
-        evidence={"exported_files": exported, "tracked_files": tracked, "root": str(destination)},
+        evidence={
+            "exported_files": exported,
+            "tracked_files": tracked,
+            "root": str(destination),
+        },
     )
 
 
@@ -259,7 +291,11 @@ def discover_pytest_configs(root: Path) -> list[Path]:
     found.extend(sorted(root.rglob("pytest.ini")))
     unique: list[Path] = []
     for path in found:
-        if path not in unique and ".venv" not in path.parts and "node_modules" not in path.parts:
+        if (
+            path not in unique
+            and ".venv" not in path.parts
+            and "node_modules" not in path.parts
+        ):
             unique.append(path)
     return unique
 
@@ -299,7 +335,17 @@ def preflight_pytest_config(export_root: Path, python: str) -> PhaseResult:
         # (`--dist loadgroup` with no pytest-xdist) dies here, before collection, so
         # an empty target is enough -- and is fast.
         parse = _run(
-            [python, "-m", "pytest", "-c", str(config), "--collect-only", "-q", "--no-header", str(empty)],
+            [
+                python,
+                "-m",
+                "pytest",
+                "-c",
+                str(config),
+                "--collect-only",
+                "-q",
+                "--no-header",
+                str(empty),
+            ],
             cwd=export_root,
             timeout=120,
         )
@@ -317,7 +363,17 @@ def preflight_pytest_config(export_root: Path, python: str) -> PhaseResult:
         if sample is None:
             continue
         collect = _run(
-            [python, "-m", "pytest", "-c", str(config), "--collect-only", "-q", "--no-header", str(sample)],
+            [
+                python,
+                "-m",
+                "pytest",
+                "-c",
+                str(config),
+                "--collect-only",
+                "-q",
+                "--no-header",
+                str(sample),
+            ],
             cwd=export_root,
             timeout=300,
         )
@@ -325,7 +381,8 @@ def preflight_pytest_config(export_root: Path, python: str) -> PhaseResult:
             tail = (collect.stderr or collect.stdout).strip().splitlines()
             problems.append(
                 f"{relative}: conftest/plugin import failed on {sample.relative_to(export_root)} "
-                f"(pytest exited {collect.returncode}): " + (tail[-1] if tail else "no output")
+                f"(pytest exited {collect.returncode}): "
+                + (tail[-1] if tail else "no output")
             )
     empty.rmdir()
     if problems:
@@ -358,7 +415,11 @@ def waiver_activation(policy_waivers: tuple[object, ...], base_oid: str) -> Phas
     the count is always printed.
     """
     total = len(policy_waivers)
-    active = sum(1 for waiver in policy_waivers if getattr(waiver, "integration_base", None) == base_oid)
+    active = sum(
+        1
+        for waiver in policy_waivers
+        if getattr(waiver, "integration_base", None) == base_oid
+    )
     inert = total - active
     detail = f"{active}/{total} mutation waiver(s) active at base {base_oid[:12]}"
     if inert:
@@ -370,7 +431,12 @@ def waiver_activation(policy_waivers: tuple[object, ...], base_oid: str) -> Phas
         name="waiver-activation",
         ok=True,
         detail=detail,
-        evidence={"total": total, "active": active, "inert": inert, "base_commit": base_oid},
+        evidence={
+            "total": total,
+            "active": active,
+            "inert": inert,
+            "base_commit": base_oid,
+        },
     )
 
 
@@ -419,7 +485,8 @@ def run_review(
     if json_out.is_file():
         payload = json.loads(json_out.read_text(encoding="utf-8"))
     decision = str(payload.get("decision", "unknown"))
-    findings = payload.get("findings", [])
+    findings_value = payload.get("findings", [])
+    findings = findings_value if isinstance(findings_value, list) else []
     blocking = [
         finding
         for finding in findings
@@ -432,7 +499,11 @@ def run_review(
             name="review",
             ok=completed.returncode == 0 and decision == "pass",
             detail=f"decision={decision} exit={completed.returncode} unexcepted blocking findings={len(blocking)}",
-            evidence={"decision": decision, "exit_code": completed.returncode, "blocking": len(blocking)},
+            evidence={
+                "decision": decision,
+                "exit_code": completed.returncode,
+                "blocking": len(blocking),
+            },
         ),
         payload,
     )
@@ -458,14 +529,21 @@ def clean_clone_closure(repo: Path, export_root: Path) -> PhaseResult:
     tracked = {line for line in _git(["ls-files"], repo=repo).splitlines() if line}
     records = untracked_import_closure(tracked)
     if records:
-        names = ", ".join(str(getattr(record, "path", record)) for record in records[:5])
+        names = ", ".join(
+            str(getattr(record, "path", record)) for record in records[:5]
+        )
         return PhaseResult(
             name="clean-clone",
             ok=False,
             detail=f"{len(records)} untracked module(s) are import-reachable from tracked code: {names}",
             evidence={"count": len(records)},
         )
-    return PhaseResult(name="clean-clone", ok=True, detail="no untracked import dependencies", evidence={})
+    return PhaseResult(
+        name="clean-clone",
+        ok=True,
+        detail="no untracked import dependencies",
+        evidence={},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -535,14 +613,27 @@ def run_gate(
     return (EXIT_PASS if not failed else EXIT_FAIL), phases, statuses
 
 
-def render(phases: list[PhaseResult], statuses: list[ToolStatus], exit_code: int) -> str:
-    lines = ["gate | " + ("PASS" if exit_code == EXIT_PASS else "REFUSED" if exit_code == EXIT_REFUSED else "FAIL")]
+def render(
+    phases: list[PhaseResult], statuses: list[ToolStatus], exit_code: int
+) -> str:
+    lines = [
+        "gate | "
+        + (
+            "PASS"
+            if exit_code == EXIT_PASS
+            else "REFUSED"
+            if exit_code == EXIT_REFUSED
+            else "FAIL"
+        )
+    ]
     for phase in phases:
         marker = "ok " if phase.ok else "FAIL"
         lines.append(f"  [{marker}] {phase.name}: {phase.detail}")
     missing = [status for status in statuses if not status.found]
     for status in missing:
-        lines.append(f"    missing tool {status.executable} -- install via {status.provided_by}")
+        lines.append(
+            f"    missing tool {status.executable} -- install via {status.provided_by}"
+        )
     return "\n".join(lines)
 
 
@@ -552,14 +643,32 @@ def build_parser() -> argparse.ArgumentParser:
         description="The single governance gate: identical locally and in CI.",
     )
     parser.add_argument("--repo", default=".", help="repository root (default: .)")
-    parser.add_argument("--ref", default="HEAD", help="candidate ref to review (default: HEAD)")
-    parser.add_argument("--base", default=DEFAULT_BASE, help=f"integration base ref (default: {DEFAULT_BASE})")
-    parser.add_argument("--profile", default="full", choices=("fast", "full"), help="review profile")
-    parser.add_argument("--python", default=sys.executable, help="interpreter for subprocesses")
-    parser.add_argument("--policy", default=str(DEFAULT_POLICY), help="policy path, repo-relative")
-    parser.add_argument("--json-out", default="tasks/audit/gate.json", help="review JSON artifact path")
-    parser.add_argument("--skip-review", action="store_true", help="run preflight phases only")
-    parser.add_argument("--json", action="store_true", help="emit the phase report as JSON")
+    parser.add_argument(
+        "--ref", default="HEAD", help="candidate ref to review (default: HEAD)"
+    )
+    parser.add_argument(
+        "--base",
+        default=DEFAULT_BASE,
+        help=f"integration base ref (default: {DEFAULT_BASE})",
+    )
+    parser.add_argument(
+        "--profile", default="full", choices=("fast", "full"), help="review profile"
+    )
+    parser.add_argument(
+        "--python", default=sys.executable, help="interpreter for subprocesses"
+    )
+    parser.add_argument(
+        "--policy", default=str(DEFAULT_POLICY), help="policy path, repo-relative"
+    )
+    parser.add_argument(
+        "--json-out", default="tasks/audit/gate.json", help="review JSON artifact path"
+    )
+    parser.add_argument(
+        "--skip-review", action="store_true", help="run preflight phases only"
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="emit the phase report as JSON"
+    )
     return parser
 
 

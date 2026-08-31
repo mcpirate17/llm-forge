@@ -63,6 +63,14 @@ glob = "*.json"
 chunk = "whole"
 
 [[source]]
+id = "repo-tasks"
+kind = "index"
+root = "tasks"
+glob = "*.md"
+exclude_dir_names = ["audit"]
+chunk = "heading"
+
+[[source]]
 id = "repo-skills"
 kind = "index"
 roots = [".claude/commands", ".claude/skills", ".agents/skills"]

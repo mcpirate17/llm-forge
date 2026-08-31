@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 
 from conductor.candidate_review.ownership import (
@@ -219,14 +222,28 @@ def test_main_cli_error(session_repo: Path, capsys: pytest.CaptureFixture[str]) 
 def test_close_session_memory_index_sync(
     session_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    called = []
+    called: list[Path] = []
+    lock_paths: list[Path] = []
+    lock_held = False
+
+    @contextmanager
+    def fake_lock(path: Path):
+        nonlocal lock_held
+        lock_paths.append(path)
+        lock_held = True
+        try:
+            yield
+        finally:
+            lock_held = False
 
     def fake_build_index(repo: Path) -> None:
+        assert lock_held
         called.append(repo)
 
     import conductor.memory_index
 
     monkeypatch.setattr(conductor.memory_index, "build_index", fake_build_index)
+    monkeypatch.setattr(conductor.memory_index, "index_write_lock", fake_lock)
 
     res = close_session(
         session_repo,
@@ -235,4 +252,46 @@ def test_close_session_memory_index_sync(
         sync_memory_index=True,
     )
     assert res.memory_status == "ok"
-    assert len(called) == 1
+    assert called == [session_repo]
+    assert lock_paths == [session_repo / "research" / "cache" / "memory_index.jsonl"]
+
+
+def test_close_session_unchanged_memory_result_does_not_save(
+    session_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import conductor.memory_index
+
+    index_path = session_repo / "research" / "cache" / "memory_index.jsonl"
+    built: list[Path] = []
+    lock_paths: list[Path] = []
+    saved: list[object] = []
+
+    @contextmanager
+    def fake_lock(path: Path):
+        lock_paths.append(path)
+        yield
+
+    def fake_result(*, index_path: Path) -> SimpleNamespace:
+        built.append(index_path)
+        return SimpleNamespace(changed=False)
+
+    monkeypatch.setattr(conductor.memory_index, "build_index", lambda: None)
+    monkeypatch.setattr(conductor.memory_index, "index_write_lock", fake_lock)
+    monkeypatch.setattr(conductor.memory_index, "build_index_result", fake_result)
+    monkeypatch.setattr(
+        conductor.memory_index,
+        "save_index_result",
+        lambda result, path: saved.append((result, path)),
+    )
+
+    res = close_session(
+        session_repo,
+        owner="mem-agent",
+        all_owner_claims=True,
+        sync_memory_index=True,
+    )
+
+    assert res.memory_status == "ok"
+    assert lock_paths == [index_path]
+    assert built == [index_path]
+    assert saved == []

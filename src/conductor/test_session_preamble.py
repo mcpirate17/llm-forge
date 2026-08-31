@@ -25,7 +25,9 @@ def _isolated_exposure(monkeypatch: pytest.MonkeyPatch) -> None:
     exercise the line's presence and its contribution to the MAX_INJECT_CHARS budget.
     """
     monkeypatch.setattr(
-        preamble, "_exposure_line", lambda: "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s)."
+        preamble,
+        "_exposure_line",
+        lambda: "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s).",
     )
 
 
@@ -81,6 +83,23 @@ def test_inject_stays_under_budget() -> None:
     )
     assert len(text) <= preamble.MAX_INJECT_CHARS
     assert "python -m conductor.kb_retrieve" in text
+
+
+def test_a2a_summary_requires_explicit_show_for_full_message() -> None:
+    text = preamble.render_text(
+        state=_state(),  # type: ignore[arg-type]
+        a2a_name="codex-efficiency",
+        a2a_summary="[open] message-1 from=peer\n  bounded summary",
+    )
+
+    assert "A2A compact (codex-efficiency); retrieve only when needed" in text
+    assert (
+        "`python -m conductor.agent_a2a show --as-name codex-efficiency <id>`" in text
+    )
+    assert (
+        "`python -m conductor.agent_a2a read --as-name codex-efficiency <id>`" in text
+    )
+    assert "bounded summary" in text
 
 
 def test_hook_payload_shape() -> None:

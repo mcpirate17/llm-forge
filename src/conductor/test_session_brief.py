@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import subprocess
+import sqlite3
+import json
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,6 +21,28 @@ INBOX = (
     + "word " * 60
     + "\nsecond line\n\n[UNREAD] bbb from=helm at=t2\nshort\n\n[UNREAD] ccc from=x at=t3\n\n"
 )
+COMPACT_INBOX = {
+    "schema_version": 1,
+    "authority": "bounded-a2a-inbox",
+    "agent": "fable-5",
+    "unread_only": True,
+    "total": 1,
+    "shown": 1,
+    "omitted": 0,
+    "raw_bytes_not_injected": 12,
+    "messages": [
+        {
+            "id": "aaa",
+            "from": "codex",
+            "at": "t1",
+            "thread": "thread-1",
+            "status": "open",
+            "requires_response": True,
+            "summary": "short",
+            "raw_bytes": 12,
+        }
+    ],
+}
 
 
 def test_snippet_strips_frontmatter_and_truncates() -> None:
@@ -80,20 +105,90 @@ def test_inbox_preview_handles_missing_agent_and_failures(
 ) -> None:
     assert sb.inbox_preview(None) == ""
 
-    def fake_run(*_a: Any, **_k: Any) -> SimpleNamespace:
-        return SimpleNamespace(returncode=0, stdout=INBOX)
+    def fake_run(command: list[str], **_kwargs: Any) -> SimpleNamespace:
+        assert command == [
+            sys.executable,
+            "-m",
+            "conductor.agent_a2a",
+            "inbox",
+            "--as-name",
+            "fable-5",
+            "--unread",
+            "--compact",
+            "--max-messages",
+            "8",
+            "--preview-chars",
+            "140",
+            "--max-chars",
+            "1200",
+            "--json",
+        ]
+        return SimpleNamespace(returncode=0, stdout=json.dumps(COMPACT_INBOX))
 
     monkeypatch.setattr(sb.subprocess, "run", fake_run)
     out = sb.inbox_preview("fable-5")
-    assert out.startswith("A2A unread (fable-5):\n[UNREAD] aaa")
+    compact = json.dumps(
+        COMPACT_INBOX, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    )
+    assert out == f"A2A unread (fable-5); full message by explicit show:\n{compact}"
+    empty = {
+        **COMPACT_INBOX,
+        "total": 0,
+        "shown": 0,
+        "messages": [],
+        "raw_bytes_not_injected": 0,
+    }
     monkeypatch.setattr(
-        sb.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="")
+        sb.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout=json.dumps(empty)),
     )
     assert sb.inbox_preview("fable-5") == "A2A: no unread for fable-5"
     monkeypatch.setattr(
         sb.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=3, stdout="")
     )
     assert sb.inbox_preview("fable-5") == "A2A: inbox unavailable (exit 3)"
+
+
+def test_inbox_preview_rejects_untrusted_compact_envelopes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wrong_schema = {**COMPACT_INBOX, "schema_version": 2}
+    wrong_agent = {**COMPACT_INBOX, "agent": "other"}
+    wrong_count = {**COMPACT_INBOX, "omitted": 1}
+    wrong_integer = {**COMPACT_INBOX, "total": True}
+    raw_content = json.loads(json.dumps(COMPACT_INBOX))
+    raw_content["messages"][0]["body"] = "full body must not cross the boundary"
+    oversized = {**COMPACT_INBOX, "extension": "x" * sb.MAX_INBOX_CHARS}
+
+    for payload in (
+        [],
+        wrong_schema,
+        wrong_agent,
+        wrong_count,
+        wrong_integer,
+        raw_content,
+        oversized,
+    ):
+        monkeypatch.setattr(
+            sb.subprocess,
+            "run",
+            lambda *a, _payload=payload, **k: SimpleNamespace(
+                returncode=0, stdout=json.dumps(_payload)
+            ),
+        )
+        assert sb.inbox_preview("fable-5") == (
+            "A2A: inbox unavailable (untrusted compact response)"
+        )
+
+    monkeypatch.setattr(
+        sb.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout="not-json"),
+    )
+    assert sb.inbox_preview("fable-5") == (
+        "A2A: inbox unavailable (invalid compact response)"
+    )
 
 
 def test_inbox_preview_reports_subprocess_failure(
@@ -112,8 +207,94 @@ def test_top_cards_formats_kb_retrieve_hits(monkeypatch: pytest.MonkeyPatch) -> 
         name="kb_a.md", text="---\nid: X\n---\n\n# Title\n\nBody line."
     )
     monkeypatch.setattr(sb.kb_retrieve, "load_index", lambda: ["row"])
-    monkeypatch.setattr(sb.kb_retrieve, "query_index", lambda task, rows, top_k: [card])
+    monkeypatch.setattr(
+        sb.kb_retrieve,
+        "query_index",
+        lambda task, rows, top_k, embedder: [card],
+    )
     assert sb.top_cards("do it") == ["- kb_a.md: # Title Body line."]
+
+
+def test_brief_degrades_cleanly_when_local_indexes_are_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sb, "load_state", lambda refresh: {"standing_mandates": ["GRAPH_GATE: call"]}
+    )
+    monkeypatch.setattr(sb, "claims_for_paths", lambda paths: "CLAIMS: none")
+    monkeypatch.setattr(sb, "inbox_preview", lambda agent: "")
+    monkeypatch.setattr(
+        sb.kb_retrieve,
+        "load_index",
+        lambda: (_ for _ in ()).throw(FileNotFoundError("clean checkout")),
+    )
+    monkeypatch.setattr(
+        sb.memory_vectors,
+        "load_sidecar",
+        lambda: (_ for _ in ()).throw(FileNotFoundError("clean checkout")),
+    )
+    monkeypatch.setattr(sb, "task_previews", lambda task: [])
+
+    out = sb.brief("repair clean checkout", ["conductor/example.py"])
+
+    assert "TASK: repair clean checkout" in out
+    assert "MANDATES: GRAPH_GATE" in out
+    assert "CLAIMS: none" in out
+
+
+def test_kb_and_memory_retrieval_share_one_query_embedding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sb._query_vector.cache_clear()
+    calls: list[tuple[str, str]] = []
+    vector = [0.25, 0.75]
+
+    def fake_embed(text: str, *, purpose: str) -> list[float]:
+        calls.append((text, purpose))
+        return vector
+
+    def fake_query(_task, _rows, *, top_k, embedder):
+        assert top_k == sb.CARDS_K
+        assert embedder("ignored") is vector
+        return []
+
+    def fake_search(query, _rows, _matrix, *, top_k):
+        assert top_k == sb.MEMORY_K
+        assert query is vector
+        return []
+
+    monkeypatch.setattr(sb.kb_retrieve, "embed_text", fake_embed)
+    monkeypatch.setattr(sb.kb_retrieve, "load_index", lambda: ["kb-row"])
+    monkeypatch.setattr(sb.kb_retrieve, "query_index", fake_query)
+    monkeypatch.setattr(sb.memory_vectors, "load_sidecar", lambda: (["row"], "matrix"))
+    monkeypatch.setattr(sb.memory_vectors, "search", fake_search)
+
+    assert sb.top_cards("shared task") == []
+    assert sb.memory_previews("shared task") == []
+    assert calls == [(sb.kb_retrieve.QUERY_INSTRUCT + "shared task", "query")]
+    sb._query_vector.cache_clear()
+
+
+def test_task_previews_opens_index_read_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from research.tools import index_notes
+
+    database = tmp_path / "notes.sqlite"
+    sqlite3.connect(database).close()
+
+    def fake_search(connection, task, *, limit, source):
+        assert task == "pending work"
+        assert limit == 3
+        assert source == "tasks"
+        with pytest.raises(sqlite3.OperationalError, match="readonly"):
+            connection.execute("CREATE TABLE forbidden_write (value INTEGER)")
+        return [{"title": "Task", "snippet": "Pending", "path": "task.md"}]
+
+    monkeypatch.setattr(index_notes, "DB_PATH", database)
+    monkeypatch.setattr(index_notes, "search_notes", fake_search)
+
+    assert sb.task_previews("pending work") == ["- Task: Pending (task.md)"]
 
 
 def test_build_brief_assembles_sections_and_bounds_size() -> None:
@@ -150,6 +331,8 @@ def test_brief_orchestrates_and_main_prints(
     monkeypatch.setattr(sb, "claims_for_paths", lambda paths: f"CLAIMS for {paths}")
     monkeypatch.setattr(sb, "inbox_preview", lambda agent: f"A2A for {agent}")
     monkeypatch.setattr(sb, "top_cards", lambda task: [f"- card for {task}"])
+    monkeypatch.setattr(sb, "memory_previews", lambda task: [])
+    monkeypatch.setattr(sb, "task_previews", lambda task: [])
     monkeypatch.setenv("A2A_AGENT_NAME", "env-agent")
     out = sb.brief("do it", ["p.py"])
     assert "CLAIMS for ['p.py']" in out and "A2A for env-agent" in out

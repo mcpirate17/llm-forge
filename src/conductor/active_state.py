@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import inspect
 import json
 import os
 import re
@@ -57,13 +58,16 @@ class ActiveState:
         return asdict(self)
 
 
-def parse_top_headings(limit: int = 4) -> list[str]:
+def parse_top_headings(
+    limit: int = 4, *, current_work_path: Path | None = None
+) -> list[str]:
     """Parse top active headings from .current_work.md."""
-    if not CURRENT_WORK_PATH.exists():
+    path = current_work_path or CURRENT_WORK_PATH
+    if not path.exists():
         return []
     headings: list[str] = []
     try:
-        with CURRENT_WORK_PATH.open("r", encoding="utf-8") as f:
+        with path.open("r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 m = HEADING_RE.match(line)
@@ -78,11 +82,11 @@ def parse_top_headings(limit: int = 4) -> list[str]:
     return headings
 
 
-def parse_active_claims() -> list[dict[str, Any]]:
+def parse_active_claims(repo: Path = ROOT) -> list[dict[str, Any]]:
     """Read unexpired claims from the governance ownership store."""
     from conductor.candidate_review.ownership import load_claims
 
-    claims, _ = load_claims(ROOT)
+    claims, _ = load_claims(repo)
     now = dt.datetime.now(dt.timezone.utc)
     active: list[dict[str, Any]] = []
     for claim in claims:
@@ -99,10 +103,10 @@ def parse_active_claims() -> list[dict[str, Any]]:
     return active
 
 
-def generate_active_state() -> ActiveState:
+def generate_active_state(repo: Path = ROOT) -> ActiveState:
     """Construct an updated ActiveState object from live repo sources."""
-    headings = parse_top_headings(limit=4)
-    claims = parse_active_claims()
+    headings = parse_top_headings(limit=4, current_work_path=repo / ".current_work.md")
+    claims = parse_active_claims(repo)
     return ActiveState(
         active_headings=headings,
         active_claims=claims,
@@ -180,7 +184,13 @@ def _write_state_atomic(path: Path, payload: dict[str, Any]) -> None:
 
 def save_active_state(path: Path = ACTIVE_STATE_PATH) -> ActiveState:
     """Generate, validate, and atomically write ``active_state.json``."""
-    state = generate_active_state()
+    repo = path.resolve().parent.parent
+    # Keep zero-argument test doubles compatible with the public helper while
+    # passing the target repository to the real implementation.
+    if inspect.signature(generate_active_state).parameters:
+        state = generate_active_state(repo)
+    else:
+        state = generate_active_state()
     validate_active_state(state)
     _write_state_atomic(path, state.to_dict())
     return state

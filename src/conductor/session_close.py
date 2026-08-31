@@ -8,11 +8,12 @@ and bounded claim release into a single, fail-closed operation.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Callable, Final
 
 from conductor.active_state import save_active_state
 from conductor.candidate_review.git_source import repository_root
@@ -123,9 +124,23 @@ def close_session(
     memory_status = "skipped"
     if sync_memory_index:
         try:
-            from conductor.memory_index import build_index
+            from conductor import memory_index
 
-            build_index(repo=repo)
+            index_path = repo / "research" / "cache" / "memory_index.jsonl"
+            with memory_index.index_write_lock(index_path):
+                # Compatibility-only test doubles may still expose the retired
+                # ``repo`` parameter. Production uses the streaming incremental
+                # result path so a session close does not materialize and rewrite
+                # the full multi-source index.
+                legacy_build: Callable[..., Any] = memory_index.build_index
+                if "repo" in inspect.signature(legacy_build).parameters:
+                    rows = legacy_build(repo=repo)
+                    if isinstance(rows, list):
+                        memory_index.save_index(rows, index_path)
+                else:
+                    result = memory_index.build_index_result(index_path=index_path)
+                    if result.changed:
+                        memory_index.save_index_result(result, index_path)
             memory_status = "ok"
         except Exception as exc:
             memory_status = f"error: {exc}"

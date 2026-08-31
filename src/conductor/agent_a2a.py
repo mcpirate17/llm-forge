@@ -6,9 +6,8 @@ and a JSON-RPC ``message/send`` endpoint on 127.0.0.1, addressed by a fixed
 per-agent port from the shared registry.  Delivery is synchronous-first with
 store-and-forward: an unreachable peer queues the message in the sender's own
 store (``delivery_status='queued'``) for later redelivery via the ``flush``
-command, an automatic flush before each new send to the same peer (ordering
-preserved), or the auto-flush that runs when ``peers`` probes a recipient as
-up.  A peer that is reachable but rejects a message stays a terminal
+command or an automatic sender-scoped flush before each new send to the same
+peer (ordering preserved). A peer that is reachable but rejects a message stays a terminal
 ``failed`` — only transport-level unreachability queues.  Discovery is card
 probing, so there is no shared mutable bridge state to clobber.
 
@@ -39,19 +38,16 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import dataclasses
-import datetime as dt
+import hashlib
 import hmac
 import json
 import os
 import re
-import secrets
+import socket
 import sqlite3
 import stat
-import sys
 import uuid
 from collections.abc import Iterator, Sequence
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Final
 
@@ -91,97 +87,49 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-ROOT: Final = Path(__file__).resolve().parents[1]
-DEFAULT_STATE_DIR: Final = ROOT / ".agents" / "a2a"
-BIND_HOST: Final = "127.0.0.1"
-SCHEMA_VERSION: Final = 1
+from conductor.a2a_compaction import (
+    CompactionError,
+    compact_message,
+    validate_coordination_v2,
+)
+from conductor.a2a_registry import (
+    BIND_HOST as BIND_HOST,
+    DEFAULT_REAP_FAILURES as DEFAULT_REAP_FAILURES,
+    DEFAULT_STATE_DIR as DEFAULT_STATE_DIR,
+    IDENTITY_RE as IDENTITY_RE,
+    KNOWN_AGENTS as KNOWN_AGENTS,
+    LIVENESS_SCHEMA_VERSION as LIVENESS_SCHEMA_VERSION,
+    PROBE_TIMEOUT_S as PROBE_TIMEOUT_S,
+    ROOT as ROOT,
+    SCHEMA_VERSION as SCHEMA_VERSION,
+    A2aError as A2aError,
+    AgentRecord as AgentRecord,
+    _atomic_json,
+    _liveness_payload,
+    _registration_fingerprint,
+    _registry_lock,
+    _registry_payload,
+    _serve_port,
+    _utc_now,
+    fetch_card as fetch_card,
+    init_registry as init_registry,
+    list_peers as list_peers,
+    load_registry as load_registry,
+    probe_peer as probe_peer,
+)
+
 MAX_BODY_BYTES: Final = 1 << 18
-PROBE_TIMEOUT_S: Final = 1.0
 SEND_TIMEOUT_S: Final = 10.0
-IDENTITY_RE: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+DEFAULT_COMPACT_MESSAGES: Final = 8
+DEFAULT_PREVIEW_CHARS: Final = 140
+DEFAULT_CONTEXT_CHARS: Final = 1200
+MAX_PREVIEW_ROWS: Final = 256
 HEX64_RE: Final = re.compile(r"^[0-9a-f]{64}$")
 TOKEN_HEADER: Final = "X-A2A-Token"
-KNOWN_AGENTS: Final[dict[str, int]] = {
-    "codex-phase22": 7310,
-    "glm-5.3": 7311,
-    "fable-nmf6": 7312,
-    "claude-opus-5": 7313,
-    "antigravity": 7314,
-    "fable-helm": 7315,
-    "grok": 7316,
-}
-DATA_KINDS: Final = frozenset({"gate-review-request", "coordination"})
+DATA_KINDS: Final = frozenset(
+    {"gate-review-request", "coordination", "coordination-v2"}
+)
 REVIEW_GATES: Final = frozenset({1, 2, 3, 4, 5, 7})
-
-
-class A2aError(RuntimeError):
-    """A fail-closed transport, registry, or payload error."""
-
-
-@dataclasses.dataclass(frozen=True)
-class AgentRecord:
-    """One fleet identity from the shared registry."""
-
-    name: str
-    port: int
-    token: str = dataclasses.field(repr=False)
-
-    @property
-    def base_url(self) -> str:
-        return f"http://{BIND_HOST}:{self.port}"
-
-
-def _utc_now() -> str:
-    return dt.datetime.now(dt.UTC).isoformat(timespec="milliseconds")
-
-
-def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
-    tmp = path.with_suffix(f".{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
-    os.chmod(tmp, stat.S_IRUSR | stat.S_IWUSR)
-    os.replace(tmp, path)
-
-
-def load_registry(state_dir: Path) -> dict[str, AgentRecord]:
-    path = state_dir / "agents.json"
-    if not path.is_file():
-        raise A2aError(f"registry {path} missing; run the init command first")
-    payload = json.loads(path.read_text())
-    if payload.get("schema_version") != SCHEMA_VERSION:
-        raise A2aError(f"unsupported registry schema {payload.get('schema_version')!r}")
-    records: dict[str, AgentRecord] = {}
-    for name, entry in payload.get("agents", {}).items():
-        if not IDENTITY_RE.match(name):
-            raise A2aError(f"invalid agent name {name!r}")
-        token = entry.get("token")
-        if not isinstance(token, str) or len(token) < 16:
-            raise A2aError(f"agent {name!r} has no usable token")
-        records[name] = AgentRecord(name=name, port=int(entry["port"]), token=token)
-    if not records:
-        raise A2aError(f"registry {path} lists no agents")
-    return records
-
-
-def init_registry(state_dir: Path) -> dict[str, AgentRecord]:
-    """Create or extend the registry; existing entries are preserved."""
-    state_dir.mkdir(parents=True, exist_ok=True)
-    os.chmod(state_dir, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-    path = state_dir / "agents.json"
-    payload: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "agents": {}}
-    if path.is_file():
-        payload = json.loads(path.read_text())
-        if payload.get("schema_version") != SCHEMA_VERSION:
-            raise A2aError(
-                f"unsupported registry schema {payload.get('schema_version')!r}"
-            )
-    agents: dict[str, Any] = payload.setdefault("agents", {})
-    for name, port in KNOWN_AGENTS.items():
-        entry = agents.setdefault(name, {})
-        entry["port"] = int(entry.get("port", port))
-        if not isinstance(entry.get("token"), str) or len(entry["token"]) < 16:
-            entry["token"] = secrets.token_urlsafe(24)
-    _atomic_json(path, payload)
-    return load_registry(state_dir)
 
 
 class A2aStore:
@@ -200,6 +148,7 @@ class A2aStore:
         connection.row_factory = sqlite3.Row
         try:
             connection.execute("PRAGMA busy_timeout=5000")
+            connection.execute("PRAGMA foreign_keys=ON")
             connection.execute("PRAGMA journal_mode=WAL")
             yield connection
             connection.commit()
@@ -228,9 +177,165 @@ class A2aStore:
                 );
                 CREATE INDEX IF NOT EXISTS messages_inbox
                     ON messages(direction, read_at, created_at);
+                CREATE TABLE IF NOT EXISTS message_state (
+                    direction TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    protocol_status TEXT NOT NULL,
+                    requires_response INTEGER NOT NULL
+                        CHECK(requires_response IN (0, 1)),
+                    retention_class TEXT NOT NULL
+                        CHECK(retention_class IN ('pinned', 'operational')),
+                    resolved_at TEXT,
+                    superseded_at TEXT,
+                    hold_reason TEXT,
+                    tombstoned_at TEXT,
+                    body_sha256 TEXT NOT NULL,
+                    body_bytes INTEGER NOT NULL,
+                    data_sha256 TEXT,
+                    data_bytes INTEGER NOT NULL,
+                    PRIMARY KEY (direction, message_id),
+                    FOREIGN KEY (direction, message_id)
+                        REFERENCES messages(direction, message_id)
+                        ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS message_state_context
+                    ON message_state(direction, thread_id);
+                CREATE INDEX IF NOT EXISTS message_state_retention
+                    ON message_state(
+                        retention_class, hold_reason, tombstoned_at,
+                        resolved_at, superseded_at
+                    );
+                CREATE TABLE IF NOT EXISTS retention_events (
+                    event_id TEXT PRIMARY KEY,
+                    direction TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    policy_version INTEGER NOT NULL,
+                    manifest_json TEXT NOT NULL,
+                    manifest_sha256 TEXT NOT NULL,
+                    compacted_at TEXT NOT NULL,
+                    UNIQUE(direction, message_id),
+                    FOREIGN KEY (direction, message_id)
+                        REFERENCES messages(direction, message_id)
+                        ON DELETE RESTRICT
+                );
+                CREATE TABLE IF NOT EXISTS message_presentations (
+                    direction TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    presented_at TEXT NOT NULL,
+                    PRIMARY KEY (direction, message_id),
+                    FOREIGN KEY (direction, message_id)
+                        REFERENCES messages(direction, message_id)
+                        ON DELETE CASCADE
+                );
                 """
             )
         os.chmod(self.path, stat.S_IRUSR | stat.S_IWUSR)
+
+    @staticmethod
+    def _legacy_state(
+        *, message_id: str, sender: str, body: str, data_json: str | None
+    ) -> dict[str, Any]:
+        collapsed = " ".join(body.split())
+        summary = (
+            collapsed[:237].rstrip() + "..." if len(collapsed) > 240 else collapsed
+        )
+        body_encoded = body.encode("utf-8")
+        data_encoded = data_json.encode("utf-8") if data_json is not None else b""
+        return {
+            "thread_id": f"legacy:{sender}",
+            "summary": summary or f"message {message_id}",
+            "protocol_status": "open",
+            "requires_response": 1,
+            # Existing/unstructured content may be durable authentication
+            # evidence. It is view-compactable but never retention-eligible.
+            "retention_class": "pinned",
+            "body_sha256": hashlib.sha256(body_encoded).hexdigest(),
+            "body_bytes": len(body_encoded),
+            "data_sha256": (
+                hashlib.sha256(data_encoded).hexdigest()
+                if data_json is not None
+                else None
+            ),
+            "data_bytes": len(data_encoded),
+        }
+
+    @staticmethod
+    def _protocol_state(
+        *,
+        message_id: str,
+        direction: str,
+        sender: str,
+        recipient: str,
+        body: str,
+        data_json: str | None,
+        created_at: str,
+        received_at: str | None,
+        delivery_status: str,
+    ) -> dict[str, Any]:
+        try:
+            receipt = compact_message(
+                {
+                    "message_id": message_id,
+                    "direction": direction,
+                    "sender": sender,
+                    "recipient": recipient,
+                    "body": body,
+                    "data_json": data_json,
+                    "created_at": created_at,
+                    "received_at": received_at,
+                    "delivery_status": delivery_status,
+                    "status_reason": None,
+                    "read_at": None,
+                }
+            )
+        except CompactionError as exc:
+            raise A2aError(f"message compaction metadata is invalid: {exc}") from exc
+        protocol_v2 = receipt["protocol"] == "coordination-v2"
+        return {
+            "thread_id": receipt["thread_id"],
+            "summary": receipt["summary"],
+            "protocol_status": receipt["status"] or "open",
+            "requires_response": int(receipt["actionable"]),
+            "retention_class": "operational" if protocol_v2 else "pinned",
+            "body_sha256": receipt["body_sha256"],
+            "body_bytes": receipt["raw_body_bytes"],
+            "data_sha256": receipt["data_sha256"],
+            "data_bytes": receipt["raw_data_bytes"],
+            "supersedes": receipt["supersedes"],
+        }
+
+    @staticmethod
+    def _insert_state(
+        connection: sqlite3.Connection,
+        *,
+        direction: str,
+        message_id: str,
+        state: dict[str, Any],
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO message_state (
+                direction, message_id, thread_id, summary, protocol_status,
+                requires_response, retention_class, body_sha256, body_bytes,
+                data_sha256, data_bytes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                direction,
+                message_id,
+                state["thread_id"],
+                state["summary"],
+                state["protocol_status"],
+                state["requires_response"],
+                state["retention_class"],
+                state["body_sha256"],
+                state["body_bytes"],
+                state["data_sha256"],
+                state["data_bytes"],
+            ),
+        )
 
     def record_inbound(
         self,
@@ -239,9 +344,11 @@ class A2aStore:
         recipient: str,
         body: str,
         data_json: str | None,
+        state: dict[str, Any] | None = None,
     ) -> None:
+        now = _utc_now()
         with self.connect() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
                 INSERT OR IGNORE INTO messages (
                     message_id, direction, sender, recipient, body, data_json,
@@ -254,10 +361,55 @@ class A2aStore:
                     recipient,
                     body,
                     data_json,
-                    _utc_now(),
-                    _utc_now(),
+                    now,
+                    now,
                 ),
             )
+            if cursor.rowcount == 1:
+                selected_state = state or self._protocol_state(
+                    message_id=message_id,
+                    direction="inbound",
+                    sender=sender,
+                    recipient=recipient,
+                    body=body,
+                    data_json=data_json,
+                    created_at=now,
+                    received_at=now,
+                    delivery_status="delivered",
+                )
+                self._insert_state(
+                    connection,
+                    direction="inbound",
+                    message_id=message_id,
+                    state=selected_state,
+                )
+                for superseded_id in selected_state.get("supersedes", []):
+                    superseded = connection.execute(
+                        """
+                        UPDATE message_state
+                        SET superseded_at=COALESCE(superseded_at, ?),
+                            protocol_status='superseded'
+                        WHERE direction='inbound' AND message_id=?
+                          AND thread_id=? AND tombstoned_at IS NULL
+                          AND EXISTS (
+                              SELECT 1 FROM messages AS prior
+                              WHERE prior.direction='inbound'
+                                AND prior.message_id=message_state.message_id
+                                AND prior.sender=?
+                          )
+                        """,
+                        (
+                            now,
+                            superseded_id,
+                            selected_state["thread_id"],
+                            sender,
+                        ),
+                    )
+                    if superseded.rowcount != 1:
+                        raise A2aError(
+                            f"supersedes target {superseded_id!r} is missing or "
+                            "belongs to another sender/thread"
+                        )
 
     def record_outbound(
         self,
@@ -266,7 +418,9 @@ class A2aStore:
         recipient: str,
         body: str,
         data_json: str | None,
+        state: dict[str, Any] | None = None,
     ) -> None:
+        now = _utc_now()
         with self.connect() as connection:
             connection.execute(
                 """
@@ -275,7 +429,24 @@ class A2aStore:
                     created_at, delivery_status
                 ) VALUES (?, 'outbound', ?, ?, ?, ?, ?, 'pending')
                 """,
-                (message_id, sender, recipient, body, data_json, _utc_now()),
+                (message_id, sender, recipient, body, data_json, now),
+            )
+            self._insert_state(
+                connection,
+                direction="outbound",
+                message_id=message_id,
+                state=state
+                or self._protocol_state(
+                    message_id=message_id,
+                    direction="outbound",
+                    sender=sender,
+                    recipient=recipient,
+                    body=body,
+                    data_json=data_json,
+                    created_at=now,
+                    received_at=None,
+                    delivery_status="pending",
+                ),
             )
 
     def mark_outbound(
@@ -346,6 +517,138 @@ class A2aStore:
         with self.connect() as connection:
             return list(connection.execute(query, (limit,)).fetchall())
 
+    def preview_rows(
+        self,
+        *,
+        unread_only: bool,
+        unpresented_only: bool = False,
+        limit: int,
+        preview_chars: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Read bounded inbox envelopes without materializing full bodies."""
+
+        where = "m.direction='inbound'"
+        if unread_only:
+            where += " AND m.read_at IS NULL"
+        if unpresented_only:
+            where += " AND p.message_id IS NULL"
+        query = f"""
+            SELECT
+                m.message_id, m.direction, m.sender, m.recipient,
+                m.created_at, m.received_at, m.delivery_status, m.read_at,
+                substr(replace(replace(m.body, char(10), ' '), char(13), ' '),
+                       1, ?) AS body,
+                length(CAST(m.body AS BLOB)) AS body_bytes,
+                COALESCE(s.thread_id, 'legacy:' || m.sender) AS thread_id,
+                COALESCE(NULLIF(substr(s.summary, 1, ?), ''),
+                         substr(replace(replace(m.body, char(10), ' '), char(13), ' '),
+                                1, ?)) AS summary,
+                COALESCE(s.protocol_status, 'open') AS protocol_status,
+                COALESCE(s.requires_response, 1) AS requires_response,
+                COALESCE(s.retention_class, 'pinned') AS retention_class,
+                p.presented_at,
+                s.resolved_at, s.superseded_at, s.hold_reason,
+                COALESCE(s.body_sha256, '') AS body_sha256,
+                COALESCE(s.data_bytes, length(CAST(m.data_json AS BLOB)), 0)
+                    AS data_bytes,
+                SUM(
+                    length(CAST(m.body AS BLOB))
+                    + COALESCE(length(CAST(m.data_json AS BLOB)), 0)
+                ) OVER () AS total_raw_bytes,
+                COUNT(*) OVER () AS total_count
+            FROM messages AS m
+            LEFT JOIN message_state AS s
+              ON s.direction=m.direction AND s.message_id=m.message_id
+            LEFT JOIN message_presentations AS p
+              ON p.direction=m.direction AND p.message_id=m.message_id
+            WHERE {where}
+            ORDER BY m.created_at DESC, m.message_id DESC
+            LIMIT ?
+        """
+        with self.connect() as connection:
+            fetched = connection.execute(
+                query, (preview_chars, preview_chars, preview_chars, limit)
+            ).fetchall()
+        total = int(fetched[0]["total_count"]) if fetched else 0
+        return ([{key: row[key] for key in row.keys()} for row in fetched], total)
+
+    def message(self, message_id: str, direction: str = "inbound") -> sqlite3.Row:
+        with self.connect() as connection:
+            return self._fetch(connection, message_id, direction)
+
+    def mark_presented(self, message_ids: Sequence[str]) -> int:
+        if not message_ids:
+            return 0
+        presented_at = _utc_now()
+        with self.connect() as connection:
+            before = connection.total_changes
+            connection.executemany(
+                """
+                INSERT OR IGNORE INTO message_presentations (
+                    direction, message_id, presented_at
+                ) VALUES ('inbound', ?, ?)
+                """,
+                ((message_id, presented_at) for message_id in message_ids),
+            )
+            return connection.total_changes - before
+
+    def resolve(self, message_id: str) -> sqlite3.Row:
+        """Mark one read inbound message resolved without changing its body."""
+
+        with self.connect() as connection:
+            row = self._fetch(connection, message_id, "inbound")
+            if row["read_at"] is None:
+                raise A2aError(f"cannot resolve unread message {message_id!r}")
+            state = connection.execute(
+                """
+                SELECT 1 FROM message_state
+                WHERE direction='inbound' AND message_id=?
+                """,
+                (message_id,),
+            ).fetchone()
+            if state is None:
+                self._insert_state(
+                    connection,
+                    direction="inbound",
+                    message_id=message_id,
+                    state=self._legacy_state(
+                        message_id=message_id,
+                        sender=row["sender"],
+                        body=row["body"],
+                        data_json=row["data_json"],
+                    ),
+                )
+            connection.execute(
+                """
+                UPDATE message_state
+                SET resolved_at=COALESCE(resolved_at, ?),
+                    protocol_status='resolved'
+                WHERE direction='inbound' AND message_id=?
+                """,
+                (_utc_now(), message_id),
+            )
+            return self._fetch(connection, message_id, "inbound")
+
+    def set_hold(self, message_id: str, reason: str | None) -> None:
+        if reason is not None:
+            reason = " ".join(reason.split())
+            if not reason or len(reason) > 240:
+                raise A2aError("hold reason must be 1..240 characters")
+        with self.connect() as connection:
+            self._fetch(connection, message_id, "inbound")
+            cursor = connection.execute(
+                """
+                UPDATE message_state SET hold_reason=?
+                WHERE direction='inbound' AND message_id=?
+                """,
+                (reason, message_id),
+            )
+            if cursor.rowcount != 1:
+                raise A2aError(
+                    f"message {message_id!r} has no lifecycle metadata; "
+                    "legacy messages remain pinned"
+                )
+
     def counts(self) -> dict[str, int]:
         with self.connect() as connection:
             return {
@@ -390,13 +693,18 @@ def validate_data_payload(payload: Any) -> str:
             or not all(isinstance(p, str) and p for p in paths)
         ):
             raise A2aError("gate-review-request requires non-empty artifact_paths")
+    elif kind == "coordination-v2":
+        try:
+            validate_coordination_v2(payload)
+        except CompactionError as exc:
+            raise A2aError(str(exc)) from exc
     return kind
 
 
 def build_agent_card(name: str, port: int) -> AgentCard:
     return AgentCard(
         name=name,
-        description=f"NM-F6 coordination endpoint for {name}",
+        description=f"Bounded local-agent coordination endpoint for {name}",
         version="1.0.0",
         capabilities=AgentCapabilities(streaming=False, push_notifications=False),
         default_input_modes=["application/json"],
@@ -406,6 +714,14 @@ def build_agent_card(name: str, port: int) -> AgentCard:
                 id="coordination",
                 name="coordination",
                 description="Peer-to-peer status and handoff messages",
+            ),
+            AgentSkill(
+                id="coordination-v2",
+                name="coordination-v2",
+                description=(
+                    "Sender-authored bounded summaries, thread IDs, lifecycle "
+                    "status, and supersession edges for context-safe coordination"
+                ),
             ),
             AgentSkill(
                 id="gate-review-request",
@@ -511,47 +827,81 @@ def build_app(record: AgentRecord, store: A2aStore) -> Starlette:
     return app
 
 
-def serve(name: str, state_dir: Path) -> None:
-    records = load_registry(state_dir)
-    if name not in records:
-        raise A2aError(f"unknown agent {name!r}; registered: {sorted(records)}")
-    record = records[name]
-    store = A2aStore(state_dir, name)
-    app = build_app(record, store)
-    print(
-        json.dumps(
-            {
-                "name": record.name,
-                "port": record.port,
-                "card_url": f"{record.base_url}{AGENT_CARD_WELL_KNOWN_PATH}",
-                "rpc_url": f"{record.base_url}{DEFAULT_RPC_URL}",
-                "pid": os.getpid(),
-            },
-            sort_keys=True,
-        ),
-        flush=True,
-    )
-    uvicorn.run(
-        app,
-        host=BIND_HOST,
-        port=record.port,
-        log_level="warning",
-        lifespan="off",
-    )
-
-
-def fetch_card(record: AgentRecord, timeout: float) -> dict[str, Any]:
-    response = httpx.get(
-        f"{record.base_url}{AGENT_CARD_WELL_KNOWN_PATH}",
-        timeout=timeout,
-    )
-    if response.status_code != 200:
-        raise A2aError(f"card fetch returned HTTP {response.status_code}")
-    card = response.json()
-    if card.get("name") != record.name:
+def serve(name: str, state_dir: Path, port: int | None = None) -> None:
+    # Bind first. A port collision must never leave a fresh identity in the
+    # registry. The generation rotates only after the endpoint owns its socket,
+    # allowing liveness/reap to reject stale probe results across restarts.
+    selected_port = _serve_port(state_dir, name, port)
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        listener.bind((BIND_HOST, selected_port))
+        listener.listen(socket.SOMAXCONN)
+    except OSError as exc:
+        listener.close()
         raise A2aError(
-            f"card name {card.get('name')!r} does not match registry {record.name!r}"
+            f"cannot bind {name!r} to {BIND_HOST}:{selected_port}: {exc}"
+        ) from exc
+
+    try:
+        records = init_registry(
+            state_dir,
+            name=name,
+            port=selected_port,
+            renew_generation=True,
         )
+        record = records[name]
+        store = A2aStore(state_dir, name)
+        app = build_app(record, store)
+        print(
+            json.dumps(
+                {
+                    "name": record.name,
+                    "port": record.port,
+                    "generation": record.generation,
+                    "card_url": f"{record.base_url}{AGENT_CARD_WELL_KNOWN_PATH}",
+                    "rpc_url": f"{record.base_url}{DEFAULT_RPC_URL}",
+                    "pid": os.getpid(),
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+        config = uvicorn.Config(app, log_level="warning", lifespan="off")
+        uvicorn.Server(config).run(sockets=[listener])
+    finally:
+        listener.close()
+
+
+def _require_coordination_v2_skill(record: AgentRecord, card: dict[str, Any]) -> None:
+    """Reject v2 delivery unless the recipient explicitly advertises support."""
+
+    skills = card.get("skills")
+    advertised = isinstance(skills, list) and any(
+        isinstance(skill, dict) and skill.get("id") == "coordination-v2"
+        for skill in skills
+    )
+    if not advertised:
+        raise A2aError(
+            f"peer {record.name!r} does not advertise coordination-v2; "
+            "refusing structured send"
+        )
+
+
+def _coordination_v2_card(
+    record: AgentRecord, data_payload: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    """Preflight v2 capability before the caller records an outbound fact."""
+
+    if data_payload is None or data_payload.get("kind") != "coordination-v2":
+        return None
+    try:
+        card = fetch_card(record, timeout=PROBE_TIMEOUT_S)
+    except httpx.HTTPError as exc:
+        raise A2aError(
+            f"cannot verify coordination-v2 support for peer {record.name!r}: {exc}"
+        ) from exc
+    _require_coordination_v2_skill(record, card)
     return card
 
 
@@ -561,6 +911,8 @@ def _deliver_wire(
     message_id: str,
     body: str,
     data_payload: dict[str, Any] | None,
+    *,
+    card: dict[str, Any] | None = None,
 ) -> None:
     """Push one message over the wire; raises on any non-delivery.
 
@@ -583,7 +935,9 @@ def _deliver_wire(
         "method": "SendMessage",
         "params": {"message": MessageToDict(message)},
     }
-    fetch_card(record, timeout=PROBE_TIMEOUT_S)
+    delivery_card = card or fetch_card(record, timeout=PROBE_TIMEOUT_S)
+    if data_payload is not None and data_payload.get("kind") == "coordination-v2":
+        _require_coordination_v2_skill(record, delivery_card)
     response = httpx.post(
         f"{record.base_url}{DEFAULT_RPC_URL}",
         json=request,
@@ -627,6 +981,7 @@ def send_message(
     if data_payload is not None:
         validate_data_payload(data_payload)
     record = records[to_name]
+    delivery_card = _coordination_v2_card(record, data_payload)
     message_id = str(uuid.uuid4())
     data_json: str | None = None
     if data_payload is not None:
@@ -643,7 +998,14 @@ def send_message(
         data_json=data_json,
     )
     try:
-        _deliver_wire(record, from_name, message_id, body, data_payload)
+        _deliver_wire(
+            record,
+            from_name,
+            message_id,
+            body,
+            data_payload,
+            card=delivery_card,
+        )
         store.mark_outbound(message_id, "delivered", None, _utc_now())
     except httpx.TransportError as exc:
         reason = f"peer unreachable: {exc}"
@@ -730,228 +1092,129 @@ def flush_queued(
 
 def _outbound_row(store: A2aStore, message_id: str) -> dict[str, Any]:
     with store.connect() as connection:
-        row = store._fetch(connection, message_id, "outbound")  # noqa: SLF001
-    return {key: row[key] for key in row.keys()}
+        row = connection.execute(
+            """
+            SELECT m.message_id, m.sender, m.recipient, m.created_at,
+                   m.received_at, m.delivery_status, m.status_reason,
+                   s.thread_id, s.summary, s.protocol_status,
+                   s.requires_response, s.body_sha256, s.body_bytes,
+                   s.data_sha256, s.data_bytes
+            FROM messages AS m
+            JOIN message_state AS s
+              ON s.direction=m.direction AND s.message_id=m.message_id
+            WHERE m.message_id=? AND m.direction='outbound'
+            """,
+            (message_id,),
+        ).fetchone()
+    if row is None:
+        raise A2aError(f"unknown outbound message {message_id!r}")
+    return {
+        "schema_version": 1,
+        "authority": "a2a-delivery-receipt",
+        **{key: row[key] for key in row.keys()},
+    }
 
 
-def probe_peer(item: tuple[str, AgentRecord]) -> dict[str, Any]:
-    name, record = item
-    try:
-        card = fetch_card(record, timeout=PROBE_TIMEOUT_S)
-        return {
-            "name": name,
-            "port": record.port,
-            "status": "up",
-            "card_version": card.get("version"),
-            "skills": [s.get("id") for s in card.get("skills", [])],
-        }
-    except (A2aError, httpx.HTTPError) as exc:
-        return {
-            "name": name,
-            "port": record.port,
-            "status": "down",
-            "reason": str(exc)[:200],
-        }
+def reap_registry(
+    state_dir: Path, consecutive_failures: int = DEFAULT_REAP_FAILURES
+) -> dict[str, Any]:
+    """Probe peers and remove identities down for the requested failure streak."""
 
-
-def list_peers(state_dir: Path) -> list[dict[str, Any]]:
-    records = load_registry(state_dir)
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        return list(pool.map(probe_peer, sorted(records.items())))
+    if consecutive_failures < 1:
+        raise A2aError("--consecutive-failures must be at least 1")
+    peers = list_peers(state_dir)
+    candidates = {
+        item["name"]: item["registration_fingerprint"]
+        for item in peers
+        if item.get("status") == "down"
+        and item.get("consecutive_failures", 0) >= consecutive_failures
+    }
+    registry_path = state_dir / "agents.json"
+    liveness_path = state_dir / "liveness.json"
+    removed: list[str] = []
+    with _registry_lock(state_dir):
+        payload = _registry_payload(registry_path)
+        agents: dict[str, Any] = payload["agents"]
+        records = load_registry(state_dir)
+        liveness = _liveness_payload(liveness_path)
+        removed = sorted(
+            name
+            for name, fingerprint in candidates.items()
+            if name in agents
+            and name in records
+            and _registration_fingerprint(records[name]) == fingerprint
+            and isinstance(liveness["agents"].get(name), dict)
+            and liveness["agents"][name].get("registration_fingerprint") == fingerprint
+            and liveness["agents"][name].get("consecutive_failures", 0)
+            >= consecutive_failures
+        )
+        for name in removed:
+            del agents[name]
+        if removed:
+            _atomic_json(registry_path, payload)
+            for name in removed:
+                liveness["agents"].pop(name, None)
+            _atomic_json(liveness_path, liveness)
+    return {
+        "consecutive_failures": consecutive_failures,
+        "probed": peers,
+        "reaped": removed,
+    }
 
 
 def _row_dict(row: sqlite3.Row) -> dict[str, Any]:
-    return {key: row[key] for key in row.keys()}
+    from conductor.a2a_cli import _row_dict as implementation
+
+    return implementation(row)
+
+
+def _compact_json(value: Any) -> str:
+    from conductor.a2a_cli import _compact_json as implementation
+
+    return implementation(value)
+
+
+def compact_inbox_payload(
+    store: A2aStore,
+    *,
+    agent: str,
+    unread_only: bool,
+    unpresented_only: bool,
+    max_messages: int,
+    preview_chars: int,
+    max_chars: int,
+) -> tuple[dict[str, Any], list[str]]:
+    """Build one structurally valid, character-bounded inbox envelope."""
+
+    from conductor.a2a_cli import compact_inbox_payload as implementation
+
+    return implementation(
+        store,
+        agent=agent,
+        unread_only=unread_only,
+        unpresented_only=unpresented_only,
+        max_messages=max_messages,
+        preview_chars=preview_chars,
+        max_chars=max_chars,
+    )
+
+
+def render_compact_inbox(payload: dict[str, Any]) -> str:
+    from conductor.a2a_cli import render_compact_inbox as implementation
+
+    return implementation(payload)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="agent_a2a", description=__doc__)
-    parser.add_argument(
-        "--state-dir",
-        type=Path,
-        default=DEFAULT_STATE_DIR,
-        help="registry + per-agent stores (default: %(default)s)",
-    )
-    sub = parser.add_subparsers(dest="command", required=True)
+    from conductor.a2a_cli import build_parser as implementation
 
-    sub.add_parser("init", help="create/extend the agent registry")
-
-    serve_parser = sub.add_parser("serve", help="run this agent's A2A endpoint")
-    serve_parser.add_argument("--name", required=True)
-
-    send_parser = sub.add_parser("send", help="deliver one message to a peer")
-    send_parser.add_argument("--from-name", required=True)
-    send_parser.add_argument("--to", required=True)
-    body_group = send_parser.add_mutually_exclusive_group(required=True)
-    body_group.add_argument("--body")
-    body_group.add_argument("--body-file", type=Path)
-    body_group.add_argument("--stdin", action="store_true")
-    send_parser.add_argument(
-        "--data-file",
-        type=Path,
-        help="optional structured payload (JSON object with a kind)",
-    )
-    send_parser.add_argument(
-        "--no-queue",
-        action="store_true",
-        help="fail terminally when the peer is unreachable instead of queueing",
-    )
-
-    flush_parser = sub.add_parser(
-        "flush", help="redeliver queued messages to now-reachable peers"
-    )
-    flush_parser.add_argument(
-        "--as-name", help="flush only this sender's queue (default: all local stores)"
-    )
-    flush_parser.add_argument("--to", help="flush only messages to this recipient")
-
-    inbox_parser = sub.add_parser("inbox", help="list received messages")
-    inbox_parser.add_argument("--as-name", required=True)
-    inbox_parser.add_argument("--unread", action="store_true")
-    inbox_parser.add_argument("--limit", type=int, default=100)
-    inbox_parser.add_argument("--json", action="store_true")
-
-    read_parser = sub.add_parser("read", help="mark one inbound message read")
-    read_parser.add_argument("--as-name", required=True)
-    read_parser.add_argument("message_id")
-
-    sub.add_parser("peers", help="probe every registered agent card")
-    sub.add_parser("status", help="local store summary")
-    return parser
-
-
-def _message_body(args: argparse.Namespace) -> str:
-    if args.body is not None:
-        return args.body
-    if args.body_file is not None:
-        return args.body_file.read_text()
-    return sys.stdin.read()
-
-
-def _cmd_send(args: argparse.Namespace) -> int:
-    data_payload = None
-    if args.data_file is not None:
-        loaded = json.loads(args.data_file.read_text())
-        if not isinstance(loaded, dict):
-            raise A2aError("--data-file must contain a JSON object")
-        data_payload = loaded
-    row = send_message(
-        args.from_name,
-        args.to,
-        _message_body(args),
-        data_payload,
-        args.state_dir,
-        queue_on_unreachable=not args.no_queue,
-    )
-    print(json.dumps(row, ensure_ascii=False, sort_keys=True))
-    if row["delivery_status"] == "delivered":
-        return 0
-    return 3 if row["delivery_status"] == "queued" else 2
-
-
-def _cmd_flush(args: argparse.Namespace) -> int:
-    results = flush_queued(args.state_dir, from_name=args.as_name, to_name=args.to)
-    print(json.dumps(results, ensure_ascii=False, indent=2, sort_keys=True))
-    return 3 if any(r["status"] == "queued" for r in results) else 0
+    return implementation()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-    try:
-        if args.command == "init":
-            records = init_registry(args.state_dir)
-            print(
-                json.dumps(
-                    {
-                        "registry": str(args.state_dir / "agents.json"),
-                        "agents": {
-                            name: {"port": r.port}
-                            for name, r in sorted(records.items())
-                        },
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            return 0
+    from conductor.a2a_cli import main as implementation
 
-        if args.command == "serve":
-            serve(args.name, args.state_dir)
-            return 0
-
-        if args.command == "send":
-            return _cmd_send(args)
-
-        if args.command == "flush":
-            return _cmd_flush(args)
-
-        if args.command == "inbox":
-            if args.limit < 1 or args.limit > 10_000:
-                raise A2aError("--limit must be between 1 and 10000")
-            sender_store = A2aStore(args.state_dir, args.as_name)
-            rows = sender_store.rows(unread_only=args.unread, limit=args.limit)
-            if args.json:
-                print(
-                    json.dumps(
-                        [_row_dict(row) for row in rows],
-                        ensure_ascii=False,
-                        indent=2,
-                        sort_keys=True,
-                    )
-                )
-            else:
-                for row in rows:
-                    state = "UNREAD" if row["read_at"] is None else "READ"
-                    suffix = f" data={row['data_json']}" if row["data_json"] else ""
-                    print(
-                        f"[{state}] {row['message_id']} from={row['sender']} "
-                        f"at={row['received_at']}{suffix}\n{row['body']}\n"
-                    )
-            return 0
-
-        if args.command == "read":
-            sender_store = A2aStore(args.state_dir, args.as_name)
-            row = sender_store.mark_read(args.message_id)
-            print(json.dumps(_row_dict(row), sort_keys=True))
-            return 0
-
-        if args.command == "peers":
-            peers = list_peers(args.state_dir)
-            print(json.dumps(peers, indent=2, sort_keys=True))
-            # Auto-flush any queued messages now that we know who is up;
-            # stdout stays a plain peer list for existing consumers.
-            if any(p["status"] == "up" for p in peers):
-                flushed = flush_queued(args.state_dir)
-                delivered = sum(1 for r in flushed if r["status"] == "delivered")
-                if delivered:
-                    print(
-                        f"agent-a2a: flushed {delivered} queued message(s)",
-                        file=sys.stderr,
-                    )
-            return 0
-
-        if args.command == "status":
-            records = load_registry(args.state_dir)
-            stores = {name: A2aStore(args.state_dir, name).counts() for name in records}
-            print(
-                json.dumps(
-                    {
-                        "registry": str(args.state_dir / "agents.json"),
-                        "agents": {
-                            name: {"port": r.port}
-                            for name, r in sorted(records.items())
-                        },
-                        "stores": stores,
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            return 0
-    except (A2aError, sqlite3.Error, OSError, ValueError) as exc:
-        print(f"agent-a2a: {exc}", file=sys.stderr)
-        return 2
-    raise AssertionError(f"unhandled command {args.command!r}")
+    return implementation(argv)
 
 
 if __name__ == "__main__":

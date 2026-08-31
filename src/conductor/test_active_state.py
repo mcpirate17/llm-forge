@@ -51,6 +51,31 @@ def test_generate_and_save_active_state(tmp_path: Path, monkeypatch) -> None:
     assert not list(tmp_path.glob(".active_state.json.*.tmp"))
 
 
+def test_generate_active_state_uses_alternate_repo_headings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    alternate_repo = tmp_path / "alternate"
+    alternate_repo.mkdir()
+    (alternate_repo / ".current_work.md").write_text(
+        "# Active Coordination\n## Alternate repository task\n",
+        encoding="utf-8",
+    )
+    global_work = tmp_path / "global.md"
+    global_work.write_text("## Wrong repository task\n", encoding="utf-8")
+    monkeypatch.setattr(active_state, "CURRENT_WORK_PATH", global_work)
+    seen_repos: list[Path] = []
+
+    def fake_claims(repo: Path) -> list[dict[str, object]]:
+        seen_repos.append(repo)
+        return []
+
+    monkeypatch.setattr(active_state, "parse_active_claims", fake_claims)
+    state = active_state.generate_active_state(alternate_repo)
+
+    assert state.active_headings == ["Alternate repository task"]
+    assert seen_repos == [alternate_repo]
+
+
 def test_validate_active_state_rejects_expired_claim() -> None:
     now = datetime.now(timezone.utc)
     state = active_state.ActiveState(
