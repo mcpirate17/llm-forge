@@ -43,6 +43,21 @@
         "conductor/mutation_testing_support.py": "be44aba5add7f66d4736162cf0d17b97ca4954725aa7e81800c33c6d2c1e86f8",
         "conductor/mutation_value.py": "6379c6451bde62d6f5e3c37b98f1cdf8d9147e91e464c189e0c8532af62683be"
       }
+    },
+    {
+      "id": "pre-native-evidence-verifier-20260901",
+      "recorded_at": "2026-09-01",
+      "owner": "codex-rust-mutation-evidence",
+      "justification": "The native evidence verifier changes registry, manifest, receipt, and evidence-selection routing only. Mutation application, outcome classification, receipt generation, and receipt field semantics remain in the unchanged Python runner.",
+      "covers_diff": "conductor/mutation_testing.py: route default verify_evidence calls through research_runtime_native while retaining the existing Python verifier as an explicit fallback and differential oracle.",
+      "verified_by": "Full candidate inventory parity on protected base e7b18cac6 after the registered self-campaign refresh, using final governance-formatted target adapter SHA-256 ea157d3e83671be77aa08313ceebe2d6db8b081a3018881c0796e6542a3df62e, the same candidate filesystem, and the recorded runner contract: 785 ranked test paths, 705 accepted evidence rows, 80 missing rows, zero malformed receipts, and exact normalized Python/native result SHA-256 259f5c28c62f50d6cdcb423ea356d77e12a13100ebbed1811f9cd7c1c26f6da3. Selected-path SHA-256 was a6619bcfeb80b94a8554f2508d562967478bcf53f64762b6be0a4ed85f9ad4bb.",
+      "runner_components_sha256": {
+        "audit/orchestrator/snapshot_worktree.py": "3b5d99c5922b33f2c45aff3fbd6ac21916b31209cb0cdc7f484595b7a770fb42",
+        "conductor/mutation_scope.py": "1abcfa6d83fa4ffa506efc99423b945b7a8490c0a3cf86234d282b4543750adb",
+        "conductor/mutation_testing.py": "021a4ce310396f1e86dcd905ff6a75e0b811892a3b4d507ca81db739a92c3ffd",
+        "conductor/mutation_testing_support.py": "be44aba5add7f66d4736162cf0d17b97ca4954725aa7e81800c33c6d2c1e86f8",
+        "conductor/mutation_value.py": "6379c6451bde62d6f5e3c37b98f1cdf8d9147e91e464c189e0c8532af62683be"
+      }
     }
   ]
 }

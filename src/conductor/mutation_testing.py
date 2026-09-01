@@ -10,17 +10,18 @@ from __future__ import annotations
 
 import argparse
 import ast
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
 import time
-from typing import Any, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 from audit.orchestrator.snapshot_worktree import isolated_snapshot
 from conductor import mutation_testing_support as _support
@@ -28,6 +29,7 @@ from conductor.mutation_scope import (
     CampaignError,
     TestFileScope,
     _load_test_scopes,
+    _python_test_nodeids,
     _require_mapping,
     _require_string,
     _require_string_list,
@@ -44,7 +46,6 @@ from conductor.mutation_value import (
     test_value_receipt_errors,
     value_inspection_payload,
 )
-
 
 SCHEMA_VERSION = 1
 REGISTRY_SCHEMA_VERSION = 1
@@ -226,7 +227,7 @@ def _patch_paths(patch_path: Path) -> tuple[str, ...]:
     for line in lines:
         if line.startswith(("rename from ", "rename to ", "copy from ", "copy to ")):
             raise CampaignError("mutation patches may not rename or copy files")
-        if line.startswith("GIT binary patch") or line.startswith("Binary files "):
+        if line.startswith(("GIT binary patch", "Binary files ")):
             raise CampaignError("mutation patches must be textual unified diffs")
         if line.startswith("diff --git "):
             fields = line.split()
@@ -637,7 +638,9 @@ def symbol_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
     for relative, pinned in campaign.source_symbols.items():
         path = root / relative
         if not path.is_file() or path.is_symlink():
-            drift.append({"path": relative, "symbol": None, "reason": "absent or symlink"})
+            drift.append(
+                {"path": relative, "symbol": None, "reason": "absent or symlink"}
+            )
             continue
         current = symbol_hashes(path)
         for symbol, expected in pinned.items():
@@ -649,7 +652,9 @@ def symbol_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
                         "symbol": symbol,
                         "expected_sha256": expected,
                         "actual_sha256": actual,
-                        "reason": "symbol removed" if actual is None else "symbol changed",
+                        "reason": "symbol removed"
+                        if actual is None
+                        else "symbol changed",
                     }
                 )
     return drift
@@ -919,7 +924,7 @@ def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def _default_receipt_path(campaign: Campaign, repo_root: Path) -> Path:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return (
         repo_root
         / "research/reports/mutation_testing"
@@ -961,7 +966,7 @@ def run_campaign(
         "runner_components_sha256": runner_components,
         "language": campaign.language,
         "mutation_engine": campaign.mutation_engine,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "status": "RUNNING",
         "source_sha256": dict(campaign.source_sha256),
         "source_symbols": {k: dict(v) for k, v in campaign.source_symbols.items()},
@@ -1253,7 +1258,7 @@ def _receipt_errors(
     return errors
 
 
-def verify_evidence(
+def _verify_evidence_python(
     registry_path: Path,
     paths: Sequence[str],
     *,
@@ -1332,7 +1337,9 @@ def verify_evidence(
                     continue
                 # Missing generated_at sorts oldest rather than crashing; a receipt
                 # without one is still evidence, just never preferred over a dated peer.
-                candidates.append((str(receipt.get("generated_at") or ""), campaign, path))
+                candidates.append(
+                    (str(receipt.get("generated_at") or ""), campaign, path)
+                )
         accepted: tuple[Campaign, Path] | None = None
         if candidates:
             newest = max(candidates, key=lambda item: (item[0], item[2].name))
@@ -1360,6 +1367,172 @@ def verify_evidence(
                 }
             )
     return _support.evidence_result(normalized, evidence, missing, malformed)
+
+
+_ORIGINAL_LOAD_CAMPAIGN = load_campaign
+
+
+def _native_verification_request(
+    registry_path: Path,
+    paths: Sequence[str],
+    *,
+    repo_root: Path,
+    anchor_repo: Path | None,
+    plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    root = repo_root.resolve()
+    try:
+        registry_relative = registry_path.resolve().relative_to(root).as_posix()
+    except ValueError as exc:
+        raise CampaignError("mutation registry must be inside the repository") from exc
+    normalized = tuple(_safe_relative_path(path, "candidate path") for path in paths)
+    try:
+        components = _runner_components_sha256()
+    except CampaignError as exc:
+        runner: dict[str, Any] = {
+            "components": None,
+            "error": str(exc),
+            "mutation_testing_sha256": None,
+        }
+    else:
+        runner = {
+            "components": components,
+            "error": None,
+            "mutation_testing_sha256": components["conductor/mutation_testing.py"],
+        }
+    scope_paths = tuple(
+        _safe_relative_path(path, "native plan Python scope path")
+        for path in _require_string_list(
+            plan.get("python_scope_paths"), "native plan.python_scope_paths"
+        )
+    )
+    symbol_paths = tuple(
+        _safe_relative_path(path, "native plan symbol path")
+        for path in _require_string_list(
+            plan.get("symbol_paths"), "native plan.symbol_paths"
+        )
+    )
+    directories = tuple(
+        _safe_relative_path(relative, "receipt directory")
+        for relative in _require_string_list(
+            plan.get("receipt_directories"), "native plan.receipt_directories"
+        )
+    )
+    return {
+        "repo_root": str(root),
+        "registry_path": registry_relative,
+        "canonical_test_patterns": list(CANONICAL_TEST_PATTERNS),
+        "receipt_directories": list(directories),
+        "candidate_paths": list(normalized),
+        "python_test_nodeids": {
+            path: list(_python_test_nodeids(root / path, path)) for path in scope_paths
+        },
+        "symbol_hashes": {path: symbol_hashes(root / path) for path in symbol_paths},
+        "runner": runner,
+        "anchor": {
+            "repo": str((anchor_repo or repo_root).resolve()),
+            "commit": LEGACY_RECEIPT_ANCHOR_COMMIT,
+            "tree": LEGACY_RECEIPT_ANCHOR_TREE,
+            "receipt_prefix": LEGACY_RECEIPT_PREFIX,
+        },
+    }
+
+
+def _native_verify_evidence(
+    registry_path: Path,
+    paths: Sequence[str],
+    *,
+    repo_root: Path,
+    anchor_repo: Path | None,
+) -> dict[str, Any] | None:
+    try:
+        from research_runtime_native import (
+            plan_mutation_evidence_native,
+            verify_mutation_evidence_native,
+        )
+    except (ImportError, AttributeError):
+        return None
+    # Tests and downstream tools deliberately replace this loader to inject a
+    # synthetic campaign.  That is an explicit Python extension seam, so keep
+    # it authoritative rather than silently bypassing it in native code.
+    if load_campaign is not _ORIGINAL_LOAD_CAMPAIGN:
+        return None
+    root = repo_root.resolve()
+    try:
+        registry_relative = registry_path.resolve().relative_to(root).as_posix()
+    except ValueError as exc:
+        raise CampaignError("mutation registry must be inside the repository") from exc
+    try:
+        plan_encoded = plan_mutation_evidence_native(
+            json.dumps(
+                {"repo_root": str(root), "registry_path": registry_relative},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
+        plan = _require_mapping(
+            json.loads(plan_encoded), "native mutation evidence plan"
+        )
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise CampaignError(str(exc)) from exc
+    request = _native_verification_request(
+        registry_path,
+        paths,
+        repo_root=repo_root,
+        anchor_repo=anchor_repo,
+        plan=plan,
+    )
+    try:
+        encoded = verify_mutation_evidence_native(
+            json.dumps(request, ensure_ascii=False, separators=(",", ":"))
+        )
+        result = json.loads(encoded)
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise CampaignError(str(exc)) from exc
+    return dict(_require_mapping(result, "native mutation evidence"))
+
+
+def verify_evidence(
+    registry_path: Path,
+    paths: Sequence[str],
+    *,
+    repo_root: Path = REPO_ROOT,
+    anchor_repo: Path | None = None,
+) -> dict[str, Any]:
+    """Require current full-campaign PASS receipts for every changed test path."""
+
+    native = _native_verify_evidence(
+        registry_path,
+        paths,
+        repo_root=repo_root,
+        anchor_repo=anchor_repo,
+    )
+    if native is None:
+        return _verify_evidence_python(
+            registry_path,
+            paths,
+            repo_root=repo_root,
+            anchor_repo=anchor_repo,
+        )
+    if os.environ.get("CONDUCTOR_MUTATION_EVIDENCE_DIFFERENTIAL") == "1":
+        reference = _verify_evidence_python(
+            registry_path,
+            paths,
+            repo_root=repo_root,
+            anchor_repo=anchor_repo,
+        )
+        if native != reference:
+            native_digest = hashlib.sha256(
+                json.dumps(native, sort_keys=True).encode("utf-8")
+            ).hexdigest()
+            reference_digest = hashlib.sha256(
+                json.dumps(reference, sort_keys=True).encode("utf-8")
+            ).hexdigest()
+            raise CampaignError(
+                "native mutation evidence parity mismatch: "
+                f"native={native_digest}, reference={reference_digest}"
+            )
+    return native
 
 
 def _json_print(payload: Mapping[str, Any]) -> None:
