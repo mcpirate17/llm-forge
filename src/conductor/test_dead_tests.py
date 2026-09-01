@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -9,21 +10,26 @@ from conductor import dead_tests
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+    command = ("git", *args)
+    subprocess.run(command, cwd=repo, check=True, capture_output=True, text=True)
 
 
 def _init_repo(repo: Path) -> None:
     repo.mkdir(parents=True, exist_ok=True)
-    _git(repo, "init", "-b", "main")
-    _git(repo, "config", "user.email", "governance-tests@example.invalid")
-    _git(repo, "config", "user.name", "Governance Tests")
-    _git(repo, "config", "commit.gpgsign", "false")
+    commands = (
+        ("init", "-b", "main"),
+        ("config", "user.email", "governance-tests@example.invalid"),
+        ("config", "user.name", "Governance Tests"),
+        ("config", "commit.gpgsign", "false"),
+    )
+    for command in commands:
+        _git(repo, *command)
 
 
 def _write(repo: Path, relative: str, content: str) -> None:
-    path = repo / relative
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    destination = repo.joinpath(relative)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(content, encoding="utf-8")
 
 
 def _commit_broken_test(repo: Path) -> None:
@@ -33,6 +39,11 @@ def _commit_broken_test(repo: Path) -> None:
     _write(repo, "test_probe.py", "import pkg.missing_module\n")
     _git(repo, "add", "--all")
     _git(repo, "commit", "-m", "base")
+
+
+def _commit_all(repo: Path, message: str = "base") -> None:
+    _git(repo, "add", "--all")
+    _git(repo, "commit", "-m", message)
 
 
 def test_explicit_root_scans_the_named_repo_not_cwd(tmp_path: Path) -> None:
@@ -124,3 +135,195 @@ def test_resolver_resolve_untracked_honours_explicit_root(tmp_path: Path) -> Non
 
     _write(target, "pkg/helper.py", "value = 1\n")
     assert resolver.resolve_untracked("pkg.helper", "main.py") == "pkg/helper.py"
+
+
+def test_native_scan_preserves_relative_guarded_and_native_imports(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "pkg/__init__.py", "")
+    _write(repo, "pkg/dep.py", "VALUE = 1\n")
+    _write(repo, "pkg/dynamic.py", "VALUE = 2\n")
+    _write(repo, "pkg/native.rs", "pub fn marker() {}\n")
+    _write(
+        repo,
+        "pkg/sub/module.py",
+        """from typing import TYPE_CHECKING
+from .. import dep
+import pkg.native
+if FLAG:
+    import pkg.hard_missing
+if TYPE_CHECKING:
+    import pkg.type_missing
+if typing.TYPE_CHECKING:
+    import pkg.attribute_missing
+if __name__ == "__main__":
+    import pkg.main_missing
+try:
+    import pkg.try_missing
+except ImportError:
+    pass
+def lazy():
+    import pkg.lazy_missing
+async def async_lazy():
+    import pkg.async_missing
+"pkg.dynamic"
+"loader.py"
+""",
+    )
+    tracked = [
+        "pkg/__init__.py",
+        "pkg/dep.py",
+        "pkg/dynamic.py",
+        "pkg/native.rs",
+        "pkg/sub/module.py",
+    ]
+
+    module = dead_tests.scan_module(
+        "pkg/sub/module.py", dead_tests.Resolver(tracked, root=repo), root=repo
+    )
+
+    assert module == dead_tests.Module(
+        path="pkg/sub/module.py",
+        has_main=True,
+        basenames={"loader.py"},
+        deps={"pkg/dep.py", "pkg/dynamic.py"},
+        missing={"pkg.hard_missing"},
+        soft_missing={
+            "pkg.async_missing",
+            "pkg.attribute_missing",
+            "pkg.lazy_missing",
+            "pkg.main_missing",
+            "pkg.try_missing",
+            "pkg.type_missing",
+        },
+        untracked=set(),
+    )
+
+
+def test_native_analysis_preserves_classification_precedence_and_order(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    files = {
+        "Makefile": "run: pkg/configured.py\n",
+        "app.py": "import pkg.live\n",
+        "loader.py": 'PLUGIN = "dyn.py"\n',
+        "pkg/__init__.py": "",
+        "pkg/broken_target.py": "VALUE = 1\n",
+        "pkg/configured.py": "VALUE = 2\n",
+        "pkg/dyn.py": "VALUE = 3\n",
+        "pkg/live.py": "VALUE = 4\n",
+        "pkg/orphan.py": "VALUE = 5\n",
+        "pkg/stale.py": "def lazy():\n    import pkg.deleted\n",
+        "test_broken.py": "import pkg.broken_target\nimport pkg.missing\n",
+        "test_configured.py": "import pkg.configured\n",
+        "test_dynamic.py": "import pkg.dyn\n",
+        "test_live.py": "import pkg.live\n",
+        "test_orphan.py": "import pkg.orphan\n",
+        "test_untracked_dep.py": "import pkg.untracked\n",
+    }
+    for path, source in files.items():
+        _write(repo, path, source)
+    _commit_all(repo)
+    _write(repo, "pkg/untracked.py", "VALUE = 6\n")
+    _write(repo, "test_untracked_extra.py", "def test_extra():\n    pass\n")
+    _write(repo, "research/notes/targets.md", "pkg/orphan.py\n")
+
+    report = dead_tests.analyse(dead_tests.tracked_files(root=repo), root=repo)
+
+    assert report["broken"] == [
+        {
+            "test": "test_broken.py",
+            "missing": ["pkg.missing"],
+            "last_commit": report["broken"][0]["last_commit"],
+        }
+    ]
+    assert report["depends_on_untracked"] == [
+        {
+            "test": "test_untracked_dep.py",
+            "untracked": ["pkg/untracked.py"],
+            "last_commit": report["depends_on_untracked"][0]["last_commit"],
+        }
+    ]
+    assert report["untracked_importers"] == {
+        "pkg/untracked.py": ["test_untracked_dep.py"]
+    }
+    assert report["orphan_target"] == [
+        {
+            "test": "test_orphan.py",
+            "targets": ["pkg/orphan.py"],
+            "notes_only": ["pkg/orphan.py"],
+            "last_commit": report["orphan_target"][0]["last_commit"],
+        }
+    ]
+    assert report["stale_imports"] == [
+        {
+            "module": "pkg/stale.py",
+            "missing": ["pkg.deleted"],
+            "last_commit": report["stale_imports"][0]["last_commit"],
+        }
+    ]
+    assert report["untracked_tests"] == ["test_untracked_extra.py"]
+    assert all(
+        row["test"] not in {"test_configured.py", "test_dynamic.py", "test_live.py"}
+        for row in report["orphan_target"]
+    )
+
+
+def test_native_closure_handles_ten_thousand_module_cycle_deterministically() -> None:
+    count = 10_000
+    modules = {
+        f"pkg/module_{index:05d}.py": dead_tests.Module(
+            path=f"pkg/module_{index:05d}.py",
+            deps={f"pkg/module_{(index + 1) % count:05d}.py"},
+        )
+        for index in range(count)
+    }
+    modules["pkg/module_09999.py"].missing.add("pkg.gone")
+    modules["pkg/module_05000.py"].untracked.add("pkg/local_only.py")
+
+    first = dead_tests.closure("pkg/module_00000.py", modules)
+    second = dead_tests.closure("pkg/module_00000.py", dict(reversed(modules.items())))
+
+    assert first == ({"pkg.gone"}, {"pkg/local_only.py"})
+    assert second == first
+
+
+def test_native_scan_parse_error_remains_dead_tests_error(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "pkg/__init__.py", "")
+    _write(repo, "pkg/broken.py", "if:\n")
+    resolver = dead_tests.Resolver(["pkg/__init__.py", "pkg/broken.py"], root=repo)
+
+    with pytest.raises(
+        dead_tests.DeadTestsError,
+        match=r"pkg/broken.py does not parse: invalid syntax \(broken.py, line 1\)",
+    ):
+        dead_tests.scan_module("pkg/broken.py", resolver, root=repo)
+
+
+def test_native_closure_preserves_missing_module_key_error() -> None:
+    modules = {
+        "test_probe.py": dead_tests.Module(path="test_probe.py", deps={"pkg/absent.py"})
+    }
+
+    with pytest.raises(KeyError, match="pkg/absent.py"):
+        dead_tests.closure("test_probe.py", modules)
+
+
+def test_native_module_payload_is_json_deterministic(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "pkg/__init__.py", "")
+    _write(repo, "pkg/b.py", "VALUE = 1\n")
+    _write(repo, "pkg/a.py", "import pkg.b\n")
+    resolver = dead_tests.Resolver(
+        ["pkg/b.py", "pkg/a.py", "pkg/__init__.py"], root=repo
+    )
+
+    first = resolver._native.scan_module("pkg/a.py", str(repo))
+    second = resolver._native.scan_module("pkg/a.py", str(repo))
+
+    assert first == second
+    assert json.loads(first)["deps"] == ["pkg/b.py"]
