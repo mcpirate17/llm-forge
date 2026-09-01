@@ -933,7 +933,9 @@ def verify_evidence(
         registry = _load_registry(registry_path, root)
         campaigns_override = [
             _native_campaign_contract(campaign, repo_root=root)
-            for campaign in _registry_campaigns(registry_path, repo_root=root)
+            for campaign in _registry_campaigns(
+                registry_path, repo_root=root, strict=False
+            )
         ]
         plan = {
             "symbol_paths": [],
@@ -961,19 +963,29 @@ def _json_print(payload: Mapping[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
-def _registry_campaigns(registry_path: Path, *, repo_root: Path) -> list[Campaign]:
-    """Every campaign the registry lists, loaded and validated."""
+def _registry_campaigns(
+    registry_path: Path, *, repo_root: Path, strict: bool = True
+) -> list[Campaign]:
+    """Every campaign the registry lists, loaded and validated.
+
+    With ``strict=False`` a manifest that fails to load is skipped instead of aborting the
+    whole load. That cannot weaken the evidence gate — a campaign that does not load also
+    matches no candidate path, so the tests it claimed stay blocked — and it keeps one
+    lane's half-written manifest from refusing evidence for every other lane. Re-pinning
+    stays strict: silently skipping a campaign there would drop it from the repair pass.
+    """
     payload = _load_registry(registry_path, repo_root)
-    return [
-        load_campaign(
-            repo_root
-            / _safe_relative_path(
-                row["manifest"], f"registry.campaigns[{index}].manifest"
-            ),
-            repo_root=repo_root,
+    campaigns: list[Campaign] = []
+    for index, row in enumerate(payload["campaigns"]):
+        manifest = repo_root / _safe_relative_path(
+            row["manifest"], f"registry.campaigns[{index}].manifest"
         )
-        for index, row in enumerate(payload["campaigns"])
-    ]
+        try:
+            campaigns.append(load_campaign(manifest, repo_root=repo_root))
+        except CampaignError:
+            if strict:
+                raise
+    return campaigns
 
 
 def repin_campaigns(
