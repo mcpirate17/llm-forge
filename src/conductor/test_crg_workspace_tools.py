@@ -76,6 +76,20 @@ def test_ast_context_filters_contains_edges(monkeypatch: pytest.MonkeyPatch) -> 
     assert "def f(): ..." in out
 
 
+def test_ast_context_caps_output_and_says_how_to_narrow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    big = _summary(skeleton="x" * (tools.AST_CONTEXT_MAX_BYTES + 500))
+    monkeypatch.setattr(tools, "get_file_context", lambda *a, **k: big)
+    out = tools.ast_context("pkg/mod.py")
+    assert len(out) < tools.AST_CONTEXT_MAX_BYTES + 120
+    assert "truncated" in out and "pass symbol=<name>" in out
+    narrowed = tools.ast_context("pkg/mod.py", symbol="f")
+    assert "offset/limit" in narrowed and "pass symbol" not in narrowed
+    monkeypatch.setattr(tools, "get_file_context", lambda *a, **k: _summary())
+    assert "truncated" not in tools.ast_context("pkg/mod.py")
+
+
 def test_ast_context_reports_errors_as_text(monkeypatch: pytest.MonkeyPatch) -> None:
     def boom(*_args: Any, **_kwargs: Any) -> FileContextSummary:
         raise GraphContextError("symbol 'nope' not found")

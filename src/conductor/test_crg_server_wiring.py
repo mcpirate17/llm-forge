@@ -35,6 +35,11 @@ def wired(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
         lambda mcp: calls.append(("register", mcp is fake_mcp)),
     )
     monkeypatch.setattr(
+        crg_server,
+        "assert_supported_fastmcp",
+        lambda: calls.append(("fastmcp_pin", None)),
+    )
+    monkeypatch.setattr(
         crg_server, "prune_tools", lambda mcp: calls.append(("prune", mcp is fake_mcp))
     )
     monkeypatch.setattr(crg_server, "search_enrichers", lambda root: {"enrich": root})
@@ -57,6 +62,7 @@ def test_main_wires_everything_in_order(
         ("bridge", None),
         ("node_text", Path("/r")),
         ("register", True),
+        ("fastmcp_pin", None),
         ("prune", True),
         ("shim", (True, Path("/r"), {"enrich": Path("/r")})),
         ("crg_main", "/r"),

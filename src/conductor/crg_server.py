@@ -11,6 +11,7 @@ from conductor.crg_embedding_bridge import CrgBridgeError, install_bridge
 from conductor.crg_embedding_text import install_node_text
 from conductor.crg_response_shim import (
     ResponseShimError,
+    assert_supported_fastmcp,
     install_response_shim,
     prune_tools,
 )
@@ -35,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     if os.environ.get("CRG_SHIM_DISABLE", "").strip() != "1":
         register_workspace_tools(mcp)
         try:
+            # Pin first: a fastmcp drift must report as a version mismatch, not
+            # as a missing private registry inside prune_tools.
+            assert_supported_fastmcp()
             prune_tools(mcp)
             install_response_shim(mcp, root, enrichers=search_enrichers(root))
         except ResponseShimError as exc:

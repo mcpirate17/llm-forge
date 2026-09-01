@@ -10,6 +10,7 @@ because it shares the ``mcp__code-review-graph__`` prefix.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from collections.abc import Callable
 from dataclasses import replace
@@ -29,6 +30,11 @@ from conductor.session_brief import brief as session_brief
 from conductor.session_brief import snippet as _snippet
 
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+# Skeletons of big files exceeded the 8 KB context bound on 56 % of calls (telemetry
+# baseline 2026-09-01); cap and say how to narrow instead of shipping the whole thing.
+AST_CONTEXT_MAX_BYTES: Final[int] = int(
+    os.environ.get("CRG_AST_CONTEXT_MAX_BYTES", "8000")
+)
 MAX_SOURCE_BYTES: Final[int] = 12_000
 LOCATE_LIMIT: Final[int] = 10
 # Search-result fields that only restate ``signature``/``qualified_name`` or carry
@@ -71,7 +77,23 @@ def ast_context(
         callers=[c for c in summary.callers if c.kind != CONTAINS_KIND],
         callees=[c for c in summary.callees if c.kind != CONTAINS_KIND],
     )
-    return format_markdown_context(summary)
+    return _cap_context(format_markdown_context(summary), symbol)
+
+
+def _cap_context(text: str, symbol: str | None) -> str:
+    """Cut a skeleton to the context bound and say how to narrow it."""
+    if len(text) <= AST_CONTEXT_MAX_BYTES:
+        return text
+    hint = (
+        "pass symbol=<name> to narrow to one function/class"
+        if symbol is None
+        else "Read the file with offset/limit for the rest"
+    )
+    dropped = len(text) - AST_CONTEXT_MAX_BYTES
+    return (
+        text[:AST_CONTEXT_MAX_BYTES]
+        + f"\n… truncated {dropped} of {len(text)} bytes; {hint}."
+    )
 
 
 def workspace_recall(query: str, notes_k: int = 5, cards_k: int = 3) -> dict[str, Any]:
