@@ -156,7 +156,12 @@ def test_prefix_only_strips_repo_root_not_lookalikes() -> None:
 
 
 def _fake_mcp(tools: dict[str, Any]) -> SimpleNamespace:
-    return SimpleNamespace(_tool_manager=SimpleNamespace(_tools=tools))
+    """fastmcp 3 shape: tools live in _local_provider._components as 'tool:<name>@'."""
+    for name, tool in tools.items():
+        tool.name = name
+    components = {f"tool:{name}@": tool for name, tool in tools.items()}
+    components["resource:probe@"] = SimpleNamespace(name="probe")
+    return SimpleNamespace(_local_provider=SimpleNamespace(_components=components))
 
 
 def test_install_wraps_sync_and_async_tools(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -217,10 +222,17 @@ def test_install_fails_loud_when_seam_is_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(shim, "assert_supported_fastmcp", lambda: None)
-    with pytest.raises(shim.ResponseShimError, match="_tool_manager"):
+    with pytest.raises(shim.ResponseShimError, match="_local_provider"):
         shim.install_response_shim(SimpleNamespace(), REPO)
     with pytest.raises(shim.ResponseShimError, match="no callable fn"):
         shim.install_response_shim(_fake_mcp({"t": SimpleNamespace(fn=None)}), REPO)
+
+
+def test_registered_tools_skips_non_tool_components_and_needs_one_tool() -> None:
+    tool = SimpleNamespace(fn=lambda: None)
+    assert shim.registered_tools(_fake_mcp({"only": tool})) == {"only": tool}
+    with pytest.raises(shim.ResponseShimError, match="holds no tools"):
+        shim.registered_tools(_fake_mcp({}))
 
 
 def test_hidden_tool_names_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -255,7 +267,7 @@ def test_prune_tools_removes_only_listed_and_fails_on_unknown() -> None:
     }
     removed: list[str] = []
     mcp = _fake_mcp(tools)
-    mcp.remove_tool = removed.append
+    mcp._local_provider.remove_tool = removed.append
     assert shim.prune_tools(mcp, frozenset({"drop_b", "drop_a"})) == [
         "drop_a",
         "drop_b",

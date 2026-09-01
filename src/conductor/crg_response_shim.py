@@ -29,7 +29,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Final
 
-EXPECTED_FASTMCP_VERSION: Final[str] = "2.14.6"
+EXPECTED_FASTMCP_VERSION: Final[str] = "3.4.7"
 HINTS_ENV: Final[str] = "CRG_KEEP_HINTS"
 MAX_LIST_ENV: Final[str] = "CRG_MAX_LIST_ITEMS"
 DEFAULT_MAX_LIST_ITEMS: Final[int] = 150
@@ -49,6 +49,13 @@ DEFAULT_HIDDEN_TOOLS: Final[frozenset[str]] = frozenset(
         "get_docs_section_tool",
         "list_repos_tool",
         "cross_repo_search_tool",
+        # 2.3.8 "insight" tools: graph-statistics prose no agent task here needs;
+        # hidden so their ~5 KB of schema never enters a session.
+        "get_hub_nodes_tool",
+        "get_bridge_nodes_tool",
+        "get_knowledge_gaps_tool",
+        "get_surprising_connections_tool",
+        "get_suggested_questions_tool",
     }
 )
 
@@ -167,21 +174,35 @@ def assert_supported_fastmcp() -> None:
     if version != EXPECTED_FASTMCP_VERSION:
         raise ResponseShimError(
             f"fastmcp version {version!r} != {EXPECTED_FASTMCP_VERSION!r}; "
-            "re-verify the _tool_manager/_tools/fn seam before bumping"
+            "re-verify the _local_provider._components/fn seam before bumping"
         )
 
 
 def registered_tools(mcp: Any) -> dict[str, Any]:
-    """Return FastMCP's registered tool objects, failing loud if the seam moved."""
-    manager = getattr(mcp, "_tool_manager", None)
-    tools = getattr(manager, "_tools", None)
-    if not isinstance(tools, dict) or not tools:
+    """Return FastMCP's registered tools by name, failing loud if the seam moved.
+
+    fastmcp 3 stores every locally registered component in
+    ``mcp._local_provider._components`` keyed ``"tool:<name>@[version]"``; a
+    tool exposes ``name`` and a reassignable ``fn`` that ``run`` calls.
+    """
+    provider = getattr(mcp, "_local_provider", None)
+    components = getattr(provider, "_components", None)
+    if not isinstance(components, dict) or not components:
         raise ResponseShimError(
-            "FastMCP tool registry (_tool_manager._tools) not found"
+            "FastMCP tool registry (_local_provider._components) not found"
         )
-    for name, tool in tools.items():
-        if not callable(getattr(tool, "fn", None)):
-            raise ResponseShimError(f"tool {name!r} has no callable fn attribute")
+    tools: dict[str, Any] = {}
+    for key, tool in components.items():
+        if not str(key).startswith("tool:"):
+            continue
+        name = getattr(tool, "name", None)
+        if not isinstance(name, str) or not callable(getattr(tool, "fn", None)):
+            raise ResponseShimError(f"tool {key!r} has no name or no callable fn")
+        tools[name] = tool
+    if not tools:
+        raise ResponseShimError(
+            "FastMCP tool registry (_local_provider._components) holds no tools"
+        )
     return tools
 
 
@@ -228,10 +249,11 @@ def prune_tools(mcp: Any, hidden: frozenset[str] | None = None) -> list[str]:
     unknown = sorted(names - tools.keys())
     if unknown:
         raise ResponseShimError(f"cannot hide unknown CRG tools: {unknown}")
-    if not callable(getattr(mcp, "remove_tool", None)):
-        raise ResponseShimError("FastMCP server has no remove_tool()")
+    provider = getattr(mcp, "_local_provider", None)
+    if not callable(getattr(provider, "remove_tool", None)):
+        raise ResponseShimError("FastMCP local provider has no remove_tool()")
     for name in sorted(names):
-        mcp.remove_tool(name)
+        provider.remove_tool(name)
     return sorted(names)
 
 
