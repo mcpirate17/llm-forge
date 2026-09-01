@@ -29,10 +29,10 @@ from conductor.kb_retrieve import EmbeddingBatch, embed_batch
 
 EXPECTED_CRG_VERSION: Final[str] = "2.3.8"
 EXPECTED_EMBEDDINGS_SHA256: Final[str] = (
-    "aa86b01dacae7832548d788be9b2ca5123500da06f0fa65c81cb0bf04eea1b29"
+    "1f5a79e692822d608abda77b330f23eb7d206695f451da93eaa8ae1fdb183636"
 )
 EXPECTED_MAIN_SHA256: Final[str] = (
-    "1d01605d2c97d4e2753b7a89e4e46e9f0113fbe8f20d17b3a08a5c08bced6f70"
+    "1b2518cd1358d4890a10819331b13943146cf82260b32a4f47789d65fe36faec"
 )
 BRIDGE_CONTRACT_VERSION: Final[int] = 1
 QUERY_INSTRUCT: Final[str] = (
