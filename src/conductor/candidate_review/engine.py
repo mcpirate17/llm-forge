@@ -10,12 +10,13 @@ import secrets
 import subprocess
 import sys
 import time
+from collections.abc import Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator, Sequence, cast
+from typing import Any, cast
 
 from conductor.candidate_review import SCHEMA_VERSION
 from conductor.candidate_review.checks import (
@@ -34,12 +35,12 @@ from conductor.candidate_review.command_runner import (
 )
 from conductor.candidate_review.git_source import git_common_dir, run_git
 from conductor.candidate_review.model import (
+    SEVERITY_RANK,
     Candidate,
     CheckResult,
     CheckStatus,
     Finding,
     ReviewReceipt,
-    SEVERITY_RANK,
     Severity,
     seal_receipt,
     sha256_file,
@@ -317,7 +318,7 @@ def _held_governance_lock(
                 {
                     "pid": os.getpid(),
                     "token": lease_token,
-                    "acquired": datetime.now(timezone.utc).isoformat(),
+                    "acquired": datetime.now(UTC).isoformat(),
                 },
                 sort_keys=True,
             )
@@ -637,7 +638,7 @@ def _parallel_results(
             check_id = futures[future]
             try:
                 results.append(future.result())
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - convert every check crash to a receipt
                 results.append(_crash_result(check_id, exc))
     return results
 
@@ -791,7 +792,7 @@ def _build_receipt(
         bypass=bypass,
         timings={
             "started_at": wall_started.isoformat(),
-            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "finished_at": datetime.now(UTC).isoformat(),
             "duration_ms": round((time.perf_counter() - monotonic_started) * 1000),
         },
         cache={
@@ -809,7 +810,7 @@ def _build_receipt(
 
 
 def run_review(ctx: ReviewContext) -> ReviewOutcome:
-    wall_started = datetime.now(timezone.utc)
+    wall_started = datetime.now(UTC)
     monotonic_started = time.perf_counter()
     engine, engine_result = _engine_integrity(ctx)
     baselines = baseline_receipts(ctx.policy, ctx.snapshot, ctx.profile, ctx.classes)
@@ -872,7 +873,7 @@ def append_attestation(message_file: Path, repo: Path) -> dict[str, str]:
             "pre-commit receipt tree no longer matches the candidate index"
         )
     if not isinstance(policy, dict) or not isinstance(policy.get("sha256"), str):
-        raise RuntimeError("pre-commit receipt has no bound policy digest")
+        raise RuntimeError("pre-commit receipt has no bound policy digest")  # noqa: TRY004 - protocol error, not a type error
     message = message_file.read_text(encoding="utf-8")
     existing = _trailers(message)
     desired = {
@@ -915,7 +916,7 @@ def snapshot_working_tree(repo: Path, owner: str) -> str | None:
     whether that is fatal. It never raises: failing to snapshot must not be a new way
     to fail a commit.
     """
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     ref = f"refs/snapshots/{owner}/{stamp}"
     # In a linked worktree `.git` is a FILE pointing at the real gitdir, so the index
     # path has to be resolved by git rather than assembled from the repo root.
@@ -923,7 +924,10 @@ def snapshot_working_tree(repo: Path, owner: str) -> str | None:
         git_dir = Path(
             subprocess.run(
                 ["git", "rev-parse", "--absolute-git-dir"],
-                cwd=repo, capture_output=True, text=True, check=True,
+                cwd=repo,
+                capture_output=True,
+                text=True,
+                check=True,
             ).stdout.strip()
         )
     except (subprocess.CalledProcessError, OSError):
@@ -933,7 +937,12 @@ def snapshot_working_tree(repo: Path, owner: str) -> str | None:
 
     def run(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["git", *args], cwd=repo, env=environment, capture_output=True, text=True, check=True
+            ["git", *args],
+            cwd=repo,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=True,
         )
 
     try:
@@ -957,10 +966,15 @@ def run_locked_git_commit(repo: Path, args: Sequence[str]) -> int:
         raise ValueError(
             "commit mutex wrapper accepts only arguments beginning with 'commit'"
         )
-    owner = os.environ.get("GOVERNANCE_OWNER", "unknown")
+    owner = os.environ.get("GOVERNANCE_OWNER")
+    if owner is None:
+        owner = "unknown"
     snapshot_ref = snapshot_working_tree(repo, owner)
     if snapshot_ref:
-        print(f"governance-commit: working tree snapshotted to {snapshot_ref}", file=sys.stderr)
+        print(
+            f"governance-commit: working tree snapshotted to {snapshot_ref}",
+            file=sys.stderr,
+        )
     else:
         print(
             "governance-commit: WARNING -- could not snapshot the working tree; "

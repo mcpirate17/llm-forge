@@ -41,7 +41,13 @@ FLEET: Final[str] = (
 )
 MUTATION: Final[str] = (
     "MUTATION: new/changed tests need a registered campaign PASS receipt. "
-    "`make mutation-coverage`. Never run mutants without Tim."
+    "`make mutation-coverage`. Mutation runs are pre-approved (Tim, "
+    "2026-08-31); disposable worktrees only, receipts still mandatory."
+)
+DELEGATE: Final[str] = (
+    "DELEGATE: searches touching >3 files, bulk reads, and summaries go to a "
+    "subagent; keep the session context for decisions. Prefer "
+    "ast_context_tool/query_graph over whole-file Read (>=400 lines: slice)."
 )
 
 
@@ -116,6 +122,7 @@ def compact_state(state: dict[str, Any], *, include_exposure: bool = True) -> st
         RETRIEVE,
         FLEET,
         MUTATION,
+        DELEGATE,
         "MANDATES: " + (", ".join(mandate_ids) if mandate_ids else "none"),
         f"CLAIMS: {n_claims} active. Inspect with `make governance-claims`.",
     ]

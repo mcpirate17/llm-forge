@@ -28,13 +28,16 @@ from conductor import mutation_testing_support as _support
 from conductor.mutation_scope import (
     CampaignError,
     TestFileScope,
-    _load_test_scopes as _load_test_scopes,
+    _python_test_nodeids,
     _require_mapping,
-    _require_string as _require_string,
     _require_string_list,
     _safe_relative_path,
     _test_scopes_payload,
 )
+from conductor.mutation_scope import (
+    _load_test_scopes as _load_test_scopes,  # noqa: PLC0414
+)
+from conductor.mutation_scope import _require_string as _require_string  # noqa: PLC0414
 from conductor.mutation_value import (
     ValueAnalysisSpec,
     ValueEvidenceError,
@@ -880,6 +883,11 @@ def _native_verification_request(
     normalized = tuple(_safe_relative_path(path, "candidate path") for path in paths)
     symbol_paths = _native_plan_paths(plan, "symbol_paths", "native plan symbol path")
     directories = _native_plan_paths(plan, "receipt_directories", "receipt directory")
+    python_scope_paths = _native_plan_paths(
+        {"python_scope_paths": plan.get("python_scope_paths", [])},
+        "python_scope_paths",
+        "native plan Python scope path",
+    )
     return {
         "repo_root": str(root),
         "registry_path": registry_relative,
@@ -887,6 +895,10 @@ def _native_verification_request(
         "receipt_directories": list(directories),
         "candidate_paths": list(normalized),
         "symbol_hashes": {path: symbol_hashes(root / path) for path in symbol_paths},
+        "python_test_nodeids": {
+            path: list(_python_test_nodeids(root / path, path))
+            for path in python_scope_paths
+        },
         "campaigns_override": None,
         "runner": _native_runner_payload(),
         "anchor": _native_anchor_payload(repo_root, anchor_repo),

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from collections.abc import Callable
+from pathlib import Path
 from types import ModuleType
-from typing import Callable
 
 import pytest
 
@@ -72,6 +72,15 @@ def test_compact_state_omits_claim_paths() -> None:
     assert ".current_work.md" in text
     assert "MUTATION" in text
     assert "mutation-coverage" in text
+
+
+def test_compact_state_states_mutation_authority_and_delegation() -> None:
+    text = preamble.compact_state(_state())  # type: ignore[arg-type]
+
+    assert "Mutation runs are pre-approved (Tim, 2026-08-31)" in text
+    assert "disposable worktrees only" in text
+    assert "DELEGATE: searches touching >3 files" in text
+    assert "ast_context_tool/query_graph" in text
 
 
 def test_inject_stays_under_budget() -> None:
