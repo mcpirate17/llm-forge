@@ -243,15 +243,180 @@ def append(record: dict[str, Any], path: Path = DEFAULT_PATH) -> bool:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def main() -> int:
+def rotate(path: Path) -> Path:
+    """Move a full log aside as ``<name>.<utc-stamp>.full`` and return the new name."""
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target = path.with_name(f"{path.name}.{stamp}.full")
+    os.replace(path, target)
+    return target
+
+
+def record(record_: dict[str, Any], path: Path) -> None:
+    """Append, rotating a full log first: the cap bounds one file, never drops data."""
+
+    if append(record_, path):
+        return
+    rotated = rotate(path)
+    print(f"context telemetry log rotated to {rotated.name}", file=sys.stderr)
+    if not append(record_, path):
+        raise OSError(f"context telemetry record exceeds the log budget ({path})")
+
+
+def hook_context_event(
+    hook: str, hook_json: Any, *, event_name: str = ""
+) -> dict[str, Any]:
+    """Reduce one hook's stdout JSON to the size of the context it injects."""
+
+    context = ""
+    specific = (
+        hook_json.get("hookSpecificOutput") if isinstance(hook_json, dict) else None
+    )
+    if isinstance(specific, dict):
+        context = str(specific.get("additionalContext") or "")
+        event_name = event_name or str(specific.get("hookEventName") or "")
+    context_bytes = len(context.encode("utf-8"))
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        "pid": os.getpid(),
+        "provider": _provider()[:MAX_PROVIDER_CHARS],
+        "event": "HookContext",
+        "hook_event": (event_name or "unknown")[:MAX_TOOL_CHARS],
+        "tool": hook[:MAX_TOOL_CHARS],
+        "input_bytes": 0,
+        "output_bytes": context_bytes,
+        "tool_input_tokens_estimate": 0,
+        "output_tokens_estimate": (context_bytes + 3) // 4,
+        "output_tokens_estimate_scope": "hook-additional-context-bytes",
+        "output_bounded": False,
+    }
+
+
+def _events(paths: list[Path]) -> Iterator[dict[str, Any]]:
+    for path in paths:
+        with path.open("rb") as handle:
+            for line in handle:
+                try:
+                    item = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(item, dict):
+                    yield item
+
+
+def summarize(paths: list[Path], *, bound_bytes: int = 8000) -> dict[str, Any]:
+    """Per-(event, tool) byte and token totals; ``over_bound`` = raw results the
+    post-bash-quiet hook cuts down before the model sees them."""
+
+    rows: dict[tuple[str, str], dict[str, int]] = {}
+    for item in _events(paths):
+        key = (str(item.get("event", "?")), str(item.get("tool", "?")))
+        row = rows.setdefault(
+            key,
+            {
+                "count": 0,
+                "output_bytes": 0,
+                "output_tokens_estimate": 0,
+                "over_bound": 0,
+                "over_bound_bytes": 0,
+            },
+        )
+        out = _nonnegative_int(item.get("output_bytes")) or 0
+        row["count"] += 1
+        row["output_bytes"] += out
+        row["output_tokens_estimate"] += (
+            _nonnegative_int(item.get("output_tokens_estimate")) or 0
+        )
+        if out > bound_bytes:
+            row["over_bound"] += 1
+            row["over_bound_bytes"] += out - bound_bytes
+    ranked = sorted(rows.items(), key=lambda kv: kv[1]["output_bytes"], reverse=True)
+    total = sum(r["output_bytes"] for r in rows.values())
+    return {
+        "schema_version": "llm.context-telemetry.summary.v1",
+        "files": [str(p) for p in paths],
+        "bound_bytes": bound_bytes,
+        "events": sum(r["count"] for r in rows.values()),
+        "output_bytes": total,
+        "hook_context_bytes": sum(
+            r["output_bytes"] for (ev, _), r in rows.items() if ev == "HookContext"
+        ),
+        "rows": [
+            {
+                "event": ev,
+                "tool": tool,
+                **r,
+                "share": round(r["output_bytes"] / total, 4) if total else 0.0,
+            }
+            for (ev, tool), r in ranked
+        ],
+    }
+
+
+def _format_summary(summary: dict[str, Any]) -> str:
+    lines = [
+        f"events={summary['events']} output_bytes={summary['output_bytes']:,} "
+        f"hook_context_bytes={summary['hook_context_bytes']:,} bound={summary['bound_bytes']}",
+        f"{'event':<14}{'tool':<22}{'count':>7}{'bytes':>13}{'share':>7}{'>bound':>8}{'bytes>bound':>13}",
+    ]
+    for r in summary["rows"]:
+        lines.append(
+            f"{r['event']:<14}{r['tool']:<22}{r['count']:>7}{r['output_bytes']:>13,}"
+            f"{r['share']:>7.1%}{r['over_bound']:>8}{r['over_bound_bytes']:>13,}"
+        )
+    return "\n".join(lines)
+
+
+def _cmd_record(path: Path) -> int:
     try:
-        payload = json.load(sys.stdin)
-        path = Path(os.environ.get("CONTEXT_TELEMETRY_PATH", DEFAULT_PATH))
-        if not append(event(payload), path):
-            print("context telemetry log is full; event dropped", file=sys.stderr)
-    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        record(event(json.load(sys.stdin)), path)
+    except (OSError, TypeError, ValueError) as exc:
         print(f"context telemetry unavailable: {exc}", file=sys.stderr)
     return 0
+
+
+def _cmd_hook_context(path: Path, hook: str, event_name: str) -> int:
+    """Tee: log the injected-context size, echo the hook JSON byte-for-byte."""
+
+    raw = sys.stdin.buffer.read()
+    sys.stdout.buffer.write(raw)
+    sys.stdout.flush()
+    try:
+        item = hook_context_event(hook, json.loads(raw), event_name=event_name)
+        if item["output_bytes"]:  # a quiet hook injects nothing: no event
+            record(item, path)
+    except (OSError, TypeError, ValueError) as exc:
+        print(f"context telemetry unavailable: {exc}", file=sys.stderr)
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command")
+    sub.add_parser("record", help="(default) log one PostToolUse payload from stdin")
+    hook = sub.add_parser(
+        "hook-context", help="log a hook's injected context size; passes stdin through"
+    )
+    hook.add_argument("--hook", required=True)
+    hook.add_argument(
+        "--event", default="", help="hook event name if the JSON lacks one"
+    )
+    summary = sub.add_parser("summary", help="aggregate one or more event logs")
+    summary.add_argument("paths", nargs="*", type=Path)
+    summary.add_argument("--bound-bytes", type=int, default=8000)
+    summary.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    path = Path(os.environ.get("CONTEXT_TELEMETRY_PATH", DEFAULT_PATH))
+    if args.command == "hook-context":
+        return _cmd_hook_context(path, args.hook, args.event)
+    if args.command == "summary":
+        paths = args.paths or [path]
+        result = summarize(paths, bound_bytes=args.bound_bytes)
+        print(json.dumps(result, indent=2) if args.json else _format_summary(result))
+        return 0
+    return _cmd_record(path)
 
 
 if __name__ == "__main__":

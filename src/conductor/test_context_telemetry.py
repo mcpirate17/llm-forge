@@ -77,3 +77,91 @@ def test_output_bounded_requires_a_structured_marker() -> None:
 
     assert literal["output_bounded"] is False
     assert structured["output_bounded"] is True
+
+
+def test_hook_context_event_measures_only_the_injected_context() -> None:
+    record = telemetry.hook_context_event(
+        "session-start",
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": "héllo",
+            }
+        },
+    )
+    assert record["event"] == "HookContext"
+    assert record["tool"] == "session-start"
+    assert record["hook_event"] == "SessionStart"
+    assert record["output_bytes"] == 6
+    assert record["output_tokens_estimate"] == 2
+
+    quiet = telemetry.hook_context_event(
+        "pre-read-skeleton",
+        {"hookSpecificOutput": {"hookEventName": "PreToolUse"}},
+        event_name="Override",
+    )
+    assert quiet["output_bytes"] == 0
+    assert quiet["hook_event"] == "Override"
+    assert (
+        telemetry.hook_context_event(
+            "x", {"hookSpecificOutput": {"hookEventName": "PreToolUse"}}
+        )["hook_event"]
+        == "PreToolUse"
+    )
+    assert (
+        telemetry.hook_context_event("x", "not json", event_name="E")["hook_event"]
+        == "E"
+    )
+
+
+def test_record_rotates_a_full_log_instead_of_dropping(
+    tmp_path: Path, monkeypatch
+) -> None:
+    path = tmp_path / "events.jsonl"
+    encoded = (
+        json.dumps({"id": 1}, ensure_ascii=False, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    monkeypatch.setattr(telemetry, "MAX_LOG_BYTES", len(encoded))
+
+    telemetry.record({"id": 1}, path)
+    telemetry.record({"id": 2}, path)
+
+    rotated = list(tmp_path.glob("events.jsonl.*.full"))
+    assert len(rotated) == 1
+    assert rotated[0].read_bytes() == encoded
+    assert json.loads(path.read_text(encoding="utf-8")) == {"id": 2}
+
+
+def test_summary_groups_by_event_and_tool_and_counts_over_bound(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "events.jsonl"
+    records = [
+        telemetry.event({"tool_name": "Bash", "tool_response": "x" * 30}),
+        telemetry.event({"tool_name": "Bash", "tool_response": "x" * 8}),
+        telemetry.event({"tool_name": "Read", "tool_response": "y" * 10}),
+        telemetry.hook_context_event(
+            "session-start",
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "SessionStart",
+                    "additionalContext": "abcd",
+                }
+            },
+        ),
+    ]
+    for item in records:
+        telemetry.append(item, path)
+    path.write_bytes(path.read_bytes() + b"not json\n")
+
+    summary = telemetry.summarize([path], bound_bytes=12)
+
+    assert summary["events"] == 4
+    assert summary["hook_context_bytes"] == 4
+    rows = {(row["event"], row["tool"]): row for row in summary["rows"]}
+    bash = rows[("PostToolUse", "Bash")]
+    assert bash["count"] == 2 and bash["output_bytes"] == 32 + 10
+    assert bash["over_bound"] == 1 and bash["over_bound_bytes"] == 32 - 12
+    assert rows[("PostToolUse", "Read")]["over_bound"] == 0
+    assert summary["rows"][0]["tool"] == "Bash"
+    assert abs(sum(row["share"] for row in summary["rows"]) - 1.0) < 1e-3

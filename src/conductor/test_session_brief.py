@@ -346,3 +346,15 @@ def test_brief_orchestrates_and_main_prints(
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO(INBOX))
     assert sb.main(["a2a-compact"]) == 0
     assert capsys.readouterr().out.startswith("[UNREAD] aaa")
+
+
+def test_compact_inbox_passes_already_compact_input_through() -> None:
+    compact = (
+        "A2A compact agent=fable-5 total=2 shown=2 omitted=0\n"
+        "[open] aaa from=codex thread=t1 response=yes\n  first summary\n"
+        "[working] bbb from=helm thread=t2\n  second summary\n"
+        "raw bytes withheld from context: 999\n"
+    )
+    assert sb.is_compact_inbox(compact) and not sb.is_compact_inbox(INBOX)
+    assert sb.compact_inbox(compact) == compact.strip()
+    assert sb.compact_inbox(compact, max_msgs=1) == compact.strip()

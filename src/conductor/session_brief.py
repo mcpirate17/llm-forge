@@ -60,10 +60,24 @@ def snippet(text: str, limit: int = SNIPPET_CHARS) -> str:
     return body if len(body) <= limit else body[: limit - 1].rstrip() + "…"
 
 
+def is_compact_inbox(text: str) -> bool:
+    """True when *text* is the compact inbox rendering, not a ``--full`` dump."""
+    lines = text.splitlines()
+    return bool(lines) and lines[0].startswith("A2A compact agent=")
+
+
 def compact_inbox(
     text: str, *, max_msgs: int = MAX_MSGS, preview: int = PREVIEW_CHARS
 ) -> str:
-    """Header + one-line preview per ``[UNREAD]`` message; never whole bodies."""
+    """Header + one-line preview per ``[UNREAD]`` message; never whole bodies.
+
+    Input in the already-bounded compact form (``[<status>] <id> from=...``
+    headers from ``agent_a2a inbox`` without ``--full``) passes through
+    unchanged: it carries no bodies to strip, and the old filter silently
+    erased it (0 bytes injected at session start, 2026-08-30 to 2026-09-01).
+    """
+    if is_compact_inbox(text):
+        return text.strip()
     msgs: list[str] = []
     header: str | None = None
     body: list[str] = []
