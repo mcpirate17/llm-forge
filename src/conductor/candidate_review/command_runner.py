@@ -18,6 +18,7 @@ from conductor.candidate_review.model import (
     CheckStatus,
     Finding,
     Severity,
+    sha256_json,
 )
 from conductor.candidate_review.policy import CheckPolicy
 
@@ -287,6 +288,40 @@ def _tail(value: str, maximum: int) -> str:
     return value if len(value) <= maximum else value[-maximum:]
 
 
+def _jscpd_aggregate_fingerprint(analyzer_output: str) -> str:
+    """Identify a candidate-caused clone set without hashing audit scratch paths."""
+
+    marker_suffix = "CAUSED by this candidate's changed files:"
+    lines = analyzer_output.splitlines()
+    marker_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if line.startswith("ERROR: jscpd found ") and line.endswith(marker_suffix)
+        ),
+        None,
+    )
+    if marker_index is None:
+        return ""
+
+    marker = " ".join(lines[marker_index].split())
+    pairs = sorted(
+        " ".join(line.split())
+        for line in lines[marker_index + 1 :]
+        if " <-> " in line and line.strip().endswith(" lines)")
+    )
+    if not pairs:
+        return ""
+    return sha256_json(
+        {
+            "check_id": "jscpd",
+            "rule_id": "analyzer-finding",
+            "marker": marker,
+            "result_set": pairs,
+        }
+    )[:24]
+
+
 def tool_version(
     ctx: ReviewContext, check: CheckPolicy
 ) -> tuple[str | None, str | None]:
@@ -375,6 +410,11 @@ def run_command_check(
                 severity=Severity.CRITICAL if crash else check.severity,
                 message=analyzer_output or f"analyzer exited {completed.returncode}",
                 evidence={"exit_code": completed.returncode},
+                fingerprint=(
+                    _jscpd_aggregate_fingerprint(analyzer_output)
+                    if check.check_id == "jscpd" and not crash
+                    else ""
+                ),
             )
         )
     result = _result(check.check_id, started, findings, files=files)

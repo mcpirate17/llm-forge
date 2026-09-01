@@ -12,14 +12,18 @@
 from __future__ import annotations
 
 import ast
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
 from conductor.candidate_review import verification
 from conductor.candidate_review.checks import _call_name, _PythonVisitor
+from conductor.candidate_review.model import Severity
+from conductor.candidate_review.policy import CheckPolicy
 
 
 def _call_node(expression: str) -> ast.expr:
@@ -192,11 +196,84 @@ class _StubContext:
 
 def _blocking(module: str = "lane.py") -> dict[str, Any]:
     return {
-        "module": module, "qualname": "Lane.forward", "rule": "drop_where",
-        "lineno": 12, "verdict": "REACHABLE_BUT_UNTESTED",
-        "description": "torch.where(...) collapsed", "amplifier": "params_x1e3",
+        "module": module,
+        "qualname": "Lane.forward",
+        "rule": "drop_where",
+        "lineno": 12,
+        "verdict": "REACHABLE_BUT_UNTESTED",
+        "description": "torch.where(...) collapsed",
+        "amplifier": "params_x1e3",
         "max_diff_amplified": 0.97,
     }
+
+
+def test_jscpd_fingerprint_ignores_audit_roots_and_pair_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same caused clone set keeps one identity across isolated audit roots."""
+    from conductor.candidate_review import command_runner
+
+    check = CheckPolicy(
+        check_id="jscpd",
+        kind="command",
+        profiles=("full",),
+        classes=("python",),
+        exclude_classes=(),
+        command=("jscpd-audit",),
+        version_command=("jscpd", "--version"),
+        severity=Severity.HIGH,
+        timeout_seconds=30,
+        memory_mb=512,
+        always=True,
+        cache=False,
+        run_on_deletions=False,
+        max_output_chars=30_000,
+    )
+    pair_lines = [
+        "  conductor/a.py  <->  conductor/b.py  (17 lines)",
+        "  research/tools/x.py  <->  research/tools/y.py  (31 lines)",
+    ]
+    outputs = [
+        "\n".join(
+            [
+                f"audit-root: /tmp/audit-{root} | git-head: {head} | mode: index-snapshot",
+                f"command: jscpd --config /tmp/{root}/jscpd.json",
+                "jscpd: 400 duplicate pair(s) found, 398 in baseline, 2 new.",
+                "ERROR: jscpd found 2 new duplicate pair(s) CAUSED by this candidate's changed files:",
+                *pairs,
+                "Refactor to remove the duplication.",
+            ]
+        )
+        for root, head, pairs in (
+            ("one", "1" * 40, pair_lines),
+            ("two", "2" * 40, list(reversed(pair_lines))),
+        )
+    ]
+    completed = iter(
+        subprocess.CompletedProcess(["jscpd-audit"], 1, output, "")
+        for output in outputs
+    )
+    monkeypatch.setattr(command_runner, "files_for_policy", lambda *_: ["a.py"])
+    monkeypatch.setattr(
+        command_runner, "_run_process", lambda *_, **__: next(completed)
+    )
+
+    ctx = SimpleNamespace(
+        repo=tmp_path,
+        snapshot=tmp_path,
+        candidate=SimpleNamespace(
+            base_commit_oid=None,
+            base_tree_oid="base-tree",
+            tree_oid="candidate-tree",
+        ),
+    )
+    results = [
+        command_runner.run_command_check(ctx, check, version="4.2.1") for _ in range(2)
+    ]
+
+    assert results[0].findings[0].message != results[1].findings[0].message
+    assert results[0].findings[0].fingerprint
+    assert results[0].findings[0].fingerprint == results[1].findings[0].fingerprint
 
 
 def test_equivalence_probe_reports_only_reachable_untested_branches(
@@ -210,12 +287,14 @@ def test_equivalence_probe_reports_only_reachable_untested_branches(
     from conductor import slop_gate
     from conductor.candidate_review.checks import check_equivalence_probe
 
-    summary = {"modules_probed": 1, "modules_without_drivers": [],
-               "blocking": [_blocking()], "advisory": [_blocking("other.py")]}
+    summary = {
+        "modules_probed": 1,
+        "modules_without_drivers": [],
+        "blocking": [_blocking()],
+        "advisory": [_blocking("other.py")],
+    }
     monkeypatch.setattr(slop_gate, "run", lambda base, root, only=(): (1, summary))
-    result = check_equivalence_probe(
-        _StubContext(tmp_path, (_StubChange("lane.py"),))
-    )
+    result = check_equivalence_probe(_StubContext(tmp_path, (_StubChange("lane.py"),)))
     assert [f.path for f in result.findings] == ["lane.py"]
     assert result.metrics["advisory"] == 1
 
@@ -231,8 +310,12 @@ def test_equivalence_probe_never_probes_a_test_file(
 
     def _run(base: str, root: Path, only: Any = ()) -> tuple[int, dict[str, Any]]:
         seen.append(list(only))
-        return 0, {"modules_probed": 0, "modules_without_drivers": [],
-                   "blocking": [], "advisory": []}
+        return 0, {
+            "modules_probed": 0,
+            "modules_without_drivers": [],
+            "blocking": [],
+            "advisory": [],
+        }
 
     monkeypatch.setattr(slop_gate, "run", _run)
     check_equivalence_probe(
@@ -257,12 +340,22 @@ def test_severity_follows_the_tier_so_only_shipped_code_blocks(
 
     shipped = _blocking("conductor/lane.py")
     script = _blocking("research/tools/one_off.py")
-    summary = {"modules_probed": 2, "modules_without_drivers": [],
-               "blocking": [shipped, script], "advisory": []}
+    summary = {
+        "modules_probed": 2,
+        "modules_without_drivers": [],
+        "blocking": [shipped, script],
+        "advisory": [],
+    }
     monkeypatch.setattr(slop_gate, "run", lambda base, root, only=(): (1, summary))
     result = check_equivalence_probe(
-        _StubContext(tmp_path, (_StubChange("conductor/lane.py"),
-                                _StubChange("research/tools/one_off.py"))))
+        _StubContext(
+            tmp_path,
+            (
+                _StubChange("conductor/lane.py"),
+                _StubChange("research/tools/one_off.py"),
+            ),
+        )
+    )
     by_path = {f.path: f.severity for f in result.findings}
     assert by_path["conductor/lane.py"] == Severity.HIGH
     assert by_path["research/tools/one_off.py"] == Severity.LOW
@@ -283,12 +376,15 @@ def test_the_gate_hands_its_findings_to_the_backlog(
     from conductor.candidate_review.checks import check_equivalence_probe
 
     drop = _backlog_drop
-    summary = {"modules_probed": 1, "modules_without_drivers": [],
-               "blocking": [_blocking("conductor/lane.py")], "advisory": []}
+    summary = {
+        "modules_probed": 1,
+        "modules_without_drivers": [],
+        "blocking": [_blocking("conductor/lane.py")],
+        "advisory": [],
+    }
     monkeypatch.setattr(slop_gate, "run", lambda base, root, only=(): (1, summary))
 
-    check_equivalence_probe(
-        _StubContext(tmp_path, (_StubChange("conductor/lane.py"),)))
+    check_equivalence_probe(_StubContext(tmp_path, (_StubChange("conductor/lane.py"),)))
 
     written = list(drop.glob("*.json"))
     assert len(written) == 1, f"expected one run artifact, got {written}"
@@ -310,10 +406,15 @@ def test_a_backlog_write_failure_does_not_fail_the_review(
     blocked = tmp_path / "unwritable"
     blocked.write_text("not a directory")
     monkeypatch.setattr(slop_ledger, "GATE_FINDINGS", blocked / "nested")
-    summary = {"modules_probed": 1, "modules_without_drivers": [],
-               "blocking": [_blocking("conductor/lane.py")], "advisory": []}
+    summary = {
+        "modules_probed": 1,
+        "modules_without_drivers": [],
+        "blocking": [_blocking("conductor/lane.py")],
+        "advisory": [],
+    }
     monkeypatch.setattr(slop_gate, "run", lambda base, root, only=(): (1, summary))
 
     result = check_equivalence_probe(
-        _StubContext(tmp_path, (_StubChange("conductor/lane.py"),)))
+        _StubContext(tmp_path, (_StubChange("conductor/lane.py"),))
+    )
     assert [f.path for f in result.findings] == ["conductor/lane.py"]
