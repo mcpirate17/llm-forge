@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -28,13 +28,11 @@ from conductor import mutation_testing_support as _support
 from conductor.mutation_scope import (
     CampaignError,
     TestFileScope,
-    _load_test_scopes,
-    _python_test_nodeids,
+    _load_test_scopes as _load_test_scopes,
     _require_mapping,
-    _require_string,
+    _require_string as _require_string,
     _require_string_list,
     _safe_relative_path,
-    _test_scope_errors,
     _test_scopes_payload,
 )
 from conductor.mutation_value import (
@@ -43,19 +41,16 @@ from conductor.mutation_value import (
     analyze_test_value,
     collect_pytest_junit_batch,
     load_value_analysis,
-    test_value_receipt_errors,
     value_inspection_payload,
 )
 
-SCHEMA_VERSION = 1
-REGISTRY_SCHEMA_VERSION = 1
 RECEIPT_SCHEMA = "llm.mutation-testing.receipt.v3"
 LEGACY_RECEIPT_SCHEMA = "llm.mutation-testing.receipt.v2"
 LEGACY_RECEIPT_ANCHOR_COMMIT = "61343f575215dd222a74fc2c060d0328692ded5e"
 LEGACY_RECEIPT_ANCHOR_TREE = "b01877ba62c32445f7649450f9b395dd70de306a"
 LEGACY_RECEIPT_PREFIX = "conductor/mutation_campaigns/receipts/"
-CANONICAL_TEST_PATTERNS = _support.CANONICAL_TEST_PATTERNS
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+CANONICAL_TEST_PATTERNS = _support.CANONICAL_TEST_PATTERNS
 OUTPUT_TAIL_CHARS = 12_000
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNNER_COMPONENT_PATHS = (
@@ -64,6 +59,9 @@ RUNNER_COMPONENT_PATHS = (
     "conductor/mutation_testing.py",
     "conductor/mutation_testing_support.py",
     "conductor/mutation_value.py",
+    "research/runtime/native/rust/research-runtime/src/mutation_evidence.rs",
+    "research/runtime/native/rust/research-runtime/src/mutation_manifest.rs",
+    "research/runtime/native/rust/research-runtime/src/mutation_receipt.rs",
 )
 
 
@@ -150,348 +148,110 @@ class CommandResult:
         }
 
 
-def _load_ranked_tests(value: object) -> tuple[RankedTest, ...]:
-    if not isinstance(value, list) or not value:
-        raise CampaignError("ranked_tests must be a non-empty list")
-    tests: list[RankedTest] = []
-    for index, raw in enumerate(value, start=1):
-        row = _require_mapping(raw, f"ranked_tests[{index - 1}]")
-        rank = row.get("rank")
-        if not isinstance(rank, int):
-            raise CampaignError(f"ranked_tests[{index - 1}].rank must be an integer")
-        tests.append(
-            RankedTest(
-                rank=rank,
-                nodeid=_require_string(row.get("nodeid"), "ranked test nodeid"),
-                contract=_require_string(row.get("contract"), "ranked test contract"),
-                rationale=_require_string(
-                    row.get("rationale"), "ranked test rationale"
-                ),
-            )
-        )
-    ranks = [test.rank for test in tests]
-    if ranks != list(range(1, len(tests) + 1)):
-        raise CampaignError(
-            f"ranked_tests must be ordered with contiguous ranks, got {ranks}"
-        )
-    nodeids = [test.nodeid for test in tests]
-    if len(set(nodeids)) != len(nodeids):
-        raise CampaignError("ranked_tests contains duplicate nodeids")
-    return tuple(tests)
+def _native_row(model: Any, row: Mapping[str, Any]) -> Any:
+    """Materialize one normalized native row as its stable Python dataclass."""
+
+    values = {
+        name: row["id"] if name == "mutation_id" else row[name]
+        for name in model.__dataclass_fields__
+    }
+    for name in ("allowed_paths", "expected_killers"):
+        if name in values:
+            values[name] = tuple(values[name])
+    if "patch_file" in values:
+        values["patch_file"] = Path(values["patch_file"])
+    return model(**values)
 
 
-def _load_planned_mutations(value: object) -> tuple[PlannedMutation, ...]:
-    if not isinstance(value, list):
-        raise CampaignError("planned_mutations must be a list")
-    planned: list[PlannedMutation] = []
-    for index, raw in enumerate(value):
-        row = _require_mapping(raw, f"planned_mutations[{index}]")
-        planned.append(
-            PlannedMutation(
-                mutation_id=_require_string(
-                    row.get("id"), f"planned_mutations[{index}].id"
-                ),
-                target_path=_safe_relative_path(
-                    row.get("target_path"),
-                    f"planned_mutations[{index}].target_path",
-                ),
-                contract=_require_string(
-                    row.get("contract"), f"planned_mutations[{index}].contract"
-                ),
-                description=_require_string(
-                    row.get("description"),
-                    f"planned_mutations[{index}].description",
-                ),
-                expected_killers=_require_string_list(
-                    row.get("expected_killers", []),
-                    f"planned_mutations[{index}].expected_killers",
-                ),
-            )
+def _native_json_call(
+    function_name: str,
+    payload: Mapping[str, Any],
+) -> Any:
+    """Call one native mutation primitive and decode its JSON result."""
+
+    try:
+        runtime = __import__("research_runtime_native")
+        operation = getattr(runtime, function_name)
+        encoded = operation(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         )
-    ids = [mutation.mutation_id for mutation in planned]
-    if len(set(ids)) != len(ids):
-        raise CampaignError("planned_mutations contains duplicate ids")
-    return tuple(planned)
+        return json.loads(encoded)
+    except (ImportError, AttributeError, ValueError, json.JSONDecodeError) as exc:
+        raise CampaignError(str(exc)) from exc
 
 
 def _patch_paths(patch_path: Path) -> tuple[str, ...]:
     """Extract and validate repository-relative paths from a unified diff."""
 
-    paths: list[str] = []
-    diff_paths: list[str] = []
-    old_paths: list[str] = []
     try:
-        lines = patch_path.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeError) as exc:
-        raise CampaignError(f"cannot read mutation patch {patch_path}: {exc}") from exc
-    for line in lines:
-        if line.startswith(("rename from ", "rename to ", "copy from ", "copy to ")):
-            raise CampaignError("mutation patches may not rename or copy files")
-        if line.startswith(("GIT binary patch", "Binary files ")):
-            raise CampaignError("mutation patches must be textual unified diffs")
-        if line.startswith("diff --git "):
-            fields = line.split()
-            if (
-                len(fields) != 4
-                or not fields[2].startswith("a/")
-                or not fields[3].startswith("b/")
-            ):
-                raise CampaignError(f"unsupported mutation diff header: {line!r}")
-            old = _safe_relative_path(fields[2][2:], "mutation diff old path")
-            new = _safe_relative_path(fields[3][2:], "mutation diff new path")
-            if old != new:
-                raise CampaignError("mutation patches may not rename files")
-            diff_paths.append(new)
-        elif line.startswith("--- "):
-            raw = line[4:].split("\t", 1)[0]
-            if raw == "/dev/null":
-                raise CampaignError("mutation patches may not create or delete files")
-            if not raw.startswith("a/"):
-                raise CampaignError(f"unsupported mutation patch path: {raw!r}")
-            old_paths.append(_safe_relative_path(raw[2:], "mutation patch path"))
-        elif line.startswith("+++ "):
-            raw = line[4:].split("\t", 1)[0]
-            if raw == "/dev/null":
-                raise CampaignError("mutation patches may not create or delete files")
-            if not raw.startswith("b/"):
-                raise CampaignError(f"unsupported mutation patch path: {raw!r}")
-            paths.append(_safe_relative_path(raw[2:], "mutation patch path"))
-    if not paths:
-        raise CampaignError(f"mutation patch contains no modified paths: {patch_path}")
-    if not diff_paths or sorted(diff_paths) != sorted(paths):
-        raise CampaignError("mutation patch diff headers do not match modified paths")
-    if sorted(old_paths) != sorted(paths):
-        raise CampaignError("mutation patch old/new paths do not match")
-    return tuple(sorted(set(paths)))
+        from research_runtime_native import mutation_patch_paths_native
 
-
-def _load_mutations(
-    value: object, manifest_path: Path, repo_root: Path
-) -> tuple[Mutation, ...]:
-    if not isinstance(value, list):
-        raise CampaignError("mutations must be a list")
-    mutations: list[Mutation] = []
-    for index, raw in enumerate(value):
-        row = _require_mapping(raw, f"mutations[{index}]")
-        patch_rel = _safe_relative_path(
-            row.get("patch_file"), f"mutations[{index}].patch_file"
-        )
-        patch_path = (manifest_path.parent / patch_rel).resolve()
-        try:
-            patch_path.relative_to(repo_root.resolve())
-        except ValueError as exc:
-            raise CampaignError(
-                f"mutations[{index}].patch_file escapes the repository"
-            ) from exc
-        allowed_paths = tuple(
-            _safe_relative_path(item, f"mutations[{index}].allowed_paths")
-            for item in _require_string_list(
-                row.get("allowed_paths", []), f"mutations[{index}].allowed_paths"
-            )
-        )
-        if not allowed_paths:
-            raise CampaignError(f"mutations[{index}].allowed_paths may not be empty")
-        patch_sha256 = _require_string(
-            row.get("patch_sha256"), f"mutations[{index}].patch_sha256"
-        )
-        if not SHA256_RE.fullmatch(patch_sha256):
-            raise CampaignError(
-                f"mutations[{index}].patch_sha256 must be a lowercase SHA-256 digest"
-            )
-        actual_patch_sha256 = _sha256(patch_path) if patch_path.is_file() else None
-        if actual_patch_sha256 != patch_sha256:
-            raise CampaignError(
-                f"mutation {row.get('id')!r} patch hash drifted: "
-                f"expected {patch_sha256}, got {actual_patch_sha256}"
-            )
-        actual_paths = _patch_paths(patch_path)
-        if actual_paths != tuple(sorted(set(allowed_paths))):
-            raise CampaignError(
-                f"mutation {row.get('id')!r} patch paths {actual_paths} do not match "
-                f"allowed_paths {tuple(sorted(set(allowed_paths)))}"
-            )
-        mutations.append(
-            Mutation(
-                mutation_id=_require_string(row.get("id"), f"mutations[{index}].id"),
-                patch_file=patch_path,
-                patch_sha256=patch_sha256,
-                allowed_paths=actual_paths,
-                expected_killers=_require_string_list(
-                    row.get("expected_killers", []),
-                    f"mutations[{index}].expected_killers",
-                ),
-            )
-        )
-    ids = [mutation.mutation_id for mutation in mutations]
-    if len(set(ids)) != len(ids):
-        raise CampaignError("mutations contains duplicate ids")
-    return tuple(mutations)
+        return tuple(mutation_patch_paths_native(str(patch_path)))
+    except (ImportError, AttributeError, ValueError) as exc:
+        raise CampaignError(str(exc)) from exc
 
 
 def load_campaign(path: Path, *, repo_root: Path = REPO_ROOT) -> Campaign:
-    """Load and structurally validate a mutation campaign manifest."""
+    """Load a mutation campaign through the native deterministic validator."""
 
+    root = repo_root.resolve()
     manifest_path = path.resolve()
     try:
-        manifest_path.relative_to(repo_root.resolve())
+        relative_manifest = manifest_path.relative_to(root).as_posix()
     except ValueError as exc:
         raise CampaignError("campaign manifest must be inside the repository") from exc
     try:
         raw = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise CampaignError(f"cannot load campaign {manifest_path}: {exc}") from exc
-    payload = _require_mapping(raw, "campaign")
-    if payload.get("schema_version") != SCHEMA_VERSION:
-        raise CampaignError(
-            f"unsupported schema_version={payload.get('schema_version')!r}; "
-            f"expected {SCHEMA_VERSION}"
+    result = _native_json_call(
+        "load_mutation_campaign_native",
+        {"repo_root": str(root), "manifest_path": relative_manifest},
+    )
+    data = _require_mapping(result, "native mutation campaign")
+    ranked_tests = tuple(_native_row(RankedTest, row) for row in data["ranked_tests"])
+    planned_mutations = tuple(
+        _native_row(PlannedMutation, row) for row in data["planned_mutations"]
+    )
+    mutations = tuple(_native_row(Mutation, row) for row in data["mutations"])
+    test_scopes = {
+        relative: TestFileScope(
+            path=relative,
+            mode=scope["mode"],
+            inventory=scope["inventory"],
+            nodeids=tuple(scope["nodeids"]),
         )
-    expected_mutations = payload.get("expected_mutations")
-    if not isinstance(expected_mutations, int) or expected_mutations < 1:
-        raise CampaignError("expected_mutations must be a positive integer")
-    source_raw = _require_mapping(payload.get("source_sha256"), "source_sha256")
-    source_sha256: dict[str, str] = {}
-    for raw_path, raw_digest in source_raw.items():
-        source_path = _safe_relative_path(raw_path, "source_sha256 path")
-        digest = _require_string(raw_digest, f"source_sha256[{source_path}]")
-        if not SHA256_RE.fullmatch(digest):
-            raise CampaignError(
-                f"source_sha256[{source_path}] must be a lowercase SHA-256 digest"
-            )
-        source_sha256[source_path] = digest
-    ranked_tests = _load_ranked_tests(payload.get("ranked_tests"))
-    expected_ranked_tests = payload.get("expected_ranked_tests", len(ranked_tests))
-    if expected_ranked_tests != len(ranked_tests):
-        raise CampaignError(
-            f"expected_ranked_tests={expected_ranked_tests!r}, "
-            f"but {len(ranked_tests)} tests are ranked"
-        )
-    planned = _load_planned_mutations(payload.get("planned_mutations", []))
-    if len(planned) != expected_mutations:
-        raise CampaignError(
-            f"expected {expected_mutations} planned mutation slots, got {len(planned)}"
-        )
-    mutations = _load_mutations(payload.get("mutations", []), manifest_path, repo_root)
-    planned_ids = {mutation.mutation_id for mutation in planned}
-    unknown_ids = {
-        mutation.mutation_id
-        for mutation in mutations
-        if mutation.mutation_id not in planned_ids
+        for relative, scope in data["test_scopes"].items()
     }
-    if unknown_ids:
-        raise CampaignError(
-            f"materialized mutations lack planned slots: {sorted(unknown_ids)}"
-        )
-    baseline = _require_mapping(payload.get("baseline"), "baseline")
-    test_argv = _require_string_list(baseline.get("argv"), "baseline.argv")
-    timeout_seconds = baseline.get("timeout_seconds")
-    if not isinstance(timeout_seconds, int) or timeout_seconds < 1:
-        raise CampaignError("baseline.timeout_seconds must be a positive integer")
-    missing_tests = [
-        test.nodeid
-        for test in ranked_tests
-        if test.nodeid not in test_argv
-        and test.nodeid.split("::", 1)[0] not in test_argv
-    ]
-    if missing_tests:
-        raise CampaignError(f"baseline.argv omits ranked tests: {missing_tests}")
-    resource_gate = _require_mapping(payload.get("resource_gate", {}), "resource_gate")
-    poll_seconds = resource_gate.get("poll_seconds", 30)
-    if not isinstance(poll_seconds, int) or poll_seconds < 1 or poll_seconds > 300:
-        raise CampaignError("resource_gate.poll_seconds must be in [1, 300]")
-    environment_raw = _require_mapping(payload.get("environment", {}), "environment")
-    environment: dict[str, str] = {}
-    for raw_key, raw_value in environment_raw.items():
-        key = _require_string(raw_key, "environment key")
-        if not isinstance(raw_value, str):
-            raise CampaignError(f"environment[{key!r}] must be a string")
-        environment[key] = raw_value
-    test_scopes = _load_test_scopes(
-        payload.get("test_scopes", {}),
-        source_sha256=source_sha256,
-        ranked_tests=ranked_tests,
-        repo_root=repo_root,
-    )
-    source_symbols = _load_source_symbols(
-        payload.get("source_symbols", {}), source_sha256=source_sha256
-    )
     try:
         value_analysis = load_value_analysis(
-            payload.get("value_analysis"),
+            raw.get("value_analysis") if isinstance(raw, dict) else None,
             ranked_nodeids=[test.nodeid for test in ranked_tests],
-            mutation_ids=[mutation.mutation_id for mutation in planned],
-            source_paths=list(source_sha256),
+            mutation_ids=[mutation.mutation_id for mutation in planned_mutations],
+            source_paths=list(data["source_sha256"]),
         )
     except ValueEvidenceError as exc:
         raise CampaignError(f"invalid value_analysis: {exc}") from exc
-    campaign = Campaign(
-        manifest_path=manifest_path,
-        manifest_sha256=_sha256(manifest_path),
-        campaign_id=_require_string(payload.get("campaign_id"), "campaign_id"),
-        title=_require_string(payload.get("title"), "title"),
-        language=_require_string(payload.get("language"), "language"),
-        mutation_engine=_require_string(
-            payload.get("mutation_engine"), "mutation_engine"
-        ),
-        expected_mutations=expected_mutations,
-        source_sha256=source_sha256,
-        source_symbols=source_symbols,
+    kwargs = {
+        name: data[name]
+        for name in Campaign.__dataclass_fields__
+        if name in data and name not in {"value_analysis", "test_scopes"}
+    }
+    kwargs.update(
+        manifest_path=root / data["manifest"],
         ranked_tests=ranked_tests,
-        planned_mutations=planned,
+        planned_mutations=planned_mutations,
         mutations=mutations,
-        test_argv=test_argv,
-        timeout_seconds=timeout_seconds,
-        blocked_process_substrings=_require_string_list(
-            resource_gate.get("blocked_process_substrings", []),
-            "resource_gate.blocked_process_substrings",
-        ),
-        poll_seconds=poll_seconds,
-        environment=environment,
-        host_read_dependencies=tuple(
-            _safe_relative_path(item, "host_read_dependencies")
-            for item in _require_string_list(
-                payload.get("host_read_dependencies", []),
-                "host_read_dependencies",
-            )
-        ),
         test_scopes=test_scopes,
         value_analysis=value_analysis,
     )
-    _validate_cross_references(campaign)
-    return campaign
-
-
-def _validate_cross_references(campaign: Campaign) -> None:
-    ranked = {test.nodeid for test in campaign.ranked_tests}
-    for planned in campaign.planned_mutations:
-        missing = sorted(set(planned.expected_killers) - ranked)
-        if missing:
-            raise CampaignError(
-                f"planned mutation {planned.mutation_id!r} has unranked killers: {missing}"
-            )
-        if planned.target_path not in campaign.source_sha256:
-            raise CampaignError(
-                f"planned mutation {planned.mutation_id!r} targets an unbound source: "
-                f"{planned.target_path}"
-            )
-    planned_by_id = {
-        mutation.mutation_id: mutation for mutation in campaign.planned_mutations
-    }
-    for mutation in campaign.mutations:
-        planned = planned_by_id[mutation.mutation_id]
-        if tuple(mutation.expected_killers) != tuple(planned.expected_killers):
-            raise CampaignError(
-                f"mutation {mutation.mutation_id!r} expected_killers drifted from its slot"
-            )
-        if planned.target_path not in mutation.allowed_paths:
-            raise CampaignError(
-                f"mutation {mutation.mutation_id!r} does not patch its planned target"
-            )
-        unbound = sorted(set(mutation.allowed_paths) - set(campaign.source_sha256))
-        if unbound:
-            raise CampaignError(
-                f"mutation {mutation.mutation_id!r} patches unbound sources: {unbound}"
-            )
+    for name in (
+        "test_argv",
+        "blocked_process_substrings",
+        "host_read_dependencies",
+    ):
+        kwargs[name] = tuple(kwargs[name])
+    return Campaign(**kwargs)
 
 
 def _sha256(path: Path) -> str:
@@ -521,80 +281,22 @@ RUNNER_LINEAGE_PATH = "conductor/mutation_runner_lineage.json"
 
 
 def _lineage_accepts(recorded: object, repo_root: Path) -> bool:
-    """True when `recorded` runner hashes are declared receipt-compatible with today's.
+    """Return whether a runner-component map is explicitly accepted."""
 
-    Every receipt pins the whole-file sha256 of five runner components, so ANY edit to
-    the runner voids every receipt in the repository at once. Measured 2026-08-30: one
-    added comment line dropped coverage from 505 to 74, rejecting 431 test paths. That
-    is the same over-broad-pin pathology per-symbol source pins exist to fix, one level
-    up -- a content pin over a whole file where only a narrow semantic surface decides
-    what a receipt MEANS.
-
-    An entry in `conductor/mutation_runner_lineage.json` narrows it, and only that:
-    it rewrites no receipt, names its justification and the diff it covers, is proven
-    by re-running a sample under both runners rather than asserted, and deleting it
-    restores strict whole-file behaviour immediately. It is NOT the frozen legacy v2
-    git anchor, which stays frozen.
-
-    Fail-closed: an absent, unreadable or malformed lineage file accepts nothing.
-    """
-    if not isinstance(recorded, dict):
-        return False
-    path = repo_root / RUNNER_LINEAGE_PATH
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
-    if payload.get("schema_version") != 1:
-        return False
-    entries = payload.get("entries")
-    if not isinstance(entries, list):
-        return False
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        if entry.get("runner_components_sha256") == recorded:
-            return True
-    return False
+        from research_runtime_native import mutation_runner_lineage_accepts_native
 
-
-def _load_source_symbols(
-    value: object, *, source_sha256: Mapping[str, str]
-) -> dict[str, dict[str, str]]:
-    """Validate the optional per-symbol pin table.
-
-    Fail-closed on every shape error. A malformed entry that silently degraded to "no
-    pins" would turn a narrowed pin into no pin at all, which is the one outcome worse
-    than the over-broad whole-file hash it replaces.
-    """
-    table = _require_mapping(value, "source_symbols")
-    parsed: dict[str, dict[str, str]] = {}
-    for raw_path, raw_symbols in table.items():
-        relative = _safe_relative_path(raw_path, "source_symbols key")
-        if relative not in source_sha256:
-            raise CampaignError(
-                f"source_symbols[{relative!r}] is not bound in source_sha256; "
-                "a symbolically pinned file must still declare the file it belongs to"
-            )
-        symbols = _require_mapping(raw_symbols, f"source_symbols[{relative!r}]")
-        if not symbols:
-            raise CampaignError(
-                f"source_symbols[{relative!r}] is empty; omit the path instead of "
-                "pinning nothing, which would silently disable drift detection for it"
-            )
-        entry: dict[str, str] = {}
-        for raw_symbol, raw_digest in symbols.items():
-            symbol = _require_string(raw_symbol, f"source_symbols[{relative!r}] key")
-            digest = _require_string(
-                raw_digest, f"source_symbols[{relative!r}][{symbol!r}]"
-            )
-            if not SHA256_RE.fullmatch(digest):
-                raise CampaignError(
-                    f"source_symbols[{relative!r}][{symbol!r}] must be a lowercase SHA-256 digest"
+        return bool(
+            mutation_runner_lineage_accepts_native(
+                json.dumps(
+                    {"repo_root": str(repo_root.resolve()), "recorded": recorded},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
                 )
-            entry[symbol] = digest
-        parsed[relative] = entry
-    return parsed
+            )
+        )
+    except (ImportError, AttributeError, ValueError, TypeError):
+        return False
 
 
 def symbol_hashes(path: Path) -> dict[str, str]:
@@ -632,59 +334,26 @@ def symbol_hashes(path: Path) -> dict[str, str]:
     return hashes
 
 
-def symbol_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
-    """Per-symbol drift for paths the campaign pins symbolically."""
-    drift: list[dict[str, Any]] = []
-    for relative, pinned in campaign.source_symbols.items():
-        path = root / relative
-        if not path.is_file() or path.is_symlink():
-            drift.append(
-                {"path": relative, "symbol": None, "reason": "absent or symlink"}
-            )
-            continue
-        current = symbol_hashes(path)
-        for symbol, expected in pinned.items():
-            actual = current.get(symbol)
-            if actual != expected:
-                drift.append(
-                    {
-                        "path": relative,
-                        "symbol": symbol,
-                        "expected_sha256": expected,
-                        "actual_sha256": actual,
-                        "reason": "symbol removed"
-                        if actual is None
-                        else "symbol changed",
-                    }
-                )
-    return drift
-
-
 def source_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
-    """Return every absent or hash-drifted source bound by the campaign.
+    """Return native file drift plus CPython-AST symbol drift."""
 
-    A path pinned symbolically in `source_symbols` is checked symbol-by-symbol and is
-    NOT whole-file hashed -- that is what stops an unrelated edit from voiding the
-    campaign. Everything else keeps the whole-file pin, so nothing changes for a
-    manifest that does not opt in.
-    """
-
-    drift: list[dict[str, Any]] = []
-    for relative, expected in campaign.source_sha256.items():
-        if relative in campaign.source_symbols:
-            continue
-        path = root / relative
-        actual = _sha256(path) if path.is_file() and not path.is_symlink() else None
-        if actual != expected:
-            drift.append(
-                {
-                    "path": relative,
-                    "expected_sha256": expected,
-                    "actual_sha256": actual,
-                    "is_symlink": path.is_symlink(),
-                }
-            )
-    return drift + symbol_drift(campaign, root)
+    current = {
+        relative: symbol_hashes(root / relative)
+        for relative in campaign.source_symbols
+        if (root / relative).is_file() and not (root / relative).is_symlink()
+    }
+    result = _native_json_call(
+        "mutation_source_drift_native",
+        {
+            "repo_root": str(root.resolve()),
+            "source_sha256": dict(campaign.source_sha256),
+            "source_symbols": campaign.source_symbols,
+            "symbol_hashes": current,
+        },
+    )
+    if not isinstance(result, list) or not all(isinstance(row, dict) for row in result):
+        raise CampaignError("native mutation source drift must be a list of objects")
+    return result
 
 
 def _ps_output() -> str:
@@ -732,61 +401,22 @@ def inspect_campaign(
     """Return readiness, ranking, drift, and resource evidence without mutations."""
 
     drift = source_drift(campaign, repo_root)
-    manifest_actual = (
+    manifest_drift = (
         _sha256(campaign.manifest_path) if campaign.manifest_path.is_file() else None
+    ) != campaign.manifest_sha256
+    result = _native_json_call(
+        "inspect_mutation_campaign_native",
+        {
+            "campaign": _native_campaign_contract(campaign, repo_root=repo_root),
+            "source_drift": drift,
+            "manifest_hash_drift": manifest_drift,
+            "blocking_processes": blocking_processes(
+                campaign.blocked_process_substrings
+            ),
+            "value_analysis": value_inspection_payload(campaign.value_analysis),
+        },
     )
-    manifest_drift = manifest_actual != campaign.manifest_sha256
-    blockers = blocking_processes(campaign.blocked_process_substrings)
-    readiness_reasons: list[str] = []
-    if len(campaign.mutations) != campaign.expected_mutations:
-        readiness_reasons.append(
-            f"materialized_mutations={len(campaign.mutations)}; "
-            f"expected={campaign.expected_mutations}"
-        )
-    if drift:
-        readiness_reasons.append(f"source_hash_drift={len(drift)}")
-    if manifest_drift:
-        readiness_reasons.append("manifest_hash_drift=1")
-    status = "READY" if not readiness_reasons else "NOT_READY"
-    return {
-        "schema_version": "llm.mutation-testing.inspect.v1",
-        "campaign_id": campaign.campaign_id,
-        "title": campaign.title,
-        "status": status,
-        "readiness_reasons": readiness_reasons,
-        "resource_status": "BUSY" if blockers else "IDLE",
-        "blocking_processes": blockers,
-        "source_drift": drift,
-        "manifest_sha256": campaign.manifest_sha256,
-        "manifest_hash_drift": manifest_drift,
-        "expected_mutations": campaign.expected_mutations,
-        "materialized_mutations": len(campaign.mutations),
-        "ranked_tests": [
-            {
-                "rank": test.rank,
-                "nodeid": test.nodeid,
-                "contract": test.contract,
-                "rationale": test.rationale,
-            }
-            for test in campaign.ranked_tests
-        ],
-        "test_scopes": _test_scopes_payload(campaign),
-        "value_analysis": value_inspection_payload(campaign.value_analysis),
-        "planned_mutations": [
-            {
-                "id": mutation.mutation_id,
-                "target_path": mutation.target_path,
-                "contract": mutation.contract,
-                "description": mutation.description,
-                "expected_killers": list(mutation.expected_killers),
-                "materialized": any(
-                    ready.mutation_id == mutation.mutation_id
-                    for ready in campaign.mutations
-                ),
-            }
-            for mutation in campaign.planned_mutations
-        ],
-    }
+    return dict(_require_mapping(result, "native mutation campaign inspection"))
 
 
 def _wait_for_idle(campaign: Campaign, wait_seconds: int) -> list[dict[str, Any]]:
@@ -1125,38 +755,77 @@ def _select_mutations(
 
 
 def _load_registry(path: Path, repo_root: Path) -> Mapping[str, Any]:
-    registry_path = path.resolve()
+    root = repo_root.resolve()
     try:
-        registry_path.relative_to(repo_root.resolve())
+        relative = path.resolve().relative_to(root).as_posix()
     except ValueError as exc:
         raise CampaignError("mutation registry must be inside the repository") from exc
-    try:
-        payload = _require_mapping(
-            json.loads(registry_path.read_text(encoding="utf-8")), "registry"
-        )
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise CampaignError(
-            f"cannot load mutation registry {registry_path}: {exc}"
-        ) from exc
-    if payload.get("schema_version") != REGISTRY_SCHEMA_VERSION:
-        raise CampaignError(
-            f"unsupported registry schema_version={payload.get('schema_version')!r}; "
-            f"expected {REGISTRY_SCHEMA_VERSION}"
-        )
-    if payload.get("enforcement") != "changed_tests":
-        raise CampaignError("registry enforcement must be 'changed_tests'")
-    patterns = _require_string_list(
-        payload.get("test_patterns"), "registry.test_patterns"
+    return _require_mapping(
+        _native_json_call(
+            "load_mutation_registry_native",
+            {
+                "repo_root": str(root),
+                "registry_path": relative,
+                "canonical_test_patterns": list(CANONICAL_TEST_PATTERNS),
+            },
+        ),
+        "registry",
     )
-    if patterns != CANONICAL_TEST_PATTERNS:
-        raise CampaignError("registry.test_patterns must match the canonical inventory")
-    _require_string_list(
-        payload.get("receipt_directories"), "registry.receipt_directories"
+
+
+def _native_campaign_contract(
+    campaign: Campaign,
+    *,
+    repo_root: Path,
+) -> dict[str, Any]:
+    """Serialize the stable campaign contract consumed by native validation."""
+
+    payload = asdict(campaign)
+    payload["manifest"] = campaign.manifest_path.relative_to(
+        repo_root.resolve()
+    ).as_posix()
+    del payload["manifest_path"]
+    payload["test_scopes"] = _test_scopes_payload(campaign)
+    payload["ranked_test_paths"] = [
+        test.nodeid.split("::", 1)[0] for test in campaign.ranked_tests
+    ]
+    for row in payload["planned_mutations"]:
+        row["id"] = row.pop("mutation_id")
+    for row in payload["mutations"]:
+        row["id"] = row.pop("mutation_id")
+        row["patch_file"] = str(row["patch_file"])
+    payload["value_analysis_payload"] = None
+    payload["value_analysis"] = (
+        None
+        if campaign.value_analysis is None
+        else {
+            "expected_nodeids": [test.nodeid for test in campaign.ranked_tests],
+            "expected_repetitions": campaign.value_analysis.baseline_repetitions,
+        }
     )
-    campaigns = payload.get("campaigns")
-    if not isinstance(campaigns, list) or not campaigns:
-        raise CampaignError("registry.campaigns must be a non-empty list")
+    payload["source_drifted"] = bool(source_drift(campaign, repo_root))
     return payload
+
+
+def _native_runner_payload() -> dict[str, Any]:
+    try:
+        components = _runner_components_sha256()
+    except CampaignError as exc:
+        return {"components": None, "error": str(exc), "mutation_testing_sha256": None}
+    return {
+        "components": components,
+        "error": None,
+        "mutation_testing_sha256": components["conductor/mutation_testing.py"],
+    }
+
+
+def _native_anchor_payload(repo_root: Path, anchor_repo: Path | None) -> dict[str, str]:
+    return {
+        "repo": str((anchor_repo or repo_root).resolve()),
+        "commit": LEGACY_RECEIPT_ANCHOR_COMMIT,
+        "tree": LEGACY_RECEIPT_ANCHOR_TREE,
+        "receipt_prefix": LEGACY_RECEIPT_PREFIX,
+    }
 
 
 def _receipt_errors(
@@ -1167,213 +836,40 @@ def _receipt_errors(
     receipt_bytes: bytes | None = None,
     anchor_repo: Path | None = None,
 ) -> list[str]:
-    errors: list[str] = []
-    expected_manifest = campaign.manifest_path.relative_to(repo_root).as_posix()
-    schema = receipt.get("schema_version")
-    anchored_legacy = schema == LEGACY_RECEIPT_SCHEMA
-    if anchored_legacy:
-        errors.extend(
-            _support.legacy_receipt_anchor_errors(
-                receipt_path,
-                receipt_bytes,
-                repo_root,
-                anchor_repo or repo_root,
-                anchor_commit=LEGACY_RECEIPT_ANCHOR_COMMIT,
-                anchor_tree=LEGACY_RECEIPT_ANCHOR_TREE,
-                receipt_prefix=LEGACY_RECEIPT_PREFIX,
-                manifest_path=expected_manifest,
-                manifest_sha256=campaign.manifest_sha256,
-            )
-        )
-    elif schema != RECEIPT_SCHEMA:
-        errors.append("receipt schema is not current")
-    if receipt.get("status") != "PASS":
-        errors.append(f"status={receipt.get('status')!r}")
-    if receipt.get("campaign_id") != campaign.campaign_id:
-        errors.append("campaign_id mismatch")
-    if receipt.get("manifest") != expected_manifest:
-        errors.append("manifest path mismatch")
-    if receipt.get("manifest_sha256") != campaign.manifest_sha256:
-        errors.append("manifest hash mismatch")
-    if not anchored_legacy:
-        try:
-            runner_components = _runner_components_sha256()
-        except CampaignError as exc:
-            errors.append(str(exc))
-        else:
-            recorded = receipt.get("runner_components_sha256")
-            if recorded != runner_components and not _lineage_accepts(
-                recorded, repo_root
-            ):
-                errors.append("runner component hash map mismatch")
-            elif (
-                recorded == runner_components
-                and receipt.get("runner_sha256")
-                != runner_components["conductor/mutation_testing.py"]
-            ):
-                # Only meaningful when the map itself matches; a lineage-accepted
-                # receipt necessarily carries the older runner sha too.
-                errors.append("runner hash mismatch")
-    if receipt.get("source_sha256") != dict(campaign.source_sha256):
-        errors.append("source hash map mismatch")
-    expected_symbols = {k: dict(v) for k, v in campaign.source_symbols.items()}
-    if receipt.get("source_symbols", {}) != expected_symbols:
-        errors.append("source symbol map mismatch")
-    if receipt.get("test_scopes", {}) != _test_scopes_payload(campaign):
-        errors.append("test scope map mismatch")
-    if receipt.get("complete_campaign") is not True:
-        errors.append("partial campaign receipt")
-    expected_ids = [mutation.mutation_id for mutation in campaign.mutations]
-    if receipt.get("selected_mutations") != expected_ids:
-        errors.append("selected mutation ids mismatch")
-    rows = receipt.get("mutants")
-    if not isinstance(rows, list):
-        errors.append("mutants must be a list")
-    else:
-        actual = {
-            row.get("id"): row
-            for row in rows
-            if isinstance(row, dict) and isinstance(row.get("id"), str)
-        }
-        if list(actual) != expected_ids:
-            errors.append("mutant result ids mismatch")
-        for mutation in campaign.mutations:
-            row = actual.get(mutation.mutation_id, {})
-            if row.get("outcome") != "KILLED":
-                errors.append(f"mutant {mutation.mutation_id} was not killed")
-            if row.get("patch_sha256") != mutation.patch_sha256:
-                errors.append(f"mutant {mutation.mutation_id} patch hash mismatch")
-    if receipt.get("mutation_score") != 1.0:
-        errors.append("mutation score is not 1.0")
-    if campaign.value_analysis is not None:
-        errors.extend(
-            test_value_receipt_errors(
-                receipt.get("test_value"),
-                expected_nodeids=[test.nodeid for test in campaign.ranked_tests],
-                expected_repetitions=campaign.value_analysis.baseline_repetitions,
-            )
-        )
-    if source_drift(campaign, repo_root):
-        errors.append("current source hashes drifted")
-    return errors
-
-
-def _verify_evidence_python(
-    registry_path: Path,
-    paths: Sequence[str],
-    *,
-    repo_root: Path = REPO_ROOT,
-    anchor_repo: Path | None = None,
-) -> dict[str, Any]:
-    """Require current full-campaign PASS receipts for every changed test path."""
-
-    payload = _load_registry(registry_path, repo_root)
-    normalized = tuple(_safe_relative_path(path, "candidate path") for path in paths)
-    campaign_rows = payload.get("campaigns")
-    assert isinstance(campaign_rows, list)
-    campaigns: list[Campaign] = []
-    for index, raw in enumerate(campaign_rows):
-        row = _require_mapping(raw, f"registry.campaigns[{index}]")
-        manifest = _safe_relative_path(
-            row.get("manifest"), f"registry.campaigns[{index}].manifest"
-        )
-        campaigns.append(load_campaign(repo_root / manifest, repo_root=repo_root))
-
-    receipts, malformed = _support.load_receipts(
-        repo_root,
-        _require_string_list(payload.get("receipt_directories"), "receipt_directories"),
-        safe_relative=_safe_relative_path,
-        require_mapping=_require_mapping,
-        error_type=CampaignError,
+    result = _native_json_call(
+        "validate_mutation_receipt_native",
+        {
+            "repo_root": str(repo_root.resolve()),
+            "anchor_repo": str((anchor_repo or repo_root).resolve()),
+            "campaign": _native_campaign_contract(campaign, repo_root=repo_root),
+            "receipt": dict(receipt),
+            "receipt_path": None if receipt_path is None else str(receipt_path),
+            "receipt_bytes": (None if receipt_bytes is None else list(receipt_bytes)),
+            "runner": _native_runner_payload(),
+            "anchor": _native_anchor_payload(repo_root, anchor_repo),
+        },
     )
-
-    evidence: list[dict[str, Any]] = []
-    missing: list[dict[str, Any]] = []
-    for test_path in sorted(set(normalized)):
-        matching = [
-            campaign
-            for campaign in campaigns
-            if test_path in campaign.source_sha256
-            and any(
-                ranked.nodeid.split("::", 1)[0] == test_path
-                for ranked in campaign.ranked_tests
-            )
-        ]
-        # Collect EVERY valid receipt across EVERY campaign ranking this path, then
-        # take the newest. The old loop broke at the first campaign in registry order
-        # that had any valid receipt, so a second campaign covering the same test file
-        # was silently invisible -- its receipts never even appeared in the rejection
-        # reasons. 9 test paths are claimed by two campaigns each, so "which evidence
-        # counts" was decided by position in registry.json.
-        #
-        # Newest is by the receipt's own generated_at, not filename order. The previous
-        # `reversed(...)` over a lexicographic glob was a filename-shaped proxy for
-        # recency that quietly disagrees with it whenever a campaign_id sorts oddly.
-        candidates: list[tuple[str, Campaign, Path]] = []
-        rejection_reasons: list[str] = []
-        for campaign in matching:
-            scope_errors = _test_scope_errors(campaign, test_path)
-            if scope_errors:
-                rejection_reasons.append(
-                    f"{campaign.campaign_id}: {', '.join(scope_errors)}"
-                )
-                continue
-            campaign_receipts = [
-                (path, receipt, raw_bytes)
-                for path, receipt, raw_bytes in receipts
-                if receipt.get("campaign_id") == campaign.campaign_id
-            ]
-            for path, receipt, raw_bytes in campaign_receipts:
-                errors = _receipt_errors(
-                    receipt,
-                    campaign,
-                    repo_root,
-                    path,
-                    raw_bytes,
-                    anchor_repo or repo_root,
-                )
-                if errors:
-                    rejection_reasons.append(f"{path.name}: {', '.join(errors)}")
-                    continue
-                # Missing generated_at sorts oldest rather than crashing; a receipt
-                # without one is still evidence, just never preferred over a dated peer.
-                candidates.append(
-                    (str(receipt.get("generated_at") or ""), campaign, path)
-                )
-        accepted: tuple[Campaign, Path] | None = None
-        if candidates:
-            newest = max(candidates, key=lambda item: (item[0], item[2].name))
-            accepted = (newest[1], newest[2])
-        if accepted is None:
-            missing.append(
-                {
-                    "path": test_path,
-                    "reason": (
-                        "no registered campaign ranks this test file"
-                        if not matching
-                        else "no current complete PASS receipt"
-                    ),
-                    "receipt_rejections": rejection_reasons,
-                }
-            )
-        else:
-            campaign, receipt_path = accepted
-            evidence.append(
-                {
-                    "path": test_path,
-                    "campaign_id": campaign.campaign_id,
-                    "receipt": receipt_path.relative_to(repo_root).as_posix(),
-                    "scope": _test_scopes_payload(campaign)[test_path],
-                }
-            )
-    return _support.evidence_result(normalized, evidence, missing, malformed)
+    if not isinstance(result, list) or not all(
+        isinstance(error, str) for error in result
+    ):
+        raise CampaignError("native mutation receipt must be a list of strings")
+    return result
 
 
 _ORIGINAL_LOAD_CAMPAIGN = load_campaign
 
 
+def _native_plan_paths(
+    plan: Mapping[str, Any], key: str, label: str
+) -> tuple[str, ...]:
+    return tuple(
+        _safe_relative_path(path, label)
+        for path in _require_string_list(plan.get(key), f"native plan.{key}")
+    )
+
+
 def _native_verification_request(
-    registry_path: Path,
+    registry_relative: str,
     paths: Sequence[str],
     *,
     repo_root: Path,
@@ -1381,107 +877,76 @@ def _native_verification_request(
     plan: Mapping[str, Any],
 ) -> dict[str, Any]:
     root = repo_root.resolve()
-    try:
-        registry_relative = registry_path.resolve().relative_to(root).as_posix()
-    except ValueError as exc:
-        raise CampaignError("mutation registry must be inside the repository") from exc
     normalized = tuple(_safe_relative_path(path, "candidate path") for path in paths)
-    try:
-        components = _runner_components_sha256()
-    except CampaignError as exc:
-        runner: dict[str, Any] = {
-            "components": None,
-            "error": str(exc),
-            "mutation_testing_sha256": None,
-        }
-    else:
-        runner = {
-            "components": components,
-            "error": None,
-            "mutation_testing_sha256": components["conductor/mutation_testing.py"],
-        }
-    scope_paths = tuple(
-        _safe_relative_path(path, "native plan Python scope path")
-        for path in _require_string_list(
-            plan.get("python_scope_paths"), "native plan.python_scope_paths"
-        )
-    )
-    symbol_paths = tuple(
-        _safe_relative_path(path, "native plan symbol path")
-        for path in _require_string_list(
-            plan.get("symbol_paths"), "native plan.symbol_paths"
-        )
-    )
-    directories = tuple(
-        _safe_relative_path(relative, "receipt directory")
-        for relative in _require_string_list(
-            plan.get("receipt_directories"), "native plan.receipt_directories"
-        )
-    )
+    symbol_paths = _native_plan_paths(plan, "symbol_paths", "native plan symbol path")
+    directories = _native_plan_paths(plan, "receipt_directories", "receipt directory")
     return {
         "repo_root": str(root),
         "registry_path": registry_relative,
         "canonical_test_patterns": list(CANONICAL_TEST_PATTERNS),
         "receipt_directories": list(directories),
         "candidate_paths": list(normalized),
-        "python_test_nodeids": {
-            path: list(_python_test_nodeids(root / path, path)) for path in scope_paths
-        },
         "symbol_hashes": {path: symbol_hashes(root / path) for path in symbol_paths},
-        "runner": runner,
-        "anchor": {
-            "repo": str((anchor_repo or repo_root).resolve()),
-            "commit": LEGACY_RECEIPT_ANCHOR_COMMIT,
-            "tree": LEGACY_RECEIPT_ANCHOR_TREE,
-            "receipt_prefix": LEGACY_RECEIPT_PREFIX,
-        },
+        "campaigns_override": None,
+        "runner": _native_runner_payload(),
+        "anchor": _native_anchor_payload(repo_root, anchor_repo),
     }
 
 
-def _native_verify_evidence(
+def verify_evidence(
     registry_path: Path,
     paths: Sequence[str],
     *,
-    repo_root: Path,
-    anchor_repo: Path | None,
-) -> dict[str, Any] | None:
+    repo_root: Path = REPO_ROOT,
+    anchor_repo: Path | None = None,
+) -> dict[str, Any]:
+    """Require current native full-campaign PASS evidence for changed tests."""
+
     try:
         from research_runtime_native import (
             plan_mutation_evidence_native,
             verify_mutation_evidence_native,
         )
-    except (ImportError, AttributeError):
-        return None
-    # Tests and downstream tools deliberately replace this loader to inject a
-    # synthetic campaign.  That is an explicit Python extension seam, so keep
-    # it authoritative rather than silently bypassing it in native code.
-    if load_campaign is not _ORIGINAL_LOAD_CAMPAIGN:
-        return None
+    except (ImportError, AttributeError) as exc:
+        raise CampaignError(str(exc)) from exc
     root = repo_root.resolve()
     try:
         registry_relative = registry_path.resolve().relative_to(root).as_posix()
     except ValueError as exc:
         raise CampaignError("mutation registry must be inside the repository") from exc
-    try:
-        plan_encoded = plan_mutation_evidence_native(
-            json.dumps(
-                {"repo_root": str(root), "registry_path": registry_relative},
-                ensure_ascii=False,
-                separators=(",", ":"),
+    campaigns_override: list[dict[str, Any]] | None = None
+    if load_campaign is _ORIGINAL_LOAD_CAMPAIGN:
+        try:
+            plan_encoded = plan_mutation_evidence_native(
+                json.dumps(
+                    {"repo_root": str(root), "registry_path": registry_relative},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
             )
-        )
-        plan = _require_mapping(
-            json.loads(plan_encoded), "native mutation evidence plan"
-        )
-    except (ValueError, json.JSONDecodeError) as exc:
-        raise CampaignError(str(exc)) from exc
+            plan = _require_mapping(
+                json.loads(plan_encoded), "native mutation evidence plan"
+            )
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise CampaignError(str(exc)) from exc
+    else:
+        registry = _load_registry(registry_path, root)
+        campaigns_override = [
+            _native_campaign_contract(campaign, repo_root=root)
+            for campaign in _registry_campaigns(registry_path, repo_root=root)
+        ]
+        plan = {
+            "symbol_paths": [],
+            "receipt_directories": registry.get("receipt_directories"),
+        }
     request = _native_verification_request(
-        registry_path,
+        registry_relative,
         paths,
         repo_root=repo_root,
         anchor_repo=anchor_repo,
         plan=plan,
     )
+    request["campaigns_override"] = campaigns_override
     try:
         encoded = verify_mutation_evidence_native(
             json.dumps(request, ensure_ascii=False, separators=(",", ":"))
@@ -1492,49 +957,6 @@ def _native_verify_evidence(
     return dict(_require_mapping(result, "native mutation evidence"))
 
 
-def verify_evidence(
-    registry_path: Path,
-    paths: Sequence[str],
-    *,
-    repo_root: Path = REPO_ROOT,
-    anchor_repo: Path | None = None,
-) -> dict[str, Any]:
-    """Require current full-campaign PASS receipts for every changed test path."""
-
-    native = _native_verify_evidence(
-        registry_path,
-        paths,
-        repo_root=repo_root,
-        anchor_repo=anchor_repo,
-    )
-    if native is None:
-        return _verify_evidence_python(
-            registry_path,
-            paths,
-            repo_root=repo_root,
-            anchor_repo=anchor_repo,
-        )
-    if os.environ.get("CONDUCTOR_MUTATION_EVIDENCE_DIFFERENTIAL") == "1":
-        reference = _verify_evidence_python(
-            registry_path,
-            paths,
-            repo_root=repo_root,
-            anchor_repo=anchor_repo,
-        )
-        if native != reference:
-            native_digest = hashlib.sha256(
-                json.dumps(native, sort_keys=True).encode("utf-8")
-            ).hexdigest()
-            reference_digest = hashlib.sha256(
-                json.dumps(reference, sort_keys=True).encode("utf-8")
-            ).hexdigest()
-            raise CampaignError(
-                "native mutation evidence parity mismatch: "
-                f"native={native_digest}, reference={reference_digest}"
-            )
-    return native
-
-
 def _json_print(payload: Mapping[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
@@ -1542,17 +964,16 @@ def _json_print(payload: Mapping[str, Any]) -> None:
 def _registry_campaigns(registry_path: Path, *, repo_root: Path) -> list[Campaign]:
     """Every campaign the registry lists, loaded and validated."""
     payload = _load_registry(registry_path, repo_root)
-    rows = payload.get("campaigns")
-    if not isinstance(rows, list):
-        raise CampaignError("registry.campaigns must be a list")
-    campaigns: list[Campaign] = []
-    for index, raw in enumerate(rows):
-        row = _require_mapping(raw, f"registry.campaigns[{index}]")
-        manifest = _safe_relative_path(
-            row.get("manifest"), f"registry.campaigns[{index}].manifest"
+    return [
+        load_campaign(
+            repo_root
+            / _safe_relative_path(
+                row["manifest"], f"registry.campaigns[{index}].manifest"
+            ),
+            repo_root=repo_root,
         )
-        campaigns.append(load_campaign(repo_root / manifest, repo_root=repo_root))
-    return campaigns
+        for index, row in enumerate(payload["campaigns"])
+    ]
 
 
 def repin_campaigns(
@@ -1597,13 +1018,54 @@ def repin_campaigns(
             "hint": "re-run with --run --allow-mutations to re-pin AND regenerate receipts",
         }
 
+    selected = {
+        campaign.campaign_id: campaign
+        for campaign in campaigns
+        if any(row["campaign_id"] == campaign.campaign_id for row in drifted)
+    }
+    symbol_paths = {
+        relative
+        for campaign in selected.values()
+        for relative in campaign.source_symbols
+    }
+    source_paths = {
+        relative
+        for campaign in selected.values()
+        for relative in campaign.source_sha256
+        if relative not in campaign.source_symbols
+    }
+    try:
+        from research_runtime_native import plan_mutation_repin_native
+
+        plans = plan_mutation_repin_native(
+            str(repo_root.resolve()),
+            [
+                (
+                    campaign.manifest_path.relative_to(repo_root.resolve()).as_posix(),
+                    dict(campaign.source_sha256),
+                    {
+                        path: dict(pins)
+                        for path, pins in campaign.source_symbols.items()
+                    },
+                )
+                for campaign in selected.values()
+            ],
+            {
+                path: _sha256(repo_root / path)
+                for path in source_paths
+                if (repo_root / path).is_file()
+            },
+            {path: symbol_hashes(repo_root / path) for path in symbol_paths},
+        )
+    except (ImportError, AttributeError, ValueError) as exc:
+        raise CampaignError(str(exc)) from exc
+    updated = dict(plans)
     rerun: list[dict[str, Any]] = []
     for entry in drifted:
         campaign_id = str(entry["campaign_id"])
-        manifest = next(
-            c.manifest_path for c in campaigns if c.campaign_id == campaign_id
-        )
-        _repin_manifest(manifest, repo_root=repo_root)
+        manifest = selected[campaign_id].manifest_path
+        relative = manifest.relative_to(repo_root.resolve()).as_posix()
+        manifest.write_text(updated[relative], encoding="utf-8")
         refreshed = load_campaign(manifest, repo_root=repo_root)
         remaining = source_drift(refreshed, repo_root)
         if remaining:
@@ -1624,36 +1086,6 @@ def repin_campaigns(
         "drifted": drifted,
         "rerun": rerun,
     }
-
-
-def _repin_manifest(manifest_path: Path, *, repo_root: Path) -> None:
-    """Rewrite drifted digests in place by targeted substitution.
-
-    Never `json.dumps(..., sort_keys=True)`: that reorders
-    `value_analysis.mutation_contracts`, whose key order must match
-    `planned_mutations`, and the loader then refuses the campaign. Measured 2026-08-30.
-    """
-    text = manifest_path.read_text(encoding="utf-8")
-    payload = json.loads(text)
-    for relative, recorded in dict(payload.get("source_sha256", {})).items():
-        if relative in payload.get("source_symbols", {}):
-            continue
-        path = repo_root / relative
-        if not path.is_file():
-            continue
-        actual = _sha256(path)
-        if actual != recorded and text.count(recorded) == 1:
-            text = text.replace(recorded, actual)
-    for relative, symbols in dict(payload.get("source_symbols", {})).items():
-        path = repo_root / relative
-        if not path.is_file():
-            continue
-        current = symbol_hashes(path)
-        for symbol, recorded in dict(symbols).items():
-            actual = current.get(symbol)
-            if actual and actual != recorded and text.count(recorded) == 1:
-                text = text.replace(recorded, actual)
-    manifest_path.write_text(text, encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
