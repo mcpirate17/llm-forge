@@ -27,7 +27,7 @@ from conductor.embedding_contract import (
 )
 from conductor.kb_retrieve import EmbeddingBatch, embed_batch
 
-EXPECTED_CRG_VERSION: Final[str] = "2.3.1"
+EXPECTED_CRG_VERSION: Final[str] = "2.3.8"
 EXPECTED_EMBEDDINGS_SHA256: Final[str] = (
     "aa86b01dacae7832548d788be9b2ca5123500da06f0fa65c81cb0bf04eea1b29"
 )

@@ -172,6 +172,27 @@ def _extract_native_usage(payload: Any) -> dict[str, Any]:
     }
 
 
+MODEL_VISIBLE_FIELDS: Final[dict[str, tuple[str, ...]]] = {
+    "Edit": ("filePath", "structuredPatch", "userModified"),
+    "Write": ("type", "filePath"),
+}
+
+
+def model_visible_output(tool_name: str, tool_output: Any) -> Any:
+    """Project a tool response onto what the agent actually sees.
+
+    Edit and Write echo the whole file back to the hook (``originalFile``,
+    ``content``) while the agent sees a confirmation and the patch; measuring
+    the raw envelope credited Edit with 22 % of all tool bytes (2026-09-01).
+    Other tools are measured as delivered.
+    """
+
+    fields = MODEL_VISIBLE_FIELDS.get(tool_name)
+    if fields is None or not isinstance(tool_output, Mapping):
+        return tool_output
+    return {key: tool_output[key] for key in fields if key in tool_output}
+
+
 def _is_bounded_output(value: Any, encoded: bytes) -> bool:
     if isinstance(value, Mapping):
         for key in ("elided", "truncated", "output_bounded", "outputBounded"):
@@ -202,6 +223,7 @@ def event(payload: Any) -> dict[str, Any]:
         _field(payload, "hook_event_name", "hookEventName") or "PostToolUse"
     )
     tool_name = str(_field(payload, "tool_name", "toolName") or "unknown")
+    tool_output = model_visible_output(tool_name, tool_output)
     input_encoded = _json_bytes(tool_input)
     output_encoded = _json_bytes(tool_output)
     input_bytes = len(input_encoded)
@@ -273,7 +295,12 @@ def hook_context_event(
         hook_json.get("hookSpecificOutput") if isinstance(hook_json, dict) else None
     )
     if isinstance(specific, dict):
-        context = str(specific.get("additionalContext") or "")
+        # A deny reason reaches the agent exactly like injected context does.
+        context = str(
+            specific.get("additionalContext")
+            or specific.get("permissionDecisionReason")
+            or ""
+        )
         event_name = event_name or str(specific.get("hookEventName") or "")
     context_bytes = len(context.encode("utf-8"))
     return {

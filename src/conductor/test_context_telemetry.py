@@ -165,3 +165,45 @@ def test_summary_groups_by_event_and_tool_and_counts_over_bound(
     assert rows[("PostToolUse", "Read")]["over_bound"] == 0
     assert summary["rows"][0]["tool"] == "Bash"
     assert abs(sum(row["share"] for row in summary["rows"]) - 1.0) < 1e-3
+
+
+def test_event_measures_edit_and_write_as_the_agent_sees_them() -> None:
+    big = "x" * 10_000
+    edit = telemetry.event(
+        {
+            "tool_name": "Edit",
+            "tool_response": {
+                "filePath": "a.py",
+                "oldString": "a",
+                "newString": "b",
+                "originalFile": big,
+                "structuredPatch": [{"lines": ["-a", "+b"]}],
+                "userModified": False,
+            },
+        }
+    )
+    write = telemetry.event(
+        {
+            "tool_name": "Write",
+            "tool_response": {"type": "create", "filePath": "a.py", "content": big},
+        }
+    )
+    bash = telemetry.event({"tool_name": "Bash", "tool_response": {"stdout": big}})
+    assert edit["output_bytes"] < 200
+    assert write["output_bytes"] < 100
+    assert bash["output_bytes"] > 10_000
+    assert telemetry.model_visible_output("Edit", "not a mapping") == "not a mapping"
+
+
+def test_hook_context_event_counts_a_deny_reason_as_injected_context() -> None:
+    denied = telemetry.hook_context_event(
+        "pre-read-skeleton",
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "PRE-READ DENIED: 812 lines",
+            }
+        },
+    )
+    assert denied["output_bytes"] == len("PRE-READ DENIED: 812 lines")
