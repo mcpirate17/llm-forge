@@ -1084,6 +1084,19 @@ def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
 BUILTIN_CHECKS["duplicate-function-bodies"] = check_duplicate_function_bodies
 
 
+def check_structure_audit(ctx: ReviewContext) -> CheckResult:
+    """Delegate to quality_checks, which imports this module for its helpers."""
+
+    from conductor.candidate_review.quality_checks import (
+        check_structure_audit as audit_structure,
+    )
+
+    return audit_structure(ctx)
+
+
+BUILTIN_CHECKS["structure-audit"] = check_structure_audit
+
+
 def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
     """Tier-1 gate: no change ships with a reachable branch no test drives.
 
@@ -1125,7 +1138,8 @@ def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
     tiers = {
         (item["module"], item["qualname"]): item["tier"]
         for item in slop_ledger.aggregate(
-            slop_ledger.findings_from_summary({"blocking": summary["blocking"]}))
+            slop_ledger.findings_from_summary({"blocking": summary["blocking"]})
+        )
     }
     findings = [
         Finding(
@@ -1144,7 +1158,9 @@ def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
                 f"{item.get('max_diff_amplified'):.3e}); no test drives that regime. "
                 "Cover it or remove the construct."
             ),
-            evidence={k: item[k] for k in ("qualname", "verdict", "amplifier") if k in item},
+            evidence={
+                k: item[k] for k in ("qualname", "verdict", "amplifier") if k in item
+            },
         )
         for item in summary["blocking"]
     ]
