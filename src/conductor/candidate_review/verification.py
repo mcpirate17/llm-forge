@@ -8,6 +8,7 @@ import re
 import sqlite3
 import sys
 import time
+from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Mapping, Sequence
 
@@ -17,6 +18,11 @@ from conductor.candidate_review.checks import (
     _result,
 )
 from conductor.candidate_review import external_invariants
+from conductor.candidate_review.value_waivers import (
+    WAIVED_RULE,
+    apply_value_waivers,
+    waiver_states as value_waiver_states,
+)
 from conductor.candidate_review.command_runner import _run_process, _tail
 from conductor.candidate_review.graph_selection import (
     _convention_tests,
@@ -791,6 +797,9 @@ def _new_test_value_findings(
             receipt.get("test_value") if isinstance(receipt, dict) else None,
             [nodeid for nodeid in nodeids if nodeid not in waived],
         ):
+            # admission_errors names the nodeid with repr(); carry it as evidence so
+            # a value waiver can match it exactly rather than by prefix of a message.
+            named = next((nodeid for nodeid in nodeids if repr(nodeid) in error), None)
             findings.append(
                 Finding(
                     check_id="mutation-evidence",
@@ -803,6 +812,7 @@ def _new_test_value_findings(
                         "record batch-level per-test attribution, and retain it as "
                         "CORE or explicitly justified INTENTIONAL_REDUNDANCY."
                     ),
+                    evidence={} if named is None else {"nodeid": named},
                 )
             )
     return findings
@@ -893,25 +903,55 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
                     message=f"new test definitions could not be verified: {exc}",
                 )
             )
-    findings.extend(_new_test_value_findings(ctx, payload, gated_nodeids))
-    return _result(
-        "mutation-evidence",
-        started,
-        findings,
-        files=test_paths,
-        metrics={
-            "checked_test_paths": payload.get("checked_test_paths", []),
-            "covered_tests": _container_len(payload, "evidence"),
-            "missing_tests": _container_len(payload, "missing_evidence"),
-            "value_gated_nodeids": [
-                nodeid for nodeids in gated_nodeids.values() for nodeid in nodeids
-            ],
-            "mutation_waiver_applied": sorted(active_paths),
-            "mutation_waiver_states": sorted(
-                waiver_states, key=lambda s: str(s["path"])
-            ),
-        },
+    value_findings = _new_test_value_findings(ctx, payload, gated_nodeids)
+    metrics = _mutation_evidence_metrics(payload, gated_nodeids, waiver_states)
+    return _mutation_evidence_result(
+        ctx, started, [*findings, *value_findings], test_paths, metrics
     )
+
+
+def _mutation_evidence_result(
+    ctx: ReviewContext,
+    started: float,
+    findings: list[Finding],
+    test_paths: list[str],
+    metrics: dict[str, object],
+) -> CheckResult:
+    """Apply the policy's value waivers; a result made only of WAIVED lines passes."""
+
+    today = date.today()
+    base = ctx.candidate.base_commit_oid
+    findings = apply_value_waivers(
+        findings, ctx.policy.value_waivers, base=base, today=today
+    )
+    metrics["value_waiver_states"] = value_waiver_states(
+        ctx.policy.value_waivers, base=base, today=today
+    )
+    result = _result(
+        "mutation-evidence", started, findings, files=test_paths, metrics=metrics
+    )
+    if result.findings and all(f.rule_id == WAIVED_RULE for f in result.findings):
+        result.status = CheckStatus.PASSED
+    return result
+
+
+def _mutation_evidence_metrics(
+    payload: Mapping[str, object],
+    gated_nodeids: Mapping[str, Sequence[str]],
+    waiver_states: list[dict[str, object]],
+) -> dict[str, object]:
+    return {
+        "checked_test_paths": payload.get("checked_test_paths", []),
+        "covered_tests": _container_len(payload, "evidence"),
+        "missing_tests": _container_len(payload, "missing_evidence"),
+        "value_gated_nodeids": [
+            nodeid for nodeids in gated_nodeids.values() for nodeid in nodeids
+        ],
+        "mutation_waiver_applied": sorted(
+            str(s["path"]) for s in waiver_states if s["active"]
+        ),
+        "mutation_waiver_states": sorted(waiver_states, key=lambda s: str(s["path"])),
+    }
 
 
 def check_test_evidence(ctx: ReviewContext) -> tuple[CheckResult, TestSelection]:

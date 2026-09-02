@@ -36,6 +36,7 @@ ALLOWED_TOP_LEVEL = {
     "baselines",
     "exceptions",
     "mutation_waivers",
+    "value_waivers",
     "tools",
 }
 ALLOWED_CHECK_KEYS = {
@@ -253,6 +254,18 @@ class MutationWaiverPolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class ValueWaiverPolicy:
+    """A nodeid-exact exemption from new-test value gating, bound to one base."""
+
+    integration_base: str
+    nodeids: tuple[str, ...]
+    reason: str
+    approved_by: str
+    approved_on: date
+    expires: date | None
+
+
+@dataclass(frozen=True, slots=True)
 class Policy:
     path: Path
     digest: str
@@ -275,6 +288,7 @@ class Policy:
     baselines: tuple[BaselinePolicy, ...]
     exceptions: tuple[ExceptionPolicy, ...]
     mutation_waivers: tuple[MutationWaiverPolicy, ...] = ()
+    value_waivers: tuple[ValueWaiverPolicy, ...] = ()
     tools: tuple[ToolPolicy, ...] = ()
 
     def classify_change(self, change: Change) -> Change:
@@ -737,6 +751,80 @@ def _parse_mutation_waivers(raw: Any) -> tuple[MutationWaiverPolicy, ...]:
     return waivers
 
 
+VALUE_WAIVER_KEYS = frozenset(
+    {"integration_base", "nodeids", "reason", "approved_by", "approved_on", "expires"}
+)
+_COMMIT_OID = re.compile(r"[0-9a-f]{40}")
+
+
+def _parse_value_waiver_nodeids(raw: Any) -> tuple[str, ...]:
+    if not isinstance(raw, list) or not raw:
+        raise PolicyError("value_waivers.nodeids must be a non-empty array of nodeids")
+    nodeids: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str) or "::" not in entry or entry != entry.strip():
+            raise PolicyError(
+                "value_waivers.nodeids entries must be exact pytest nodeids "
+                f"(path::name): {entry!r}"
+            )
+        if any(meta in entry for meta in "*?["):
+            raise PolicyError(
+                f"value_waivers.nodeids are exact, never patterns: {entry!r}"
+            )
+        nodeids.append(entry)
+    if len(set(nodeids)) != len(nodeids):
+        raise PolicyError("value_waivers.nodeids must not repeat a nodeid")
+    return tuple(nodeids)
+
+
+def _parse_value_waiver(raw: Any) -> ValueWaiverPolicy:
+    if not isinstance(raw, dict):
+        raise PolicyError("each value_waivers entry must be a table")
+    unknown = set(raw) - VALUE_WAIVER_KEYS
+    if unknown:
+        raise PolicyError(f"value waiver has unknown keys: {sorted(unknown)}")
+    missing = VALUE_WAIVER_KEYS - {"expires"} - set(raw)
+    if missing:
+        raise PolicyError(f"value waiver is missing keys: {sorted(missing)}")
+    base = raw["integration_base"]
+    if not isinstance(base, str) or _COMMIT_OID.fullmatch(base) is None:
+        raise PolicyError(
+            "value_waivers.integration_base must be the full 40-hex commit oid "
+            f"of the integration base it binds to: {base!r}"
+        )
+    for key in ("reason", "approved_by"):
+        if not isinstance(raw[key], str) or not raw[key].strip():
+            raise PolicyError(f"value_waivers.{key} must be a non-empty string")
+    expires = raw.get("expires")
+    return ValueWaiverPolicy(
+        integration_base=base,
+        nodeids=_parse_value_waiver_nodeids(raw["nodeids"]),
+        reason=raw["reason"].strip(),
+        approved_by=raw["approved_by"].strip(),
+        approved_on=_date_value(raw["approved_on"], field="value_waivers.approved_on"),
+        expires=(
+            None
+            if expires is None
+            else _date_value(expires, field="value_waivers.expires")
+        ),
+    )
+
+
+def _parse_value_waivers(raw: Any) -> tuple[ValueWaiverPolicy, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise PolicyError("value_waivers must be an array of tables")
+    waivers = tuple(_parse_value_waiver(entry) for entry in raw)
+    seen: set[str] = set()
+    for waiver in waivers:
+        overlap = seen.intersection(waiver.nodeids)
+        if overlap:
+            raise PolicyError(f"value waivers overlap on nodeids: {sorted(overlap)}")
+        seen.update(waiver.nodeids)
+    return waivers
+
+
 def _parse_tools(raw: Any) -> tuple[ToolPolicy, ...]:
     """Parse the declared external tool set.
 
@@ -903,6 +991,7 @@ def load_policy(path: Path) -> Policy:
         baselines=_parse_baselines(baselines_raw),
         exceptions=tuple(_parse_exception(value) for value in exceptions_raw),
         mutation_waivers=_parse_mutation_waivers(raw.get("mutation_waivers")),
+        value_waivers=_parse_value_waivers(raw.get("value_waivers")),
         tools=_parse_tools(raw.get("tools")),
     )
     _validate_policy(policy)
