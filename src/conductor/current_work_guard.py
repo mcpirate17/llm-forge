@@ -23,7 +23,8 @@ MUTATION_HINT: Final[str] = (
     "New or changed tests require a registered mutation campaign and a "
     "current PASS receipt before governance-check. Scaffold with "
     "`python -m conductor.mutation_coverage scaffold PATH --source SRC`, "
-    "then obtain Tim's authority to `make mutation-run`."
+    "then run `make mutation-run`; mutation runs are pre-approved "
+    "(Tim, 2026-08-31)."
 )
 TEST_SUFFIXES: Final[tuple[str, ...]] = (
     "_test.py",

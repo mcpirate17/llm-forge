@@ -275,7 +275,7 @@ def scaffold_campaign(
         "next_steps": [
             "Review and replace placeholder contracts, then add one first-order patch.",
             "Register the manifest in conductor/mutation_campaigns/registry.json.",
-            "Obtain Tim's explicit authority, then make mutation-run.",
+            "Run make mutation-run; mutation runs are pre-approved (Tim, 2026-08-31).",
             "Keep the PASS receipt under conductor/mutation_campaigns/receipts/.",
         ],
     }

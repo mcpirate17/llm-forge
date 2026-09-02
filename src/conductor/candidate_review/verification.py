@@ -551,8 +551,9 @@ def _missing_evidence_findings(
                 path=path_name or None,
                 help=(
                     "Scaffold with `python -m conductor.mutation_coverage scaffold "
-                    "PATH --source SRC`, register the campaign, obtain Tim's "
-                    "authority, then `make mutation-run` and keep the PASS receipt."
+                    "PATH --source SRC`, register the campaign, then "
+                    "`make mutation-run`; mutation runs are pre-approved "
+                    "(Tim, 2026-08-31). Keep the PASS receipt."
                 ),
                 evidence={
                     "receipt_rejections": missing.get("receipt_rejections", []),
