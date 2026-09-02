@@ -18,8 +18,9 @@ from conductor.candidate_review.checks import ReviewContext
 from conductor.candidate_review.model import Candidate, Change, CheckResult, Severity
 from conductor.candidate_review.policy import load_policy
 from conductor.candidate_review.quality_checks import check_structure_audit
+from conductor.candidate_review.policy_path import resolve_policy_path
 
-POLICY = load_policy(Path("conductor/candidate_policy.toml"))
+POLICY = load_policy(resolve_policy_path())
 
 
 def _change(path: str) -> Change:

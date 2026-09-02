@@ -111,6 +111,33 @@ def test_assert_project_absent_raises_when_a_host_package_imports(
         smoke.assert_project_absent(str(python), tmp_path)
 
 
+def test_clean_env_drops_the_host_pythonpath_and_plugin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PYTHONPATH", "/host/snapshot")
+    monkeypatch.setenv(smoke.PLUGIN_ENV, "conductor._project_hooks")
+    monkeypatch.setenv("KEEP_ME", "1")
+    env = smoke.clean_env()
+    assert "PYTHONPATH" not in env
+    assert env[smoke.PLUGIN_ENV] == ""
+    assert env["PYTHONDONTWRITEBYTECODE"] == "1"
+    assert env["KEEP_ME"] == "1"
+
+
+def test_assert_project_absent_probes_in_the_clean_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A probe inheriting the host's PYTHONPATH or plugin would import the host."""
+    python = tmp_path / "python"
+    python.write_text(
+        f'#!/bin/sh\n[ -n "$PYTHONPATH" ] || [ -n "${smoke.PLUGIN_ENV}" ]\n'
+    )
+    python.chmod(0o755)
+    monkeypatch.setenv("PYTHONPATH", "/host/snapshot")
+    monkeypatch.setenv(smoke.PLUGIN_ENV, "conductor._project_hooks")
+    smoke.assert_project_absent(str(python), tmp_path)
+
+
 def test_summarize_junit_counts_nodeids_and_groups_by_first_line() -> None:
     summary = smoke.summarize_junit(JUNIT)
     assert (summary.passed, summary.failed, summary.errors, summary.skipped) == (

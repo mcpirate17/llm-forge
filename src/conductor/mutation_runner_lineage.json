@@ -69,9 +69,27 @@
       "runner_components_sha256": {
         "audit/orchestrator/snapshot_worktree.py": "3b5d99c5922b33f2c45aff3fbd6ac21916b31209cb0cdc7f484595b7a770fb42",
         "conductor/mutation_scope.py": "1abcfa6d83fa4ffa506efc99423b945b7a8490c0a3cf86234d282b4543750adb",
-        "conductor/mutation_testing.py": "\u0065a157d3e83671be77aa08313ceebe2d6db8b081a3018881c0796e6542a3df62e",
+        "conductor/mutation_testing.py": "ea157d3e83671be77aa08313ceebe2d6db8b081a3018881c0796e6542a3df62e",
         "conductor/mutation_testing_support.py": "be44aba5add7f66d4736162cf0d17b97ca4954725aa7e81800c33c6d2c1e86f8",
         "conductor/mutation_value.py": "6379c6451bde62d6f5e3c37b98f1cdf8d9147e91e464c189e0c8532af62683be"
+      }
+    },
+    {
+      "id": "pre-snapshot-worktree-move-20260902",
+      "recorded_at": "2026-09-02",
+      "owner": "claude",
+      "justification": "Runner state immediately before audit/orchestrator/snapshot_worktree.py moved to conductor/snapshot_worktree.py so a standalone conductor-tooling install can import the runner without the host's root audit/ package. The module body is byte-identical (git rename); conductor/mutation_testing.py changes only the import line and the component path it pins. Nothing about how a mutant is applied, how an outcome is classified, or what any receipt field means changed.",
+      "covers_diff": "conductor/mutation_testing.py: import isolated_snapshot from conductor.snapshot_worktree; RUNNER_COMPONENT_PATHS names conductor/snapshot_worktree.py instead of audit/orchestrator/snapshot_worktree.py. audit/orchestrator/snapshot_worktree.py is a sys.modules alias shim.",
+      "verified_by": "Nineteen campaigns whose pins named the moved module, the runner, or an edited file were re-run under the NEW runner (runner_sha256 52e992df...) and compared mutant-by-mutant against the receipts the recorded runner produced on master: agent_hooks_crg_gate_20260826 (1), candidate_review_policy_fingerprint_exception_20260827 (1), claude_candidate_review_cli_policy_20260827 (1), claude_claims_view (4), claude_crg_gate (42), claude_gate_policy_provenance_20260830 (5), claude_hooks_bash_guard_20260901 (11), claude_rank10t1_gate_20260830 (16), claude_rank10t1_runner_lineage_20260830 (8), claude_rank8_candidate_review_cli_policy_20260830 (15), claude_read_budget (6), claude_structure_audit_20260831 (23), conductor_governance_20260826 (1), local_ai_policy_integrity_20260827 (9), mutation_evidence_gate_hardening_20260827 (8), mutation_evidence_gate_v5_20260827 (26), mutation_evidence_gate_value_edges_20260827 (1), mutation_framework_self (12, v10 receipt), mutation_value_self (6): 196 mutants, every per-mutant outcome identical, every score 1.0, every configured test_value PASS, runner_sha256 confirmed different in every pair. The runner diff is confined to the import path of isolated_snapshot and the component path list; conductor/snapshot_worktree.py is byte-identical to the file it replaced.",
+      "runner_components_sha256": {
+        "audit/orchestrator/snapshot_worktree.py": "3b5d99c5922b33f2c45aff3fbd6ac21916b31209cb0cdc7f484595b7a770fb42",
+        "conductor/mutation_scope.py": "1abcfa6d83fa4ffa506efc99423b945b7a8490c0a3cf86234d282b4543750adb",
+        "conductor/mutation_testing.py": "ff771bb7d325cddf9bdfe2bb718437f303a6db504f5c8e12ec2e060abd43e809",
+        "conductor/mutation_testing_support.py": "be44aba5add7f66d4736162cf0d17b97ca4954725aa7e81800c33c6d2c1e86f8",
+        "conductor/mutation_value.py": "6379c6451bde62d6f5e3c37b98f1cdf8d9147e91e464c189e0c8532af62683be",
+        "tooling/native/conductor-native/src/mutation_evidence.rs": "4ae245015d7c51c9ab4cb586bff7679a04343fce40b18d1ac288d8861233c5a1",
+        "tooling/native/conductor-native/src/mutation_manifest.rs": "94c83cd536a826d2cb972530c77c5afd37360a2b7f63deb6c7cb5bccbf7714d9",
+        "tooling/native/conductor-native/src/mutation_receipt.rs": "54db78d17d02fd774fdcbf8bf5d275425ae1ab328bf3084dfab2d7e2c68377c1"
       }
     }
   ]

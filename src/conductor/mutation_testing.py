@@ -23,7 +23,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from audit.orchestrator.snapshot_worktree import isolated_snapshot
 from conductor import mutation_testing_support as _support
 from conductor.mutation_scope import (
     CampaignError,
@@ -46,6 +45,7 @@ from conductor.mutation_value import (
     load_value_analysis,
     value_inspection_payload,
 )
+from conductor.snapshot_worktree import isolated_snapshot
 
 RECEIPT_SCHEMA = "llm.mutation-testing.receipt.v3"
 LEGACY_RECEIPT_SCHEMA = "llm.mutation-testing.receipt.v2"
@@ -57,11 +57,11 @@ CANONICAL_TEST_PATTERNS = _support.CANONICAL_TEST_PATTERNS
 OUTPUT_TAIL_CHARS = 12_000
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNNER_COMPONENT_PATHS = (
-    "audit/orchestrator/snapshot_worktree.py",
     "conductor/mutation_scope.py",
     "conductor/mutation_testing.py",
     "conductor/mutation_testing_support.py",
     "conductor/mutation_value.py",
+    "conductor/snapshot_worktree.py",
     "tooling/native/conductor-native/src/mutation_evidence.rs",
     "tooling/native/conductor-native/src/mutation_manifest.rs",
     "tooling/native/conductor-native/src/mutation_receipt.rs",

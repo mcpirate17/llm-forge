@@ -44,6 +44,7 @@ from conductor.test_candidate_review import (
     _minimal_policy_text,
     _receipt,
 )
+from conductor.candidate_review.policy_path import resolve_policy_path
 
 
 def test_command_analyzer_failures_are_blocking(
@@ -68,7 +69,7 @@ def test_command_analyzer_failures_are_blocking(
     _commit_all(repo, "baseline")
     (repo / "probe.py").write_text("VALUE = 2\n", encoding="utf-8")
     _git(repo, "add", "probe.py")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
@@ -328,7 +329,7 @@ def test_latency_benchmark_uses_isolated_real_git_candidates(
 
 
 def test_policy_primitives_and_classification_fail_closed(tmp_path: Path) -> None:
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     assert policy.active_checks("fast")
     invalid_calls = [
         (review_policy._string_tuple, ("bad",), {"field": "value"}),
@@ -447,7 +448,7 @@ def test_baselines_and_exceptions_are_exact_and_auditable(tmp_path: Path) -> Non
     utc_today = datetime.now(timezone.utc).date()
     baseline = tmp_path / "baseline.json"
     baseline.write_text("{}\n", encoding="utf-8")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     baseline_policy = review_policy.BaselinePolicy(
         baseline_id="probe",
         path="baseline.json",

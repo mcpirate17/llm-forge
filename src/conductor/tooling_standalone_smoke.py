@@ -111,13 +111,24 @@ def lay_out(staging: Path, dest: Path) -> None:
         raise RuntimeError(f"{project_hooks} survived the layout")
 
 
+def clean_env() -> dict[str, str]:
+    """The rehearsal environment: the host's ``PYTHONPATH`` and project test plugin
+    are dropped (the plugin variable is pinned empty so the package default cannot be
+    reselected) and bytecode is not written into the layout."""
+    env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", PLUGIN_ENV}}
+    env[PLUGIN_ENV] = ""
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
 def assert_project_absent(python: str, cwd: Path) -> None:
     """Fail unless every host package is unimportable from the rehearsal venv.
 
-    The caller's ``PYTHONPATH`` is dropped, as ``run_pytest`` drops it: the gate runs
-    tests with the snapshot on it, and a probe that inherits it refuses falsely.
+    The probe runs in the same ``clean_env`` as ``run_pytest``: the gate runs tests
+    with the snapshot on ``PYTHONPATH`` and the project plugin selected, and a probe
+    that inherits either refuses falsely.
     """
-    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env = clean_env()
     for package in PROJECT_PACKAGES:
         probe = _run([python, "-c", f"import {package}"], cwd=cwd, timeout=60, env=env)
         if probe.returncode == 0:
@@ -146,9 +157,7 @@ def install(dest: Path, uv: str) -> tuple[str, float]:
 
 def run_pytest(dest: Path, python: str, timeout: int) -> tuple[int, Path]:
     junit = dest / "junit.xml"
-    env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", PLUGIN_ENV}}
-    env[PLUGIN_ENV] = ""
-    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env = clean_env()
     try:
         completed = _run(
             [

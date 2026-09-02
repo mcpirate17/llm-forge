@@ -82,7 +82,10 @@ def test_a_superset_is_not_accepted(tmp_path: Path) -> None:
 
 def test_matches_any_entry_not_only_the_first(tmp_path: Path) -> None:
     older = {"id": "old", "runner_components_sha256": {"x": "1" * 64}}
-    _write_lineage(tmp_path, _valid([older, {"id": "e1", "runner_components_sha256": dict(RECORDED)}]))
+    _write_lineage(
+        tmp_path,
+        _valid([older, {"id": "e1", "runner_components_sha256": dict(RECORDED)}]),
+    )
     assert _lineage_accepts(dict(RECORDED), tmp_path) is True
 
 
@@ -104,12 +107,21 @@ def test_malformed_json_accepts_nothing(tmp_path: Path) -> None:
 
 
 def test_unknown_schema_version_accepts_nothing(tmp_path: Path) -> None:
-    _write_lineage(tmp_path, {"schema_version": 999, "entries": [{"runner_components_sha256": dict(RECORDED)}]})
+    _write_lineage(
+        tmp_path,
+        {
+            "schema_version": 999,
+            "entries": [{"runner_components_sha256": dict(RECORDED)}],
+        },
+    )
     assert _lineage_accepts(dict(RECORDED), tmp_path) is False
 
 
 def test_entries_not_a_list_accepts_nothing(tmp_path: Path) -> None:
-    _write_lineage(tmp_path, {"schema_version": 1, "entries": {"runner_components_sha256": dict(RECORDED)}})
+    _write_lineage(
+        tmp_path,
+        {"schema_version": 1, "entries": {"runner_components_sha256": dict(RECORDED)}},
+    )
     assert _lineage_accepts(dict(RECORDED), tmp_path) is False
 
 
@@ -119,12 +131,17 @@ def test_empty_entries_accepts_nothing(tmp_path: Path) -> None:
 
 
 def test_non_dict_entry_is_skipped_not_fatal(tmp_path: Path) -> None:
-    _write_lineage(tmp_path, _valid(["garbage", {"id": "e1", "runner_components_sha256": dict(RECORDED)}]))
+    _write_lineage(
+        tmp_path,
+        _valid(["garbage", {"id": "e1", "runner_components_sha256": dict(RECORDED)}]),
+    )
     assert _lineage_accepts(dict(RECORDED), tmp_path) is True
 
 
 @pytest.mark.parametrize("recorded", [None, "string", 42, ["list"]])
-def test_a_non_mapping_recorded_value_is_refused(tmp_path: Path, recorded: object) -> None:
+def test_a_non_mapping_recorded_value_is_refused(
+    tmp_path: Path, recorded: object
+) -> None:
     """A receipt whose runner map is not a mapping cannot match anything."""
     _write_lineage(tmp_path, _valid())
     assert _lineage_accepts(recorded, tmp_path) is False
@@ -147,8 +164,13 @@ def test_shipped_lineage_is_wellformed_and_documented() -> None:
         # Every entry must carry its own justification and evidence, or it is an
         # unaudited bypass rather than a narrowed pin.
         assert entry.get("justification"), f"{entry.get('id')} has no justification"
-        assert entry.get("verified_by"), f"{entry.get('id')} has no verification evidence"
-        assert entry.get("covers_diff"), f"{entry.get('id')} does not name the diff it covers"
+        assert entry.get("verified_by"), (
+            f"{entry.get('id')} has no verification evidence"
+        )
+        assert entry.get("covers_diff"), (
+            f"{entry.get('id')} does not name the diff it covers"
+        )
         hashes = entry["runner_components_sha256"]
-        assert len(hashes) == 5, "a lineage entry must pin all five runner components"
+        # Five components before the native decomposition (2026-09-01), eight after.
+        assert len(hashes) in {5, 8}, "a lineage entry must pin every runner component"
         assert all(len(v) == 64 for v in hashes.values())

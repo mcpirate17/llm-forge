@@ -17,6 +17,7 @@ from typing import Sequence
 
 from conductor.candidate_review.model import write_json_atomic
 from conductor.candidate_review.ownership import create_claim
+from conductor.candidate_review.policy_path import DEFAULT_POLICY_RELATIVE
 
 SCENARIOS = (
     "docs-only",
@@ -35,7 +36,7 @@ GOVERNANCE_PATHS = (
     "Makefile",
     "conductor/_native.py",
     "conductor/_project_hooks.py",
-    "conductor/candidate_policy.toml",
+    DEFAULT_POLICY_RELATIVE.as_posix(),
     "conductor/check_duplicate_function_bodies.py",
     "conductor/check_protected_deletes.py",
     "conductor/guardrail_audit.py",

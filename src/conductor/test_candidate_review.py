@@ -96,6 +96,7 @@ from conductor.candidate_review.policy import (
     W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
     load_policy,
 )
+from conductor.candidate_review.policy_path import resolve_policy_path
 from conductor.candidate_review.reporters import (
     human_summary,
     junit_xml,
@@ -622,7 +623,7 @@ def test_adversarial_builtin_matrix_exercises_real_candidate_flows(
     repo = _init_repo(tmp_path / "repo")
     _write_adversarial_sources(repo)
     policy = replace(
-        load_policy(Path("conductor/candidate_policy.toml")),
+        load_policy(resolve_policy_path()),
         max_file_bytes=200,
         max_binary_bytes=1,
     )
@@ -708,7 +709,7 @@ def test_dynamic_execution_gate_distinguishes_builtins_from_method_calls(
     ]
     (repo / "probe.py").write_text("\n".join(probe_lines) + "\n", encoding="utf-8")
     _git(repo, "add", "--all")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
@@ -770,7 +771,7 @@ def test_protocol_ellipsis_methods_are_not_flagged_as_stubs(tmp_path: Path) -> N
     )
     (repo / "protocol_probe.py").write_text(proto_probe, encoding="utf-8")
     _git(repo, "add", "--all")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
@@ -804,7 +805,7 @@ def test_analyzer_reporting_includes_stdout_alongside_warning_stderr(
     _commit_all(repo, "baseline")
     (repo / "probe.py").write_text("VALUE = 2\n", encoding="utf-8")
     _git(repo, "add", "probe.py")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
@@ -857,7 +858,7 @@ def test_command_cache_mutex_and_attestation_contracts(tmp_path: Path) -> None:
     _commit_all(repo, "baseline")
     (repo / "probe.py").write_text("VALUE = 2\n", encoding="utf-8")
     _git(repo, "add", "probe.py")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
@@ -967,7 +968,7 @@ def test_targeted_test_selection_execution_and_coverage(
         encoding="utf-8",
     )
     _git(repo, "add", "probe.py", "conductor/__init__.py", "conductor/test_probe.py")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
@@ -1084,7 +1085,7 @@ def test_targeted_test_sharding_preserves_the_changed_coverage_verdict(
         "conductor/test_a.py",
         "conductor/test_b.py",
     )
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     selection = ReviewTestSelection(
         ("conductor/test_a.py", "conductor/test_b.py"), {}, ()
@@ -1135,7 +1136,7 @@ def test_targeted_test_shard_killed_by_signal_is_not_reported_as_a_failure(
     _commit_all(repo, "baseline")
     (repo / "probe.py").write_text("def value():\n    return 3\n", encoding="utf-8")
     _git(repo, "add", "probe.py")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     full = next(
         check for check in policy.checks if check.check_id == "targeted-tests-full"
@@ -1189,7 +1190,7 @@ def test_engine_and_tree_integrity_fail_closed_without_candidate_evidence(
     _commit_all(repo, "baseline")
     (repo / "probe.py").write_text("VALUE = 2\n", encoding="utf-8")
     _git(repo, "add", "probe.py")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
@@ -1273,7 +1274,7 @@ def test_graph_selected_tests_use_immutable_matching_metadata(tmp_path: Path) ->
     )
     connection.commit()
     connection.close()
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
         context = ReviewContext(
@@ -1554,7 +1555,7 @@ def _change(path: str, *, classes: tuple[str, ...] = ()) -> Change:
 
 
 def test_javascript_spec_and_native_tests_are_classified_as_tests() -> None:
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     spec = policy.classify_change(_change("aria_designer/e2e/designer.spec.js"))
     native = policy.classify_change(_change("research/runtime/native/test_kernel.c"))
     production = policy.classify_change(_change("research/tools/mixer_fingerprint.py"))
@@ -1564,7 +1565,7 @@ def test_javascript_spec_and_native_tests_are_classified_as_tests() -> None:
 
 
 def test_mutation_evidence_skips_when_no_tests_changed(tmp_path: Path) -> None:
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     context = ReviewContext(
         repo=tmp_path,
         snapshot=tmp_path,
@@ -1593,7 +1594,7 @@ def test_mutation_evidence_skips_when_no_tests_changed(tmp_path: Path) -> None:
 
 
 def test_mutation_evidence_fails_closed_without_registry(tmp_path: Path) -> None:
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     context = ReviewContext(
         repo=tmp_path,
         snapshot=tmp_path,
@@ -1653,7 +1654,7 @@ def test_mutation_evidence_fails_closed_without_receipt(
             "malformed_receipts": [],
         },
     )
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     context = ReviewContext(
         repo=tmp_path,
         snapshot=snapshot,
@@ -1788,7 +1789,7 @@ def _new_test_value_context(
     test_path.write_text(
         "def test_new_contract():\n    assert True\n", encoding="utf-8"
     )
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     context = ReviewContext(
         repo=tmp_path,
         snapshot=snapshot,
@@ -2331,7 +2332,7 @@ def _runtime_waiver_context(
     other_path = snapshot / "research/tests/test_other_probe.py"
     other_path.parent.mkdir(parents=True, exist_ok=True)
     other_path.write_text("def test_other():\n    assert True\n", encoding="utf-8")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     waiver = MutationWaiverPolicy(
         waiver_id="runtime-waiver",
         path="conductor/test_waived_probe.py",
@@ -2626,7 +2627,7 @@ def test_wall_budget_is_separable_from_the_cpu_budget() -> None:
     exceed it, because a shard starved by its siblings is slow without burning the CPU
     that would prove it is stuck. Raising the wall must not raise the CPU limit.
     """
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     full = next(
         check for check in policy.checks if check.check_id == "targeted-tests-full"
     )
@@ -2650,7 +2651,7 @@ def test_a_stalled_shard_does_not_discard_the_other_shards_results(
     _commit_all(repo, "baseline")
     (repo / "probe.py").write_text("def value():\n    return 3\n", encoding="utf-8")
     _git(repo, "add", "probe.py")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     full = next(
         check for check in policy.checks if check.check_id == "targeted-tests-full"
@@ -2700,7 +2701,7 @@ def test_every_stalled_shard_still_fails_the_check(
     _commit_all(repo, "baseline")
     (repo / "probe.py").write_text("def value():\n    return 3\n", encoding="utf-8")
     _git(repo, "add", "probe.py")
-    policy = load_policy(Path("conductor/candidate_policy.toml"))
+    policy = load_policy(resolve_policy_path())
     candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
     full = next(
         check for check in policy.checks if check.check_id == "targeted-tests-full"

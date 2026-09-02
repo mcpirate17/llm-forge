@@ -46,8 +46,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from conductor.candidate_review.policy import PolicyError, ToolPolicy, load_policy
+from conductor.candidate_review.policy_path import resolve_policy_path
 
-DEFAULT_POLICY = Path("conductor/candidate_policy.toml")
 DEFAULT_BASE = "origin/w7-trident-program"
 # Exit codes are part of the contract: hooks and CI branch on them.
 EXIT_PASS = 0
@@ -562,7 +562,7 @@ def run_gate(
     base_ref: str,
     profile: str,
     python: str,
-    policy_path: Path,
+    policy_path: str | os.PathLike[str] | None = None,
     json_out: Path,
     skip_review: bool = False,
 ) -> tuple[int, list[PhaseResult], list[ToolStatus]]:
@@ -583,7 +583,7 @@ def run_gate(
         phases.append(export_tree(repo, target_ref, export_root))
 
         try:
-            policy = load_policy(export_root / policy_path)
+            policy = load_policy(resolve_policy_path(policy_path, tree=export_root))
         except PolicyError as exc:
             raise GateRefusal(f"policy did not load: {exc}") from exc
 
@@ -658,7 +658,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--python", default=sys.executable, help="interpreter for subprocesses"
     )
     parser.add_argument(
-        "--policy", default=str(DEFAULT_POLICY), help="policy path, repo-relative"
+        "--policy",
+        default=None,
+        help="candidate-relative policy path (default: $CONDUCTOR_POLICY, then "
+        "conductor/candidate_policy.toml in the candidate)",
     )
     parser.add_argument(
         "--json-out", default="tasks/audit/gate.json", help="review JSON artifact path"
@@ -682,7 +685,7 @@ def main(argv: list[str] | None = None) -> int:
             base_ref=args.base,
             profile=args.profile,
             python=args.python,
-            policy_path=Path(args.policy),
+            policy_path=args.policy,
             json_out=repo / args.json_out,
             skip_review=args.skip_review,
         )

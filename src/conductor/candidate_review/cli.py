@@ -42,16 +42,8 @@ from conductor.candidate_review.ownership import (
     release_claim,
 )
 from conductor.candidate_review.policy import PolicyError, load_policy
+from conductor.candidate_review.policy_path import resolve_policy_path
 from conductor.candidate_review.reporters import human_summary, write_outputs
-
-DEFAULT_POLICY = "conductor/candidate_policy.toml"
-
-
-def _relative_policy(raw: str) -> PurePosixPath:
-    path = PurePosixPath(raw)
-    if path.is_absolute() or ".." in path.parts or not path.parts:
-        raise ValueError(f"policy path must be candidate-relative: {raw!r}")
-    return path
 
 
 def _output_path(repo: Path, raw: str) -> Path | None:
@@ -149,8 +141,7 @@ def review_command(args: argparse.Namespace) -> int:
             base_ref=args.base_ref or None,
         )
         with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
-            policy_rel = _relative_policy(args.policy)
-            policy = load_policy(snapshot / policy_rel.as_posix())
+            policy = load_policy(resolve_policy_path(args.policy, tree=snapshot))
             candidate = classify_candidate(candidate, policy)
             with tempfile.TemporaryDirectory(
                 prefix="llm-governance-runtime-"
@@ -404,7 +395,12 @@ def _parser() -> argparse.ArgumentParser:
     review.add_argument("--profile", choices=("fast", "full"), required=True)
     review.add_argument("--target-ref", default="HEAD")
     review.add_argument("--base-ref", default="")
-    review.add_argument("--policy", default=DEFAULT_POLICY)
+    review.add_argument(
+        "--policy",
+        default=None,
+        help="candidate-relative policy path (default: $CONDUCTOR_POLICY, then "
+        "conductor/candidate_policy.toml in the candidate)",
+    )
     review.add_argument("--owner", default="")
     review.add_argument("--lock-timeout", type=float, default=30.0)
     review.add_argument("--json-out", default="")

@@ -25,6 +25,7 @@ from conductor.test_candidate_review import (
     _probe_source,
     _write_grandfather_inventory,
 )
+from conductor.candidate_review.policy_path import resolve_policy_path
 
 EMPTY_TREE_OID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 PROBE_PATH = "research/tests/test_probe.py"
@@ -121,7 +122,7 @@ def _gate_context(
             changes=(_change(PROBE_PATH),),
         ),
         entries=(),
-        policy=load_policy(Path("conductor/candidate_policy.toml")),
+        policy=load_policy(resolve_policy_path()),
         surface="manual",
         profile="fast",
         owner=None,
