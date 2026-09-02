@@ -161,11 +161,12 @@ def check_project_imports(package_dir: Path) -> list[Violation]:
 
 
 def default_hook_dirs(package_dir: Path) -> list[Path]:
-    """Hook trees next to the package: repo layout first, then the standalone one."""
+    """Hook trees next to the package: launchers, the tooling bodies, the standalone one."""
     root = package_dir.parent
     candidates = (
         root / ".claude" / "hooks",
         root / ".agent_hooks",
+        root / "tooling" / "hooks",
         root.parent / "hooks",
     )
     return [d for d in candidates if d.is_dir()]

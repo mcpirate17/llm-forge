@@ -198,6 +198,11 @@ def test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts(
     pkg = _tree(tmp_path, {"src/conductor/x.py": "", "hooks/pre.sh": "ls /mnt/data\n"})
     dirs = tb.default_hook_dirs(pkg.parent / "src" / "conductor")
     assert dirs == [tmp_path / "hooks"]
+    moved = _tree(
+        tmp_path / "moved" / "repo",
+        {"conductor/x.py": "", "tooling/hooks/claude/pre.sh": "ls /mnt/data\n"},
+    )
+    assert tb.default_hook_dirs(moved) == [moved.parent / "tooling" / "hooks"]
     nowhere = tmp_path / "a" / "b" / "conductor"
     assert tb.default_hook_dirs(nowhere) == []
     with pytest.raises(FileNotFoundError):

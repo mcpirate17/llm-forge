@@ -135,6 +135,10 @@ def hook_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         REPO_ROOT / ".agent_hooks" / "crg_gate.py",
         root / ".agent_hooks" / "crg_gate.py",
     )
+    # The launcher above execs the tooling body it finds under its own checkout.
+    gate_body = root / "tooling" / "hooks" / "agent" / "crg_gate.py"
+    gate_body.parent.mkdir(parents=True)
+    shutil.copy(REPO_ROOT / "tooling" / "hooks" / "agent" / "crg_gate.py", gate_body)
     monkeypatch.setenv(
         "GROK_INSPECT_COMMAND",
         f"{python} -m conductor.grok_inspect_stub {shlex.quote(str(root))}",
