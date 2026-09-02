@@ -1,0 +1,526 @@
+// PyO3 0.29's generated argument conversion trips this Rust 1.93 lint even
+// though the handwritten functions do not perform a redundant conversion.
+#![allow(clippy::useless_conversion)]
+
+use std::collections::HashSet;
+use std::env;
+use std::fs::{self, File};
+use std::io::Read;
+use std::path::{Component, Path, PathBuf};
+use std::process::Command;
+
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use serde::ser::{SerializeMap, Serializer}; // codespell:ignore ser
+use serde::Serialize;
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+
+const HASH_BUFFER_BYTES: usize = 64 * 1024;
+
+fn value_error(message: impl Into<String>) -> PyErr {
+    PyValueError::new_err(message.into())
+}
+
+fn normalize_mutation_path(value: &str, label: &str) -> Result<String, String> {
+    let text = value.replace('\\', "/");
+    if text.trim().is_empty() {
+        return Err(format!("{label} must be a non-empty string"));
+    }
+    if text.starts_with('/') || text.starts_with("./") {
+        return Err(format!(
+            "{label} must be a normalized repository-relative path"
+        ));
+    }
+
+    let mut parts = Vec::new();
+    for part in text.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                return Err(format!(
+                    "{label} must be a normalized repository-relative path"
+                ));
+            }
+            _ => parts.push(part),
+        }
+    }
+    if parts.is_empty() {
+        Ok(".".to_owned())
+    } else {
+        Ok(parts.join("/"))
+    }
+}
+
+#[pyfunction]
+fn normalize_mutation_path_native(value: &str, label: &str) -> PyResult<String> {
+    normalize_mutation_path(value, label).map_err(value_error)
+}
+
+fn lexical_absolute(path: &Path) -> Result<PathBuf, String> {
+    let source = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        env::current_dir()
+            .map_err(|error| format!("cannot resolve current directory: {error}"))?
+            .join(path)
+    };
+    let mut normalized = PathBuf::new();
+    for component in source.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(Path::new("/")),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::Normal(part) => normalized.push(part),
+        }
+    }
+    Ok(normalized)
+}
+
+fn resolved_existing_or_lexical(path: &Path) -> Result<PathBuf, String> {
+    match fs::canonicalize(path) {
+        Ok(resolved) => Ok(resolved),
+        Err(_) => lexical_absolute(path),
+    }
+}
+
+fn registry_patterns(
+    repo_root: &str,
+    registry_path: &str,
+    canonical_patterns: &[String],
+) -> Result<Vec<String>, String> {
+    let root = resolved_existing_or_lexical(Path::new(repo_root))?;
+    let registry = resolved_existing_or_lexical(Path::new(registry_path))?;
+    if registry.strip_prefix(&root).is_err() {
+        return Err("mutation registry must be inside the repository".to_owned());
+    }
+    let text = fs::read_to_string(&registry).map_err(|error| {
+        format!(
+            "cannot load mutation registry {}: {error}",
+            registry.display()
+        )
+    })?;
+    let payload: Value = serde_json::from_str(&text).map_err(|error| {
+        format!(
+            "cannot load mutation registry {}: {error}",
+            registry.display()
+        )
+    })?;
+    let object = payload
+        .as_object()
+        .ok_or_else(|| "registry must be a JSON object".to_owned())?;
+    let raw_patterns = object.get("test_patterns").and_then(Value::as_array);
+    let Some(raw_patterns) = raw_patterns else {
+        return Err("registry.test_patterns must be a list of non-empty strings".to_owned());
+    };
+    if raw_patterns.is_empty() {
+        return Err("registry.test_patterns must be a list of non-empty strings".to_owned());
+    }
+    let mut patterns = Vec::with_capacity(raw_patterns.len());
+    for raw in raw_patterns {
+        let Some(pattern) = raw.as_str() else {
+            return Err("registry.test_patterns must be a list of non-empty strings".to_owned());
+        };
+        if pattern.is_empty() {
+            return Err("registry.test_patterns must be a list of non-empty strings".to_owned());
+        }
+        patterns.push(pattern.to_owned());
+    }
+    if patterns != canonical_patterns {
+        return Err("registry.test_patterns must match the canonical inventory".to_owned());
+    }
+    Ok(patterns)
+}
+
+#[pyfunction]
+fn mutation_registry_patterns_native(
+    repo_root: &str,
+    registry_path: &str,
+    canonical_patterns: Vec<String>,
+) -> PyResult<Vec<String>> {
+    registry_patterns(repo_root, registry_path, &canonical_patterns).map_err(value_error)
+}
+
+fn wildcard_segment_matches(candidate: &str, pattern: &str) -> bool {
+    let candidate: Vec<char> = candidate.chars().collect();
+    let pattern: Vec<char> = pattern.chars().collect();
+    let mut row = vec![false; candidate.len() + 1];
+    row[0] = true;
+    for token in pattern {
+        let mut next = vec![false; candidate.len() + 1];
+        match token {
+            '*' => {
+                next[0] = row[0];
+                for index in 1..=candidate.len() {
+                    next[index] = row[index] || next[index - 1];
+                }
+            }
+            '?' => {
+                next[1..].copy_from_slice(&row[..candidate.len()]);
+            }
+            literal => {
+                for index in 1..=candidate.len() {
+                    next[index] = row[index - 1] && candidate[index - 1] == literal;
+                }
+            }
+        }
+        row = next;
+    }
+    row[candidate.len()]
+}
+
+fn glob_segments_match(path: &[&str], pattern: &[&str]) -> bool {
+    if pattern.is_empty() {
+        return path.is_empty();
+    }
+    if pattern[0] == "**" {
+        // pathlib's leading ``**/`` requires at least one directory component.
+        return (1..=path.len()).any(|count| glob_segments_match(&path[count..], &pattern[1..]));
+    }
+    if path.is_empty() || !wildcard_segment_matches(path[0], pattern[0]) {
+        return false;
+    }
+    glob_segments_match(&path[1..], &pattern[1..])
+}
+
+fn is_mutation_test_path(path: &str, patterns: &[String]) -> bool {
+    let normalized = path.replace('\\', "/");
+    let path_parts: Vec<&str> = normalized
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect();
+    patterns.iter().any(|raw_pattern| {
+        let normalized_pattern = raw_pattern.replace('\\', "/");
+        let pattern_parts: Vec<&str> = normalized_pattern
+            .split('/')
+            .filter(|part| !part.is_empty() && *part != ".")
+            .collect();
+        if pattern_parts.is_empty() {
+            return false;
+        }
+        if pattern_parts.len() == 1 {
+            return path_parts
+                .last()
+                .is_some_and(|name| wildcard_segment_matches(name, pattern_parts[0]));
+        }
+        if pattern_parts.first() == Some(&"**") {
+            return glob_segments_match(&path_parts, &pattern_parts);
+        }
+        if pattern_parts.len() > path_parts.len() {
+            return false;
+        }
+        glob_segments_match(
+            &path_parts[path_parts.len() - pattern_parts.len()..],
+            &pattern_parts,
+        )
+    })
+}
+
+#[pyfunction]
+fn is_mutation_test_path_native(path: &str, patterns: Vec<String>) -> bool {
+    is_mutation_test_path(path, &patterns)
+}
+
+fn git_paths(repo_root: &str, args: &[String]) -> Result<Vec<String>, String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(repo_root)
+        .output()
+        .map_err(|error| format!("git {} failed: {error}", args.join(" ")))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        let detail = if stderr.is_empty() { stdout } else { stderr };
+        return Err(format!("git {} failed: {detail}", args.join(" ")));
+    }
+    let stdout = String::from_utf8(output.stdout)
+        .map_err(|error| format!("git {} produced non-UTF-8 output: {error}", args.join(" ")))?;
+    Ok(stdout
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.replace('\\', "/"))
+        .collect())
+}
+
+#[pyfunction]
+fn mutation_git_paths_native(repo_root: &str, args: Vec<String>) -> PyResult<Vec<String>> {
+    git_paths(repo_root, &args).map_err(value_error)
+}
+
+fn should_skip_mutation_path(path: &str, skip_directory_names: &HashSet<&str>) -> bool {
+    let normalized = path.replace('\\', "/");
+    let parts: Vec<&str> = normalized
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect();
+    parts.iter().any(|part| skip_directory_names.contains(part))
+        || (parts.contains(&"research") && parts.contains(&"cache"))
+}
+
+#[pyfunction]
+fn should_skip_mutation_path_native(path: &str, skip_directory_names: Vec<String>) -> bool {
+    let skip: HashSet<&str> = skip_directory_names.iter().map(String::as_str).collect();
+    should_skip_mutation_path(path, &skip)
+}
+
+#[pyfunction]
+fn mutation_test_inventory_native(
+    repo_root: &str,
+    registry_path: &str,
+    canonical_patterns: Vec<String>,
+    skip_directory_names: Vec<String>,
+    mode: &str,
+    include_untracked: bool,
+) -> PyResult<Vec<String>> {
+    let patterns =
+        registry_patterns(repo_root, registry_path, &canonical_patterns).map_err(value_error)?;
+    let mut raw_paths = match mode {
+        "all" => git_paths(repo_root, &["ls-files".to_owned()]).map_err(value_error)?,
+        "changed" => git_paths(
+            repo_root,
+            &[
+                "diff".to_owned(),
+                "--name-only".to_owned(),
+                "HEAD".to_owned(),
+            ],
+        )
+        .map_err(value_error)?,
+        _ => {
+            return Err(value_error(format!(
+                "mutation inventory mode must be 'all' or 'changed', got {mode:?}"
+            )));
+        }
+    };
+    if include_untracked || mode == "changed" {
+        raw_paths.extend(
+            git_paths(
+                repo_root,
+                &[
+                    "ls-files".to_owned(),
+                    "--others".to_owned(),
+                    "--exclude-standard".to_owned(),
+                ],
+            )
+            .map_err(value_error)?,
+        );
+    }
+
+    let skip: HashSet<&str> = skip_directory_names.iter().map(String::as_str).collect();
+    let mut seen = HashSet::with_capacity(raw_paths.len());
+    let mut selected = Vec::new();
+    for raw in raw_paths {
+        let path = raw.replace('\\', "/");
+        let normalized = path
+            .split('/')
+            .filter(|part| !part.is_empty() && *part != ".")
+            .collect::<Vec<_>>()
+            .join("/");
+        if !seen.insert(normalized.clone())
+            || should_skip_mutation_path(&normalized, &skip)
+            || !is_mutation_test_path(&normalized, &patterns)
+        {
+            continue;
+        }
+        selected.push(normalized);
+    }
+    selected.sort_unstable();
+    Ok(selected)
+}
+
+fn sha256_file(path: &Path) -> Result<String, String> {
+    let mut file = File::open(path).map_err(|error| format!("{}: {error}", path.display()))?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0_u8; HASH_BUFFER_BYTES];
+    loop {
+        let count = file
+            .read(&mut buffer)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&buffer[..count]);
+    }
+    let output = digest.finalize();
+    Ok(format!("{output:x}"))
+}
+
+struct OrderedSourceHashes<'a>(&'a [(String, String)]);
+
+impl Serialize for OrderedSourceHashes<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.0.len()))?;
+        for (path, digest) in self.0 {
+            map.serialize_entry(path, digest)?;
+        }
+        map.end()
+    }
+}
+
+#[derive(Serialize)]
+struct RankedTestPayload<'a> {
+    rank: usize,
+    nodeid: &'a str,
+    contract: &'static str,
+    rationale: &'static str,
+}
+
+#[derive(Serialize)]
+struct PlannedMutationPayload<'a> {
+    id: &'static str,
+    target_path: &'a str,
+    contract: &'static str,
+    description: &'static str,
+    expected_killers: [&'a str; 1],
+}
+
+#[derive(Serialize)]
+struct BaselinePayload<'a> {
+    argv: Vec<&'a str>,
+    timeout_seconds: u32,
+}
+
+#[derive(Serialize)]
+struct ResourceGatePayload {
+    blocked_process_substrings: Vec<String>,
+    poll_seconds: u32,
+}
+
+#[derive(Serialize)]
+struct ScaffoldPayload<'a> {
+    schema_version: u32,
+    campaign_id: String,
+    title: String,
+    language: &'static str,
+    mutation_engine: &'static str,
+    expected_ranked_tests: usize,
+    expected_mutations: u32,
+    source_sha256: OrderedSourceHashes<'a>,
+    ranked_tests: Vec<RankedTestPayload<'a>>,
+    planned_mutations: [PlannedMutationPayload<'a>; 1],
+    mutations: Vec<String>,
+    baseline: BaselinePayload<'a>,
+    resource_gate: ResourceGatePayload,
+    environment: std::collections::BTreeMap<String, String>,
+    host_read_dependencies: Vec<String>,
+}
+
+fn python_path_stem(path: &str) -> &str {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    match name.rfind('.') {
+        Some(index) if index > 0 && index + 1 < name.len() => &name[..index],
+        _ => name,
+    }
+}
+
+#[pyfunction]
+fn plan_mutation_scaffold_native(
+    repo_root: &str,
+    test_path: &str,
+    source_paths: Vec<String>,
+    nodeids: Vec<String>,
+) -> PyResult<String> {
+    let relative = normalize_mutation_path(test_path, "scaffold test path").map_err(value_error)?;
+    let target = Path::new(repo_root).join(&relative);
+    if !target.is_file() {
+        return Err(value_error(format!(
+            "scaffold test path does not exist: {relative}"
+        )));
+    }
+    if nodeids.is_empty() {
+        return Err(value_error(format!(
+            "{relative} contains no test functions to rank"
+        )));
+    }
+
+    let mut source_hashes = Vec::with_capacity(source_paths.len() + 1);
+    let mut seen = HashSet::with_capacity(source_paths.len() + 1);
+    source_hashes.push((relative.clone(), sha256_file(&target).map_err(value_error)?));
+    seen.insert(relative.clone());
+    for source in source_paths {
+        let source_relative =
+            normalize_mutation_path(&source, "scaffold source path").map_err(value_error)?;
+        let source_file = Path::new(repo_root).join(&source_relative);
+        if !source_file.is_file() {
+            return Err(value_error(format!(
+                "scaffold source path does not exist: {source_relative}"
+            )));
+        }
+        if seen.insert(source_relative.clone()) {
+            source_hashes.push((
+                source_relative,
+                sha256_file(&source_file).map_err(value_error)?,
+            ));
+        }
+    }
+
+    let planned_target = source_hashes
+        .iter()
+        .find_map(|(path, _)| (path != &relative).then_some(path.as_str()))
+        .unwrap_or(&relative);
+    let campaign_stem = python_path_stem(&relative);
+    let campaign_id = format!("{campaign_stem}_scaffold");
+    let ranked_tests = nodeids
+        .iter()
+        .enumerate()
+        .map(|(index, nodeid)| RankedTestPayload {
+            rank: index + 1,
+            nodeid,
+            contract: "replace with the behavioral contract this test enforces",
+            rationale: "rank by the damage a silent defect would do",
+        })
+        .collect();
+    let mut argv = vec!["python", "-m", "pytest", "-q", "-o", "addopts="];
+    argv.extend(nodeids.iter().map(String::as_str));
+    let payload = ScaffoldPayload {
+        schema_version: 1,
+        campaign_id,
+        title: format!("Scaffolded campaign for {relative}"),
+        language: if relative.ends_with(".py") {
+            "python"
+        } else {
+            "unknown"
+        },
+        mutation_engine: "reviewed_unified_diff",
+        expected_ranked_tests: nodeids.len(),
+        expected_mutations: 1,
+        source_sha256: OrderedSourceHashes(&source_hashes),
+        ranked_tests,
+        planned_mutations: [PlannedMutationPayload {
+            id: "first_order_placeholder",
+            target_path: planned_target,
+            contract: "replace with the first-order defect this test must kill",
+            description: "Materialize one reviewed unified diff. Do not generate mutants automatically and do not edit the shared checkout.",
+            expected_killers: [&nodeids[0]],
+        }],
+        mutations: Vec::new(),
+        baseline: BaselinePayload {
+            argv,
+            timeout_seconds: 120,
+        },
+        resource_gate: ResourceGatePayload {
+            blocked_process_substrings: Vec::new(),
+            poll_seconds: 30,
+        },
+        environment: std::collections::BTreeMap::new(),
+        host_read_dependencies: Vec::new(),
+    };
+    serde_json::to_string(&payload)
+        .map_err(|error| value_error(format!("cannot serialize mutation scaffold: {error}")))
+}
+
+pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(normalize_mutation_path_native, module)?)?;
+    module.add_function(wrap_pyfunction!(mutation_registry_patterns_native, module)?)?;
+    module.add_function(wrap_pyfunction!(is_mutation_test_path_native, module)?)?;
+    module.add_function(wrap_pyfunction!(mutation_git_paths_native, module)?)?;
+    module.add_function(wrap_pyfunction!(should_skip_mutation_path_native, module)?)?;
+    module.add_function(wrap_pyfunction!(mutation_test_inventory_native, module)?)?;
+    module.add_function(wrap_pyfunction!(plan_mutation_scaffold_native, module)?)?;
+    Ok(())
+}

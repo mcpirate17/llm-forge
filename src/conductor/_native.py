@@ -1,18 +1,17 @@
-"""The single seam between ``conductor`` and the project's native runtime.
+"""The single seam between ``conductor`` and its native crate.
 
 Every native primitive the agent tooling uses is imported here and nowhere else in
-``conductor/``. Today the symbols come from ``research_runtime_native`` (the Rust crate
-under ``research/runtime/native/rust/research-runtime``; its ``mutation_*.rs`` and
-``repository_analysis.rs`` modules are conductor-only helpers). Step 2 of the tooling
-extraction swaps this module's import for a conductor-owned crate; nothing else in the
-package changes.
+``conductor/``. The symbols come from ``conductor_native``, the conductor-owned Rust
+crate under ``tooling/native/conductor-native`` (mutation campaigns, receipts, evidence,
+dead-test and untracked-import closure). The project's research crate,
+``research_runtime_native``, is no longer imported anywhere in this package.
 
 Importing this module is as eager as importing the extension itself: modules that must
 stay collectable without the extension import it at the point of use, never at module
 scope.
 """
 
-from research_runtime_native import (
+from conductor_native import (
     DeadTestsAnalysisNative,
     DeadTestsResolverNative,
     dead_tests_closure_native,

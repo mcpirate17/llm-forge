@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "conductor-native"
+version = "0.1.0"
+description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
+requires-python = ">=3.12"
+
+[tool.maturin]
+bindings = "pyo3"
+module-name = "conductor_native"
+# Without this the wheel links libpython, which is right for `cargo test` and wrong
+# for anything installed. The crate's `extension-module` feature defaults off so the
+# unit tests can link; this turns it back on for the shipped artifact.
+features = ["extension-module"]

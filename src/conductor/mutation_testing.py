@@ -62,9 +62,9 @@ RUNNER_COMPONENT_PATHS = (
     "conductor/mutation_testing.py",
     "conductor/mutation_testing_support.py",
     "conductor/mutation_value.py",
-    "research/runtime/native/rust/research-runtime/src/mutation_evidence.rs",
-    "research/runtime/native/rust/research-runtime/src/mutation_manifest.rs",
-    "research/runtime/native/rust/research-runtime/src/mutation_receipt.rs",
+    "tooling/native/conductor-native/src/mutation_evidence.rs",
+    "tooling/native/conductor-native/src/mutation_manifest.rs",
+    "tooling/native/conductor-native/src/mutation_receipt.rs",
 )
 
 

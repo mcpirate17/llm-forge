@@ -1238,7 +1238,10 @@ def test_graph_selected_tests_use_immutable_matching_metadata(tmp_path: Path) ->
     test_path.write_text(
         "def test_value_property():\n    assert True\n", encoding="utf-8"
     )
-    _git(repo, "add", "probe.py", "conductor/test_graph_probe.py")
+    rust_path = repo / "native" / "lib.rs"
+    rust_path.parent.mkdir()
+    rust_path.write_text("#[test]\nfn probe() {}\n", encoding="utf-8")
+    _git(repo, "add", "probe.py", "conductor/test_graph_probe.py", "native/lib.rs")
     database = repo / ".code-review-graph" / "graph.db"
     database.parent.mkdir()
     connection = sqlite3.connect(database)
@@ -1258,10 +1261,15 @@ def test_graph_selected_tests_use_immutable_matching_metadata(tmp_path: Path) ->
         [
             ("probe:value", str((repo / "probe.py").resolve()), 0),
             ("test:value", str(test_path.resolve()), 1),
+            ("rust:probe", str(rust_path.resolve()), 1),
         ],
     )
-    connection.execute(
-        "INSERT INTO edges VALUES (?, ?, ?)", ("test:value", "probe:value", "calls")
+    connection.executemany(
+        "INSERT INTO edges VALUES (?, ?, ?)",
+        [
+            ("test:value", "probe:value", "calls"),
+            ("rust:probe", "probe:value", "calls"),
+        ],
     )
     connection.commit()
     connection.close()
