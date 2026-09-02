@@ -33,6 +33,8 @@ GOVERNANCE_PATHS = (
     ".pre-commit-config.yaml",
     "AGENTS.md",
     "Makefile",
+    "conductor/_native.py",
+    "conductor/_project_hooks.py",
     "conductor/candidate_policy.toml",
     "conductor/check_duplicate_function_bodies.py",
     "conductor/check_protected_deletes.py",
@@ -44,9 +46,11 @@ GOVERNANCE_PATHS = (
     "conductor/test_ref_aware_governance.py",
     "conductor/test_run_duplicate_audit.py",
     "conductor/test_vulture_audit.py",
+    "conductor/tooling_boundary.py",
     "conductor/vulture_baseline.json",
     "research/notes/unified_candidate_review_architecture_2026-08-16.md",
 )
+HOOK_TREES = (".agent_hooks", ".claude/hooks", "tooling/hooks")
 BENCHMARK_CLAIM_PATHS = (
     "benchmark_fixture",
     "package-lock.json",
@@ -127,11 +131,23 @@ def _insert(index: Path, repo: Path, path: str, content: bytes, mode: str) -> st
 
 
 def _source_paths(source: Path) -> list[str]:
+    """The governance surface: fixed paths, the review package, and the hook trees.
+
+    The always-on tooling-boundary check refuses a tree with no hook directory next
+    to ``conductor/`` (rule b scans it), so every hook tree present at the source is
+    carried into the fixture.
+    """
     paths: list[str] = list(GOVERNANCE_PATHS)
     paths.extend(
         path.relative_to(source).as_posix()
         for path in sorted((source / "conductor" / "candidate_review").glob("*.py"))
     )
+    for hook_tree in HOOK_TREES:
+        paths.extend(
+            path.relative_to(source).as_posix()
+            for path in sorted((source / hook_tree).rglob("*"))
+            if path.is_file() and "__pycache__" not in path.parts
+        )
     return sorted(set(paths))
 
 

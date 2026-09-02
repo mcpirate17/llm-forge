@@ -13,7 +13,7 @@ index holds no source it parses — pure ``.toml``/``.json`` edits — so this s
 directly and says so). Without that the gate raises CRITICAL
 ``graph-evidence-incomplete``.
 
-Measured on the live 762 MB / 45 192-node store (2026-09-02, /home/tim/Projects/LLM
+Measured on the live 762 MB / 45 192-node store (2026-09-02, main checkout
 -> /tmp worktree): copy + prefix rewrite of 1 342 649 cells + FTS rebuild 5.9 s,
 incremental ``update`` 0.4 s, 6.4 s wall — against tens of minutes for a rebuild
 from scratch. The sqlite work stays in Python deliberately: it is a one-off

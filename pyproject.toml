@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "conductor-tooling"
+version = "0.1.0"
+description = "Agent governance tooling: mutation campaigns, candidate review, A2A, knowledge retrieval, agent hooks"
+requires-python = ">=3.12"
+# Exactly the third-party distributions conductor imports (scan of every import at
+# every scope against the host's dependency list, 2026-09-02). Host-only crates are
+# extras below; nothing here resolves to the host repository.
+dependencies = [
+  "a2a-sdk[http-server]>=1.1.2",
+  "conductor-native",
+  "coverage>=7.0",
+  "defusedxml>=0.7.1",
+  "httpx>=0.28",
+  "numpy>=1.26",
+  "pyyaml>=6.0",
+  "starlette>=0.45",
+  "uvicorn>=0.30",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+# slop-core is a host-repository Rust crate (research/runtime/native/rust/slop-core);
+# repo_index, native_ablations, slop_ledger and slop_gate import it at function scope
+# and fail loud with a build hint when it is absent. It is not an extra: no registry
+# or standalone path can resolve it, so declaring it would make `uv lock` impossible.
+# That coupling is known, not hidden.
+
+[project.scripts]
+kb_retrieve = "conductor.kb_retrieve:main"
+memory_index = "conductor.memory_index:main"
+candidate_review = "conductor.candidate_review.cli:main"
+mutation_testing = "conductor.mutation_testing:main"
+agent_a2a = "conductor.agent_a2a:main"
+handoff = "conductor.handoff:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/conductor"]
+
+[tool.uv.sources]
+conductor-native = { path = "native/conductor-native" }
