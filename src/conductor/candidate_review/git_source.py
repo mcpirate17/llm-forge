@@ -365,29 +365,69 @@ def materialize_tree(
         yield root, entries
 
 
+def _rename_sources(repo: Path, candidate: Candidate) -> dict[str, str]:
+    """Map each moved destination path to the source path git paired it with.
+
+    A pathspec limited to destination paths hides the other half of a move, so
+    git cannot pair the two and scores the whole file as new code. This pass
+    runs unrestricted so the pairing exists before the line-level diff is
+    scoped. ``--find-copies`` is needed as well as ``--find-renames`` because a
+    move that leaves an alias shim behind keeps the source path alive, which is
+    a copy to git, not a rename. ``--find-copies`` must come last: a later
+    ``-M`` turns copy detection back off.
+    """
+    raw = run_git(
+        repo,
+        [
+            "diff",
+            "--name-status",
+            "--find-renames",
+            "--find-copies",
+            "--diff-filter=RC",
+            "--no-color",
+            "-z",
+            candidate.base_tree_oid,
+            candidate.tree_oid,
+        ],
+    ).stdout.decode("utf-8", "replace")
+    fields = raw.split("\0")
+    sources: dict[str, str] = {}
+    index = 0
+    while index + 2 < len(fields) and fields[index]:
+        sources[fields[index + 2]] = fields[index + 1]
+        index += 3
+    return sources
+
+
 def changed_line_numbers(
     repo: Path, candidate: Candidate, paths: Sequence[str]
 ) -> dict[str, set[int]]:
     if not paths:
         return {}
+    wanted = set(paths)
+    sources = _rename_sources(repo, candidate)
+    scope = sorted(wanted | {sources[path] for path in wanted & sources.keys()})
     raw = run_git(
         repo,
         [
             "diff",
             "--unified=0",
+            "--find-renames",
+            "--find-copies",
             "--no-color",
             candidate.base_tree_oid,
             candidate.tree_oid,
             "--",
-            *paths,
+            *scope,
         ],
     ).stdout.decode("utf-8", "replace")
     current: str | None = None
     result: dict[str, set[int]] = {}
     for line in raw.splitlines():
         if line.startswith("+++ b/"):
-            current = line[6:]
-            result.setdefault(current, set())
+            current = line[6:] if line[6:] in wanted else None
+            if current is not None:
+                result.setdefault(current, set())
         elif line.startswith("@@") and current:
             plus = line.split(" ")[2][1:]
             start_raw, _, count_raw = plus.partition(",")

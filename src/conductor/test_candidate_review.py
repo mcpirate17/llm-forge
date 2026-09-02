@@ -58,6 +58,7 @@ from conductor.candidate_review.engine import (
 )
 from conductor.candidate_review.git_source import (
     GitSourceError,
+    changed_line_numbers,
     classify_candidate,
     list_tree,
     materialize_tree,
@@ -2750,3 +2751,77 @@ def test_changed_coverage_judges_each_risk_class_on_its_own_lines() -> None:
     # the lenient side, never silently held to the strict one.
     assert _risk_buckets(per_file, {})["other"]["measurable"] == 200
     assert _risk_buckets(per_file, {})["high"]["measurable"] == 0
+
+
+def _numbered_module(prefix: str, count: int) -> str:
+    return "".join(f"{prefix}_{n} = {n}\n" for n in range(1, count + 1))
+
+
+def test_changed_lines_score_a_move_by_its_edited_hunks_only(tmp_path: Path) -> None:
+    """A moved file is changed code only where its hunks are.
+
+    The diff was scoped to destination paths with no rename detection, so git
+    never saw the deletion half of the pair and scored every line of a moved
+    file as new. Measured on PR #184: 710 lines for conductor/workspace_hygiene.py
+    against 4 actually edited, which forced a coverage exception.
+    """
+    repo = _init_repo(tmp_path / "repo")
+    (repo / "pure.py").write_text(_numbered_module("PURE", 8), encoding="utf-8")
+    (repo / "edited.py").write_text(_numbered_module("EDIT", 8), encoding="utf-8")
+    (repo / "touched.py").write_text(_numbered_module("TOUCH", 8), encoding="utf-8")
+    _commit_all(repo, "baseline")
+
+    _git(repo, "mv", "pure.py", "moved_pure.py")
+    _git(repo, "mv", "edited.py", "moved_edited.py")
+    moved = _numbered_module("EDIT", 8).splitlines(keepends=True)
+    moved[3] = "EDIT_4 = 40\n"
+    (repo / "moved_edited.py").write_text("".join(moved), encoding="utf-8")
+    (repo / "added.py").write_text(_numbered_module("ADD", 4), encoding="utf-8")
+    touched = _numbered_module("TOUCH", 8).splitlines(keepends=True)
+    touched[0] = "TOUCH_1 = 11\n"
+    (repo / "touched.py").write_text("".join(touched), encoding="utf-8")
+    _git(repo, "add", "--all")
+
+    candidate = resolve_candidate(repo, kind="index")
+    paths = [change.path for change in candidate.changes]
+    assert set(paths) == {"moved_pure.py", "moved_edited.py", "added.py", "touched.py"}
+    changed = changed_line_numbers(repo, candidate, paths)
+
+    # (a) a pure rename is not new code, and the vanished source is never scored.
+    assert changed.get("moved_pure.py", set()) == set()
+    assert "pure.py" not in changed
+    # (b) a rename with one edited hunk contributes exactly its destination lines.
+    assert changed["moved_edited.py"] == {4}
+    # (c) a genuinely new file still contributes every line.
+    assert changed["added.py"] == {1, 2, 3, 4}
+    # (d) an in-place edit is unchanged from the pre-rename-detection behaviour.
+    assert changed["touched.py"] == {1}
+
+
+def test_changed_lines_pair_a_move_that_leaves_an_alias_shim(tmp_path: Path) -> None:
+    """A move that keeps the old path alive as an alias is a copy to git.
+
+    PR #184 replaced research/tools/workspace_hygiene.py with a ten-line alias
+    and added conductor/workspace_hygiene.py, so the source was modified rather
+    than deleted and rename detection alone could not pair them.
+    """
+    repo = _init_repo(tmp_path / "repo")
+    (repo / "tools").mkdir()
+    body = _numbered_module("LINE", 40)
+    (repo / "tools" / "mod.py").write_text(body, encoding="utf-8")
+    _commit_all(repo, "baseline")
+
+    moved = body.splitlines(keepends=True)
+    moved[9] = "LINE_10 = 100\n"
+    (repo / "pkg").mkdir()
+    (repo / "pkg" / "mod.py").write_text("".join(moved), encoding="utf-8")
+    (repo / "tools" / "mod.py").write_text(
+        "from pkg.mod import LINE_1  # moved\n", encoding="utf-8"
+    )
+    _git(repo, "add", "--all")
+
+    candidate = resolve_candidate(repo, kind="index")
+    changed = changed_line_numbers(repo, candidate, ["pkg/mod.py", "tools/mod.py"])
+
+    assert changed["pkg/mod.py"] == {10}
+    assert changed["tools/mod.py"] == {1}
