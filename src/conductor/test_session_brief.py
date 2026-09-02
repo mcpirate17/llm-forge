@@ -278,7 +278,7 @@ def test_kb_and_memory_retrieval_share_one_query_embedding(
 def test_task_previews_opens_index_read_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from research.tools import index_notes
+    from conductor import index_notes
 
     database = tmp_path / "notes.sqlite"
     sqlite3.connect(database).close()

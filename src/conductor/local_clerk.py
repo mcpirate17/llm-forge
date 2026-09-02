@@ -45,12 +45,28 @@ OUTPUT_ROOT: Final[Path] = ROOT / "research" / "tmp" / "local_clerk"
 APPLICATION_MARKER: Final[str] = "human review required; originals are preserved"
 TITLE_RE: Final[re.Pattern[str]] = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$")
 FORBIDDEN_SOURCE_NAME: Final[str] = ".current_work.md"
-ALLOWED_ROOTS: Final[tuple[Path, ...]] = (
-    ROOT,
-    Path("/home/tim/.claude/tasks"),
-    Path("/home/tim/.codex/memories"),
-    Path("/home/tim/Documents/CodexVault"),
-)
+CLERK_ROOTS_ENV: Final[str] = "CONDUCTOR_CLERK_ROOTS"
+
+
+def _clerk_roots() -> tuple[Path, ...]:
+    """Roots a clerical source may live under: the repo plus the host's note stores.
+
+    ``CONDUCTOR_CLERK_ROOTS`` (``os.pathsep``-separated) replaces the home-derived
+    stores; the repository root is always allowed.
+    """
+    override = os.environ.get(CLERK_ROOTS_ENV)
+    if override is not None:
+        return (ROOT, *(Path(item) for item in override.split(os.pathsep) if item))
+    home = Path.home()
+    return (
+        ROOT,
+        home / ".claude" / "tasks",
+        home / ".codex" / "memories",
+        home / "Documents" / "CodexVault",
+    )
+
+
+ALLOWED_ROOTS: Final[tuple[Path, ...]] = _clerk_roots()
 MODEL_FIELDS: Final[frozenset[str]] = frozenset(
     {"summary", "source_decisions", "open_tasks", "todo_items", "duplicate_candidates"}
 )
@@ -287,7 +303,10 @@ def _parse_model_json(raw: str) -> Any:
 
 
 def _ollama_endpoint() -> tuple[str, int, str]:
-    raw = os.environ.get("OLLAMA_HOST", DEFAULT_OLLAMA_HOST).strip()
+    raw = os.environ.get("OLLAMA_HOST")
+    if raw is None:
+        raw = DEFAULT_OLLAMA_HOST
+    raw = raw.strip()
     parsed = urllib.parse.urlsplit(raw)
     if (
         parsed.scheme != "http"

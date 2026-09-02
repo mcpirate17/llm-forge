@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -157,3 +158,19 @@ def test_draft_provenance_round_trips_and_rejects_tampering(
     tampered_path.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(clerk.ClerkError, match="source changed since draft"):
         clerk.validate_document(tampered_path)
+
+
+def test_clerk_roots_derive_from_home_unless_overridden(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(clerk.CLERK_ROOTS_ENV, raising=False)
+    home = Path.home()
+    assert clerk._clerk_roots() == (
+        clerk.ROOT,
+        home / ".claude" / "tasks",
+        home / ".codex" / "memories",
+        home / "Documents" / "CodexVault",
+    )
+    first, second = tmp_path / "notes", tmp_path / "vault"
+    monkeypatch.setenv(clerk.CLERK_ROOTS_ENV, f"{first}{os.pathsep}{second}")
+    assert clerk._clerk_roots() == (clerk.ROOT, first, second)

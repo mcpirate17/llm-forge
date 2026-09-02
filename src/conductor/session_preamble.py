@@ -62,17 +62,15 @@ def _exposure_line() -> str:
     count) is excluded from this hook-safe path.
     """
     try:
-        from research.tools.workspace_hygiene import cheap_exposure_counts
+        from conductor.workspace_hygiene import cheap_exposure_counts
 
         counts = cheap_exposure_counts()
     except (ImportError, RuntimeError, OSError) as exc:
-        return (
-            f"EXPOSED: unavailable ({exc}). python -m research.tools.workspace_hygiene"
-        )
+        return f"EXPOSED: unavailable ({exc}). python -m conductor.workspace_hygiene"
     return (
         f"EXPOSED: {counts['local_only_commits']} local-only commit(s), "
         f"{counts['stale_dirty_files']} stale dirty file(s), branches skipped (needs gh). "
-        "python -m research.tools.workspace_hygiene"
+        "python -m conductor.workspace_hygiene"
     )
 
 

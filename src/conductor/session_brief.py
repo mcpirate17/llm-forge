@@ -224,7 +224,7 @@ def task_previews(task: str, k: int = 3) -> list[str]:
     """Fetch cheap, local task/TODO previews without opening whole documents."""
 
     try:
-        from research.tools.index_notes import DB_PATH, search_notes
+        from conductor.index_notes import DB_PATH, search_notes
 
         if not Path(DB_PATH).is_file():
             return []

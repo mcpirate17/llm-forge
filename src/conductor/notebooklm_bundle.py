@@ -2,13 +2,23 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
-VAULT_ROOT = Path("/home/tim/Documents/CodexVault")
+VAULT_ROOT_ENV = "CODEX_VAULT_ROOT"
+
+
+def _vault_root() -> Path:
+    """The Obsidian vault: ``CODEX_VAULT_ROOT`` when set, else the home default."""
+    return Path(
+        os.environ.get(VAULT_ROOT_ENV, Path.home() / "Documents" / "CodexVault")
+    )
+
+
+VAULT_ROOT = _vault_root()
 DEFAULT_OUT = ROOT / "tasks" / "notebooklm" / "codex_context_bundle.md"
 INCLUDE_FILES = (
     "AGENTS.md",

@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from research_runtime_native import (
+from conductor._native import (
     is_mutation_test_path_native,
     mutation_git_paths_native,
     mutation_registry_patterns_native,

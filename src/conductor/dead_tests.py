@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import NoReturn
 
-from research_runtime_native import (
+from conductor._native import (
     DeadTestsAnalysisNative,
     DeadTestsResolverNative,
     dead_tests_closure_native,

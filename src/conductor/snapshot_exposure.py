@@ -1,6 +1,6 @@
 """Snapshot-on-detect: the missing consumer of ``workspace_hygiene``'s EXPOSED signal.
 
-``research.tools.workspace_hygiene`` and ``conductor.branch_policy`` are deliberately
+``conductor.workspace_hygiene`` and ``conductor.branch_policy`` are deliberately
 report-only (see their module docstrings) -- detecting a branch with no push in
 ``STALE_PUSH_HOURS`` or no PR in ``STALE_PR_HOURS`` never mutates git state. Nothing
 acted on that signal until now: ``research/notes/branch_exposure_audit_2026-08-30.md``
@@ -26,7 +26,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from research.tools import workspace_hygiene
+from conductor import workspace_hygiene
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT_PREFIX = "refs/snapshots/branches"

@@ -523,7 +523,7 @@ def clean_clone_closure(repo: Path, export_root: Path) -> PhaseResult:
     tree CI will actually see.
     """
     try:
-        from research.tools.workspace_hygiene import untracked_import_closure
+        from conductor.workspace_hygiene import untracked_import_closure
     except ImportError as exc:  # pragma: no cover - import wiring is environmental
         raise GateRefusal(f"clean-clone closure check is unavailable: {exc}") from exc
     tracked = {line for line in _git(["ls-files"], repo=repo).splitlines() if line}

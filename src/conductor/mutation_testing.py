@@ -173,7 +173,8 @@ def _native_json_call(
     """Call one native mutation primitive and decode its JSON result."""
 
     try:
-        runtime = __import__("research_runtime_native")
+        from conductor import _native as runtime
+
         operation = getattr(runtime, function_name)
         encoded = operation(
             json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -187,7 +188,7 @@ def _patch_paths(patch_path: Path) -> tuple[str, ...]:
     """Extract and validate repository-relative paths from a unified diff."""
 
     try:
-        from research_runtime_native import mutation_patch_paths_native
+        from conductor._native import mutation_patch_paths_native
 
         return tuple(mutation_patch_paths_native(str(patch_path)))
     except (ImportError, AttributeError, ValueError) as exc:
@@ -287,7 +288,7 @@ def _lineage_accepts(recorded: object, repo_root: Path) -> bool:
     """Return whether a runner-component map is explicitly accepted."""
 
     try:
-        from research_runtime_native import mutation_runner_lineage_accepts_native
+        from conductor._native import mutation_runner_lineage_accepts_native
 
         return bool(
             mutation_runner_lineage_accepts_native(
@@ -915,7 +916,7 @@ def verify_evidence(
     """Require current native full-campaign PASS evidence for changed tests."""
 
     try:
-        from research_runtime_native import (
+        from conductor._native import (
             plan_mutation_evidence_native,
             verify_mutation_evidence_native,
         )
@@ -1059,7 +1060,7 @@ def repin_campaigns(
         if relative not in campaign.source_symbols
     }
     try:
-        from research_runtime_native import plan_mutation_repin_native
+        from conductor._native import plan_mutation_repin_native
 
         plans = plan_mutation_repin_native(
             str(repo_root.resolve()),

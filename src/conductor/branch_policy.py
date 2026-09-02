@@ -714,7 +714,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
 
 
 def _cmd_exposed(args: argparse.Namespace) -> int:
-    from research.tools import workspace_hygiene  # local import: avoids an import cycle
+    from conductor import workspace_hygiene  # local import: avoids an import cycle
 
     report = workspace_hygiene.exposure_report(Path.cwd())
     if args.json:
