@@ -998,6 +998,19 @@ def check_native_source(ctx: ReviewContext) -> CheckResult:
 BUILTIN_CHECKS["native-source"] = check_native_source
 
 
+def check_crate_version(ctx: ReviewContext) -> CheckResult:
+    """Delegate to crate_version, which imports this module for its helpers."""
+
+    from conductor.candidate_review.crate_version import (
+        check_crate_version as _run,
+    )
+
+    return _run(ctx)
+
+
+BUILTIN_CHECKS["crate-version"] = check_crate_version
+
+
 def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
     started = time.perf_counter()
     changed = [change.path for change in ctx.live_changes if "python" in change.classes]
