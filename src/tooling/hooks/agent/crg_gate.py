@@ -26,6 +26,92 @@ REPO_ROOT = Path(
     or os.environ.get("PROJECT_DIR")
     or Path(__file__).resolve().parents[3]
 ).resolve()
+# A fail-open in a sibling worktree is recorded here rather than denied unless
+# CRG_GATE_ENFORCE_WORKTREES is set. Enforcing it blocks every lane that has
+# never claimed, which is a fleet decision, not a hook default.
+EXPOSURE_CAP_BYTES = 4 * 1024 * 1024
+
+
+def _checkout_of(path: Path) -> tuple[Path, Path] | None:
+    """`(worktree root, git common dir)` for `path`, or None outside a checkout.
+
+    Filesystem-only by design: this runs on every Edit, and a `git rev-parse`
+    per target would put a subprocess in the hook's latency path. Walks
+    lexically, so a path that does not exist yet (a Write creating a file)
+    resolves the same as one that does.
+    """
+    for candidate in (path, *path.parents):
+        entry = candidate / ".git"
+        if entry.is_dir():
+            return candidate, entry.resolve()
+        if not entry.is_file():
+            continue
+        # A linked worktree: `.git` is a file pointing at
+        # `<common>/worktrees/<name>`, which names the common dir in `commondir`.
+        try:
+            text = entry.read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+        if not text.startswith("gitdir:"):
+            return None
+        gitdir = Path(text[len("gitdir:") :].strip())
+        if not gitdir.is_absolute():
+            gitdir = candidate / gitdir
+        gitdir = gitdir.resolve()
+        marker = gitdir / "commondir"
+        if not marker.is_file():
+            return candidate, gitdir
+        try:
+            raw = marker.read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+        common = Path(raw)
+        return candidate, (
+            common if common.is_absolute() else (gitdir / common)
+        ).resolve()
+    return None
+
+
+_REPO_CHECKOUT = _checkout_of(REPO_ROOT)
+REPO_COMMON_DIR = _REPO_CHECKOUT[1] if _REPO_CHECKOUT else None
+
+
+def _enforce_worktrees() -> bool:
+    return os.environ.get("CRG_GATE_ENFORCE_WORKTREES", "") not in ("", "0")
+
+
+def _record_exposure(owner: str, target: str, tool: str, checkout: str) -> None:
+    """Append an unclaimed sibling-worktree write to a durable log.
+
+    `create_claim` prunes expired claims on every write, so the claim store
+    cannot answer "was this path claimed when it was written" for any past
+    window. This log is the only record of the fail-open that survives that
+    prune. It lives beside the claim store in the git common directory, so
+    every worktree appends to one file and no checkout is dirtied.
+    """
+    if REPO_COMMON_DIR is None:
+        return
+    try:
+        directory = REPO_COMMON_DIR / "governance"
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / "claim-gate-exposure.jsonl"
+        if path.is_file() and path.stat().st_size > EXPOSURE_CAP_BYTES:
+            return
+        line = json.dumps(
+            {
+                "at": time.time(),
+                "owner": owner,
+                "tool": tool,
+                "checkout": checkout,
+                "path": target,
+            },
+            sort_keys=True,
+        )
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as handle:
+            handle.write(f"{line}\n")
+    except OSError:
+        return
 
 
 def _read_payload() -> dict[str, Any]:
@@ -121,18 +207,40 @@ def _target_paths(payload: dict[str, Any]) -> list[str]:
     return paths
 
 
-def _repo_relative_targets(payload: dict[str, Any]) -> list[str]:
-    targets: list[str] = []
+def _classify_targets(
+    payload: dict[str, Any],
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Split write targets into `(this checkout, sibling worktrees)`.
+
+    Both halves are checkout-relative. Claims are keyed on the path within a
+    checkout and `claim_store_path` resolves through the git common directory,
+    so one claim covers the same path in every worktree of this repository --
+    which is why a sibling worktree is gate-relevant and `/tmp` is not.
+    """
+    local: list[str] = []
+    sibling: list[tuple[str, str]] = []
     for raw in _target_paths(payload):
         target = Path(raw)
         resolved = (
             target.resolve() if target.is_absolute() else (REPO_ROOT / target).resolve()
         )
         try:
-            targets.append(resolved.relative_to(REPO_ROOT).as_posix())
-        except ValueError:
+            local.append(resolved.relative_to(REPO_ROOT).as_posix())
             continue
-    return targets
+        except ValueError:
+            pass
+        checkout = _checkout_of(resolved)
+        if checkout is None or REPO_COMMON_DIR is None:
+            continue  # outside any checkout: the scratchpad, /tmp
+        root, common = checkout
+        if common != REPO_COMMON_DIR:
+            continue  # a different repository entirely
+        sibling.append((str(root), resolved.relative_to(root).as_posix()))
+    return local, sibling
+
+
+def _repo_relative_targets(payload: dict[str, Any]) -> list[str]:
+    return _classify_targets(payload)[0]
 
 
 def _claim_allows(owner: str, target: str) -> tuple[bool, str]:
@@ -217,12 +325,26 @@ def verify(payload: dict[str, Any], *, owner: str) -> int:
             payload, "BLOCKED: edit target is missing; live claim cannot be verified."
         )
         return 0
-    # Paths outside the repo (session scratchpad, /tmp) have nothing to claim.
-    for target in _repo_relative_targets(payload):
+    # Paths outside any checkout (session scratchpad, /tmp) have nothing to claim.
+    local, sibling = _classify_targets(payload)
+    for target in local:
         allowed, detail = _claim_allows(owner, target)
         if not allowed:
             _deny(
                 payload, f"BLOCKED: {detail}. Create a narrow governance claim first."
+            )
+            return 0
+    tool = payload.get("tool_name") if isinstance(payload.get("tool_name"), str) else ""
+    for checkout, target in sibling:
+        allowed, detail = _claim_allows(owner, target)
+        if allowed:
+            continue
+        _record_exposure(owner, target, tool or "", checkout)
+        if _enforce_worktrees():
+            _deny(
+                payload,
+                f"BLOCKED: {detail} (in worktree {checkout}). "
+                "Create a narrow governance claim first.",
             )
             return 0
     return 0
@@ -231,6 +353,16 @@ def verify(payload: dict[str, Any], *, owner: str) -> int:
 def _bash_command(payload: dict[str, Any]) -> str:
     value = _tool_input(payload).get("command")
     return value if isinstance(value, str) else ""
+
+
+def _bash_checkout(payload: dict[str, Any]) -> tuple[Path, bool]:
+    """`(checkout to resolve write targets against, is a sibling worktree)`."""
+    cwd = payload.get("cwd")
+    if isinstance(cwd, str) and cwd and REPO_COMMON_DIR is not None:
+        checkout = _checkout_of(Path(cwd).resolve())
+        if checkout and checkout[1] == REPO_COMMON_DIR and checkout[0] != REPO_ROOT:
+            return checkout[0], True
+    return REPO_ROOT, False
 
 
 def verify_bash(payload: dict[str, Any], *, owner: str) -> int:
@@ -251,7 +383,13 @@ def verify_bash(payload: dict[str, Any], *, owner: str) -> int:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from bash_write_targets import OPAQUE_WRITE, repo_write_targets
 
-        targets = repo_write_targets(command, REPO_ROOT)
+        # Resolve against the checkout the command actually runs in. Under the
+        # hardcoded root an absolute path inside a sibling worktree fell
+        # outside it and was dropped, so the write was never gated. A relative
+        # one produced the same repo-relative string either way, so its claim
+        # decision was accidentally right while attributed to the wrong tree.
+        base, in_sibling = _bash_checkout(payload)
+        targets = repo_write_targets(command, base)
     except Exception:  # noqa: BLE001 - see fail-open rationale above
         return 0
     if not targets:
@@ -273,11 +411,14 @@ def verify_bash(payload: dict[str, Any], *, owner: str) -> int:
         return 0
     for target in targets:
         allowed, detail = _claim_allows(owner, target)
-        if not allowed:
-            _deny(
-                payload, f"BLOCKED: {detail}. Create a narrow governance claim first."
-            )
-            return 0
+        if allowed:
+            continue
+        if in_sibling:
+            _record_exposure(owner, target, "Bash", str(base))
+            if not _enforce_worktrees():
+                continue
+        _deny(payload, f"BLOCKED: {detail}. Create a narrow governance claim first.")
+        return 0
     return 0
 
 

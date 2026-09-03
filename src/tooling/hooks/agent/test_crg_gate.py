@@ -344,3 +344,158 @@ def test_a_heredoc_does_not_disturb_the_write_target(bash_targets) -> None:
     assert bash_targets.write_targets(
         "cat > conductor/x.py <<'EOF'\nprint('hi')\nEOF"
     ) == ["conductor/x.py"]
+
+
+# --- sibling worktrees -------------------------------------------------------
+#
+# The gate resolved every target against one hardcoded REPO_ROOT, so a write
+# into another checkout of the SAME repository fell outside it and was dropped
+# by the branch meant for /tmp -- and `verify` then allowed it. Claims are
+# stored under the git common directory, so those paths were always claimable;
+# only the gate could not see them.
+
+
+@pytest.fixture
+def worktree_gate(gate, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """The fixture repo plus a linked worktree of it, and an unrelated repo."""
+    repo = Path(gate.REPO_ROOT)
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"],
+        cwd=repo,
+        check=True,
+    )
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "worktree", "add", "--quiet", "-b", "side", str(linked)],
+        cwd=repo,
+        check=True,
+    )
+    stranger = tmp_path / "stranger"
+    stranger.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=stranger, check=True)
+    monkeypatch.setenv("CRG_GATE_STATE_DIR", str(tmp_path / "state"))
+    return gate, linked, stranger
+
+
+def _edit_decision(gate, capsys, path: str, owner: str = "claude") -> str:
+    payload = {
+        "session_id": "s1",
+        "tool_name": "Edit",
+        "tool_input": {"file_path": path},
+    }
+    gate._write_state(
+        gate._state_path(gate._state_dir(), gate._state_key(payload), "graph-used")
+    )
+    capsys.readouterr()
+    assert gate.verify(payload, owner=owner) == 0
+    out = capsys.readouterr().out.strip()
+    if not out:
+        return "allow"
+    return json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def test_a_sibling_worktree_path_is_claim_relevant(worktree_gate) -> None:
+    """The classifier must place it with the repo, not with /tmp."""
+    gate, linked, _ = worktree_gate
+    payload = {"tool_input": {"file_path": str(linked / "a.py")}}
+    local, sibling = gate._classify_targets(payload)
+    assert local == []
+    assert sibling == [(str(linked), "a.py")]
+
+
+def test_scratchpad_and_foreign_repos_remain_unclaimable(worktree_gate) -> None:
+    """The drop this replaces was right for these two; only worktrees regressed."""
+    gate, _, stranger = worktree_gate
+    for path in ("/tmp/loose.txt", str(stranger / "a.py")):
+        assert gate._classify_targets({"tool_input": {"file_path": path}}) == ([], [])
+
+
+def test_sibling_worktree_write_is_allowed_but_recorded_by_default(
+    worktree_gate, capsys
+) -> None:
+    """Enforcing would block every lane that has never claimed, so the default
+    records the fail-open instead of denying it. The record is the deliverable:
+    `create_claim` prunes expired claims on every write, so without this log no
+    past window can be audited at all."""
+    gate, linked, _ = worktree_gate
+    assert _edit_decision(gate, capsys, str(linked / "a.py")) == "allow"
+    log = Path(gate.REPO_COMMON_DIR) / "governance" / "claim-gate-exposure.jsonl"
+    record = json.loads(log.read_text(encoding="utf-8").strip())
+    assert record["path"] == "a.py"
+    assert record["owner"] == "claude"
+    assert record["checkout"] == str(linked)
+
+
+def test_sibling_worktree_write_is_denied_under_enforcement(
+    worktree_gate, capsys, monkeypatch
+) -> None:
+    gate, linked, _ = worktree_gate
+    monkeypatch.setenv("CRG_GATE_ENFORCE_WORKTREES", "1")
+    reason = _edit_decision(gate, capsys, str(linked / "a.py"))
+    assert reason.startswith("BLOCKED: path 'a.py' is held by codex-phase22")
+    assert str(linked) in reason
+
+
+def test_a_claim_spans_every_worktree(worktree_gate, capsys, monkeypatch) -> None:
+    """`b.py` is claimed by claude in the main checkout. One claim store lives
+    under the git common directory, so the claim must cover the same path in a
+    linked worktree -- otherwise enforcement would demand a second claim per
+    worktree and the fix would be unusable."""
+    gate, linked, _ = worktree_gate
+    monkeypatch.setenv("CRG_GATE_ENFORCE_WORKTREES", "1")
+    assert _edit_decision(gate, capsys, str(linked / "b.py")) == "allow"
+
+
+def test_bash_resolves_targets_against_the_worktree_it_runs_in(
+    worktree_gate, capsys, monkeypatch
+) -> None:
+    """The target is absolute on purpose. A relative path yields the same
+    repo-relative string under either root, so it cannot tell the two apart --
+    an absolute path inside the worktree fell outside the hardcoded root and
+    was dropped, which is the case that was actually ungated."""
+    gate, linked, _ = worktree_gate
+    monkeypatch.setenv("CRG_GATE_ENFORCE_WORKTREES", "1")
+    payload = {
+        "session_id": "s1",
+        "tool_name": "Bash",
+        "cwd": str(linked),
+        "tool_input": {"command": f"sed -i s/A/C/ {linked / 'a.py'}"},
+    }
+    gate._write_state(
+        gate._state_path(gate._state_dir(), gate._state_key(payload), "graph-used")
+    )
+    capsys.readouterr()
+    assert gate.verify_bash(payload, owner="claude") == 0
+    reason = json.loads(capsys.readouterr().out)["hookSpecificOutput"][
+        "permissionDecisionReason"
+    ]
+    assert reason.startswith("BLOCKED: path 'a.py' is held by codex-phase22")
+
+
+def test_bash_in_a_worktree_still_fails_open_by_default(worktree_gate, capsys) -> None:
+    gate, linked, _ = worktree_gate
+    payload = {
+        "session_id": "s1",
+        "tool_name": "Bash",
+        "cwd": str(linked),
+        "tool_input": {"command": "sed -i s/A/C/ a.py"},
+    }
+    gate._write_state(
+        gate._state_path(gate._state_dir(), gate._state_key(payload), "graph-used")
+    )
+    capsys.readouterr()
+    assert gate.verify_bash(payload, owner="claude") == 0
+    assert capsys.readouterr().out.strip() == ""
+
+
+def test_exposure_log_stops_at_its_cap(worktree_gate, capsys, monkeypatch) -> None:
+    """An unbounded append in the hook path would grow without limit across a
+    fleet that never claims."""
+    gate, linked, _ = worktree_gate
+    monkeypatch.setattr(gate, "EXPOSURE_CAP_BYTES", 1)
+    log = Path(gate.REPO_COMMON_DIR) / "governance" / "claim-gate-exposure.jsonl"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text('{"x": 1}\n', encoding="utf-8")
+    assert _edit_decision(gate, capsys, str(linked / "a.py")) == "allow"
+    assert log.read_text(encoding="utf-8") == '{"x": 1}\n'
