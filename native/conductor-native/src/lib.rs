@@ -5,6 +5,7 @@
 //! the project's research crate (tooling boundary step 2a).
 
 mod dead_tests;
+mod guardrail_ast;
 mod mutation_coverage;
 mod mutation_evidence;
 mod mutation_manifest;
@@ -15,6 +16,7 @@ use pyo3::prelude::*;
 #[pymodule]
 fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     dead_tests::register(module)?;
+    guardrail_ast::register(module)?;
     mutation_coverage::register(module)?;
     mutation_evidence::register(module)?;
     Ok(())

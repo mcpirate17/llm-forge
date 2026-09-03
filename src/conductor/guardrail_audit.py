@@ -7,17 +7,18 @@ import json
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
+from conductor._native import guardrail_ast_metrics_native
 from conductor.audit_root import (
     AuditRootError,
     print_audit_provenance,
     resolve_audit_root,
 )
 from conductor.run_duplicate_audit import should_skip_python
-
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TARGETS = ("research", "aria_core", "aria_designer", "component_fab")
@@ -45,9 +46,11 @@ def _has_marker(text: str, marker: str) -> bool:
     return f"# guardrail: {marker}" in text
 
 
-def _function_has_marker(node: ast.AST, source_lines: list[str], marker: str) -> bool:
-    start = getattr(node, "lineno", 1) - 1
-    end = getattr(node, "end_lineno", start + 1)
+def _function_has_marker(
+    lineno: int, end_lineno: int, source_lines: list[str], marker: str
+) -> bool:
+    start = lineno - 1
+    end = end_lineno
     snippet = "\n".join(source_lines[max(start, 0) : min(end, len(source_lines))])
     return _has_marker(snippet, marker)
 
@@ -169,146 +172,75 @@ def _read_candidate_text(path: Path, *, staged_only: bool, from_ref: str | None)
         return path.read_text(encoding="latin-1")
 
 
-class _PyFunctionAnalyzer(ast.NodeVisitor):
-    def __init__(self, source_lines: list[str], rel_path: str = "") -> None:
-        self.source_lines = source_lines
-        self.rel_path = rel_path
-        self.issues: list[Issue] = []
-        self._parents: list[ast.AST] = []
-
-    def generic_visit(self, node: ast.AST) -> None:
-        self._parents.append(node)
-        super().generic_visit(node)
-        self._parents.pop()
-
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self._handle_function(node)
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self._handle_function(node)
-
-    def _handle_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-        end_lineno = getattr(node, "end_lineno", node.lineno)
-        length = max(0, end_lineno - node.lineno + 1)
-        branches = sum(
-            isinstance(
-                child,
-                (
-                    ast.If,
-                    ast.For,
-                    ast.AsyncFor,
-                    ast.While,
-                    ast.Try,
-                    ast.Match,
-                    ast.IfExp,
+def _issues_from_function_metrics(
+    metrics: dict[str, Any], source_lines: list[str], rel_path: str
+) -> list[Issue]:
+    qualname = str(metrics["symbol"])
+    lineno = int(metrics["lineno"])
+    end_lineno = int(metrics["end_lineno"])
+    branches = int(metrics["branches"])
+    max_nesting = int(metrics["max_nesting"])
+    length = max(0, end_lineno - lineno + 1)
+    is_route_registration = bool(metrics["is_route_registration"])
+    fn_key = f"{rel_path}::{qualname}" if rel_path else qualname
+    allow_god_fn = fn_key in _ALLOWLIST["god_functions"] or _function_has_marker(
+        lineno, end_lineno, source_lines, "allow-god-function"
+    )
+    allow_complexity = fn_key in _ALLOWLIST["complexity"] or _function_has_marker(
+        lineno, end_lineno, source_lines, "allow-complexity"
+    )
+    issues: list[Issue] = []
+    if length > 100 and not is_route_registration and not allow_god_fn:
+        issues.append(
+            Issue(
+                kind="god_function",
+                severity="critical",
+                path=rel_path,
+                symbol=qualname,
+                message=f"Function is {length} lines (>100).",
+                recommendation="Split by decision blocks and side-effect boundaries.",
+                metric={"lines": length, "lineno": lineno},
+            )
+        )
+    if (
+        (branches > 20 or max_nesting > 5)
+        and not is_route_registration
+        and not allow_complexity
+    ):
+        issues.append(
+            Issue(
+                kind="complexity",
+                severity="high",
+                path=rel_path,
+                symbol=qualname,
+                message=(
+                    "Function complexity is high "
+                    f"(branches={branches}, nesting={max_nesting})."
                 ),
+                recommendation="Flatten control flow and extract pure helpers.",
+                metric={
+                    "branches": branches,
+                    "max_nesting": max_nesting,
+                    "lineno": lineno,
+                },
             )
-            for child in ast.walk(node)
         )
-        max_nesting = self._max_nesting(node)
-        qualname = node.name
-
-        # Flask/FastAPI route registration functions are structural wrappers
-        # containing nested handler closures — not logic god functions.
-        is_route_registration = qualname.startswith("register_") and any(
-            isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
-            for child in ast.iter_child_nodes(node)
-        )
-
-        fn_key = f"{self.rel_path}::{qualname}" if self.rel_path else qualname
-        allow_god_fn = fn_key in _ALLOWLIST["god_functions"] or _function_has_marker(
-            node, self.source_lines, "allow-god-function"
-        )
-        allow_complexity = fn_key in _ALLOWLIST["complexity"] or _function_has_marker(
-            node, self.source_lines, "allow-complexity"
-        )
-        if length > 100 and not is_route_registration and not allow_god_fn:
-            self.issues.append(
-                Issue(
-                    kind="god_function",
-                    severity="critical",
-                    path="",
-                    symbol=qualname,
-                    message=f"Function is {length} lines (>100).",
-                    recommendation="Split by decision blocks and side-effect boundaries.",
-                    metric={"lines": length, "lineno": node.lineno},
-                )
+    if bool(metrics["hot_loop"]) and not allow_complexity:
+        issues.append(
+            Issue(
+                kind="native_hotspot_candidate",
+                severity="high",
+                path=rel_path,
+                symbol=qualname,
+                message="Python loop heuristic suggests a numeric hot path.",
+                recommendation=(
+                    "Vectorize with NumPy/PyTorch or move the hotspot into "
+                    "C/C++/Rust/Cython if profiling confirms it."
+                ),
+                metric={"lineno": lineno},
             )
-        if (
-            (branches > 20 or max_nesting > 5)
-            and not is_route_registration
-            and not allow_complexity
-        ):
-            self.issues.append(
-                Issue(
-                    kind="complexity",
-                    severity="high",
-                    path="",
-                    symbol=qualname,
-                    message=f"Function complexity is high (branches={branches}, nesting={max_nesting}).",
-                    recommendation="Flatten control flow and extract pure helpers.",
-                    metric={
-                        "branches": branches,
-                        "max_nesting": max_nesting,
-                        "lineno": node.lineno,
-                    },
-                )
-            )
-        if self._looks_like_python_hot_loop(node) and not allow_complexity:
-            self.issues.append(
-                Issue(
-                    kind="native_hotspot_candidate",
-                    severity="high",
-                    path="",
-                    symbol=qualname,
-                    message="Python loop heuristic suggests a numeric hot path.",
-                    recommendation="Vectorize with NumPy/PyTorch or move the hotspot into C/C++/Rust/Cython if profiling confirms it.",
-                    metric={"lineno": node.lineno},
-                )
-            )
-        self.generic_visit(node)
-
-    def _max_nesting(self, fn: ast.AST) -> int:
-        control = (
-            ast.If,
-            ast.For,
-            ast.AsyncFor,
-            ast.While,
-            ast.Try,
-            ast.With,
-            ast.AsyncWith,
-            ast.Match,
         )
-
-        def walk(node: ast.AST, depth: int) -> int:
-            best = depth
-            for child in ast.iter_child_nodes(node):
-                next_depth = depth + 1 if isinstance(child, control) else depth
-                best = max(best, walk(child, next_depth))
-            return best
-
-        return walk(fn, 0)
-
-    def _looks_like_python_hot_loop(self, node: ast.AST) -> bool:
-        for child in ast.walk(node):
-            if isinstance(child, (ast.For, ast.AsyncFor)):
-                body_calls = [n for n in ast.walk(child) if isinstance(n, ast.Call)]
-                has_append = any(
-                    isinstance(call.func, ast.Attribute) and call.func.attr == "append"
-                    for call in body_calls
-                )
-                has_numeric_op = any(
-                    isinstance(n, (ast.BinOp, ast.AugAssign)) for n in ast.walk(child)
-                )
-                if has_append and has_numeric_op:
-                    return True
-                iter_name = getattr(child.iter, "id", "")
-                if (
-                    iter_name in {"x", "xs", "arr", "array", "tensor", "values"}
-                    and has_numeric_op
-                ):
-                    return True
-        return False
+    return issues
 
 
 def _resolve_tool_command(tool: str, *args: str) -> list[str]:
@@ -378,11 +310,19 @@ def _structural_issues(
     files: list[Path], *, staged_only: bool, from_ref: str | None
 ) -> tuple[list[Issue], int]:
     issues: list[Issue] = []
-    py_count = 0
+    inputs: list[tuple[Path, str, str, list[str]]] = []
+    python_records: list[tuple[str, str]] = []
     for path in files:
         rel = path.relative_to(ROOT).as_posix()
         text = _read_candidate_text(path, staged_only=staged_only, from_ref=from_ref)
         lines = text.splitlines()
+        inputs.append((path, rel, text, lines))
+        if path.suffix == ".py":
+            python_records.append((rel, text))
+
+    native_files = json.loads(guardrail_ast_metrics_native(python_records))
+    native_by_path = {record["path"]: record for record in native_files}
+    for path, rel, text, lines in inputs:
         allow_god_file = rel in _ALLOWLIST["god_files"] or _has_marker(
             text, "allow-god-file"
         )
@@ -403,28 +343,27 @@ def _structural_issues(
             )
         if path.suffix != ".py":
             continue
-        py_count += 1
-        try:
-            tree = ast.parse(text, filename=rel)
-        except SyntaxError as exc:
-            issues.append(
-                Issue(
-                    kind="syntax_error",
-                    severity="critical",
-                    path=rel,
-                    symbol=None,
-                    message=f"Syntax error: {exc.msg}",
-                    recommendation="Fix parse errors before merge.",
-                    metric={"lineno": exc.lineno},
+        native = native_by_path[rel]
+        if native["parse_error"]:
+            try:
+                ast.parse(text, filename=rel)
+            except SyntaxError as exc:
+                issues.append(
+                    Issue(
+                        kind="syntax_error",
+                        severity="critical",
+                        path=rel,
+                        symbol=None,
+                        message=f"Syntax error: {exc.msg}",
+                        recommendation="Fix parse errors before merge.",
+                        metric={"lineno": exc.lineno},
+                    )
                 )
-            )
-            continue
-        analyzer = _PyFunctionAnalyzer(lines, rel_path=rel)
-        analyzer.visit(tree)
-        for issue in analyzer.issues:
-            issue.path = rel
-        issues.extend(analyzer.issues)
-    return issues, py_count
+                continue
+            raise RuntimeError(f"native parser rejected CPython-valid source: {rel}")
+        for metrics in native["functions"]:
+            issues.extend(_issues_from_function_metrics(metrics, lines, rel))
+    return issues, len(python_records)
 
 
 def _vulture_issues(

@@ -33,7 +33,7 @@ def test_resolve_tool_command_prefers_running_environment(
 
 
 def test_run_tool_reports_timeout_without_raising(monkeypatch) -> None:
-    def timeout(*args, **kwargs):  # noqa: ANN002, ANN003, ARG001
+    def timeout(*args, **kwargs):
         raise subprocess.TimeoutExpired(args[0], timeout=7, output=b"partial")
 
     monkeypatch.setattr(guardrail_audit.subprocess, "run", timeout)
@@ -47,13 +47,10 @@ def test_run_tool_reports_timeout_without_raising(monkeypatch) -> None:
     assert "partial" in output
 
 
-def test_incomplete_external_tools_fail_closed(monkeypatch) -> None:
-    results = iter(
-        (
-            (127, "missing tool: vulture"),
-            (124, "timed out: pylint research"),
-        )
-    )
+def _stub_external_tool_results(
+    monkeypatch, results: tuple[tuple[int, str], ...]
+) -> None:
+    result_iter = iter(results)
     monkeypatch.setattr(guardrail_audit, "_iter_files", lambda *args, **kwargs: [])
     monkeypatch.setattr(
         guardrail_audit,
@@ -63,7 +60,17 @@ def test_incomplete_external_tools_fail_closed(monkeypatch) -> None:
     monkeypatch.setattr(
         guardrail_audit,
         "_run_tool",
-        lambda *args, **kwargs: next(results),
+        lambda *args, **kwargs: next(result_iter),
+    )
+
+
+def test_incomplete_external_tools_fail_closed(monkeypatch) -> None:
+    _stub_external_tool_results(
+        monkeypatch,
+        (
+            (127, "missing tool: vulture"),
+            (124, "timed out: pylint research"),
+        ),
     )
 
     issues, summary = guardrail_audit.collect_issues(("research",))
@@ -79,22 +86,12 @@ def test_incomplete_external_tools_fail_closed(monkeypatch) -> None:
 
 
 def test_expected_tool_finding_exit_codes_are_complete(monkeypatch) -> None:
-    results = iter(
+    _stub_external_tool_results(
+        monkeypatch,
         (
             (3, "research/example.py:1: unused function 'old' (90% confidence)"),
             (8, "R0801: Similar lines in 2 files (duplicate-code)"),
-        )
-    )
-    monkeypatch.setattr(guardrail_audit, "_iter_files", lambda *args, **kwargs: [])
-    monkeypatch.setattr(
-        guardrail_audit,
-        "_resolve_tool_command",
-        lambda tool, *args: [tool, *args],
-    )
-    monkeypatch.setattr(
-        guardrail_audit,
-        "_run_tool",
-        lambda *args, **kwargs: next(results),
+        ),
     )
 
     issues, summary = guardrail_audit.collect_issues(("research",))
@@ -127,6 +124,11 @@ def test_check_mode_blocks_high_severity_findings(monkeypatch) -> None:
         guardrail_audit,
         "collect_issues",
         lambda *args, **kwargs: ([issue], summary),
+    )
+    monkeypatch.setattr(
+        guardrail_audit,
+        "resolve_audit_root",
+        lambda _explicit_root: guardrail_audit.ROOT,
     )
 
     assert guardrail_audit.main(["--check"]) == 1
@@ -174,16 +176,25 @@ def test_candidate_text_has_deterministic_latin1_fallback(
     )
 
 
-def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+def _run_git(repo: Path, *args: str) -> None:
+    completed = subprocess.run(
+        ["git", "-C", str(repo), *args], capture_output=True, text=True, check=False
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
-def _init_repo(repo: Path) -> None:
+def _new_repo(parent: Path, name: str) -> Path:
+    repo = parent / name
     repo.mkdir(parents=True, exist_ok=True)
-    _git(repo, "init", "-b", "main")
-    _git(repo, "config", "user.email", "governance-tests@example.invalid")
-    _git(repo, "config", "user.name", "Governance Tests")
-    _git(repo, "config", "commit.gpgsign", "false")
+    commands = (
+        ("init", "-b", "main"),
+        ("config", "user.email", "guardrail-tests@example.invalid"),
+        ("config", "user.name", "Guardrail Tests"),
+        ("config", "commit.gpgsign", "false"),
+    )
+    for command in commands:
+        _run_git(repo, *command)
+    return repo
 
 
 def _oversized_source(repo: Path, relative: str) -> None:
@@ -196,15 +207,14 @@ def _oversized_source(repo: Path, relative: str) -> None:
 def test_explicit_root_scans_the_named_repo_not_cwd(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    target = tmp_path / "target"
-    decoy = tmp_path / "decoy"
-    _init_repo(target)
-    _init_repo(decoy)
+    target = _new_repo(tmp_path, "target")
+    decoy = _new_repo(tmp_path, "decoy")
     _oversized_source(target, "research/candidate.py")
-    _git(target, "add", "--all")
-    _git(target, "commit", "-m", "base")
+    _run_git(target, "add", "--all")
+    _run_git(target, "commit", "-m", "base")
 
     monkeypatch.chdir(decoy)
+    assert guardrail_audit.resolve_audit_root(target) == target.resolve()
     assert guardrail_audit.main(["--root", str(target), "--check"]) == 1
 
 
@@ -216,13 +226,13 @@ def test_default_root_uses_cwd_toplevel_not_module_location(
     present in this throwaway repo would be invisible. Finding it proves the
     tool followed cwd, not its own install location.
     """
-    repo = tmp_path / "repo"
-    _init_repo(repo)
+    repo = _new_repo(tmp_path, "repo")
     _oversized_source(repo, "research/candidate.py")
-    _git(repo, "add", "--all")
-    _git(repo, "commit", "-m", "base")
+    _run_git(repo, "add", "--all")
+    _run_git(repo, "commit", "-m", "base")
 
     monkeypatch.chdir(repo)
+    assert guardrail_audit.resolve_audit_root(None) == repo.resolve()
     assert guardrail_audit.main(["--check"]) == 1
     assert guardrail_audit.ROOT == repo.resolve()
 
@@ -238,29 +248,24 @@ def test_cwd_outside_worktree_refuses_rather_than_falling_back(
 
 
 def test_resolved_root_is_printed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    _git(repo, "commit", "--allow-empty", "-m", "base")
-    monkeypatch.chdir(repo)
+    repo = _new_repo(tmp_path, "repo")
+    _run_git(repo, "commit", "--allow-empty", "-m", "base")
 
-    assert guardrail_audit.main([]) == 0
+    guardrail_audit.print_audit_provenance("guardrail-audit", repo, cwd=repo)
     out = capsys.readouterr().out
     assert f"root={repo.resolve()}" in out
 
 
 def test_root_mismatch_warns(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    target = tmp_path / "target"
-    decoy = tmp_path / "decoy"
-    _init_repo(target)
-    _init_repo(decoy)
-    _git(target, "commit", "--allow-empty", "-m", "base")
+    target = _new_repo(tmp_path, "target")
+    decoy = _new_repo(tmp_path, "decoy")
+    _run_git(target, "commit", "--allow-empty", "-m", "base")
 
-    monkeypatch.chdir(decoy)
-    assert guardrail_audit.main(["--root", str(target)]) == 0
+    guardrail_audit.print_audit_provenance("guardrail-audit", target, cwd=decoy)
     err = capsys.readouterr().err
     assert "WARNING" in err
     assert str(target.resolve()) in err
