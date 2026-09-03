@@ -1,6 +1,6 @@
 """Python surface for the native test index.
 
-The index itself is Rust (``research/runtime/native/rust/slop-core``); everything here
+The index itself is Rust (``tooling/native/slop-core``); everything here
 is argument marshalling and a CLI. It replaces two O(repository) scans that the gate
 was paying per unit of work:
 
@@ -25,19 +25,15 @@ import argparse
 import pathlib
 from collections.abc import Sequence
 
-_BUILD_HINT = (
-    "slop_core is not built. Run:\n"
-    "    make -C research/runtime/native slop-core\n"
-    "(which is `maturin develop --release` in rust/slop-core)"
-)
+from conductor._native import slop_core
 
-try:
-    import slop_core as _core
-except ImportError as exc:  # pragma: no cover - exercised only on an unbuilt tree
-    raise ImportError(_BUILD_HINT) from exc
+# Decided once when conductor._native loaded: the extension, or SlopCoreUnavailable
+# (an ImportError naming the build step). No per-call fallback.
+_core = slop_core()
+TestIndex = _core.TestIndex
 
 
-def build(root: pathlib.Path | str) -> _core.TestIndex:
+def build(root: pathlib.Path | str) -> TestIndex:
     """Index every ``test_*.py`` under ``root``. One pass; query it many times."""
     return _core.build_test_index(str(pathlib.Path(root).resolve()))
 

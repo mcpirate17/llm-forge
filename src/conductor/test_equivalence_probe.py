@@ -128,7 +128,7 @@ def timed(x, scale=1.0):
     return Timing(total=total, elapsed_ms=0.0)
 '''
 
-TESTS = '''
+TESTS = """
 import torch
 from fixture_mod import (
     Lane, decorated, load_bearing, renormalised, scaled, timed, validated,
@@ -166,7 +166,7 @@ def test_validated_rejects_negative():
     with _pytest.raises(ValueError):
         validated(-1)
     assert validated(3) == 6
-'''
+"""
 
 
 @pytest.fixture
@@ -188,8 +188,11 @@ def _verdicts(
     workspace: pathlib.Path, qualname: str, extra_rules: tuple[str, ...] = ()
 ) -> dict[str, str]:
     results = probe_function(
-        workspace / "fixture_mod.py", qualname, ["test_fixture_mod.py"],
-        module_name="fixture_mod", extra_rules=extra_rules,
+        workspace / "fixture_mod.py",
+        qualname,
+        ["test_fixture_mod.py"],
+        module_name="fixture_mod",
+        extra_rules=extra_rules,
     )
     return {r.rule: r.verdict for r in results}
 
@@ -217,7 +220,8 @@ def test_expensive_unproven_rules_are_off_unless_asked_for(
     """
     assert "ablate_function_to_passthrough" not in _verdicts(workspace, "scaled")
     opted_in = _verdicts(
-        workspace, "scaled", extra_rules=("ablate_function_to_passthrough",))
+        workspace, "scaled", extra_rules=("ablate_function_to_passthrough",)
+    )
     assert opted_in["ablate_function_to_passthrough"] == Verdict.LIVE
 
     # The bare `OPTIONAL_RULES[name]` lookup already raises KeyError, so the explicit
@@ -285,7 +289,8 @@ def test_methods_record_their_receiver(workspace: pathlib.Path) -> None:
     comparison is discarded as unusable, and the sweep returns a clean zero -- a
     verdict of "no difference" from a run that never executed the function.
     """
-    (workspace / "fixture_mod.py").write_text(textwrap.dedent('''
+    (workspace / "fixture_mod.py").write_text(
+        textwrap.dedent("""
         import torch
 
 
@@ -295,19 +300,24 @@ def test_methods_record_their_receiver(workspace: pathlib.Path) -> None:
 
             def forward(self, x):
                 return (x * self.gain).clamp_min(-1e30)
-    '''))
-    (workspace / "test_fixture_mod.py").write_text(textwrap.dedent('''
+    """)
+    )
+    (workspace / "test_fixture_mod.py").write_text(
+        textwrap.dedent("""
         import torch
         from fixture_mod import Lane
 
 
         def test_lane():
             assert Lane().forward(torch.ones(3)).sum() == 9.0
-    '''))
+    """)
+    )
     sys.modules.pop("fixture_mod", None)
     importlib.invalidate_caches()
     results = probe_function(
-        workspace / "fixture_mod.py", "Lane.forward", ["test_fixture_mod.py"],
+        workspace / "fixture_mod.py",
+        "Lane.forward",
+        ["test_fixture_mod.py"],
         module_name="fixture_mod",
     )
     assert results, "the method produced no ablations"
@@ -344,7 +354,8 @@ def test_unary_call_rule_needs_a_one_argument_callee() -> None:
     """
     import ast
 
-    tree = ast.parse(textwrap.dedent("""
+    tree = ast.parse(
+        textwrap.dedent("""
         def unary(x):
             return x + 1
 
@@ -355,10 +366,14 @@ def test_unary_call_rule_needs_a_one_argument_callee() -> None:
 
         def caller(v):
             return unary(v) + binary(v)
-    """))
+    """)
+    )
     fn = next(n for n in tree.body if getattr(n, "name", "") == "caller")
-    dropped = [a.description for a in generate_ablations(fn, tree)
-               if a.rule == "drop_unary_call"]
+    dropped = [
+        a.description
+        for a in generate_ablations(fn, tree)
+        if a.rule == "drop_unary_call"
+    ]
     assert any("unary" in d for d in dropped)
     assert not any("binary" in d for d in dropped)
 
@@ -383,7 +398,9 @@ def test_a_module_probe_shares_one_driver_run_across_its_functions(
     )
     module_path = workspace / "fixture_mod.py"
     targets = ep.public_functions(module_path)
-    assert len(targets) > 1, "fixture must have several targets for this to mean anything"
+    assert len(targets) > 1, (
+        "fixture must have several targets for this to mean anything"
+    )
 
     ep.probe_module(module_path, ["test_fixture_mod.py"])
     assert len(runs) == 1, f"expected one shared driver run, got {len(runs)}"
@@ -435,7 +452,7 @@ def test_batching_bounds_recorder_memory_without_losing_a_target(
 
 
 def test_whole_function_knockout_reaches_the_probe(workspace: pathlib.Path) -> None:
-    """"Delete the whole function -- does anything miss it?" is the question the other
+    """ "Delete the whole function -- does anything miss it?" is the question the other
     rules cannot ask.
 
     Every other rule removes a construct *inside* a function, so a function whose body
@@ -455,11 +472,10 @@ def test_the_probe_uses_the_native_engine_not_the_python_one(
     Pinned by a rule the Python engine never had, so this fails if the import is
     quietly reverted rather than merely renamed.
     """
-    import slop_core
-
+    from conductor._native import slop_core
     from conductor.equivalence_ablations import RULES as PYTHON_RULES
 
-    native_default, _ = slop_core.rule_names()
+    native_default, _ = slop_core().rule_names()
     assert "ablate_function_to_none" in native_default
     assert len(native_default) > len(PYTHON_RULES)
     # and the probe is on the larger set, not merely able to reach it. Pinned on a
@@ -495,7 +511,9 @@ def test_the_jitter_control_reports_rather_than_swallows(
     have made the probe quietly less capable and told nobody.
     """
     results = probe_function(
-        workspace / "fixture_mod.py", "timed", ["test_fixture_mod.py"],
+        workspace / "fixture_mod.py",
+        "timed",
+        ["test_fixture_mod.py"],
         module_name="fixture_mod",
     )
     unstable = [r for r in results if r.verdict == Verdict.NONDETERMINISTIC]
@@ -515,7 +533,9 @@ def test_the_control_does_not_suppress_a_deterministic_finding(
     this, dropping every finding on the floor would pass the test above.
     """
     results = probe_function(
-        workspace / "fixture_mod.py", "Lane.forward", ["test_fixture_mod.py"],
+        workspace / "fixture_mod.py",
+        "Lane.forward",
+        ["test_fixture_mod.py"],
         module_name="fixture_mod",
     )
     blocking = [r for r in results if r.verdict == Verdict.REACHABLE_BUT_UNTESTED]
@@ -536,11 +556,15 @@ def test_the_jitter_floor_is_pooled_across_the_functions_ablations(
     instability, so the worst jitter any of them saw is the floor all of them clear.
     """
     results = probe_function(
-        workspace / "fixture_mod.py", "timed", ["test_fixture_mod.py"],
+        workspace / "fixture_mod.py",
+        "timed",
+        ["test_fixture_mod.py"],
         module_name="fixture_mod",
     )
     floor = max((r.max_diff_control or 0.0) for r in results)
-    assert floor > 0.0, "the fixture must actually jitter for this test to mean anything"
+    assert floor > 0.0, (
+        "the fixture must actually jitter for this test to mean anything"
+    )
     survivors = [r for r in results if r.verdict == Verdict.REACHABLE_BUT_UNTESTED]
     assert not survivors, (
         "no ablation may block on a difference under the function's own jitter floor: "
@@ -556,9 +580,15 @@ def test_repeated_probes_of_unchanged_code_agree(workspace: pathlib.Path) -> Non
     consecutive runs. A gate whose findings move on their own cannot be enforced.
     """
     runs = [
-        {r.rule: r.verdict for r in probe_function(
-            workspace / "fixture_mod.py", "timed", ["test_fixture_mod.py"],
-            module_name="fixture_mod")}
+        {
+            r.rule: r.verdict
+            for r in probe_function(
+                workspace / "fixture_mod.py",
+                "timed",
+                ["test_fixture_mod.py"],
+                module_name="fixture_mod",
+            )
+        }
         for _ in range(3)
     ]
     assert runs[0] == runs[1] == runs[2], f"verdicts moved between runs: {runs}"

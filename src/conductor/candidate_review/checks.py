@@ -1110,6 +1110,17 @@ def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
     the tree that ships.
     """
     started = time.perf_counter()
+    from conductor import _native
+
+    if _native.SLOP_CORE_UNAVAILABLE:  # decided once at import, never per call
+        finding = Finding(
+            check_id="equivalence-probe",
+            rule_id="slop-core-unavailable",
+            severity=Severity.CRITICAL,
+            message=f"required native engine is unavailable: {_native.SLOP_CORE_UNAVAILABLE}",
+            help="Install the crate; the probe never skips on a missing engine.",
+        )
+        return _result("equivalence-probe", started, (finding,), files=())
     from conductor import slop_gate, slop_ledger
 
     modules = [

@@ -13,11 +13,11 @@ import pytest
 # this failed on CI while passing locally.
 na = pytest.importorskip(
     "conductor.native_ablations",
-    reason="slop_core not built; run `make -C research/runtime/native slop-core`",
+    reason="slop_core not built; run `make slop-core`",
     exc_type=ImportError,
 )
 
-SAMPLE = '''
+SAMPLE = """
 import os  # noqa: F401
 
 
@@ -30,7 +30,7 @@ def helper(v, scale=1.0):
 def caller(x, flag=True):
     y = helper(x)
     return y.clamp(min=0) if flag else y
-'''
+"""
 
 
 def test_rules_split_into_default_and_measured_optout():
@@ -66,7 +66,9 @@ def test_unknown_rule_is_refused_not_ignored():
 def test_optional_rules_are_off_until_asked_for():
     base = {a.rule for a in na.ablations(SAMPLE)}
     assert "ablate_function_to_passthrough" not in base
-    widened = {a.rule for a in na.ablations(SAMPLE, extra=["ablate_function_to_passthrough"])}
+    widened = {
+        a.rule for a in na.ablations(SAMPLE, extra=["ablate_function_to_passthrough"])
+    }
     assert "ablate_function_to_passthrough" in widened
 
 
@@ -87,3 +89,37 @@ def test_multi_site_edits_apply_together():
     assert len(pins) == 1 and len(pins[0].edits) == 2
     out = pins[0].apply(src)
     assert "x * 2.0" in out and "a + 2.0" in out
+
+
+def test_a_missing_engine_is_one_named_import_time_decision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Absence is decided when ``conductor._native`` loads, and it is named.
+
+    The accessor raises an ``ImportError`` subclass so the ``importorskip`` at the top
+    of this module keeps skipping cleanly on an unbuilt tree; the message carries the
+    build step, not a bare ``No module named``.
+    """
+    import sys
+
+    from conductor import _native
+
+    monkeypatch.setitem(sys.modules, "slop_core", None)
+    module, reason = _native._import_slop_core()
+    assert module is None
+    assert reason is not None
+    assert "slop_core is not installed" in reason
+    assert "make slop-core" in reason
+
+    monkeypatch.setattr(_native, "_SLOP_CORE", None)
+    monkeypatch.setattr(_native, "SLOP_CORE_UNAVAILABLE", reason)
+    with pytest.raises(_native.SlopCoreUnavailable, match="make slop-core") as info:
+        _native.slop_core()
+    assert isinstance(info.value, ImportError)
+
+
+def test_the_installed_engine_is_handed_out_once_and_unchanged() -> None:
+    from conductor import _native
+
+    assert _native.SLOP_CORE_UNAVAILABLE is None
+    assert _native.slop_core() is na._core

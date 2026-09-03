@@ -104,9 +104,34 @@ def rust_toolchain_env(environ: dict[str, str] | None = None) -> dict[str, str]:
     return env
 
 
+def _report_missing_rustup_home(env: dict[str, str]) -> None:
+    if not env.get("RUSTUP_HOME"):
+        print(
+            "cargo-audit: no rustup home was found under $HOME or the login "
+            "account's home; if cargo is a rustup shim, export RUSTUP_HOME "
+            "before running the gate",
+            file=sys.stderr,
+        )
+
+
+def version(env: dict[str, str] | None = None) -> int:
+    """Probe `cargo audit --version` under the same toolchain the check itself uses.
+
+    The gate's version probe runs inside the review sandbox, where HOME is replaced;
+    resolving the toolchain here is what makes the probe agree with the check.
+    """
+    env = rust_toolchain_env() if env is None else env
+    completed = subprocess.run(["cargo", "audit", "--version"], check=False, env=env)
+    if completed.returncode:
+        _report_missing_rustup_home(env)
+    return completed.returncode
+
+
 def main(argv: list[str] | None = None) -> int:
     root = Path.cwd().resolve()
     values = sys.argv[1:] if argv is None else argv
+    if values == ["--version"]:
+        return version()
     lockfiles = {
         lockfile
         for value in values
@@ -127,13 +152,7 @@ def main(argv: list[str] | None = None) -> int:
             env=env,
         )
         if completed.returncode:
-            if not env.get("RUSTUP_HOME"):
-                print(
-                    "cargo-audit: no rustup home was found under $HOME or the login "
-                    "account's home; if cargo is a rustup shim, export RUSTUP_HOME "
-                    "before running the gate",
-                    file=sys.stderr,
-                )
+            _report_missing_rustup_home(env)
             return completed.returncode
     return 0
 

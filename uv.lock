@@ -36,9 +36,9 @@ name = "aiologic"
 version = "0.17.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "sniffio" },
+    { name = "sniffio", marker = "python_full_version < '3.14'" },
     { name = "typing-extensions", marker = "python_full_version < '3.13'" },
-    { name = "wrapt" },
+    { name = "wrapt", marker = "python_full_version < '3.14'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f1/7a/d51f2fde1e8ae8a83431f8e97b7a71e9358cdb1d4d2ce6be387fa44d68de/aiologic-0.17.1.tar.gz", hash = "sha256:2e1b93b9e88ced318c2a63ad7b382688f40cbfe40e3d42258d49dc9c5aea179d", size = 252354, upload-time = "2026-06-27T20:41:33.25Z" }
 wheels = [
@@ -327,6 +327,7 @@ dependencies = [
     { name = "httpx" },
     { name = "numpy" },
     { name = "pyyaml" },
+    { name = "slop-core" },
     { name = "starlette" },
     { name = "uvicorn" },
 ]
@@ -346,6 +347,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.26" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "slop-core", directory = "native/slop-core" },
     { name = "starlette", specifier = ">=0.45" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]
@@ -505,7 +507,7 @@ name = "culsans"
 version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "aiologic" },
+    { name = "aiologic", marker = "python_full_version < '3.14'" },
     { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d9/e3/49afa1bc180e0d28008ec6bcdf82a4072d1c7a41032b5b759b60814ca4b0/culsans-0.11.0.tar.gz", hash = "sha256:0b43d0d05dce6106293d114c86e3fb4bfc63088cfe8ff08ed3fe36891447fe33", size = 107546, upload-time = "2025-12-31T23:15:38.196Z" }
@@ -950,6 +952,10 @@ sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0", size = 73075, upload-time = "2026-05-14T19:25:26.443Z" },
 ]
+
+[[package]]
+name = "slop-core"
+source = { directory = "native/slop-core" }
 
 [[package]]
 name = "sniffio"

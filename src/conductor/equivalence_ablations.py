@@ -10,7 +10,7 @@ reason, recorded there with the reason rather than deleted quietly.
 
 Kept, not deleted, so the removal is a decision someone takes with the diff in front
 of them rather than a side effect of the switch. Do not add rules here -- add them to
-`research/runtime/native/rust/slop-core/src/rules.rs`, or the two engines diverge and
+`tooling/native/slop-core/src/rules.rs`, or the two engines diverge and
 the sweep silently reports whichever one it happens to be wired to.
 
 A mutation-testing patch asks "if I corrupt this, does a test notice?". An ablation
@@ -35,8 +35,20 @@ __all__ = ["Ablation", "generate_ablations", "RULES"]
 
 _NORM_METHODS = frozenset({"norm", "std", "rms", "sum", "abs"})
 _DROPPABLE_METHODS = frozenset(
-    {"clamp", "clamp_min", "clamp_max", "masked_fill", "masked_fill_", "detach",
-     "tril", "triu", "nan_to_num", "contiguous", "sigmoid_", "relu_"}
+    {
+        "clamp",
+        "clamp_min",
+        "clamp_max",
+        "masked_fill",
+        "masked_fill_",
+        "detach",
+        "tril",
+        "triu",
+        "nan_to_num",
+        "contiguous",
+        "sigmoid_",
+        "relu_",
+    }
 )
 
 
@@ -83,8 +95,11 @@ def _drop_statement(tree: ast.AST, target: ast.stmt) -> ast.AST:
         def generic_visit(self, node: ast.AST) -> ast.AST:
             for field, value in list(ast.iter_fields(node)):
                 if isinstance(value, list):
-                    kept = [v for v in value
-                            if not (isinstance(v, ast.stmt) and _same_position(v, target))]
+                    kept = [
+                        v
+                        for v in value
+                        if not (isinstance(v, ast.stmt) and _same_position(v, target))
+                    ]
                     if len(kept) != len(value):
                         setattr(node, field, kept or [ast.Pass()])
             return super().generic_visit(node)
@@ -95,20 +110,33 @@ def _drop_statement(tree: ast.AST, target: ast.stmt) -> ast.AST:
 def _rule_drop_method(fn: ast.AST) -> Iterator[tuple[str, str, ast.AST, ast.AST]]:
     """``x.clamp(...)`` / ``x.detach()`` / ``x.masked_fill(...)`` -> ``x``."""
     for node in ast.walk(fn):
-        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                and node.func.attr in _DROPPABLE_METHODS):
-            yield (f"drop_{node.func.attr}",
-                   f".{node.func.attr}(...) removed", node, node.func.value)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in _DROPPABLE_METHODS
+        ):
+            yield (
+                f"drop_{node.func.attr}",
+                f".{node.func.attr}(...) removed",
+                node,
+                node.func.value,
+            )
 
 
-def _rule_drop_normalisation(fn: ast.AST) -> Iterator[tuple[str, str, ast.AST, ast.AST]]:
+def _rule_drop_normalisation(
+    fn: ast.AST,
+) -> Iterator[tuple[str, str, ast.AST, ast.AST]]:
     """``x / x.norm(...)`` -> ``x``. Only when the denominator is a magnitude."""
     for node in ast.walk(fn):
         if not (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div)):
             continue
         if _mentions_magnitude(node.right):
-            yield ("drop_normalisation", "division by a magnitude removed",
-                   node, node.left)
+            yield (
+                "drop_normalisation",
+                "division by a magnitude removed",
+                node,
+                node.left,
+            )
 
 
 def _mentions_magnitude(node: ast.AST) -> bool:
@@ -123,17 +151,29 @@ def _mentions_magnitude(node: ast.AST) -> bool:
 def _rule_drop_where(fn: ast.AST) -> Iterator[tuple[str, str, ast.AST, ast.AST]]:
     """``torch.where(cond, a, b)`` -> ``a``: the guarded branch always taken."""
     for node in ast.walk(fn):
-        if (isinstance(node, ast.Call) and len(node.args) == 3
-                and isinstance(node.func, ast.Attribute) and node.func.attr == "where"):
-            yield ("drop_where", "torch.where(...) collapsed to its first branch",
-                   node, node.args[0 + 1])
+        if (
+            isinstance(node, ast.Call)
+            and len(node.args) == 3
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "where"
+        ):
+            yield (
+                "drop_where",
+                "torch.where(...) collapsed to its first branch",
+                node,
+                node.args[0 + 1],
+            )
 
 
 def _rule_drop_raise_guard(fn: ast.AST) -> Iterator[tuple[str, str, ast.stmt, None]]:
     """``if cond: raise ...`` removed -- a validation guard that may never fire."""
     for node in ast.walk(fn):
-        if (isinstance(node, ast.If) and not node.orelse and len(node.body) == 1
-                and isinstance(node.body[0], ast.Raise)):
+        if (
+            isinstance(node, ast.If)
+            and not node.orelse
+            and len(node.body) == 1
+            and isinstance(node.body[0], ast.Raise)
+        ):
             yield ("drop_raise_guard", "validation guard removed", node, None)
 
 
@@ -149,15 +189,20 @@ def _rule_drop_trailing_arg(
     included -- and buries one real finding under dozens of meaningless ones.
     """
     for node in ast.walk(fn):
-        if not (isinstance(node, ast.Call) and len(node.args) >= 2 and not node.keywords):
+        if not (
+            isinstance(node, ast.Call) and len(node.args) >= 2 and not node.keywords
+        ):
             continue
         if _callee_name(node) not in defaulted:
             continue
         trimmed = copy.deepcopy(node)
         trimmed.args = trimmed.args[:-1]
-        yield ("drop_trailing_arg",
-               f"trailing argument dropped from {_callee_name(node)}(...)",
-               node, trimmed)
+        yield (
+            "drop_trailing_arg",
+            f"trailing argument dropped from {_callee_name(node)}(...)",
+            node,
+            trimmed,
+        )
 
 
 def _callee_name(call: ast.Call) -> str:
@@ -183,9 +228,12 @@ def _rule_flip_boolean_default(
     for default in list(fn.args.defaults) + [d for d in fn.args.kw_defaults if d]:
         if isinstance(default, ast.Constant) and isinstance(default.value, bool):
             flipped = ast.Constant(value=not default.value)
-            yield ("flip_boolean_default",
-                   f"default {default.value} flipped to {not default.value}",
-                   default, flipped)
+            yield (
+                "flip_boolean_default",
+                f"default {default.value} flipped to {not default.value}",
+                default,
+                flipped,
+            )
 
 
 def _rule_drop_unary_call(
@@ -199,10 +247,19 @@ def _rule_drop_unary_call(
     reports a difference that says nothing.
     """
     for node in ast.walk(fn):
-        if (isinstance(node, ast.Call) and len(node.args) == 1 and not node.keywords
-                and isinstance(node.func, ast.Name) and node.func.id in unary):
-            yield ("drop_unary_call", f"{node.func.id}(...) replaced by its argument",
-                   node, node.args[0])
+        if (
+            isinstance(node, ast.Call)
+            and len(node.args) == 1
+            and not node.keywords
+            and isinstance(node.func, ast.Name)
+            and node.func.id in unary
+        ):
+            yield (
+                "drop_unary_call",
+                f"{node.func.id}(...) replaced by its argument",
+                node,
+                node.args[0],
+            )
 
 
 def _rule_drop_expression_statement(
@@ -215,17 +272,29 @@ def _rule_drop_expression_statement(
     either the effect is inert or nothing observes it.
     """
     for node in ast.walk(fn):
-        if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
-                and not isinstance(node.value.func, ast.Attribute)):
-            yield ("drop_expression_statement",
-                   f"discarded call to {_callee_name(node.value)}(...) removed",
-                   node, None)
-        elif (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
-              and isinstance(node.value.func, ast.Attribute)
-              and node.value.func.attr.endswith("_")):
-            yield ("drop_expression_statement",
-                   f"discarded in-place {node.value.func.attr}(...) removed",
-                   node, None)
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and not isinstance(node.value.func, ast.Attribute)
+        ):
+            yield (
+                "drop_expression_statement",
+                f"discarded call to {_callee_name(node.value)}(...) removed",
+                node,
+                None,
+            )
+        elif (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Attribute)
+            and node.value.func.attr.endswith("_")
+        ):
+            yield (
+                "drop_expression_statement",
+                f"discarded in-place {node.value.func.attr}(...) removed",
+                node,
+                None,
+            )
 
 
 def _rule_body_to_passthrough(
@@ -246,9 +315,12 @@ def _rule_body_to_passthrough(
     stub.decorator_list = []
     stub.body = [ast.Return(value=ast.Name(id=positional[0], ctx=ast.Load()))]
     ast.fix_missing_locations(stub)
-    yield ("body_to_passthrough",
-           f"entire body replaced by `return {positional[0]}`",
-           fn, stub)
+    yield (
+        "body_to_passthrough",
+        f"entire body replaced by `return {positional[0]}`",
+        fn,
+        stub,
+    )
 
 
 RULES: tuple[Callable[..., Iterator[tuple]], ...] = (
@@ -272,7 +344,10 @@ OPTIONAL_RULES: dict[str, Callable[..., Iterator[tuple]]] = {
 }
 
 # Rules that need the module's own definitions to stay type-safe or meaningful.
-_MODULE_AWARE = {"_rule_drop_trailing_arg": "defaulted", "_rule_drop_unary_call": "unary"}
+_MODULE_AWARE = {
+    "_rule_drop_trailing_arg": "defaulted",
+    "_rule_drop_unary_call": "unary",
+}
 
 
 def defaulted_callees(module_tree: ast.AST | None) -> frozenset[str]:
@@ -281,7 +356,10 @@ def defaulted_callees(module_tree: ast.AST | None) -> frozenset[str]:
         return frozenset()
     names = set()
     for node in ast.walk(module_tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.args.defaults:
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.args.defaults
+        ):
             names.add(node.name)
     return frozenset(names)
 
@@ -300,14 +378,20 @@ def unary_callees(module_tree: ast.AST | None) -> frozenset[str]:
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         a = node.args
-        if (len(a.args) == 1 and not a.defaults and not a.kwonlyargs
-                and a.vararg is None and a.kwarg is None):
+        if (
+            len(a.args) == 1
+            and not a.defaults
+            and not a.kwonlyargs
+            and a.vararg is None
+            and a.kwarg is None
+        ):
             names.add(node.name)
     return frozenset(names)
 
 
 def generate_ablations(
-    fn: ast.FunctionDef | ast.AsyncFunctionDef, module_tree: ast.AST | None = None,
+    fn: ast.FunctionDef | ast.AsyncFunctionDef,
+    module_tree: ast.AST | None = None,
     extra_rules: Sequence[str] = (),
 ) -> list[Ablation]:
     """Every single-construct ablation of ``fn``, in source order.
@@ -328,15 +412,21 @@ def generate_ablations(
     for rule in active:
         if rule in extra:
             args: tuple = (fn, extra[rule])
-        elif rule in (_rule_flip_boolean_default, _rule_drop_expression_statement,
-                      _rule_body_to_passthrough):
+        elif rule in (
+            _rule_flip_boolean_default,
+            _rule_drop_expression_statement,
+            _rule_body_to_passthrough,
+        ):
             args = (fn, frozenset())
         else:
             args = (fn,)
         for name, description, target, replacement in rule(*args):
             try:
-                tree = (_drop_statement(fn, target) if replacement is None
-                        else _replace(fn, target, replacement))
+                tree = (
+                    _drop_statement(fn, target)
+                    if replacement is None
+                    else _replace(fn, target, replacement)
+                )
             except LookupError:
                 continue
             out.append(Ablation(name, description, getattr(target, "lineno", 0), tree))

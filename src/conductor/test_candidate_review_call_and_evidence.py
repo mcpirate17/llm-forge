@@ -418,3 +418,36 @@ def test_a_backlog_write_failure_does_not_fail_the_review(
         _StubContext(tmp_path, (_StubChange("conductor/lane.py"),))
     )
     assert [f.path for f in result.findings] == ["conductor/lane.py"]
+
+
+def test_a_missing_engine_is_a_named_critical_finding_not_a_crash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without ``slop_core`` the probe reports ``slop-core-unavailable`` and stops.
+
+    A standalone install of the tooling once crashed the whole review here with an
+    ImportError from a module-scope import. The decision is read from
+    ``conductor._native`` (taken once, at import), never re-tried per call, and the
+    finding fails closed like every other required analyzer.
+    """
+    from conductor import _native, slop_gate
+    from conductor.candidate_review.checks import check_equivalence_probe
+
+    monkeypatch.setattr(
+        _native, "SLOP_CORE_UNAVAILABLE", "slop_core is not installed (test)"
+    )
+
+    def _never(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("the probe ran without its engine")
+
+    monkeypatch.setattr(slop_gate, "run", _never)
+
+    result = check_equivalence_probe(
+        _StubContext(tmp_path, (_StubChange("conductor/lane.py"),))
+    )
+
+    assert [f.rule_id for f in result.findings] == ["slop-core-unavailable"]
+    finding = result.findings[0]
+    assert finding.severity is Severity.CRITICAL
+    assert "slop_core is not installed (test)" in finding.message
+    assert not result.files

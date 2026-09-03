@@ -1,15 +1,19 @@
-"""The single seam between ``conductor`` and its native crate.
+"""The single seam between ``conductor`` and its native crates.
 
 Every native primitive the agent tooling uses is imported here and nowhere else in
-``conductor/``. The symbols come from ``conductor_native``, the conductor-owned Rust
-crate under ``tooling/native/conductor-native`` (mutation campaigns, receipts, evidence,
-dead-test and untracked-import closure). The project's research crate,
+``conductor/``. The symbols come from two conductor-owned Rust crates under
+``tooling/native``: ``conductor_native`` (mutation campaigns, receipts, evidence,
+dead-test and untracked-import closure), which is required, and ``slop_core`` (the
+ablation engine and test index behind the equivalence probe), whose absence is decided
+once, here, at import time -- see :func:`slop_core`. The project's research crate,
 ``research_runtime_native``, is no longer imported anywhere in this package.
 
-Importing this module is as eager as importing the extension itself: modules that must
-stay collectable without the extension import it at the point of use, never at module
+Importing this module is as eager as importing the extensions themselves: modules that
+must stay collectable without them import it at the point of use, never at module
 scope.
 """
+
+from __future__ import annotations
 
 from conductor_native import (
     DeadTestsAnalysisNative,
@@ -35,7 +39,45 @@ from conductor_native import (
     verify_mutation_evidence_native,
 )
 
+SLOP_CORE_BUILD_HINT = (
+    "slop_core is not installed. Build it into the venv with `make slop-core` "
+    "(`maturin develop --release` in tooling/native/slop-core) or `uv sync`."
+)
+
+
+class SlopCoreUnavailable(ImportError):
+    """The ``slop_core`` extension is missing; the message names the build step.
+
+    An ``ImportError`` so ``pytest.importorskip(..., exc_type=ImportError)`` in the
+    engine's test modules still skips cleanly on an unbuilt tree.
+    """
+
+
+def _import_slop_core():
+    """``(module, None)`` when the extension imports, else ``(None, why)``."""
+    try:
+        import slop_core
+    except ImportError as exc:
+        return None, f"{SLOP_CORE_BUILD_HINT} ({exc})"
+    return slop_core, None
+
+
+# One decision, taken when this module loads. Consumers either take the module from
+# `slop_core()` and fail loud, or read SLOP_CORE_UNAVAILABLE and report it by name.
+# There is no per-call retry and no pure-Python fallback.
+_SLOP_CORE, SLOP_CORE_UNAVAILABLE = _import_slop_core()
+
+
+def slop_core():
+    """The ``slop_core`` extension, or :class:`SlopCoreUnavailable` naming why not."""
+    if _SLOP_CORE is None:
+        raise SlopCoreUnavailable(SLOP_CORE_UNAVAILABLE)
+    return _SLOP_CORE
+
+
 __all__ = [
+    "SLOP_CORE_BUILD_HINT",
+    "SLOP_CORE_UNAVAILABLE",
     "DeadTestsAnalysisNative",
     "DeadTestsResolverNative",
     "dead_tests_closure_native",
@@ -53,8 +95,10 @@ __all__ = [
     "plan_mutation_evidence_native",
     "plan_mutation_repin_native",
     "plan_mutation_scaffold_native",
+    "SlopCoreUnavailable",
     "scan_untracked_import_closure_native",
     "should_skip_mutation_path_native",
+    "slop_core",
     "validate_mutation_receipt_native",
     "verify_mutation_evidence_native",
 ]

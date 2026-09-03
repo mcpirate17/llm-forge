@@ -34,6 +34,7 @@ from conductor.tooling_boundary import PROJECT_PACKAGES
 LAYOUT: tuple[tuple[str, str], ...] = (
     ("conductor", "src/conductor"),
     ("tooling/native/conductor-native", "native/conductor-native"),
+    ("tooling/native/slop-core", "native/slop-core"),
     (".claude/hooks", "hooks"),
     ("tooling/pyproject.toml", "pyproject.toml"),
     ("tooling/README.md", "README.md"),

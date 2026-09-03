@@ -222,3 +222,41 @@ def test_a_path_outside_the_root_owns_no_lockfile(tmp_path):
     outside.mkdir()
 
     assert cargo_audit_files._owning_lockfile(outside / "lib.rs", root=root) is None
+
+
+def test_the_version_probe_runs_under_the_recovered_toolchain(tmp_path, monkeypatch):
+    """The gate probes `cargo audit --version` inside a sandbox whose HOME hides rustup.
+
+    Routing the probe through the wrapper resolves the toolchain the same way the
+    check command does, so the analyzer cannot be "unavailable" for the probe yet
+    available for the check.
+    """
+    rustup = _rustup(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("RUSTUP_HOME", raising=False)
+    monkeypatch.delenv("CARGO_HOME", raising=False)
+    seen: list[tuple[list[str], str | None]] = []
+
+    def fake_run(argv, check, env):
+        seen.append((argv, env.get("RUSTUP_HOME")))
+        return type("Done", (), {"returncode": 0})()
+
+    monkeypatch.setattr(cargo_audit_files.subprocess, "run", fake_run)
+    assert cargo_audit_files.main(["--version"]) == 0
+    assert seen == [(["cargo", "audit", "--version"], str(rustup))]
+
+
+def test_a_failed_version_probe_names_the_missing_rustup_home(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("RUSTUP_HOME", raising=False)
+    monkeypatch.delenv("CARGO_HOME", raising=False)
+    monkeypatch.setattr(cargo_audit_files, "_login_home", lambda: None)
+    monkeypatch.setattr(
+        cargo_audit_files.subprocess,
+        "run",
+        lambda argv, check, env: type("Done", (), {"returncode": 101})(),
+    )
+    assert cargo_audit_files.main(["--version"]) == 101
+    assert "export RUSTUP_HOME" in capsys.readouterr().err

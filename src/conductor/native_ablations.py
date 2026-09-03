@@ -1,6 +1,6 @@
 """Python surface for the native ablation engine.
 
-The engine itself is Rust (``research/runtime/native/rust/slop-core``). Everything
+The engine itself is Rust (``tooling/native/slop-core``). Everything
 here is argument marshalling and a CLI -- deliberately, because parsing and span
 rewriting have no business running in the interpreter. Measured over 400 modules of
 this repo: 12.80 s in Python for 5,064 ablations, 0.80 s in Rust for 35,372.
@@ -17,16 +17,11 @@ import json
 import pathlib
 import sys
 
-_BUILD_HINT = (
-    "slop_core is not built. Run:\n"
-    "    make -C research/runtime/native slop-core\n"
-    "(which is `maturin develop --release` in rust/slop-core)"
-)
+from conductor._native import slop_core
 
-try:
-    import slop_core as _core
-except ImportError as exc:  # pragma: no cover - exercised only on an unbuilt tree
-    raise ImportError(_BUILD_HINT) from exc
+# Decided once when conductor._native loaded: the extension, or SlopCoreUnavailable
+# (an ImportError naming the build step). No per-call fallback.
+_core = slop_core()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -80,10 +75,18 @@ def ablate_module(path, rules=None, extra=()) -> list[tuple[Ablation, str]]:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("path", nargs="?", help="module to ablate")
-    ap.add_argument("--rule", action="append", dest="rules",
-                    help="restrict to this rule (repeatable)")
-    ap.add_argument("--extra", action="append", default=[],
-                    help="enable an opt-in rule (repeatable)")
+    ap.add_argument(
+        "--rule",
+        action="append",
+        dest="rules",
+        help="restrict to this rule (repeatable)",
+    )
+    ap.add_argument(
+        "--extra",
+        action="append",
+        default=[],
+        help="enable an opt-in rule (repeatable)",
+    )
     ap.add_argument("--json", help="write findings to this path")
     ap.add_argument("--list-rules", action="store_true")
     args = ap.parse_args(argv)

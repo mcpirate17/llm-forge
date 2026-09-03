@@ -35,5 +35,6 @@ pytest 36 s: **865 passed, 47 failed, 46 errors, 5 skipped**, exit 1. Failure gr
 Collection errors (8 files): `test_candidate_review_structure_audit` (policy path),
 `test_equivalence_probe` (`slop_core`), `test_mutation_coverage`, `test_mutation_dry_run`,
 `test_mutation_testing`, `test_mutation_value`, `test_receipt_verify`, `test_runner_lineage`
-(`audit`). None of these is visible to the boundary contract: they are path and
+(`audit`). slop-core has since become a path source (`native/slop-core`), so the
+`slop_core` group closes at the next rehearsal. None of these is visible to the boundary contract: they are path and
 host-package couplings, the split's remaining work.

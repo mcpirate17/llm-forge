@@ -1,0 +1,20 @@
+# Makes the crate installable with plain `pip install <this directory>`.
+#
+# `maturin develop` needs an activated virtualenv, which a CI runner using
+# setup-python does not have. A PEP 517 build backend needs nothing but pip, so the
+# same one command works on a developer's venv and on a runner.
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "slop-core"
+description = "Native ablation engine and repository test index for the equivalence probe"
+requires-python = ">=3.11"
+dynamic = ["version"]
+
+[tool.maturin]
+module-name = "slop_core"
+# Without this the wheel links libpython, which is right for `cargo test` and wrong
+# for anything installed.
+features = ["extension-module"]

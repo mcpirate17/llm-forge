@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterable, Sequence
 
 if TYPE_CHECKING:  # pragma: no cover - the native class has no Python definition
-    from slop_core import TestIndex
+    from conductor.repo_index import TestIndex
 else:
     TestIndex = "TestIndex"
 
@@ -88,33 +88,50 @@ class Waiver:
     reason: str
 
     def covers(self, module: str, rule: str, qualname: str) -> bool:
-        return (self.module == module and self.rule == rule
-                and self.qualname in ("*", qualname))
+        return (
+            self.module == module
+            and self.rule == rule
+            and self.qualname in ("*", qualname)
+        )
 
 
 def load_waivers(path: pathlib.Path = WAIVERS) -> list[Waiver]:
     if not path.is_file():
         return []
     raw = json.loads(path.read_text())
-    return [Waiver(w["module"], w["rule"], w.get("qualname", "*"), w["reason"])
-            for w in raw.get("waivers", [])]
+    return [
+        Waiver(w["module"], w["rule"], w.get("qualname", "*"), w["reason"])
+        for w in raw.get("waivers", [])
+    ]
 
 
 def changed_modules(base: str, root: pathlib.Path) -> list[str]:
     """Changed, still-present, non-test Python sources."""
-    out = subprocess.run(["git", "diff", "--name-only", f"{base}...HEAD"],
-                         cwd=root, capture_output=True, text=True, check=True).stdout
-    staged = subprocess.run(["git", "diff", "--name-only", "--cached"],
-                            cwd=root, capture_output=True, text=True, check=True).stdout
+    out = subprocess.run(
+        ["git", "diff", "--name-only", f"{base}...HEAD"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    staged = subprocess.run(
+        ["git", "diff", "--name-only", "--cached"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
     names = {n for n in (out + staged).splitlines() if n.endswith(".py")}
     return sorted(
-        n for n in names
+        n
+        for n in names
         if (root / n).is_file() and not pathlib.Path(n).name.startswith("test_")
     )
 
 
-def drivers_for(module: str, root: pathlib.Path,
-                index: TestIndex | None = None) -> list[str]:
+def drivers_for(
+    module: str, root: pathlib.Path, index: TestIndex | None = None
+) -> list[str]:
     """Test files that import ``module``, which are what can drive it with real data.
 
     Answered from the native index. The scan this replaces re-walked and re-parsed
@@ -127,8 +144,9 @@ def drivers_for(module: str, root: pathlib.Path,
     return (index or build_index(root)).drivers_for(module)
 
 
-def refine_unexercised(findings: list[dict], root: pathlib.Path,
-                       index: TestIndex | None = None) -> list[dict]:
+def refine_unexercised(
+    findings: list[dict], root: pathlib.Path, index: TestIndex | None = None
+) -> list[dict]:
     """Split "the probe never ran this" into the two things it can mean.
 
     A function the driver tests never call is either a real coverage hole or a miss in
@@ -151,8 +169,12 @@ def refine_unexercised(findings: list[dict], root: pathlib.Path,
     return findings
 
 
-def probe(module: str, tests: Sequence[str], root: pathlib.Path,
-          index: TestIndex | None = None) -> list[dict]:
+def probe(
+    module: str,
+    tests: Sequence[str],
+    root: pathlib.Path,
+    index: TestIndex | None = None,
+) -> list[dict]:
     # A private directory per probe, not a fixed report path. Two probes running at
     # once against a shared name is one reading the other's findings and attributing
     # them to the wrong module -- silently, because both files parse.
@@ -165,14 +187,31 @@ def probe(module: str, tests: Sequence[str], root: pathlib.Path,
     report = workdir / "report.json"
     try:
         subprocess.run(
-            [sys.executable, "-m", "conductor.equivalence_probe", module, *tests,
-             "--json", str(report)],
-            cwd=root, capture_output=True, text=True, timeout=PER_MODULE_TIMEOUT,
+            [
+                sys.executable,
+                "-m",
+                "conductor.equivalence_probe",
+                module,
+                *tests,
+                "--json",
+                str(report),
+            ],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=PER_MODULE_TIMEOUT,
         )
     except subprocess.TimeoutExpired:
         shutil.rmtree(workdir, ignore_errors=True)
-        return [{"qualname": "<module>", "rule": "timeout", "lineno": 0,
-                 "verdict": "TIMEOUT", "description": "probe exceeded its budget"}]
+        return [
+            {
+                "qualname": "<module>",
+                "rule": "timeout",
+                "lineno": 0,
+                "verdict": "TIMEOUT",
+                "description": "probe exceeded its budget",
+            }
+        ]
     if not report.is_file():
         shutil.rmtree(workdir, ignore_errors=True)
         return []
@@ -182,8 +221,9 @@ def probe(module: str, tests: Sequence[str], root: pathlib.Path,
         shutil.rmtree(workdir, ignore_errors=True)
 
 
-def run(base: str, root: pathlib.Path, only: Iterable[str] = (),
-        jobs: int | None = None) -> tuple[int, dict]:
+def run(
+    base: str, root: pathlib.Path, only: Iterable[str] = (), jobs: int | None = None
+) -> tuple[int, dict]:
     waivers = load_waivers(root / WAIVERS)
     modules = list(only) or changed_modules(base, root)
     # One pass over the test tree answers both the driver question for every module
@@ -219,8 +259,10 @@ def run(base: str, root: pathlib.Path, only: Iterable[str] = (),
         for finding in findings_by_module.get(module, []):
             finding["module"] = module
             if finding["verdict"] in BLOCKING:
-                if any(w.covers(module, finding["rule"], finding["qualname"])
-                       for w in waivers):
+                if any(
+                    w.covers(module, finding["rule"], finding["qualname"])
+                    for w in waivers
+                ):
                     finding["waived"] = True
                     advisory.append(finding)
                 else:
@@ -230,52 +272,78 @@ def run(base: str, root: pathlib.Path, only: Iterable[str] = (),
             elif finding["verdict"] == UNTESTED:
                 untested.append(finding)
     summary = {
-        "base": base, "modules_probed": len(modules) - len(skipped),
+        "base": base,
+        "modules_probed": len(modules) - len(skipped),
         "modules_without_drivers": skipped,
-        "blocking": blocking, "advisory": advisory, "untested": untested,
+        "blocking": blocking,
+        "advisory": advisory,
+        "untested": untested,
     }
     return (1 if blocking else 0), summary
 
 
 def _render(summary: dict) -> None:
     for f in summary["blocking"]:
-        print(f"BLOCKING  {f['module']}::{f['qualname']}:{f['lineno']}  {f['description']}")
+        print(
+            f"BLOCKING  {f['module']}::{f['qualname']}:{f['lineno']}  {f['description']}"
+        )
         amp = f.get("amplifier")
         if amp:
-            print(f"          reachable via {amp} "
-                  f"(relative change {f.get('max_diff_amplified'):.3e}) -- add a test "
-                  f"that drives that regime, or remove the construct")
+            print(
+                f"          reachable via {amp} "
+                f"(relative change {f.get('max_diff_amplified'):.3e}) -- add a test "
+                f"that drives that regime, or remove the construct"
+            )
     for f in summary["advisory"]:
         mark = "waived" if f.get("waived") else f["verdict"].lower()
-        print(f"advisory  [{mark}] {f['module']}::{f['qualname']}:{f['lineno']}  {f['description']}")
+        print(
+            f"advisory  [{mark}] {f['module']}::{f['qualname']}:{f['lineno']}  {f['description']}"
+        )
     if summary.get("untested"):
-        print(f"{len(summary['untested'])} function(s) no test file anywhere names -- "
-              "a coverage hole, not a driver-selection miss:")
+        print(
+            f"{len(summary['untested'])} function(s) no test file anywhere names -- "
+            "a coverage hole, not a driver-selection miss:"
+        )
         for f in summary["untested"][:8]:
             print(f"            {f['module']}::{f['qualname']}")
     if summary["modules_without_drivers"]:
-        print(f"no driver tests for {len(summary['modules_without_drivers'])} changed module(s); "
-              "the probe cannot speak for them")
-    print(f"blocking={len(summary['blocking'])} advisory={len(summary['advisory'])} "
-          f"probed={summary['modules_probed']}")
+        print(
+            f"no driver tests for {len(summary['modules_without_drivers'])} changed module(s); "
+            "the probe cannot speak for them"
+        )
+    print(
+        f"blocking={len(summary['blocking'])} advisory={len(summary['advisory'])} "
+        f"probed={summary['modules_probed']}"
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="conductor.slop_gate")
     parser.add_argument("--base", default="origin/master")
     parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path.cwd())
-    parser.add_argument("--module", action="append", default=[],
-                        help="probe these modules instead of the changed set")
+    parser.add_argument(
+        "--module",
+        action="append",
+        default=[],
+        help="probe these modules instead of the changed set",
+    )
     parser.add_argument("--json", type=pathlib.Path)
-    parser.add_argument("--jobs", type=int, default=None,
-                        help="probe this many modules at once (default: a quarter of "
-                             "the cores, capped at 8). Each probe is a child "
-                             "interpreter, so oversubscribing slows the sweep down.")
-    parser.add_argument("--enforce", action="store_true",
-                        help="fail on REACHABLE_BUT_UNTESTED. Off by default while the "
-                             "probe is alpha: its ablation set is still growing, so a "
-                             "blocking verdict today may be an artifact of a rule "
-                             "written yesterday rather than a defect in the code.")
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=None,
+        help="probe this many modules at once (default: a quarter of "
+        "the cores, capped at 8). Each probe is a child "
+        "interpreter, so oversubscribing slows the sweep down.",
+    )
+    parser.add_argument(
+        "--enforce",
+        action="store_true",
+        help="fail on REACHABLE_BUT_UNTESTED. Off by default while the "
+        "probe is alpha: its ablation set is still growing, so a "
+        "blocking verdict today may be an artifact of a rule "
+        "written yesterday rather than a defect in the code.",
+    )
     args = parser.parse_args(argv)
 
     code, summary = run(args.base, args.root, args.module, args.jobs)

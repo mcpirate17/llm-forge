@@ -26,16 +26,11 @@ import pathlib
 from collections.abc import Sequence
 from typing import Any
 
-_BUILD_HINT = (
-    "slop_core is not built. Run:\n"
-    "    make -C research/runtime/native slop-core\n"
-    "(which is `maturin develop --release` in rust/slop-core)"
-)
+from conductor._native import slop_core
 
-try:
-    import slop_core as _core
-except ImportError as exc:  # pragma: no cover - exercised only on an unbuilt tree
-    raise ImportError(_BUILD_HINT) from exc
+# Decided once when conductor._native loaded: the extension, or SlopCoreUnavailable
+# (an ImportError naming the build step). No per-call fallback.
+_core = slop_core()
 
 LEDGER = pathlib.Path("conductor/slop_ledger.json")
 REPORT = pathlib.Path("research/reports/slop_backlog.md")
@@ -80,8 +75,11 @@ def merge_summaries(summaries: Sequence[dict[str, Any]]) -> dict[str, Any]:
     what keeps the backlog current between sweeps instead of only at one.
     """
     merged: dict[str, Any] = {
-        "blocking": [], "advisory": [], "untested": [],
-        "modules_without_drivers": [], "modules_probed": 0,
+        "blocking": [],
+        "advisory": [],
+        "untested": [],
+        "modules_without_drivers": [],
+        "modules_probed": 0,
     }
     without: set[str] = set()
     for summary in summaries:
@@ -235,9 +233,11 @@ def render(
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="conductor.slop_ledger")
     parser.add_argument(
-        "findings", type=pathlib.Path, nargs="+",
+        "findings",
+        type=pathlib.Path,
+        nargs="+",
         help="one or more slop_gate --json summaries; a sweep and any gate run "
-             "artifacts from research/reports/gate_findings are folded together",
+        "artifacts from research/reports/gate_findings are folded together",
     )
     parser.add_argument("--ledger", type=pathlib.Path, default=LEDGER)
     parser.add_argument("--report", type=pathlib.Path, default=REPORT)

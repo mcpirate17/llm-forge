@@ -13,6 +13,7 @@ requires-python = ">=3.12"
 dependencies = [
   "a2a-sdk[http-server]>=1.1.2",
   "conductor-native",
+  "slop-core",
   "coverage>=7.0",
   "defusedxml>=0.7.1",
   "httpx>=0.28",
@@ -24,11 +25,9 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
-# slop-core is a host-repository Rust crate (research/runtime/native/rust/slop-core);
-# repo_index, native_ablations, slop_ledger and slop_gate import it at function scope
-# and fail loud with a build hint when it is absent. It is not an extra: no registry
-# or standalone path can resolve it, so declaring it would make `uv lock` impossible.
-# That coupling is known, not hidden.
+# Both Rust crates live under native/ and are path sources below. slop-core (the
+# ablation engine and test index behind the equivalence probe) is reached only through
+# conductor/_native.py, which decides its absence once at import time.
 
 [project.scripts]
 kb_retrieve = "conductor.kb_retrieve:main"
@@ -43,3 +42,4 @@ packages = ["src/conductor"]
 
 [tool.uv.sources]
 conductor-native = { path = "native/conductor-native" }
+slop-core = { path = "native/slop-core" }

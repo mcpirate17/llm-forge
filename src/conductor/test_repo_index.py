@@ -12,13 +12,14 @@ from __future__ import annotations
 import ast
 import pathlib
 import random
+import re
 import subprocess
 
 import pytest
 
 ri = pytest.importorskip(
     "conductor.repo_index",
-    reason="slop_core not built; run `make -C research/runtime/native slop-core`",
+    reason="slop_core not built; run `make slop-core`",
     exc_type=ImportError,
 )
 
@@ -84,11 +85,11 @@ def test_from_package_import_module_is_resolved(index):
 def test_named_by_agrees_with_the_git_grep_it_replaces(index):
     """`refine_unexercised` spawned one of these per unreached function; 405 last sweep.
 
-    Compared over tracked files only, because the two disagree on purpose. `git grep`
-    sees what git has; the index walks the filesystem, as `drivers_for` always has.
-    An untracked test file you just wrote genuinely does name the function it tests,
-    and calling that an unnamed coverage hole would be wrong -- but the difference is
-    real, so it is pinned here rather than left to surface as a mystery.
+    The reference is `git grep -l -w -F` over the test files, spelled as the same
+    word-boundary search in Python: the gate runs this file inside a materialised
+    snapshot that has no git directory, where shelling out to git is an exit 128,
+    not a comparison. The inventory is the one the index walks, so an untracked
+    test file you just wrote counts on both sides.
     """
     names = sorted(
         n.name
@@ -97,19 +98,20 @@ def test_named_by_agrees_with_the_git_grep_it_replaces(index):
         for n in ast.walk(ast.parse(p.read_text()))
         if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
     )
-    tracked = set(
-        subprocess.run(["git", "ls-files", "--", "*/test_*.py", "test_*.py"],
-                       cwd=REPO, capture_output=True, text=True, check=True).stdout.split()
-    )
+    tests = {
+        str(p.relative_to(REPO)): p.read_text(errors="replace")
+        for p in REPO.rglob("test_*.py")
+        if ".git" not in p.parts and ".venv" not in p.parts
+    }
     random.seed(11)
-    for name in random.sample(names, 25):
-        grep = subprocess.run(
-            ["git", "grep", "-l", "-w", "-F", name, "--", "*/test_*.py", "test_*.py"],
-            cwd=REPO,
-            capture_output=True,
-            text=True,
-        ).stdout.split()
-        assert set(index.named_by(name)) & tracked == set(grep), name
+    sample = random.sample(names, 25)
+    word = re.compile(
+        r"(?<![A-Za-z0-9_])(" + "|".join(map(re.escape, sample)) + r")(?![A-Za-z0-9_])"
+    )
+    found = {rel: set(word.findall(text)) for rel, text in tests.items()}
+    for name in sample:
+        grep = {rel for rel, hits in found.items() if name in hits}
+        assert set(index.named_by(name)) & set(tests) == grep, name
 
 
 def test_a_package_is_named_by_its_directory(index):
@@ -156,7 +158,9 @@ def test_the_index_sees_untracked_tests_and_git_grep_does_not(index, tmp_path):
         assert scratch.name in " ".join(fresh.named_by(marker))
         grep = subprocess.run(
             ["git", "grep", "-l", "-w", "-F", marker, "--", "*/test_*.py", "test_*.py"],
-            cwd=REPO, capture_output=True, text=True,
+            cwd=REPO,
+            capture_output=True,
+            text=True,
         ).stdout.split()
         assert grep == [], "the probe file was committed; this test no longer isolates"
     finally:
@@ -164,7 +168,9 @@ def test_the_index_sees_untracked_tests_and_git_grep_does_not(index, tmp_path):
 
 
 def test_the_cli_answers_the_driver_question_it_was_asked(capsys):
-    assert ri.main(["--root", str(REPO), "--drivers-for", "conductor/slop_gate.py"]) == 0
+    assert (
+        ri.main(["--root", str(REPO), "--drivers-for", "conductor/slop_gate.py"]) == 0
+    )
     assert "conductor/test_slop_gate.py" in capsys.readouterr().out
 
 
