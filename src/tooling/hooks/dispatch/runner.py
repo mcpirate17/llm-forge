@@ -22,6 +22,7 @@ from typing import Any
 
 from tooling.hooks.dispatch import adapters
 from tooling.hooks.dispatch.merge import HookOutcome, merge
+from tooling.hooks.dispatch.paths import body_path, interpreter_bin
 from tooling.hooks.dispatch.registry import HookSpec, hooks_for
 
 
@@ -130,7 +131,7 @@ def parse_output(text: str) -> tuple[dict[str, Any] | None, str | None]:
 def _run_subprocess(
     spec: HookSpec, ctx: Context
 ) -> tuple[dict[str, Any] | None, str | None]:
-    body = ctx.root / spec.argv[0]
+    body = body_path(ctx.root, spec.argv[0])
     argv = [sys.executable, str(body)] if body.suffix == ".py" else [str(body)]
     argv.extend(spec.argv[1:])
     proc = subprocess.run(
@@ -230,6 +231,9 @@ def build_context(event: str, raw: bytes, root: Path) -> Context:
     env = dict(os.environ)
     env["PROJECT_DIR"] = str(root)
     env.setdefault("CLAUDE_PROJECT_DIR", str(root))
+    # Shell bodies call ``python3 -m conductor.*``: resolve it to this interpreter
+    # first, the one that carries the tooling in a foreign project.
+    env["PATH"] = os.pathsep.join([interpreter_bin(), *filter(None, [env.get("PATH")])])
     os.environ["PROJECT_DIR"] = str(root)
     return Context(root, event, payload, raw, env)
 

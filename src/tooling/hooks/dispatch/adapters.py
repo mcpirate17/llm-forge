@@ -20,6 +20,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from tooling.hooks.dispatch.paths import body_path
+
 _LOCK = threading.Lock()
 _MODULES: dict[str, ModuleType] = {}
 _PROJECT_ENV_LOADED: set[Path] = set()
@@ -36,7 +38,7 @@ GIT_TREE_REWRITE = re.compile(
 
 def _body(ctx: Any, relative: str) -> ModuleType:
     """Import a hook body by file path, once per process."""
-    path = ctx.root / relative
+    path = body_path(ctx.root, relative)
     name = f"_hook_body_{path.stem.strip('_')}"
     with _LOCK:
         module = _MODULES.get(name)

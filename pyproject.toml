@@ -18,6 +18,7 @@ dependencies = [
   "defusedxml>=0.7.1",
   "httpx>=0.28",
   "numpy>=1.26",
+  "pydantic>=2",
   "pyyaml>=6.0",
   "starlette>=0.45",
   "uvicorn>=0.30",
@@ -25,11 +26,14 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
+# The code-review-graph MCP server that `conductor init` wires into .mcp.json.
+graph = ["code-review-graph==2.3.8"]
 # Both Rust crates live under native/ and are path sources below. slop-core (the
 # ablation engine and test index behind the equivalence probe) is reached only through
 # conductor/_native.py, which decides its absence once at import time.
 
 [project.scripts]
+conductor = "conductor.__main__:main"
 kb_retrieve = "conductor.kb_retrieve:main"
 memory_index = "conductor.memory_index:main"
 candidate_review = "conductor.candidate_review.cli:main"
@@ -38,7 +42,7 @@ agent_a2a = "conductor.agent_a2a:main"
 handoff = "conductor.handoff:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/conductor"]
+packages = ["src/conductor", "src/tooling"]
 
 [tool.uv.sources]
 conductor-native = { path = "native/conductor-native" }

@@ -184,6 +184,7 @@ def test_rule_b_flags_each_literal_in_generic_hooks(
             ".claude/hooks/pre.sh": f"#!/bin/sh\necho ok\nls {literal}x\n",
             ".claude/hooks/project/env.sh": f"export X={literal}\n",
             ".claude/hooks/test_pre.py": f"X = '{literal}'\n",
+            ".claude/hooks/__pycache__/pre.cpython-312.pyc": f"{literal}/pre.py\n",
             ".agent_hooks/guard.py": f"P = '{literal}'\n",
         },
     )

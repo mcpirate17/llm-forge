@@ -32,6 +32,7 @@ from conductor._project_hooks import DEFAULT_TEST_PLUGIN
 
 PROJECT_PACKAGES: tuple[str, ...] = (
     "research",
+    "audit",
     "component_fab",
     "aria_designer",
     "aria_core",
@@ -178,6 +179,8 @@ def _hook_files(hook_dir: Path) -> Iterable[Path]:
             continue
         rel = path.relative_to(hook_dir)
         if rel.parts[0] == HOOK_EXCLUDED_SUBDIR or rel.name.startswith("test_"):
+            continue
+        if "__pycache__" in rel.parts:  # bytecode embeds the compiling checkout's path
             continue
         yield path
 

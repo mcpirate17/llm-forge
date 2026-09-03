@@ -7,6 +7,12 @@ tests. The failures are the deliverable: every one is a coupling the boundary
 contract cannot see -- a test that assumes ``research/`` next to the package, a
 receipt path, a host tool. The report groups them by first failure line.
 
+The second half is the foreign install: the wheel is built from that tree and
+installed into another fresh venv, ``conductor init`` scaffolds a throwaway git
+repository there (running the hook doctor), a force-push is denied through the
+scaffolded dispatcher, and the dispatcher and ``conductor`` are proven to import from
+that venv alone. Any of those failing is a blocker, raised, never summarized.
+
 This is a rehearsal, not evidence: it is a Makefile target
 (``make tooling-standalone-smoke``), never part of ``make gate``.
 """
@@ -35,6 +41,7 @@ LAYOUT: tuple[tuple[str, str], ...] = (
     ("conductor", "src/conductor"),
     ("tooling/native/conductor-native", "native/conductor-native"),
     ("tooling/native/slop-core", "native/slop-core"),
+    ("tooling/hooks", "src/tooling/hooks"),
     (".claude/hooks", "hooks"),
     ("tooling/pyproject.toml", "pyproject.toml"),
     ("tooling/README.md", "README.md"),
@@ -43,6 +50,14 @@ EXCLUDED_HOOK_SUBDIR = "project"
 PLUGIN_ENV = "CONDUCTOR_PROJECT_TEST_PLUGIN"
 MAX_FAILING_NODEIDS = 50
 MAX_GROUPS = 10
+NATIVE_CRATES = ("native/conductor-native", "native/slop-core")
+FOREIGN_MODULES = ("tooling.hooks.dispatch", "conductor.project_init")
+FORCE_PUSH = {
+    "session_id": "standalone-smoke",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {"command": "git push --force origin master"},
+}
 
 
 @dataclass(slots=True)
@@ -156,6 +171,125 @@ def install(dest: Path, uv: str) -> tuple[str, float]:
     return python, time.perf_counter() - started
 
 
+def build_wheel(dest: Path, uv: str) -> Path:
+    """``uv build --wheel`` of the assembled tree; the one wheel it produces."""
+    built = _run([uv, "build", "--wheel", "--out-dir", "dist"], cwd=dest, timeout=600)
+    if built.returncode:
+        raise RuntimeError(f"uv build failed: {built.stderr.strip()[-4000:]}")
+    wheels = sorted((dest / "dist").glob("*.whl"))
+    if len(wheels) != 1:
+        raise RuntimeError(f"expected one wheel in {dest / 'dist'}, found {wheels}")
+    return wheels[0]
+
+
+def install_wheel(dest: Path, uv: str, wheel: Path) -> tuple[str, float]:
+    """A second fresh venv holding only the crates and the built wheel; (python, s)."""
+    started = time.perf_counter()
+    venv_dir = dest / ".venv-foreign"
+    venv = _run([uv, "venv", "--python", sys.executable, str(venv_dir)], cwd=dest)
+    if venv.returncode:
+        raise RuntimeError(f"uv venv (foreign) failed: {venv.stderr.strip()[-2000:]}")
+    python = str(venv_dir / "bin" / "python")
+    pip = _run(
+        [uv, "pip", "install", "--python", python, *NATIVE_CRATES, str(wheel)],
+        cwd=dest,
+        timeout=1500,
+    )
+    if pip.returncode:
+        raise RuntimeError(
+            f"uv pip install (wheel) failed: {pip.stderr.strip()[-4000:]}"
+        )
+    return python, time.perf_counter() - started
+
+
+def init_foreign_project(dest: Path, python: str) -> tuple[Path, str]:
+    """``conductor init`` on a throwaway git repository; the doctor runs inside it."""
+    project = dest / "foreign-project"
+    project.mkdir()
+    git = _run(["git", "init", "-q", str(project)], cwd=dest, timeout=60)
+    if git.returncode:
+        raise RuntimeError(f"git init failed: {git.stderr.strip()}")
+    env = clean_env()
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    init = _run(
+        [python, "-m", "conductor", "init", str(project)],
+        cwd=dest,
+        env=env,
+        timeout=600,
+    )
+    if init.returncode:
+        raise RuntimeError(
+            f"conductor init failed (exit {init.returncode}):\n"
+            f"{init.stdout[-3000:]}\n{init.stderr[-3000:]}"
+        )
+    return project, init.stdout
+
+
+def deny_force_push(project: Path) -> None:
+    """The scaffolded launcher must deny a force-push with only the venv's shebang."""
+    env = clean_env()
+    env["CLAUDE_PROJECT_DIR"] = str(project)
+    env["CRG_SKIP_EMBED"] = "1"
+    proc = _run(
+        [str(project / ".claude" / "hooks" / "dispatch.py"), "PreToolUse"],
+        cwd=project,
+        env=env,
+        timeout=60,
+        input=json.dumps({**FORCE_PUSH, "cwd": str(project)}),
+    )
+    if proc.returncode:
+        raise RuntimeError(
+            f"dispatcher exited {proc.returncode}: {proc.stderr.strip()[-2000:]}"
+        )
+    try:
+        decision = json.loads(proc.stdout)["hookSpecificOutput"]["permissionDecision"]
+    except (ValueError, KeyError, TypeError) as exc:
+        raise RuntimeError(
+            f"dispatcher output is not a decision: {proc.stdout[:500]!r}"
+        ) from exc
+    if decision != "deny":
+        raise RuntimeError(f"force-push was {decision!r}, not denied")
+
+
+def assert_imports_from_venv(python: str, project: Path) -> dict[str, str]:
+    """Every foreign module resolves inside the venv, never the monorepo or the tree."""
+    venv_root = str(Path(python).absolute().parents[1])  # never resolve a venv python
+    roots: dict[str, str] = {}
+    for module in FOREIGN_MODULES:
+        probe = _run(
+            [python, "-c", f"import {module} as m; print(m.__file__)"],
+            cwd=project,
+            env=clean_env(),
+            timeout=60,
+        )
+        if probe.returncode:
+            raise RuntimeError(
+                f"{module} does not import from the foreign venv: "
+                f"{probe.stderr.strip()[-500:]}"
+            )
+        location = probe.stdout.strip()
+        if not location.startswith(venv_root):
+            raise RuntimeError(f"{module} imports from {location}, outside {venv_root}")
+        roots[module] = location
+    return roots
+
+
+def rehearse_foreign(dest: Path, uv: str) -> dict[str, object]:
+    wheel = build_wheel(dest, uv)
+    python, install_seconds = install_wheel(dest, uv, wheel)
+    project, doctor_output = init_foreign_project(dest, python)
+    assert_project_absent(python, project)
+    deny_force_push(project)
+    roots = assert_imports_from_venv(python, project)
+    return {
+        "foreign_wheel": wheel.name,
+        "foreign_install_seconds": round(install_seconds, 1),
+        "foreign_doctor": doctor_output.strip().splitlines()[-1],
+        "foreign_force_push": "deny",
+        "foreign_import_roots": roots,
+    }
+
+
 def run_pytest(dest: Path, python: str, timeout: int) -> tuple[int, Path]:
     junit = dest / "junit.xml"
     env = clean_env()
@@ -166,6 +300,7 @@ def run_pytest(dest: Path, python: str, timeout: int) -> tuple[int, Path]:
                 "-m",
                 "pytest",
                 "src/conductor",
+                "src/tooling",
                 "-q",
                 "-p",
                 "no:cacheprovider",
@@ -260,6 +395,7 @@ def rehearse(
     assert_project_absent(python, dest)
     pytest_exit, junit = run_pytest(dest, python, timeout)
     summary = summarize_junit(junit.read_text(encoding="utf-8"))
+    foreign = rehearse_foreign(dest, uv)
     return {
         "tree_sha": tree,
         "ref": ref,
@@ -268,6 +404,7 @@ def rehearse(
         "pytest_exit": pytest_exit,
         "exit_code": verdict(pytest_exit, summary),
         **asdict(summary),
+        **foreign,
     }
 
 
@@ -317,6 +454,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "errors",
                     "skipped",
                     "exit_code",
+                    "foreign_install_seconds",
+                    "foreign_doctor",
+                    "foreign_force_push",
                 )
             }
         )
