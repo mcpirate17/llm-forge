@@ -16,6 +16,7 @@ pub mod engine;
 pub mod file_families;
 pub mod index;
 pub mod ledger;
+pub mod repository_scan;
 pub mod rules;
 
 use engine::{Ablation, Rule};
@@ -368,6 +369,7 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
         consolidation::audit_consolidation_evidence,
         m
     )?)?;
+    m.add_function(wrap_pyfunction!(repository_scan::audit_repository_scan, m)?)?;
     m.add_class::<PyTestIndex>()?;
     Ok(())
 }
