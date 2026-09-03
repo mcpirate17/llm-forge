@@ -10,6 +10,7 @@ mod candidate_structure;
 mod dead_tests;
 mod duplicate_bodies;
 mod guardrail_ast;
+mod memory_index;
 mod mutation_coverage;
 mod mutation_evidence;
 mod mutation_manifest;
@@ -29,6 +30,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     guardrail_ast::register(module)?;
     mutation_coverage::register(module)?;
     mutation_evidence::register(module)?;
+    memory_index::register(module)?;
     native_reuse::register(module)?;
     tooling_boundary::register(module)?;
     Ok(())

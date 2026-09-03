@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Chunk index over the workspace memory catalog.
 
 Reads ``conductor/memory_sources.toml`` (kind=index), chunks markdown, and
@@ -19,16 +18,21 @@ import sys
 import tempfile
 import time
 import tomllib
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import chain
 from pathlib import Path
-from typing import Any, Callable, Final, Iterator
+from typing import Any, Final
 
+from conductor._native import (
+    memory_index_metadata_native,
+    memory_index_query_file_native,
+    memory_index_score_rows_native,
+)
 from conductor.kb_retrieve import (
     QUERY_INSTRUCT,
     RetrieveError,
-    _dot,
     assert_embedding_meta,
     embed_batch,
     embed_text,
@@ -611,22 +615,64 @@ def query_index(
         )
     else:
         qvec = embedder(QUERY_INSTRUCT + query.strip())
-    scored: list[dict[str, Any]] = []
-    for row in rows:
-        vec = row["vector"]
-        if len(vec) != len(qvec):
-            raise RetrieveError(f"dim mismatch in {row.get('path')}")
-        scored.append(
-            {
-                "score": float(_dot(qvec, vec)),
-                "source": row["source"],
-                "path": row["path"],
-                "title": row["title"],
-                "text": row["text"][:500],
-            }
+    try:
+        native_hits = memory_index_score_rows_native(qvec, rows, top_k)
+    except ValueError as exc:
+        raise RetrieveError(str(exc)) from exc
+    return _native_hits(native_hits)
+
+
+def _native_hits(
+    rows: list[tuple[float, str, str, str, str]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "score": score,
+            "source": source,
+            "path": path,
+            "title": title,
+            "text": text,
+        }
+        for score, source, path, title, text in rows
+    ]
+
+
+def query_index_file(
+    query: str,
+    path: Path = INDEX_PATH,
+    *,
+    top_k: int = 8,
+    embedder: Callable[[str], list[float]] = embed_text,
+) -> list[dict[str, Any]]:
+    """Query a validated JSONL index without materializing vectors in Python."""
+
+    if not query.strip():
+        raise RetrieveError("query is empty")
+    if top_k < 1:
+        raise RetrieveError("top_k must be >= 1")
+    try:
+        fingerprint, dimension, _count = memory_index_metadata_native(str(path))
+    except ValueError as exc:
+        raise RetrieveError(str(exc)) from exc
+    if embedder is embed_text:
+        qvec = embed_text(
+            QUERY_INSTRUCT + query.strip(),
+            purpose="query",
+            required_fingerprint=fingerprint,
         )
-    scored.sort(key=lambda item: item["score"], reverse=True)
-    return scored[:top_k]
+    else:
+        qvec = embedder(QUERY_INSTRUCT + query.strip())
+    if len(qvec) != dimension:
+        raise RetrieveError(
+            f"query dimension {len(qvec)} != index dimension {dimension}"
+        )
+    try:
+        native_hits = memory_index_query_file_native(
+            str(path), qvec, top_k, fingerprint
+        )
+    except ValueError as exc:
+        raise RetrieveError(str(exc)) from exc
+    return _native_hits(native_hits)
 
 
 @contextmanager
@@ -707,7 +753,12 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0
-        hits = query_index(args.query, load_index(args.index), top_k=args.top_k)
+        if args.index.is_file():
+            hits = query_index_file(args.query, args.index, top_k=args.top_k)
+        else:
+            # Preserve the public load/query seam for callers that provide a
+            # virtual path; real files use the bounded-memory native path.
+            hits = query_index(args.query, load_index(args.index), top_k=args.top_k)
         print(json.dumps(hits, indent=2, ensure_ascii=False))
         return 0
     except RetrieveError as exc:
