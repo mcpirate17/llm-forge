@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.5"
+version = "0.1.7"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
