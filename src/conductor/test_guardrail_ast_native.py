@@ -187,76 +187,79 @@ def test_policy_thresholds_markers_allowlists_and_order(
         "_ALLOWLIST",
         {key: set(values) for key, values in guardrail_audit._ALLOWLIST.items()},
     )
-    lines = ["def candidate():", "    # guardrail: allow-god-function"] + [
-        "    value = 1" for _ in range(100)
-    ]
-    metrics = {
-        "symbol": "candidate",
-        "lineno": 1,
-        "end_lineno": 102,
-        "branches": 21,
-        "max_nesting": 6,
-        "is_route_registration": False,
-        "hot_loop": True,
-    }
-    issues = guardrail_audit._issues_from_function_metrics(
-        metrics, lines, "pkg/probe.py"
+
+    def native_issues(path: str, source: str) -> list[dict[str, object]]:
+        policy = json.dumps(
+            {
+                "god_functions": sorted(guardrail_audit._ALLOWLIST["god_functions"]),
+                "complexity": sorted(guardrail_audit._ALLOWLIST["complexity"]),
+            }
+        )
+        payload = json.loads(guardrail_ast_metrics_native([(path, source)], policy))
+        return payload[0]["issues"]
+
+    source = "\n".join(
+        ["def candidate(values):", "    # guardrail: allow-god-function"]
+        + [f"    if flag_{index}: pass" for index in range(21)]
+        + ["    for value in values:", "        output.append(value * 2)"]
+        + ["    value = 1" for _ in range(77)]
     )
-    assert [issue.kind for issue in issues] == [
+    issues = native_issues("pkg/probe.py", source)
+    assert [issue["kind"] for issue in issues] == [
         "complexity",
         "native_hotspot_candidate",
     ]
-    assert issues[0].metric == {
-        "branches": 21,
-        "max_nesting": 6,
+    assert issues[0]["metric"] == {
+        "branches": 22,
+        "max_nesting": 1,
         "lineno": 1,
     }
 
-    threshold_metrics = dict(
-        metrics,
-        end_lineno=101,
-        branches=0,
-        max_nesting=0,
-        hot_loop=False,
+    threshold_source = "\n".join(
+        ["def boundary():", *("    value = 1" for _ in range(100))]
     )
-    threshold_lines = ["def boundary():", *("    value = 1" for _ in range(100))]
-    threshold_issues = guardrail_audit._issues_from_function_metrics(
-        threshold_metrics, threshold_lines, "pkg/boundary.py"
-    )
-    assert [issue.kind for issue in threshold_issues] == ["god_function"]
-    assert threshold_issues[0].metric == {"lines": 101, "lineno": 1}
+    threshold_issues = native_issues("pkg/boundary.py", threshold_source)
+    assert [issue["kind"] for issue in threshold_issues] == ["god_function"]
+    assert threshold_issues[0]["metric"] == {"lines": 101, "lineno": 1}
 
-    for branch_count, nesting in ((21, 0), (0, 6)):
-        complexity_metrics = dict(
-            metrics,
-            end_lineno=2,
-            branches=branch_count,
-            max_nesting=nesting,
-            hot_loop=False,
-        )
-        assert [
-            issue.kind
-            for issue in guardrail_audit._issues_from_function_metrics(
-                complexity_metrics, ["def candidate():", "    pass"], "pkg/edge.py"
-            )
-        ] == ["complexity"]
+    branch_source = "\n".join(
+        ["def branchy():"]
+        + [
+            line
+            for index in range(21)
+            for line in (f"    if flag_{index}:", "        pass")
+        ]
+    )
+    assert [
+        issue["kind"] for issue in native_issues("pkg/branch.py", branch_source)
+    ] == ["complexity"]
+    nesting_source = "\n".join(
+        ["def nested():"]
+        + [f"{'    ' * (depth + 1)}if flag_{depth}:" for depth in range(6)]
+        + [f"{'    ' * 7}return 1"]
+    )
+    assert [
+        issue["kind"] for issue in native_issues("pkg/nesting.py", nesting_source)
+    ] == ["complexity"]
 
     guardrail_audit._ALLOWLIST["complexity"].add("pkg/probe.py::candidate")
-    assert not guardrail_audit._issues_from_function_metrics(
-        metrics, lines, "pkg/probe.py"
-    )
+    assert not native_issues("pkg/probe.py", source)
 
-    route_metrics = dict(metrics, is_route_registration=True)
     monkeypatch.setattr(
         guardrail_audit,
         "_ALLOWLIST",
         {"god_files": set(), "god_functions": set(), "complexity": set()},
     )
+    route_source = "\n".join(
+        ["def register_routes(values):", "    def handler():", "        return 1"]
+        + [f"    if flag_{index}: pass" for index in range(21)]
+        + ["    for value in values:", "        output.append(value * 2)"]
+        + ["    value = 1" for _ in range(77)]
+    )
     assert [
-        issue.kind
-        for issue in guardrail_audit._issues_from_function_metrics(
-            route_metrics, ["def register_routes():"], "pkg/routes.py"
-        )
+        issue["kind"]
+        for issue in native_issues("pkg/routes.py", route_source)
+        if issue["symbol"] == "register_routes"
     ] == ["native_hotspot_candidate"]
 
 

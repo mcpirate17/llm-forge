@@ -1,15 +1,18 @@
 //! Batched structural metrics for the Python guardrail audit.
 //!
-//! Git selection, snapshot reads, decoding, policy thresholds, allowlists, and issue
-//! wording remain in Python. This module owns only the repeated parse-and-walk work.
+//! Git selection, snapshot reads, decoding, and file-level policy remain in Python.
+//! This module owns function parsing, metrics, allowlists, thresholds, and issue rows.
 
 #![allow(clippy::useless_conversion)]
+
+use std::collections::HashSet;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{walk_expr, walk_stmt, SourceOrderVisitor};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 #[derive(Debug, Serialize)]
 struct FunctionMetrics {
@@ -27,6 +30,25 @@ struct FileMetrics {
     path: String,
     parse_error: bool,
     functions: Vec<FunctionMetrics>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    issues: Option<Vec<PolicyIssue>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FunctionPolicy {
+    god_functions: HashSet<String>,
+    complexity: HashSet<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct PolicyIssue {
+    kind: &'static str,
+    severity: &'static str,
+    path: String,
+    symbol: Option<String>,
+    message: String,
+    recommendation: &'static str,
+    metric: Value,
 }
 
 #[derive(Default)]
@@ -183,12 +205,137 @@ impl<'a> SourceOrderVisitor<'a> for FunctionCollector<'a> {
     }
 }
 
-fn analyze_file(path: String, source: String) -> FileMetrics {
+fn split_python_lines(text: &str) -> Vec<&str> {
+    let mut lines = Vec::new();
+    let mut start = 0;
+    let mut chars = text.char_indices().peekable();
+    while let Some((index, character)) = chars.next() {
+        if !matches!(
+            character,
+            '\n' | '\r'
+                | '\u{000b}'
+                | '\u{000c}'
+                | '\u{001c}'
+                | '\u{001d}'
+                | '\u{001e}'
+                | '\u{0085}'
+                | '\u{2028}'
+                | '\u{2029}'
+        ) {
+            continue;
+        }
+        lines.push(&text[start..index]);
+        let mut end = index + character.len_utf8();
+        if character == '\r' {
+            if let Some(&(next_index, '\n')) = chars.peek() {
+                chars.next();
+                end = next_index + 1;
+            }
+        }
+        start = end;
+    }
+    if start < text.len() {
+        lines.push(&text[start..]);
+    }
+    lines
+}
+
+fn function_has_marker(
+    lineno: usize,
+    end_lineno: usize,
+    source_lines: &[&str],
+    marker: &str,
+) -> bool {
+    let needle = format!("# guardrail: {marker}");
+    source_lines
+        [lineno.saturating_sub(1).min(source_lines.len())..end_lineno.min(source_lines.len())]
+        .iter()
+        .any(|line| line.contains(&needle))
+}
+
+fn policy_issues(
+    metrics: &FunctionMetrics,
+    source_lines: &[&str],
+    rel_path: &str,
+    policy: &FunctionPolicy,
+) -> Vec<PolicyIssue> {
+    let length = metrics
+        .end_lineno
+        .saturating_sub(metrics.lineno)
+        .saturating_add(1);
+    let fn_key = if rel_path.is_empty() {
+        metrics.symbol.clone()
+    } else {
+        format!("{rel_path}::{}", metrics.symbol)
+    };
+    let allow_god_fn = policy.god_functions.contains(&fn_key)
+        || function_has_marker(
+            metrics.lineno,
+            metrics.end_lineno,
+            source_lines,
+            "allow-god-function",
+        );
+    let allow_complexity = policy.complexity.contains(&fn_key)
+        || function_has_marker(
+            metrics.lineno,
+            metrics.end_lineno,
+            source_lines,
+            "allow-complexity",
+        );
+    let mut issues = Vec::new();
+    if length > 100 && !metrics.is_route_registration && !allow_god_fn {
+        issues.push(PolicyIssue {
+            kind: "god_function",
+            severity: "critical",
+            path: rel_path.to_owned(),
+            symbol: Some(metrics.symbol.clone()),
+            message: format!("Function is {length} lines (>100)."),
+            recommendation: "Split by decision blocks and side-effect boundaries.",
+            metric: json!({"lines": length, "lineno": metrics.lineno}),
+        });
+    }
+    if (metrics.branches > 20 || metrics.max_nesting > 5)
+        && !metrics.is_route_registration
+        && !allow_complexity
+    {
+        issues.push(PolicyIssue {
+            kind: "complexity",
+            severity: "high",
+            path: rel_path.to_owned(),
+            symbol: Some(metrics.symbol.clone()),
+            message: format!(
+                "Function complexity is high (branches={}, nesting={}).",
+                metrics.branches, metrics.max_nesting
+            ),
+            recommendation: "Flatten control flow and extract pure helpers.",
+            metric: json!({
+                "branches": metrics.branches,
+                "max_nesting": metrics.max_nesting,
+                "lineno": metrics.lineno,
+            }),
+        });
+    }
+    if metrics.hot_loop && !allow_complexity {
+        issues.push(PolicyIssue {
+            kind: "native_hotspot_candidate",
+            severity: "high",
+            path: rel_path.to_owned(),
+            symbol: Some(metrics.symbol.clone()),
+            message: "Python loop heuristic suggests a numeric hot path.".to_owned(),
+            recommendation: "Vectorize with NumPy/PyTorch or move the hotspot into C/C++/Rust/Cython if profiling confirms it.",
+            metric: json!({"lineno": metrics.lineno}),
+        });
+    }
+    issues
+}
+
+fn analyze_file(path: String, source: String, policy: Option<&FunctionPolicy>) -> FileMetrics {
     let Ok(module) = ruff_python_parser::parse_module(&source) else {
         return FileMetrics {
             path,
             parse_error: true,
             functions: Vec::new(),
+            issues: policy.map(|_| Vec::new()),
         };
     };
     let syntax = module.into_syntax();
@@ -208,22 +355,37 @@ fn analyze_file(path: String, source: String) -> FileMetrics {
     for statement in &syntax.body {
         collector.visit_stmt(statement);
     }
+    let issues = policy.map(|policy| {
+        let source_lines = split_python_lines(&source);
+        collector
+            .functions
+            .iter()
+            .flat_map(|metrics| policy_issues(metrics, &source_lines, &path, policy))
+            .collect()
+    });
     FileMetrics {
         path,
         parse_error: false,
         functions: collector.functions,
+        issues,
     }
 }
 
 #[pyfunction]
+#[pyo3(signature = (records, policy_json=None))]
 fn guardrail_ast_metrics_native(
     py: Python<'_>,
     records: Vec<(String, String)>,
+    policy_json: Option<&str>,
 ) -> PyResult<String> {
-    let metrics = py.detach(|| {
+    let policy = policy_json
+        .map(serde_json::from_str::<FunctionPolicy>)
+        .transpose()
+        .map_err(|error| PyValueError::new_err(format!("invalid guardrail policy: {error}")))?;
+    let metrics = py.detach(move || {
         records
             .into_iter()
-            .map(|(path, source)| analyze_file(path, source))
+            .map(|(path, source)| analyze_file(path, source, policy.as_ref()))
             .collect::<Vec<_>>()
     });
     serde_json::to_string(&metrics).map_err(|error| PyValueError::new_err(error.to_string()))

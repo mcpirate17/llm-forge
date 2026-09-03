@@ -46,15 +46,6 @@ def _has_marker(text: str, marker: str) -> bool:
     return f"# guardrail: {marker}" in text
 
 
-def _function_has_marker(
-    lineno: int, end_lineno: int, source_lines: list[str], marker: str
-) -> bool:
-    start = lineno - 1
-    end = end_lineno
-    snippet = "\n".join(source_lines[max(start, 0) : min(end, len(source_lines))])
-    return _has_marker(snippet, marker)
-
-
 CODE_EXTS = {
     ".py",
     ".js",
@@ -172,77 +163,6 @@ def _read_candidate_text(path: Path, *, staged_only: bool, from_ref: str | None)
         return path.read_text(encoding="latin-1")
 
 
-def _issues_from_function_metrics(
-    metrics: dict[str, Any], source_lines: list[str], rel_path: str
-) -> list[Issue]:
-    qualname = str(metrics["symbol"])
-    lineno = int(metrics["lineno"])
-    end_lineno = int(metrics["end_lineno"])
-    branches = int(metrics["branches"])
-    max_nesting = int(metrics["max_nesting"])
-    length = max(0, end_lineno - lineno + 1)
-    is_route_registration = bool(metrics["is_route_registration"])
-    fn_key = f"{rel_path}::{qualname}" if rel_path else qualname
-    allow_god_fn = fn_key in _ALLOWLIST["god_functions"] or _function_has_marker(
-        lineno, end_lineno, source_lines, "allow-god-function"
-    )
-    allow_complexity = fn_key in _ALLOWLIST["complexity"] or _function_has_marker(
-        lineno, end_lineno, source_lines, "allow-complexity"
-    )
-    issues: list[Issue] = []
-    if length > 100 and not is_route_registration and not allow_god_fn:
-        issues.append(
-            Issue(
-                kind="god_function",
-                severity="critical",
-                path=rel_path,
-                symbol=qualname,
-                message=f"Function is {length} lines (>100).",
-                recommendation="Split by decision blocks and side-effect boundaries.",
-                metric={"lines": length, "lineno": lineno},
-            )
-        )
-    if (
-        (branches > 20 or max_nesting > 5)
-        and not is_route_registration
-        and not allow_complexity
-    ):
-        issues.append(
-            Issue(
-                kind="complexity",
-                severity="high",
-                path=rel_path,
-                symbol=qualname,
-                message=(
-                    "Function complexity is high "
-                    f"(branches={branches}, nesting={max_nesting})."
-                ),
-                recommendation="Flatten control flow and extract pure helpers.",
-                metric={
-                    "branches": branches,
-                    "max_nesting": max_nesting,
-                    "lineno": lineno,
-                },
-            )
-        )
-    if bool(metrics["hot_loop"]) and not allow_complexity:
-        issues.append(
-            Issue(
-                kind="native_hotspot_candidate",
-                severity="high",
-                path=rel_path,
-                symbol=qualname,
-                message="Python loop heuristic suggests a numeric hot path.",
-                recommendation=(
-                    "Vectorize with NumPy/PyTorch or move the hotspot into "
-                    "C/C++/Rust/Cython if profiling confirms it."
-                ),
-                metric={"lineno": lineno},
-            )
-        )
-    return issues
-
-
 def _resolve_tool_command(tool: str, *args: str) -> list[str]:
     """Prefer the executable installed beside the running Python interpreter."""
 
@@ -320,7 +240,16 @@ def _structural_issues(
         if path.suffix == ".py":
             python_records.append((rel, text))
 
-    native_files = json.loads(guardrail_ast_metrics_native(python_records))
+    function_policy = json.dumps(
+        {
+            "god_functions": sorted(_ALLOWLIST["god_functions"]),
+            "complexity": sorted(_ALLOWLIST["complexity"]),
+        },
+        separators=(",", ":"),
+    )
+    native_files = json.loads(
+        guardrail_ast_metrics_native(python_records, function_policy)
+    )
     native_by_path = {record["path"]: record for record in native_files}
     for path, rel, text, lines in inputs:
         allow_god_file = rel in _ALLOWLIST["god_files"] or _has_marker(
@@ -361,8 +290,7 @@ def _structural_issues(
                 )
                 continue
             raise RuntimeError(f"native parser rejected CPython-valid source: {rel}")
-        for metrics in native["functions"]:
-            issues.extend(_issues_from_function_metrics(metrics, lines, rel))
+        issues.extend(Issue(**row) for row in native["issues"])
     return issues, len(python_records)
 
 
