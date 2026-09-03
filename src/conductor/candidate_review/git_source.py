@@ -280,6 +280,18 @@ def resolve_candidate(
         base_tree = commit_tree(repo, merge_base)
     else:
         raise GitSourceError(f"unsupported candidate kind: {kind!r}")
+    # A waiver binds to a base only once that base is proven to be on this candidate's
+    # own history. For `range` (a merge base) and a parentless `commit` the check is a
+    # formality; for a `commit` with an explicit --base-ref it is the only thing that
+    # stops a base off an unrelated history from activating a waiver. Fail closed: an
+    # unverifiable base yields no waiver base, which leaves every waiver inert.
+    if base_commit is None:
+        integration_oid: str | None = None
+        integration_detail = f"{kind} candidate has no base commit"
+    else:
+        integration_oid, integration_detail = _verify_ancestor(
+            repo, base_commit, tip=target, detail=f"{kind} candidate base"
+        )
     return Candidate(
         kind=kind,
         tree_oid=target_tree,
@@ -288,8 +300,8 @@ def resolve_candidate(
         commit_oid=target,
         target_ref=target_ref,
         changes=_diff_changes(repo, base_tree, target_tree),
-        integration_base_oid=base_commit,
-        integration_base_detail=f"{kind} candidate base",
+        integration_base_oid=integration_oid,
+        integration_base_detail=integration_detail,
     )
 
 
