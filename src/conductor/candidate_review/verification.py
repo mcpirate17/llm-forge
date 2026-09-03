@@ -27,6 +27,7 @@ from conductor.candidate_review.command_runner import _tail
 from conductor.candidate_review.graph_selection import (
     _convention_tests,
     _graph_test_paths,
+    _rust_crate_tests,
 )
 from conductor.candidate_review.git_source import (
     GitSourceError,
@@ -506,14 +507,21 @@ def select_tests(ctx: ReviewContext) -> TestSelection:
     else:
         graph = {"status": "not-required", "selected_edges": 0}
     tests = graph_tests | _convention_tests(ctx, sources) | changed_tests
-    if sources and not tests:
+    # A crate's own `#[cfg(test)]` modules are evidence, but they are not pytest
+    # nodeids: `tests` is sharded and executed, so they are counted separately.
+    # Without this a change confined to Rust reported no targeted tests while
+    # its suite sat in the same crate.
+    native_tests = _rust_crate_tests(ctx, sources)
+    graph["native_test_files"] = sum(len(files) for files in native_tests.values())
+    uncovered = [source for source in sources if source not in native_tests]
+    if uncovered and not tests:
         findings.append(
             Finding(
                 check_id="test-evidence",
                 rule_id="no-targeted-tests",
                 severity=Severity.HIGH,
                 message="changed production code has no graph-selected or convention-matched tests",
-                evidence={"source_paths": sources},
+                evidence={"source_paths": uncovered},
             )
         )
     high_risk = any(

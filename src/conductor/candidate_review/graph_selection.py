@@ -176,6 +176,66 @@ def _imports_reexport(text: str, surfaces: dict[str, set[str]]) -> bool:
     return False
 
 
+def _rust_crate_tests(
+    ctx: ReviewContext, source_paths: Sequence[str]
+) -> dict[str, tuple[str, ...]]:
+    """Each changed Rust source mapped to the test files of its own crate.
+
+    Every other selector here is Python-only: it matches ``test_<stem>.py``
+    names and walks Python import edges. A crate whose tests are ``#[cfg(test)]``
+    modules or files under ``tests/`` therefore selected nothing, so a change
+    confined to Rust reported "no targeted tests" while its own suite sat beside
+    it -- structural for a project whose compute is deliberately native.
+
+    Returned per source rather than as one set, so a change that touches Python
+    as well is still answerable for the Python half. These paths are evidence
+    that the changed code is tested, not work for the pytest runner, so the
+    caller keeps them out of the executed set.
+    """
+
+    crates: dict[str, PurePosixPath] = {}
+    for source in source_paths:
+        path = PurePosixPath(source)
+        if path.suffix != ".rs":
+            continue
+        for parent in path.parents:
+            if (ctx.snapshot / parent / "Cargo.toml").is_file():
+                crates[source] = parent
+                break
+    cache: dict[PurePosixPath, tuple[str, ...]] = {}
+    covered: dict[str, tuple[str, ...]] = {}
+    for source, crate in crates.items():
+        files = cache.get(crate)
+        if files is None:
+            files = _crate_test_files(ctx, crate)
+            cache[crate] = files
+        if files:
+            covered[source] = files
+    return covered
+
+
+def _crate_test_files(ctx: ReviewContext, crate: PurePosixPath) -> tuple[str, ...]:
+    """The Rust files in ``crate`` that carry tests, in path order."""
+
+    tests: list[str] = []
+    for candidate in sorted((ctx.snapshot / crate).rglob("*.rs")):
+        rel = candidate.relative_to(ctx.snapshot).as_posix()
+        # target/ is build output: a vendored dependency's test modules there
+        # would report coverage this crate does not have.
+        if "/target/" in f"/{rel}":
+            continue
+        if candidate.parent == ctx.snapshot / crate / "tests":
+            tests.append(rel)
+            continue
+        try:
+            text = candidate.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if "#[cfg(test)]" in text:
+            tests.append(rel)
+    return tuple(tests)
+
+
 def _convention_tests(ctx: ReviewContext, source_paths: Sequence[str]) -> set[str]:
     names = {f"test_{PurePosixPath(path).stem}.py" for path in source_paths}
     modules = [path.removesuffix(".py").replace("/", ".") for path in source_paths]
