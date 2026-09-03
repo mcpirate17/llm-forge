@@ -404,6 +404,10 @@ def test_a_sibling_worktree_path_is_claim_relevant(worktree_gate) -> None:
     assert sibling == [(str(linked), "a.py")]
 
 
+@pytest.mark.host_path(
+    "resolving a path outside any checkout walks to the filesystem root, so the "
+    "gate stats /.git on the way up -- that walk is the behaviour under test"
+)
 def test_scratchpad_and_foreign_repos_remain_unclaimable(worktree_gate) -> None:
     """The drop this replaces was right for these two; only worktrees regressed."""
     gate, _, stranger = worktree_gate
@@ -499,3 +503,48 @@ def test_exposure_log_stops_at_its_cap(worktree_gate, capsys, monkeypatch) -> No
     log.write_text('{"x": 1}\n', encoding="utf-8")
     assert _edit_decision(gate, capsys, str(linked / "a.py")) == "allow"
     assert log.read_text(encoding="utf-8") == '{"x": 1}\n'
+
+
+def test_an_allowed_write_stamps_the_claim(gate) -> None:
+    """The idle timer only reclaims abandoned claims if working ones stay stamped."""
+    from conductor.candidate_review.ownership import load_activity, load_claims
+
+    repo = Path(gate.REPO_ROOT)
+    assert load_activity(repo) == {}
+    allowed, _detail = gate._claim_allows("claude", "b.py")
+    assert allowed
+    claims, _digest = load_claims(repo)
+    mine = next(claim for claim in claims if claim.owner == "claude")
+    assert load_activity(repo)[mine.claim_id]
+    assert mine.claim_id in load_activity(repo)
+
+
+def test_a_lapsed_claim_of_our_own_says_so(gate) -> None:
+    """'no live exact claim' sends the agent to create a duplicate; naming the
+    lapse sends it to re-claim."""
+    from datetime import timedelta
+
+    from conductor.candidate_review.ownership import load_claims, touch_claim
+
+    repo = Path(gate.REPO_ROOT)
+    claims, _digest = load_claims(repo)
+    mine = next(claim for claim in claims if claim.owner == "claude")
+    touch_claim(repo, mine.claim_id, now=mine.creation - timedelta(days=1))
+    allowed, detail = gate._claim_allows("claude", "b.py")
+    assert not allowed
+    assert "no longer live" in detail and "re-claim" in detail
+    assert mine.claim_id in detail
+
+
+def test_another_owners_lapsed_claim_does_not_hold_the_path(gate) -> None:
+    from datetime import timedelta
+
+    from conductor.candidate_review.ownership import load_claims, touch_claim
+
+    repo = Path(gate.REPO_ROOT)
+    claims, _digest = load_claims(repo)
+    theirs = next(claim for claim in claims if claim.owner == "codex-phase22")
+    touch_claim(repo, theirs.claim_id, now=theirs.creation - timedelta(days=1))
+    allowed, detail = gate._claim_allows("claude", "a.py")
+    assert not allowed
+    assert "is held by" not in detail  # lapsed: nobody holds it any more

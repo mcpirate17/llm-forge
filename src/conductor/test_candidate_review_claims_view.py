@@ -116,4 +116,7 @@ def test_compact_text_counts_expired_and_hides_them() -> None:
     )
     assert text.splitlines()[0] == "claims: 1 active, 1 expired, sha256 abcdef012345"
     assert "claim-live" in text and "claim-dead" not in text
-    assert "exp 08-27 14:00Z" in text
+    # 14:00 is what it asked for; 13:30 is the idle lapse, and the earlier one is
+    # what actually releases the path. Printing the later one would be a lie.
+    assert "exp 08-27 13:30Z" in text
+    assert "idle   0m" in text

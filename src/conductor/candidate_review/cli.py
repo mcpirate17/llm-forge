@@ -325,12 +325,21 @@ def compact_claims_text(
         if len(just) > COMPACT_JUSTIFICATION_CHARS:
             just = just[: COMPACT_JUSTIFICATION_CHARS - 1] + "…"
         lines.append(
-            f"{claim.claim_id}  {claim.owner:<14} exp {claim.expiry:%m-%d %H:%MZ}  "
+            f"{claim.claim_id}  {claim.owner:<14} exp {claim.deadline:%m-%d %H:%MZ}  "
+            f"idle {(now - (claim.activity or claim.creation)).total_seconds() / 60:>3.0f}m  "
             f"{len(claim.paths):>2} paths  {_dir_summary(claim.paths)}  {just}"
         )
         if with_paths:
             lines.append("    " + " ".join(claim.paths))
     return "\n".join(lines)
+
+
+def _stored_fields(claim: OwnershipClaim) -> dict[str, object]:
+    """The claim as the store holds it: the idle stamp lives in a sidecar, and this
+    view is the store. ``--compact`` is where idle time is shown."""
+    payload = asdict(claim)
+    payload.pop("last_seen", None)
+    return payload
 
 
 def claims_command(args: argparse.Namespace) -> int:
@@ -353,7 +362,8 @@ def claims_command(args: argparse.Namespace) -> int:
         return 0
     print(
         json.dumps(
-            {"sha256": digest, "claims": [asdict(item) for item in selected]}, indent=2
+            {"sha256": digest, "claims": [_stored_fields(item) for item in selected]},
+            indent=2,
         )
     )
     return 0
@@ -432,7 +442,7 @@ def _parser() -> argparse.ArgumentParser:
     claim.add_argument("--repo", default=".")
     claim.add_argument("--owner", required=True)
     claim.add_argument("--justification", required=True)
-    claim.add_argument("--hours", type=float, default=8.0)
+    claim.add_argument("--hours", type=float, default=1.0)
     claim.add_argument("paths", nargs="+")
     claim.set_defaults(func=claim_command)
     release = subparsers.add_parser(

@@ -248,28 +248,48 @@ def _claim_allows(owner: str, target: str) -> tuple[bool, str]:
         return False, "hook has no GOVERNANCE_OWNER identity"
     try:
         sys.path.insert(0, str(REPO_ROOT))
-        from conductor.candidate_review.ownership import load_claims, paths_overlap
+        from conductor.candidate_review.ownership import (
+            load_claims,
+            paths_overlap,
+            touch_claim,
+        )
 
         claims, digest = load_claims(REPO_ROOT)
     except (ImportError, OSError, RuntimeError, ValueError) as exc:
         return False, f"live claim store is unavailable: {exc}"
     now = datetime.now(UTC)
     holders: list[str] = []
+    lapsed: list[str] = []
     for claim in claims:
-        if not claim.active(now):
-            continue
         if not any(paths_overlap(target, claimed) for claimed in claim.paths):
             continue
-        if claim.owner.casefold() == owner.casefold():
+        mine = claim.owner.casefold() == owner.casefold()
+        if not claim.active(now):
+            if mine:
+                lapsed.append(f"{claim.claim_id} ({claim.lapse_reason(now)})")
+            continue
+        if mine:
+            try:
+                touch_claim(REPO_ROOT, claim.claim_id, now=now)
+            except OSError:
+                # The stamp is a convenience, not the authority. If it cannot be
+                # written the claim simply lapses on its existing timer, which is
+                # the safe direction; refusing a legitimate write is not.
+                pass
             return True, digest
         holders.append(
-            f"{claim.owner} until {claim.expires_at[:16]}Z ({claim.claim_id})"
+            f"{claim.owner} until {claim.deadline:%Y-%m-%dT%H:%M}Z ({claim.claim_id})"
         )
     if holders:
         return False, (
             f"path {target!r} is held by {'; '.join(holders)}; "
             f"owner={owner!r} has no live claim on it — coordinate via A2A or "
             "wait for expiry"
+        )
+    if lapsed:
+        return False, (
+            f"your claim on {target!r} is no longer live: {'; '.join(lapsed)} — "
+            "re-claim the path before writing"
         )
     return False, f"no live exact claim for owner={owner!r} path={target!r}"
 
