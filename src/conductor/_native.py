@@ -18,6 +18,7 @@ from __future__ import annotations
 from conductor_native import (
     DeadTestsAnalysisNative,
     DeadTestsResolverNative,
+    candidate_structure_facts_native,
     dead_tests_closure_native,
     duplicate_body_fingerprints_native,
     guardrail_ast_metrics_native,
@@ -84,6 +85,7 @@ __all__ = [
     "DeadTestsAnalysisNative",
     "DeadTestsResolverNative",
     "SlopCoreUnavailable",
+    "candidate_structure_facts_native",
     "dead_tests_closure_native",
     "duplicate_body_fingerprints_native",
     "guardrail_ast_metrics_native",

@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 pyo3 = { version = "0.29" }
 ruff_python_ast = { package = "rustpython-ruff_python_ast", version = "0.15.8" }
 ruff_python_parser = { package = "rustpython-ruff_python_parser", version = "0.15.8" }
+ruff_text_size = { package = "rustpython-ruff_text_size", version = "0.15.8" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 sha2 = "0.10"
