@@ -43,6 +43,7 @@ from conductor.mutation_value import (
     analyze_test_value,
     collect_pytest_junit_batch,
     load_value_analysis,
+    pytest_attribution_supported,
     value_inspection_payload,
 )
 from conductor.snapshot_worktree import isolated_snapshot
@@ -513,6 +514,53 @@ def _run_command(
     )
 
 
+KILLER_FAILURE_OUTCOMES = frozenset({"FAILED", "ERROR"})
+
+
+def killer_verdict(
+    mutation: Mutation,
+    report: Mapping[str, Any] | None,
+    outcome: str,
+) -> dict[str, Any]:
+    """Adjudicate whether a killed mutant died to the tests its contract named.
+
+    A non-zero exit only says *something* failed. `expected_killers` is the
+    campaign's prediction about *which* test catches the defect, and a mutant
+    killed by anything else is evidence the contract does not hold.
+    """
+
+    declared = list(mutation.expected_killers)
+    if outcome != "KILLED":
+        return {"status": "NOT_APPLICABLE", "declared": declared}
+    if report is None:
+        return {
+            "status": "UNAVAILABLE",
+            "declared": declared,
+            "reason": "campaign batch carries no per-test attribution",
+        }
+    if report.get("status") != "COMPLETE":
+        return {
+            "status": "UNAVAILABLE",
+            "declared": declared,
+            "reason": f"attribution is {report.get('status')}",
+        }
+    tests = report.get("tests", {})
+    observed = sorted(
+        nodeid
+        for nodeid, row in tests.items()
+        if row.get("outcome") in KILLER_FAILURE_OUTCOMES
+    )
+    matched = sorted(set(declared) & set(observed))
+    return {
+        "status": "CONFIRMED" if matched else "MISATTRIBUTED",
+        "declared": declared,
+        "observed_failures": observed,
+        "matched": matched,
+        "unobservable": sorted(set(declared) - set(tests)),
+        "collateral": sorted(set(observed) - set(declared)),
+    }
+
+
 def _run_campaign_command(
     campaign: Campaign,
     *,
@@ -521,7 +569,13 @@ def _run_campaign_command(
 ) -> tuple[CommandResult, Mapping[str, Any] | None]:
     """Run one batch, adding per-test evidence with no test-mutant Cartesian loop."""
 
-    if campaign.value_analysis is None:
+    ranked_nodeids = [test.nodeid for test in campaign.ranked_tests]
+    if not pytest_attribution_supported(campaign.test_argv, ranked_nodeids):
+        if campaign.value_analysis is not None:
+            raise CampaignError(
+                "value analysis needs a pytest batch whose ranked tests are "
+                "Python nodeids and whose argv does not already set --junitxml"
+            )
         return (
             _run_command(
                 campaign.test_argv,
@@ -535,7 +589,7 @@ def _run_campaign_command(
         return collect_pytest_junit_batch(
             argv=campaign.test_argv,
             report_path=snapshot_root / ".mutation-value" / f"{report_name}.xml",
-            ranked_nodeids=[test.nodeid for test in campaign.ranked_tests],
+            ranked_nodeids=ranked_nodeids,
             run_command=lambda argv: _run_command(
                 argv,
                 cwd=snapshot_root,
@@ -615,6 +669,7 @@ def run_campaign(
         "mutants": [],
         "mutation_score": None,
         "test_value": None,
+        "killer_enforcement": None,
     }
     if receipt_path is None:
         output_path = _default_receipt_path(campaign, repo_root)
@@ -688,6 +743,7 @@ def run_campaign(
                 "outcome": outcome,
                 "test_result": result.as_dict(),
             }
+            row["killer_attribution"] = killer_verdict(mutation, report, outcome)
             if report is not None:
                 row["test_attribution"] = report
                 mutant_reports[mutation.mutation_id] = report
@@ -716,6 +772,25 @@ def run_campaign(
         row["id"] for row in receipt["mutants"] if row["outcome"] == "SURVIVED"
     ]
     receipt["classification_required"] = list(receipt["survivors"])
+    misattributed = [
+        row["id"]
+        for row in receipt["mutants"]
+        if row["killer_attribution"]["status"] == "MISATTRIBUTED"
+    ]
+    unattributed = [
+        row["id"]
+        for row in receipt["mutants"]
+        if row["killer_attribution"]["status"] == "UNAVAILABLE"
+    ]
+    receipt["killer_enforcement"] = {
+        "status": "REFUSED"
+        if misattributed
+        else "UNAVAILABLE"
+        if unattributed
+        else "ENFORCED",
+        "misattributed": misattributed,
+        "unattributed": unattributed,
+    }
     mutation_status = (
         "PASS"
         if killed == len(selected) and not survived and not timed_out
@@ -723,6 +798,8 @@ def run_campaign(
         if survived
         else "ERROR"
     )
+    if misattributed:
+        mutation_status = "FAIL"
     if campaign.value_analysis is not None:
         receipt["test_value"] = analyze_test_value(
             campaign.value_analysis,

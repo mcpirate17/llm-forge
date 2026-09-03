@@ -268,6 +268,23 @@ def _pytest_identity(nodeid: str) -> tuple[str, str]:
     return classname, parts[-1]
 
 
+def pytest_attribution_supported(
+    argv: Sequence[str], ranked_nodeids: Sequence[str]
+) -> bool:
+    """Report whether this batch can be run under JUnit and mapped to nodeids."""
+
+    if not ranked_nodeids:
+        return False
+    if any(arg == "--junitxml" or arg.startswith("--junitxml=") for arg in argv):
+        return False
+    for nodeid in ranked_nodeids:
+        try:
+            _pytest_identity(nodeid)
+        except ValueEvidenceError:
+            return False
+    return True
+
+
 def parse_pytest_junit(
     report_path: Path, ranked_nodeids: Sequence[str]
 ) -> dict[str, Any]:
