@@ -9,6 +9,7 @@ mod a2a_retention;
 mod candidate_structure;
 mod dead_tests;
 mod duplicate_bodies;
+mod git_source;
 mod guardrail_ast;
 mod memory_index;
 mod mutation_coverage;
@@ -28,6 +29,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     dead_tests::register(module)?;
     duplicate_bodies::register(module)?;
     guardrail_ast::register(module)?;
+    git_source::register(module)?;
     mutation_coverage::register(module)?;
     mutation_evidence::register(module)?;
     memory_index::register(module)?;

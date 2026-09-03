@@ -7,10 +7,11 @@ import re
 import stat
 import subprocess
 import tempfile
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
-from typing import Iterator, Sequence
+from typing import Protocol
 
 from conductor.candidate_review.model import Candidate, Change, TreeEntry
 
@@ -20,6 +21,10 @@ ZERO_OID = "0" * 40
 
 class GitSourceError(RuntimeError):
     """Candidate identity or materialization could not be proven."""
+
+
+class _ChangeClassifier(Protocol):
+    def classify_change(self, change: Change) -> Change: ...
 
 
 MAX_MATERIALIZED_BLOB_BYTES = 64 * 1024 * 1024
@@ -173,43 +178,40 @@ def _parents(repo: Path, commit_oid: str) -> list[str]:
 def _diff_changes(
     repo: Path, base_tree: str, candidate_tree: str
 ) -> tuple[Change, ...]:
+    from conductor._native import git_diff_changes_native
+
     raw = run_git(
         repo,
         ["diff-tree", "--raw", "-z", "-r", "-M", "-C", base_tree, candidate_tree],
     ).stdout
-    fields = raw.split(b"\0")
-    changes: list[Change] = []
-    cursor = 0
-    while cursor < len(fields) and fields[cursor]:
-        header = fields[cursor].decode("ascii", "strict")
-        cursor += 1
-        if not header.startswith(":"):
-            raise GitSourceError(f"malformed raw Git diff header: {header!r}")
-        old_mode, new_mode, old_oid, new_oid, status = header[1:].split()
-        if cursor >= len(fields) or not fields[cursor]:
-            raise GitSourceError("raw Git diff omitted a candidate path")
-        first_path = fields[cursor].decode("utf-8", "surrogateescape")
-        cursor += 1
-        old_path: str | None = None
-        path = first_path
-        if status[0] in {"R", "C"}:
-            if cursor >= len(fields) or not fields[cursor]:
-                raise GitSourceError("raw Git rename/copy omitted its destination path")
-            old_path = first_path
-            path = fields[cursor].decode("utf-8", "surrogateescape")
-            cursor += 1
-        changes.append(
-            Change(
-                status=status,
-                path=path,
-                old_path=old_path,
-                old_mode=old_mode,
-                new_mode=new_mode,
-                old_oid=old_oid,
-                new_oid=new_oid,
-            )
+    try:
+        decoded = git_diff_changes_native(raw)
+    except ValueError as exc:
+        raise GitSourceError(str(exc)) from exc
+    return tuple(
+        Change(
+            status=status,
+            path=path_raw.decode("utf-8", "surrogateescape"),
+            old_path=(
+                old_path_raw.decode("utf-8", "surrogateescape")
+                if old_path_raw is not None
+                else None
+            ),
+            old_mode=old_mode,
+            new_mode=new_mode,
+            old_oid=old_oid,
+            new_oid=new_oid,
         )
-    return tuple(changes)
+        for (
+            status,
+            path_raw,
+            old_path_raw,
+            old_mode,
+            new_mode,
+            old_oid,
+            new_oid,
+        ) in decoded
+    )
 
 
 def resolve_candidate(
@@ -305,24 +307,25 @@ def resolve_candidate(
     )
 
 
-def classify_candidate(candidate: Candidate, classifier: object) -> Candidate:
-    classify = getattr(classifier, "classify_change")
+def classify_candidate(
+    candidate: Candidate, classifier: _ChangeClassifier
+) -> Candidate:
+    classify = classifier.classify_change
     return replace(
         candidate, changes=tuple(classify(change) for change in candidate.changes)
     )
 
 
 def list_tree(repo: Path, tree_oid: str) -> tuple[TreeEntry, ...]:
+    from conductor._native import git_tree_entries_native
+
     raw = run_git(repo, ["ls-tree", "-r", "-z", "-l", "--full-tree", tree_oid]).stdout
+    try:
+        decoded = git_tree_entries_native(raw)
+    except ValueError as exc:
+        raise GitSourceError(str(exc)) from exc
     entries: list[TreeEntry] = []
-    for record in raw.split(b"\0"):
-        if not record:
-            continue
-        try:
-            metadata, path_raw = record.split(b"\t", 1)
-            mode, object_type, oid, size_raw = metadata.decode("ascii").split()
-        except ValueError as exc:
-            raise GitSourceError("malformed git ls-tree record") from exc
+    for path_raw, mode, object_type, oid, size in decoded:
         path = path_raw.decode("utf-8", "surrogateescape")
         _validate_tree_path(path)
         entries.append(
@@ -331,7 +334,7 @@ def list_tree(repo: Path, tree_oid: str) -> tuple[TreeEntry, ...]:
                 mode=mode,
                 object_type=object_type,
                 oid=oid,
-                size=int(size_raw) if size_raw != "-" else None,
+                size=size,
             )
         )
     return tuple(entries)
@@ -457,6 +460,8 @@ def _rename_sources(repo: Path, candidate: Candidate) -> dict[str, str]:
     a copy to git, not a rename. ``--find-copies`` must come last: a later
     ``-M`` turns copy detection back off.
     """
+    from conductor._native import git_rename_sources_native
+
     raw = run_git(
         repo,
         [
@@ -470,19 +475,18 @@ def _rename_sources(repo: Path, candidate: Candidate) -> dict[str, str]:
             candidate.base_tree_oid,
             candidate.tree_oid,
         ],
-    ).stdout.decode("utf-8", "replace")
-    fields = raw.split("\0")
-    sources: dict[str, str] = {}
-    index = 0
-    while index + 2 < len(fields) and fields[index]:
-        sources[fields[index + 2]] = fields[index + 1]
-        index += 3
-    return sources
+    ).stdout
+    return {
+        destination.decode("utf-8", "replace"): source.decode("utf-8", "replace")
+        for source, destination in git_rename_sources_native(raw)
+    }
 
 
 def changed_line_numbers(
     repo: Path, candidate: Candidate, paths: Sequence[str]
 ) -> dict[str, set[int]]:
+    from conductor._native import git_changed_lines_native
+
     if not paths:
         return {}
     wanted = set(paths)
@@ -501,18 +505,5 @@ def changed_line_numbers(
             "--",
             *scope,
         ],
-    ).stdout.decode("utf-8", "replace")
-    current: str | None = None
-    result: dict[str, set[int]] = {}
-    for line in raw.splitlines():
-        if line.startswith("+++ b/"):
-            current = line[6:] if line[6:] in wanted else None
-            if current is not None:
-                result.setdefault(current, set())
-        elif line.startswith("@@") and current:
-            plus = line.split(" ")[2][1:]
-            start_raw, _, count_raw = plus.partition(",")
-            start = int(start_raw)
-            count = int(count_raw or "1")
-            result[current].update(range(start, start + count))
-    return result
+    ).stdout
+    return {path: set(lines) for path, lines in git_changed_lines_native(raw, paths)}
