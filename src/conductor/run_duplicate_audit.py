@@ -4,91 +4,37 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-import defusedxml.ElementTree as ET
-import hashlib
 import json
 import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from pathlib import Path, PurePosixPath
 from typing import Any
-from pathlib import Path
-from pathlib import PurePosixPath
+
+import defusedxml.ElementTree as ET
 
 from conductor.changed_files_cli import (
     add_changed_files_arguments,
     resolve_changed_files,
 )
-
+from conductor.duplicate_audit_config import (
+    AUDIT_ERROR_EXIT_CODE,
+    DEFAULT_SOURCE_DIRS,
+    GENERATED_ARTIFACT_GLOBS,
+    JSCPD_BASELINE_RELATIVE,
+    JSCPD_GENERATED_EVIDENCE_IGNORE,
+    JSCPD_INDEX_CONFIG_PATHS,
+    JSCPD_SOURCE_SUFFIXES,
+    PMD_CPD_BASELINE_RELATIVE,
+    PMD_EXCLUDES,
+    VULTURE_SOURCE_DIRS,
+    VULTURE_SOURCE_SUFFIXES,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
-
-# Duplication baselines: grandfather pre-existing clone pairs so the staged
-# gate only fails on NEW duplication introduced by a commit, not on repo-wide
-# debt that predates it (same "add to the whitelist with reviewer approval"
-# pattern as conductor/guardrail_allowlist.json and
-# conductor/radon_complexity_baseline.json). Refresh with --save-baseline
-# after a deliberate refactor changes the known clone set.
-JSCPD_BASELINE_RELATIVE = Path("conductor/jscpd_duplication_baseline.json")
-PMD_CPD_BASELINE_RELATIVE = Path("conductor/pmd_cpd_duplication_baseline.json")
-AUDIT_ERROR_EXIT_CODE = 2
-
-DEFAULT_SOURCE_DIRS = (
-    "research",
-    "aria_core",
-    "aria_designer",
-    "component_fab",
-    "conductor",
-)
-
-GENERATED_ARTIFACT_GLOBS = ("aria_designer/workflows/generated/**",)
-JSCPD_INDEX_CONFIG_PATHS = (
-    ".gitignore",
-    "package.json",
-    JSCPD_BASELINE_RELATIVE.as_posix(),
-)
-JSCPD_GENERATED_EVIDENCE_IGNORE = "**/conductor/mutation_campaigns/receipts/**"
-
-JSCPD_SOURCE_SUFFIXES = frozenset(
-    {
-        ".c",
-        ".cc",
-        ".cpp",
-        ".cu",
-        ".h",
-        ".hpp",
-        ".js",
-        ".jsx",
-        ".json",
-        ".py",
-        ".rs",
-        ".sh",
-        ".ts",
-        ".tsx",
-        ".yaml",
-        ".yml",
-    }
-)
-VULTURE_SOURCE_DIRS = ("research", "aria_core", "aria_designer")
-VULTURE_SOURCE_SUFFIXES = frozenset({".py"})
-
-PMD_EXCLUDES = (
-    "**/.venv/**",
-    "**/node_modules/**",
-    "**/__pycache__/**",
-    "**/build/**",
-    "**/dist/**",
-    "**/.run/**",
-    "**/tests/**",
-    "research/dashboard/**",
-    "research/runtime/**",
-    "research/runtime_events/**",
-    "research/reports/**",
-    "research/data/**",
-    "research/perf_artifacts/**",
-)
 
 
 class DuplicateAuditError(RuntimeError):
@@ -333,25 +279,6 @@ def _skip_vulture_source(path: PurePosixPath) -> bool:
     )
 
 
-def _relativize_jscpd_name(file_entry: object, cwd: Path) -> str | None:
-    """Repo-relative posix path for a jscpd firstFile/secondFile entry.
-
-    jscpd's JSON reporter only populates ``fragment`` (the duplicated text
-    ``_stable_dup_key`` hashes for identity) when invoked with ``--absolute``,
-    which reports absolute paths instead of bare basenames; convert back to
-    a repo-relative path so findings match the rest of the governance tooling.
-    """
-    if not isinstance(file_entry, dict):
-        return None
-    name = file_entry.get("name")
-    if not isinstance(name, str) or not name:
-        return None
-    try:
-        return Path(name).resolve().relative_to(cwd.resolve()).as_posix()
-    except ValueError:
-        return name
-
-
 def _stable_dup_key(first_path: str, second_path: str, fragment: str) -> str:
     """Content-hash identity for a clone pair, stable across unrelated line drift.
 
@@ -360,11 +287,13 @@ def _stable_dup_key(first_path: str, second_path: str, fragment: str) -> str:
     already-reviewed clone pair.
     """
     normalized = "\n".join(line.rstrip() for line in fragment.strip("\n").splitlines())
-    digest = hashlib.sha256(normalized.encode("utf-8", "surrogateescape")).hexdigest()[
-        :16
-    ]
-    a, b = sorted((first_path, second_path))
-    return f"{a}::{b}::{digest}"
+    from conductor._native import stable_duplicate_key_native
+
+    return stable_duplicate_key_native(
+        first_path,
+        second_path,
+        normalized.encode("utf-8", "surrogateescape"),
+    )
 
 
 def _write_baseline(path: Path, entries: list[dict], *, root: Path = ROOT) -> None:
@@ -681,48 +610,15 @@ def _jscpd_collect_duplicates(
                 f"jscpd exited successfully but did not produce {report.name}"
             )
         try:
-            data = json.loads(report.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            report_json = report.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
             raise DuplicateAuditError(f"jscpd report is not valid JSON: {exc}") from exc
-        if not isinstance(data, dict) or not isinstance(data.get("duplicates"), list):
-            raise DuplicateAuditError(
-                "jscpd report must be an object containing a duplicates array"
-            )
-        entries: list[dict] = []
-        for index, dup in enumerate(data["duplicates"]):
-            if not isinstance(dup, dict):
-                raise DuplicateAuditError(f"jscpd duplicate {index} must be an object")
-            first_file = dup.get("firstFile")
-            second_file = dup.get("secondFile")
-            first = _relativize_jscpd_name(first_file, cwd)
-            second = _relativize_jscpd_name(second_file, cwd)
-            fragment = dup.get("fragment")
-            lines = dup.get("lines")
-            if not isinstance(first, str) or not first:
-                raise DuplicateAuditError(
-                    f"jscpd duplicate {index} has an invalid firstFile.name"
-                )
-            if not isinstance(second, str) or not second:
-                raise DuplicateAuditError(
-                    f"jscpd duplicate {index} has an invalid secondFile.name"
-                )
-            if not isinstance(fragment, str) or not fragment:
-                raise DuplicateAuditError(
-                    f"jscpd duplicate {index} has an invalid fragment"
-                )
-            if isinstance(lines, bool) or not isinstance(lines, int) or lines <= 0:
-                raise DuplicateAuditError(
-                    f"jscpd duplicate {index} has an invalid line count {lines!r}"
-                )
-            entries.append(
-                {
-                    "key": _stable_dup_key(first, second, fragment),
-                    "firstFile": first,
-                    "secondFile": second,
-                    "lines": lines,
-                }
-            )
-        return entries
+        from conductor._native import normalize_jscpd_report_native
+
+        try:
+            return json.loads(normalize_jscpd_report_native(report_json, str(cwd)))
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise DuplicateAuditError(str(exc)) from exc
 
 
 def _resolve_jscpd_executable(cwd: Path, executable: str | None) -> str:
@@ -1053,12 +949,20 @@ def _pmd_duplicate_entry(
         )
     first = _relativize(first_path, relativize_root)
     second = _relativize(second_path, relativize_root)
-    return {
-        "key": _stable_dup_key(first, second, fragment),
-        "firstFile": first,
-        "secondFile": second,
+    from conductor._native import normalize_duplicate_rows_native
+
+    row = {
+        "first_path": first,
+        "second_path": second,
+        "fragment": fragment,
         "lines": lines,
     }
+    try:
+        return json.loads(
+            normalize_duplicate_rows_native(json.dumps([row]), "pmd-cpd duplication")
+        )[0]
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise DuplicateAuditError(str(exc)) from exc
 
 
 def _pmd_collect_duplicates(
