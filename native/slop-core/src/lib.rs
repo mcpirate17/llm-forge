@@ -10,6 +10,7 @@
 //! pure source-to-source work with no interpreter in the loop, which is why they
 //! belong here.
 
+pub mod audit_inventory;
 pub mod engine;
 pub mod index;
 pub mod ledger;
@@ -325,6 +326,7 @@ fn tally_items(py: Python<'_>, items: &Bound<'_, PyList>) -> PyResult<Py<PyDict>
 
 #[pymodule]
 fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(audit_inventory::audit_inventory_candidates, m)?)?;
     m.add_function(wrap_pyfunction!(ablations, m)?)?;
     m.add_function(wrap_pyfunction!(apply, m)?)?;
     m.add_function(wrap_pyfunction!(rule_names, m)?)?;
