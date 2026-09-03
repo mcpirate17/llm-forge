@@ -2,19 +2,18 @@
 from __future__ import annotations
 
 import argparse
-import ast
-import hashlib
+import json
 import subprocess
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
+from conductor._native import duplicate_body_fingerprints_native
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOTS = ("research", "aria_core", "aria_designer", "component_fab")
 SKIP_PARTS = {"tests", "test", ".venv", "node_modules", "__pycache__", "migrations"}
-MIN_BODY_LINES = 8
 
 
 @dataclass(frozen=True)
@@ -104,58 +103,53 @@ def _read_index(path: str) -> str:
     return proc.stdout.decode("utf-8", "replace")
 
 
-def _function_digest(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
-    end_lineno = getattr(node, "end_lineno", node.lineno)
-    if end_lineno - node.lineno + 1 < MIN_BODY_LINES:
-        return None
-    clone = ast.FunctionDef(
-        name="_",
-        args=node.args,
-        body=node.body,
-        decorator_list=[],
-        returns=node.returns,
-        type_comment=getattr(node, "type_comment", None),
+def _functions_many(
+    records: Sequence[tuple[str, str]],
+) -> dict[str, list[FunctionBody]]:
+    native_files = json.loads(
+        duplicate_body_fingerprints_native(list(records), "standalone")
     )
-    ast.fix_missing_locations(clone)
-    payload = ast.dump(clone, include_attributes=False)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return {
+        native_file["path"]: [
+            FunctionBody(
+                native_file["path"],
+                function["name"],
+                function["lineno"],
+                function["digest"],
+            )
+            for function in native_file["functions"]
+        ]
+        for native_file in native_files
+    }
 
 
 def _functions(path: str, content: str) -> list[FunctionBody]:
-    if not content.strip():
-        return []
-    try:
-        tree = ast.parse(content, filename=path)
-    except SyntaxError:
-        return []
-    found: list[FunctionBody] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        digest = _function_digest(node)
-        if digest is None:
-            continue
-        found.append(FunctionBody(path, node.name, node.lineno, digest))
-    return found
+    return _functions_many([(path, content)]).get(path, [])
 
 
 def _duplicate_pairs(
     from_ref: str | None = None,
 ) -> list[tuple[FunctionBody, FunctionBody]]:
     base_ref = _merge_base(from_ref) if from_ref is not None else "HEAD"
+    tracked_paths = _tracked_python_files(base_ref)
+    base_functions_by_path = _functions_many(
+        [(path, _read_ref(path, base_ref)) for path in tracked_paths]
+    )
     existing_by_digest: dict[str, FunctionBody] = {}
-    for path in _tracked_python_files(base_ref):
-        for fn in _functions(path, _read_ref(path, base_ref)):
+    for path in tracked_paths:
+        for fn in base_functions_by_path.get(path, []):
             existing_by_digest.setdefault(fn.digest, fn)
 
     # Build the exact candidate snapshot. Local pre-commit reads the index;
     # CI range checks read HEAD. In either mode, changed/deleted source paths
     # are represented in the snapshot so split refactors count as moves.
     changed_paths = set(_changed_python_files(base_ref if from_ref else None))
-    candidate_functions_by_path: dict[str, list[FunctionBody]] = {}
-    for path in changed_paths:
-        content = _read_ref(path, "HEAD") if from_ref else _read_index(path)
-        candidate_functions_by_path[path] = _functions(path, content)
+    candidate_functions_by_path = _functions_many(
+        [
+            (path, _read_ref(path, "HEAD") if from_ref else _read_index(path))
+            for path in changed_paths
+        ]
+    )
     candidate_digests_by_path = {
         path: {fn.digest for fn in functions}
         for path, functions in candidate_functions_by_path.items()
@@ -168,7 +162,7 @@ def _duplicate_pairs(
 
     duplicate_pairs: list[tuple[FunctionBody, FunctionBody]] = []
     for path in changed_paths:
-        base_digests = {fn.digest for fn in _functions(path, _read_ref(path, base_ref))}
+        base_digests = {fn.digest for fn in base_functions_by_path.get(path, [])}
         for fn in candidate_functions_by_path[path]:
             if fn.digest in base_digests:
                 continue

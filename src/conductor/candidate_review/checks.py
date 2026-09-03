@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import fnmatch
-import hashlib
 import io
 import json
 import os
@@ -12,11 +11,12 @@ import re
 import time
 import tokenize
 import tomllib
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Iterable
 
+from conductor._native import duplicate_body_fingerprints_native
 from conductor.candidate_review.git_source import changed_line_numbers
 from conductor.candidate_review.model import (
     Candidate,
@@ -311,7 +311,7 @@ def check_config_and_notebooks(ctx: ReviewContext) -> CheckResult:
                             "PyYAML is required for YAML admission checks"
                         ) from exc
                 yaml_module.safe_load(path.read_text(encoding="utf-8"))  # type: ignore[attr-defined]
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - normalize third-party parser failures
             findings.append(
                 Finding(
                     check_id="config-parse",
@@ -326,12 +326,16 @@ def check_config_and_notebooks(ctx: ReviewContext) -> CheckResult:
 
 def _validate_notebook(rel: str, payload: object, findings: list[Finding]) -> None:
     if not isinstance(payload, dict) or not isinstance(payload.get("cells"), list):
-        raise ValueError("notebook must be an object with a cells array")
+        raise ValueError(  # noqa: TRY004 - all notebook parse failures share one path
+            "notebook must be an object with a cells array"
+        )
     if payload.get("nbformat") != 4:
         raise ValueError(f"unsupported notebook format: {payload.get('nbformat')!r}")
     for index, cell in enumerate(payload["cells"]):
         if not isinstance(cell, dict):
-            raise ValueError(f"cell {index} is not an object")
+            raise ValueError(  # noqa: TRY004 - all notebook parse failures share one path
+                f"cell {index} is not an object"
+            )
         if cell.get("cell_type") == "code" and (
             cell.get("outputs") or cell.get("execution_count")
         ):
@@ -416,14 +420,15 @@ class _PythonVisitor(ast.NodeVisitor):
             len(body) == 1
             and isinstance(body[0], ast.Expr)
             and isinstance(body[0].value, ast.Constant)
+            and body[0].value.value is Ellipsis
+            and not self.protocol_depth
         ):
-            if body[0].value.value is Ellipsis and not self.protocol_depth:
-                self._add(
-                    "ellipsis-stub",
-                    Severity.HIGH,
-                    body[0],
-                    "ellipsis-only function is a stub",
-                )
+            self._add(
+                "ellipsis-stub",
+                Severity.HIGH,
+                body[0],
+                "ellipsis-only function is a stub",
+            )
         self.generic_visit(node)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
@@ -757,7 +762,7 @@ def check_ownership(ctx: ReviewContext) -> CheckResult:
                 )
             )
         return _result("ownership", started, findings, files=relevant)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     active = [claim for claim in claims if claim.active(now)]
     for claim in claims:
         if not claim.active(now):
@@ -949,16 +954,15 @@ def check_research_evidence(
             )
     if re.search(
         r"(?i)(?:dtype|device|numerical|stability|finite|nan|inf)", changed_text
-    ):
-        if not re.search(r"(?i)(?:dtype|device|isfinite|nan|raises|error)", test_text):
-            findings.append(
-                Finding(
-                    check_id="research-integrity",
-                    rule_id="missing-numerical-device-tests",
-                    severity=Severity.HIGH,
-                    message="numerical/device-sensitive research change lacks selected dtype/device/finiteness tests",
-                )
+    ) and not re.search(r"(?i)(?:dtype|device|isfinite|nan|raises|error)", test_text):
+        findings.append(
+            Finding(
+                check_id="research-integrity",
+                rule_id="missing-numerical-device-tests",
+                severity=Severity.HIGH,
+                message="numerical/device-sensitive research change lacks selected dtype/device/finiteness tests",
             )
+        )
     return _result(
         "research-integrity",
         started,
@@ -994,22 +998,6 @@ def check_native_source(ctx: ReviewContext) -> CheckResult:
 BUILTIN_CHECKS["native-source"] = check_native_source
 
 
-def _function_body_digest(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
-    body = list(node.body)
-    if (
-        body
-        and isinstance(body[0], ast.Expr)
-        and isinstance(body[0].value, ast.Constant)
-    ):
-        if isinstance(body[0].value.value, str):
-            body = body[1:]
-    length = (node.end_lineno or node.lineno) - node.lineno + 1
-    if length < 10 or not body:
-        return None
-    normalized = ast.dump(ast.Module(body=body, type_ignores=[]), annotate_fields=True)
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-
-
 def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
     started = time.perf_counter()
     changed = [change.path for change in ctx.live_changes if "python" in change.classes]
@@ -1018,6 +1006,7 @@ def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
     changed_lines = changed_line_numbers(ctx.repo, ctx.candidate, changed)
     bodies: dict[str, list[tuple[str, str, int]]] = {}
     changed_bodies: set[tuple[str, str, int]] = set()
+    records: list[tuple[str, str]] = []
     for path in ctx.snapshot.rglob("*.py"):
         if any(
             part in {".venv", "node_modules", "__pycache__", ".run"}
@@ -1026,21 +1015,19 @@ def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
             continue
         rel = path.relative_to(ctx.snapshot).as_posix()
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
-        except (OSError, UnicodeDecodeError, SyntaxError):
+            records.append((rel, path.read_text(encoding="utf-8")))
+        except (OSError, UnicodeDecodeError):
             continue
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            digest = _function_body_digest(node)
-            if digest is None:
-                continue
-            location = (rel, node.name, node.lineno)
+    native_files = json.loads(duplicate_body_fingerprints_native(records, "candidate"))
+    for native_file in native_files:
+        rel = native_file["path"]
+        for node in native_file["functions"]:
+            digest = node["digest"]
+            location = (rel, node["name"], node["lineno"])
             bodies.setdefault(digest, []).append(location)
             lines = changed_lines.get(rel, set())
             if lines and any(
-                node.lineno <= line <= (node.end_lineno or node.lineno)
-                for line in lines
+                node["lineno"] <= line <= node["end_lineno"] for line in lines
             ):
                 changed_bodies.add(location)
     findings: list[Finding] = []
