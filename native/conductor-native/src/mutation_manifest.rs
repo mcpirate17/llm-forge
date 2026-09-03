@@ -1824,5 +1824,11 @@ mod rust_inventory_tests {
         );
         assert_eq!(rust_fn_name("let fn_like = 1;"), None);
         assert_eq!(rust_fn_name("struct NotAFn;"), None);
+        // `fn ` must be the whole prefix, not merely present somewhere on the
+        // line. Matching it by substring would name a function after text that
+        // only mentions one, and the reader would then inventory a test that
+        // does not exist and certify a complete scope around it.
+        assert_eq!(rust_fn_name("let s = \"fn phantom\";"), None);
+        assert_eq!(rust_fn_name("// call fn helper() later"), None);
     }
 }
