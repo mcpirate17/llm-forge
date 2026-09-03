@@ -26,9 +26,8 @@ REPO_ROOT = Path(
     or os.environ.get("PROJECT_DIR")
     or Path(__file__).resolve().parents[3]
 ).resolve()
-# A fail-open in a sibling worktree is recorded here rather than denied unless
-# CRG_GATE_ENFORCE_WORKTREES is set. Enforcing it blocks every lane that has
-# never claimed, which is a fleet decision, not a hook default.
+# Every gated write in a sibling worktree is recorded here, whether it is denied
+# or allowed, because the claim store prunes and cannot answer for a past window.
 EXPOSURE_CAP_BYTES = 4 * 1024 * 1024
 
 
@@ -76,8 +75,24 @@ _REPO_CHECKOUT = _checkout_of(REPO_ROOT)
 REPO_COMMON_DIR = _REPO_CHECKOUT[1] if _REPO_CHECKOUT else None
 
 
+REMEDY = (
+    "Create a narrow governance claim first: "
+    "make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' "
+    "(CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+)
+
+
 def _enforce_worktrees() -> bool:
-    return os.environ.get("CRG_GATE_ENFORCE_WORKTREES", "") not in ("", "0")
+    """Whether an unclaimed sibling-worktree write is denied. On by default.
+
+    It shipped recording-only, because enforcing it before identity was fixed
+    would have denied lanes on their *own* claims: the gate named every codex
+    lane after the checkout it was wired at, so their claims never matched. That
+    is fixed (:func:`session_checkout`), and the flag was Tim's call to make on
+    2026-09-03. `CRG_GATE_ENFORCE_WORKTREES=0` turns it back off fleet-wide
+    without a code change, which is what an unblock looks like at 3am.
+    """
+    return os.environ.get("CRG_GATE_ENFORCE_WORKTREES", "1") not in ("", "0")
 
 
 def _record_exposure(owner: str, target: str, tool: str, checkout: str) -> None:
@@ -311,7 +326,7 @@ def _claim_allows(owner: str, target: str) -> tuple[bool, str]:
     return False, f"no live exact claim for owner={owner!r} path={target!r}"
 
 
-def _default_owner() -> str:
+def _default_owner(root: Path | None = None) -> str:
     """The lane this hook speaks for, or ``""`` to deny for want of an identity.
 
     Every ladder the gate used to carry lived here, and it disagreed with the one
@@ -319,6 +334,9 @@ def _default_owner() -> str:
     while claiming as ``codex-<lane>``. There is one resolver now; a failure to
     reach it denies rather than guessing an owner, because guessing is what let a
     lane write over another lane's claim.
+
+    `root` is the checkout to derive the lane from, and it is the *session's*,
+    not `REPO_ROOT`. See :func:`session_checkout`.
     """
     try:
         sys.path.insert(0, str(REPO_ROOT))
@@ -327,7 +345,7 @@ def _default_owner() -> str:
         return ""
     try:
         # OwnerIdentityError is a RuntimeError: an unnameable lane denies.
-        return resolve_owner(REPO_ROOT)
+        return resolve_owner(REPO_ROOT if root is None else root)
     except (RuntimeError, OSError, ValueError):
         return ""
 
@@ -373,9 +391,7 @@ def verify(payload: dict[str, Any], *, owner: str) -> int:
     for target in local:
         allowed, detail = _claim_allows(owner, target)
         if not allowed:
-            _deny(
-                payload, f"BLOCKED: {detail}. Create a narrow governance claim first."
-            )
+            _deny(payload, f"BLOCKED: {detail}. {REMEDY}")
             return 0
     tool = payload.get("tool_name") if isinstance(payload.get("tool_name"), str) else ""
     for checkout, target in sibling:
@@ -386,8 +402,7 @@ def verify(payload: dict[str, Any], *, owner: str) -> int:
         if _enforce_worktrees():
             _deny(
                 payload,
-                f"BLOCKED: {detail} (in worktree {checkout}). "
-                "Create a narrow governance claim first.",
+                f"BLOCKED: {detail} (in worktree {checkout}). {REMEDY}",
             )
             return 0
     return 0
@@ -398,14 +413,38 @@ def _bash_command(payload: dict[str, Any]) -> str:
     return value if isinstance(value, str) else ""
 
 
+def session_checkout(payload: dict[str, Any]) -> Path:
+    """The checkout the session is working in, else the checkout the hook serves.
+
+    `REPO_ROOT` is where the *hook* was wired, not where the session works.
+    `.codex/hooks.json` pins it to the main checkout by absolute path for every
+    codex lane, so a lane name derived from it is whatever branch the main
+    checkout happens to have out — which is how 68 codex writes came to be
+    recorded under a Claude lane's name on 2026-09-03. The session's own working
+    directory is the session, so that is what names it.
+
+    The hook process is spawned by the session, so `os.getcwd()` is the same
+    directory whenever the payload omits `cwd`; codex's own budget hook already
+    reads it that way. A cwd in another repository, or none, falls back to
+    `REPO_ROOT` rather than guessing.
+    """
+    if REPO_COMMON_DIR is None:
+        return REPO_ROOT
+    raw = payload.get("cwd")
+    candidate = raw if isinstance(raw, str) and raw else os.getcwd()
+    try:
+        checkout = _checkout_of(Path(candidate).resolve())
+    except OSError:
+        return REPO_ROOT
+    if checkout is None or checkout[1] != REPO_COMMON_DIR:
+        return REPO_ROOT
+    return checkout[0]
+
+
 def _bash_checkout(payload: dict[str, Any]) -> tuple[Path, bool]:
     """`(checkout to resolve write targets against, is a sibling worktree)`."""
-    cwd = payload.get("cwd")
-    if isinstance(cwd, str) and cwd and REPO_COMMON_DIR is not None:
-        checkout = _checkout_of(Path(cwd).resolve())
-        if checkout and checkout[1] == REPO_COMMON_DIR and checkout[0] != REPO_ROOT:
-            return checkout[0], True
-    return REPO_ROOT, False
+    root = session_checkout(payload)
+    return root, root != REPO_ROOT
 
 
 def verify_bash(payload: dict[str, Any], *, owner: str) -> int:
@@ -460,7 +499,7 @@ def verify_bash(payload: dict[str, Any], *, owner: str) -> int:
             _record_exposure(owner, target, "Bash", str(base))
             if not _enforce_worktrees():
                 continue
-        _deny(payload, f"BLOCKED: {detail}. Create a narrow governance claim first.")
+        _deny(payload, f"BLOCKED: {detail}. {REMEDY}")
         return 0
     return 0
 
@@ -468,16 +507,21 @@ def verify_bash(payload: dict[str, Any], *, owner: str) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("start", "mark", "verify", "verify-bash"))
-    parser.add_argument("--owner", default=_default_owner())
+    # Resolved after the payload is read, not at parse time: the lane comes from
+    # the session's checkout, which only the payload names.
+    parser.add_argument("--owner", default=None)
     args = parser.parse_args()
     payload = _read_payload()
+    owner = args.owner
+    if owner is None:
+        owner = _default_owner(session_checkout(payload))
     if args.action == "start":
         return start(payload)
     if args.action == "mark":
         return mark(payload)
     if args.action == "verify-bash":
-        return verify_bash(payload, owner=args.owner)
-    return verify(payload, owner=args.owner)
+        return verify_bash(payload, owner=owner)
+    return verify(payload, owner=owner)
 
 
 if __name__ == "__main__":

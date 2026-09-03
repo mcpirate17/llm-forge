@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import io
 import json
 import subprocess
 import sys
@@ -415,15 +416,15 @@ def test_scratchpad_and_foreign_repos_remain_unclaimable(worktree_gate) -> None:
         assert gate._classify_targets({"tool_input": {"file_path": path}}) == ([], [])
 
 
-def test_sibling_worktree_write_is_allowed_but_recorded_by_default(
+def test_a_denied_sibling_worktree_write_is_still_recorded(
     worktree_gate, capsys
 ) -> None:
-    """Enforcing would block every lane that has never claimed, so the default
-    records the fail-open instead of denying it. The record is the deliverable:
-    `create_claim` prunes expired claims on every write, so without this log no
-    past window can be audited at all."""
+    """The record survives enforcement, and has to: `create_claim` prunes expired
+    claims on every write, so without this log no past window can be audited at
+    all. Recording only the writes that were allowed would leave the enforced
+    fleet with no audit trail whatsoever."""
     gate, linked, _ = worktree_gate
-    assert _edit_decision(gate, capsys, str(linked / "a.py")) == "allow"
+    assert _edit_decision(gate, capsys, str(linked / "a.py")).startswith("BLOCKED:")
     log = Path(gate.REPO_COMMON_DIR) / "governance" / "claim-gate-exposure.jsonl"
     record = json.loads(log.read_text(encoding="utf-8").strip())
     assert record["path"] == "a.py"
@@ -477,7 +478,8 @@ def test_bash_resolves_targets_against_the_worktree_it_runs_in(
     assert reason.startswith("BLOCKED: path 'a.py' is held by codex-phase22")
 
 
-def test_bash_in_a_worktree_still_fails_open_by_default(worktree_gate, capsys) -> None:
+def test_bash_in_a_worktree_is_denied_by_default(worktree_gate, capsys) -> None:
+    """Enforcement is the default now, so this needs no environment to bite."""
     gate, linked, _ = worktree_gate
     payload = {
         "session_id": "s1",
@@ -490,13 +492,31 @@ def test_bash_in_a_worktree_still_fails_open_by_default(worktree_gate, capsys) -
     )
     capsys.readouterr()
     assert gate.verify_bash(payload, owner="claude") == 0
-    assert capsys.readouterr().out.strip() == ""
+    reason = json.loads(capsys.readouterr().out)["hookSpecificOutput"][
+        "permissionDecisionReason"
+    ]
+    assert reason.startswith("BLOCKED: path 'a.py' is held by codex-phase22")
+
+
+def test_enforcement_is_off_only_when_it_is_explicitly_turned_off(
+    worktree_gate, capsys, monkeypatch
+) -> None:
+    """The unblock lever. `0` is the documented value; empty is the same thing,
+    because an exported-but-empty variable is how a launcher clears one."""
+    gate, linked, _ = worktree_gate
+    for value in ("0", ""):
+        monkeypatch.setenv("CRG_GATE_ENFORCE_WORKTREES", value)
+        assert gate._enforce_worktrees() is False
+        assert _edit_decision(gate, capsys, str(linked / "a.py")) == "allow"
+    monkeypatch.delenv("CRG_GATE_ENFORCE_WORKTREES")
+    assert gate._enforce_worktrees() is True
 
 
 def test_exposure_log_stops_at_its_cap(worktree_gate, capsys, monkeypatch) -> None:
     """An unbounded append in the hook path would grow without limit across a
     fleet that never claims."""
     gate, linked, _ = worktree_gate
+    monkeypatch.setenv("CRG_GATE_ENFORCE_WORKTREES", "0")
     monkeypatch.setattr(gate, "EXPOSURE_CAP_BYTES", 1)
     log = Path(gate.REPO_COMMON_DIR) / "governance" / "claim-gate-exposure.jsonl"
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -574,3 +594,117 @@ def test_a_lane_does_not_inherit_another_vendors_claim(gate) -> None:
     allowed, detail = gate._claim_allows("codex-rust-hotpath-20260903", "b.py")
     assert not allowed
     assert "is held by claude until" in detail
+
+
+# --- the lane is the session's checkout, not the hook's -----------------------
+#
+# `_default_owner` derived the lane from REPO_ROOT, which `.codex/hooks.json`
+# pins to the main checkout by absolute path for every codex lane. The gate
+# therefore named all of them after whatever branch the main checkout had out:
+# 68 codex writes are recorded under a Claude lane's name in the exposure log
+# for 2026-09-03. Identity has to follow the session, not the wiring.
+
+
+def test_session_checkout_is_the_worktree_the_session_runs_in(worktree_gate) -> None:
+    gate, linked, _ = worktree_gate
+    payload = {"cwd": str(linked)}
+    assert gate.session_checkout(payload) == linked
+
+
+def test_session_checkout_falls_back_to_the_hook_process_cwd(
+    worktree_gate, monkeypatch
+) -> None:
+    """Codex omits `cwd` on some payloads. The hook is spawned by the session,
+    so its own working directory names the same checkout."""
+    gate, linked, _ = worktree_gate
+    monkeypatch.chdir(linked)
+    assert gate.session_checkout({}) == linked
+
+
+def test_session_checkout_ignores_a_cwd_in_another_repository(
+    worktree_gate, monkeypatch
+) -> None:
+    """A different repository shares no claim store, so it names no lane here."""
+    gate, _, stranger = worktree_gate
+    monkeypatch.chdir(stranger)
+    assert gate.session_checkout({"cwd": str(stranger)}) == Path(gate.REPO_ROOT)
+
+
+def test_the_lane_is_named_for_the_session_not_for_the_hooks_root(
+    worktree_gate,
+) -> None:
+    """The regression: same hook, same REPO_ROOT, two sessions, two identities."""
+    gate, linked, _ = worktree_gate
+    in_worktree = gate._default_owner(gate.session_checkout({"cwd": str(linked)}))
+    at_root = gate._default_owner(gate.session_checkout({"cwd": str(gate.REPO_ROOT)}))
+    assert in_worktree == "linked"  # the worktree's own name
+    assert at_root != in_worktree
+
+
+def test_a_denial_tells_the_lane_how_to_unblock_itself(worktree_gate, capsys) -> None:
+    """Enforcement now denies fleet-wide. A lane that has never claimed reads
+    this message and nothing else, so it has to carry both the remedy and the
+    lever -- otherwise the only way out of a stall is finding Tim."""
+    gate, linked, _ = worktree_gate
+    reason = _edit_decision(gate, capsys, str(linked / "a.py"))
+    assert "make governance-claim" in reason
+    assert "CRG_GATE_ENFORCE_WORKTREES=0" in reason
+
+
+def test_a_local_denial_also_carries_the_remedy(worktree_gate, capsys) -> None:
+    """The sibling-worktree branch is not the only way to be stopped: a write to
+    an unclaimed path in the lane's own checkout has the same way out."""
+    gate, _, _ = worktree_gate
+    reason = _edit_decision(gate, capsys, str(Path(gate.REPO_ROOT) / "a.py"))
+    assert reason.startswith("BLOCKED:")
+    assert "make governance-claim" in reason
+
+
+def test_a_hook_outside_a_checkout_names_the_root(worktree_gate, monkeypatch) -> None:
+    """With no common dir there is no worktree family to place a cwd in, so the
+    only defensible answer is the checkout the hook was wired against."""
+    gate, linked, _ = worktree_gate
+    monkeypatch.setattr(gate, "REPO_COMMON_DIR", None)
+    assert gate.session_checkout({"cwd": str(linked)}) == Path(gate.REPO_ROOT)
+
+
+def test_an_unresolvable_cwd_is_not_guessed_at(worktree_gate, monkeypatch) -> None:
+    """A cwd that cannot be stat'd -- deleted worktree, dead mount -- falls back
+    rather than naming a lane from a path nobody can resolve."""
+    gate, linked, _ = worktree_gate
+
+    def _raise(_path):
+        raise OSError("stale file handle")
+
+    monkeypatch.setattr(gate, "_checkout_of", _raise)
+    assert gate.session_checkout({"cwd": str(linked)}) == Path(gate.REPO_ROOT)
+
+
+def test_main_names_the_owner_from_the_sessions_checkout(
+    worktree_gate, monkeypatch
+) -> None:
+    """The entry point every lane actually runs: no `--owner` means the lane is
+    derived from the session, and an explicit `--owner` is honoured as given."""
+    gate, linked, _ = worktree_gate
+    seen: dict[str, str] = {}
+
+    def _record(key):
+        def _fn(payload, *, owner):
+            seen[key] = owner
+            return 0
+
+        return _fn
+
+    monkeypatch.setattr(gate, "verify", _record("verify"))
+    monkeypatch.setattr(gate, "verify_bash", _record("verify-bash"))
+    payload = json.dumps({"cwd": str(linked), "tool_name": "Edit"})
+
+    monkeypatch.setattr(sys, "argv", ["crg_gate", "verify"])
+    monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
+    assert gate.main() == 0
+    assert seen["verify"] == "linked"
+
+    monkeypatch.setattr(sys, "argv", ["crg_gate", "verify-bash", "--owner", "explicit"])
+    monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
+    assert gate.main() == 0
+    assert seen["verify-bash"] == "explicit"

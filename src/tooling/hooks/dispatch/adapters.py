@@ -68,16 +68,20 @@ def _command(ctx: Any) -> str:
     return str(tool_input.get("command") or "")
 
 
-def _owner(ctx: Any) -> str:
+def _owner(ctx: Any, gate: ModuleType) -> str:
     """The lane this hook speaks for, from the one resolver both ends share.
 
     This used to end in ``or "claude"``, which is why every Claude session in the
     fleet claimed and wrote as the same owner and could edit over each other's
     claims. An unnameable lane now yields ``""``, which the gate denies on.
+
+    Derived from the session's checkout, not ``ctx.root``: ``ctx.root`` is
+    ``PROJECT_DIR``, the checkout the *hook* was wired against, which is shared
+    by every lane a launcher points at it.
     """
     identity = _conductor(ctx, "conductor.candidate_review.identity")
     try:
-        return identity.resolve_owner(ctx.root)
+        return identity.resolve_owner(gate.session_checkout(ctx.payload))
     except identity.OwnerIdentityError:
         return ""
 
@@ -133,13 +137,13 @@ def crg_gate_mark(ctx: Any) -> None:
 
 
 def crg_gate_verify(ctx: Any) -> None:
-    _body(ctx, "tooling/hooks/agent/crg_gate.py").verify(ctx.payload, owner=_owner(ctx))
+    gate = _body(ctx, "tooling/hooks/agent/crg_gate.py")
+    gate.verify(ctx.payload, owner=_owner(ctx, gate))
 
 
 def crg_gate_verify_bash(ctx: Any) -> None:
-    _body(ctx, "tooling/hooks/agent/crg_gate.py").verify_bash(
-        ctx.payload, owner=_owner(ctx)
-    )
+    gate = _body(ctx, "tooling/hooks/agent/crg_gate.py")
+    gate.verify_bash(ctx.payload, owner=_owner(ctx, gate))
 
 
 def crg_refresh_wait(ctx: Any) -> dict[str, Any] | None:
