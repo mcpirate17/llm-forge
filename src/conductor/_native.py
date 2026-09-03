@@ -39,6 +39,7 @@ from conductor_native import (
     plan_mutation_scaffold_native,
     scan_untracked_import_closure_native,
     should_skip_mutation_path_native,
+    tooling_boundary_facts_native,
     validate_mutation_receipt_native,
     verify_mutation_evidence_native,
 )
@@ -107,6 +108,7 @@ __all__ = [
     "scan_untracked_import_closure_native",
     "should_skip_mutation_path_native",
     "slop_core",
+    "tooling_boundary_facts_native",
     "validate_mutation_receipt_native",
     "verify_mutation_evidence_native",
 ]

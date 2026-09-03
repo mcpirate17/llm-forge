@@ -22,13 +22,14 @@ from __future__ import annotations
 import argparse
 import ast
 import importlib
-import re
+import json
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from conductor._project_hooks import DEFAULT_TEST_PLUGIN
+from conductor._native import tooling_boundary_facts_native
 
 PROJECT_PACKAGES: tuple[str, ...] = (
     "research",
@@ -72,15 +73,6 @@ ALLOWLIST: tuple[tuple[str, str, str, str], ...] = (
     ),
 )
 
-# A dotted module path (``pkg.sub``) or a plugin spec (``pkg:fn``). A bare package
-# name is a path segment, not an import edge: that is a path coupling, which the
-# rehearsal (``tooling_standalone_smoke``) surfaces rather than this rule.
-_MODULE_RE = re.compile(
-    r"^(?:"
-    + "|".join(PROJECT_PACKAGES)
-    + r")(?:(?:\.[A-Za-z_]\w*)+(?::[A-Za-z_]\w*)?|:[A-Za-z_]\w*)$"
-)
-
 
 @dataclass(frozen=True, slots=True)
 class Violation:
@@ -101,23 +93,6 @@ def _rel(path: Path, package_dir: Path) -> str:
         return path.as_posix()
 
 
-def _is_test_path(rel: Path) -> bool:
-    return rel.name.startswith("test_") or "tests" in rel.parts[:-1]
-
-
-def package_modules(package_dir: Path) -> list[Path]:
-    """Every ``.py`` under the conductor package, sorted, caches excluded."""
-    return sorted(
-        p
-        for p in package_dir.rglob("*.py")
-        if "__pycache__" not in p.relative_to(package_dir).parts
-    )
-
-
-def _allowed(rel: str, kind: str, module: str) -> bool:
-    return any(rel == path and kind == k and module == m for path, k, m, _ in ALLOWLIST)
-
-
 def _imported_modules(node: ast.AST) -> list[str]:
     if isinstance(node, ast.Import):
         return [alias.name for alias in node.names]
@@ -130,35 +105,47 @@ def _parse(path: Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
+def _facts(
+    package_dir: Path, hook_dirs: Sequence[Path] = ()
+) -> dict[str, list[dict[str, object]]]:
+    return json.loads(
+        tooling_boundary_facts_native(
+            str(package_dir),
+            [str(path) for path in hook_dirs],
+            list(PROJECT_PACKAGES),
+            NATIVE_CRATE,
+            NATIVE_SEAM,
+            list(PATH_LITERALS),
+            list(HOOK_LITERALS),
+            HOOK_EXCLUDED_SUBDIR,
+            [(path, kind, value) for path, kind, value, _ in ALLOWLIST],
+        )
+    )
+
+
+def _violations(rule: str, facts: Sequence[dict[str, object]]) -> list[Violation]:
+    templates = {
+        "project_import": "imports project module {}",
+        "project_string": "names project module {!r} as a string",
+        "hook_literal": "hook contains {!r}",
+        "module_literal": "module contains {!r}",
+        "native_import": "imports {} outside the seam",
+        "native_string": "names {} outside the seam",
+    }
+    return [
+        Violation(
+            rule,
+            str(fact["path"]),
+            int(fact["line"]),
+            templates[str(fact["kind"])].format(fact["value"]),
+        )
+        for fact in facts
+    ]
+
+
 def check_project_imports(package_dir: Path) -> list[Violation]:
     """Rule a: no project package is reachable from any conductor module."""
-    found: list[Violation] = []
-    for path in package_modules(package_dir):
-        rel = path.relative_to(package_dir).as_posix()
-        shown = _rel(path, package_dir)
-        for node in ast.walk(_parse(path)):
-            for module in _imported_modules(node):
-                if module.split(".")[0] in PROJECT_PACKAGES and not _allowed(
-                    rel, "import", module
-                ):
-                    found.append(
-                        Violation(
-                            "a", shown, node.lineno, f"imports project module {module}"
-                        )
-                    )
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                if _MODULE_RE.match(node.value) and not _allowed(
-                    rel, "string", node.value.split(":")[0]
-                ):
-                    found.append(
-                        Violation(
-                            "a",
-                            shown,
-                            node.lineno,
-                            f"names project module {node.value!r} as a string",
-                        )
-                    )
-    return found
+    return _violations("a", _facts(package_dir)["a"])
 
 
 def default_hook_dirs(package_dir: Path) -> list[Path]:
@@ -173,51 +160,19 @@ def default_hook_dirs(package_dir: Path) -> list[Path]:
     return [d for d in candidates if d.is_dir()]
 
 
-def _hook_files(hook_dir: Path) -> Iterable[Path]:
-    for path in sorted(hook_dir.rglob("*")):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(hook_dir)
-        if rel.parts[0] == HOOK_EXCLUDED_SUBDIR or rel.name.startswith("test_"):
-            continue
-        if "__pycache__" in rel.parts:  # bytecode embeds the compiling checkout's path
-            continue
-        yield path
-
-
-def _literal_hits(path: Path, literals: Sequence[str]) -> Iterable[tuple[int, str]]:
-    text = path.read_text(encoding="utf-8", errors="replace")
-    for lineno, line in enumerate(text.splitlines(), start=1):
-        for literal in literals:
-            if literal in line:
-                yield lineno, literal
-
-
 def check_hook_literals(
     hook_dirs: Sequence[Path], package_dir: Path
 ) -> list[Violation]:
     """Rule b: generic hooks carry no project path literal."""
-    return [
-        Violation("b", _rel(path, package_dir), lineno, f"hook contains {literal!r}")
-        for hook_dir in hook_dirs
-        for path in _hook_files(hook_dir)
-        for lineno, literal in _literal_hits(path, HOOK_LITERALS)
-    ]
+    return _violations("b", _facts(package_dir, hook_dirs)["b"])
 
 
 def check_path_literals(package_dir: Path) -> list[Violation]:
     """Rule c: non-test modules carry no host path literal."""
-    return [
-        Violation("c", _rel(path, package_dir), lineno, f"module contains {literal!r}")
-        for path in package_modules(package_dir)
-        if not _is_test_path(path.relative_to(package_dir))
-        for lineno, literal in _literal_hits(path, PATH_LITERALS)
-        if not _allowed(path.relative_to(package_dir).as_posix(), "literal", literal)
-    ]
+    return _violations("c", _facts(package_dir)["c"])
 
 
-def check_native_seam(package_dir: Path) -> list[Violation]:
-    """Rule d: ``_native.py`` is the only seam and re-exports only real symbols."""
+def _check_live_native_exports(package_dir: Path) -> list[Violation]:
     found: list[Violation] = []
     seam = package_dir / NATIVE_SEAM
     shown = _rel(seam, package_dir)
@@ -246,37 +201,14 @@ def check_native_seam(package_dir: Path) -> list[Violation]:
                             f"{alias.name} is not exported by {NATIVE_CRATE}",
                         )
                     )
-    for path in package_modules(package_dir):
-        if path == seam:
-            continue
-        rel = path.relative_to(package_dir).as_posix()
-        for node in ast.walk(_parse(path)):
-            names = [
-                m for m in _imported_modules(node) if m.split(".")[0] == NATIVE_CRATE
-            ]
-            if names and not _allowed(rel, "import", NATIVE_CRATE):
-                found.append(
-                    Violation(
-                        "d",
-                        _rel(path, package_dir),
-                        node.lineno,
-                        f"imports {NATIVE_CRATE} outside the seam",
-                    )
-                )
-            if (
-                isinstance(node, ast.Constant)
-                and node.value == NATIVE_CRATE
-                and not _allowed(rel, "string", NATIVE_CRATE)
-            ):
-                found.append(
-                    Violation(
-                        "d",
-                        _rel(path, package_dir),
-                        node.lineno,
-                        f"names {NATIVE_CRATE} outside the seam",
-                    )
-                )
     return found
+
+
+def check_native_seam(package_dir: Path) -> list[Violation]:
+    """Rule d: ``_native.py`` is the only seam and re-exports only real symbols."""
+    return _check_live_native_exports(package_dir) + _violations(
+        "d", _facts(package_dir)["d"]
+    )
 
 
 def check_all(
@@ -285,11 +217,12 @@ def check_all(
     dirs = default_hook_dirs(package_dir) if hook_dirs is None else list(hook_dirs)
     if not dirs:
         raise FileNotFoundError(f"no hook tree found next to {package_dir}")
+    facts = _facts(package_dir, dirs)
     return {
-        "a": check_project_imports(package_dir),
-        "b": check_hook_literals(dirs, package_dir),
-        "c": check_path_literals(package_dir),
-        "d": check_native_seam(package_dir),
+        "a": _violations("a", facts["a"]),
+        "b": _violations("b", facts["b"]),
+        "c": _violations("c", facts["c"]),
+        "d": _check_live_native_exports(package_dir) + _violations("d", facts["d"]),
     }
 
 
