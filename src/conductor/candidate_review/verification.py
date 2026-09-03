@@ -825,6 +825,23 @@ def _container_len(payload: Mapping[str, object], key: str) -> int:
     return len(rows) if isinstance(rows, list) else 0
 
 
+def _receipt_required_paths(
+    test_paths: Sequence[str], gated_nodeids: Mapping[str, Sequence[str]] | None
+) -> list[str]:
+    """Changed test files that must carry a mutation PASS receipt.
+
+    Only files defining a test the anchored inventory does not grandfather -- new
+    work. Touching a historical test file leaves its definitions inventoried and
+    demands no campaign: the historical debt was declared complete on 2026-08-31
+    and must not re-enter the gate through whoever edits the file next. ``None``
+    fails closed to the pre-scoping rule -- an unreadable anchor proves nothing.
+    """
+
+    if gated_nodeids is None:
+        return list(test_paths)
+    return [path for path in test_paths if gated_nodeids.get(path)]
+
+
 def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
     """Require mutation PASS receipts and value admission for new tests."""
 
@@ -841,6 +858,41 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
             duration_ms=0,
             skipped_reason="no matching candidate test changes",
         )
+    scope_findings: list[Finding] = []
+    gated_nodeids: dict[str, tuple[str, ...]] = {}
+    try:
+        grandfathered = _load_grandfathered_nodeids(ctx)
+    except _GrandfatherError as exc:
+        scope_findings.append(
+            Finding(
+                check_id="mutation-evidence",
+                rule_id="grandfather-inventory-invalid",
+                severity=Severity.CRITICAL,
+                message=f"grandfather inventory fails closed: {exc}",
+                help=(
+                    "Restore the inventory bytes bound at commit "
+                    f"{MUTATION_WAIVER_SOURCE_ANCHOR}; the value gate cannot be "
+                    "evaluated without an anchored inventory."
+                ),
+            )
+        )
+    else:
+        try:
+            gated_nodeids = _value_gated_nodeids(ctx, grandfathered)
+        except RuntimeError as exc:
+            scope_findings.append(
+                Finding(
+                    check_id="mutation-evidence",
+                    rule_id="new-test-definition-unavailable",
+                    severity=Severity.CRITICAL,
+                    message=f"new test definitions could not be verified: {exc}",
+                )
+            )
+    receipt_paths = _receipt_required_paths(
+        test_paths, None if scope_findings else gated_nodeids
+    )
+    waiver_states = _waiver_states(ctx)
+    exempt = [path for path in test_paths if path not in set(receipt_paths)]
     registry = ctx.snapshot / "conductor/mutation_campaigns/registry.json"
     if not registry.is_file():
         finding = Finding(
@@ -861,7 +913,7 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
 
     try:
         payload = verify_evidence(
-            registry, test_paths, repo_root=ctx.snapshot, anchor_repo=ctx.repo
+            registry, receipt_paths, repo_root=ctx.snapshot, anchor_repo=ctx.repo
         )
     except CampaignError as exc:
         finding = Finding(
@@ -871,40 +923,12 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
             message=f"mutation evidence could not be verified: {exc}",
         )
         return _result("mutation-evidence", started, [finding], files=test_paths)
-    waiver_states = _waiver_states(ctx)
     active_paths = {str(s["path"]) for s in waiver_states if s["active"]}
     findings = _mutation_receipt_findings(payload, waived=active_paths)
-    gated_nodeids: dict[str, tuple[str, ...]] = {}
-    try:
-        grandfathered = _load_grandfathered_nodeids(ctx)
-    except _GrandfatherError as exc:
-        findings.append(
-            Finding(
-                check_id="mutation-evidence",
-                rule_id="grandfather-inventory-invalid",
-                severity=Severity.CRITICAL,
-                message=f"grandfather inventory fails closed: {exc}",
-                help=(
-                    "Restore the inventory bytes bound at commit "
-                    f"{MUTATION_WAIVER_SOURCE_ANCHOR}; the value gate cannot be "
-                    "evaluated without an anchored inventory."
-                ),
-            )
-        )
-    else:
-        try:
-            gated_nodeids = _value_gated_nodeids(ctx, grandfathered)
-        except RuntimeError as exc:
-            findings.append(
-                Finding(
-                    check_id="mutation-evidence",
-                    rule_id="new-test-definition-unavailable",
-                    severity=Severity.CRITICAL,
-                    message=f"new test definitions could not be verified: {exc}",
-                )
-            )
+    findings.extend(scope_findings)
     value_findings = _new_test_value_findings(ctx, payload, gated_nodeids)
     metrics = _mutation_evidence_metrics(payload, gated_nodeids, waiver_states)
+    metrics["receipt_exempt_tests"] = exempt
     return _mutation_evidence_result(
         ctx, started, [*findings, *value_findings], test_paths, metrics
     )
