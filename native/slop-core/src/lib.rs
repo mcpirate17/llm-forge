@@ -14,6 +14,7 @@ pub mod audit_inventory;
 pub mod consolidation;
 pub mod engine;
 pub mod file_families;
+pub mod file_profiles;
 pub mod index;
 pub mod ledger;
 pub mod repository_scan;
@@ -351,6 +352,10 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     m.add_function(wrap_pyfunction!(
         file_families::audit_file_family_groups,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        file_profiles::audit_file_family_profiles,
         m
     )?)?;
     m.add_function(wrap_pyfunction!(
