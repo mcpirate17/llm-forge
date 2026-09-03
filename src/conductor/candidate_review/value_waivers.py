@@ -10,9 +10,15 @@ against code it never reaches) are all dishonest.
 ``[[value_waivers]]`` in the candidate policy names such tests exactly. A waiver
 applies to a finding only while every one of these holds, checked on every gate run:
 
-1. the candidate's base commit equals the waiver's ``integration_base`` -- the rule
-   ``[[mutation_waivers]]`` follows, so a rebase or a merge ahead of the waiver
-   re-arms the gate rather than carrying the exemption forward silently;
+1. the candidate's *integration base* equals the waiver's ``integration_base`` -- the
+   rule ``[[mutation_waivers]]`` follows, so a rebase or a merge ahead of the waiver
+   re-arms the gate rather than carrying the exemption forward silently. That base is
+   the commit on the integration line the candidate descends from, which a ``range``
+   review already computes as its merge base and an ``index`` review resolves the same
+   way (``git_source.resolve_integration_base``). Binding it to HEAD instead, as the
+   pre-commit index review did until 2026-09-02, made every waiver inert at commit
+   time the moment the branch carried one commit: the commit was blocked by a finding
+   the very same gate waived in CI;
 2. an ``expires`` date is declared and is not in the past;
 3. the finding names one of the waiver's nodeids exactly -- never a prefix, never a
    pattern, and an empty nodeid list waives nothing.

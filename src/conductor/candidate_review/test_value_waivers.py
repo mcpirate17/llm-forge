@@ -14,7 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from conductor.candidate_review.checks import check_mutation_evidence
+from conductor.candidate_review.checks import ReviewContext, check_mutation_evidence
+from conductor.candidate_review.git_source import resolve_candidate, run_git
 from conductor.candidate_review.model import CheckStatus, Finding, Severity
 from conductor.candidate_review.policy import (
     PolicyError,
@@ -136,10 +137,79 @@ def test_a_parsed_waiver_carries_its_expiry() -> None:
     assert waiver.nodeids == (NODEID,)
 
 
-def test_the_gate_applies_an_active_policy_waiver(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def _git(repo: Path, *args: str) -> str:
+    return run_git(repo, list(args)).stdout.decode().strip()
+
+
+def _branched_repo(tmp_path: Path) -> tuple[Path, str, str]:
+    """A repo whose lane branch carries one commit past the `master` integration line."""
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "master")
+    _git(repo, "config", "user.email", "gate@example.invalid")
+    _git(repo, "config", "user.name", "gate")
+    _git(repo, "config", "commit.gpgsign", "false")
+    _git(repo, "config", "core.hooksPath", str(tmp_path / "no-hooks"))
+    (repo / "a.txt").write_text("one\n", encoding="utf-8")
+    _git(repo, "add", "a.txt")
+    _git(repo, "commit", "-qm", "integration base")
+    integration = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "-b", "lane")
+    (repo / "a.txt").write_text("two\n", encoding="utf-8")
+    _git(repo, "commit", "-qam", "lane commit")
+    head = _git(repo, "rev-parse", "HEAD")
+    (repo / "b.txt").write_text("staged\n", encoding="utf-8")
+    _git(repo, "add", "b.txt")
+    return repo, integration, head
+
+
+def test_an_index_candidate_binds_waivers_to_the_integration_base(
+    tmp_path: Path,
 ) -> None:
-    """End to end: a DELETE_CANDIDATE new test waived in policy is a WAIVED line."""
+    """The staged diff is still taken against HEAD; the waiver base is the merge base."""
+
+    repo, integration, head = _branched_repo(tmp_path)
+    assert integration != head
+    candidate = resolve_candidate(repo, kind="index")
+    assert candidate.base_commit_oid == head
+    assert candidate.integration_base_oid == integration
+    assert candidate.waiver_base == integration
+    assert "master" in candidate.integration_base_detail
+    assert [change.path for change in candidate.changes] == ["b.txt"]
+
+
+def test_an_integration_base_that_is_not_an_ancestor_is_refused(
+    tmp_path: Path,
+) -> None:
+    """A base off this history binds nothing: no waiver base, so every waiver is inert."""
+
+    repo, _integration, _head = _branched_repo(tmp_path)
+    _git(repo, "checkout", "-q", "--orphan", "unrelated")
+    (repo / "c.txt").write_text("elsewhere\n", encoding="utf-8")
+    _git(repo, "add", "c.txt")
+    _git(repo, "commit", "-qm", "unrelated root")
+    unrelated = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "lane")
+    candidate = resolve_candidate(repo, kind="index", base_ref=unrelated)
+    assert candidate.base_commit_oid == unrelated
+    assert candidate.integration_base_oid is None
+    assert "is not an ancestor of" in candidate.integration_base_detail
+    assert candidate.waiver_base is None
+    _still_critical(
+        apply_value_waivers(
+            [_finding()],
+            (_waiver(integration_base=unrelated),),
+            base=candidate.waiver_base,
+            today=TODAY,
+        )
+    )
+
+
+def _gate_context_with_receipt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[ReviewContext, str]:
+    """A gate context whose one new test is classified DELETE_CANDIDATE."""
 
     context = _gate_context(
         monkeypatch, tmp_path, inventory={PROBE_PATH: ["test_probe_legacy"]}
@@ -168,13 +238,85 @@ def test_the_gate_applies_an_active_policy_waiver(
     monkeypatch.setattr(
         "conductor.mutation_testing.verify_evidence", lambda *a, **k: payload
     )
+    return context, nodeid
+
+
+def _with_waiver(
+    context: ReviewContext, waiver: ValueWaiverPolicy, **candidate_fields: object
+) -> ReviewContext:
+    return replace(
+        context,
+        candidate=replace(context.candidate, **candidate_fields),
+        policy=replace(context.policy, value_waivers=(waiver,)),
+    )
+
+
+def test_the_gate_binds_waivers_to_the_integration_base_not_head(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A waiver pinned to the integration base applies while HEAD has moved past it."""
+
+    context, nodeid = _gate_context_with_receipt(monkeypatch, tmp_path)
+    integration = "f" * 40
+    assert context.candidate.base_commit_oid != integration
+    waiver = _waiver(
+        integration_base=integration,
+        nodeids=(nodeid,),
+        expires=date.today() + timedelta(days=30),
+    )
+    result = check_mutation_evidence(
+        _with_waiver(
+            context,
+            waiver,
+            integration_base_oid=integration,
+            integration_base_detail="merge base with origin/master",
+        )
+    )
+    assert [f.rule_id for f in result.findings] == ["new-test-value-waived"]
+    assert result.status is CheckStatus.PASSED
+    assert result.metrics["value_waiver_base"] == {
+        "commit": integration,
+        "resolved_by": "merge base with origin/master",
+    }
+
+
+def test_an_expired_waiver_is_inert_at_the_integration_base(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Rebinding the base does not loosen the expiry: an expired waiver still blocks."""
+
+    context, nodeid = _gate_context_with_receipt(monkeypatch, tmp_path)
+    integration = "f" * 40
+    waiver = _waiver(
+        integration_base=integration,
+        nodeids=(nodeid,),
+        expires=date.today() - timedelta(days=1),
+    )
+    result = check_mutation_evidence(
+        _with_waiver(
+            context,
+            waiver,
+            integration_base_oid=integration,
+            integration_base_detail="merge base with origin/master",
+        )
+    )
+    assert [f.rule_id for f in result.findings] == ["new-test-value-not-admitted"]
+    assert result.status is CheckStatus.FAILED
+    assert result.metrics["value_waiver_states"][0]["active"] is False
+
+
+def test_the_gate_applies_an_active_policy_waiver(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """End to end: a DELETE_CANDIDATE new test waived in policy is a WAIVED line."""
+
+    context, nodeid = _gate_context_with_receipt(monkeypatch, tmp_path)
     waiver = _waiver(
         integration_base=context.candidate.base_commit_oid,
         nodeids=(nodeid,),
         expires=date.today() + timedelta(days=30),
     )
-    context = replace(context, policy=replace(context.policy, value_waivers=(waiver,)))
-    result = check_mutation_evidence(context)
+    result = check_mutation_evidence(_with_waiver(context, waiver))
     assert [f.rule_id for f in result.findings] == ["new-test-value-waived"]
     assert result.status is CheckStatus.PASSED
     assert result.metrics["value_waiver_states"] == [

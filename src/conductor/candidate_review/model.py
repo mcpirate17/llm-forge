@@ -71,6 +71,31 @@ class Candidate:
     commit_oid: str | None
     target_ref: str | None
     changes: tuple[Change, ...]
+    # The commit on the integration line this candidate descends from -- the base a
+    # `range` review would compute in CI. For an `index` candidate `base_commit_oid`
+    # is HEAD (the tree the staged diff is taken against), which is *not* that base
+    # once the branch carries a commit, so base-bound `[[value_waivers]]` and
+    # `[[mutation_waivers]]` evaluated against HEAD were inert at commit time while
+    # the same gate honoured them in CI. `git_source.resolve_candidate` fills this in;
+    # None means it could not be resolved and `integration_base_detail` says why.
+    integration_base_oid: str | None = None
+    integration_base_detail: str = ""
+
+    @property
+    def waiver_base(self) -> str | None:
+        """The commit base-bound waivers are evaluated against.
+
+        Fail-closed: once resolution has run (`integration_base_detail` is set) and
+        failed, there is no integration base, so every base-bound waiver stays inert
+        and says so -- never a fall back to HEAD, which would honour a waiver pinned
+        to a base this candidate does not descend from. A candidate nobody resolved
+        (hand-built, or a kind that has no separate integration base) keeps using its
+        review base.
+        """
+
+        if self.integration_base_oid is not None:
+            return self.integration_base_oid
+        return None if self.integration_base_detail else self.base_commit_oid
 
 
 @dataclass(slots=True)

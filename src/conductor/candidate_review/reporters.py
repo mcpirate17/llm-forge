@@ -6,19 +6,29 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from conductor.candidate_review.model import ReviewReceipt, write_json_atomic
+from conductor.candidate_review.value_waivers import WAIVED_RULE
 
 
 def human_summary(receipt: ReviewReceipt) -> str:
+    # WAIVED lines are printed in full and ahead of everything else: they are the only
+    # reason a blocking finding did not block, and a developer who cannot see them
+    # cannot tell a waived gate from an unarmed one.
+    waived = [
+        finding for finding in receipt.findings if finding["rule_id"] == WAIVED_RULE
+    ]
     blocking = [
         finding
         for finding in receipt.findings
         if finding["severity"] in {"critical", "high"}
         and not finding.get("exception_id")
+        and finding not in waived
     ]
     advisory = [
         finding
         for finding in receipt.findings
-        if finding not in blocking and not finding.get("exception_id")
+        if finding not in blocking
+        and finding not in waived
+        and not finding.get("exception_id")
     ]
     cached = receipt.cache.get("hits", 0)
     duration = receipt.timings.get("duration_ms", 0)
@@ -27,9 +37,11 @@ def human_summary(receipt: ReviewReceipt) -> str:
             f"candidate-review {receipt.decision.upper()} | {receipt.surface}/{receipt.profile} | "
             f"tree {str(receipt.candidate['tree_oid'])[:12]} | {duration} ms | {cached} cache hits"
         ),
-        f"blocking={len(blocking)} advisory={len(advisory)} receipt={receipt.receipt_id}",
+        f"blocking={len(blocking)} advisory={len(advisory)} waived={len(waived)} "
+        f"receipt={receipt.receipt_id}",
     ]
-    for finding in [*blocking, *advisory][:20]:
+    shown = [*waived, *blocking, *advisory][: 20 + len(waived)]
+    for finding in shown:
         location = finding.get("path") or "governance"
         if finding.get("line"):
             location = f"{location}:{finding['line']}"
@@ -42,9 +54,9 @@ def human_summary(receipt: ReviewReceipt) -> str:
             f"- {str(finding['severity']).upper()} {finding['check_id']}/{finding['rule_id']} "
             f"{location}: {finding['message']}{exception}"
         )
-    if len(receipt.findings) > 20:
+    if len(receipt.findings) > len(shown):
         lines.append(
-            f"- ... {len(receipt.findings) - 20} more findings in the JSON receipt"
+            f"- ... {len(receipt.findings) - len(shown)} more findings in the JSON receipt"
         )
     return "\n".join(lines) + "\n"
 

@@ -24,6 +24,9 @@ class GitSourceError(RuntimeError):
 
 MAX_MATERIALIZED_BLOB_BYTES = 64 * 1024 * 1024
 MAX_MATERIALIZED_TREE_BYTES = 2 * 1024 * 1024 * 1024
+# The integration line, in resolution order; CONDUCTOR_INTEGRATION_REF overrides it.
+DEFAULT_INTEGRATION_REFS: tuple[str, ...] = ("origin/master", "master")
+INTEGRATION_REF_ENV = "CONDUCTOR_INTEGRATION_REF"
 
 
 def run_git(
@@ -114,6 +117,52 @@ def _head_or_empty(repo: Path) -> tuple[str | None, str]:
     return commit_oid, commit_tree(repo, commit_oid)
 
 
+def integration_refs() -> tuple[str, ...]:
+    """Refs that name the integration line, most specific first."""
+
+    override = os.environ.get(INTEGRATION_REF_ENV, "").strip()
+    return (override,) if override else DEFAULT_INTEGRATION_REFS
+
+
+def resolve_integration_base(
+    repo: Path, *, tip: str, refs: Sequence[str] | None = None
+) -> tuple[str | None, str]:
+    """Merge base between `tip` and the integration line, with why when there is none.
+
+    This is the base a CI `range` review computes for the same branch, so a waiver
+    pinned to it is honoured identically by both. Resolution is fail-closed: an
+    unresolvable integration line yields None and a reason, never a guess, and the
+    caller falls back to the review base (which only makes waivers inert, never
+    active). The result is verified to be an ancestor of `tip` -- a base that is not
+    one describes a different history, and binding a waiver to it would carry an
+    exemption across a rebase, which is exactly what the pinning exists to prevent.
+    """
+
+    tried: list[str] = []
+    for ref in refs if refs is not None else integration_refs():
+        resolved = run_git(
+            repo, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], check=False
+        )
+        if resolved.returncode:
+            tried.append(ref)
+            continue
+        merge = run_git(repo, ["merge-base", ref, tip], check=False)
+        oid = merge.stdout.decode().strip()
+        if merge.returncode or not oid:
+            return None, f"no merge base between {ref} and {tip[:12]}"
+        return _verify_ancestor(repo, oid, tip=tip, detail=f"merge base with {ref}")
+    return None, f"no integration ref resolved (tried {', '.join(tried) or 'none'})"
+
+
+def _verify_ancestor(
+    repo: Path, oid: str, *, tip: str, detail: str
+) -> tuple[str | None, str]:
+    ancestor = run_git(repo, ["merge-base", "--is-ancestor", oid, tip], check=False)
+    if ancestor.returncode:
+        return None, f"{oid[:12]} ({detail}) is not an ancestor of {tip[:12]}"
+    return oid, detail
+
+
 def _parents(repo: Path, commit_oid: str) -> list[str]:
     raw = (
         run_git(repo, ["show", "-s", "--format=%P", commit_oid]).stdout.decode().strip()
@@ -172,12 +221,28 @@ def resolve_candidate(
 ) -> Candidate:
     repo = repository_root(repo)
     if kind == "index":
+        head_commit, head_tree = _head_or_empty(repo)
         if base_ref is not None:
             base_commit = resolve_commit(repo, base_ref)
             base_tree = commit_tree(repo, base_commit)
         else:
-            base_commit, base_tree = _head_or_empty(repo)
+            base_commit, base_tree = head_commit, head_tree
         tree = run_git(repo, ["write-tree"]).stdout.decode().strip()
+        # The staged diff is taken against `base_commit` (HEAD by default); waivers
+        # bind to the integration line instead, so both bases are carried.
+        if head_commit is None:
+            integration_oid, integration_detail = None, "HEAD names no commit"
+        elif base_ref is not None:
+            integration_oid, integration_detail = _verify_ancestor(
+                repo,
+                str(base_commit),
+                tip=head_commit,
+                detail=f"explicit base ref {base_ref}",
+            )
+        else:
+            integration_oid, integration_detail = resolve_integration_base(
+                repo, tip=head_commit
+            )
         return Candidate(
             kind=kind,
             tree_oid=tree,
@@ -186,6 +251,8 @@ def resolve_candidate(
             commit_oid=None,
             target_ref=None,
             changes=_diff_changes(repo, base_tree, tree),
+            integration_base_oid=integration_oid,
+            integration_base_detail=integration_detail,
         )
     target = resolve_commit(repo, target_ref)
     target_tree = commit_tree(repo, target)
@@ -221,6 +288,8 @@ def resolve_candidate(
         commit_oid=target,
         target_ref=target_ref,
         changes=_diff_changes(repo, base_tree, target_tree),
+        integration_base_oid=base_commit,
+        integration_base_detail=f"{kind} candidate base",
     )
 
 

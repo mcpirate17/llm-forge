@@ -371,7 +371,7 @@ def _waiver_states(ctx: ReviewContext) -> list[dict[str, object]]:
     """Evaluate each configured waiver once into an auditable activation state."""
 
     states: list[dict[str, object]] = []
-    base = ctx.candidate.base_commit_oid
+    base = ctx.candidate.waiver_base
     for waiver in ctx.policy.mutation_waivers:
         state: dict[str, object] = {
             "id": waiver.waiver_id,
@@ -920,10 +920,16 @@ def _mutation_evidence_result(
     """Apply the policy's value waivers; a result made only of WAIVED lines passes."""
 
     today = date.today()
-    base = ctx.candidate.base_commit_oid
+    # Waivers bind to the integration base, never to HEAD: an index candidate reviewed
+    # at pre-commit must honour exactly the waivers CI honours for the same branch.
+    base = ctx.candidate.waiver_base
     findings = apply_value_waivers(
         findings, ctx.policy.value_waivers, base=base, today=today
     )
+    metrics["value_waiver_base"] = {
+        "commit": base,
+        "resolved_by": ctx.candidate.integration_base_detail,
+    }
     metrics["value_waiver_states"] = value_waiver_states(
         ctx.policy.value_waivers, base=base, today=today
     )
