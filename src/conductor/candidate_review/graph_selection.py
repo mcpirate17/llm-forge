@@ -7,6 +7,7 @@ store read-only and fails closed when its head does not match the candidate.
 
 from __future__ import annotations
 
+import ast
 import sqlite3
 from pathlib import Path, PurePosixPath
 from typing import Sequence
@@ -80,8 +81,105 @@ def _graph_test_paths(
         connection.close()
 
 
+def _public_names(module: Path) -> set[str]:
+    """Public top-level names of ``module``: its ``__all__`` when present, else
+    every top-level binding not prefixed with an underscore."""
+    try:
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, UnicodeDecodeError):
+        return set()
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets):
+            continue
+        if isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
+            return {
+                element.value
+                for element in node.value.elts
+                if isinstance(element, ast.Constant) and isinstance(element.value, str)
+            }
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.add(node.target.id)
+    return {name for name in names if not name.startswith("_")}
+
+
+def _reexport_surfaces(
+    ctx: ReviewContext, source_paths: Sequence[str]
+) -> dict[str, set[str]]:
+    """Map package module string -> names its ``__init__`` re-exports from a changed file.
+
+    The code-review graph does not resolve ``from .module import name`` inside a
+    package ``__init__`` (those files carry no outbound edge), so a test importing
+    through the re-export yields no edge into the changed file and the
+    ``test_<stem>.py`` convention cannot match either. Without this the adapters
+    under ``component_fab/*/adaptation.py`` select zero tests despite being
+    covered by five existing ones.
+    """
+    surfaces: dict[str, set[str]] = {}
+    for source in source_paths:
+        path = PurePosixPath(source)
+        if path.suffix != ".py" or path.name == "__init__.py":
+            continue
+        init = ctx.snapshot / path.parent / "__init__.py"
+        if not init.is_file():
+            continue
+        try:
+            tree = ast.parse(init.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            continue
+        names: set[str] = set()
+        for node in ast.walk(tree):
+            # ast.walk descends into Try/If bodies, so conditional and
+            # try/except re-exports are covered.
+            if (
+                not isinstance(node, ast.ImportFrom)
+                or node.level != 1
+                or node.module != path.stem
+            ):
+                continue
+            for alias in node.names:
+                if alias.name == "*":
+                    # `from .module import *` names nothing here; the re-exported
+                    # surface is the changed module's own public API. Missing it
+                    # would under-select, which reads as a pass.
+                    names |= _public_names(ctx.snapshot / source)
+                else:
+                    names.add(alias.asname or alias.name)
+        if names:
+            surfaces.setdefault(path.parent.as_posix().replace("/", "."), set()).update(
+                names
+            )
+    return surfaces
+
+
+def _imports_reexport(text: str, surfaces: dict[str, set[str]]) -> bool:
+    """True when ``text`` imports a re-exported name from its owning package."""
+    if not surfaces:
+        return False
+    try:
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError):
+        return False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or node.level or not node.module:
+            continue
+        names = surfaces.get(node.module)
+        if names and any((alias.asname or alias.name) in names for alias in node.names):
+            return True
+    return False
+
+
 def _convention_tests(ctx: ReviewContext, source_paths: Sequence[str]) -> set[str]:
     names = {f"test_{PurePosixPath(path).stem}.py" for path in source_paths}
+    modules = [path.removesuffix(".py").replace("/", ".") for path in source_paths]
+    surfaces = _reexport_surfaces(ctx, source_paths)
     tests: set[str] = set()
     for base in (
         "conductor",
@@ -102,9 +200,8 @@ def _convention_tests(ctx: ReviewContext, source_paths: Sequence[str]) -> set[st
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 continue
-            for source in source_paths:
-                module = source.removesuffix(".py").replace("/", ".")
-                if module in text:
-                    tests.add(rel)
-                    break
+            if any(module in text for module in modules) or _imports_reexport(
+                text, surfaces
+            ):
+                tests.add(rel)
     return tests
