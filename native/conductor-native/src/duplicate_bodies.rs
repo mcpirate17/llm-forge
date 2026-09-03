@@ -4,12 +4,14 @@
 //! finding wording remain in Python. This module owns the repeated parse and
 //! location-free structural canonicalization shared by the two policy callers.
 
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyAny, PyBool, PyDict, PyInt, PyList};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::{ComparableExpr, ComparableParameters, ComparableStmt};
 use ruff_python_ast::visitor::source_order::{walk_stmt, SourceOrderVisitor};
@@ -66,6 +68,179 @@ struct RawDuplicateRow {
     second_path: String,
     fragment: String,
     lines: Value,
+}
+
+type DuplicateBaselineComparison = (usize, usize, Vec<String>, Vec<String>, Vec<String>);
+
+fn python_object_repr(value: &Bound<'_, PyAny>) -> PyResult<String> {
+    value.repr()?.extract::<String>()
+}
+
+fn sorted_dict_keys_repr(value: &Bound<'_, PyDict>) -> PyResult<String> {
+    let keys = value.keys();
+    keys.call_method0("sort")?;
+    keys.repr()?.extract::<String>()
+}
+
+fn validate_baseline_payload(payload: &Bound<'_, PyAny>, path: &str) -> PyResult<HashSet<String>> {
+    let baseline = payload
+        .cast::<PyDict>()
+        .map_err(|_| PyValueError::new_err(format!("baseline root must be an object: {path}")))?;
+    let expected_keys = ["_comment", "count", "entries"];
+    let has_exact_keys = baseline.len() == expected_keys.len()
+        && expected_keys
+            .iter()
+            .all(|key| baseline.contains(*key).unwrap_or(false));
+    if !has_exact_keys {
+        return Err(PyValueError::new_err(format!(
+            "baseline keys are invalid ({path}): expected ['_comment', 'count', 'entries'], got {}",
+            sorted_dict_keys_repr(baseline)?
+        )));
+    }
+
+    let count = baseline
+        .get_item("count")?
+        .ok_or_else(|| PyValueError::new_err("baseline count disappeared during validation"))?;
+    let entries_value = baseline
+        .get_item("entries")?
+        .ok_or_else(|| PyValueError::new_err("baseline entries disappeared during validation"))?;
+    if count.is_instance_of::<PyBool>() || !count.is_instance_of::<PyInt>() || count.lt(0)? {
+        return Err(PyValueError::new_err(format!(
+            "baseline count must be a non-negative integer ({path}); got {}",
+            python_object_repr(&count)?
+        )));
+    }
+    let entries = entries_value.cast::<PyDict>().map_err(|_| {
+        PyValueError::new_err(format!("baseline entries must be an object: {path}"))
+    })?;
+    if !count.eq(entries.len())? {
+        return Err(PyValueError::new_err(format!(
+            "baseline count mismatch ({path}): declared {}, found {}",
+            python_object_repr(&count)?,
+            entries.len()
+        )));
+    }
+
+    let mut validated = HashSet::with_capacity(entries.len());
+    for (key_value, entry_value) in entries.iter() {
+        let key_repr = python_object_repr(&key_value)?;
+        let key = key_value.extract::<String>().map_err(|_| {
+            PyValueError::new_err(format!(
+                "baseline contains an invalid entry key: {}",
+                key_repr
+            ))
+        })?;
+        if key.is_empty() {
+            return Err(PyValueError::new_err(format!(
+                "baseline contains an invalid entry key: {key_repr}"
+            )));
+        }
+        let entry = entry_value.cast::<PyDict>().map_err(|_| {
+            PyValueError::new_err(format!(
+                "baseline entry {key_repr} must contain exactly 'files' and 'lines'"
+            ))
+        })?;
+        if entry.len() != 2 || !entry.contains("files")? || !entry.contains("lines")? {
+            return Err(PyValueError::new_err(format!(
+                "baseline entry {key_repr} must contain exactly 'files' and 'lines'"
+            )));
+        }
+
+        let files_value = entry
+            .get_item("files")?
+            .ok_or_else(|| PyValueError::new_err("baseline files disappeared during validation"))?;
+        let files = files_value.cast::<PyList>().ok();
+        let valid_files = if let Some(files) = files {
+            if files.len() != 2 {
+                None
+            } else {
+                let first = files.get_item(0)?.extract::<String>().ok();
+                let second = files.get_item(1)?.extract::<String>().ok();
+                match (first, second) {
+                    (Some(first), Some(second))
+                        if !first.is_empty() && !second.is_empty() && first <= second =>
+                    {
+                        Some((first, second))
+                    }
+                    _ => None,
+                }
+            }
+        } else {
+            None
+        };
+        let Some((first_file, second_file)) = valid_files else {
+            return Err(PyValueError::new_err(format!(
+                "baseline entry {key_repr} has invalid sorted file-pair metadata"
+            )));
+        };
+
+        let lines = entry
+            .get_item("lines")?
+            .ok_or_else(|| PyValueError::new_err("baseline lines disappeared during validation"))?;
+        if lines.is_instance_of::<PyBool>() || !lines.is_instance_of::<PyInt>() || lines.le(0)? {
+            return Err(PyValueError::new_err(format!(
+                "baseline entry {key_repr} has invalid line count {}",
+                python_object_repr(&lines)?
+            )));
+        }
+
+        let valid_key = key.rsplit_once("::").is_some_and(|(pair, digest)| {
+            pair == format!("{first_file}::{second_file}")
+                && digest.len() == 16
+                && digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        });
+        if !valid_key {
+            return Err(PyValueError::new_err(format!(
+                "baseline entry key does not match its file pair/hash schema: {key_repr}"
+            )));
+        }
+        validated.insert(key);
+    }
+    Ok(validated)
+}
+
+#[pyfunction]
+fn compare_duplicate_baseline_native(
+    payload: &Bound<'_, PyAny>,
+    current_entries: Vec<(String, String, String)>,
+    changed_files: Option<Vec<String>>,
+    path: &str,
+) -> PyResult<DuplicateBaselineComparison> {
+    let baseline = validate_baseline_payload(payload, path)?;
+    let current = current_entries
+        .into_iter()
+        .map(|(key, first_file, second_file)| (key, (first_file, second_file)))
+        .collect::<HashMap<_, _>>();
+    let mut new_keys = current
+        .keys()
+        .filter(|key| !baseline.contains(*key))
+        .cloned()
+        .collect::<Vec<_>>();
+    new_keys.sort();
+
+    let Some(changed_files) = changed_files else {
+        return Ok((
+            current.len(),
+            baseline.len(),
+            new_keys,
+            Vec::new(),
+            Vec::new(),
+        ));
+    };
+    let changed_files = changed_files.into_iter().collect::<HashSet<_>>();
+    let (caused_keys, inherited_keys) = new_keys.iter().cloned().partition(|key| {
+        let (first_file, second_file) = &current[key];
+        changed_files.contains(first_file) || changed_files.contains(second_file)
+    });
+    Ok((
+        current.len(),
+        baseline.len(),
+        new_keys,
+        caused_keys,
+        inherited_keys,
+    ))
 }
 
 fn positive_integer(value: &Value) -> bool {
@@ -430,6 +605,7 @@ fn duplicate_body_fingerprints_native(
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(compare_duplicate_baseline_native, module)?)?;
     module.add_function(wrap_pyfunction!(
         duplicate_body_fingerprints_native,
         module

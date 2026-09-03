@@ -336,7 +336,7 @@ def _display_path(path: Path, *, root: Path = ROOT) -> str:
         return str(path)
 
 
-def _baseline_entries(path: Path) -> dict[str, dict[str, Any]]:
+def _baseline_payload(path: Path) -> Any:
     if not path.is_file():
         raise DuplicateAuditError(f"required baseline report is missing: {path}")
     try:
@@ -345,64 +345,7 @@ def _baseline_entries(path: Path) -> dict[str, dict[str, Any]]:
         raise DuplicateAuditError(
             f"baseline is not valid JSON ({path}): {exc}"
         ) from exc
-    if not isinstance(payload, dict):
-        raise DuplicateAuditError(f"baseline root must be an object: {path}")
-    expected_keys = {"_comment", "count", "entries"}
-    actual_keys = set(payload)
-    if actual_keys != expected_keys:
-        raise DuplicateAuditError(
-            f"baseline keys are invalid ({path}): expected {sorted(expected_keys)}, "
-            f"got {sorted(actual_keys)}"
-        )
-    count = payload["count"]
-    entries = payload["entries"]
-    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
-        raise DuplicateAuditError(
-            f"baseline count must be a non-negative integer ({path}); got {count!r}"
-        )
-    if not isinstance(entries, dict):
-        raise DuplicateAuditError(f"baseline entries must be an object: {path}")
-    if count != len(entries):
-        raise DuplicateAuditError(
-            f"baseline count mismatch ({path}): declared {count}, found {len(entries)}"
-        )
-    validated: dict[str, dict[str, Any]] = {}
-    for key, entry in entries.items():
-        if not isinstance(key, str) or not key:
-            raise DuplicateAuditError(
-                f"baseline contains an invalid entry key: {key!r}"
-            )
-        if not isinstance(entry, dict) or set(entry) != {"files", "lines"}:
-            raise DuplicateAuditError(
-                f"baseline entry {key!r} must contain exactly 'files' and 'lines'"
-            )
-        files = entry["files"]
-        lines = entry["lines"]
-        if (
-            not isinstance(files, list)
-            or len(files) != 2
-            or not all(isinstance(item, str) and item for item in files)
-            or files != sorted(files)
-        ):
-            raise DuplicateAuditError(
-                f"baseline entry {key!r} has invalid sorted file-pair metadata"
-            )
-        if isinstance(lines, bool) or not isinstance(lines, int) or lines <= 0:
-            raise DuplicateAuditError(
-                f"baseline entry {key!r} has invalid line count {lines!r}"
-            )
-        pair, separator, digest = key.rpartition("::")
-        if (
-            not separator
-            or pair != "::".join(files)
-            or len(digest) != 16
-            or any(character not in "0123456789abcdef" for character in digest)
-        ):
-            raise DuplicateAuditError(
-                f"baseline entry key does not match its file pair/hash schema: {key!r}"
-            )
-        validated[key] = entry
-    return validated
+    return payload
 
 
 def _print_dup_keys(current: dict[str, dict], keys: list[str]) -> None:
@@ -416,11 +359,6 @@ def _print_dup_keys(current: dict[str, dict], keys: list[str]) -> None:
         print(f"  ... and {len(keys) - 20} more")
 
 
-def _causes_dup_pair(entry: dict, changed_files: frozenset[str]) -> bool:
-    """A duplicate *pair* is caused by the candidate if either side changed."""
-    return bool(changed_files.intersection((entry["firstFile"], entry["secondFile"])))
-
-
 def _check_against_baseline(
     path: Path,
     entries: list[dict],
@@ -430,15 +368,27 @@ def _check_against_baseline(
     changed_files: frozenset[str] | None = None,
 ) -> int:
     try:
-        baseline = _baseline_entries(path)
-    except DuplicateAuditError as exc:
+        payload = _baseline_payload(path)
+        current = {entry["key"]: entry for entry in entries}
+        from conductor._native import compare_duplicate_baseline_native
+
+        current_count, baseline_count, new_keys, caused_keys, inherited_keys = (
+            compare_duplicate_baseline_native(
+                payload,
+                [
+                    (key, entry["firstFile"], entry["secondFile"])
+                    for key, entry in current.items()
+                ],
+                None if changed_files is None else list(changed_files),
+                str(path),
+            )
+        )
+    except (DuplicateAuditError, ValueError) as exc:
         print(f"ERROR: {tool_name}: {exc}", file=sys.stderr)
         return AUDIT_ERROR_EXIT_CODE
-    current = {entry["key"]: entry for entry in entries}
-    new_keys = sorted(set(current) - set(baseline))
     print(
-        f"{tool_name}: {len(current)} duplicate pair(s) found, "
-        f"{len(baseline)} in baseline, {len(new_keys)} new."
+        f"{tool_name}: {current_count} duplicate pair(s) found, "
+        f"{baseline_count} in baseline, {len(new_keys)} new."
     )
     if not new_keys:
         return 0
@@ -453,11 +403,6 @@ def _check_against_baseline(
             f"with --save-baseline to record it in {_display_path(path, root=root)}."
         )
         return 1
-
-    caused_keys = [
-        key for key in new_keys if _causes_dup_pair(current[key], changed_files)
-    ]
-    inherited_keys = [key for key in new_keys if key not in set(caused_keys)]
 
     if inherited_keys:
         print(
