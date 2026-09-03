@@ -9,18 +9,20 @@ messages are never eligible.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
 import sqlite3
 import sys
-from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast
 
-from conductor.agent_a2a import A2aError, DEFAULT_STATE_DIR
+from conductor._native import (
+    a2a_retention_evidence_native,
+    a2a_retention_manifests_native,
+)
+from conductor.agent_a2a import DEFAULT_STATE_DIR, A2aError
 
 DEFAULT_GRACE: Final = timedelta(hours=48)
 MIN_GRACE: Final = timedelta(hours=1)
@@ -67,20 +69,12 @@ class _RetentionBatch:
     candidate_ids: frozenset[str]
     evidence: _EvidenceSnapshot
     rows: tuple[sqlite3.Row, ...]
-    manifests: tuple[dict[str, Any], ...]
-
-
-def _canonical_json(value: Any) -> str:
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-
-
-def _sha256(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
+    manifest_json: tuple[str, ...]
+    manifest_sha256: tuple[str, ...]
+    event_sha256: tuple[str, ...]
+    original_content_bytes: int
+    tombstone_bytes: int
+    logical_bytes_removed: int
 
 
 def _evidence_snapshot(
@@ -100,10 +94,8 @@ def _evidence_snapshot(
             f"evidence scan found {len(matches)} files; maximum is {MAX_EVIDENCE_FILES}"
         )
 
-    protected: set[str] = set()
-    provenance: list[dict[str, Any]] = []
+    files: list[tuple[str, bytes]] = []
     total_bytes = 0
-    total_nodes = 0
     for path in matches:
         try:
             resolved = path.resolve(strict=True)
@@ -125,49 +117,24 @@ def _evidence_snapshot(
             raise A2aError(
                 f"evidence scan exceeds {MAX_EVIDENCE_TOTAL_BYTES} total bytes"
             )
-        try:
-            payload = json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise A2aError(f"evidence file is malformed JSON: {path}") from exc
-
-        stack = [payload]
-        while stack:
-            node = stack.pop()
-            total_nodes += 1
-            if total_nodes > MAX_EVIDENCE_NODES:
-                raise A2aError(f"evidence scan exceeds {MAX_EVIDENCE_NODES} JSON nodes")
-            if isinstance(node, Mapping):
-                for key, value in node.items():
-                    if isinstance(key, str) and key in candidate_ids:
-                        protected.add(key)
-                    stack.append(value)
-            elif isinstance(node, list):
-                stack.extend(node)
-            elif isinstance(node, str) and node in candidate_ids:
-                protected.add(node)
-        provenance.append(
-            {
-                "path": relative,
-                "bytes": len(raw),
-                "sha256": _sha256(raw),
-            }
+        files.append((relative, raw))
+    try:
+        paths, protected_message_ids, snapshot_sha256 = a2a_retention_evidence_native(
+            sorted(candidate_ids), files
         )
-    snapshot_payload = {
-        "policy": "bounded-a2a-gate-receipt-evidence-v1",
-        "patterns": list(EVIDENCE_PATTERNS),
-        "files": provenance,
-    }
+    except ValueError as exc:
+        raise A2aError(str(exc)) from exc
     return _EvidenceSnapshot(
-        paths=tuple(item["path"] for item in provenance),
-        protected_message_ids=frozenset(protected),
-        sha256=_sha256(_canonical_json(snapshot_payload).encode("utf-8")),
+        paths=tuple(paths),
+        protected_message_ids=frozenset(protected_message_ids),
+        sha256=str(snapshot_sha256),
     )
 
 
 def _aware_utc(value: datetime, *, field: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise A2aError(f"{field} must be timezone-aware")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _parse_timestamp(value: str, *, field: str) -> datetime:
@@ -292,78 +259,53 @@ def _candidate_rows(
     )
 
 
-def _structured_projection(data_json: str | None) -> dict[str, Any] | None:
-    if data_json is None:
-        return None
+_RETENTION_ROW_FIELDS: Final[tuple[str, ...]] = (
+    "message_id",
+    "direction",
+    "sender",
+    "recipient",
+    "body",
+    "data_json",
+    "created_at",
+    "received_at",
+    "read_at",
+    "resolved_at",
+    "superseded_at",
+    "thread_id",
+    "summary",
+    "protocol_status",
+    "requires_response",
+    "retention_class",
+    "body_sha256",
+    "body_bytes",
+    "data_sha256",
+    "data_bytes",
+)
+_NativeManifest = tuple[str, str, str, str, int, int]
+_NativeManifestBatch = tuple[list[_NativeManifest], int, int, int]
+
+
+def _retention_row_payload(row: sqlite3.Row) -> dict[str, Any]:
+    payload = {field: row[field] for field in _RETENTION_ROW_FIELDS}
+    payload["body"] = str(payload["body"])
+    if payload["data_json"] is not None:
+        payload["data_json"] = str(payload["data_json"])
+    payload["requires_response"] = bool(payload["requires_response"])
+    return payload
+
+
+def _native_manifests(
+    rows: tuple[sqlite3.Row, ...], *, compacted_at: str
+) -> _NativeManifestBatch:
     try:
-        value = json.loads(data_json)
-    except json.JSONDecodeError as exc:
-        raise A2aError("eligible protocol message has malformed data_json") from exc
-    if not isinstance(value, dict):
-        raise A2aError("eligible protocol message data_json is not an object")
-    fields = (
-        "kind",
-        "thread_id",
-        "summary",
-        "status",
-        "requires_response",
-        "supersedes",
-        "gate",
-        "fingerprint",
-        "artifact_paths",
-    )
-    return {field: value[field] for field in fields if field in value}
-
-
-def _manifest(row: sqlite3.Row, *, compacted_at: str) -> dict[str, Any]:
-    body = str(row["body"])
-    data_json = row["data_json"]
-    body_bytes = body.encode("utf-8")
-    data_bytes = str(data_json).encode("utf-8") if data_json is not None else b""
-    body_sha256 = _sha256(body_bytes)
-    data_sha256 = _sha256(data_bytes) if data_json is not None else None
-    if (
-        body_sha256 != row["body_sha256"]
-        or len(body_bytes) != row["body_bytes"]
-        or data_sha256 != row["data_sha256"]
-        or len(data_bytes) != row["data_bytes"]
-    ):
-        raise A2aError(
-            f"message {row['message_id']!r} content drifted from lifecycle metadata"
+        return cast(
+            _NativeManifestBatch,
+            a2a_retention_manifests_native(
+                [_retention_row_payload(row) for row in rows], compacted_at
+            ),
         )
-    manifest: dict[str, Any] = {
-        "schema_version": 1,
-        "policy_version": POLICY_VERSION,
-        "authority": "deterministic-a2a-retention",
-        "message_id": row["message_id"],
-        "direction": row["direction"],
-        "sender": row["sender"],
-        "recipient": row["recipient"],
-        "created_at": row["created_at"],
-        "received_at": row["received_at"],
-        "read_at": row["read_at"],
-        "resolved_at": row["resolved_at"],
-        "superseded_at": row["superseded_at"],
-        "thread_id": row["thread_id"],
-        "summary": row["summary"],
-        "protocol_status": row["protocol_status"],
-        "requires_response": bool(row["requires_response"]),
-        "retention_class": row["retention_class"],
-        "structured": _structured_projection(data_json),
-        "body_sha256": body_sha256,
-        "body_bytes": len(body_bytes),
-        "data_sha256": data_sha256,
-        "data_bytes": len(data_bytes),
-        "compacted_at": compacted_at,
-    }
-    manifest["manifest_sha256"] = _sha256(_canonical_json(manifest).encode("utf-8"))
-    return manifest
-
-
-def _event_sha256(*, message_id: str, manifest_sha256: str) -> str:
-    return _sha256(
-        f"{POLICY_VERSION}\0inbound\0{message_id}\0{manifest_sha256}".encode()
-    )
+    except ValueError as exc:
+        raise A2aError(str(exc)) from exc
 
 
 def _validate_candidate_timestamps(
@@ -402,25 +344,33 @@ def _prepare_batch(
         for row in candidate_rows
         if row["message_id"] not in evidence.protected_message_ids
     )[:limit]
-    manifests: list[dict[str, Any]] = []
     for row in rows:
         _validate_candidate_timestamps(row, now_utc=now_utc, grace=grace)
-        manifests.append(_manifest(row, compacted_at=compacted_at))
-    return _RetentionBatch(candidate_ids, evidence, rows, tuple(manifests))
+    items, original_bytes, tombstone_bytes, logical_bytes_removed = _native_manifests(
+        rows, compacted_at=compacted_at
+    )
+    return _RetentionBatch(
+        candidate_ids,
+        evidence,
+        rows,
+        tuple(str(item[1]) for item in items),
+        tuple(str(item[2]) for item in items),
+        tuple(str(item[3]) for item in items),
+        int(original_bytes),
+        int(tombstone_bytes),
+        int(logical_bytes_removed),
+    )
 
 
 def _insert_retention_event(
     connection: sqlite3.Connection,
     *,
     row: sqlite3.Row,
-    manifest: Mapping[str, Any],
+    manifest_json: str,
+    manifest_sha256: str,
+    event_id: str,
     compacted_at: str,
 ) -> None:
-    manifest_json = _canonical_json(manifest)
-    event_id = _event_sha256(
-        message_id=row["message_id"],
-        manifest_sha256=str(manifest["manifest_sha256"]),
-    )
     connection.execute(
         """
         INSERT INTO retention_events (
@@ -433,7 +383,7 @@ def _insert_retention_event(
             row["message_id"],
             POLICY_VERSION,
             manifest_json,
-            manifest["manifest_sha256"],
+            manifest_sha256,
             compacted_at,
         ),
     )
@@ -511,9 +461,20 @@ def _tombstone_state(
 def _apply_batch(
     connection: sqlite3.Connection, batch: _RetentionBatch, *, compacted_at: str
 ) -> int:
-    for row, manifest in zip(batch.rows, batch.manifests, strict=True):
+    for row, manifest_json, manifest_sha256, event_id in zip(
+        batch.rows,
+        batch.manifest_json,
+        batch.manifest_sha256,
+        batch.event_sha256,
+        strict=True,
+    ):
         _insert_retention_event(
-            connection, row=row, manifest=manifest, compacted_at=compacted_at
+            connection,
+            row=row,
+            manifest_json=manifest_json,
+            manifest_sha256=manifest_sha256,
+            event_id=event_id,
+            compacted_at=compacted_at,
         )
         _tombstone_message(connection, row)
         _tombstone_state(connection, row, compacted_at=compacted_at)
@@ -527,32 +488,19 @@ def _retention_result(
     compacted: int,
     batch: _RetentionBatch,
 ) -> RetentionResult:
-    original_bytes = sum(
-        int(manifest["body_bytes"]) + int(manifest["data_bytes"])
-        for manifest in batch.manifests
-    )
-    tombstone_bytes = len(TOMBSTONE_BODY.encode("utf-8")) * len(batch.manifests)
     return RetentionResult(
         store=str(store),
         mode="apply" if apply else "preview",
-        eligible=len(batch.manifests),
+        eligible=len(batch.rows),
         compacted=compacted,
-        original_content_bytes=original_bytes,
-        tombstone_bytes=tombstone_bytes,
-        logical_bytes_removed=max(0, original_bytes - tombstone_bytes),
+        original_content_bytes=batch.original_content_bytes,
+        tombstone_bytes=batch.tombstone_bytes,
+        logical_bytes_removed=batch.logical_bytes_removed,
         evidence_files=len(batch.evidence.paths),
         evidence_protected=len(batch.evidence.protected_message_ids),
         evidence_snapshot_sha256=batch.evidence.sha256,
-        manifest_sha256=[
-            str(manifest["manifest_sha256"]) for manifest in batch.manifests
-        ],
-        event_sha256=[
-            _event_sha256(
-                message_id=row["message_id"],
-                manifest_sha256=str(manifest["manifest_sha256"]),
-            )
-            for row, manifest in zip(batch.rows, batch.manifests, strict=True)
-        ],
+        manifest_sha256=list(batch.manifest_sha256),
+        event_sha256=list(batch.event_sha256),
     )
 
 
@@ -579,7 +527,7 @@ def compact_resolved_messages(
         raise FileNotFoundError(store)
     if apply and (not actor or actor != store.parent.name):
         raise A2aError("retention apply actor must match the exact store name")
-    now_utc = _aware_utc(now or datetime.now(timezone.utc), field="now")
+    now_utc = _aware_utc(now or datetime.now(UTC), field="now")
     try:
         cutoff = (now_utc - grace).isoformat(timespec="milliseconds")
     except OverflowError as exc:

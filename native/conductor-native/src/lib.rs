@@ -5,6 +5,7 @@
 //! the project's research crate (tooling boundary step 2a).
 
 mod a2a_compaction;
+mod a2a_retention;
 mod candidate_structure;
 mod dead_tests;
 mod duplicate_bodies;
@@ -21,6 +22,7 @@ use pyo3::prelude::*;
 #[pymodule]
 fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     a2a_compaction::register(module)?;
+    a2a_retention::register(module)?;
     candidate_structure::register(module)?;
     dead_tests::register(module)?;
     duplicate_bodies::register(module)?;
