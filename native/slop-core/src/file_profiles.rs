@@ -12,6 +12,10 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::python_ast::{
+    ast_children, ast_fields, descendants, is_ast, list_items, string_attr, type_name,
+};
+
 const STRUCTURE_CAP: usize = 6;
 const STATEMENT_CAP: usize = 4;
 const CONTROL_CAP: usize = 8;
@@ -39,50 +43,6 @@ struct LoadedFile {
     source: String,
 }
 
-fn type_name(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    Ok(value.get_type().name()?.to_string())
-}
-
-fn is_ast(value: &Bound<'_, PyAny>) -> PyResult<bool> {
-    value.hasattr("_fields")
-}
-
-fn ast_fields<'py>(node: &Bound<'py, PyAny>) -> PyResult<Vec<(String, Bound<'py, PyAny>)>> {
-    let mut output = Vec::new();
-    for field in node.getattr("_fields")?.try_iter()? {
-        let field: String = field?.extract()?;
-        output.push((field.clone(), node.getattr(field.as_str())?));
-    }
-    Ok(output)
-}
-
-fn ast_children<'py>(node: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    let mut output = Vec::new();
-    for (_, value) in ast_fields(node)? {
-        if is_ast(&value)? {
-            output.push(value);
-        } else if let Ok(items) = value.cast::<PyList>() {
-            for item in items.iter() {
-                if is_ast(&item)? {
-                    output.push(item);
-                }
-            }
-        }
-    }
-    Ok(output)
-}
-
-fn descendants<'py>(root: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    let mut output = Vec::new();
-    let mut stack = vec![root.clone()];
-    while let Some(node) = stack.pop() {
-        let children = ast_children(&node)?;
-        output.push(node);
-        stack.extend(children.into_iter().rev());
-    }
-    Ok(output)
-}
-
 fn py_repr(value: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(value.repr()?.to_string_lossy().into_owned())
 }
@@ -97,14 +57,6 @@ fn omit_none_field(node: &Bound<'_, PyAny>, field: &str, value: &Bound<'_, PyAny
 
 fn repr_string(py: Python<'_>, value: &str) -> PyResult<String> {
     py_repr(&PyString::new(py, value).into_any())
-}
-
-fn list_items<'py>(value: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    Ok(value.cast::<PyList>()?.iter().collect())
-}
-
-fn string_attr(node: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
-    node.getattr(name)?.extract()
 }
 
 fn optional_string_attr(node: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<String>> {

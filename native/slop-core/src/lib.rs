@@ -12,11 +12,13 @@
 
 pub mod audit_inventory;
 pub mod consolidation;
+pub mod detector_scan;
 pub mod engine;
 pub mod file_families;
 pub mod file_profiles;
 pub mod index;
 pub mod ledger;
+pub mod python_ast;
 pub mod repository_scan;
 pub mod rules;
 
@@ -358,6 +360,7 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
         file_profiles::audit_file_family_profiles,
         m
     )?)?;
+    m.add_function(wrap_pyfunction!(detector_scan::audit_detector_scan, m)?)?;
     m.add_function(wrap_pyfunction!(
         consolidation::audit_consolidation_build,
         m
