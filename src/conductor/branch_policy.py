@@ -42,9 +42,24 @@ from conductor.candidate_review.ownership import (
     paths_overlap,
 )
 
-INTEGRATION_BRANCH = "w7-trident-program"
-INTEGRATION_MIRROR = "master"
-INTEGRATION_BRANCHES: tuple[str, ...] = (INTEGRATION_BRANCH, INTEGRATION_MIRROR)
+# The integration line. `w7-trident-program` held this until 2026-08-30, when it was
+# retired and master became the line; the constant was never moved with it. That was
+# not cosmetic: `merged_branches` and `branch_claim_binding` default to this value, and
+# with w7 deleted from every checkout they raised
+#   BranchPolicyError: git merge-base --is-ancestor <branch> w7-trident-program failed:
+#   fatal: Not a valid object name w7-trident-program
+# rather than answering, so the "safe to delete" list could not be computed at all.
+INTEGRATION_BRANCH = "master"
+
+# Retired integration lines. They no longer exist as refs, but a name that was once the
+# integration line must never be classified as a deletable feature branch if it turns up
+# on an old worktree or a stale remote, so `is_integration_branch` still recognises it.
+RETIRED_INTEGRATION_BRANCHES: tuple[str, ...] = ("w7-trident-program",)
+
+INTEGRATION_BRANCHES: tuple[str, ...] = (
+    INTEGRATION_BRANCH,
+    *RETIRED_INTEGRATION_BRANCHES,
+)
 
 BRANCH_BINDINGS_SCHEMA_VERSION = 1
 _BINDING_FIELDS = frozenset(

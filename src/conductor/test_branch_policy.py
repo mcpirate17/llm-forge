@@ -33,7 +33,7 @@ def _git(repo: Path, *args: str) -> str:
     return completed.stdout
 
 
-def _init_repo(path: Path, *, initial_branch: str = "w7-trident-program") -> Path:
+def _init_repo(path: Path, *, initial_branch: str = "master") -> Path:
     path.mkdir(exist_ok=True)
     _git(path, "init", "--quiet", f"--initial-branch={initial_branch}")
     _git(path, "config", "user.name", "Branch Policy Test")
@@ -210,10 +210,23 @@ class TestValidateBranchName:
 
 class TestIsIntegrationBranch:
     def test_true_for_primary(self) -> None:
-        assert bp.is_integration_branch("w7-trident-program") is True
-
-    def test_true_for_mirror(self) -> None:
         assert bp.is_integration_branch("master") is True
+
+    def test_the_constant_names_the_current_line(self) -> None:
+        # The regression this guards: the constant lagged the integration line by four
+        # days, and because merged_branches and branch_claim_binding default to it, both
+        # raised BranchPolicyError on a repo where the retired branch no longer exists.
+        assert bp.INTEGRATION_BRANCH == "master"
+        assert bp.INTEGRATION_BRANCHES[0] == bp.INTEGRATION_BRANCH
+
+    def test_true_for_a_retired_integration_line(self) -> None:
+        # w7-trident-program stopped being the integration line on 2026-08-30. A name
+        # that was once the line must still never be classified as a deletable feature
+        # branch if it turns up on an old worktree or a stale remote.
+        assert bp.RETIRED_INTEGRATION_BRANCHES == ("w7-trident-program",)
+        for retired in bp.RETIRED_INTEGRATION_BRANCHES:
+            assert bp.is_integration_branch(retired) is True
+            assert retired in bp.INTEGRATION_BRANCHES
 
     def test_false_for_feature_branch(self) -> None:
         assert bp.is_integration_branch("claude/topic-20260829") is False
@@ -253,7 +266,7 @@ class TestIsFastForward:
         base = _commit(repo, "a.txt")
         _checkout_new(repo, "side", start=base)
         side_tip = _commit(repo, "c.txt")
-        _git(repo, "checkout", "--quiet", "w7-trident-program")
+        _git(repo, "checkout", "--quiet", "master")
         main_tip = _commit(repo, "b.txt")
         assert bp.is_fast_forward(repo, old=side_tip, new=main_tip) is False
 
@@ -264,24 +277,24 @@ class TestIsFastForward:
 class TestLocalOnlyCommits:
     def test_reports_everything_when_nothing_is_excluded(self, repo: Path) -> None:
         sha = _commit(repo, "a.txt")
-        rows = bp.local_only_commits(repo, "w7-trident-program")
+        rows = bp.local_only_commits(repo, "master")
         assert [row["sha"] for row in rows] == [sha]
 
     def test_excluded_by_remote_ref(self, repo: Path) -> None:
         sha = _commit(repo, "a.txt")
-        _git(repo, "update-ref", "refs/remotes/origin/w7-trident-program", sha)
-        assert bp.local_only_commits(repo, "w7-trident-program") == ()
+        _git(repo, "update-ref", "refs/remotes/origin/master", sha)
+        assert bp.local_only_commits(repo, "master") == ()
 
     def test_excluded_by_snapshot_ref(self, repo: Path) -> None:
         sha = _commit(repo, "a.txt")
         _git(repo, "update-ref", "refs/snapshots/backup-1", sha)
-        assert bp.local_only_commits(repo, "w7-trident-program") == ()
+        assert bp.local_only_commits(repo, "master") == ()
 
     def test_only_the_unpushed_tail_is_reported(self, repo: Path) -> None:
         base = _commit(repo, "a.txt")
-        _git(repo, "update-ref", "refs/remotes/origin/w7-trident-program", base)
+        _git(repo, "update-ref", "refs/remotes/origin/master", base)
         newer = _commit(repo, "b.txt")
-        rows = bp.local_only_commits(repo, "w7-trident-program")
+        rows = bp.local_only_commits(repo, "master")
         assert [row["sha"] for row in rows] == [newer]
 
 
@@ -292,7 +305,7 @@ class TestMergedBranches:
     def test_includes_branch_whose_tip_is_an_ancestor(self, repo: Path) -> None:
         base = _commit(repo, "a.txt")
         _checkout_new(repo, "claude/x-20260829", start=base)
-        _git(repo, "checkout", "--quiet", "w7-trident-program")
+        _git(repo, "checkout", "--quiet", "master")
         _commit(repo, "b.txt")
         assert "claude/x-20260829" in bp.merged_branches(repo)
 
@@ -300,14 +313,19 @@ class TestMergedBranches:
         base = _commit(repo, "a.txt")
         _checkout_new(repo, "claude/y-20260829", start=base)
         _commit(repo, "unique.txt")
-        _git(repo, "checkout", "--quiet", "w7-trident-program")
+        _git(repo, "checkout", "--quiet", "master")
         assert "claude/y-20260829" not in bp.merged_branches(repo)
 
     def test_excludes_integration_branches_themselves(self, repo: Path) -> None:
-        _commit(repo, "a.txt")
+        base = _commit(repo, "a.txt")
+        # A retired line whose tip is an ancestor of master satisfies the ancestry
+        # test, so only the integration-name check keeps it off the delete list.
+        _checkout_new(repo, "w7-trident-program", start=base)
+        _git(repo, "checkout", "--quiet", "master")
+        _commit(repo, "b.txt")
         result = bp.merged_branches(repo)
-        assert "w7-trident-program" not in result
         assert "master" not in result
+        assert "w7-trident-program" not in result
 
 
 # --------------------------------------------------------------------------- claim binding resolution
@@ -444,7 +462,7 @@ class TestBindingStore:
         bp.bind_branch(
             repo, branch="claude/topic-a-20260829", claim_id="c1", owner="claude"
         )
-        _git(repo, "checkout", "--quiet", "w7-trident-program")
+        _git(repo, "checkout", "--quiet", "master")
         _checkout_new(repo, "claude/topic-b-20260829", start=base)
         with pytest.raises(bp.BranchPolicyError, match="already bound to live branch"):
             bp.bind_branch(
@@ -459,7 +477,7 @@ class TestBindingStore:
         bp.bind_branch(
             repo, branch="claude/topic-a-20260829", claim_id="c1", owner="claude"
         )
-        _git(repo, "checkout", "--quiet", "w7-trident-program")
+        _git(repo, "checkout", "--quiet", "master")
         _git(repo, "branch", "-D", "claude/topic-a-20260829")
         _checkout_new(repo, "claude/topic-b-20260829", start=base)
         binding = bp.bind_branch(
@@ -669,7 +687,7 @@ class TestEvaluatePushFeatureBranch:
     ) -> None:
         base = _commit(repo, "a.txt")
         _checkout_new(repo, "claude/topic-a-20260829", start=base)
-        _git(repo, "checkout", "--quiet", "w7-trident-program")
+        _git(repo, "checkout", "--quiet", "master")
         _checkout_new(repo, "claude/topic-b-20260829", start=base)
         _write_binding_row(
             repo, branch="claude/topic-a-20260829", claim_id="c1", owner="claude"
@@ -709,7 +727,7 @@ class TestEvaluatePushIntegrationBranch:
         new = _commit(repo, "b.txt")
         # reversed roles => not a fast-forward
         decision = bp.evaluate_push(
-            repo, branch="w7-trident-program", remote_old=new, remote_new=old
+            repo, branch="master", remote_old=new, remote_new=old
         )
         assert decision.allowed is False
         assert any("fast-forward" in r for r in decision.reasons)
@@ -721,10 +739,10 @@ class TestEvaluatePushIntegrationBranch:
         _checkout_new(repo, "claude/feat-20260829", start=base)
         feat_sha = _commit(repo, "feature.txt")
         _git(repo, "update-ref", "refs/remotes/origin/claude/feat-20260829", feat_sha)
-        _git(repo, "checkout", "--quiet", "w7-trident-program")
+        _git(repo, "checkout", "--quiet", "master")
         _git(repo, "merge", "--ff-only", "--quiet", "claude/feat-20260829")
         decision = bp.evaluate_push(
-            repo, branch="w7-trident-program", remote_old=base, remote_new=feat_sha
+            repo, branch="master", remote_old=base, remote_new=feat_sha
         )
         assert decision.allowed is True
 
@@ -732,7 +750,7 @@ class TestEvaluatePushIntegrationBranch:
         base = _commit(repo, "a.txt")
         direct = _commit(repo, "direct.txt")
         decision = bp.evaluate_push(
-            repo, branch="w7-trident-program", remote_old=base, remote_new=direct
+            repo, branch="master", remote_old=base, remote_new=direct
         )
         assert decision.allowed is False
         assert any(
@@ -744,7 +762,7 @@ class TestEvaluatePushIntegrationBranch:
     ) -> None:
         sha = _commit(repo, "a.txt")
         decision = bp.evaluate_push(
-            repo, branch="w7-trident-program", remote_old="", remote_new=sha
+            repo, branch="master", remote_old="", remote_new=sha
         )
         assert decision.allowed is False
 
