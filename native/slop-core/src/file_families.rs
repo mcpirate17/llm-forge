@@ -1,7 +1,10 @@
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
+
+const MINHASH_PRIME: u64 = (1_u64 << 61) - 1;
+const MAX_LSH_BUCKET_SIZE: usize = 80;
 
 const COMPONENTS: [(&str, f64); 6] = [
     ("structure", 0.35),
@@ -144,6 +147,84 @@ fn exact_pairs(
     (pairs, pair_universe)
 }
 
+fn all_pairs(profile_count: usize) -> Vec<(usize, usize)> {
+    let mut pairs =
+        Vec::with_capacity(profile_count.saturating_mul(profile_count.saturating_sub(1)) / 2);
+    for left in 0..profile_count {
+        for right in (left + 1)..profile_count {
+            pairs.push((left, right));
+        }
+    }
+    pairs
+}
+
+fn minhash_signature(values: &[u64], permutations: usize) -> Vec<u64> {
+    (0..permutations)
+        .map(|index| {
+            let multiplier =
+                (0x9E37_79B1_85EB_CA87_u128 + 2 * index as u128) % MINHASH_PRIME as u128;
+            let multiplier = if multiplier == 0 { 1 } else { multiplier };
+            let offset = (0xC2B2_AE3D_27D4_EB4F_u128 * (index as u128 + 1)) % MINHASH_PRIME as u128;
+            values
+                .iter()
+                .map(|&value| {
+                    ((multiplier * value as u128 + offset) % MINHASH_PRIME as u128) as u64
+                })
+                .min()
+                .unwrap_or(0)
+        })
+        .collect()
+}
+
+fn lsh_pairs(
+    feature_hashes: Vec<Vec<u64>>,
+    permutations: i64,
+    band_size: i64,
+) -> Result<Vec<(usize, usize)>, &'static str> {
+    if permutations <= 0 {
+        if permutations < 0
+            && band_size < 0
+            && (2..=MAX_LSH_BUCKET_SIZE).contains(&feature_hashes.len())
+        {
+            return Ok(all_pairs(feature_hashes.len()));
+        }
+        return Ok(Vec::new());
+    }
+    if feature_hashes.iter().any(Vec::is_empty) {
+        return Err("min() arg is an empty sequence");
+    }
+    if band_size < 0 {
+        return Ok(Vec::new());
+    }
+
+    let permutations = permutations as usize;
+    let band_size = band_size as usize;
+    let mut buckets: HashMap<(usize, Vec<u64>), Vec<usize>> = HashMap::new();
+    for (profile_index, values) in feature_hashes.iter().enumerate() {
+        let signature = minhash_signature(values, permutations);
+        for start in (0..permutations).step_by(band_size) {
+            let band = start / band_size;
+            buckets
+                .entry((band, signature[start..start + band_size].to_vec()))
+                .or_default()
+                .push(profile_index);
+        }
+    }
+
+    let mut pairs = BTreeSet::new();
+    for members in buckets.values() {
+        if members.len() < 2 || members.len() > MAX_LSH_BUCKET_SIZE {
+            continue;
+        }
+        for left_position in 0..members.len() {
+            for right_position in (left_position + 1)..members.len() {
+                pairs.insert((members[left_position], members[right_position]));
+            }
+        }
+    }
+    Ok(pairs.into_iter().collect())
+}
+
 fn cached_similarity<'a>(
     profiles: &[Profile],
     cache: &'a mut HashMap<(usize, usize), Similarity>,
@@ -271,6 +352,17 @@ pub(crate) fn audit_file_family_exact_pairs(
 ) -> PyResult<(Vec<(usize, usize)>, usize)> {
     let profiles = profiles_from(values)?;
     Ok(py.detach(move || exact_pairs(&profiles, min_similarity, min_shared_features)))
+}
+
+#[pyfunction]
+pub(crate) fn audit_file_family_lsh_pairs(
+    py: Python<'_>,
+    feature_hashes: Vec<Vec<u64>>,
+    permutations: i64,
+    band_size: i64,
+) -> PyResult<Vec<(usize, usize)>> {
+    py.detach(move || lsh_pairs(feature_hashes, permutations, band_size))
+        .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
 #[pyfunction]

@@ -353,6 +353,10 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m
     )?)?;
     m.add_function(wrap_pyfunction!(
+        file_families::audit_file_family_lsh_pairs,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
         file_families::audit_file_family_groups,
         m
     )?)?;
