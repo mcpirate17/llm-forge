@@ -547,6 +547,173 @@ fn inventory_python_test_nodeids(root: &Path, relative: &str) -> Result<Vec<Stri
     Ok(nodeids)
 }
 
+/// Inventory the `#[test]` functions in one Rust source file, in source order.
+///
+/// The nodeid shape matches what `cargo_test` scopes already declare — `<path>::<fn>`,
+/// with no module path — so a name repeated in two `mod` blocks is ambiguous and is
+/// refused rather than silently collapsed. Attributes may stack (`#[test]` then
+/// `#[ignore]`), so the scan walks forward from the marker to the first `fn` item.
+/// How an outer attribute relates to test discovery.
+#[derive(Debug, PartialEq, Eq)]
+enum TestAttribute {
+    /// `#[test]`, or any path whose final segment is `test` (`#[tokio::test(..)]`).
+    Marks,
+    /// A framework marker this reader cannot expand (`#[rstest]`, `#[test_case(..)]`).
+    /// Guessing would silently shrink a scope that claims to be complete, so refuse.
+    Unrecognised,
+    Other,
+}
+
+/// Read one outer attribute starting at `start`, following continuation lines until its
+/// brackets balance. Returns the attribute path and the last line it occupies.
+fn read_rust_attribute(lines: &[&str], start: usize) -> Option<(String, usize)> {
+    let mut depth = 0i32;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut text = String::new();
+    for (offset, line) in lines[start..].iter().enumerate() {
+        for ch in line.chars() {
+            let inside_before = depth > 0;
+            if escaped {
+                escaped = false;
+            } else if in_string {
+                match ch {
+                    '\\' => escaped = true,
+                    '"' => in_string = false,
+                    _ => {}
+                }
+            } else {
+                match ch {
+                    '"' => in_string = true,
+                    '[' => depth += 1,
+                    ']' => depth -= 1,
+                    _ => {}
+                }
+            }
+            if inside_before {
+                if depth == 0 {
+                    let path: String = text
+                        .chars()
+                        .take_while(|c| !matches!(c, '(' | '=' | ' ' | '\t'))
+                        .collect();
+                    return Some((path.trim().to_owned(), start + offset));
+                }
+                text.push(ch);
+            }
+        }
+        if depth <= 0 {
+            break;
+        }
+    }
+    None
+}
+
+fn classify_rust_attribute(path: &str) -> TestAttribute {
+    let last = path.rsplit("::").next().unwrap_or(path);
+    if last == "test" {
+        TestAttribute::Marks
+    } else if last.contains("test") {
+        TestAttribute::Unrecognised
+    } else {
+        TestAttribute::Other
+    }
+}
+
+/// Inventory `#[test]` functions in a Rust source file, in source order, as the
+/// `<path>::<fn>` nodeids a `cargo_test` scope declares.
+fn inventory_rust_test_nodeids(root: &Path, relative: &str) -> Result<Vec<String>, String> {
+    let source = fs::read_to_string(root.join(relative))
+        .map_err(|error| format!("cannot inventory Rust tests in {relative}: {error}"))?;
+    let lines: Vec<&str> = source.lines().collect();
+    let mut names: Vec<String> = Vec::new();
+    let mut pending: Option<usize> = None;
+    let mut index = 0usize;
+    while index < lines.len() {
+        let trimmed = lines[index].trim();
+        if trimmed.is_empty() || trimmed.starts_with("//") {
+            index += 1;
+            continue;
+        }
+        if trimmed.starts_with("#[") {
+            let (path, end) = read_rust_attribute(&lines, index).ok_or_else(|| {
+                format!(
+                    "cannot inventory Rust tests in {relative}: unterminated attribute at line {}",
+                    index + 1
+                )
+            })?;
+            match classify_rust_attribute(&path) {
+                TestAttribute::Marks => pending = pending.or(Some(index)),
+                TestAttribute::Unrecognised => {
+                    return Err(format!(
+                        "cannot inventory Rust tests in {relative}: line {} uses #[{path}], a test \
+                         framework this reader cannot expand; a complete cargo_test scope over \
+                         this file would silently undercount",
+                        index + 1
+                    ))
+                }
+                TestAttribute::Other => {}
+            }
+            index = end + 1;
+            continue;
+        }
+        if let Some(opened) = pending {
+            let name = rust_fn_name(trimmed).ok_or_else(|| {
+                format!(
+                    "cannot inventory Rust tests in {relative}: #[test] at line {} has no fn",
+                    opened + 1
+                )
+            })?;
+            if names.contains(&name) {
+                return Err(format!(
+                    "cannot inventory Rust tests in {relative}: duplicate test name {name:?}; \
+                     cargo_test nodeids carry no module path"
+                ));
+            }
+            names.push(name);
+            pending = None;
+        }
+        index += 1;
+    }
+    if let Some(opened) = pending {
+        return Err(format!(
+            "cannot inventory Rust tests in {relative}: #[test] at line {} has no fn",
+            opened + 1
+        ));
+    }
+    if names.is_empty() {
+        return Err(format!("complete Rust test scope is empty: {relative}"));
+    }
+    Ok(names
+        .into_iter()
+        .map(|name| format!("{relative}::{name}"))
+        .collect())
+}
+/// Extract the identifier from a `fn` item line, ignoring visibility and `async`.
+fn rust_fn_name(line: &str) -> Option<String> {
+    let mut rest = line;
+    for prefix in [
+        "pub(crate) ",
+        "pub(super) ",
+        "pub ",
+        "async ",
+        "const ",
+        "unsafe ",
+        "extern ",
+    ] {
+        while let Some(stripped) = rest.strip_prefix(prefix) {
+            rest = stripped.trim_start();
+        }
+    }
+    let rest = rest.strip_prefix("fn ")?.trim_start();
+    let end = rest
+        .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .unwrap_or(rest.len());
+    if end == 0 {
+        return None;
+    }
+    Some(rest[..end].to_owned())
+}
+
 pub(crate) fn load_campaign_contract(
     root: &Path,
     relative_manifest: &str,
@@ -899,7 +1066,7 @@ pub(crate) fn load_campaign_contract(
         if !source_sha256.contains_key(&path) {
             return Err(format!("test_scopes[{path}] is not bound in source_sha256"));
         }
-        if inventory != "python_ast" && mode == "complete" {
+        if inventory != "python_ast" && inventory != "cargo_test" && mode == "complete" {
             return Err(format!(
                 "complete test scope inventory is unsupported: {inventory:?}"
             ));
@@ -908,6 +1075,30 @@ pub(crate) fn load_campaign_contract(
             return Err(format!(
                 "test_scopes[{path}].inventory='python_ast' requires a .py file"
             ));
+        }
+        if inventory == "cargo_test" && !path.ends_with(".rs") {
+            return Err(format!(
+                "test_scopes[{path}].inventory='cargo_test' requires a .rs file"
+            ));
+        }
+        if inventory == "cargo_test" && mode == "complete" {
+            let discovered = inventory_rust_test_nodeids(root, &path)?;
+            if nodeids != discovered {
+                let declared: BTreeSet<&str> = nodeids.iter().map(String::as_str).collect();
+                let actual: BTreeSet<&str> = discovered.iter().map(String::as_str).collect();
+                let missing = actual
+                    .difference(&declared)
+                    .map(|value| (*value).to_owned());
+                let extra = declared
+                    .difference(&actual)
+                    .map(|value| (*value).to_owned());
+                return Err(format!(
+                    "complete test scope does not match current Rust inventory for {path}: missing={}, extra={}, expected_order={}",
+                    python_list(missing),
+                    python_list(extra),
+                    python_list(discovered.clone())
+                ));
+            }
         }
         if inventory == "python_ast" && mode == "complete" {
             let source_inventory;
@@ -1458,5 +1649,180 @@ mod registry_resilience_tests {
         assert!(manifests.contains(&"conductor/mutation_campaigns/broken.json"));
         assert!(manifests.contains(&"conductor/mutation_campaigns/absent.json"));
         assert!(broken.iter().all(|entry| !entry.error.is_empty()));
+    }
+}
+
+#[cfg(test)]
+mod rust_inventory_tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::{inventory_rust_test_nodeids, rust_fn_name};
+
+    static NEXT_TREE: AtomicU64 = AtomicU64::new(0);
+
+    fn write_source(body: &str) -> (PathBuf, String) {
+        let serial = NEXT_TREE.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "llm-rust-inventory-{}-{serial}",
+            std::process::id()
+        ));
+        let relative = "src/subject.rs";
+        fs::create_dir_all(root.join("src")).expect("create tree");
+        fs::write(root.join(relative), body).expect("write source");
+        (root, relative.to_owned())
+    }
+
+    #[test]
+    fn inventory_lists_tests_in_source_order_and_skips_helpers() {
+        let (root, relative) = write_source(
+            "#[cfg(test)]\nmod inner {\n    fn helper() {}\n\n    #[test]\n    fn beta() {}\n\n    /// doc\n    #[test]\n    #[ignore]\n    // why this test exists\n    pub fn alpha() {}\n\n    #[tokio::test]\n\n    async fn gamma() {}\n}\n",
+        );
+        let found = inventory_rust_test_nodeids(&root, &relative).expect("inventory");
+        assert_eq!(
+            found,
+            vec![
+                format!("{relative}::beta"),
+                format!("{relative}::alpha"),
+                format!("{relative}::gamma"),
+            ],
+            "source order is the contract; helpers and doc comments are not tests"
+        );
+    }
+
+    #[test]
+    fn inventory_refuses_a_name_repeated_across_modules() {
+        let (root, relative) = write_source(
+            "mod a {\n    #[test]\n    fn same() {}\n}\nmod b {\n    #[test]\n    fn same() {}\n}\n",
+        );
+        let error = inventory_rust_test_nodeids(&root, &relative)
+            .expect_err("cargo_test nodeids carry no module path, so this is ambiguous");
+        assert!(error.contains("duplicate test name"), "got {error}");
+    }
+
+    #[test]
+    fn inventory_refuses_a_file_with_no_tests() {
+        let (root, relative) = write_source("fn not_a_test() {}\n");
+        let error = inventory_rust_test_nodeids(&root, &relative)
+            .expect_err("an empty complete scope must fail loud");
+        assert!(
+            error.contains("complete Rust test scope is empty"),
+            "got {error}"
+        );
+    }
+
+    #[test]
+    fn inventory_refuses_a_dangling_test_attribute() {
+        let (root, relative) = write_source("#[test]\n");
+        let error = inventory_rust_test_nodeids(&root, &relative)
+            .expect_err("an attribute with no fn is malformed, not empty");
+        assert!(error.contains("has no fn"), "got {error}");
+    }
+
+    #[test]
+    fn inventory_refuses_a_missing_file() {
+        let (root, _) = write_source("#[test]\nfn a() {}\n");
+        let error = inventory_rust_test_nodeids(&root, "src/absent.rs")
+            .expect_err("a missing file must not read as an empty inventory");
+        assert!(error.contains("cannot inventory Rust tests"), "got {error}");
+    }
+
+    #[test]
+    fn inventory_reads_attributes_that_carry_arguments() {
+        let (root, relative) = write_source(
+            "#[tokio::test(flavor = \"multi_thread\")]\nasync fn with_args() {}\n\n#[tokio::test(\n    flavor = \"multi_thread\",\n    worker_threads = 2,\n)]\nasync fn across_lines() {}\n",
+        );
+        let found = inventory_rust_test_nodeids(&root, &relative).expect("inventory");
+        assert_eq!(
+            found,
+            vec![
+                format!("{relative}::with_args"),
+                format!("{relative}::across_lines"),
+            ],
+            "an attribute path is the text before its arguments, on one line or many"
+        );
+    }
+
+    #[test]
+    fn inventory_refuses_a_test_framework_it_cannot_expand() {
+        for attribute in ["#[rstest]", "#[test_case(1, 2)]", "#[proptest]"] {
+            let (root, relative) = write_source(&format!(
+                "#[test]\nfn real() {{}}\n\n{attribute}\nfn other() {{}}\n"
+            ));
+            let error = inventory_rust_test_nodeids(&root, &relative)
+                .expect_err("guessing would silently undercount a complete scope");
+            assert!(error.contains("cannot expand"), "{attribute}: got {error}");
+        }
+    }
+
+    #[test]
+    fn inventory_is_not_confused_by_test_shaped_non_markers() {
+        let (root, relative) = write_source(
+            "#[cfg(test)]\nmod inner {\n    #[cfg_attr(test, derive(Debug))]\n    struct S;\n\n    #[test]\n    #[should_panic(expected = \"boom [test]\")]\n    fn only_one() {}\n}\n",
+        );
+        let found = inventory_rust_test_nodeids(&root, &relative).expect("inventory");
+        assert_eq!(
+            found,
+            vec![format!("{relative}::only_one")],
+            "cfg(test), cfg_attr(test, ..) and a bracket inside a string are not test markers"
+        );
+    }
+
+    #[test]
+    fn attribute_reader_reports_the_path_and_its_last_line() {
+        let lines = [
+            "#[tokio::test(",
+            "    flavor = \"x\",",
+            ")]",
+            "async fn a() {}",
+        ];
+        let (path, end) = super::read_rust_attribute(&lines, 0).expect("balanced attribute");
+        assert_eq!(path, "tokio::test");
+        assert_eq!(end, 2, "the fn is found after the attribute's last line");
+        assert_eq!(super::read_rust_attribute(&["#[tokio::test("], 0), None);
+    }
+
+    #[test]
+    fn attribute_classification_splits_markers_from_frameworks() {
+        use super::{classify_rust_attribute, TestAttribute};
+        assert_eq!(classify_rust_attribute("test"), TestAttribute::Marks);
+        assert_eq!(classify_rust_attribute("tokio::test"), TestAttribute::Marks);
+        assert_eq!(
+            classify_rust_attribute("rstest"),
+            TestAttribute::Unrecognised
+        );
+        assert_eq!(
+            classify_rust_attribute("test_case"),
+            TestAttribute::Unrecognised
+        );
+        assert_eq!(classify_rust_attribute("cfg"), TestAttribute::Other);
+        assert_eq!(
+            classify_rust_attribute("should_panic"),
+            TestAttribute::Other
+        );
+        assert_eq!(
+            classify_rust_attribute("serial_test::serial"),
+            TestAttribute::Other
+        );
+    }
+
+    #[test]
+    fn fn_name_strips_visibility_and_qualifiers() {
+        assert_eq!(rust_fn_name("fn plain() {}").as_deref(), Some("plain"));
+        assert_eq!(
+            rust_fn_name("pub fn exported() {}").as_deref(),
+            Some("exported")
+        );
+        assert_eq!(
+            rust_fn_name("pub(crate) async fn scoped() {}").as_deref(),
+            Some("scoped")
+        );
+        assert_eq!(
+            rust_fn_name("fn generic<T: Copy>(value: T) {}").as_deref(),
+            Some("generic")
+        );
+        assert_eq!(rust_fn_name("let fn_like = 1;"), None);
+        assert_eq!(rust_fn_name("struct NotAFn;"), None);
     }
 }
