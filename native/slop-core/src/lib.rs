@@ -362,6 +362,14 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     m.add_function(wrap_pyfunction!(detector_scan::audit_detector_scan, m)?)?;
     m.add_function(wrap_pyfunction!(
+        consolidation::audit_consolidation_normalize,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        consolidation::audit_consolidation_collect,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
         consolidation::audit_consolidation_build,
         m
     )?)?;

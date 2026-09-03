@@ -426,7 +426,7 @@ fn method_canonical(node: &Bound<'_, PyAny>) -> PyResult<String> {
     ))
 }
 
-fn method_hash(node: &Bound<'_, PyAny>) -> PyResult<String> {
+pub(crate) fn normalized_function_hash(node: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(sha1_hex(&method_canonical(node)?))
 }
 
@@ -459,7 +459,7 @@ fn profile_ast(tree: &Bound<'_, PyAny>, relative: String, source: &str) -> PyRes
             let (named, shaped) = function_signature(&method)?;
             profile.api.insert(format!("method:{named}"));
             profile.api.insert(format!("method:{shaped}"));
-            let digest = method_hash(&method).map_err(|error| {
+            let digest = normalized_function_hash(&method).map_err(|error| {
                 PyRuntimeError::new_err(format!("method hash failed for {name}: {error}"))
             })?;
             profile

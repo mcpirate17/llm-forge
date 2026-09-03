@@ -1,7 +1,13 @@
+use pyo3::exceptions::{PyRuntimeError, PySyntaxError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fs;
+use std::path::PathBuf;
+
+use crate::file_profiles::normalized_function_hash;
+use crate::python_ast::{ast_children, ast_fields, is_ast, list_items, string_attr, type_name};
 
 const HIGH_RISK_PARTS: [&str; 5] = ["generator", "mechanisms", "models", "ops", "synthesis"];
 
@@ -14,6 +20,183 @@ struct Record {
     node_hash: String,
     tokens: usize,
     source: String,
+}
+
+struct LoadedSource {
+    path: PathBuf,
+    relative: String,
+    source: String,
+}
+
+fn universal_newlines(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes)
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+}
+
+fn load_sources(paths: Vec<String>, repo: String) -> Result<(Vec<LoadedSource>, usize), String> {
+    let repo = PathBuf::from(repo);
+    let mut loaded = Vec::with_capacity(paths.len());
+    let mut unparsable = 0;
+    for raw_path in paths {
+        let path = PathBuf::from(raw_path);
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                unparsable += 1;
+                continue;
+            }
+        };
+        let relative = path
+            .strip_prefix(&repo)
+            .map_err(|_| {
+                format!(
+                    "consolidation path {} is outside repository {}",
+                    path.display(),
+                    repo.display()
+                )
+            })?
+            .to_string_lossy()
+            .replace('\\', "/");
+        loaded.push(LoadedSource {
+            path,
+            relative,
+            source: universal_newlines(&bytes),
+        });
+    }
+    Ok((loaded, unparsable))
+}
+
+fn is_docstring(node: &Bound<'_, PyAny>) -> PyResult<bool> {
+    if type_name(node)? != "Expr" {
+        return Ok(false);
+    }
+    let value = node.getattr("value")?;
+    Ok(type_name(&value)? == "Constant" && value.getattr("value")?.extract::<String>().is_ok())
+}
+
+fn count_list(value: &Bound<'_, PyAny>, strip_docstring: bool) -> PyResult<usize> {
+    let mut items = list_items(value)?;
+    if strip_docstring
+        && items
+            .first()
+            .is_some_and(|item| is_docstring(item).unwrap_or(false))
+    {
+        items.remove(0);
+    }
+    let mut count = 0;
+    for item in items {
+        if is_ast(&item)? {
+            count += count_node(&item)?;
+        }
+    }
+    Ok(count)
+}
+
+fn count_node(node: &Bound<'_, PyAny>) -> PyResult<usize> {
+    let kind = type_name(node)?;
+    let nested_scope = matches!(
+        kind.as_str(),
+        "FunctionDef" | "AsyncFunctionDef" | "ClassDef"
+    );
+    let mut count = 1;
+    for (field, value) in ast_fields(node)? {
+        if is_ast(&value)? {
+            count += count_node(&value)?;
+        } else if value.cast::<PyList>().is_ok() {
+            count += count_list(&value, nested_scope && field == "body")?;
+        }
+    }
+    Ok(count)
+}
+
+fn normalized_node_count(node: &Bound<'_, PyAny>) -> PyResult<usize> {
+    Ok(1 + count_list(&node.getattr("body")?, true)?)
+}
+
+fn line_slices(source: &str) -> Vec<&str> {
+    if source.is_empty() {
+        return Vec::new();
+    }
+    source.split_inclusive('\n').collect()
+}
+
+fn source_segment(source: &str, node: &Bound<'_, PyAny>) -> PyResult<String> {
+    let start_line: usize = node.getattr("lineno")?.extract()?;
+    let end_line: Option<usize> = node.getattr("end_lineno")?.extract()?;
+    let start_column: usize = node.getattr("col_offset")?.extract()?;
+    let end_column: Option<usize> = node.getattr("end_col_offset")?.extract()?;
+    let (Some(end_line), Some(end_column)) = (end_line, end_column) else {
+        return Ok(String::new());
+    };
+    let lines = line_slices(source);
+    let first = lines.get(start_line.saturating_sub(1)).ok_or_else(|| {
+        PyRuntimeError::new_err(format!("source start line {start_line} is out of range"))
+    })?;
+    if start_line == end_line {
+        return first
+            .as_bytes()
+            .get(start_column..end_column)
+            .and_then(|bytes| std::str::from_utf8(bytes).ok())
+            .map(str::to_owned)
+            .ok_or_else(|| PyRuntimeError::new_err("invalid one-line AST source offsets"));
+    }
+    let last = lines.get(end_line.saturating_sub(1)).ok_or_else(|| {
+        PyRuntimeError::new_err(format!("source end line {end_line} is out of range"))
+    })?;
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(
+        first
+            .as_bytes()
+            .get(start_column..)
+            .ok_or_else(|| PyRuntimeError::new_err("invalid first-line AST source offset"))?,
+    );
+    for line in lines.iter().take(end_line - 1).skip(start_line) {
+        bytes.extend_from_slice(line.as_bytes());
+    }
+    bytes.extend_from_slice(
+        last.as_bytes()
+            .get(..end_column)
+            .ok_or_else(|| PyRuntimeError::new_err("invalid final-line AST source offset"))?,
+    );
+    String::from_utf8(bytes)
+        .map_err(|_| PyRuntimeError::new_err("AST source offsets split a UTF-8 code point"))
+}
+
+fn extract_records(
+    tree: &Bound<'_, PyAny>,
+    file: &LoadedSource,
+    min_lines: usize,
+) -> PyResult<Vec<Record>> {
+    let mut output = Vec::new();
+    let mut queue = VecDeque::from([tree.clone()]);
+    while let Some(node) = queue.pop_front() {
+        queue.extend(ast_children(&node)?);
+        if !matches!(
+            type_name(&node)?.as_str(),
+            "FunctionDef" | "AsyncFunctionDef"
+        ) {
+            continue;
+        }
+        let line_start: usize = node.getattr("lineno")?.extract()?;
+        let line_end = node
+            .getattr("end_lineno")?
+            .extract::<Option<usize>>()?
+            .unwrap_or(line_start);
+        if line_end - line_start + 1 < min_lines {
+            continue;
+        }
+        output.push(Record {
+            file: file.relative.clone(),
+            line_start,
+            line_end,
+            name: string_attr(&node, "name")?,
+            node_hash: normalized_function_hash(&node)?,
+            tokens: normalized_node_count(&node)?,
+            source: source_segment(&file.source, &node)?,
+        });
+    }
+    Ok(output)
 }
 
 #[derive(Clone, Debug)]
@@ -345,6 +528,51 @@ fn record_to_dict<'py>(py: Python<'py>, record: &Record) -> PyResult<Bound<'py, 
     output.set_item("tokens", record.tokens)?;
     output.set_item("source", &record.source)?;
     Ok(output)
+}
+
+#[pyfunction]
+pub(crate) fn audit_consolidation_normalize(node: &Bound<'_, PyAny>) -> PyResult<(String, usize)> {
+    Ok((
+        normalized_function_hash(node)?,
+        normalized_node_count(node)?,
+    ))
+}
+
+/// Read the corpus without the GIL, then retain CPython only as the grammar and
+/// canonical AST provider. Traversal, normalization, hashing, token counting,
+/// source slicing, and record construction remain inside this one native batch.
+#[pyfunction]
+pub(crate) fn audit_consolidation_collect(
+    py: Python<'_>,
+    paths: Vec<String>,
+    repo: String,
+    min_lines: usize,
+) -> PyResult<(Py<PyList>, usize)> {
+    let (files, mut unparsable) = py
+        .detach(move || load_sources(paths, repo))
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let ast = py.import("ast")?;
+    let output = PyList::empty(py);
+    for file in files {
+        let tree = match ast.call_method1("parse", (&file.source, file.path.to_string_lossy())) {
+            Ok(tree) => tree,
+            Err(error) if error.is_instance_of::<PySyntaxError>(py) => {
+                unparsable += 1;
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
+        let records = extract_records(&tree, &file, min_lines).map_err(|error| {
+            PyRuntimeError::new_err(format!(
+                "native consolidation extraction failed for {}: {error}",
+                file.relative
+            ))
+        })?;
+        for record in &records {
+            output.append(record_to_dict(py, record)?)?;
+        }
+    }
+    Ok((output.unbind(), unparsable))
 }
 
 #[pyfunction]
