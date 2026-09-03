@@ -23,7 +23,6 @@ from typing import Any, Final
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 ACTIVE_STATE_PATH: Final[Path] = ROOT / "conductor" / "active_state.json"
 CURRENT_WORK_PATH: Final[Path] = ROOT / ".current_work.md"
-CLAIMS_PATH: Final[Path] = ROOT / ".agents" / "claims" / "claims.json"
 
 HEADING_RE: Final = re.compile(r"^##\s+(.+)$")
 
