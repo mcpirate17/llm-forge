@@ -11,7 +11,9 @@
 //! belong here.
 
 pub mod audit_inventory;
+pub mod consolidation;
 pub mod engine;
+pub mod file_families;
 pub mod index;
 pub mod ledger;
 pub mod rules;
@@ -326,7 +328,10 @@ fn tally_items(py: Python<'_>, items: &Bound<'_, PyList>) -> PyResult<Py<PyDict>
 
 #[pymodule]
 fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(audit_inventory::audit_inventory_candidates, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        audit_inventory::audit_inventory_candidates,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(ablations, m)?)?;
     m.add_function(wrap_pyfunction!(apply, m)?)?;
     m.add_function(wrap_pyfunction!(rule_names, m)?)?;
@@ -335,6 +340,34 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(aggregate_findings, m)?)?;
     m.add_function(wrap_pyfunction!(diff_against, m)?)?;
     m.add_function(wrap_pyfunction!(tally_items, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        file_families::audit_file_family_compare,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        file_families::audit_file_family_exact_pairs,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        file_families::audit_file_family_groups,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        consolidation::audit_consolidation_build,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        consolidation::audit_consolidation_assign,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        consolidation::audit_consolidation_suggested_home,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        consolidation::audit_consolidation_evidence,
+        m
+    )?)?;
     m.add_class::<PyTestIndex>()?;
     Ok(())
 }
