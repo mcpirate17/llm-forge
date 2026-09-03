@@ -23,7 +23,7 @@ from conductor.candidate_review.value_waivers import (
     apply_value_waivers,
     waiver_states as value_waiver_states,
 )
-from conductor.candidate_review.command_runner import _run_process, _tail
+from conductor.candidate_review.command_runner import _tail
 from conductor.candidate_review.graph_selection import (
     _convention_tests,
     _graph_test_paths,
@@ -31,15 +31,16 @@ from conductor.candidate_review.graph_selection import (
 from conductor.candidate_review.git_source import (
     GitSourceError,
     _batch_blobs,
-    changed_line_numbers,
     list_tree,
     run_git,
 )
 from conductor.candidate_review.model import (
+    Change,
     CheckResult,
     CheckStatus,
     Finding,
     Severity,
+    TreeEntry,
     sha256_bytes,
     sha256_file,
 )
@@ -55,6 +56,13 @@ from conductor.candidate_review.policy import (
     W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
     MUTATION_WAIVER_SOURCE_ANCHOR,
     CheckPolicy,
+)
+from conductor.candidate_review.coverage_eval import (  # noqa: F401
+    # `_coverage_counts` and `_risk_buckets` are re-exported, not used here:
+    # callers and tests reach them through this module's namespace.
+    _coverage_counts,
+    _evaluate_changed_coverage,
+    _risk_buckets,
 )
 
 GRANDFATHER_SCHEMA_VERSION = 1
@@ -90,16 +98,29 @@ TEST_PROPERTY_TEXT = re.compile(
 ZERO_OID = "0" * 40
 
 
-def _python_test_labels(source: str, path: str) -> set[str]:
+def _python_test_definitions(source: str, path: str) -> dict[str, str]:
+    """Map every collectible test label in `source` to its own definition text.
+
+    The text is what makes a *changed* definition distinguishable from one that
+    merely shares a file with a change; decorators are part of it because a
+    parametrize list is part of what the test asserts.
+    """
+
     try:
         tree = ast.parse(source)
     except SyntaxError as exc:
         raise RuntimeError(f"cannot parse test definitions in {path}: {exc}") from exc
-    labels: set[str] = set()
+    lines = source.splitlines()
+
+    def text(node: ast.AST) -> str:
+        start = min([node.lineno, *(d.lineno for d in node.decorator_list)])
+        return "\n".join(lines[start - 1 : node.end_lineno])
+
+    definitions: dict[str, str] = {}
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.name.startswith("test_"):
-                labels.add(node.name)
+                definitions[node.name] = text(node)
             continue
         if not isinstance(node, ast.ClassDef) or not node.name.startswith("Test"):
             continue
@@ -107,8 +128,12 @@ def _python_test_labels(source: str, path: str) -> set[str]:
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
                 child.name.startswith("test_")
             ):
-                labels.add(f"{node.name}::{child.name}")
-    return labels
+                definitions[f"{node.name}::{child.name}"] = text(child)
+    return definitions
+
+
+def _python_test_labels(source: str, path: str) -> set[str]:
+    return set(_python_test_definitions(source, path))
 
 
 class _GrandfatherError(RuntimeError):
@@ -335,10 +360,44 @@ def _inventory_path_unsafe(rel_path: object) -> bool:
     )
 
 
+def _base_test_definitions(ctx: ReviewContext, change: Change) -> dict[str, str] | None:
+    """The candidate base's definitions for `change.path`, or None if unavailable.
+
+    None means "assume nothing was there", which gates every definition in the
+    file -- the pre-2026-09-03 behaviour, kept as the fail-closed answer for an
+    added file, an unreadable base blob, or a base that does not parse.
+    """
+
+    if change.old_mode == "000000" or change.old_oid == ZERO_OID:
+        return None
+    entry = TreeEntry(
+        path=change.old_path or change.path,
+        mode=change.old_mode,
+        object_type="blob",
+        oid=change.old_oid,
+    )
+    try:
+        blob = _batch_blobs(ctx.repo, [entry]).get(change.old_oid)
+        if blob is None:
+            return None
+        return _python_test_definitions(blob.decode("utf-8"), entry.path)
+    except (GitSourceError, UnicodeError, RuntimeError):
+        return None
+
+
 def _value_gated_nodeids(
     ctx: ReviewContext, grandfathered: Mapping[str, frozenset[str]]
 ) -> dict[str, tuple[str, ...]]:
-    """Nodeids lacking anchored evidence: every current test def not in the inventory."""
+    """Nodeids lacking anchored evidence: test defs this candidate added or changed.
+
+    Scoped against the candidate base, not against the file. Sharing a file with a
+    change is not itself a reason to demand value evidence -- a definition whose own
+    text is byte-identical to the base was not introduced or altered here, and
+    charging the current change for it bills this candidate for pre-existing debt.
+    A changed helper or fixture therefore no longer re-gates its untouched callers;
+    proving a behaviour change did not break them is what the mutation campaign is
+    for, not what admission evidence answers.
+    """
 
     gated: dict[str, tuple[str, ...]] = {}
     for change in ctx.live_changes:
@@ -360,8 +419,16 @@ def _value_gated_nodeids(
             source = (ctx.snapshot / path).read_text(encoding="utf-8")
         except (OSError, UnicodeError) as exc:
             raise RuntimeError(f"cannot read candidate test {path}: {exc}") from exc
+        definitions = _python_test_definitions(source, path)
+        base = _base_test_definitions(ctx, change)
+        if base is not None:
+            definitions = {
+                label: body
+                for label, body in definitions.items()
+                if base.get(label) != body
+            }
         excluded = grandfathered.get(path, frozenset())
-        labels = sorted(set(_python_test_labels(source, path)) - excluded)
+        labels = sorted(set(definitions) - excluded)
         if labels:
             gated[path] = tuple(f"{path}::{label}" for label in labels)
     return gated
@@ -1105,145 +1172,3 @@ def _pytest_command(tests: Sequence[str], coverage_file: Path | None) -> list[st
         ]
     )
     return prefix
-
-
-def _risk_buckets(
-    per_file: Mapping[str, Mapping[str, int]], risk_of: Mapping[str, str]
-) -> dict[str, dict[str, int]]:
-    """Split measured changed lines into high-risk and everything else.
-
-    A path with no recorded risk counts as other-risk: it is never silently
-    promoted to the lenient side by being unknown, nor held to the strict bar it
-    was never classified into.
-    """
-    buckets = {
-        "high": {"covered": 0, "measurable": 0},
-        "other": {"covered": 0, "measurable": 0},
-    }
-    for path, counts in per_file.items():
-        bucket = "high" if risk_of.get(path) == "high" else "other"
-        buckets[bucket]["covered"] += counts["covered"]
-        buckets[bucket]["measurable"] += counts["measurable"]
-    return buckets
-
-
-def _evaluate_changed_coverage(
-    ctx: ReviewContext, coverage_file: Path
-) -> tuple[list[Finding], dict[str, object]]:
-    output = ctx.runtime_dir / "coverage.json"
-    command = [
-        sys.executable,
-        "-m",
-        "coverage",
-        "json",
-        f"--data-file={coverage_file}",
-        "-o",
-        str(output),
-        "--quiet",
-    ]
-    completed = _run_process(
-        command,
-        ctx=ctx,
-        timeout_seconds=60,
-        memory_mb=2048,
-        limit_resources=False,
-        include_git_metadata=False,
-    )
-    if completed.returncode or not output.is_file():
-        return [
-            Finding(
-                check_id="targeted-tests-full",
-                rule_id="coverage-incomplete",
-                severity=Severity.CRITICAL,
-                message=(
-                    completed.stderr
-                    or completed.stdout
-                    or "coverage JSON was not produced"
-                ).strip(),
-            )
-        ], {}
-    payload = json.loads(output.read_text(encoding="utf-8"))
-    source_paths = [
-        change.path
-        for change in ctx.live_changes
-        if "python" in change.classes and "test" not in change.classes
-    ]
-    changed = changed_line_numbers(ctx.repo, ctx.candidate, source_paths)
-    covered, measurable, per_file = _coverage_counts(ctx, payload, changed)
-    percent = 100.0 if measurable == 0 else covered * 100.0 / measurable
-    # Evaluate each risk class against its own bar, using the lines actually
-    # MEASURED rather than whether any changed path happens to be high-risk.
-    # The old rule let a single conductor/** file raise the bar for every changed
-    # line in the candidate, so a shortfall in low-risk code was judged at 90 --
-    # measured 2026-08-29 on the W7 slices, where the bar and the shortfall came
-    # from different paths entirely.
-    risk_of = {change.path: change.risk for change in ctx.live_changes}
-    buckets = _risk_buckets(per_file, risk_of)
-
-    findings: list[Finding] = []
-    metrics: dict[str, object] = {
-        "changed_coverage_percent": round(percent, 2),
-        "changed_lines_measurable": measurable,
-        "changed_lines_covered": covered,
-    }
-    for bucket, threshold in (
-        ("high", ctx.policy.high_risk_coverage_threshold),
-        ("other", ctx.policy.coverage_threshold),
-    ):
-        counts = buckets[bucket]
-        if counts["measurable"] == 0:
-            continue
-        pct = counts["covered"] * 100.0 / counts["measurable"]
-        metrics[f"changed_coverage_percent_{bucket}"] = round(pct, 2)
-        metrics[f"changed_coverage_threshold_{bucket}"] = threshold
-        metrics[f"changed_lines_measurable_{bucket}"] = counts["measurable"]
-        metrics[f"changed_lines_covered_{bucket}"] = counts["covered"]
-        if pct < threshold:
-            findings.append(
-                Finding(
-                    check_id="targeted-tests-full",
-                    rule_id="changed-code-coverage",
-                    severity=Severity.HIGH,
-                    message=(
-                        f"changed-code coverage for {bucket}-risk lines is "
-                        f"{pct:.1f}%, below {threshold:.1f}%"
-                    ),
-                    evidence={
-                        "risk_class": bucket,
-                        "covered": counts["covered"],
-                        "measurable": counts["measurable"],
-                        "per_file": {
-                            path: c
-                            for path, c in per_file.items()
-                            if ("high" if risk_of.get(path) == "high" else "other")
-                            == bucket
-                        },
-                    },
-                )
-            )
-    return findings, metrics
-
-
-def _coverage_counts(
-    ctx: ReviewContext,
-    payload: object,
-    changed: dict[str, set[int]],
-) -> tuple[int, int, dict[str, dict[str, int]]]:
-    if not isinstance(payload, dict) or not isinstance(payload.get("files"), dict):
-        raise ValueError("coverage JSON has no files object")
-    coverage_files = payload["files"]
-    covered = 0
-    measurable = 0
-    per_file: dict[str, dict[str, int]] = {}
-    for rel, changed_lines in changed.items():
-        record = coverage_files.get(rel) or coverage_files.get(str(ctx.snapshot / rel))
-        if not isinstance(record, dict):
-            continue
-        executed = set(record.get("executed_lines", []))
-        missing = set(record.get("missing_lines", []))
-        relevant = changed_lines & (executed | missing)
-        hits = relevant & executed
-        measurable += len(relevant)
-        covered += len(hits)
-        per_file[rel] = {"measurable": len(relevant), "covered": len(hits)}
-    return covered, measurable, per_file
