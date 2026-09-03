@@ -13,14 +13,25 @@ from conductor.candidate_review.model import sha256_json, write_json_atomic
 
 CLAIM_SCHEMA_VERSION = 1
 ACTIVITY_SCHEMA_VERSION = 1
+# A claim carries two durations. `expected_at` is what the owner estimated the work
+# would take; `expires_at` is the most it may hold the path even if the estimate was
+# wrong. Neither is a promise the path stays held: a claim also lapses once nothing
+# has been written under it for the idle window, and crossing the expected time
+# shrinks that window from IDLE_LAPSE_MINUTES to OVERRUN_IDLE_MINUTES. An owner
+# still inside its own estimate gets patience; one that blew the estimate and then
+# went quiet loses the path in minutes.
+#
 # The stored schema still admits the legacy 24 h lifetime so an existing store keeps
-# loading after this cap landed. The two timers below are what actually bind: no new
-# claim may outlive MAX_ACTIVE_CLAIM_HOURS, and any claim -- however long it asked
-# for -- lapses IDLE_LAPSE_HOURS after the last write recorded under it. A claim its
-# owner walked away from stops holding the path without anyone releasing it.
+# loading -- lowering MAX_CLAIM_HOURS raises OwnershipError, which the write gate
+# reports as "claim store unavailable" and fails closed for every lane at once.
+# MAX_ACTIVE_CLAIM_HOURS is the bound that actually binds: it is applied at creation
+# and clamped again on read, so it reaches already-stored claims with no migration.
 MAX_CLAIM_HOURS = 24.0
-MAX_ACTIVE_CLAIM_HOURS = 4.0
-IDLE_LAPSE_HOURS = 1.5
+MAX_ACTIVE_CLAIM_HOURS = 2.0
+EXPECTED_DEFAULT_MINUTES = 15.0
+MAX_DEFAULT_MINUTES = 60.0
+IDLE_LAPSE_MINUTES = 45.0
+OVERRUN_IDLE_MINUTES = 10.0
 _TOUCH_DEBOUNCE_SECONDS = 60.0
 _BROAD_ROOTS = frozenset(
     {
@@ -59,6 +70,10 @@ class OwnershipClaim:
     justification: str
     created_at: str
     expires_at: str
+    # When the owner estimated the work would be done. Optional so a store written
+    # before this field existed still loads: absent means the claim never has a soft
+    # phase and its expected time is its hard one.
+    expected_at: str | None = None
     # Attached by load_claims from the activity sidecar; never part of the claim's
     # identity hash and never written back into the claim store.
     last_seen: str | None = None
@@ -72,38 +87,63 @@ class OwnershipClaim:
         return _instant(self.created_at, self.claim_id, "creation time")
 
     @property
+    def expected(self) -> datetime:
+        """When the owner said it would be done -- soft, and never after the hard cap."""
+        if self.expected_at is None:
+            return self.hard_deadline
+        return min(
+            _instant(self.expected_at, self.claim_id, "expected time"),
+            self.hard_deadline,
+        )
+
+    @property
     def activity(self) -> datetime | None:
         if self.last_seen is None:
             return None
         return _instant(self.last_seen, self.claim_id, "activity stamp")
 
     @property
-    def deadline(self) -> datetime:
-        """The earliest of the three timers: requested expiry, hard cap, idle lapse."""
-        created = self.creation
-        capped = min(self.expiry, created + timedelta(hours=MAX_ACTIVE_CLAIM_HOURS))
-        return min(
-            capped, (self.activity or created) + timedelta(hours=IDLE_LAPSE_HOURS)
-        )
+    def hard_deadline(self) -> datetime:
+        """The longest this claim may hold, whatever it asked for and however busy."""
+        return min(self.expiry, self.creation + timedelta(hours=MAX_ACTIVE_CLAIM_HOURS))
+
+    def overrun(self, now: datetime) -> bool:
+        """Past the estimate. Still holds the path, but on a much shorter fuse."""
+        return now > self.expected
+
+    def idle_window(self, now: datetime) -> timedelta:
+        minutes = OVERRUN_IDLE_MINUTES if self.overrun(now) else IDLE_LAPSE_MINUTES
+        return timedelta(minutes=minutes)
+
+    def idle_deadline(self, now: datetime) -> datetime:
+        return (self.activity or self.creation) + self.idle_window(now)
+
+    def deadline(self, now: datetime) -> datetime:
+        """The earliest of the hard cap and the idle window in force at *now*."""
+        return min(self.hard_deadline, self.idle_deadline(now))
 
     def active(self, now: datetime) -> bool:
-        return self.deadline > now
+        return self.deadline(now) > now
 
     def lapse_reason(self, now: datetime) -> str:
         """Why this claim is no longer active -- for the message that denies a write."""
         if self.active(now):
             return ""
-        idle_deadline = (self.activity or self.creation) + timedelta(
-            hours=IDLE_LAPSE_HOURS
-        )
-        if idle_deadline <= now and idle_deadline <= self.expiry:
+        idle_deadline = self.idle_deadline(now)
+        if idle_deadline <= now and idle_deadline <= self.hard_deadline:
             since = self.activity or self.creation
             what = "last write" if self.activity else "creation"
+            window = self.idle_window(now).total_seconds() / 60.0
+            overran = (
+                f"overran its expected {self.expected:%H:%M}Z, so it "
+                if self.overrun(now)
+                else ""
+            )
             return (
                 f"idle since {what} at {since:%Y-%m-%d %H:%M}Z "
-                f"(lapses after {IDLE_LAPSE_HOURS:g}h without a write)"
+                f"({overran}lapses after {window:g}m without a write)"
             )
-        return f"expired at {self.deadline:%Y-%m-%d %H:%M}Z"
+        return f"expired at {self.hard_deadline:%Y-%m-%d %H:%M}Z"
 
 
 def claim_store_path(repo: Path) -> Path:
@@ -191,15 +231,20 @@ def paths_overlap(first: str, second: str) -> bool:
     )
 
 
+_REQUIRED_CLAIM_FIELDS = frozenset(
+    {"claim_id", "owner", "paths", "justification", "created_at", "expires_at"}
+)
+
+
 def _claim_from_payload(payload: object) -> OwnershipClaim:
-    if not isinstance(payload, dict) or set(payload) != {
-        "claim_id",
-        "owner",
-        "paths",
-        "justification",
-        "created_at",
-        "expires_at",
-    }:
+    # `expected_at` is optional: a store written before it existed must keep loading,
+    # because a raise here reaches the write gate as "claim store unavailable" and
+    # fails closed for every lane at once.
+    if not isinstance(payload, dict) or not (
+        _REQUIRED_CLAIM_FIELDS
+        <= set(payload)
+        <= _REQUIRED_CLAIM_FIELDS | {"expected_at"}
+    ):
         raise OwnershipError("ownership claim has an invalid schema")
     paths = payload["paths"]
     if not isinstance(paths, list) or not paths:
@@ -214,6 +259,11 @@ def _claim_from_payload(payload: object) -> OwnershipClaim:
         justification=str(payload["justification"]).strip(),
         created_at=str(payload["created_at"]),
         expires_at=str(payload["expires_at"]),
+        expected_at=(
+            str(payload["expected_at"])
+            if payload.get("expected_at") is not None
+            else None
+        ),
     )
     if not claim.claim_id or not claim.owner or not claim.justification:
         raise OwnershipError(
@@ -226,15 +276,24 @@ def _claim_from_payload(payload: object) -> OwnershipClaim:
     expiry = claim.expiry
     if expiry <= created or expiry - created > timedelta(hours=MAX_CLAIM_HOURS):
         raise OwnershipError(f"claim {claim.claim_id} has an invalid lifetime")
-    identity = sha256_json(
-        {
-            "owner": claim.owner,
-            "paths": claim.paths,
-            "justification": claim.justification,
-            "created_at": claim.created_at,
-            "expires_at": claim.expires_at,
-        }
-    )
+    if claim.expected_at is not None:
+        expected = _instant(claim.expected_at, claim.claim_id, "expected time")
+        if expected <= created or expected > expiry:
+            raise OwnershipError(
+                f"claim {claim.claim_id} expects to finish outside its own lifetime"
+            )
+    fields = {
+        "owner": claim.owner,
+        "paths": claim.paths,
+        "justification": claim.justification,
+        "created_at": claim.created_at,
+        "expires_at": claim.expires_at,
+    }
+    # Bound into the identity only when present, so claims stored before the field
+    # existed still hash to the id they were written under.
+    if claim.expected_at is not None:
+        fields["expected_at"] = claim.expected_at
+    identity = sha256_json(fields)
     if claim.claim_id != f"claim-{identity[:20]}":
         raise OwnershipError(f"claim {claim.claim_id} is not bound to its content")
     return claim
@@ -278,6 +337,10 @@ def _write_claims(repo: Path, claims: Sequence[OwnershipClaim]) -> Path:
     for claim in claims:
         payload = asdict(claim)
         payload.pop("last_seen", None)
+        # Omit rather than store null, so a claim written before `expected_at`
+        # existed round-trips to the exact bytes its id was hashed over.
+        if payload.get("expected_at") is None:
+            payload.pop("expected_at", None)
         stored.append({**payload, "paths": list(claim.paths)})
     write_json_atomic(
         path,
@@ -297,7 +360,8 @@ def create_claim(
     owner: str,
     paths: Sequence[str],
     justification: str,
-    hours: float,
+    expected_minutes: float = EXPECTED_DEFAULT_MINUTES,
+    max_minutes: float = MAX_DEFAULT_MINUTES,
 ) -> OwnershipClaim:
     owner = owner.strip()
     justification = justification.strip()
@@ -306,9 +370,13 @@ def create_claim(
         raise OwnershipError(
             "owner, justification, and at least one exact path are required"
         )
-    if hours <= 0 or hours > MAX_ACTIVE_CLAIM_HOURS:
+    cap = MAX_ACTIVE_CLAIM_HOURS * 60.0
+    if max_minutes <= 0 or max_minutes > cap:
+        raise OwnershipError(f"claim max time must be > 0 and <= {cap:g} minutes")
+    if expected_minutes <= 0 or expected_minutes > max_minutes:
         raise OwnershipError(
-            f"claim duration must be > 0 and <= {MAX_ACTIVE_CLAIM_HOURS:g} hours"
+            "claim expected time must be > 0 and no later than its max time "
+            f"({max_minutes:g} minutes)"
         )
     now = datetime.now(timezone.utc)
     claims, _digest = load_claims(repo)
@@ -322,7 +390,8 @@ def create_claim(
                         f"owned by {claim.owner!r} at {existing!r}"
                     )
     created_at = now.isoformat()
-    expires_at = (now + timedelta(hours=hours)).isoformat()
+    expires_at = (now + timedelta(minutes=max_minutes)).isoformat()
+    expected_at = (now + timedelta(minutes=expected_minutes)).isoformat()
     identity = sha256_json(
         {
             "owner": owner,
@@ -330,6 +399,7 @@ def create_claim(
             "justification": justification,
             "created_at": created_at,
             "expires_at": expires_at,
+            "expected_at": expected_at,
         }
     )
     claim = OwnershipClaim(
@@ -339,6 +409,7 @@ def create_claim(
         justification=justification,
         created_at=created_at,
         expires_at=expires_at,
+        expected_at=expected_at,
     )
     _write_claims(repo, [*active, claim])
     return claim

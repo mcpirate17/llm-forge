@@ -245,9 +245,13 @@ def _repo_relative_targets(payload: dict[str, Any]) -> list[str]:
 
 def _claim_allows(owner: str, target: str) -> tuple[bool, str]:
     if not owner:
-        return False, "hook has no GOVERNANCE_OWNER identity"
+        return False, (
+            "hook has no governance identity, so no claim can be matched — "
+            "export GOVERNANCE_OWNER=<lane>"
+        )
     try:
         sys.path.insert(0, str(REPO_ROOT))
+        from conductor.candidate_review.identity import vendor_for
         from conductor.candidate_review.ownership import (
             load_claims,
             paths_overlap,
@@ -257,18 +261,30 @@ def _claim_allows(owner: str, target: str) -> tuple[bool, str]:
         claims, digest = load_claims(REPO_ROOT)
     except (ImportError, OSError, RuntimeError, ValueError) as exc:
         return False, f"live claim store is unavailable: {exc}"
+    # Claims written before lanes had identities name a vendor. They still hold,
+    # or every lane that has not yet rebased loses its writes the moment this
+    # lands. Each such match is logged, so the day the log goes quiet is the day
+    # this fallback can be deleted.
+    legacy = vendor_for(owner)
     now = datetime.now(UTC)
     holders: list[str] = []
     lapsed: list[str] = []
     for claim in claims:
         if not any(paths_overlap(target, claimed) for claimed in claim.paths):
             continue
-        mine = claim.owner.casefold() == owner.casefold()
+        claimed_by = claim.owner.casefold()
+        mine = claimed_by == owner.casefold()
+        by_vendor = not mine and bool(legacy) and claimed_by == legacy
+        mine = mine or by_vendor
         if not claim.active(now):
             if mine:
                 lapsed.append(f"{claim.claim_id} ({claim.lapse_reason(now)})")
             continue
         if mine:
+            if by_vendor:
+                _record_exposure(
+                    owner, target, f"vendor-claim:{claim.owner}", str(REPO_ROOT)
+                )
             try:
                 touch_claim(REPO_ROOT, claim.claim_id, now=now)
             except OSError:
@@ -278,7 +294,8 @@ def _claim_allows(owner: str, target: str) -> tuple[bool, str]:
                 pass
             return True, digest
         holders.append(
-            f"{claim.owner} until {claim.deadline:%Y-%m-%dT%H:%M}Z ({claim.claim_id})"
+            f"{claim.owner} until {claim.deadline(now):%Y-%m-%dT%H:%M}Z"
+            f"{' OVERRUN' if claim.overrun(now) else ''} ({claim.claim_id})"
         )
     if holders:
         return False, (
@@ -295,18 +312,24 @@ def _claim_allows(owner: str, target: str) -> tuple[bool, str]:
 
 
 def _default_owner() -> str:
-    explicit = os.environ.get("GOVERNANCE_OWNER", "").strip()
-    if explicit:
-        return explicit
-    if os.environ.get("QWEN_PROJECT_DIR"):
-        return "qwen"
-    if os.environ.get("GROK_PROJECT_DIR"):
-        return "grok"
-    if os.environ.get("CLAUDE_PROJECT_DIR"):
-        return os.environ.get("A2A_AGENT_NAME", "").strip() or "claude"
-    if os.environ.get("CODEX_HOME"):
-        return "codex"
-    return "codex"
+    """The lane this hook speaks for, or ``""`` to deny for want of an identity.
+
+    Every ladder the gate used to carry lived here, and it disagreed with the one
+    claim creation used — which is how codex came to run its gate as ``codex``
+    while claiming as ``codex-<lane>``. There is one resolver now; a failure to
+    reach it denies rather than guessing an owner, because guessing is what let a
+    lane write over another lane's claim.
+    """
+    try:
+        sys.path.insert(0, str(REPO_ROOT))
+        from conductor.candidate_review.identity import resolve_owner
+    except ImportError:
+        return ""
+    try:
+        # OwnerIdentityError is a RuntimeError: an unnameable lane denies.
+        return resolve_owner(REPO_ROOT)
+    except (RuntimeError, OSError, ValueError):
+        return ""
 
 
 def start(payload: dict[str, Any]) -> int:

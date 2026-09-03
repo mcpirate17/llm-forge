@@ -203,6 +203,9 @@ class TestValidateBranchName:
             "Claude/topic-20260829",
             "claude/topic-20260229",
             "bad name here",
+            # an agent slug that survives slugification but still starts with a
+            # digit: the suggestion must prefix it, or it is not itself valid.
+            "9team/topic-20260829",
         ):
             suggestion = bp.suggest_branch_name(bad)
             bp.validate_branch_name(suggestion)  # must not raise
@@ -240,8 +243,17 @@ class TestIsIntegrationBranch:
 
 
 class TestIsFastForward:
-    def test_equal_shas_is_ff(self, repo: Path) -> None:
+    def test_equal_shas_is_ff(
+        self, repo: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         sha = _commit(repo, "a.txt")
+
+        # git would answer True here anyway, so asserting the return value alone
+        # tests nothing. What the shortcut buys is skipping the subprocess.
+        def boom(*args: object, **kwargs: object) -> object:
+            raise AssertionError("equal shas must not shell out to git")
+
+        monkeypatch.setattr(bp.subprocess, "run", boom)
         assert bp.is_fast_forward(repo, old=sha, new=sha) is True
 
     def test_empty_old_is_ff(self, repo: Path) -> None:
@@ -276,9 +288,11 @@ class TestIsFastForward:
 
 class TestLocalOnlyCommits:
     def test_reports_everything_when_nothing_is_excluded(self, repo: Path) -> None:
-        sha = _commit(repo, "a.txt")
+        first = _commit(repo, "a.txt")
+        second = _commit(repo, "b.txt")
         rows = bp.local_only_commits(repo, "master")
-        assert [row["sha"] for row in rows] == [sha]
+        # the whole unpushed run, newest first -- not just the tip
+        assert [row["sha"] for row in rows] == [second, first]
 
     def test_excluded_by_remote_ref(self, repo: Path) -> None:
         sha = _commit(repo, "a.txt")
@@ -344,7 +358,7 @@ class TestBranchClaimBinding:
     def test_matches_owner_and_overlapping_path(self, repo: Path) -> None:
         self._feature_branch_with_changed_file(repo, "claude/topic-20260829", "src.py")
         claim = create_claim(
-            repo, owner="claude", paths=["src.py"], justification="t", hours=1
+            repo, owner="claude", paths=["src.py"], justification="t", max_minutes=60
         )
         matches = bp.branch_claim_binding(repo, "claude/topic-20260829")
         assert claim in matches
@@ -352,14 +366,14 @@ class TestBranchClaimBinding:
     def test_excludes_non_overlapping_path(self, repo: Path) -> None:
         self._feature_branch_with_changed_file(repo, "claude/topic-20260829", "src.py")
         create_claim(
-            repo, owner="claude", paths=["other.py"], justification="t", hours=1
+            repo, owner="claude", paths=["other.py"], justification="t", max_minutes=60
         )
         assert bp.branch_claim_binding(repo, "claude/topic-20260829") == ()
 
     def test_excludes_different_owner(self, repo: Path) -> None:
         self._feature_branch_with_changed_file(repo, "claude/topic-20260829", "src.py")
         create_claim(
-            repo, owner="fable-5", paths=["src.py"], justification="t", hours=1
+            repo, owner="fable-5", paths=["src.py"], justification="t", max_minutes=60
         )
         assert bp.branch_claim_binding(repo, "claude/topic-20260829") == ()
 
@@ -511,6 +525,12 @@ class TestRecordPushAndStaleness:
         assert updated.last_push_at == when.isoformat()
 
     def test_record_push_noop_for_unbound_branch(self, repo: Path) -> None:
+        # another branch IS bound: a no-op must still return None rather than
+        # reach for whatever binding happens to be in the store.
+        _checkout_new(repo, "claude/other-20260829")
+        bp.bind_branch(
+            repo, branch="claude/other-20260829", claim_id="c1", owner="claude"
+        )
         assert bp.record_push(repo, branch="claude/none-20260829") is None
 
     def _binding(self, *, created_at: datetime) -> bp.BranchBinding:
@@ -830,8 +850,13 @@ class TestCli:
         rc = bp.main(["check-branch", "bad name"])
         assert rc == 1
         capsys.readouterr()
-        rc = bp.main(["check-push", "--branch", "Bad Name"])
-        assert rc != 0
+        # the branch must EXIST, or check-push exits 2 down the error path
+        # without ever reaching the refusal it is supposed to be testing.
+        _commit(repo, "a.txt")
+        _checkout_new(repo, "Bad_Name")
+        rc = bp.main(["check-push", "--branch", "Bad_Name"])
+        assert rc == 1
+        assert "REFUSE" in capsys.readouterr().out
 
     def test_check_push_stdin_protocol_allow(
         self,

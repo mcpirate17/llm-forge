@@ -71,7 +71,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     subprocess.run(["git", "init", "--quiet"], cwd=r, check=True)
     for name in ("a.py", "b.py"):
         (r / name).write_text("X = 1\n", encoding="utf-8")
-    create_claim(r, owner="codex", paths=["a.py"], justification="j", hours=1)
+    create_claim(r, owner="codex", paths=["a.py"], justification="j", max_minutes=60)
     monkeypatch.setattr(sb, "ROOT", r)
     return r
 

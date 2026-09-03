@@ -29,6 +29,7 @@ from conductor.candidate_review.model import (
     Severity,
     write_json_atomic,
 )
+from conductor.candidate_review import identity
 from conductor.candidate_review.ownership import (
     OwnershipError,
     claim_store_path,
@@ -163,8 +164,6 @@ def test_cli_review_attestation_claim_and_receipt_workflow(
                 "claim",
                 "--repo",
                 str(repo),
-                "--owner",
-                "Codex",
                 "--justification",
                 "exercise the complete CLI ownership protocol",
                 "probe.txt",
@@ -173,6 +172,9 @@ def test_cli_review_attestation_claim_and_receipt_workflow(
         == 0
     )
     claims, _digest = load_claims(repo)
+    # No --owner was passed: the claim is filed under the lane that will write it,
+    # which is the only name its own write gate will present.
+    assert claims[0].owner == identity.resolve_owner(repo)
     assert review_cli.main(["claims", "--repo", str(repo)]) == 0
     assert (
         review_cli.main(
@@ -180,7 +182,7 @@ def test_cli_review_attestation_claim_and_receipt_workflow(
                 "release-claim",
                 claims[0].claim_id,
                 "--owner",
-                "Codex",
+                claims[0].owner,
                 "--repo",
                 str(repo),
             ]
@@ -538,20 +540,20 @@ def test_ownership_state_rejects_tampering_and_broad_claims(tmp_path: Path) -> N
     for path in ("research", "../escape", "/absolute", "conductor/**"):
         with pytest.raises(OwnershipError, match="narrow and repository-relative"):
             review_ownership.normalize_claim_path(path)
-    with pytest.raises(OwnershipError, match="duration"):
+    with pytest.raises(OwnershipError, match="max time must be"):
         create_claim(
             repo,
             owner="Codex",
             paths=["conductor/probe.py"],
             justification="invalid duration test",
-            hours=25,
+            max_minutes=25 * 60,
         )
     claim = create_claim(
         repo,
         owner="Codex",
         paths=["conductor/probe.py"],
         justification="tamper-evident ownership test",
-        hours=1,
+        max_minutes=60,
     )
     store = claim_store_path(repo)
     payload = json.loads(store.read_text(encoding="utf-8"))

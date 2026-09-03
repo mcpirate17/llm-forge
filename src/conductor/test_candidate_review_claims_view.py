@@ -25,10 +25,10 @@ def repo_with_claims(tmp_path: Path) -> Path:
         owner="alpha",
         paths=["conductor/a.py", "conductor/b.py"],
         justification="alpha " + "x" * 100,
-        hours=1,
+        max_minutes=60,
     )
     create_claim(
-        repo, owner="beta", paths=["docs.md"], justification="beta docs", hours=1
+        repo, owner="beta", paths=["docs.md"], justification="beta docs", max_minutes=60
     )
     return repo
 
@@ -41,7 +41,7 @@ def test_compact_view_is_one_line_per_claim_plus_paths(
     )
     out = capsys.readouterr().out
     lines = out.splitlines()
-    assert lines[0].startswith("claims: 2 active, 0 expired, sha256 ")
+    assert lines[0].startswith("claims: 2 active (0 overrun), 0 expired, sha256 ")
     assert len(lines) == 3
     alpha = next(line for line in lines if " alpha " in line)
     assert " 2 paths  conductor/(2)  " in alpha and alpha.endswith("…")
@@ -93,6 +93,7 @@ def test_default_json_view_is_unchanged(
         "justification",
         "created_at",
         "expires_at",
+        "expected_at",
     }
 
 
@@ -114,9 +115,32 @@ def test_compact_text_counts_expired_and_hides_them() -> None:
         "abcdef0123456789",
         now=now,
     )
-    assert text.splitlines()[0] == "claims: 1 active, 1 expired, sha256 abcdef012345"
+    assert (
+        text.splitlines()[0]
+        == "claims: 1 active (0 overrun), 1 expired, sha256 abcdef012345"
+    )
     assert "claim-live" in text and "claim-dead" not in text
-    # 14:00 is what it asked for; 13:30 is the idle lapse, and the earlier one is
+    # 14:00 is what it asked for; 12:45 is the idle lapse, and the earlier one is
     # what actually releases the path. Printing the later one would be a lie.
-    assert "exp 08-27 13:30Z" in text
-    assert "idle   0m" in text
+    assert "due 08-27 14:00Z ends 08-27 12:45Z" in text
+    assert "on-time" in text
+    assert "idle   0/45m" in text
+
+
+def test_compact_text_marks_an_overrun_claim() -> None:
+    """Past its estimate the claim still holds, and the view has to say so."""
+    now = datetime(2026, 8, 27, 12, 0, tzinfo=timezone.utc)
+    claim = OwnershipClaim(
+        claim_id="claim-late",
+        owner="late",
+        paths=("p.py",),
+        justification="j",
+        created_at=(now - timedelta(hours=1)).isoformat(),
+        expires_at=(now + timedelta(hours=1)).isoformat(),
+        expected_at=(now - timedelta(minutes=30)).isoformat(),
+        last_seen=(now - timedelta(minutes=5)).isoformat(),
+    )
+    text = review_cli.compact_claims_text([claim], "abcdef0123456789", now=now)
+    assert text.splitlines()[0].startswith("claims: 1 active (1 overrun),")
+    assert "OVERRUN" in text
+    assert "idle   5/10m" in text

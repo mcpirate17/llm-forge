@@ -304,7 +304,7 @@ def test_structured_claims_reject_exact_path_overlap_and_bind_content(
         owner="Codex",
         paths=["conductor/candidate_review"],
         justification="candidate governance implementation",
-        hours=1,
+        max_minutes=60,
     )
     claims, digest = load_claims(repo)
     assert claims == (claim,)
@@ -315,7 +315,7 @@ def test_structured_claims_reject_exact_path_overlap_and_bind_content(
             owner="Other agent",
             paths=["conductor/candidate_review/engine.py"],
             justification="conflicting edit",
-            hours=1,
+            max_minutes=60,
         )
     with pytest.raises(OwnershipError, match="not 'Other agent'"):
         release_claim(repo, claim_id=claim.claim_id, owner="Other agent")
@@ -347,7 +347,7 @@ def test_ownership_claim_is_independent_of_ignored_worktree_ledger(
         owner="Codex",
         paths=["source.py"],
         justification="focused ownership test",
-        hours=1,
+        max_minutes=60,
     )
 
     def result_with_ledger(text: str):

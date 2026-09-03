@@ -48,7 +48,7 @@ def test_release_owner_claims_requires_explicit_scope(session_repo: Path) -> Non
         owner="agent-alpha",
         paths=["conductor/foo.py"],
         justification="alpha task",
-        hours=1.0,
+        max_minutes=60.0,
     )
     with pytest.raises(
         SessionCloseError,
@@ -68,14 +68,14 @@ def test_release_specific_claim_id(session_repo: Path) -> None:
         owner="agent-alpha",
         paths=["conductor/foo.py"],
         justification="alpha task 1",
-        hours=1.0,
+        max_minutes=60.0,
     )
     c2 = create_claim(
         session_repo,
         owner="agent-alpha",
         paths=["conductor/baz.py"],
         justification="alpha task 2",
-        hours=1.0,
+        max_minutes=60.0,
     )
 
     released = release_owner_claims(
@@ -104,7 +104,7 @@ def test_close_session_full_flow(session_repo: Path) -> None:
         owner="agent-close",
         paths=["conductor/file1.py"],
         justification="close task",
-        hours=1.0,
+        max_minutes=60.0,
     )
 
     res = close_session(
@@ -173,7 +173,7 @@ def test_main_cli(session_repo: Path, capsys: pytest.CaptureFixture[str]) -> Non
         owner="cli-agent",
         paths=["conductor/cli_file.py"],
         justification="cli task",
-        hours=1.0,
+        max_minutes=60.0,
     )
 
     code = main(

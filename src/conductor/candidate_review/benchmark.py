@@ -209,7 +209,7 @@ def _prepare_fixture(source: Path, root: Path) -> Fixture:
         owner="Codex",
         paths=BENCHMARK_CLAIM_PATHS,
         justification="isolated candidate-review latency benchmark",
-        hours=1,
+        max_minutes=60,
     )
     return Fixture(source, repo, baseline_commit, baseline_tree)
 

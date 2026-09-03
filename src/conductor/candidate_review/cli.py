@@ -33,13 +33,23 @@ from conductor.candidate_review.git_source import (
     run_git,
 )
 from conductor.candidate_review.model import sha256_json, write_json_atomic
+from conductor.candidate_review.identity import (
+    OwnerIdentityError,
+    is_vendor,
+    normalize,
+    require_lane_owner,
+    resolve_owner,
+)
 from conductor.candidate_review.ownership import (
+    EXPECTED_DEFAULT_MINUTES,
+    MAX_DEFAULT_MINUTES,
     OwnershipClaim,
     OwnershipError,
     create_claim,
     load_claims,
     paths_overlap,
     release_claim,
+    touch_claim,
 )
 from conductor.candidate_review.policy import PolicyError, load_policy
 from conductor.candidate_review.policy_path import resolve_policy_path
@@ -244,24 +254,94 @@ def commit_command(args: argparse.Namespace) -> int:
     return run_locked_git_commit(repo, ["commit", *commit_args])
 
 
+def _claim_owner(repo: Path, declared: str) -> str:
+    """The name this claim is filed under: the lane, and only the lane.
+
+    Claiming as ``codex`` and writing as ``codex-rust-hotpath-next-20260903`` is
+    how the store came to hold claims their own owner's gate could not recognise,
+    and claiming as a bare vendor is how every session of that vendor came to
+    satisfy one claim. Both are refused here, at the one place claims are born.
+    """
+    declared = normalize(declared)
+    if declared:
+        require_lane_owner(declared)  # a vendor name fails here, and says why
+    try:
+        resolved = resolve_owner(repo)
+    except OwnerIdentityError:
+        if not declared:
+            raise
+        resolved = ""
+    if declared and resolved and not is_vendor(resolved) and declared != resolved:
+        raise OwnerIdentityError(
+            f"owner {declared!r} is not this lane: writes from here are gated as "
+            f"{resolved!r}, so the claim would hold paths its own writer cannot "
+            "touch. Drop --owner, or export GOVERNANCE_OWNER to rename the lane"
+        )
+    return require_lane_owner(declared or resolved)
+
+
 def claim_command(args: argparse.Namespace) -> int:
     repo = repository_root(Path(args.repo))
+    try:
+        owner = _claim_owner(repo, args.owner)
+    except OwnerIdentityError as exc:
+        print(f"ownership claim failed closed: {exc}", file=sys.stderr)
+        return 1
     try:
         with governance_lock(repo, exclusive=True, timeout_seconds=30.0):
             claim = create_claim(
                 repo,
-                owner=args.owner,
+                owner=owner,
                 paths=args.paths,
                 justification=args.justification,
-                hours=args.hours,
+                expected_minutes=args.expected_minutes,
+                max_minutes=(
+                    args.hours * 60.0 if args.hours is not None else args.max_minutes
+                ),
             )
     except (OSError, OwnershipError, TimeoutError) as exc:
         print(f"ownership claim failed closed: {exc}", file=sys.stderr)
         return 1
     print(
         f"created {claim.claim_id} owner={claim.owner} "
-        f"expires={claim.expires_at} paths={','.join(claim.paths)}"
+        f"expected={claim.expected_at} max={claim.expires_at} "
+        f"paths={','.join(claim.paths)}"
     )
+    return 0
+
+
+def touch_claim_command(args: argparse.Namespace) -> int:
+    """Heartbeat: say the work under a claim is still moving.
+
+    The idle timer measures time since the last *write*, so long legitimate work
+    that writes nothing -- a benchmark, a mutation campaign, a build -- would
+    otherwise lapse a claim its owner is actively using. This is how such an owner
+    keeps it, and the reason the idle window can be short enough to be useful.
+    """
+    repo = repository_root(Path(args.repo))
+    try:
+        with governance_lock(repo, exclusive=True, timeout_seconds=30.0):
+            claims, _digest = load_claims(repo)
+            match = next(
+                (claim for claim in claims if claim.claim_id == args.claim_id), None
+            )
+            if match is None:
+                raise OwnershipError(f"no claim {args.claim_id}")
+            if match.owner != args.owner:
+                raise OwnershipError(
+                    f"claim {args.claim_id} is owned by {match.owner!r}, "
+                    f"not {args.owner!r}"
+                )
+            now = datetime.now(timezone.utc)
+            if not match.active(now):
+                raise OwnershipError(
+                    f"claim {args.claim_id} already lapsed: {match.lapse_reason(now)}"
+                )
+            touch_claim(repo, args.claim_id, now=now)
+    except (OSError, OwnershipError, TimeoutError) as exc:
+        print(f"claim heartbeat failed closed: {exc}", file=sys.stderr)
+        return 1
+    print(f"touched {args.claim_id}; idle timer reset, max time unchanged")
     return 0
 
 
@@ -312,21 +392,28 @@ def compact_claims_text(
     now: datetime,
     with_paths: bool = False,
 ) -> str:
-    """One line per active claim: id owner expiry path-count dirs justification.
+    """One line per active claim: id owner state expected/max idle paths dirs why.
 
     The full JSON store is ~60 KB on a busy tree (~15k tokens). Full path lists
     only with *with_paths*; use ``--path`` to answer "is X claimed" instead.
     """
     active = [claim for claim in claims if claim.active(now)]
     expired = len(claims) - len(active)
-    lines = [f"claims: {len(active)} active, {expired} expired, sha256 {digest[:12]}"]
+    overrun = sum(1 for claim in active if claim.overrun(now))
+    lines = [
+        f"claims: {len(active)} active ({overrun} overrun), {expired} expired, "
+        f"sha256 {digest[:12]}"
+    ]
     for claim in active:
         just = claim.justification.strip().replace("\n", " ")
         if len(just) > COMPACT_JUSTIFICATION_CHARS:
             just = just[: COMPACT_JUSTIFICATION_CHARS - 1] + "…"
+        idle = (now - (claim.activity or claim.creation)).total_seconds() / 60
+        state = "OVERRUN" if claim.overrun(now) else "on-time"
         lines.append(
-            f"{claim.claim_id}  {claim.owner:<14} exp {claim.deadline:%m-%d %H:%MZ}  "
-            f"idle {(now - (claim.activity or claim.creation)).total_seconds() / 60:>3.0f}m  "
+            f"{claim.claim_id}  {claim.owner:<14} {state:<7} "
+            f"due {claim.expected:%m-%d %H:%MZ} ends {claim.deadline(now):%m-%d %H:%MZ}  "
+            f"idle {idle:>3.0f}/{claim.idle_window(now).total_seconds() / 60:g}m  "
             f"{len(claim.paths):>2} paths  {_dir_summary(claim.paths)}  {just}"
         )
         if with_paths:
@@ -388,10 +475,10 @@ def fix_command(args: argparse.Namespace) -> int:
     return 0
 
 
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.set_defaults(func=None)
-    subparsers = parser.add_subparsers(dest="command", required=True)
+def _add_review_parsers(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    """Reviewing a candidate, and the receipts that bind one to a commit."""
     review = subparsers.add_parser("review", help="Review an exact Git candidate")
     review.add_argument("--repo", default=".")
     review.add_argument(
@@ -436,15 +523,49 @@ def _parser() -> argparse.ArgumentParser:
     commit.add_argument("--repo", default=".")
     commit.add_argument("git_args", nargs=argparse.REMAINDER)
     commit.set_defaults(func=commit_command)
+
+
+def _add_claim_parsers(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    """Creating, refreshing, releasing and reading ownership claims."""
     claim = subparsers.add_parser(
         "claim", help="Create a narrow, expiring ownership claim"
     )
     claim.add_argument("--repo", default=".")
-    claim.add_argument("--owner", required=True)
+    claim.add_argument(
+        "--owner",
+        default="",
+        help="lane name; defaults to this worktree's, and must agree with it",
+    )
     claim.add_argument("--justification", required=True)
-    claim.add_argument("--hours", type=float, default=1.0)
+    claim.add_argument(
+        "--expected-minutes",
+        type=float,
+        default=EXPECTED_DEFAULT_MINUTES,
+        help="how long you expect to need; past it the idle window shrinks",
+    )
+    claim.add_argument(
+        "--max-minutes",
+        type=float,
+        default=MAX_DEFAULT_MINUTES,
+        help="the most this claim may ever hold the paths",
+    )
+    claim.add_argument(
+        "--hours",
+        type=float,
+        default=None,
+        help="deprecated alias for --max-minutes, in hours",
+    )
     claim.add_argument("paths", nargs="+")
     claim.set_defaults(func=claim_command)
+    touch = subparsers.add_parser(
+        "touch-claim", help="Reset a claim's idle timer while work is still running"
+    )
+    touch.add_argument("claim_id")
+    touch.add_argument("--owner", required=True)
+    touch.add_argument("--repo", default=".")
+    touch.set_defaults(func=touch_claim_command)
     release = subparsers.add_parser(
         "release-claim", help="Release an ownership claim as its owner"
     )
@@ -470,6 +591,14 @@ def _parser() -> argparse.ArgumentParser:
         help="with --compact: also list every claimed path (implied by --path)",
     )
     claims.set_defaults(func=claims_command)
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.set_defaults(func=None)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    _add_review_parsers(subparsers)
+    _add_claim_parsers(subparsers)
     fix = subparsers.add_parser(
         "fix", help="Explicitly mutate only named worktree paths"
     )

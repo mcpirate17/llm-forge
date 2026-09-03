@@ -25,9 +25,11 @@ def gate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from conductor.candidate_review.ownership import create_claim
 
     create_claim(
-        repo, owner="codex-phase22", paths=["a.py"], justification="j", hours=1
+        repo, owner="codex-phase22", paths=["a.py"], justification="j", max_minutes=60
     )
-    create_claim(repo, owner="claude", paths=["b.py"], justification="j", hours=1)
+    create_claim(
+        repo, owner="claude", paths=["b.py"], justification="j", max_minutes=60
+    )
     monkeypatch.setenv("CRG_GATE_REPO_ROOT", str(repo))
     sys.path.insert(0, str(HOOK_DIR))
     import crg_gate
@@ -52,10 +54,8 @@ def test_denial_without_any_holder_keeps_plain_message(gate) -> None:
     allowed, detail = gate._claim_allows("claude", "c.py")
     assert not allowed
     assert detail == "no live exact claim for owner='claude' path='c.py'"
-    assert gate._claim_allows("", "a.py") == (
-        False,
-        "hook has no GOVERNANCE_OWNER identity",
-    )
+    allowed, detail = gate._claim_allows("", "a.py")
+    assert not allowed and "export GOVERNANCE_OWNER=<lane>" in detail
 
 
 @pytest.fixture
@@ -548,3 +548,29 @@ def test_another_owners_lapsed_claim_does_not_hold_the_path(gate) -> None:
     allowed, detail = gate._claim_allows("claude", "a.py")
     assert not allowed
     assert "is held by" not in detail  # lapsed: nobody holds it any more
+
+
+def test_a_lane_inherits_a_claim_written_before_lanes_had_names(gate) -> None:
+    """``b.py`` is owned by the bare literal ``claude``, as every claim once was.
+
+    Refusing those the moment the resolver ships would take the writes off every
+    lane that has not yet rebased, so they still hold -- for their own vendor only.
+    """
+    allowed, detail = gate._claim_allows("claude-branch-policy", "b.py")
+    assert allowed and len(detail) == 64
+
+
+def test_inheriting_a_vendor_claim_is_logged_so_the_fallback_can_be_retired(
+    gate, tmp_path: Path
+) -> None:
+    gate._claim_allows("claude-branch-policy", "b.py")
+    log = tmp_path / "repo" / ".git" / "governance" / "claim-gate-exposure.jsonl"
+    entry = json.loads(log.read_text(encoding="utf-8").splitlines()[-1])
+    assert entry["owner"] == "claude-branch-policy"
+    assert entry["tool"] == "vendor-claim:claude"
+
+
+def test_a_lane_does_not_inherit_another_vendors_claim(gate) -> None:
+    allowed, detail = gate._claim_allows("codex-rust-hotpath-20260903", "b.py")
+    assert not allowed
+    assert "is held by claude until" in detail
