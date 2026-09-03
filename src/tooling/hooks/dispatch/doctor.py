@@ -9,6 +9,10 @@ registered hook (legacy or dispatcher wiring), and runs on a synthetic payload
 within its timeout, exiting 0 with either nothing or valid JSON on stdout. A
 non-zero exit is DEAD even though the harness ignores it — that is the silent
 failure this tool exists to catch. Exit status is 1 when any hook is DEAD.
+
+One extra row reports the background graph-refresh state (``refresh_state_check``):
+DEAD when a worker has held the refresh lock past the stuck threshold or queued
+paths have no worker, WARN when a failed refresh is still waiting to be reported.
 """
 
 from __future__ import annotations
@@ -239,6 +243,24 @@ def run_check(
     return out
 
 
+def refresh_state_check(project_dir: Path, *, now: float | None = None) -> Report:
+    """The async graph-refresh queue: a stuck lock is DEAD, a waiting failure WARN."""
+    from tooling.hooks.agent import crg_refresh_state as refresh
+
+    store = refresh.store_for(project_dir)
+    state = refresh.status(store, now=now)
+    summary = (
+        f"graph-refresh state: pending={state['pending']} "
+        f"worker_alive={state['worker_alive']} ({store.root})"
+    )
+    report = Report(Declared("(background)", "graph-refresh", summary, 0))
+    if state["stuck"]:
+        report.dead(f"stuck: {state['stuck']}")
+    if state["failed_waiting"]:
+        report.warn(f"failed refresh waiting in {store.failed}")
+    return report
+
+
 def diagnose(
     declared: list[Declared], project_dir: Path, scratch: Path
 ) -> list[Report]:
@@ -251,6 +273,12 @@ def diagnose(
             run_check(item, report, project_dir, scratch)
         reports.append(report)
     return reports
+
+
+def render_state(report: Report) -> str:
+    """One line above the hook table: ``graph-refresh | OK|WARN|DEAD <summary>``."""
+    problems = "".join(f"\n  !! {problem}" for problem in report.problems)
+    return f"graph-refresh | {report.status} {report.declared.command}{problems}"
 
 
 def render(reports: list[Report]) -> str:
@@ -294,16 +322,21 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     with tempfile.TemporaryDirectory(prefix="hook-doctor-") as tmp:
         reports = diagnose(load_settings(settings), project_dir, Path(tmp))
+    state = refresh_state_check(project_dir)
     if args.json:
         print(
             json.dumps(
-                [r.__dict__ | {"declared": r.declared.__dict__} for r in reports],
+                [
+                    r.__dict__ | {"declared": r.declared.__dict__}
+                    for r in [*reports, state]
+                ],
                 indent=2,
             )
         )
     else:
+        print(render_state(state))
         print(render(reports))
-    return 1 if any(r.status == "DEAD" for r in reports) else 0
+    return 1 if any(r.status == "DEAD" for r in [*reports, state]) else 0
 
 
 if __name__ == "__main__":

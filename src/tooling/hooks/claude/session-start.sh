@@ -25,14 +25,20 @@ HOOK_INPUT=$(cat)
 # injected context by _append_context.py, stderr passed through. Additive only
 # -- it cannot shrink or replace what the generic half produced -- and a
 # non-zero exit is reported, never fatal.
+# Its stdout is collected through a file, never a `$(...)` pipe: a pipe stays
+# open until the extension's last DETACHED child exits, so one background job
+# (obsidian_ops_cycle, 2026-09-03) held session start for 1.2 s.
 PROJECT_HOOK="$PROJECT_HOOK_DIR/session-start.sh"
 PROJECT_HOOK_CONTEXT=""
 if [[ -x "$PROJECT_HOOK" ]]; then
-  PROJECT_HOOK_CONTEXT=$(printf '%s' "$HOOK_INPUT" \
-    | REPO_ROOT="$REPO_ROOT" HOOK_DIR="$HOOK_DIR" "$PROJECT_HOOK") || {
-    PROJECT_HOOK_CONTEXT=""
+  PROJECT_HOOK_OUT=$(mktemp)
+  if printf '%s' "$HOOK_INPUT" \
+    | REPO_ROOT="$REPO_ROOT" HOOK_DIR="$HOOK_DIR" "$PROJECT_HOOK" >"$PROJECT_HOOK_OUT"; then
+    PROJECT_HOOK_CONTEXT=$(<"$PROJECT_HOOK_OUT")
+  else
     echo "[session-start] project extension failed: $PROJECT_HOOK" >&2
-  }
+  fi
+  rm -f "$PROJECT_HOOK_OUT"
 fi
 export PROJECT_HOOK_CONTEXT
 

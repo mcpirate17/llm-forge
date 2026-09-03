@@ -19,7 +19,7 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py PostToolUse",
-            "timeout": 61
+            "timeout": 16
           }
         ]
       }

@@ -2,7 +2,7 @@
 
 Each ``HookSpec`` mirrors one entry of the pre-dispatcher ``.claude/settings.json``
 (``legacy_command`` is that entry verbatim, so the doctor can resolve either wiring
-to a registered hook). ``adapter`` names an in-process adapter in ``adapters.py``;
+to a registered hook; empty for hooks born under the dispatcher). ``adapter`` names an in-process adapter in ``adapters.py``;
 an empty adapter means the body still runs as a subprocess (``argv`` relative to the
 project root, under the running interpreter for ``.py`` bodies).
 """
@@ -45,15 +45,35 @@ _OWNER_ENV = 'env GOVERNANCE_OWNER="${GOVERNANCE_OWNER:-claude}" '
 _CRG_GATE = "$CLAUDE_PROJECT_DIR/.agent_hooks/crg_gate.py"
 _PRE_EDIT = "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-edit.sh"
 
+_GRAPH_TOOLS = "mcp__code[-_]review[-_]graph__.*"
+
 HOOKS: Final[tuple[HookSpec, ...]] = (
     # ── PreToolUse ────────────────────────────────────────────────────────
     HookSpec(
         "crg_gate_mark",
         "PreToolUse",
-        "mcp__code[-_]review[-_]graph__.*",
+        _GRAPH_TOOLS,
         5,
         f"{_CRG_GATE} mark",
         adapter="crg_gate_mark",
+        emits=False,
+    ),
+    HookSpec(
+        "crg_refresh_wait",
+        "PreToolUse",
+        _GRAPH_TOOLS,
+        5,
+        "",
+        adapter="crg_refresh_wait",
+        emits=False,
+    ),
+    HookSpec(
+        "crg_refresh_report_pre",
+        "PreToolUse",
+        ".*",
+        5,
+        "",
+        adapter="crg_refresh_report",
         emits=False,
     ),
     HookSpec(
@@ -121,12 +141,21 @@ HOOKS: Final[tuple[HookSpec, ...]] = (
     ),
     # ── PostToolUse ───────────────────────────────────────────────────────
     HookSpec(
+        "crg_refresh_report_post",
+        "PostToolUse",
+        ".*",
+        5,
+        "",
+        adapter="crg_refresh_report",
+        emits=False,
+    ),
+    HookSpec(
         "crg_graph_refresh",
         "PostToolUse",
         "Edit|Write|NotebookEdit",
-        30,
+        5,
         "$CLAUDE_PROJECT_DIR/.agent_hooks/crg_graph_refresh.py",
-        argv=("tooling/hooks/agent/crg_graph_refresh.py",),
+        adapter="crg_graph_refresh",
     ),
     HookSpec(
         "post_edit",
@@ -156,7 +185,7 @@ HOOKS: Final[tuple[HookSpec, ...]] = (
         "post_bash_graph",
         "PostToolUse",
         "Bash",
-        60,
+        5,
         "$CLAUDE_PROJECT_DIR/.claude/hooks/post-bash-graph.sh",
         adapter="post_bash_graph",
     ),
@@ -188,6 +217,15 @@ HOOKS: Final[tuple[HookSpec, ...]] = (
         emits=False,
     ),
     # ── SessionStart ──────────────────────────────────────────────────────
+    HookSpec(
+        "crg_refresh_report_session",
+        "SessionStart",
+        "",
+        5,
+        "",
+        adapter="crg_refresh_report",
+        emits=False,
+    ),
     HookSpec(
         "session_start",
         "SessionStart",
@@ -244,7 +282,7 @@ def settings_block() -> dict:
 def resolve_legacy(command: str) -> HookSpec | None:
     """The registered hook a pre-dispatcher settings.json command names."""
     for spec in HOOKS:
-        if spec.legacy_command == command:
+        if spec.legacy_command and spec.legacy_command == command:
             return spec
     return None
 

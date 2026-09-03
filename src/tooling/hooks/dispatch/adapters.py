@@ -12,7 +12,6 @@ import importlib
 import importlib.util
 import os
 import re
-import shutil
 import subprocess
 import sys
 import threading
@@ -133,6 +132,18 @@ def crg_gate_verify_bash(ctx: Any) -> None:
     )
 
 
+def crg_refresh_wait(ctx: Any) -> dict[str, Any] | None:
+    """Graph MCP query: wait (bounded) for a pending background refresh."""
+    return _body(ctx, "tooling/hooks/agent/crg_graph_refresh.py").wait_output()
+
+
+def crg_refresh_report(ctx: Any) -> dict[str, Any] | None:
+    """Every event: a failed background refresh becomes a visible systemMessage."""
+    return _body(ctx, "tooling/hooks/agent/crg_graph_refresh.py").failure_output(
+        ctx.event
+    )
+
+
 def pre_bash(ctx: Any) -> dict[str, Any] | None:
     command = _command(ctx)
     if not command:
@@ -172,6 +183,12 @@ def pre_read_skeleton(ctx: Any) -> dict[str, Any]:
 # ── PostToolUse ─────────────────────────────────────────────────────────
 
 
+def crg_graph_refresh(ctx: Any) -> dict[str, Any]:
+    return _body(ctx, "tooling/hooks/agent/crg_graph_refresh.py").hook_output(
+        ctx.payload
+    )
+
+
 def post_edit(ctx: Any) -> dict[str, Any]:
     return _body(ctx, "tooling/hooks/claude/_post_edit_audit.py").hook_output(
         ctx.payload
@@ -191,29 +208,7 @@ def post_bash_graph(ctx: Any) -> dict[str, Any]:
     command = _command(ctx)
     if not command or GIT_TREE_REWRITE.search(command) is None:
         return QUIET_POST
-    if shutil.which("code-review-graph") is None:
-        return QUIET_POST
-    proc = subprocess.run(
-        ["code-review-graph", "update", "--skip-flows"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        cwd=ctx.root,
-        env=ctx.env,
-        timeout=59,
-        check=False,
-    )
-    message = (
-        "code-review-graph refreshed after a git working-tree change."
-        if proc.returncode == 0
-        else "WARNING: code-review-graph update FAILED after a git working-tree change. "
-        "Graph reads are STALE until you run 'code-review-graph update' manually."
-    )
-    output = {
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": message,
-        }
-    }
+    output = _body(ctx, "tooling/hooks/agent/crg_graph_refresh.py").full_update_output()
     _telemetry(ctx, "post-bash-graph", output)
     return output
 

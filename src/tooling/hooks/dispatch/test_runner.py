@@ -163,15 +163,25 @@ def test_subprocess_timeout_is_an_error(tmp_path):
 
 def test_select_uses_registry_matchers():
     assert [s.name for s in runner.select("PreToolUse", PAYLOAD)] == [
+        "crg_refresh_report_pre",
         "crg_gate_verify_bash",
         "pre_bash",
         "current_work_guard_bash",
     ]
     assert [s.name for s in runner.select("SessionStart", {"source": "resume"})] == [
+        "crg_refresh_report_session",
         "session_start",
         "session_handoff",
     ]
-    assert runner.select("PreToolUse", {"tool_name": "Glob"}) == ()
+    assert [s.name for s in runner.select("PreToolUse", {"tool_name": "Glob"})] == [
+        "crg_refresh_report_pre"
+    ]
+    graph = {"tool_name": "mcp__code-review-graph__locate_tool"}
+    assert [s.name for s in runner.select("PreToolUse", graph)] == [
+        "crg_gate_mark",
+        "crg_refresh_wait",
+        "crg_refresh_report_pre",
+    ]
 
 
 def test_dispatch_merges_and_reports_errors(tmp_path, fake_adapters, monkeypatch):
