@@ -693,12 +693,15 @@ def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
     _support.atomic_json(path, payload)
 
 
+def _utc_stamp() -> str:
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
 def _default_receipt_path(campaign: Campaign, repo_root: Path) -> Path:
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return (
         repo_root
         / "research/reports/mutation_testing"
-        / f"{campaign.campaign_id}_{stamp}.json"
+        / f"{campaign.campaign_id}_{_utc_stamp()}.json"
     )
 
 
@@ -1142,6 +1145,12 @@ def _registry_campaigns(
     return campaigns
 
 
+def _plan_repin(selected: Mapping[str, Campaign], repo_root: Path) -> dict[str, str]:
+    return _support.plan_repin(
+        selected, repo_root, _sha256, symbol_hashes, CampaignError
+    )
+
+
 def repin_campaigns(
     registry_path: Path,
     *,
@@ -1164,12 +1173,13 @@ def repin_campaigns(
         raise CampaignError(
             "repin --run executes mutants and requires --allow-mutations"
         )
-    campaigns = _registry_campaigns(registry_path, repo_root=repo_root)
-    wanted = set(campaign_ids or [])
+    campaigns = _support.select_campaigns(
+        _registry_campaigns(registry_path, repo_root=repo_root),
+        campaign_ids,
+        CampaignError,
+    )
     drifted: list[dict[str, Any]] = []
     for campaign in campaigns:
-        if wanted and campaign.campaign_id not in wanted:
-            continue
         drift = source_drift(campaign, repo_root)
         if drift:
             drifted.append({"campaign_id": campaign.campaign_id, "drift": drift})
@@ -1189,43 +1199,13 @@ def repin_campaigns(
         for campaign in campaigns
         if any(row["campaign_id"] == campaign.campaign_id for row in drifted)
     }
-    symbol_paths = {
-        relative
-        for campaign in selected.values()
-        for relative in campaign.source_symbols
-    }
-    source_paths = {
-        relative
-        for campaign in selected.values()
-        for relative in campaign.source_sha256
-        if relative not in campaign.source_symbols
-    }
-    try:
-        from conductor._native import plan_mutation_repin_native
-
-        plans = plan_mutation_repin_native(
-            str(repo_root.resolve()),
-            [
-                (
-                    campaign.manifest_path.relative_to(repo_root.resolve()).as_posix(),
-                    dict(campaign.source_sha256),
-                    {
-                        path: dict(pins)
-                        for path, pins in campaign.source_symbols.items()
-                    },
-                )
-                for campaign in selected.values()
-            ],
-            {
-                path: _sha256(repo_root / path)
-                for path in source_paths
-                if (repo_root / path).is_file()
-            },
-            {path: symbol_hashes(repo_root / path) for path in symbol_paths},
-        )
-    except (ImportError, AttributeError, ValueError) as exc:
-        raise CampaignError(str(exc)) from exc
-    updated = dict(plans)
+    updated = _plan_repin(selected, repo_root)
+    # A receipt published outside the registry's receipt directory is not evidence:
+    # `research/reports/` is gitignored, so the default path this used to fall back on
+    # dropped every regenerated receipt while reporting PASS.
+    receipts = repo_root / _support.receipt_directory(
+        _load_registry(registry_path, repo_root), CampaignError
+    )
     rerun: list[dict[str, Any]] = []
     for entry in drifted:
         campaign_id = str(entry["campaign_id"])
@@ -1244,8 +1224,25 @@ def repin_campaigns(
                 }
             )
             continue
-        result = run_campaign(refreshed, allow_mutations=True)
-        rerun.append({"campaign_id": campaign_id, "status": result["status"]})
+        receipt_path = receipts / f"{campaign_id}_{_utc_stamp()}.json"
+        result = run_campaign(
+            refreshed,
+            allow_mutations=True,
+            receipt_path=receipt_path,
+            repo_root=repo_root,
+        )
+        if not receipt_path.is_file():
+            raise CampaignError(
+                f"re-run of {campaign_id!r} reported {result['status']} but published "
+                f"no receipt at {receipt_path}"
+            )
+        rerun.append(
+            {
+                "campaign_id": campaign_id,
+                "status": result["status"],
+                "receipt": result["receipt_path"],
+            }
+        )
     failed = [item for item in rerun if item["status"] != "PASS"]
     return {
         "status": "REPINNED" if not failed else "FAILED",

@@ -454,6 +454,100 @@ def apply_mutation(
         )
 
 
+def select_campaigns(
+    campaigns: Sequence[Any],
+    campaign_ids: Sequence[str] | None,
+    error_type: type[Exception],
+) -> list[Any]:
+    """The campaigns a caller asked for, refusing ids that name none of them.
+
+    An id matching nothing selects nothing, and a selection of nothing reports as
+    "nothing drifted" -- indistinguishable from a clean tree. `run` takes a manifest
+    PATH while `--campaign` takes a campaign ID, so handing over the path is the easy
+    mistake, and it answered CLEAN while a pin was drifted. A filter that matches
+    nothing is a question that was never asked, and must never be answered "no".
+    """
+
+    wanted = set(campaign_ids or [])
+    unknown = sorted(wanted - {campaign.campaign_id for campaign in campaigns})
+    if unknown:
+        raise error_type(
+            "no registered campaign has id "
+            + ", ".join(repr(identifier) for identifier in unknown)
+            + "; --campaign takes a campaign id, not a manifest path"
+        )
+    return [
+        campaign
+        for campaign in campaigns
+        if not wanted or campaign.campaign_id in wanted
+    ]
+
+
+def receipt_directory(registry: Mapping[str, Any], error_type: type[Exception]) -> str:
+    """The tracked directory the evidence gate reads receipts from.
+
+    A receipt written anywhere else is not evidence: `research/reports/` is gitignored,
+    so a receipt published there vanishes from the corpus the gate consults while the
+    command that wrote it reports PASS.
+    """
+
+    directories = registry.get("receipt_directories") or []
+    if not directories:
+        raise error_type(
+            "registry declares no receipt_directories, so a regenerated receipt "
+            "has nowhere to be published where the evidence gate will read it"
+        )
+    return str(directories[0])
+
+
+def plan_repin(
+    selected: Mapping[str, Any],
+    repo_root: Path,
+    sha256: Callable[[Path], str],
+    symbol_hashes: Callable[[Path], dict[str, str]],
+    error_type: type[Exception],
+) -> dict[str, str]:
+    """Re-pinned manifest text for each selected campaign, keyed by relative path."""
+
+    symbol_paths = {
+        relative
+        for campaign in selected.values()
+        for relative in campaign.source_symbols
+    }
+    source_paths = {
+        relative
+        for campaign in selected.values()
+        for relative in campaign.source_sha256
+        if relative not in campaign.source_symbols
+    }
+    try:
+        from conductor._native import plan_mutation_repin_native
+
+        plans = plan_mutation_repin_native(
+            str(repo_root.resolve()),
+            [
+                (
+                    campaign.manifest_path.relative_to(repo_root.resolve()).as_posix(),
+                    dict(campaign.source_sha256),
+                    {
+                        path: dict(pins)
+                        for path, pins in campaign.source_symbols.items()
+                    },
+                )
+                for campaign in selected.values()
+            ],
+            {
+                path: sha256(repo_root / path)
+                for path in source_paths
+                if (repo_root / path).is_file()
+            },
+            {path: symbol_hashes(repo_root / path) for path in symbol_paths},
+        )
+    except (ImportError, AttributeError, ValueError) as exc:
+        raise error_type(str(exc)) from exc
+    return dict(plans)
+
+
 def atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
     """Atomically publish a JSON object and clean any temporary residue."""
 

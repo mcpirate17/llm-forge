@@ -109,6 +109,24 @@
         "tooling/native/conductor-native/src/mutation_manifest.rs": "94c83cd536a826d2cb972530c77c5afd37360a2b7f63deb6c7cb5bccbf7714d9",
         "tooling/native/conductor-native/src/mutation_receipt.rs": "54db78d17d02fd774fdcbf8bf5d275425ae1ab328bf3084dfab2d7e2c68377c1"
       }
+    },
+    {
+      "id": "pre-repin-selection-and-receipt-publication-20260904",
+      "recorded_at": "2026-09-04",
+      "owner": "claude",
+      "justification": "Runner state on master immediately before repin_campaigns gained two refusals and three helpers moved into the support module. Every change is confined to `repin`, the re-pinning CLI: it selects campaigns, rewrites manifest pins and chooses a receipt path. It does not decide any mutant's outcome. Mutant application (apply_mutation), scoring, ranking, killer attribution, scope validation and receipt CONTENT (run_campaign, which writes every field) are byte-identical to master. The one receipt-adjacent change is which directory `repin --run` hands run_campaign as its output path -- previously a gitignored `research/reports/` fallback, now the registry's declared receipt directory -- which changes where a receipt lands, not what any receipt field means. A receipt produced under the recorded hash-set therefore describes the same run the new runner would produce.",
+      "covers_diff": "conductor/mutation_testing.py: repin_campaigns refuses a --campaign id that matches no registered campaign (it previously selected nothing and reported CLEAN); publishes re-run receipts into registry.receipt_directories[0] instead of the gitignored research/reports/mutation_testing fallback; and refuses a re-run that reports a status but leaves no receipt on disk. _plan_repin delegates to the support module. conductor/mutation_testing_support.py: gains select_campaigns, receipt_directory and plan_repin (the last moved verbatim out of mutation_testing._plan_repin), inserted ABOVE atomic_json so that mutation_framework_self_v10's EOF-anchored mutant still applies. New tests in conductor/test_mutation_repin.py and campaign claude_repin_unmatched_id_20260904 (4 mutants).",
+      "verified_by": "Proven, not asserted. Six campaigns holding a PASS receipt under the recorded hash-set were re-pinned and fully re-run under the NEW runner: mutation_value_self_v4 (22 mutants), mutation_evidence_gate_v5_20260827 (26), mutation_framework_self_v10 (12), local_ai_policy_integrity_20260827 (9), mutation_evidence_gate_hardening_20260827 (8) and mutation_evidence_gate_value_edges_20260827 (1) -- 78 mutants. Every one returned PASS at mutation_score 1.0 with zero survivors, and a receipt-to-receipt comparison found identical per-mutant status and identical killer attribution for all 78. Compared receipts, recorded runner -> new runner: local_ai_policy_integrity_20260827 124922Z -> 212045Z; mutation_evidence_gate_hardening_20260827 124934Z -> 212031Z; mutation_evidence_gate_value_edges_20260827 124949Z -> 212027Z; mutation_evidence_gate_v5_20260827 124953Z -> 214127Z; mutation_framework_self_v10 131834Z -> 213352Z; mutation_value_self_v4 132629Z -> 212104Z (all dated 20260904).",
+      "runner_components_sha256": {
+        "conductor/mutation_scope.py": "1abcfa6d83fa4ffa506efc99423b945b7a8490c0a3cf86234d282b4543750adb",
+        "conductor/mutation_testing.py": "c960dc34a989cf96acdc6ea2d0e55b38931bc41ff68db42a805c7db38df8d5c6",
+        "conductor/mutation_testing_support.py": "d84e8ba6e511c7e9638773705314a4bacee920a48f2f487f62b8620644a2ee09",
+        "conductor/mutation_value.py": "15fdb80c3a1e433884882591945711e8fd32a50f53528446234972102b45b426",
+        "conductor/snapshot_worktree.py": "7f2bc12bf5e106842114ca964246b5f9de2658221866b7c45c31920b02541328",
+        "tooling/native/conductor-native/src/mutation_evidence.rs": "4ae245015d7c51c9ab4cb586bff7679a04343fce40b18d1ac288d8861233c5a1",
+        "tooling/native/conductor-native/src/mutation_manifest.rs": "0da3e2e013938b67b53034cc5dc32cc1268c86cc2d56a6157a3718297d7b8e2a",
+        "tooling/native/conductor-native/src/mutation_receipt.rs": "54db78d17d02fd774fdcbf8bf5d275425ae1ab328bf3084dfab2d7e2c68377c1"
+      }
     }
   ]
 }
