@@ -125,7 +125,11 @@ def _load_json(path: str, text: str | None) -> dict[str, Any]:
 
 
 def _dump_json(data: dict[str, Any]) -> str:
-    return json.dumps(data, indent=2) + "\n"
+    # ensure_ascii=False: a foreign project's settings may hold non-ASCII text
+    # anywhere -- an env value, an allow-list entry, a comment-shaped key. The
+    # default escapes it to \uXXXX, which rewrites content this tool never
+    # wired and does not own.
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 
 
 def _merge_keyed(
@@ -159,10 +163,29 @@ def _merge_keyed(
     return merged
 
 
+def _render_merged(
+    path: str,
+    existing: str | None,
+    section: str,
+    wanted: dict[str, Any],
+    force: bool,
+) -> str:
+    """Wire ``wanted`` into ``existing``, leaving an already-wired file alone.
+
+    Serialising the merge is a whole-file rewrite: it normalises indentation,
+    escapes non-ASCII, drops the author's trailing bytes. That is a fair price
+    for wiring something in, and no price at all for wiring in nothing -- so a
+    file that already carries every wanted key comes back verbatim.
+    """
+    data = _load_json(path, existing)
+    merged = _merge_keyed(path, data, section, wanted, force)
+    if existing is not None and merged == data:
+        return existing
+    return _dump_json(merged)
+
+
 def render_settings(existing: str | None, force: bool) -> str:
-    data = _load_json(SETTINGS, existing)
-    wanted = settings_block()["hooks"]
-    return _dump_json(_merge_keyed(SETTINGS, data, "hooks", wanted, force))
+    return _render_merged(SETTINGS, existing, "hooks", settings_block()["hooks"], force)
 
 
 def mcp_entry(project_dir: Path, python: Path) -> dict[str, Any]:
@@ -176,9 +199,8 @@ def mcp_entry(project_dir: Path, python: Path) -> dict[str, Any]:
 
 
 def render_mcp(existing: str | None, config: InitConfig) -> str:
-    data = _load_json(MCP, existing)
     wanted = {MCP_SERVER: mcp_entry(config.project_dir, config.python)}
-    return _dump_json(_merge_keyed(MCP, data, "mcpServers", wanted, config.force))
+    return _render_merged(MCP, existing, "mcpServers", wanted, config.force)
 
 
 def render_launcher(python: Path) -> str:

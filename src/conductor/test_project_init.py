@@ -96,6 +96,37 @@ def test_settings_malformed_json_refused() -> None:
         pi.render_settings("[]", force=True)
 
 
+def test_an_already_wired_settings_file_is_returned_byte_for_byte() -> None:
+    # A foreign project formats its own files. Wiring in nothing must cost the
+    # owner nothing -- not an indent change, not a reordered key, not a newline.
+    existing = (
+        '{\n\t"model": "opus",\n\t"hooks": ' + json.dumps(TEMPLATE_HOOKS) + "\n}\t\n\n"
+    )
+    assert pi.render_settings(existing, force=False) == existing
+    assert pi.render_settings(existing, force=True) == existing
+
+
+def test_wiring_in_a_hook_does_not_escape_the_rest_of_the_file() -> None:
+    existing = {"env": {"GREETING": "café → ☕"}}
+    rendered = pi.render_settings(json.dumps(existing, ensure_ascii=False), force=False)
+    assert "café → ☕" in rendered
+    assert json.loads(rendered)["env"] == existing["env"]
+
+
+def test_a_partially_wired_settings_file_is_still_rewritten() -> None:
+    existing = json.dumps({"hooks": {"PreToolUse": TEMPLATE_HOOKS["PreToolUse"]}})
+    rendered = pi.render_settings(existing, force=False)
+    assert rendered != existing
+    assert json.loads(rendered)["hooks"] == TEMPLATE_HOOKS
+
+
+def test_an_absent_settings_file_is_created_not_preserved() -> None:
+    assert pi.render_settings(None, force=False) != ""
+    assert json.loads(pi.render_settings(None, force=False)) == {
+        "hooks": TEMPLATE_HOOKS
+    }
+
+
 # ── mcp merge ───────────────────────────────────────────────────────────────
 
 
@@ -117,6 +148,20 @@ def test_mcp_merge_keeps_other_servers_and_refuses_conflict(tmp_path: Path) -> N
     assert entry["args"] == ["-m", "conductor.crg_server", "--repo", str(project)]
     assert entry["command"] == sys.executable
     assert entry["env"] == {"CRG_ROLE": "review"}
+
+
+def test_an_already_wired_mcp_file_is_returned_byte_for_byte(tmp_path: Path) -> None:
+    project = _repo(tmp_path)
+    config = _config(project)
+    existing = (
+        '{"mcpServers": {"'
+        + pi.MCP_SERVER
+        + '": '
+        + json.dumps(pi.mcp_entry(project, config.python))
+        + "}}"
+    )
+    assert pi.render_mcp(existing, config) == existing
+    assert pi.render_mcp(existing, _config(project, force=True)) == existing
 
 
 # ── gitignore block ─────────────────────────────────────────────────────────
