@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Disposable git snapshots for autonomous mutation from a dirty host worktree."""
 
 from __future__ import annotations
@@ -7,10 +6,10 @@ import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 SOURCE_SUFFIXES = {
     ".c",
@@ -35,6 +34,7 @@ SOURCE_SUFFIXES = {
     ".yml",
 }
 EXCLUDED_PREFIXES = (
+    "conductor/mutation_campaigns/receipts/",
     "research/reports/",
     "research/notes/",
     "tasks/",
@@ -77,11 +77,15 @@ def snapshot_untracked_paths(repo: Path) -> list[str]:
     )
 
 
-def _snapshot_commit(repo: Path, root: Path) -> tuple[str, tuple[str, ...]]:
+def _snapshot_commit(
+    repo: Path, snapshot_repo: Path, root: Path
+) -> tuple[str, tuple[str, ...]]:
     index = root / "index"
     env = os.environ.copy()
     env.update(
         {
+            "GIT_DIR": str(snapshot_repo / ".git"),
+            "GIT_WORK_TREE": str(repo),
             "GIT_INDEX_FILE": str(index),
             "GIT_AUTHOR_NAME": "Audit Orchestrator Snapshot",
             "GIT_AUTHOR_EMAIL": "orchestrator@localhost",
@@ -106,29 +110,24 @@ def _snapshot_commit(repo: Path, root: Path) -> tuple[str, tuple[str, ...]]:
 
 @contextmanager
 def isolated_snapshot(repo: Path) -> Iterator[Snapshot]:
-    """Create a clean detached worktree without changing the host index or worktree."""
+    """Create a clean snapshot without writing objects into the host repository."""
     root = Path(tempfile.mkdtemp(prefix="llm-orchestrator-snapshot-"))
     worktree = root / "worktree"
-    added = False
     try:
-        commit, untracked = _snapshot_commit(repo, root)
-        _run(["git", "worktree", "add", "--detach", str(worktree), commit], repo)
-        added = True
+        _run(
+            [
+                "git",
+                "clone",
+                "--shared",
+                "--no-checkout",
+                "--quiet",
+                str(repo.resolve()),
+                str(worktree),
+            ],
+            repo,
+        )
+        commit, untracked = _snapshot_commit(repo, worktree, root)
+        _run(["git", "checkout", "--detach", "--quiet", commit], worktree)
         yield Snapshot(commit, worktree, untracked)
     finally:
-        if added:
-            subprocess.run(
-                ["git", "worktree", "remove", "--force", str(worktree)],
-                cwd=repo,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            subprocess.run(
-                ["git", "worktree", "prune"],
-                cwd=repo,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
         shutil.rmtree(root, ignore_errors=True)
