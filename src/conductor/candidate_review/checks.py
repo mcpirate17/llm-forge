@@ -18,6 +18,7 @@ from pathlib import Path
 
 from conductor._native import duplicate_body_fingerprints_native
 from conductor.candidate_review.git_source import changed_line_numbers
+from conductor.candidate_review.import_declaration import check_import_declaration
 from conductor.candidate_review.model import (
     Candidate,
     Change,
@@ -834,6 +835,7 @@ BUILTIN_CHECKS: dict[str, Callable[[ReviewContext], CheckResult]] = {
     "candidate-integrity": check_candidate_integrity,
     "config-parse": check_config_and_notebooks,
     "dependency-integrity": check_dependency_integrity,
+    "import-declaration": check_import_declaration,
     "mutation-evidence": check_mutation_evidence,
     "ownership": check_ownership,
     "python-ast": check_python_ast,
