@@ -174,6 +174,54 @@ def test_crate_tests_answer_the_finding_without_being_run(
     assert selection.graph["native_test_files"] == 1
 
 
+def test_native_mutation_evidence_answers_the_high_risk_gate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Native tests stay out of pytest but remain eligible evidence.
+
+    A Python caller test can also be selected for a Rust change. The stronger
+    high-risk check must evaluate both sets, or a complete Rust mutation receipt
+    cannot satisfy a rule explicitly asking for property or mutation evidence.
+    """
+
+    ctx = _crate(monkeypatch, tmp_path, lib=UNTESTED)
+    native_test = f"{CRATE}/tests/integration.rs"
+    python_test = "conductor/test_probe_caller.py"
+    _write(ctx, native_test, "#[test]\nfn works() {}\n")
+    _write(ctx, python_test, "def test_caller():\n    assert True\n")
+    monkeypatch.setattr(
+        "conductor.candidate_review.verification._graph_test_paths",
+        lambda _ctx, _sources: ({python_test}, {"status": "stubbed"}),
+    )
+    monkeypatch.setattr(
+        "conductor.candidate_review.verification._convention_tests",
+        lambda _ctx, _sources: set(),
+    )
+    observed: list[set[str]] = []
+
+    def _has_evidence(_ctx: ReviewContext, tests: set[str]) -> bool:
+        observed.append(tests)
+        return native_test in tests
+
+    monkeypatch.setattr(
+        "conductor.candidate_review.verification._has_property_evidence",
+        _has_evidence,
+    )
+    ctx = replace(
+        ctx,
+        candidate=replace(
+            ctx.candidate,
+            changes=(replace(_native_change(SOURCE), risk="high"),),
+        ),
+    )
+
+    selection = select_tests(ctx)
+
+    assert selection.findings == ()
+    assert selection.tests == (python_test,)
+    assert observed == [{python_test, native_test}]
+
+
 def test_an_untested_crate_is_still_reported(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

@@ -528,7 +528,10 @@ def select_tests(ctx: ReviewContext) -> TestSelection:
         change.risk == "high" and "test" not in change.classes
         for change in ctx.live_changes
     )
-    if high_risk and tests and not _has_property_evidence(ctx, tests):
+    evidence_tests = tests | {
+        test_path for files in native_tests.values() for test_path in files
+    }
+    if high_risk and evidence_tests and not _has_property_evidence(ctx, evidence_tests):
         findings.append(
             Finding(
                 check_id="test-evidence",

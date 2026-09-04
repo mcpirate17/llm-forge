@@ -11,8 +11,9 @@ it finds, so the ref exists before a force-push or a branch deletion can make th
 tip unrecoverable.
 
 Idempotent: a branch already snapshotted at its current tip is skipped, so running
-this on every session start (or a cron) does not multiply refs -- see
-``conductor.snapshot_retention`` for pruning the refs this does create.
+this on every session start (or a cron) does not multiply refs -- use
+``cargo run --manifest-path tooling/native/snapshot-retention/Cargo.toml -- list``
+to index or prune the refs this creates.
 
 Library API plus ``python -m conductor.snapshot_exposure`` CLI.
 """
