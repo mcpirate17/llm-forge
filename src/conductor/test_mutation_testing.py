@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import subprocess
 from types import SimpleNamespace
-from typing import Iterator
+from typing import Callable, Iterator
 
 import pytest
 
@@ -546,6 +546,52 @@ def test_mutant_timeout_is_error_not_kill(
     assert result["mutants"][0]["outcome"] == "TIMED_OUT"
 
 
+def _junit_writing_run(
+    campaign: mutation_testing.Campaign,
+    results: "Iterator[mutation_testing.CommandResult]",
+    killers: set[str],
+) -> "Callable[..., mutation_testing.CommandResult]":
+    """A `_run_command` double that writes the JUnit report pytest would write.
+
+    A double that returns a non-zero exit and writes no report is not what the
+    runner sees: the framework now refuses a kill it cannot attribute, so a
+    silent double would score a campaign PASS on evidence that never existed.
+    """
+
+    def run(argv, **_kwargs):  # type: ignore[no-untyped-def]
+        result = next(results)
+        report = next(
+            (
+                arg.split("=", 1)[1]
+                for arg in argv
+                if str(arg).startswith("--junitxml=")
+            ),
+            None,
+        )
+        if report is not None:
+            cases = []
+            for test in campaign.ranked_tests:
+                module, _, name = test.nodeid.partition("::")
+                classname = module.removesuffix(".py").replace("/", ".")
+                body = (
+                    "<failure message='killed'/>"
+                    if result.returncode != 0 and test.nodeid in killers
+                    else ""
+                )
+                cases.append(
+                    f'<testcase classname="{classname}" name="{name}" '
+                    f'time="0.01">{body}</testcase>'
+                )
+            path = Path(report)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                f"<testsuite>{''.join(cases)}</testsuite>", encoding="utf-8"
+            )
+        return result
+
+    return run
+
+
 def test_single_mutant_rerun_is_marked_partial(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -557,10 +603,18 @@ def test_single_mutant_rerun_is_marked_partial(
             mutation_testing.CommandResult(1, False, 0.1, "killed", ""),
         )
     )
-    monkeypatch.setattr(
-        mutation_testing, "_run_command", lambda *_args, **_kwargs: next(results)
-    )
     selected = campaign.mutations[1].mutation_id
+    killers = {
+        killer
+        for mutation in campaign.mutations
+        if mutation.mutation_id == selected
+        for killer in mutation.expected_killers
+    }
+    monkeypatch.setattr(
+        mutation_testing,
+        "_run_command",
+        _junit_writing_run(campaign, results, killers),
+    )
 
     result = mutation_testing.run_campaign(
         campaign,

@@ -688,6 +688,66 @@ fn inventory_rust_test_nodeids(root: &Path, relative: &str) -> Result<Vec<String
         .map(|name| format!("{relative}::{name}"))
         .collect())
 }
+/// Read the test-function name from a `static void test_*(void)` definition.
+///
+/// The signature is part of the match on purpose: a `test_`-prefixed helper
+/// with any other signature (a sink callback, a fixture) is not a test, and
+/// CMake registers exactly the same shape, so the inventory and the ctest
+/// registration cannot drift apart.
+fn c_test_fn_name(line: &str) -> Option<String> {
+    let rest = line.strip_prefix("static void ")?;
+    let (name, tail) = rest.split_once('(')?;
+    if !name.starts_with("test_") || name.is_empty() {
+        return None;
+    }
+    if !name
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || character == '_')
+    {
+        return None;
+    }
+    let tail = tail.trim_start();
+    let rest = tail.strip_prefix("void)")?;
+    // A declaration is not a definition: `static void test_x(void);` registers
+    // no test, and counting it would make a complete scope claim a case ctest
+    // never runs.
+    if rest.trim_start().starts_with('{') {
+        Some(name.to_owned())
+    } else {
+        None
+    }
+}
+
+/// Inventory `static void test_*(void)` definitions in a C or C++ source file,
+/// in source order, as the `<path>::<fn>` nodeids a `c_test` scope declares.
+fn inventory_c_test_nodeids(root: &Path, relative: &str) -> Result<Vec<String>, String> {
+    let source = fs::read_to_string(root.join(relative))
+        .map_err(|error| format!("cannot inventory C tests in {relative}: {error}"))?;
+    let mut names: Vec<String> = Vec::new();
+    for line in source.lines() {
+        // Not trimmed: CMake registers cases with a `^static void`-anchored
+        // regex, so an indented definition is never a registered ctest and
+        // counting it would make a complete scope claim a case that cannot run.
+        let Some(name) = c_test_fn_name(line) else {
+            continue;
+        };
+        if names.contains(&name) {
+            return Err(format!(
+                "cannot inventory C tests in {relative}: duplicate test name {name:?}; \
+                 ctest names are flat and the two cases would be indistinguishable"
+            ));
+        }
+        names.push(name);
+    }
+    if names.is_empty() {
+        return Err(format!("complete C test scope is empty: {relative}"));
+    }
+    Ok(names
+        .into_iter()
+        .map(|name| format!("{relative}::{name}"))
+        .collect())
+}
+
 /// Extract the identifier from a `fn` item line, ignoring visibility and `async`.
 fn rust_fn_name(line: &str) -> Option<String> {
     let mut rest = line;
@@ -1066,7 +1126,11 @@ pub(crate) fn load_campaign_contract(
         if !source_sha256.contains_key(&path) {
             return Err(format!("test_scopes[{path}] is not bound in source_sha256"));
         }
-        if inventory != "python_ast" && inventory != "cargo_test" && mode == "complete" {
+        if inventory != "python_ast"
+            && inventory != "cargo_test"
+            && inventory != "c_test"
+            && mode == "complete"
+        {
             return Err(format!(
                 "complete test scope inventory is unsupported: {inventory:?}"
             ));
@@ -1080,6 +1144,35 @@ pub(crate) fn load_campaign_contract(
             return Err(format!(
                 "test_scopes[{path}].inventory='cargo_test' requires a .rs file"
             ));
+        }
+        if inventory == "c_test"
+            && !(path.ends_with(".c")
+                || path.ends_with(".cc")
+                || path.ends_with(".cpp")
+                || path.ends_with(".cxx"))
+        {
+            return Err(format!(
+                "test_scopes[{path}].inventory='c_test' requires a .c/.cc/.cpp/.cxx file"
+            ));
+        }
+        if inventory == "c_test" && mode == "complete" {
+            let discovered = inventory_c_test_nodeids(root, &path)?;
+            if nodeids != discovered {
+                let declared: BTreeSet<&str> = nodeids.iter().map(String::as_str).collect();
+                let actual: BTreeSet<&str> = discovered.iter().map(String::as_str).collect();
+                let missing = actual
+                    .difference(&declared)
+                    .map(|value| (*value).to_owned());
+                let extra = declared
+                    .difference(&actual)
+                    .map(|value| (*value).to_owned());
+                return Err(format!(
+                    "complete test scope does not match current C inventory for {path}: missing={}, extra={}, expected_order={}",
+                    python_list(missing),
+                    python_list(extra),
+                    python_list(discovered.clone())
+                ));
+            }
         }
         if inventory == "cargo_test" && mode == "complete" {
             let discovered = inventory_rust_test_nodeids(root, &path)?;
@@ -1830,5 +1923,118 @@ mod rust_inventory_tests {
         // does not exist and certify a complete scope around it.
         assert_eq!(rust_fn_name("let s = \"fn phantom\";"), None);
         assert_eq!(rust_fn_name("// call fn helper() later"), None);
+    }
+}
+
+#[cfg(test)]
+mod c_inventory_tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::{c_test_fn_name, inventory_c_test_nodeids};
+
+    static NEXT_TREE: AtomicU64 = AtomicU64::new(0);
+
+    fn write_source(body: &str) -> (PathBuf, String) {
+        let serial = NEXT_TREE.fetch_add(1, Ordering::Relaxed);
+        let root =
+            std::env::temp_dir().join(format!("llm-c-inventory-{}-{serial}", std::process::id()));
+        let relative = "tests/test_subject.c";
+        fs::create_dir_all(root.join("tests")).expect("create tree");
+        fs::write(root.join(relative), body).expect("write source");
+        (root, relative.to_owned())
+    }
+
+    #[test]
+    fn inventory_lists_c_tests_in_source_order_and_skips_callbacks() {
+        // The callback is the real shape from test_profiler.c: a `test_`
+        // prefixed helper that ctest never registers, so counting it would make
+        // a complete scope claim a case that cannot run.
+        let (root, relative) = write_source(
+            "#include <assert.h>\n\
+             static void test_beta(void) { assert(1); }\n\
+             static void test_sink_fn(const evt_t* e, void* u) { (void)e; (void)u; }\n\
+             static void test_alpha(void) { assert(1); }\n\
+             int main(void) { return 0; }\n",
+        );
+        let found = inventory_c_test_nodeids(&root, &relative).expect("inventory");
+        assert_eq!(
+            found,
+            vec![
+                "tests/test_subject.c::test_beta".to_owned(),
+                "tests/test_subject.c::test_alpha".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn inventory_skips_a_forward_declaration() {
+        // `static void test_x(void);` compiles and registers nothing.
+        let (root, relative) = write_source(
+            "static void test_later(void);\n\
+             static void test_now(void) { }\n\
+             static void test_later(void) { }\n",
+        );
+        let found = inventory_c_test_nodeids(&root, &relative).expect("inventory");
+        assert_eq!(
+            found,
+            vec![
+                "tests/test_subject.c::test_now".to_owned(),
+                "tests/test_subject.c::test_later".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn inventory_ignores_an_indented_definition() {
+        // The governance inventory and the CMake registration must read the
+        // same set. CMake anchors at column zero; anything else is a case ctest
+        // will not run, and claiming it in a complete scope gates nothing.
+        let (root, relative) = write_source(
+            "static void test_real(void) { }\n#if 0\n    static void test_hidden(void) { }\n#endif\n",
+        );
+        let found = inventory_c_test_nodeids(&root, &relative).expect("inventory");
+        assert_eq!(found, vec!["tests/test_subject.c::test_real".to_owned()]);
+    }
+
+    #[test]
+    fn inventory_refuses_a_duplicate_c_test_name() {
+        let (root, relative) =
+            write_source("static void test_reset(void) { }\nstatic void test_reset(void) { }\n");
+        let error = inventory_c_test_nodeids(&root, &relative)
+            .expect_err("ctest names are flat, so two cases would be indistinguishable");
+        assert!(error.contains("duplicate test name"), "got {error}");
+    }
+
+    #[test]
+    fn inventory_refuses_a_c_file_with_no_tests() {
+        let (root, relative) = write_source("int main(void) { return 0; }\n");
+        let error = inventory_c_test_nodeids(&root, &relative)
+            .expect_err("an empty complete scope would gate nothing");
+        assert!(
+            error.contains("complete C test scope is empty"),
+            "got {error}"
+        );
+    }
+
+    #[test]
+    fn inventory_refuses_a_missing_c_file() {
+        let (root, _) = write_source("static void test_x(void) { }\n");
+        let error = inventory_c_test_nodeids(&root, "tests/absent.c")
+            .expect_err("a missing file must not read as an empty inventory");
+        assert!(error.contains("cannot inventory C tests"), "got {error}");
+    }
+
+    #[test]
+    fn fn_name_requires_the_void_signature_and_a_body() {
+        assert_eq!(
+            c_test_fn_name("static void test_ok(void) {"),
+            Some("test_ok".to_owned())
+        );
+        assert_eq!(c_test_fn_name("static void test_ok(void);"), None);
+        assert_eq!(c_test_fn_name("static void test_cb(int x) {"), None);
+        assert_eq!(c_test_fn_name("static void helper(void) {"), None);
+        assert_eq!(c_test_fn_name("void test_ok(void) {"), None);
     }
 }

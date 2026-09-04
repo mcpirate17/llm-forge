@@ -76,15 +76,24 @@ def test_a_declared_killer_absent_from_the_report_is_named_unobservable() -> Non
 
 
 def test_incomplete_attribution_never_confirms_a_contract() -> None:
+    """A batch that can attribute and did not is a refusal, not a shrug.
+
+    `UNATTRIBUTED` and `UNAVAILABLE` are deliberately different words: this one
+    says the harness produced a report and this run is still unexplained, which
+    is what a mutant that breaks the build or the collection looks like.
+    """
+
     verdict = killer_verdict(
         _mutation(DECLARED),
         _report(status="INCOMPLETE", declared="FAILED"),
         "KILLED",
     )
-    assert verdict["status"] == "UNAVAILABLE"
+    assert verdict["status"] == "UNATTRIBUTED"
 
 
 def test_a_batch_without_attribution_is_unavailable_not_confirmed() -> None:
+    """No per-test evidence at all is the campaign's harness, not its claim."""
+
     verdict = killer_verdict(_mutation(DECLARED), None, "KILLED")
     assert verdict["status"] == "UNAVAILABLE"
 

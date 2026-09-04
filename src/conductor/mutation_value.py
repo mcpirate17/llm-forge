@@ -366,6 +366,151 @@ def collect_cargo_libtest_batch[BatchResultT](
     return result, report
 
 
+# --------------------------------------------------------------- ctest / CMake
+C_TEST_SUFFIXES = (".c", ".cc", ".cpp", ".cxx")
+# The batch writes here and the runner reads here. A relative, campaign-visible
+# path rather than a runner-injected flag: a C batch has to build before it can
+# test, so its argv is a shell line (`cmake --build ... && ctest ...`) that no
+# argv rewrite can safely reach into.
+CTEST_JUNIT_RELATIVE = Path(".mutation-value") / "ctest.xml"
+
+
+def _ctest_identity(nodeid: str) -> str:
+    """Return the ctest name a `<path>.c::<fn>` nodeid names.
+
+    CTest names are flat and project-global while nodeids are path-qualified,
+    so the registration in CMakeLists is `<binary stem>.<function>` and the
+    stem of the nodeid's file is what carries the binary.
+    """
+
+    path, separator, function = nodeid.partition("::")
+    if (
+        not separator
+        or not function
+        or "::" in function
+        or not path.endswith(C_TEST_SUFFIXES)
+    ):
+        raise ValueEvidenceError(f"ctest requires a C/C++ nodeid: {nodeid}")
+    return f"{Path(path).stem}.{function}"
+
+
+def ctest_attribution_supported(ranked_nodeids: Sequence[str]) -> bool:
+    """Report whether this batch's ranked tests can be mapped to ctest names.
+
+    Read from the nodeids, not from argv, for the same reason the cargo adapter
+    does: a C batch builds before it tests, so its argv is a shell line and
+    `ctest` is not argv[0].
+    """
+
+    if not ranked_nodeids:
+        return False
+    try:
+        names = [_ctest_identity(nodeid) for nodeid in ranked_nodeids]
+    except ValueEvidenceError:
+        return False
+    # Two source files can each define `test_reset`; if their stems collide too,
+    # the registered ctest names collide and a kill would be attributed to
+    # whichever contract sorted first. Reporting no attribution is the honest
+    # answer.
+    return len(set(names)) == len(names)
+
+
+def ctest_junit_path(snapshot_root: Path) -> Path:
+    """Return the report path a ctest batch must write, inside one snapshot."""
+
+    return snapshot_root / CTEST_JUNIT_RELATIVE
+
+
+def parse_ctest_junit(
+    report_path: Path, ranked_nodeids: Sequence[str]
+) -> dict[str, Any]:
+    """Parse one ctest JUnit report into per-test outcomes and runtimes."""
+
+    try:
+        root = parse_xml(report_path).getroot()
+    except (OSError, ParseError) as exc:
+        raise ValueEvidenceError(f"cannot parse ctest JUnit report: {exc}") from exc
+    if root is None:
+        raise ValueEvidenceError("ctest JUnit report has no document root")
+    identities = {_ctest_identity(nodeid): nodeid for nodeid in ranked_nodeids}
+    tests: dict[str, dict[str, Any]] = {}
+    unranked_failures: list[str] = []
+    for case in root.iter("testcase"):
+        name = case.attrib.get("name", "")
+        status = case.attrib.get("status", "")
+        if case.find("error") is not None:
+            outcome = "ERROR"
+        elif case.find("failure") is not None or status == "fail":
+            outcome = "FAILED"
+        elif case.find("skipped") is not None or status in {"disabled", "notrun"}:
+            outcome = "SKIPPED"
+        else:
+            outcome = "PASSED"
+        nodeid = identities.get(name)
+        if nodeid is None:
+            # `ctest` runs the whole project, not the ranked set, so unranked
+            # cases are normal. A mutant that takes down unranked tests is a
+            # blunt mutant, which is worth recording even though it cannot
+            # enter `tests` -- that map is keyed by nodeid and is what the
+            # killer verdict reads.
+            if outcome in {"FAILED", "ERROR"}:
+                unranked_failures.append(name)
+            continue
+        try:
+            duration = float(case.attrib.get("time", "0"))
+        except ValueError:
+            duration = 0.0
+        tests[nodeid] = {
+            "outcome": outcome,
+            "duration_seconds": round(duration, 6),
+            "cases": 1,
+        }
+    missing = [nodeid for nodeid in ranked_nodeids if nodeid not in tests]
+    return {
+        "status": "COMPLETE" if not missing else "INCOMPLETE",
+        "tests": tests,
+        "failed_nodeids": [
+            nodeid
+            for nodeid in ranked_nodeids
+            if tests.get(nodeid, {}).get("outcome") in {"FAILED", "ERROR"}
+        ],
+        "missing_nodeids": missing,
+        "unmapped_cases": [],
+        "unranked_failures": sorted(unranked_failures),
+    }
+
+
+def collect_ctest_junit_batch[BatchResultT](
+    *,
+    argv: Sequence[str],
+    report_path: Path,
+    ranked_nodeids: Sequence[str],
+    run_command: Callable[[Sequence[str]], BatchResultT],
+) -> tuple[BatchResultT, Mapping[str, Any]]:
+    """Run one ctest batch and read fail-closed attribution from its report."""
+
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    # A mutant that breaks the build leaves ctest unrun. Without this removal
+    # the previous mutant's report is still on disk and would be read as this
+    # one's evidence -- a kill attributed to a run that never happened. Absent
+    # afterwards has to mean "no attribution", which is what fail-closed needs.
+    report_path.unlink(missing_ok=True)
+    result = run_command(argv)
+    try:
+        report = parse_ctest_junit(report_path, ranked_nodeids)
+    except ValueEvidenceError as exc:
+        report = {
+            "status": "INCOMPLETE",
+            "tests": {},
+            "failed_nodeids": [],
+            "missing_nodeids": list(ranked_nodeids),
+            "unmapped_cases": [],
+            "unranked_failures": [],
+            "error": str(exc),
+        }
+    return result, report
+
+
 def collect_pytest_junit_batch[BatchResultT](
     *,
     argv: Sequence[str],

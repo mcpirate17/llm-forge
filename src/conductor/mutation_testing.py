@@ -43,7 +43,10 @@ from conductor.mutation_value import (
     analyze_test_value,
     cargo_attribution_supported,
     collect_cargo_libtest_batch,
+    collect_ctest_junit_batch,
     collect_pytest_junit_batch,
+    ctest_attribution_supported,
+    ctest_junit_path,
     load_value_analysis,
     pytest_attribution_supported,
     value_inspection_payload,
@@ -543,10 +546,18 @@ def killer_verdict(
             "reason": "campaign batch carries no per-test attribution",
         }
     if report.get("status") != "COMPLETE":
+        # The batch *can* be attributed -- it produced a report -- and this run
+        # still did not say which test killed the mutant. That is not the same
+        # as a harness with no attribution at all: the usual cause is a mutant
+        # that broke the build or the collection, so the non-zero exit that
+        # reads as KILLED came from the toolchain rather than from a test. A
+        # kill nobody can attribute is not evidence, so it is a refusal.
         return {
-            "status": "UNAVAILABLE",
+            "status": "UNATTRIBUTED",
             "declared": declared,
             "reason": f"attribution is {report.get('status')}",
+            "missing_nodeids": list(report.get("missing_nodeids") or ()),
+            "error": report.get("error"),
         }
     tests = report.get("tests", {})
     observed = sorted(
@@ -574,6 +585,40 @@ def killer_verdict(
     return verdict
 
 
+def killer_enforcement(mutants: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Fold per-mutant verdicts into the campaign's contract-binding verdict.
+
+    Three outcomes, and the middle one is the point. `ENFORCED` means every kill
+    was traced to a test the mutant's contract named. `UNAVAILABLE` means the
+    harness produces no per-test evidence at all -- a property of the batch that
+    the campaign cannot fix, so it is reported and not punished. `REFUSED` means
+    the campaign's own claims did not hold: a kill landed on the wrong test, or
+    a batch that *can* attribute did not attribute this one, which is how a
+    mutant that breaks the build or the collection reads as a kill.
+    """
+
+    def ids(status: str) -> list[str]:
+        return [
+            row["id"]
+            for row in mutants
+            if row["killer_attribution"]["status"] == status
+        ]
+
+    misattributed = ids("MISATTRIBUTED")
+    unattributed = ids("UNAVAILABLE")
+    unattributed_runs = ids("UNATTRIBUTED")
+    return {
+        "status": "REFUSED"
+        if misattributed or unattributed_runs
+        else "UNAVAILABLE"
+        if unattributed
+        else "ENFORCED",
+        "misattributed": misattributed,
+        "unattributed": unattributed,
+        "unattributed_runs": unattributed_runs,
+    }
+
+
 def _run_campaign_command(
     campaign: Campaign,
     *,
@@ -588,6 +633,18 @@ def _run_campaign_command(
             raise CampaignError(
                 "value analysis needs a pytest batch whose ranked tests are "
                 "Python nodeids and whose argv does not already set --junitxml"
+            )
+        if ctest_attribution_supported(ranked_nodeids):
+            return collect_ctest_junit_batch(
+                argv=campaign.test_argv,
+                report_path=ctest_junit_path(snapshot_root),
+                ranked_nodeids=ranked_nodeids,
+                run_command=lambda argv: _run_command(
+                    argv,
+                    cwd=snapshot_root,
+                    timeout_seconds=campaign.timeout_seconds,
+                    environment=campaign.environment,
+                ),
             )
         if cargo_attribution_supported(ranked_nodeids):
             return collect_cargo_libtest_batch(
@@ -797,25 +854,7 @@ def run_campaign(
         row["id"] for row in receipt["mutants"] if row["outcome"] == "SURVIVED"
     ]
     receipt["classification_required"] = list(receipt["survivors"])
-    misattributed = [
-        row["id"]
-        for row in receipt["mutants"]
-        if row["killer_attribution"]["status"] == "MISATTRIBUTED"
-    ]
-    unattributed = [
-        row["id"]
-        for row in receipt["mutants"]
-        if row["killer_attribution"]["status"] == "UNAVAILABLE"
-    ]
-    receipt["killer_enforcement"] = {
-        "status": "REFUSED"
-        if misattributed
-        else "UNAVAILABLE"
-        if unattributed
-        else "ENFORCED",
-        "misattributed": misattributed,
-        "unattributed": unattributed,
-    }
+    receipt["killer_enforcement"] = killer_enforcement(receipt["mutants"])
     mutation_status = (
         "PASS"
         if killed == len(selected) and not survived and not timed_out
@@ -823,7 +862,7 @@ def run_campaign(
         if survived
         else "ERROR"
     )
-    if misattributed:
+    if receipt["killer_enforcement"]["status"] == "REFUSED":
         mutation_status = "FAIL"
     if campaign.value_analysis is not None:
         receipt["test_value"] = analyze_test_value(

@@ -659,10 +659,16 @@ def test_a_rust_kill_by_an_undeclared_test_is_misattributed() -> None:
         "test manifest::tests::test_beta ... ok\n",
         [alpha, beta],
     )
+    # A batch that CAN be attributed and did not attribute this kill is a
+    # refusal, not the same "no attribution here" as a harness that never
+    # produces per-test evidence -- the usual cause is a kill that came from
+    # the toolchain rather than from a test.
     assert mutation_testing.killer_verdict(mutation, ambiguous, "KILLED") == {
-        "status": "UNAVAILABLE",
+        "status": "UNATTRIBUTED",
         "declared": [alpha],
         "reason": "attribution is INCOMPLETE",
+        "missing_nodeids": [alpha],
+        "error": None,
     }
 
 
@@ -733,3 +739,220 @@ def test_a_rust_batch_is_routed_to_the_libtest_collector(tmp_path: Path) -> None
         assert calls[-1] == (("npm", "test"), False)
     finally:
         mutation_testing._run_command = original  # noqa: SLF001
+
+
+_CTEST_JUNIT = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)" tests="4" failures="1" disabled="1" skipped="0">
+  <testcase name="test_profiler.test_memory_events" classname="c" time="0.03" status="run"/>
+  <testcase name="test_profiler.test_reset_clears_all" classname="c" time="0.02" status="fail">
+    <failure message="Failed"/>
+  </testcase>
+  <testcase name="test_profiler.test_clock_ns_monotonic" classname="c" time="0" status="disabled"/>
+  <testcase name="test_kernels.test_relu" classname="c" time="0.01" status="fail">
+    <failure message="Failed"/>
+  </testcase>
+</testsuite>
+"""
+
+
+def test_a_ctest_nodeid_maps_onto_the_name_cmake_registers() -> None:
+    """The nodeid and the ctest name are two spellings of one test.
+
+    CTest names are flat and project-global while a nodeid is path-qualified, so
+    the mapping is `<file stem>.<function>`. If this drifts from what CMakeLists
+    registers, every kill lands as unattributed and the campaign refuses -- loud,
+    but only because the shape is pinned here.
+    """
+
+    nodeid = "research/runtime/native/tests/test_profiler.c::test_memory_events"
+    assert (
+        mutation_value._ctest_identity(nodeid)  # noqa: SLF001
+        == "test_profiler.test_memory_events"
+    )
+    for rejected in (
+        "research/runtime/native/src/profiler.c",  # no function
+        "conductor/test_mutation_value.py::test_x",  # not a C file
+        "tests/test_a.c::mod::test_x",  # ctest names carry no module path
+        "tests/test_a.c::",  # empty function
+    ):
+        with pytest.raises(mutation_value.ValueEvidenceError):
+            mutation_value._ctest_identity(rejected)  # noqa: SLF001
+
+
+def test_ctest_attribution_refuses_names_it_cannot_separate() -> None:
+    """Two files with the same stem collide in ctest's flat namespace.
+
+    Attributing a kill to whichever contract sorted first is worse than
+    reporting none, so the collision is refused at the shape check rather than
+    resolved by guesswork.
+    """
+
+    assert mutation_value.ctest_attribution_supported(
+        ["a/test_profiler.c::test_reset", "b/test_kernels.c::test_reset"]
+    )
+    assert not mutation_value.ctest_attribution_supported(
+        ["a/test_profiler.c::test_reset", "b/test_profiler.c::test_reset"]
+    )
+    assert not mutation_value.ctest_attribution_supported([])
+    assert not mutation_value.ctest_attribution_supported(["tests/suite.rs::test_x"])
+
+
+def test_a_ctest_report_separates_the_declared_killer_from_collateral(
+    tmp_path: Path,
+) -> None:
+    """ctest runs the whole project, so most cases in the report are unranked.
+
+    A failure outside the ranked set is not a defect but it is bluntness, and it
+    is recorded rather than discarded. A disabled case is not a pass: a test that
+    CMake registered and then disabled would otherwise vouch for a mutant it
+    never ran.
+    """
+
+    report_path = tmp_path / "ctest.xml"
+    report_path.write_text(_CTEST_JUNIT, encoding="utf-8")
+    memory = "research/runtime/native/tests/test_profiler.c::test_memory_events"
+    reset = "research/runtime/native/tests/test_profiler.c::test_reset_clears_all"
+    clock = "research/runtime/native/tests/test_profiler.c::test_clock_ns_monotonic"
+
+    report = mutation_value.parse_ctest_junit(report_path, [memory, reset, clock])
+    assert report["status"] == "COMPLETE"
+    assert report["tests"][memory]["outcome"] == "PASSED"
+    assert report["tests"][reset]["outcome"] == "FAILED"
+    assert report["tests"][clock]["outcome"] == "SKIPPED"
+    assert report["tests"][memory]["duration_seconds"] == 0.03
+    assert report["failed_nodeids"] == [reset]
+    assert report["unranked_failures"] == ["test_kernels.test_relu"]
+
+    mutation = SimpleNamespace(expected_killers=[reset])
+    verdict = mutation_testing.killer_verdict(mutation, report, "KILLED")
+    assert verdict["status"] == "CONFIRMED" and verdict["matched"] == [reset]
+
+    # A ranked test ctest never registered leaves the report incomplete rather
+    # than silently narrowing the campaign to the cases that happened to run.
+    absent = "research/runtime/native/tests/test_profiler.c::test_never_registered"
+    partial = mutation_value.parse_ctest_junit(report_path, [reset, absent])
+    assert partial["status"] == "INCOMPLETE"
+    assert partial["missing_nodeids"] == [absent]
+
+
+def test_a_ctest_batch_that_never_ran_cannot_inherit_the_last_one_s_report(
+    tmp_path: Path,
+) -> None:
+    """The failure this prevents is a kill attributed to a run that never happened.
+
+    A C batch builds before it tests, so a mutant that breaks the build exits
+    non-zero with ctest unrun. The previous mutant's report is still on disk and
+    would be read as this one's evidence -- and it would say every ranked test
+    passed, so the kill would be attributed to nothing while reading COMPLETE.
+    """
+
+    report_path = tmp_path / ".mutation-value" / "ctest.xml"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(_CTEST_JUNIT, encoding="utf-8")
+    reset = "research/runtime/native/tests/test_profiler.c::test_reset_clears_all"
+
+    result, report = mutation_value.collect_ctest_junit_batch(
+        argv=("sh", "-c", "false"),
+        report_path=report_path,
+        ranked_nodeids=[reset],
+        run_command=lambda argv: "build failed",
+    )
+    assert result == "build failed"
+    assert report["status"] == "INCOMPLETE"
+    assert report["missing_nodeids"] == [reset]
+    assert report["tests"] == {}
+    assert "cannot parse ctest JUnit report" in report["error"]
+    assert not report_path.exists()
+
+    mutation = SimpleNamespace(expected_killers=[reset])
+    verdict = mutation_testing.killer_verdict(mutation, report, "KILLED")
+    assert verdict["status"] == "UNATTRIBUTED"
+
+
+def test_a_c_batch_is_routed_to_the_ctest_collector(tmp_path: Path) -> None:
+    """Routing is read from the ranked nodeids, not argv.
+
+    A C batch has to build before it tests, so its argv is a shell line and
+    `ctest` is never argv[0]. Routing on argv would leave every C campaign
+    unattributed, which is the state this branch exists to end.
+    """
+
+    reset = "research/runtime/native/tests/test_profiler.c::test_reset_clears_all"
+    manifest = tmp_path / "campaign.json"
+    manifest.write_text("{}", encoding="utf-8")
+    campaign = mutation_testing.Campaign(
+        manifest_path=manifest,
+        manifest_sha256="0" * 64,
+        campaign_id="routing_probe",
+        title="routing probe",
+        language="c",
+        mutation_engine="reviewed_unified_diff",
+        expected_mutations=0,
+        source_sha256={},
+        ranked_tests=(mutation_testing.RankedTest(1, reset, "c", "r"),),
+        planned_mutations=(),
+        mutations=(),
+        test_argv=("sh", "-c", "cmake --build build && ctest --test-dir build"),
+        timeout_seconds=10,
+        blocked_process_substrings=(),
+        poll_seconds=1,
+        environment={},
+        host_read_dependencies=(),
+    )
+
+    calls: list[Sequence[str]] = []
+
+    def fake_run_command(argv, *, cwd, timeout_seconds, environment, stdout_sink=None):
+        calls.append(tuple(argv))
+        mutation_value.ctest_junit_path(tmp_path).write_text(
+            _CTEST_JUNIT, encoding="utf-8"
+        )
+        return "result"
+
+    original = mutation_testing._run_command  # noqa: SLF001
+    mutation_testing._run_command = fake_run_command  # noqa: SLF001
+    try:
+        result, report = mutation_testing._run_campaign_command(  # noqa: SLF001
+            campaign, snapshot_root=tmp_path, report_name="batch"
+        )
+    finally:
+        mutation_testing._run_command = original  # noqa: SLF001
+    assert result == "result"
+    assert report["tests"][reset]["outcome"] == "FAILED"
+    # The ctest path must not rewrite argv the way the pytest one does.
+    assert calls == [("sh", "-c", "cmake --build build && ctest --test-dir build")]
+
+
+def test_a_kill_a_capable_batch_did_not_attribute_refuses_the_campaign() -> None:
+    """An unattributed kill is a refusal, not a quieter shade of enforced.
+
+    Without this the framework counts a mutant that broke the build as killed,
+    reports `killer_enforcement: UNAVAILABLE`, and still passes the campaign --
+    a body count with no contract behind it. The distinction that makes it
+    actionable is harness-vs-run: a batch with no per-test evidence at all is
+    reported and not punished, because no campaign can fix it.
+    """
+
+    def row(mutant_id: str, status: str) -> dict[str, object]:
+        return {"id": mutant_id, "killer_attribution": {"status": status}}
+
+    assert mutation_testing.killer_enforcement(
+        [row("a", "CONFIRMED"), row("b", "CONFIRMED")]
+    ) == {
+        "status": "ENFORCED",
+        "misattributed": [],
+        "unattributed": [],
+        "unattributed_runs": [],
+    }
+    harness = mutation_testing.killer_enforcement(
+        [row("a", "CONFIRMED"), row("b", "UNAVAILABLE")]
+    )
+    assert harness["status"] == "UNAVAILABLE" and harness["unattributed"] == ["b"]
+    run = mutation_testing.killer_enforcement(
+        [row("a", "CONFIRMED"), row("b", "UNATTRIBUTED")]
+    )
+    assert run["status"] == "REFUSED" and run["unattributed_runs"] == ["b"]
+    wrong = mutation_testing.killer_enforcement(
+        [row("a", "MISATTRIBUTED"), row("b", "UNAVAILABLE")]
+    )
+    assert wrong["status"] == "REFUSED" and wrong["misattributed"] == ["a"]
