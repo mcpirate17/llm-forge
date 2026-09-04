@@ -11,7 +11,8 @@ when it relocates to `src/conductor`. What is enforced now, every PR, is the bou
 (`conductor/tooling_boundary.py`, an always-on gate check): no import edge from the
 tooling to the host packages, no host path literal, one native seam.
 
-**Rehearsal.** `make tooling-standalone-smoke` assembles this package from the committed
+**Rehearsal.** `make tooling-standalone-smoke` runs the Rust harness in
+`tooling/native/tooling-standalone-smoke`. It assembles this package from the committed
 tree in a scratch dir (`src/conductor`, `src/tooling/hooks`, `native/conductor-native`,
 `native/slop-core`, `hooks/` without the project extension, this manifest), installs it
 with `uv` into a fresh venv (building the crates), proves the host packages are
@@ -22,7 +23,7 @@ foreign half: `uv build --wheel`, a second fresh venv with only the crates and t
 wheel, `python -m conductor init` on a throwaway `git init` repository (the hook doctor
 runs inside it), a force-push denied through the scaffolded `.claude/hooks/dispatch.py`
 with a clean environment, and `tooling.hooks.dispatch` / `conductor.project_init` proven
-to import from that venv alone. Any of those failing raises; none is summarized.
+to import from that venv alone. Any infrastructure failure aborts with a refusal report.
 
 ## Scaffolding a project
 
