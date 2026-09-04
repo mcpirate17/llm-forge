@@ -34,7 +34,6 @@ receipt or manifest, or an unusable repository -- nothing was measured).
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 from collections.abc import Mapping
@@ -43,13 +42,14 @@ from pathlib import Path
 from typing import Any
 
 from conductor import mutation_testing_support as _support
-from conductor.mutation_scope import (
-    CampaignError,
-    _require_mapping,
-    _require_string,
-    _safe_relative_path,
+from conductor._native import (
+    load_tree_receipt_native,
+    receipt_inventory_digest_native,
+    receipt_manifest_pins_native,
+    receipt_sha256_native,
+    verify_tree_receipt_native,
 )
-from conductor.mutation_testing import SHA256_RE
+from conductor.mutation_scope import CampaignError, _require_string
 
 EXIT_PASS = 0
 EXIT_FAIL = 1
@@ -72,49 +72,18 @@ class LoadedReceipt:
     source_sha256: dict[str, str]
 
 
-def _require_sha256(value: object, label: str) -> str:
-    text = _require_string(value, label)
-    if not SHA256_RE.fullmatch(text):
-        raise CampaignError(f"{label} must be a lowercase SHA-256 digest")
-    return text
-
-
-def _load_pin_map(value: object, label: str) -> dict[str, str]:
-    """Validate a non-empty ``path -> sha256`` mapping with safe relative keys."""
-    mapping = _require_mapping(value, label)
-    if not mapping:
-        raise CampaignError(f"{label} must not be empty")
-    pins: dict[str, str] = {}
-    for raw_path, raw_digest in mapping.items():
-        pin_path = _safe_relative_path(raw_path, f"{label} key")
-        pins[pin_path] = _require_sha256(raw_digest, f"{label}[{pin_path}]")
-    return pins
-
-
 def load_receipt(path: Path) -> LoadedReceipt:
     """Parse the receipt file; structural invalidity is REFUSED, never a FAIL."""
-    if not path.is_file():
-        raise CampaignError(f"receipt file is missing: {path}")
-    raw = path.read_bytes()
-    if not raw:
-        # Existence is not content: a 0-byte stub passes is_file().
-        raise CampaignError(f"receipt file is empty: {path}")
     try:
-        payload = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError) as exc:
-        raise CampaignError(f"receipt is not valid JSON: {path}: {exc}") from exc
-    receipt = _require_mapping(payload, f"receipt {path}")
-    schema = receipt.get("schema_version")
+        receipt = json.loads(load_tree_receipt_native(str(path)))
+    except ValueError as exc:
+        raise CampaignError(str(exc)) from exc
     return LoadedReceipt(
         path=path,
-        schema_version=schema if isinstance(schema, str) else None,
-        manifest=_safe_relative_path(receipt.get("manifest"), "receipt.manifest"),
-        manifest_sha256=_require_sha256(
-            receipt.get("manifest_sha256"), "receipt.manifest_sha256"
-        ),
-        source_sha256=_load_pin_map(
-            receipt.get("source_sha256"), "receipt.source_sha256"
-        ),
+        schema_version=receipt["schema_version"],
+        manifest=receipt["manifest"],
+        manifest_sha256=receipt["manifest_sha256"],
+        source_sha256=receipt["source_sha256"],
     )
 
 
@@ -155,177 +124,53 @@ def _tree_blob(repo_root: Path, tree_oid: str, path: str) -> tuple[bytes | None,
     return result.stdout, ""
 
 
-def _manifest_pins(blob: bytes, manifest_rel: str) -> dict[str, str]:
-    """Source pins from the manifest blob as stored in the target tree."""
-    try:
-        payload = json.loads(blob.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError) as exc:
-        raise CampaignError(
-            f"manifest blob is not valid JSON: {manifest_rel}: {exc}"
-        ) from exc
-    manifest = _require_mapping(payload, f"manifest {manifest_rel}")
-    return _load_pin_map(
-        manifest.get("source_sha256"), f"manifest {manifest_rel} source_sha256"
-    )
-
-
 def inventory_digest(pins: Mapping[str, str]) -> str:
-    """Digest of a pin inventory in ``sha256sum`` line format.
-
-    One ``<sha256>  <path>\\n`` line per pin (two spaces, exactly the bytes
-    ``sha256sum`` emits), ordered with ``sort -k1,1`` semantics -- primary key
-    the hash field, ties broken by the whole line -- then sha256 over the
-    concatenated lines.
-    """
-    lines = [f"{digest}  {path}\n" for path, digest in pins.items()]
-    lines.sort(key=lambda line: (line.split("  ", 1)[0], line))
-    return hashlib.sha256("".join(lines).encode("utf-8")).hexdigest()
-
-
-def _pin_divergence(
-    recorded: Mapping[str, str], reproduced: Mapping[str, str]
-) -> dict[str, list[str]]:
-    """Name exactly how the receipt's recorded inventory differs from the tree's."""
-    shared = set(recorded) & set(reproduced)
-    return {
-        "only_in_receipt": sorted(set(recorded) - set(reproduced)),
-        "only_in_tree_inventory": sorted(set(reproduced) - set(recorded)),
-        "hash_mismatch": sorted(p for p in shared if recorded[p] != reproduced[p]),
-    }
-
-
-def _verdict(
-    receipt: LoadedReceipt,
-    repo_root: Path,
-    tree_oid: str,
-    checks: dict[str, dict[str, Any]],
-    failures: list[str],
-) -> dict[str, Any]:
-    passed = not failures and all(c.get("status") == "PASS" for c in checks.values())
-    return {
-        "status": "PASS" if passed else "FAIL",
-        "repo_root": str(repo_root),
-        "tree_oid": tree_oid,
-        "receipt": str(receipt.path),
-        "receipt_schema_version": receipt.schema_version,
-        "manifest": receipt.manifest,
-        "checks": checks,
-        "failures": failures,
-    }
+    """Return the native sha256sum-format digest of a pin inventory."""
+    return receipt_inventory_digest_native(list(pins.items()))
 
 
 def verify_receipt(
     receipt_path: Path, repo_root: Path, tree_oid: str
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Run the four-part test; every byte comes from the target tree."""
     receipt = load_receipt(receipt_path)
-    checks: dict[str, dict[str, Any]] = {}
-    failures: list[str] = []
-
-    # Part 1: the manifest path must be a blob in the target tree.
     blob, reason = _tree_blob(repo_root, tree_oid, receipt.manifest)
-    if blob is None:
-        checks[PART1] = {"status": "FAIL", "detail": reason}
-        failures.append(
-            f"part 1 ({PART1}): {receipt.manifest} is not a blob in "
-            f"tree {tree_oid}: {reason}"
-        )
-        blocked = {"status": "BLOCKED", "detail": "manifest blob unavailable"}
-        for name in (PART2, PART3, PART4):
-            checks[name] = dict(blocked)
-        return _verdict(receipt, repo_root, tree_oid, checks, failures)
-    checks[PART1] = {"status": "PASS", "size_bytes": len(blob)}
-
-    # Part 2: recorded manifest hash against the blob's actual bytes.
-    actual_manifest_sha = hashlib.sha256(blob).hexdigest()
-    if actual_manifest_sha == receipt.manifest_sha256:
-        checks[PART2] = {"status": "PASS", "sha256": actual_manifest_sha}
-    else:
-        checks[PART2] = {
-            "status": "FAIL",
-            "recorded": receipt.manifest_sha256,
-            "actual": actual_manifest_sha,
-        }
-        failures.append(
-            f"part 2 ({PART2}): recorded {receipt.manifest_sha256} != "
-            f"actual {actual_manifest_sha}"
-        )
-
-    # Parts 3 and 4 read the manifest's pins and the receipt's recorded map.
-    manifest_pins = _manifest_pins(blob, receipt.manifest)
-    _check_pins(receipt, repo_root, tree_oid, manifest_pins, checks, failures)
-    return _verdict(receipt, repo_root, tree_oid, checks, failures)
-
-
-def _check_pins(
-    receipt: LoadedReceipt,
-    repo_root: Path,
-    tree_oid: str,
-    manifest_pins: Mapping[str, str],
-    checks: dict[str, dict[str, Any]],
-    failures: list[str],
-) -> None:
-    """Parts 3 and 4: pin-by-pin hashes, then inventory-digest reproduction."""
-    # Part 3: every manifest pin against the tree's blob bytes.
-    pin_failures: list[str] = []
-    actual_hashes: dict[str, str] = {}
-    unreadable = 0
-    for path in sorted(manifest_pins):
-        pinned = manifest_pins[path]
-        source_blob, source_reason = _tree_blob(repo_root, tree_oid, path)
-        if source_blob is None:
-            unreadable += 1
-            pin_failures.append(
-                f"{path}: pinned {pinned}, but the path is not a blob in the "
-                f"target tree ({source_reason})"
+    source_rows: list[tuple[str, str | None, str]] = []
+    if blob is not None:
+        try:
+            manifest_pins = json.loads(
+                receipt_manifest_pins_native(blob, receipt.manifest)
             )
-            continue
-        actual = hashlib.sha256(source_blob).hexdigest()
-        actual_hashes[path] = actual
-        if actual != pinned:
-            pin_failures.append(f"{path}: pinned {pinned} != actual {actual}")
-    if pin_failures:
-        checks[PART3] = {
-            "status": "FAIL",
-            "checked": len(manifest_pins),
-            "failures": pin_failures,
-        }
-        failures.extend(f"part 3 ({PART3}): {line}" for line in pin_failures)
-    else:
-        checks[PART3] = {"status": "PASS", "checked": len(manifest_pins)}
-
-    # Part 4: recorded inventory digest reproduced from the tree's own hashes.
-    recorded_digest = inventory_digest(receipt.source_sha256)
-    if unreadable:
-        checks[PART4] = {
-            "status": "BLOCKED",
-            "recorded_digest": recorded_digest,
-            "detail": f"{unreadable} pinned path(s) unreadable in the target tree",
-        }
-        failures.append(
-            f"part 4 ({PART4}): blocked -- {unreadable} pinned path(s) "
-            "unreadable in the target tree; reproduction impossible"
-        )
-    else:
-        reproduced_digest = inventory_digest(actual_hashes)
-        if recorded_digest == reproduced_digest:
-            checks[PART4] = {
-                "status": "PASS",
-                "digest": recorded_digest,
-                "pins": len(actual_hashes),
-            }
-        else:
-            divergence = _pin_divergence(receipt.source_sha256, actual_hashes)
-            checks[PART4] = {
-                "status": "FAIL",
-                "recorded_digest": recorded_digest,
-                "reproduced_digest": reproduced_digest,
-                "divergence": divergence,
-            }
-            failures.append(
-                f"part 4 ({PART4}): recorded {recorded_digest} != reproduced "
-                f"{reproduced_digest} (divergence: {json.dumps(divergence)})"
+        except ValueError as exc:
+            raise CampaignError(str(exc)) from exc
+        for path in sorted(manifest_pins):
+            source_blob, source_reason = _tree_blob(repo_root, tree_oid, path)
+            source_sha256 = (
+                receipt_sha256_native(source_blob) if source_blob is not None else None
             )
+            source_rows.append((path, source_sha256, source_reason))
+    receipt_payload = json.dumps(
+        {
+            "path": str(receipt.path),
+            "schema_version": receipt.schema_version,
+            "manifest": receipt.manifest,
+            "manifest_sha256": receipt.manifest_sha256,
+            "source_sha256": receipt.source_sha256,
+        }
+    )
+    try:
+        return json.loads(
+            verify_tree_receipt_native(
+                receipt_payload,
+                str(repo_root),
+                tree_oid,
+                blob,
+                reason,
+                source_rows,
+            )
+        )
+    except ValueError as exc:
+        raise CampaignError(str(exc)) from exc
 
 
 def _print_human(verdict: dict[str, Any]) -> None:

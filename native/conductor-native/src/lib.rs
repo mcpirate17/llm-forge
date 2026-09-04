@@ -17,6 +17,7 @@ mod mutation_evidence;
 mod mutation_manifest;
 mod mutation_receipt;
 mod native_reuse;
+mod receipt_auth;
 mod tooling_boundary;
 
 use pyo3::prelude::*;
@@ -34,6 +35,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     mutation_evidence::register(module)?;
     memory_index::register(module)?;
     native_reuse::register(module)?;
+    receipt_auth::register(module)?;
     tooling_boundary::register(module)?;
     Ok(())
 }

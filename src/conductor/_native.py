@@ -36,6 +36,7 @@ from conductor_native import (
     is_mutation_test_path_native,
     load_mutation_campaign_native,
     load_mutation_registry_native,
+    load_tree_receipt_native,
     memory_index_metadata_native,
     memory_index_query_file_native,
     memory_index_score_rows_native,
@@ -52,12 +53,16 @@ from conductor_native import (
     plan_mutation_evidence_native,
     plan_mutation_repin_native,
     plan_mutation_scaffold_native,
+    receipt_inventory_digest_native,
+    receipt_manifest_pins_native,
+    receipt_sha256_native,
     scan_untracked_import_closure_native,
     should_skip_mutation_path_native,
     stable_duplicate_key_native,
     tooling_boundary_facts_native,
     validate_mutation_receipt_native,
     verify_mutation_evidence_native,
+    verify_tree_receipt_native,
 )
 
 SLOP_CORE_BUILD_HINT = (
@@ -120,6 +125,7 @@ __all__ = [
     "is_mutation_test_path_native",
     "load_mutation_campaign_native",
     "load_mutation_registry_native",
+    "load_tree_receipt_native",
     "memory_index_metadata_native",
     "memory_index_query_file_native",
     "memory_index_score_rows_native",
@@ -136,6 +142,9 @@ __all__ = [
     "plan_mutation_evidence_native",
     "plan_mutation_repin_native",
     "plan_mutation_scaffold_native",
+    "receipt_inventory_digest_native",
+    "receipt_manifest_pins_native",
+    "receipt_sha256_native",
     "scan_untracked_import_closure_native",
     "should_skip_mutation_path_native",
     "slop_core",
@@ -143,4 +152,5 @@ __all__ = [
     "tooling_boundary_facts_native",
     "validate_mutation_receipt_native",
     "verify_mutation_evidence_native",
+    "verify_tree_receipt_native",
 ]
