@@ -7,6 +7,7 @@
 mod a2a_compaction;
 mod a2a_retention;
 mod candidate_structure;
+mod context_telemetry;
 mod dead_tests;
 mod duplicate_bodies;
 mod git_source;
@@ -27,6 +28,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     a2a_compaction::register(module)?;
     a2a_retention::register(module)?;
     candidate_structure::register(module)?;
+    context_telemetry::register(module)?;
     dead_tests::register(module)?;
     duplicate_bodies::register(module)?;
     guardrail_ast::register(module)?;
