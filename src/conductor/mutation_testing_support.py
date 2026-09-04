@@ -354,8 +354,17 @@ def run_command(
     pin_argv: Callable[[Sequence[str]], list[str]],
     result_factory: Callable[..., _CommandResultT],
     output_tail_chars: int,
+    stdout_sink: Callable[[str], None] | None = None,
 ) -> _CommandResultT:
-    """Run one bounded command and retain only the configured output tails."""
+    """Run one bounded command and retain only the configured output tails.
+
+    ``stdout_sink`` receives the FULL stdout before it is truncated. A test runner
+    that reports per-test outcomes on stdout rather than into a file -- libtest --
+    cannot be attributed from a tail, and widening the stored tail to fit would put
+    megabytes of test chatter into every receipt. The sink keeps the receipt bounded
+    and the attribution complete. It is called exactly once per run, including on a
+    timeout, so a partial run still attributes the tests that did report.
+    """
 
     env = os.environ.copy()
     env.update(environment)
@@ -379,6 +388,8 @@ def run_command(
         stderr = (
             exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
         )
+        if stdout_sink is not None:
+            stdout_sink(stdout)
         return result_factory(
             returncode=None,
             timed_out=True,
@@ -386,6 +397,8 @@ def run_command(
             stdout_tail=stdout[-output_tail_chars:],
             stderr_tail=stderr[-output_tail_chars:],
         )
+    if stdout_sink is not None:
+        stdout_sink(proc.stdout)
     return result_factory(
         returncode=proc.returncode,
         timed_out=False,

@@ -612,3 +612,47 @@ def test_a_decorator_ablation_reaches_the_probe(workspace: pathlib.Path) -> None
         f"the decorator ablation never reached the probe: {sorted(verdicts)}"
     )
     assert verdicts["drop_decorator"] == Verdict.LIVE
+
+
+def test_an_amplifier_that_cannot_touch_an_argument_is_not_replayed() -> None:
+    """The amplified sweep must skip plans that reproduce the recorded call.
+
+    Eight plans over arguments none of them can scale is eight byte-identical
+    repeats of a comparison the unamplified sweep already made -- and the sweep only
+    reaches here when that comparison came back within noise. Replaying it can only
+    re-sample jitter, which the control path downstream then pays to reject. The
+    skip is what makes the gate affordable on modules that take paths and dicts
+    (nothing in conductor/ takes a tensor), so its absence is a silent, expensive
+    regression that no verdict would reveal.
+    """
+
+    import torch
+
+    from conductor import equivalence_probe
+
+    seen: list[tuple] = []
+
+    def record(*args, **kwargs):
+        seen.append((args, tuple(sorted(kwargs))))
+        return 1.0
+
+    inert = [((pathlib.Path("x"), {"a": 1}, "s"), {"flag": True})]
+    worst, which = equivalence_probe._sweep_amplified(record, record, inert)
+    assert (worst, which, seen) == (0.0, None, [])
+
+    # A float tensor is scalable, so every input amplifier still runs. The three
+    # parameter amplifiers cannot touch a tensor and are skipped -- a plan is
+    # judged per call, not once for the whole sweep.
+    equivalence_probe._sweep_amplified(record, record, [((torch.ones(3),), {})])
+    assert len(seen) == 2 * len(equivalence_probe.AMPLIFIERS)
+
+    # A tensor nested in a list is reached by the amplifier, so it is not skipped;
+    # the same tensor behind a dict key is not, and skipping it is correct.
+    assert not equivalence_probe._unamplified([torch.ones(2)], [torch.ones(2) * 2])
+    assert equivalence_probe._unamplified([1, "a"], [1, "a"])
+    # A rebuilt container of untouched elements is still an unamplified call.
+    original = [1, [2, 3]]
+    assert equivalence_probe._unamplified(original, [1, [2, 3]])
+    # Type and length are part of the answer: a tuple is not its list.
+    assert not equivalence_probe._unamplified((1, 2), [1, 2])
+    assert not equivalence_probe._unamplified([1, 2], [1])

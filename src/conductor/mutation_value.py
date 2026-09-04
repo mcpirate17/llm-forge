@@ -9,6 +9,7 @@ required scientific contract and every killed mutant.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -237,6 +238,132 @@ def parse_pytest_junit(
         "missing_nodeids": missing,
         "unmapped_cases": unmapped,
     }
+
+
+# ------------------------------------------------------------ cargo / libtest
+
+# libtest prints exactly one line per test it ran, on stdout, in the stable
+# format `test <module path>::<fn> ... ok|FAILED|ignored`. There is no machine
+# format on stable: `--format json` needs `-Z unstable-options`, `--report-time`
+# is nightly-only, and `--logfile` is deprecated AND is truncated by the last
+# binary cargo runs (the doc-test pass rewrites it with zero results). Parsing
+# the printed line is the only stable per-test signal, so that is what this reads.
+CARGO_TEST_LINE = re.compile(
+    r"^test\s+(?P<name>\S+)\s+\.\.\.\s+(?P<outcome>ok|FAILED|ignored)\b"
+)
+_CARGO_OUTCOMES = {"ok": "PASSED", "FAILED": "FAILED", "ignored": "SKIPPED"}
+
+
+def _cargo_identity(nodeid: str) -> str:
+    """Return the test function name a `<path>.rs::<fn>` nodeid names."""
+
+    path, separator, function = nodeid.partition("::")
+    if not separator or not path.endswith(".rs") or "::" in function or not function:
+        raise ValueEvidenceError(f"cargo-libtest requires a Rust nodeid: {nodeid}")
+    return function
+
+
+def cargo_attribution_supported(ranked_nodeids: Sequence[str]) -> bool:
+    """Report whether this batch's ranked tests can be mapped to libtest output.
+
+    Shape is read from the nodeids, not from argv: a campaign may wrap its run in
+    `sh -c` or a cargo alias, and refusing attribution because argv[0] is not
+    literally `cargo` would leave exactly those campaigns unattributed.
+    """
+
+    if not ranked_nodeids:
+        return False
+    try:
+        names = [_cargo_identity(nodeid) for nodeid in ranked_nodeids]
+    except ValueEvidenceError:
+        return False
+    # libtest prints the module path, not the file, so two ranked tests that share
+    # a function name are indistinguishable in the output. Guessing would attribute
+    # a kill to the wrong contract, which is worse than reporting no attribution.
+    return len(set(names)) == len(names)
+
+
+def parse_cargo_libtest(stdout: str, ranked_nodeids: Sequence[str]) -> dict[str, Any]:
+    """Map one libtest run's printed outcomes onto the campaign's ranked nodeids."""
+
+    by_name = {_cargo_identity(nodeid): nodeid for nodeid in ranked_nodeids}
+    if len(by_name) != len(ranked_nodeids):
+        raise ValueEvidenceError(
+            "ranked tests share a function name; libtest output cannot separate them"
+        )
+    tests: dict[str, dict[str, Any]] = {}
+    unranked_failures: list[str] = []
+    printed_names: dict[str, set[str]] = {}
+    for line in stdout.splitlines():
+        match = CARGO_TEST_LINE.match(line.strip())
+        if match is None:
+            continue
+        printed = match.group("name")
+        outcome = _CARGO_OUTCOMES[match.group("outcome")]
+        nodeid = by_name.get(printed.rpartition("::")[2])
+        if nodeid is None:
+            # A batch usually runs more than the ranked set -- a crate-wide `cargo
+            # test` runs every test in the binary. Those are not a defect, but a
+            # mutant that fails many of them is a blunt mutant, and that is worth
+            # recording even though it cannot enter `tests` (which is keyed by
+            # nodeid and is what the killer verdict reads).
+            if outcome == "FAILED":
+                unranked_failures.append(printed)
+            continue
+        # libtest reports no per-test duration on stable, so no duration key is
+        # written rather than a fabricated 0.0.
+        row = tests.setdefault(nodeid, {"outcome": outcome, "cases": 0})
+        if outcome == "FAILED" and row["outcome"] != "FAILED":
+            row["outcome"] = outcome
+        row["cases"] += 1
+        printed_names.setdefault(nodeid, set()).add(printed)
+    # A ranked nodeid carries no module path, so it matches on the last segment
+    # alone. Two DIFFERENT tests in the binary can therefore land on one nodeid --
+    # `crate::a::test_roundtrip` and `crate::b::test_roundtrip` both end
+    # `::test_roundtrip`. Merging them attributes one test's failure to the other's
+    # contract, which is the misattribution this adapter exists to prevent, so the
+    # nodeid is dropped rather than resolved by guesswork. The ambiguity is visible
+    # in the output itself, which is why it is caught here and not in the
+    # supported-shape check.
+    ambiguous = sorted(
+        nodeid for nodeid, names in printed_names.items() if len(names) > 1
+    )
+    for nodeid in ambiguous:
+        del tests[nodeid]
+    missing = [nodeid for nodeid in ranked_nodeids if nodeid not in tests]
+    return {
+        "status": "COMPLETE" if not missing else "INCOMPLETE",
+        "tests": tests,
+        "missing_nodeids": missing,
+        "ambiguous_nodeids": ambiguous,
+        "unmapped_cases": [],
+        "unranked_failures": sorted(unranked_failures),
+    }
+
+
+def collect_cargo_libtest_batch[BatchResultT](
+    *,
+    argv: Sequence[str],
+    ranked_nodeids: Sequence[str],
+    run_command: Callable[[Sequence[str], Callable[[str], None]], BatchResultT],
+) -> tuple[BatchResultT, Mapping[str, Any]]:
+    """Run one cargo batch and return fail-closed attribution from its stdout."""
+
+    captured: list[str] = []
+    result = run_command(argv, captured.append)
+    try:
+        report = parse_cargo_libtest("".join(captured), ranked_nodeids)
+    except ValueEvidenceError as exc:
+        report = {
+            "status": "INCOMPLETE",
+            "tests": {},
+            "missing_nodeids": list(ranked_nodeids),
+            "ambiguous_nodeids": [],
+            "unmapped_cases": [],
+            "unranked_failures": [],
+            "error": str(exc),
+        }
+    return result, report
 
 
 def collect_pytest_junit_batch[BatchResultT](

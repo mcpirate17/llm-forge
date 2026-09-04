@@ -17,7 +17,7 @@ import re
 import subprocess
 import sys
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -41,6 +41,8 @@ from conductor.mutation_value import (
     ValueAnalysisSpec,
     ValueEvidenceError,
     analyze_test_value,
+    cargo_attribution_supported,
+    collect_cargo_libtest_batch,
     collect_pytest_junit_batch,
     load_value_analysis,
     pytest_attribution_supported,
@@ -502,6 +504,7 @@ def _run_command(
     cwd: Path,
     timeout_seconds: int,
     environment: Mapping[str, str],
+    stdout_sink: Callable[[str], None] | None = None,
 ) -> CommandResult:
     return _support.run_command(
         argv,
@@ -511,6 +514,7 @@ def _run_command(
         pin_argv=_pin_interpreter,
         result_factory=CommandResult,
         output_tail_chars=OUTPUT_TAIL_CHARS,
+        stdout_sink=stdout_sink,
     )
 
 
@@ -551,7 +555,7 @@ def killer_verdict(
         if row.get("outcome") in KILLER_FAILURE_OUTCOMES
     )
     matched = sorted(set(declared) & set(observed))
-    return {
+    verdict = {
         "status": "CONFIRMED" if matched else "MISATTRIBUTED",
         "declared": declared,
         "observed_failures": observed,
@@ -559,6 +563,15 @@ def killer_verdict(
         "unobservable": sorted(set(declared) - set(tests)),
         "collateral": sorted(set(observed) - set(declared)),
     }
+    # A batch that runs a whole test binary -- every cargo campaign -- also fails
+    # tests outside the ranked set. Those cannot be adjudicated (they have no
+    # contract), but their COUNT is what separates a precise mutant from a blunt
+    # one that breaks the build and would be "killed" by any test at all. Carry
+    # them so the receipt records the bluntness instead of discarding it.
+    unranked = report.get("unranked_failures") or []
+    if unranked:
+        verdict["unranked_failures"] = list(unranked)
+    return verdict
 
 
 def _run_campaign_command(
@@ -575,6 +588,18 @@ def _run_campaign_command(
             raise CampaignError(
                 "value analysis needs a pytest batch whose ranked tests are "
                 "Python nodeids and whose argv does not already set --junitxml"
+            )
+        if cargo_attribution_supported(ranked_nodeids):
+            return collect_cargo_libtest_batch(
+                argv=campaign.test_argv,
+                ranked_nodeids=ranked_nodeids,
+                run_command=lambda argv, sink: _run_command(
+                    argv,
+                    cwd=snapshot_root,
+                    timeout_seconds=campaign.timeout_seconds,
+                    environment=campaign.environment,
+                    stdout_sink=sink,
+                ),
             )
         return (
             _run_command(

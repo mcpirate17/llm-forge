@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 import copy
 from contextlib import contextmanager
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import pytest
 
-from conductor import mutation_testing, mutation_value
+from conductor import mutation_testing, mutation_testing_support, mutation_value
 
 
 def _spec(
@@ -489,3 +491,245 @@ def test_value_admission_rejects_unmeasured_and_low_value_new_tests() -> None:
         "test_value nodeids do not match ranked tests",
         "test_value baseline repetitions mismatch",
     }
+
+
+def test_cargo_attribution_refuses_ambiguity_rather_than_guessing() -> None:
+    """libtest attribution must fail closed on every shape it cannot separate.
+
+    Each branch here is a way to attribute a Rust kill to the wrong contract, which
+    is worse than reporting no attribution at all: a MISATTRIBUTED verdict that
+    should have been UNAVAILABLE reads as a contract that held.
+    """
+
+    alpha = "tooling/native/conductor-native/src/mutation_receipt.rs::test_alpha"
+    beta = "tooling/native/conductor-native/src/mutation_manifest.rs::test_beta"
+
+    assert mutation_value.cargo_attribution_supported([alpha, beta])
+    # No ranked tests is not "trivially attributable"; there is nothing to map.
+    assert not mutation_value.cargo_attribution_supported([])
+    # A Python nodeid must never take the cargo path -- pytest attribution is
+    # richer, and silently downgrading it would lose per-test durations.
+    assert not mutation_value.cargo_attribution_supported(
+        ["conductor/test_mutation_value.py::test_alpha"]
+    )
+    # libtest prints a module path, not a file, so two ranked tests sharing a
+    # function name are indistinguishable in its output.
+    twin = "tooling/native/conductor-native/src/mutation_evidence.rs::test_alpha"
+    assert not mutation_value.cargo_attribution_supported([alpha, twin])
+    with pytest.raises(mutation_value.ValueEvidenceError, match="share a function"):
+        mutation_value.parse_cargo_libtest("", [alpha, twin])
+    with pytest.raises(mutation_value.ValueEvidenceError, match="Rust nodeid"):
+        mutation_value.parse_cargo_libtest("", ["src/lib.rs::mods::test_alpha"])
+
+    stdout = (
+        "running 4 tests\n"
+        "test receipt::tests::test_alpha ... FAILED\n"
+        "test manifest::tests::test_beta ... ok\n"
+        "test manifest::tests::test_unranked ... FAILED\n"
+        "test manifest::tests::test_skipped ... ignored\n"
+        "test result: FAILED. 1 passed; 2 failed; 1 ignored\n"
+    )
+    parsed = mutation_value.parse_cargo_libtest(stdout, [alpha, beta])
+    assert parsed["status"] == "COMPLETE"
+    assert parsed["tests"][alpha] == {"outcome": "FAILED", "cases": 1}
+    assert parsed["tests"][beta]["outcome"] == "PASSED"
+    # stable libtest reports no per-test time; a fabricated 0.0 would be read as a
+    # measurement by the value analysis, so no duration key is written at all.
+    assert "duration_seconds" not in parsed["tests"][alpha]
+    # A failure outside the ranked set is evidence of a blunt mutant. It must be
+    # recorded, and it must not enter `tests`, which the killer verdict reads.
+    assert parsed["unranked_failures"] == ["manifest::tests::test_unranked"]
+    assert set(parsed["tests"]) == {alpha, beta}
+
+    # An `ignored` test ran nothing, so it can never be a killer.
+    ignored = mutation_value.parse_cargo_libtest(
+        "test receipt::tests::test_alpha ... ignored\n", [alpha]
+    )
+    assert ignored["tests"][alpha]["outcome"] == "SKIPPED"
+
+    # A ranked test the binary never printed is INCOMPLETE, never a silent PASSED.
+    missing = mutation_value.parse_cargo_libtest(stdout, [alpha, beta, "x.rs::test_x"])
+    assert missing["status"] == "INCOMPLETE"
+    assert missing["missing_nodeids"] == ["x.rs::test_x"]
+
+    # Two DIFFERENT binaries' tests can end in the same segment as one ranked
+    # nodeid. Merging them attributes one test's failure to the other's contract.
+    collided = mutation_value.parse_cargo_libtest(
+        "test receipt::tests::test_alpha ... ok\n"
+        "test other::tests::test_alpha ... FAILED\n",
+        [alpha],
+    )
+    assert collided["ambiguous_nodeids"] == [alpha]
+    assert alpha not in collided["tests"]
+    assert collided["status"] == "INCOMPLETE"
+
+
+def test_cargo_attribution_reads_the_full_stdout_not_the_stored_tail() -> None:
+    """The sink must see the whole run even though the receipt stores a tail."""
+
+    alpha = "tooling/native/conductor-native/src/mutation_receipt.rs::test_alpha"
+    tail = mutation_testing.OUTPUT_TAIL_CHARS
+
+    def run(script: str, *, timeout_seconds: int, sink: list[str]) -> dict[str, object]:
+        return mutation_testing_support.run_command(
+            [sys.executable, "-c", script],
+            cwd=Path.cwd(),
+            timeout_seconds=timeout_seconds,
+            environment={},
+            pin_argv=list,
+            result_factory=lambda **fields: fields,
+            output_tail_chars=tail,
+            stdout_sink=sink.append,
+        )
+
+    # The verdict line is printed first and the chatter after it, so a sink fed
+    # the stored tail rather than the full stdout loses the one line attribution
+    # depends on -- which is why the tail cannot be the attribution source.
+    captured: list[str] = []
+    result = run(
+        "import sys\n"
+        "sys.stdout.write('test receipt::tests::test_alpha ... FAILED\\n')\n"
+        f"sys.stdout.write('c' * {tail * 2})\n",
+        timeout_seconds=120,
+        sink=captured,
+    )
+    assert "test_alpha" not in str(result["stdout_tail"])
+    report = mutation_value.parse_cargo_libtest("".join(captured), [alpha])
+    assert report["status"] == "COMPLETE"
+    assert report["tests"][alpha]["outcome"] == "FAILED"
+
+    # A run that exhausts its budget still attributes whatever it reported before
+    # the kill, so a slow mutant is adjudicated instead of silently unattributed.
+    timed: list[str] = []
+    expired = run(
+        "import sys, time\n"
+        "sys.stdout.write('test receipt::tests::test_alpha ... FAILED\\n')\n"
+        "sys.stdout.flush()\n"
+        "time.sleep(120)\n",
+        timeout_seconds=2,
+        sink=timed,
+    )
+    assert expired["timed_out"] is True
+    partial = mutation_value.parse_cargo_libtest("".join(timed), [alpha])
+    assert partial["tests"][alpha]["outcome"] == "FAILED"
+
+    # A shape the parser refuses must come back as no attribution, never as an
+    # exception that aborts a campaign mid-walk.
+    _, refused = mutation_value.collect_cargo_libtest_batch(
+        argv=("cargo", "test"),
+        ranked_nodeids=["conductor/test_mutation_value.py::test_alpha"],
+        run_command=lambda argv, sink: sink("test a::b ... ok\n"),
+    )
+    assert refused["status"] == "INCOMPLETE" and "Rust nodeid" in refused["error"]
+
+
+def test_a_rust_kill_by_an_undeclared_test_is_misattributed() -> None:
+    """The whole point of Rust attribution: expected_killers becomes enforceable."""
+
+    alpha = "tooling/native/conductor-native/src/mutation_receipt.rs::test_alpha"
+    beta = "tooling/native/conductor-native/src/mutation_manifest.rs::test_beta"
+    mutation = SimpleNamespace(expected_killers=[alpha])
+
+    report = mutation_value.parse_cargo_libtest(
+        "test receipt::tests::test_alpha ... ok\n"
+        "test manifest::tests::test_beta ... FAILED\n"
+        "test manifest::tests::test_blunt ... FAILED\n",
+        [alpha, beta],
+    )
+    verdict = mutation_testing.killer_verdict(mutation, report, "KILLED")
+    assert verdict["status"] == "MISATTRIBUTED"
+    assert verdict["observed_failures"] == [beta]
+    assert verdict["collateral"] == [beta]
+    # Bluntness survives into the receipt rather than being discarded.
+    assert verdict["unranked_failures"] == ["manifest::tests::test_blunt"]
+
+    declared_failed = mutation_value.parse_cargo_libtest(
+        "test receipt::tests::test_alpha ... FAILED\n"
+        "test manifest::tests::test_beta ... ok\n",
+        [alpha, beta],
+    )
+    confirmed = mutation_testing.killer_verdict(mutation, declared_failed, "KILLED")
+    assert confirmed["status"] == "CONFIRMED" and confirmed["matched"] == [alpha]
+    assert "unranked_failures" not in confirmed
+
+    # An ambiguous mapping must not be adjudicated at all.
+    ambiguous = mutation_value.parse_cargo_libtest(
+        "test receipt::tests::test_alpha ... FAILED\n"
+        "test other::tests::test_alpha ... ok\n"
+        "test manifest::tests::test_beta ... ok\n",
+        [alpha, beta],
+    )
+    assert mutation_testing.killer_verdict(mutation, ambiguous, "KILLED") == {
+        "status": "UNAVAILABLE",
+        "declared": [alpha],
+        "reason": "attribution is INCOMPLETE",
+    }
+
+
+def test_a_rust_batch_is_routed_to_the_libtest_collector(tmp_path: Path) -> None:
+    """The adapter only pays off if the batch actually reaches it.
+
+    Lives beside the adapter rather than in test_mutation_testing.py because what it
+    pins is the adapter-selection contract: which collector a batch gets, and what a
+    batch that fits none of them still returns.
+    """
+
+    alpha = "tooling/native/conductor-native/src/mutation_manifest.rs::test_alpha"
+    manifest = tmp_path / "campaign.json"
+    manifest.write_text("{}", encoding="utf-8")
+
+    def build(nodeids: Sequence[str], argv: Sequence[str]):
+        ranked = tuple(
+            mutation_testing.RankedTest(i + 1, n, "c", "r")
+            for i, n in enumerate(nodeids)
+        )
+        return mutation_testing.Campaign(
+            manifest_path=manifest,
+            manifest_sha256="0" * 64,
+            campaign_id="routing_probe",
+            title="routing probe",
+            language="rust",
+            mutation_engine="reviewed_unified_diff",
+            expected_mutations=0,
+            source_sha256={},
+            ranked_tests=ranked,
+            planned_mutations=(),
+            mutations=(),
+            test_argv=tuple(argv),
+            timeout_seconds=10,
+            blocked_process_substrings=(),
+            poll_seconds=1,
+            environment={},
+            host_read_dependencies=(),
+        )
+
+    calls: list[tuple[Sequence[str], bool]] = []
+
+    def fake_run_command(argv, *, cwd, timeout_seconds, environment, stdout_sink=None):
+        calls.append((tuple(argv), stdout_sink is not None))
+        if stdout_sink is not None:
+            stdout_sink("test manifest::tests::test_alpha ... FAILED\n")
+        return "result"
+
+    original = mutation_testing._run_command  # noqa: SLF001
+    mutation_testing._run_command = fake_run_command  # noqa: SLF001
+    try:
+        rust = build([alpha], ("cargo", "test"))
+        result, report = mutation_testing._run_campaign_command(  # noqa: SLF001
+            rust, snapshot_root=tmp_path, report_name="batch"
+        )
+        assert result == "result"
+        assert report["tests"][alpha]["outcome"] == "FAILED"
+        # The cargo path must not rewrite argv the way the pytest one does.
+        assert calls[-1] == (("cargo", "test"), True)
+
+        # A batch that fits neither collector still runs, and reports NO
+        # attribution rather than an empty one that would read as COMPLETE.
+        other = build(["tests/suite.js"], ("npm", "test"))
+        result, report = mutation_testing._run_campaign_command(  # noqa: SLF001
+            other, snapshot_root=tmp_path, report_name="batch"
+        )
+        assert (result, report) == ("result", None)
+        assert calls[-1] == (("npm", "test"), False)
+    finally:
+        mutation_testing._run_command = original  # noqa: SLF001

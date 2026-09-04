@@ -45,7 +45,11 @@ MAX_RECORDED_CALLS = 24
 # Targets shared per driver run. Bounds recorder memory; see _record_many.
 RECORD_BATCH = 32
 AMPLIFIERS: tuple[tuple[str, float], ...] = (
-    ("x1e3", 1e3), ("x1e-3", 1e-3), ("x1e6", 1e6), ("neg", -1.0), ("zero", 0.0),
+    ("x1e3", 1e3),
+    ("x1e-3", 1e-3),
+    ("x1e6", 1e6),
+    ("neg", -1.0),
+    ("zero", 0.0),
 )
 # Scaling the INPUT is not enough to reach every branch. A lane whose router reads a
 # `tanh` output is bounded however large its input grows, so a guard that only fires
@@ -61,7 +65,9 @@ CONTROL_REPEATS = 3
 # 10 separates those two populations; it does not merely make the flake go away.
 CONTROL_MARGIN = 10.0
 PARAM_AMPLIFIERS: tuple[tuple[str, float], ...] = (
-    ("params_x50", 50.0), ("params_x1e3", 1e3), ("params_zero", 0.0),
+    ("params_x50", 50.0),
+    ("params_x1e3", 1e3),
+    ("params_zero", 0.0),
 )
 
 
@@ -193,9 +199,12 @@ def _node_for_qualname(tree: ast.AST, qualname: str, where: object) -> ast.AST:
     node: Any = None
     for part in qualname.split("."):
         node = next(
-            (n for n in ast.iter_child_nodes(scope)
-             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-             and n.name == part),
+            (
+                n
+                for n in ast.iter_child_nodes(scope)
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and n.name == part
+            ),
             None,
         )
         if node is None:
@@ -230,7 +239,13 @@ def _compile_variant(
     ast.fix_missing_locations(holder)
     namespace: dict[str, Any] = {}
     code = compile(holder, getattr(module, "__file__", "<ablation>"), "exec")
-    exec(code, module.__dict__, namespace)  # noqa: S102 - by design, module globals
+    # The ablated function has to close over the module's OWN globals -- its
+    # callees, constants and decorators are resolved there -- so a sandboxed
+    # namespace would change the thing under measurement. The source executed
+    # here is this repository's own file, re-emitted from its parsed AST; no
+    # caller-supplied text reaches it.
+    # nosemgrep: python-dangerous-eval-exec
+    exec(code, module.__dict__, namespace)  # noqa: S102  # nosec B102
     return namespace[name]
 
 
@@ -295,7 +310,9 @@ def _bind_sites(module: Any, qualname: str) -> list[tuple[Any, str]]:
     return sites
 
 
-def _install_recorder(module: Any, qualname: str) -> tuple[list[tuple], list[tuple]] | None:
+def _install_recorder(
+    module: Any, qualname: str
+) -> tuple[list[tuple], list[tuple]] | None:
     """Patch every site `qualname` is reachable through. Returns (restores, calls)."""
     try:
         sites = _bind_sites(module, qualname)
@@ -303,11 +320,17 @@ def _install_recorder(module: Any, qualname: str) -> tuple[list[tuple], list[tup
         return None
     owner, attr = sites[0]
     original = inspect.getattr_static(owner, attr)
-    original = original.__func__ if isinstance(original, staticmethod) else getattr(owner, attr)
+    original = (
+        original.__func__
+        if isinstance(original, staticmethod)
+        else getattr(owner, attr)
+    )
     recorder, calls = _make_recorder(original)
     restores = []
     for site_owner, site_attr in sites:
-        restores.append((site_owner, site_attr, getattr(site_owner, site_attr, original)))
+        restores.append(
+            (site_owner, site_attr, getattr(site_owner, site_attr, original))
+        )
         setattr(site_owner, site_attr, recorder)
     return restores, calls
 
@@ -318,7 +341,9 @@ def _record_calls(module: Any, qualname: str, test_args: Sequence[str]) -> list[
 
 
 def _record_many(
-    module: Any, qualnames: Sequence[str], test_args: Sequence[str],
+    module: Any,
+    qualnames: Sequence[str],
+    test_args: Sequence[str],
     batch: int = RECORD_BATCH,
 ) -> dict[str, list[tuple]]:
     """Record every target's real arguments, sharing driver runs between them.
@@ -364,8 +389,10 @@ def _record_many(
 
 
 def _compare_one(
-    baseline: Callable[..., Any], variant: Callable[..., Any],
-    args: tuple, kwargs: dict,
+    baseline: Callable[..., Any],
+    variant: Callable[..., Any],
+    args: tuple,
+    kwargs: dict,
 ) -> float | None:
     """Relative difference for one argument set, or None when the input is unusable.
 
@@ -415,9 +442,44 @@ def _sweep(
     return worst, usable
 
 
+def _unamplified(original: Any, transformed: Any) -> bool:
+    """Did the amplifier leave this argument alone?
+
+    Mirrors the only two paths in `_amplify`/`_amplify_parameters` that build a new
+    object: a float tensor becomes a scaled tensor, a module becomes a scaled
+    deepcopy, and a list or tuple is rebuilt around whatever its elements became.
+    Everything else is returned by identity, so `is` decides it.
+    """
+    if original is transformed:
+        return True
+    if isinstance(original, (list, tuple)) and type(original) is type(transformed):
+        return len(original) == len(transformed) and all(
+            _unamplified(a, b) for a, b in zip(original, transformed)
+        )
+    return False
+
+
 def _sweep_amplified(
     baseline: Callable, variant: Callable, calls: Sequence[tuple]
 ) -> tuple[float, str | None]:
+    """Worst relative difference over the amplified regimes, and which one found it.
+
+    A plan that cannot touch a single argument is skipped, and that is exact rather
+    than heuristic: an amplifier which returns every argument by identity replays the
+    call `_sweep` already made, and this function is only reached when that sweep came
+    back within noise. Such a plan can contribute nothing but a re-sample of a
+    quantity already measured -- and a re-sample landing above noise is jitter by
+    construction, which is the false candidate the CONTROL_REPEATS path below then
+    pays to reject. Measured over four modules: 613 findings before and after, with 3
+    NONDETERMINISTIC verdicts on `run_targeted_tests` becoming NO_DIFFERENCE_OBSERVED
+    because the wall-clock field they were reading no longer got re-sampled.
+
+    It is also where the gate's time went. Nothing in `conductor/` takes a tensor or a
+    module, so all eight plans were byte-identical repeats of a function that shells
+    out to git: `project_init` alone spent 176 s of a 352 s review doing that, and is
+    now 31.8 s against 180.9 s. A probe with a real tensor or module argument still
+    runs every plan that changes it.
+    """
     worst, which = 0.0, None
     plans: list[tuple[str, Callable[[Any], Any]]] = [
         (label, lambda v, f=factor: _amplify(v, f)) for label, factor in AMPLIFIERS
@@ -430,6 +492,10 @@ def _sweep_amplified(
         for args, kwargs in calls:
             amp_args = tuple(transform(a) for a in args)
             amp_kwargs = {k: transform(v) for k, v in kwargs.items()}
+            if all(_unamplified(a, b) for a, b in zip(args, amp_args)) and all(
+                _unamplified(v, amp_kwargs[k]) for k, v in kwargs.items()
+            ):
+                continue
             diff = _compare_one(baseline, variant, amp_args, amp_kwargs)
             if diff is not None and diff > worst:
                 worst, which = diff, label
@@ -437,10 +503,15 @@ def _sweep_amplified(
 
 
 def probe_function(
-    module_path: pathlib.Path, qualname: str, test_args: Sequence[str],
-    module_name: str | None = None, noise: float = 1e-6,
-    extra_rules: Sequence[str] = (), calls: list[tuple] | None = None,
-    ablations: Sequence[NativeAblation] | None = None, source: str | None = None,
+    module_path: pathlib.Path,
+    qualname: str,
+    test_args: Sequence[str],
+    module_name: str | None = None,
+    noise: float = 1e-6,
+    extra_rules: Sequence[str] = (),
+    calls: list[tuple] | None = None,
+    ablations: Sequence[NativeAblation] | None = None,
+    source: str | None = None,
 ) -> list[AblationResult]:
     """Ablate every construct in one function and classify each by differential value."""
     module_name = module_name or _module_name_for(module_path)
@@ -448,8 +519,11 @@ def probe_function(
     if source is None:
         source = module_path.read_text()
     if ablations is None:
-        ablations = [a for a in native_ablations(source, extra=list(extra_rules))
-                     if a.qualname == qualname]
+        ablations = [
+            a
+            for a in native_ablations(source, extra=list(extra_rules))
+            if a.qualname == qualname
+        ]
     fn_ast = _node_for_qualname(ast.parse(source), qualname, module_path)
     if not ablations:
         return []
@@ -459,8 +533,14 @@ def probe_function(
     baseline = _compile_variant(fn_ast, module, fn_ast.name)
     results: list[AblationResult] = []
     for ablation in ablations:
-        base = AblationResult(qualname, ablation.rule, ablation.description,
-                              ablation.line, Verdict.NOT_EXERCISED, len(calls))
+        base = AblationResult(
+            qualname,
+            ablation.rule,
+            ablation.description,
+            ablation.line,
+            Verdict.NOT_EXERCISED,
+            len(calls),
+        )
         if not calls:
             results.append(base)
             continue
@@ -470,15 +550,20 @@ def probe_function(
             # ablate_function_to_none and drop_decorator rewrite the definition
             # itself, which no function-scoped AST swap can express.
             mutated = _node_for_qualname(
-                ast.parse(ablation.apply(source)), qualname, module_path)
+                ast.parse(ablation.apply(source)), qualname, module_path
+            )
             # For the decorator rule the decorator IS the construct under test, so
             # both ends have to carry it -- otherwise the ablation and the baseline
             # compile to the same object and every decorator reads as decorative.
             decorated = ablation.rule == "drop_decorator"
-            against = (_compile_variant(fn_ast, module, fn_ast.name, decorators=True)
-                       if decorated else baseline)
+            against = (
+                _compile_variant(fn_ast, module, fn_ast.name, decorators=True)
+                if decorated
+                else baseline
+            )
             variant = _compile_variant(
-                mutated, module, fn_ast.name, decorators=decorated)
+                mutated, module, fn_ast.name, decorators=decorated
+            )
         except (SyntaxError, LookupError) as exc:
             base.verdict, base.detail = Verdict.UNCOMPILABLE, str(exc)
             results.append(base)
@@ -498,45 +583,70 @@ def probe_function(
         amplified, which = _sweep_amplified(against, variant, calls)
         base.max_diff_amplified, base.amplifier = amplified, which
         if amplified > noise:
-            # This verdict is the one that blocks a merge, so it has to be
-            # ATTRIBUTABLE to the ablation. Measured on the first real sweep: 11 of
-            # 16 structural findings in research/eval differed only in an
-            # `elapsed_ms` wall-clock field, which changes between any two calls.
-            # The amplified sweep scored that jitter as an infinite relative change
-            # because the `==` fallback in _difference is all-or-nothing and never
-            # meets a noise threshold. Re-running the baseline against ITSELF
-            # separates instability from effect; it costs one extra sweep and is
-            # paid only when a finding is about to be reported.
-            # The single sweep above is a SCREEN, not a verdict: it is one sample of
-            # a quantity that varies between runs whenever the function under test
-            # does. Repeating the same seven modules gave blocking counts of
-            # 13 / 10 / 7 on unchanged code. So a candidate has to clear two bars:
-            #   * REPRODUCE -- the smallest effect seen over several repeats, not a
-            #     lucky largest one;
-            #   * EXCEED THE FUNCTION'S OWN JITTER -- the largest difference the
-            #     unmodified function shows against ITSELF over the same repeats.
-            # Both are paid only here, on a candidate finding, so the clean path
-            # keeps its single sweep.
-            effect = min(_sweep_amplified(against, variant, calls)[0]
-                         for _ in range(CONTROL_REPEATS))
-            control = max(_sweep_amplified(against, against, calls)[0]
-                          for _ in range(CONTROL_REPEATS))
-            base.max_diff_amplified = effect
-            base.max_diff_control = control
-            if effect <= max(noise, control * CONTROL_MARGIN):
-                base.verdict = Verdict.NONDETERMINISTIC
-                base.detail = (
-                    "the unmodified function disagrees with itself by as much as the "
-                    "ablation does, so the difference is not attributable to it")
+            if _adjudicate_amplified(base, against, variant, calls, noise):
                 results.append(base)
                 continue
-            base.verdict = Verdict.REACHABLE_BUT_UNTESTED
         elif max(recorded, amplified) > 0.0:
             base.verdict = Verdict.WITHIN_NUMERIC_NOISE
         else:
             base.verdict = Verdict.NO_DIFFERENCE_OBSERVED
         results.append(base)
 
+    _pool_jitter_floor(results)
+    return results
+
+
+def _adjudicate_amplified(
+    base: AblationResult,
+    against: Any,
+    variant: Any,
+    calls: list[tuple],
+    noise: float,
+) -> bool:
+    """Settle a candidate finding against the function's own instability.
+
+    Returns True when the difference is not attributable to the ablation, in
+    which case ``base`` already carries the NONDETERMINISTIC verdict.
+    """
+    # This verdict is the one that blocks a merge, so it has to be ATTRIBUTABLE to
+    # the ablation. Measured on the first real sweep: 11 of 16 structural findings
+    # in research/eval differed only in an `elapsed_ms` wall-clock field, which
+    # changes between any two calls. The amplified sweep scored that jitter as an
+    # infinite relative change because the `==` fallback in _difference is
+    # all-or-nothing and never meets a noise threshold. Re-running the baseline
+    # against ITSELF separates instability from effect; it costs one extra sweep
+    # and is paid only when a finding is about to be reported.
+    # The screening sweep is a SCREEN, not a verdict: it is one sample of a
+    # quantity that varies between runs whenever the function under test does.
+    # Repeating the same seven modules gave blocking counts of 13 / 10 / 7 on
+    # unchanged code. So a candidate has to clear two bars:
+    #   * REPRODUCE -- the smallest effect seen over several repeats, not a lucky
+    #     largest one;
+    #   * EXCEED THE FUNCTION'S OWN JITTER -- the largest difference the unmodified
+    #     function shows against ITSELF over the same repeats.
+    # Both are paid only here, on a candidate finding, so the clean path keeps its
+    # single sweep.
+    effect = min(
+        _sweep_amplified(against, variant, calls)[0] for _ in range(CONTROL_REPEATS)
+    )
+    control = max(
+        _sweep_amplified(against, against, calls)[0] for _ in range(CONTROL_REPEATS)
+    )
+    base.max_diff_amplified = effect
+    base.max_diff_control = control
+    if effect <= max(noise, control * CONTROL_MARGIN):
+        base.verdict = Verdict.NONDETERMINISTIC
+        base.detail = (
+            "the unmodified function disagrees with itself by as much as the "
+            "ablation does, so the difference is not attributable to it"
+        )
+        return True
+    base.verdict = Verdict.REACHABLE_BUT_UNTESTED
+    return False
+
+
+def _pool_jitter_floor(results: list[AblationResult]) -> None:
+    """Hold every ablation of one function to the worst jitter any of them saw."""
     # Jitter belongs to the FUNCTION, not to one ablation. Three control repeats is
     # still a small sample, and _run_binding_intermediate_on -- unstable enough to be
     # caught 39 times over five runs -- cleared its own control by luck in 1 run of 6.
@@ -544,16 +654,19 @@ def probe_function(
     # pool them: the worst jitter any of them saw is the floor all of them must clear.
     # Costs nothing; the controls are already measured.
     floor = max((r.max_diff_control or 0.0) for r in results) if results else 0.0
-    if floor > 0.0:
-        for r in results:
-            if (r.verdict == Verdict.REACHABLE_BUT_UNTESTED
-                    and (r.max_diff_amplified or 0.0) <= floor * CONTROL_MARGIN):
-                r.verdict = Verdict.NONDETERMINISTIC
-                r.detail = (
-                    "another ablation of this function measured the unmodified code "
-                    f"disagreeing with itself by {floor:.3e}, which this difference "
-                    "does not clear")
-    return results
+    if floor <= 0.0:
+        return
+    for r in results:
+        if (
+            r.verdict == Verdict.REACHABLE_BUT_UNTESTED
+            and (r.max_diff_amplified or 0.0) <= floor * CONTROL_MARGIN
+        ):
+            r.verdict = Verdict.NONDETERMINISTIC
+            r.detail = (
+                "another ablation of this function measured the unmodified code "
+                f"disagreeing with itself by {floor:.3e}, which this difference "
+                "does not clear"
+            )
 
 
 def _module_name_for(path: pathlib.Path) -> str:
@@ -569,15 +682,21 @@ def public_functions(module_path: pathlib.Path) -> list[str]:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             names.append(node.name)
         elif isinstance(node, ast.ClassDef):
-            names += [f"{node.name}.{m.name}" for m in node.body
-                      if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef))
-                      and not m.name.startswith("__")]
+            names += [
+                f"{node.name}.{m.name}"
+                for m in node.body
+                if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and not m.name.startswith("__")
+            ]
     return names
 
 
 def probe_module(
-    module_path: pathlib.Path, test_args: Sequence[str], only: Sequence[str] = (),
-    noise: float = 1e-6, extra_rules: Sequence[str] = (),
+    module_path: pathlib.Path,
+    test_args: Sequence[str],
+    only: Sequence[str] = (),
+    noise: float = 1e-6,
+    extra_rules: Sequence[str] = (),
 ) -> list[AblationResult]:
     targets = list(only) or public_functions(module_path)
     if not targets:
@@ -595,12 +714,17 @@ def probe_module(
     out: list[AblationResult] = []
     for qualname in targets:
         try:
-            out += probe_function(module_path, qualname, test_args,
-                                  module_name=module_name, noise=noise,
-                                  extra_rules=extra_rules,
-                                  calls=recorded.get(qualname, []),
-                                  ablations=by_qualname.get(qualname, []),
-                                  source=source)
+            out += probe_function(
+                module_path,
+                qualname,
+                test_args,
+                module_name=module_name,
+                noise=noise,
+                extra_rules=extra_rules,
+                calls=recorded.get(qualname, []),
+                ablations=by_qualname.get(qualname, []),
+                source=source,
+            )
         except LookupError:
             continue
     return out
@@ -611,25 +735,43 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("module", type=pathlib.Path)
     parser.add_argument("tests", nargs="+", help="pytest targets that drive the module")
     parser.add_argument("--function", action="append", default=[])
-    parser.add_argument("--rule", action="append", default=[], dest="extra_rules",
-                        help="enable an opt-in rule, e.g. ablate_function_to_passthrough")
-    parser.add_argument("--noise", type=float, default=1e-6,
-                        help="relative difference below which a change is round-off")
+    parser.add_argument(
+        "--rule",
+        action="append",
+        default=[],
+        dest="extra_rules",
+        help="enable an opt-in rule, e.g. ablate_function_to_passthrough",
+    )
+    parser.add_argument(
+        "--noise",
+        type=float,
+        default=1e-6,
+        help="relative difference below which a change is round-off",
+    )
     parser.add_argument("--json", type=pathlib.Path)
-    parser.add_argument("--fail-on", default="", help="comma-separated verdicts to fail on")
+    parser.add_argument(
+        "--fail-on", default="", help="comma-separated verdicts to fail on"
+    )
     args = parser.parse_args(argv)
 
-    results = probe_module(args.module, args.tests, args.function, args.noise,
-                           args.extra_rules)
+    results = probe_module(
+        args.module, args.tests, args.function, args.noise, args.extra_rules
+    )
     if args.json:
-        args.json.write_text(json.dumps([r.as_dict() for r in results], indent=2) + "\n")
+        args.json.write_text(
+            json.dumps([r.as_dict() for r in results], indent=2) + "\n"
+        )
     counts: dict[str, int] = {}
     for r in results:
         counts[r.verdict] = counts.get(r.verdict, 0) + 1
     for r in results:
         if r.verdict == Verdict.LIVE:
             continue
-        amp = f" amplified={r.max_diff_amplified:.3e} via {r.amplifier}" if r.amplifier else ""
+        amp = (
+            f" amplified={r.max_diff_amplified:.3e} via {r.amplifier}"
+            if r.amplifier
+            else ""
+        )
         print(f"{r.verdict:24s} {r.qualname}:{r.lineno} {r.description}{amp}")
     print(json.dumps(counts, sort_keys=True))
     fail_on = {v.strip() for v in args.fail_on.split(",") if v.strip()}
