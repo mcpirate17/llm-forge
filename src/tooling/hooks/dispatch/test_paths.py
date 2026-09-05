@@ -87,3 +87,60 @@ def test_the_interpreter_bin_does_not_follow_the_venv_symlink(
 
     monkeypatch.setattr(sys, "executable", str(link))
     assert paths.interpreter_bin() == str(venv)
+
+
+def _venv(root: Path) -> Path:
+    """A checkout with its own interpreter, as `own_interpreter` expects to find it."""
+    python = root / ".venv" / "bin" / "python"
+    python.parent.mkdir(parents=True, exist_ok=True)
+    python.write_text('#!/bin/sh\nexec /usr/bin/env python3 "$@"\n', encoding="utf-8")
+    python.chmod(0o755)
+    return python
+
+
+def test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller(
+    tmp_path: Path,
+) -> None:
+    """The whole point: a caller on some other venv is told to switch.
+
+    Asserted against two roots in one test, because the answer must be derived from
+    `project_root` rather than from this file's location: two checkouts on one machine
+    resolve to two different interpreters, which is what keeps a worktree from
+    importing native extensions built for a different tree. Split across two tests the
+    second one kills no mutant the first does not -- the value analysis classified it
+    DELETE_CANDIDATE, and a nodeid that detects no failure is a check-box.
+    """
+    foreign = "/some/other/venv/bin/python"
+    main, worktree = tmp_path / "main", tmp_path / "worktree"
+    main_python, worktree_python = _venv(main), _venv(worktree)
+    assert paths.own_interpreter(main, foreign) == main_python
+    assert paths.own_interpreter(worktree, foreign) == worktree_python
+
+
+def test_own_interpreter_is_none_when_the_caller_already_runs_it(
+    tmp_path: Path,
+) -> None:
+    """No re-exec loop: the correct interpreter must not be told to switch to itself."""
+    root = tmp_path / "checkout"
+    python = _venv(root)
+    assert paths.own_interpreter(root, str(python)) is None
+
+
+def test_own_interpreter_resolves_before_comparing(tmp_path: Path) -> None:
+    """A symlink to the checkout's python is the same interpreter, not a foreign one.
+
+    Comparing the raw strings would re-exec every time a caller reached the venv
+    through a link -- the loop the env guard exists to bound, fired on every hook.
+    """
+    root = tmp_path / "checkout"
+    python = _venv(root)
+    link = tmp_path / "link-to-python"
+    link.symlink_to(python)
+    assert paths.own_interpreter(root, str(link)) is None
+
+
+def test_own_interpreter_is_none_when_the_checkout_has_no_venv(tmp_path: Path) -> None:
+    """A worktree without a .venv has nothing to switch to; the caller warns."""
+    root = tmp_path / "checkout"
+    root.mkdir()
+    assert paths.own_interpreter(root, "/some/other/venv/bin/python") is None

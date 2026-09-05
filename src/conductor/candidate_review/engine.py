@@ -329,6 +329,25 @@ def _held_governance_lock(
         try:
             yield lock_path, handle.fileno()
         finally:
+            # Erase our own record before dropping the lock, not after: the file is
+            # read by _inherited_lock_token_valid, and a released lock that still
+            # names a pid and a token is a lease claim with no holder behind it.
+            # Only our own record -- a shared holder must not erase a peer's.
+            try:
+                handle.seek(0)
+                payload = json.loads(handle.read() or "{}")
+                if isinstance(payload, dict) and payload.get("pid") == os.getpid():
+                    handle.seek(0)
+                    handle.truncate()
+                    handle.flush()
+            except (OSError, ValueError):
+                # Deliberately absorbed, and the only absorbed exception here: this
+                # `finally` runs before the flock is dropped, so raising out of it
+                # would hold the governance mutex for the life of the process and
+                # wedge every later commit. An unerasable record costs a stale
+                # diagnostic; a raise costs the lock. Covered by
+                # test_an_unreadable_record_does_not_break_release.
+                pass
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 

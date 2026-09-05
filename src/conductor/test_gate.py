@@ -35,7 +35,9 @@ def _tool(
     )
 
 
-def _fake_executable(directory: Path, name: str, output: str, *, exit_code: int = 0) -> Path:
+def _fake_executable(
+    directory: Path, name: str, output: str, *, exit_code: int = 0
+) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / name
     path.write_text(f"#!/bin/sh\necho '{output}'\nexit {exit_code}\n", encoding="utf-8")
@@ -70,10 +72,14 @@ def repo(tmp_path: Path) -> Path:
 
 def test_search_path_prepends_node_bin_when_present(tmp_path: Path) -> None:
     (tmp_path / "node_modules" / ".bin").mkdir(parents=True)
-    assert gate.runner_search_path(tmp_path).startswith(str(tmp_path / "node_modules" / ".bin"))
+    assert gate.runner_search_path(tmp_path).startswith(
+        str(tmp_path / "node_modules" / ".bin")
+    )
 
 
-def test_search_path_is_unchanged_when_node_bin_absent(tmp_path: Path, monkeypatch) -> None:
+def test_search_path_is_unchanged_when_node_bin_absent(
+    tmp_path: Path, monkeypatch
+) -> None:
     monkeypatch.setenv("PATH", "/usr/bin")
     assert gate.runner_search_path(tmp_path) == "/usr/bin"
 
@@ -105,7 +111,9 @@ def test_probe_tool_reports_a_missing_tool(tmp_path: Path) -> None:
     assert status.resolved_path is None
 
 
-def test_probe_tool_treats_a_failing_version_command_as_versionless(tmp_path: Path) -> None:
+def test_probe_tool_treats_a_failing_version_command_as_versionless(
+    tmp_path: Path,
+) -> None:
     """Exit-code boundary: the binary exists, but its version probe fails."""
     _fake_executable(tmp_path / "bin", "sample", "boom", exit_code=1)
     status = gate.probe_tool(_tool(), str(tmp_path / "bin"))
@@ -119,15 +127,9 @@ def test_probe_tool_treats_a_failing_version_command_as_versionless(tmp_path: Pa
 # --------------------------------------------------------------------------
 
 
-def test_preflight_refuses_when_a_required_tool_is_missing(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
-    phase, statuses = gate.preflight_tools((_tool(),), "full", tmp_path)
-    assert phase.ok is False
-    assert phase.evidence["missing"] == ["sample"]
-    assert len(statuses) == 1
-
-
-def test_preflight_passes_when_every_required_tool_is_present(tmp_path: Path, monkeypatch) -> None:
+def test_preflight_passes_when_every_required_tool_is_present(
+    tmp_path: Path, monkeypatch
+) -> None:
     _fake_executable(tmp_path / "bin", "sample", "sample 1.2.3")
     monkeypatch.setenv("PATH", str(tmp_path / "bin"))
     phase, _statuses = gate.preflight_tools((_tool(),), "full", tmp_path)
@@ -135,32 +137,62 @@ def test_preflight_passes_when_every_required_tool_is_present(tmp_path: Path, mo
     assert phase.evidence["drifted"] == []
 
 
-def test_preflight_reports_drift_without_refusing(tmp_path: Path, monkeypatch) -> None:
-    """A version skew is information, not a refusal -- the other side of `missing`."""
+def test_preflight_refuses_a_drifted_version(tmp_path: Path, monkeypatch) -> None:
+    """A version skew refuses -- the other side of `missing`.
+
+    The local gate exists to predict CI. A PASS produced by a linter other than the
+    pinned one predicts nothing, so drift is a refusal and not a note in the detail.
+    """
     _fake_executable(tmp_path / "bin", "sample", "sample 9.9.9")
     monkeypatch.setenv("PATH", str(tmp_path / "bin"))
     phase, _statuses = gate.preflight_tools((_tool(),), "full", tmp_path)
-    assert phase.ok is True
-    assert phase.evidence["drifted"] == ["sample"]
-
-
-def test_preflight_skips_a_tool_the_profile_does_not_require(tmp_path: Path, monkeypatch) -> None:
-    """Profile filtering, absent side: a full-only tool must not refuse a fast run."""
-    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
-    phase, statuses = gate.preflight_tools((_tool(required_profiles=("full",)),), "fast", tmp_path)
-    assert phase.ok is True
-    assert statuses == []
-
-
-def test_preflight_probes_a_tool_the_profile_does_require(tmp_path: Path, monkeypatch) -> None:
-    """Profile filtering, present side: the same tool refuses a full run."""
-    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
-    phase, statuses = gate.preflight_tools((_tool(required_profiles=("full",)),), "full", tmp_path)
     assert phase.ok is False
+    assert phase.evidence["drifted"] == ["sample"]
+    assert "9.9.9" in phase.detail and "1.2.3" in phase.detail
+
+
+def test_preflight_reports_a_missing_tool_before_a_drifted_one(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Both faults refuse, so the message must name the one that is actionable first.
+
+    An absent tool is a setup fault; a drifted one is a toolchain fault. Reporting
+    drift for a run where the tool is not there at all sends the reader to the wrong
+    fix, so `missing` is decided first and `drifted` never appears alongside it.
+    """
+    _fake_executable(tmp_path / "bin", "sample", "sample 9.9.9")
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    tools = (_tool(), _tool(tool_id="absent", executable="absent"))
+    phase, _statuses = gate.preflight_tools(tools, "full", tmp_path)
+    assert phase.ok is False
+    assert phase.evidence["missing"] == ["absent"]
+    assert "drifted" not in phase.evidence
+
+
+def test_preflight_filters_tools_by_profile(tmp_path: Path, monkeypatch) -> None:
+    """Both sides of one predicate: a full-only tool is skipped on fast, probed on full.
+
+    Asserted against one tool and two profiles in a single test, because the answer has
+    to come from the profile rather than from the tool. Split in two, the present side
+    killed no mutant that the absent side and
+    test_preflight_refuses_when_a_required_tool_is_missing do not already kill -- the
+    value analysis classified it MERGE, and a nodeid that detects no failure is a
+    check-box.
+    """
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    tool = _tool(required_profiles=("full",))
+    skipped, unprobed = gate.preflight_tools((tool,), "fast", tmp_path)
+    assert skipped.ok is True
+    assert unprobed == []
+    refused, statuses = gate.preflight_tools((tool,), "full", tmp_path)
+    assert refused.ok is False
+    assert refused.evidence["missing"] == ["sample"]
     assert len(statuses) == 1
 
 
-def test_preflight_names_npm_ci_when_node_modules_is_absent(tmp_path: Path, monkeypatch) -> None:
+def test_preflight_names_npm_ci_when_node_modules_is_absent(
+    tmp_path: Path, monkeypatch
+) -> None:
     monkeypatch.setenv("PATH", str(tmp_path / "empty"))
     tool = ToolPolicy(
         tool_id="biome",
@@ -182,7 +214,9 @@ def test_preflight_names_npm_ci_when_node_modules_is_absent(tmp_path: Path, monk
 # --------------------------------------------------------------------------
 
 
-def test_export_contains_tracked_files_and_no_git_directory(repo: Path, tmp_path: Path) -> None:
+def test_export_contains_tracked_files_and_no_git_directory(
+    repo: Path, tmp_path: Path
+) -> None:
     destination = tmp_path / "export" / "tree"
     phase = gate.export_tree(repo, "HEAD", destination)
     assert phase.ok is True
@@ -201,7 +235,9 @@ def test_export_omits_untracked_files(repo: Path, tmp_path: Path) -> None:
 
 def test_export_refuses_an_unknown_ref(repo: Path, tmp_path: Path) -> None:
     with pytest.raises(gate.GateRefusal):
-        gate.export_tree(repo, "refs/heads/does-not-exist", tmp_path / "export" / "tree")
+        gate.export_tree(
+            repo, "refs/heads/does-not-exist", tmp_path / "export" / "tree"
+        )
 
 
 # --------------------------------------------------------------------------
@@ -240,7 +276,9 @@ def test_pytest_config_check_fails_on_an_unparseable_addopts(tmp_path: Path) -> 
 
 def test_pytest_config_check_passes_on_a_valid_addopts(tmp_path: Path) -> None:
     """The other side: a config whose options really do parse."""
-    (tmp_path / "pytest.ini").write_text("[pytest]\naddopts = --tb=short\n", encoding="utf-8")
+    (tmp_path / "pytest.ini").write_text(
+        "[pytest]\naddopts = --tb=short\n", encoding="utf-8"
+    )
     phase = gate.preflight_pytest_config(tmp_path, "python3")
     assert phase.ok is True
 

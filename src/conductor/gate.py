@@ -209,18 +209,35 @@ def preflight_tools(
             ),
             statuses,
         )
-    detail = f"{len(statuses)} declared tool(s) present"
     if drifted:
-        detail += f"; {len(drifted)} at a version other than CI's pin: " + ", ".join(
+        # A drifted tool is not a warning. The local gate exists to predict CI, and a
+        # PASS produced by a different linter version predicts nothing -- it is exactly
+        # the "green locally, red in CI" the pin was written to prevent. Verified at
+        # d06d4ba6e that every declared tool matches its pin, so this fails nothing
+        # that passes today; it fails the toolchain that would have lied.
+        names = ", ".join(
             f"{status.executable}={status.version!r} want {status.expected_version!r}"
             for status in drifted
+        )
+        return (
+            PhaseResult(
+                name="tool-preflight",
+                ok=False,
+                detail=(
+                    f"{len(drifted)} declared tool(s) at a version other than CI's pin: "
+                    f"{names}. Re-sync the toolchain -- a PASS under a drifted tool does "
+                    "not predict CI."
+                ),
+                evidence={"drifted": [status.tool_id for status in drifted]},
+            ),
+            statuses,
         )
     return (
         PhaseResult(
             name="tool-preflight",
             ok=True,
-            detail=detail,
-            evidence={"drifted": [status.tool_id for status in drifted]},
+            detail=f"{len(statuses)} declared tool(s) present",
+            evidence={"drifted": []},
         ),
         statuses,
     )
