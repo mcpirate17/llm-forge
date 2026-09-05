@@ -282,6 +282,31 @@ def test_both_ends_failing_identically_is_inconclusive_not_agreement(
     assert ep._compare_one(boom, boom, (), {}) is None
 
 
+def test_a_call_that_exits_the_process_is_measured_not_propagated(
+    workspace: pathlib.Path,
+) -> None:
+    """SystemExit is a BaseException, so it used to escape the probe entirely.
+
+    A module's argparse `main()` is recorded by the test that fakes `sys.argv` and
+    then replayed without it, so argparse calls `parser.error()`. One such function
+    took down the probe for its whole module: 148.7 s spent, `probed=0`, and a gate
+    that reported nothing for the file. Exiting is a behaviour of the call.
+    """
+    from conductor import equivalence_probe as ep
+
+    def exits(*_a: object, **_k: object) -> None:
+        raise SystemExit(2)
+
+    def returns(*_a: object, **_k: object) -> int:
+        return 1
+
+    # Both ends exit the same way: inconclusive, exactly as for any other raise.
+    assert ep._compare_one(exits, exits, (), {}) is None
+    # One end exits and the other does not: a difference, not an escaped exception.
+    assert ep._compare_one(returns, exits, (), {}) == float("inf")
+    assert ep._compare_one(exits, returns, (), {}) == float("inf")
+
+
 def test_methods_record_their_receiver(workspace: pathlib.Path) -> None:
     """A method probe must bind `self`, or every replay raises and nothing is measured.
 

@@ -334,14 +334,22 @@ def test_a_timed_out_probe_is_a_finding_not_a_clean_sweep(
     """
 
     def boom(argv, **kwargs):
+        # BYTES, not str: `Popen._check_timeout` builds the exception from the raw
+        # buffers it has collected, so `TimeoutExpired.stderr` is undecoded even
+        # under `text=True`. This double was constructed with a `str` and the test
+        # passed while production raised `TypeError: Object of type bytes is not
+        # JSON serializable` on the first summary write -- a test that covered the
+        # shape of the failure and not the failure.
         raise subprocess.TimeoutExpired(
-            argv, slop_gate.PER_MODULE_TIMEOUT, stderr="killed mid-import"
+            argv, slop_gate.PER_MODULE_TIMEOUT, stderr=b"killed mid-import"
         )
 
     monkeypatch.setattr(slop_gate.subprocess, "run", boom)
     findings = slop_gate.probe("lane.py", ["test_lane.py"], repo)
     assert [f["verdict"] for f in findings] == [slop_gate.TIMEOUT]
     assert "killed mid-import" in findings[0]["stderr_tail"]
+    assert isinstance(findings[0]["stderr_tail"], str), "a bytes tail is unserializable"
+    json.dumps(findings)  # the finding must survive the write that reports it
 
     monkeypatch.setattr(slop_gate, "drivers_for", lambda m, r, i=None: ["test_lane.py"])
     monkeypatch.setattr(slop_gate, "build_index", lambda root: None)
@@ -349,6 +357,7 @@ def test_a_timed_out_probe_is_a_finding_not_a_clean_sweep(
     assert code == 0, "an unmeasured module is a coverage hole, not a defect"
     assert [f["verdict"] for f in summary["incomplete"]] == [slop_gate.TIMEOUT]
     assert summary["modules_probed"] == 0, "a module that timed out was not probed"
+    json.dumps(summary)  # --json and the gate's backlog write both serialize this
 
 
 def test_a_crashed_probe_is_a_finding_not_a_clean_sweep(

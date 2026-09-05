@@ -188,9 +188,25 @@ def refine_unexercised(
 
 
 def _incomplete(
-    verdict: str, rule: str, description: str, stderr: str | None, duration: float
+    verdict: str,
+    rule: str,
+    description: str,
+    stderr: str | bytes | None,
+    duration: float,
 ) -> dict:
-    """A finding that says the probe did not run, not that the code is clean."""
+    """A finding that says the probe did not run, not that the code is clean.
+
+    `stderr` is decoded here because the two callers hand over different types:
+    `CompletedProcess.stderr` is text under `text=True`, but `TimeoutExpired.stderr`
+    is the raw bytes `Popen._check_timeout` collected -- text mode never reaches it.
+    A bytes tail survives every assertion in this module and then raises
+    `TypeError: Object of type bytes is not JSON serializable` the moment the
+    summary is written, so the timeout path crashed whatever was trying to report
+    it. Decoding at the one place both callers meet is what keeps that from being
+    two separate fixes.
+    """
+    if isinstance(stderr, bytes):
+        stderr = stderr.decode("utf-8", errors="replace")
     return {
         "qualname": "<module>",
         "rule": rule,

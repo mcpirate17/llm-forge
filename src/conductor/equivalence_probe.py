@@ -402,13 +402,19 @@ def _compare_one(
     """
     raised_baseline = raised_variant = None
     expected = actual = None
+    # SystemExit is a BaseException, so `except Exception` used to let it past both
+    # handlers and out of the probe process entirely. A recorded call to a module's
+    # argparse `main()` is replayed outside the test that faked `sys.argv`, argparse
+    # calls `parser.error()`, and one such function cost the whole module its
+    # measurement -- 148.7 s spent to report nothing for `uncurated_kill_rate.py`.
+    # Exiting is a behaviour of the call like any other raise; measure it as one.
     try:
         expected = baseline(*_clone(args), **_clone(kwargs))
-    except Exception as exc:  # noqa: BLE001 - the outcome IS the measurement
+    except (Exception, SystemExit) as exc:  # noqa: BLE001 - the outcome IS the measurement
         raised_baseline = exc
     try:
         actual = variant(*_clone(args), **_clone(kwargs))
-    except Exception as exc:  # noqa: BLE001
+    except (Exception, SystemExit) as exc:  # noqa: BLE001
         raised_variant = exc
 
     if raised_baseline is not None or raised_variant is not None:
