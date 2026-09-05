@@ -17,8 +17,19 @@ over every changed module paired with the tests that import it, and reports:
                             unstable return value defeats every differential tool --
                             but it is not evidence about this construct.
 
+    TIMEOUT                 incomplete. The probe hit PER_MODULE_TIMEOUT. Nothing was
+                            measured for that module.
+    PROBE_FAILED            incomplete. The child exited non-zero or died before it
+                            wrote a report. Nothing was measured for that module.
+
 Advisory verdicts are deliberately not blocking: sampling cannot prove equivalence,
 so a clean sweep is a lead for a human, never a licence to delete.
+
+The two incomplete verdicts are reported separately from both, and never silently:
+a check whose failure is indistinguishable from its success measures nothing. They
+are not blocking either -- an unreached module is a cost signal and a coverage hole,
+not a defect in the change -- but they are counted, named and rendered so a PASS can
+be read against how much of the sweep actually ran.
 """
 
 from __future__ import annotations
@@ -32,6 +43,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterable, Sequence
 
@@ -44,6 +56,12 @@ BLOCKING = ("REACHABLE_BUT_UNTESTED",)
 ADVISORY = ("NO_DIFFERENCE_OBSERVED", "WITHIN_NUMERIC_NOISE", "NONDETERMINISTIC")
 UNTESTED = "NOT_EXERCISED"
 UNREACHED = "NOT_REACHED_BY_DRIVERS"
+# Not verdicts about the code: verdicts about the probe. A module carrying one of
+# these was not measured, and no conclusion about it may be drawn from a clean run.
+TIMEOUT = "TIMEOUT"
+PROBE_FAILED = "PROBE_FAILED"
+INCOMPLETE = (TIMEOUT, PROBE_FAILED)
+STDERR_TAIL_CHARS = 2000
 WAIVERS = pathlib.Path("conductor/slop_waivers.json")
 PER_MODULE_TIMEOUT = 180
 # Beyond this the sweep is bounded by memory and disk, not cores; an explicit --jobs
@@ -169,6 +187,21 @@ def refine_unexercised(
     return findings
 
 
+def _incomplete(
+    verdict: str, rule: str, description: str, stderr: str | None, duration: float
+) -> dict:
+    """A finding that says the probe did not run, not that the code is clean."""
+    return {
+        "qualname": "<module>",
+        "rule": rule,
+        "lineno": 0,
+        "verdict": verdict,
+        "description": description,
+        "duration_s": round(duration, 1),
+        "stderr_tail": (stderr or "")[-STDERR_TAIL_CHARS:],
+    }
+
+
 def probe(
     module: str,
     tests: Sequence[str],
@@ -185,8 +218,9 @@ def probe(
     # parse.
     workdir = pathlib.Path(tempfile.mkdtemp(prefix=".slop_gate-", dir=root))
     report = workdir / "report.json"
+    started = time.monotonic()
     try:
-        subprocess.run(
+        completed = subprocess.run(
             [
                 sys.executable,
                 "-m",
@@ -201,24 +235,63 @@ def probe(
             text=True,
             timeout=PER_MODULE_TIMEOUT,
         )
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as expired:
         shutil.rmtree(workdir, ignore_errors=True)
         return [
-            {
-                "qualname": "<module>",
-                "rule": "timeout",
-                "lineno": 0,
-                "verdict": "TIMEOUT",
-                "description": "probe exceeded its budget",
-            }
+            _incomplete(
+                TIMEOUT,
+                "timeout",
+                f"probe exceeded its {PER_MODULE_TIMEOUT}s budget; "
+                "nothing was measured for this module",
+                expired.stderr,
+                time.monotonic() - started,
+            )
+        ]
+    duration = time.monotonic() - started
+    # The child is invoked without --fail-on, so it exits 0 on every verdict it can
+    # reach. A non-zero exit is the child failing, not a finding. It also always
+    # writes --json before returning, so an absent report is the child dying first.
+    # Both used to return [] -- indistinguishable from a module with no findings.
+    if completed.returncode != 0:
+        shutil.rmtree(workdir, ignore_errors=True)
+        return [
+            _incomplete(
+                PROBE_FAILED,
+                "probe-exit",
+                f"probe exited {completed.returncode}; "
+                "nothing was measured for this module",
+                completed.stderr,
+                duration,
+            )
         ]
     if not report.is_file():
         shutil.rmtree(workdir, ignore_errors=True)
-        return []
+        return [
+            _incomplete(
+                PROBE_FAILED,
+                "probe-no-report",
+                "probe exited 0 but wrote no report; "
+                "nothing was measured for this module",
+                completed.stderr,
+                duration,
+            )
+        ]
     try:
-        return refine_unexercised(json.loads(report.read_text()), root, index)
+        findings = refine_unexercised(json.loads(report.read_text()), root, index)
+    except json.JSONDecodeError as broken:
+        return [
+            _incomplete(
+                PROBE_FAILED,
+                "probe-bad-report",
+                f"probe report is not valid JSON ({broken}); "
+                "nothing was measured for this module",
+                completed.stderr,
+                duration,
+            )
+        ]
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
+    return findings
 
 
 def run(
@@ -233,6 +306,7 @@ def run(
     advisory: list[dict] = []
     skipped: list[str] = []
     untested: list[dict] = []
+    incomplete: list[dict] = []
 
     driven: list[tuple[str, list[str]]] = []
     for module in modules:
@@ -271,13 +345,19 @@ def run(
                 advisory.append(finding)
             elif finding["verdict"] == UNTESTED:
                 untested.append(finding)
+            elif finding["verdict"] in INCOMPLETE:
+                incomplete.append(finding)
+    # A module that timed out or crashed was not probed. Counting it in
+    # modules_probed is how "0 findings" came to look like "nothing wrong".
+    incomplete_modules = {f["module"] for f in incomplete}
     summary = {
         "base": base,
-        "modules_probed": len(modules) - len(skipped),
+        "modules_probed": len(modules) - len(skipped) - len(incomplete_modules),
         "modules_without_drivers": skipped,
         "blocking": blocking,
         "advisory": advisory,
         "untested": untested,
+        "incomplete": incomplete,
     }
     return (1 if blocking else 0), summary
 
@@ -306,14 +386,23 @@ def _render(summary: dict) -> None:
         )
         for f in summary["untested"][:8]:
             print(f"            {f['module']}::{f['qualname']}")
+    for f in summary.get("incomplete", []):
+        print(
+            f"INCOMPLETE [{f['verdict'].lower()}] {f['module']}  "
+            f"{f['description']} ({f.get('duration_s')}s)"
+        )
+        tail = (f.get("stderr_tail") or "").strip().splitlines()
+        for line in tail[-5:]:
+            print(f"            {line}")
     if summary["modules_without_drivers"]:
         print(
             f"no driver tests for {len(summary['modules_without_drivers'])} changed module(s); "
             "the probe cannot speak for them"
         )
+    incomplete = summary.get("incomplete", ())
     print(
         f"blocking={len(summary['blocking'])} advisory={len(summary['advisory'])} "
-        f"probed={summary['modules_probed']}"
+        f"probed={summary['modules_probed']} incomplete={len(incomplete)}"
     )
 
 
