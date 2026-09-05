@@ -671,3 +671,74 @@ def test_an_amplifier_that_cannot_touch_an_argument_is_not_replayed() -> None:
     # Type and length are part of the answer: a tuple is not its list.
     assert not equivalence_probe._unamplified((1, 2), [1, 2])
     assert not equivalence_probe._unamplified([1, 2], [1])
+
+
+LOOPING_TESTS = """
+import torch
+from fixture_mod import load_bearing
+
+
+def test_load_bearing_over_and_over():
+    for _ in range(5):
+        assert load_bearing(torch.tensor([-1.0, 2.0])).tolist() == [0.0, 2.0]
+"""
+
+
+def test_a_settled_sweep_stops_early_and_says_the_number_is_a_lower_bound(
+    probe_workspace,
+) -> None:
+    """LIVE needs one call past the floor; the other 23 re-answer a settled question.
+
+    The saving is the whole point -- `conductor/equivalence_probe.py` replays 24
+    recorded calls for each of its 144 ablations -- but the report has to admit what
+    it did, because `usable_calls` now counts calls SWEPT and `max_diff_recorded` is
+    the first difference past the floor rather than the largest. Reporting a
+    truncated sweep in the shape of a complete one is the fail-open this probe has
+    already been bitten by twice.
+    """
+    workspace = probe_workspace(MODULE, LOOPING_TESTS)
+    results = probe_function(
+        workspace / "fixture_mod.py",
+        "load_bearing",
+        ["test_fixture_mod.py"],
+        module_name="fixture_mod",
+    )
+    live = [r for r in results if r.verdict == Verdict.LIVE]
+    assert live, "dropping the clamp must still read LIVE"
+    for result in live:
+        # "of 5" is the anti-vacuity half: a driver that called the function once
+        # would stop after 1 of 1 and satisfy every other assertion here vacuously.
+        assert "stopped after 1 of 5 recorded calls" in (result.detail or "")
+        assert result.usable_calls == 1
+        assert (result.max_diff_recorded or 0.0) > 0.0
+
+
+def test_a_sweep_with_no_floor_returns_the_true_maximum() -> None:
+    """The amplified sweep passes no floor, and must not be quietly truncated.
+
+    Its magnitude is weighed against the function's own jitter in
+    `_adjudicate_amplified`, so a first-past-the-post value understates the effect in
+    exactly the direction that turns a real REACHABLE_BUT_UNTESTED into
+    NONDETERMINISTIC. The two calls below are ordered small-difference-first so that
+    stopping early and taking the maximum cannot return the same number.
+    """
+    from conductor import equivalence_probe
+
+    calls = [((1.0,), {}), ((100.0,), {})]
+
+    def baseline(x: float) -> float:
+        return x
+
+    def variant(x: float) -> float:
+        return x * (1.001 if x < 10 else 2.0)
+
+    worst, usable, settled = equivalence_probe._sweep(baseline, variant, calls)
+    assert (usable, settled) == (2, False)
+    assert worst == pytest.approx(1.0, rel=1e-6)
+
+    first, usable, settled = equivalence_probe._sweep(
+        baseline, variant, calls, settle_above=1e-6
+    )
+    assert (usable, settled) == (1, True)
+    assert first == pytest.approx(0.001, rel=1e-3)
+    assert first < worst

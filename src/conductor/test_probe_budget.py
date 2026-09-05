@@ -115,7 +115,12 @@ def test_a_sweep_cut_at_any_point_is_never_reported_as_clean(
     )
 
     usable_when_cut = set()
-    for budget in (1.0, 2.0, 3.0, 7.0, 12.0):
+    # 5.0 is the only budget in this range that now lands BETWEEN two recorded calls:
+    # a sweep that settles early returns without reaching the next budget check, so
+    # the tick that used to be spent there is spent further along. The walk is a
+    # search for the three checkpoints, not a fixed schedule -- when the sweep's
+    # control flow changes, re-derive it rather than dropping the assertion.
+    for budget in (1.0, 2.0, 3.0, 5.0, 7.0, 12.0):
         clock = _Clock()
         _pin_clock(monkeypatch, clock)
         results = _probe(workspace, budget)

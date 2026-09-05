@@ -490,12 +490,23 @@ def _sweep(
     variant: Callable,
     calls: Sequence[tuple],
     budget: _Budget | None = None,
-) -> tuple[float, int]:
-    """Worst relative difference, and how many argument sets the baseline accepted.
+    settle_above: float | None = None,
+) -> tuple[float, int, bool]:
+    """Worst relative difference, how many argument sets the baseline accepted, and
+    whether the sweep stopped early because the answer was already decided.
 
     The budget is checked BETWEEN calls, never inside one: a replay that has started
     is either allowed to finish or is killed mid-call, and killing it would leave the
     module under test in whatever state the ablated function got it to.
+
+    `settle_above` is the caller's noise floor, and passing it says the caller wants a
+    BOOLEAN -- "did anything exceed this?" -- not a maximum. The first call that
+    exceeds it settles that question, and every later call is a second answer to a
+    question already answered. Only the recorded sweep may pass it: the amplified
+    sweep's magnitude is compared against the function's own jitter, so there a
+    truncated maximum would understate the effect and turn a real finding into
+    NONDETERMINISTIC. Measured on `conductor/equivalence_probe.py`, whose 144
+    ablations replay 24 recorded calls apiece.
     """
     worst, usable = 0.0, 0
     for args, kwargs in calls:
@@ -505,7 +516,9 @@ def _sweep(
         if diff is not None:
             worst = max(worst, diff)
             usable += 1
-    return worst, usable
+            if settle_above is not None and worst > settle_above:
+                return worst, usable, True
+    return worst, usable, False
 
 
 def _unamplified(original: Any, transformed: Any) -> bool:
@@ -638,7 +651,9 @@ def _probe_construct(ablation: NativeAblation, ctx: _ProbeContext) -> AblationRe
     except (SyntaxError, LookupError) as exc:
         base.verdict, base.detail = Verdict.UNCOMPILABLE, str(exc)
         return base
-    recorded, usable = _sweep(against, variant, ctx.calls, ctx.budget)
+    recorded, usable, settled = _sweep(
+        against, variant, ctx.calls, ctx.budget, settle_above=ctx.noise
+    )
     base.max_diff_recorded = recorded
     base.usable_calls = usable
     if ctx.budget.cut:
@@ -653,6 +668,17 @@ def _probe_construct(ablation: NativeAblation, ctx: _ProbeContext) -> AblationRe
         return base
     if recorded > ctx.noise:
         base.verdict = Verdict.LIVE
+        if settled:
+            # Say it, because `usable_calls` now counts the calls SWEPT rather than
+            # the calls the baseline accepted, and `max_diff_recorded` is the first
+            # difference past the floor rather than the largest one. Both readings
+            # are what a reader assumes unless told otherwise -- the same misreading
+            # OVER_BUDGET carries, and the reason that verdict clears its numbers.
+            base.detail = (
+                f"stopped after {usable} of {len(ctx.calls)} recorded calls once the "
+                f"difference passed the {ctx.noise:g} noise floor; the construct is "
+                "live either way, so max_diff_recorded is a lower bound"
+            )
         return base
     amplified, which = _sweep_amplified(against, variant, ctx.calls, ctx.budget)
     base.max_diff_amplified, base.amplifier = amplified, which
