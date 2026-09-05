@@ -9,24 +9,49 @@ shared checkout.
 from __future__ import annotations
 
 import argparse
-import ast
-import hashlib
 import json
 import os
-import re
 import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from conductor import mutation_testing_support as _support
+from conductor.mutation_campaign_model import (  # noqa: F401
+    CANONICAL_TEST_PATTERNS,
+    LEGACY_RECEIPT_ANCHOR_COMMIT,
+    LEGACY_RECEIPT_ANCHOR_TREE,
+    LEGACY_RECEIPT_PREFIX,
+    LEGACY_RECEIPT_SCHEMA,
+    OUTPUT_TAIL_CHARS,
+    RECEIPT_SCHEMA,
+    REPO_ROOT,
+    RUNNER_COMPONENT_PATHS,
+    RUNNER_LINEAGE_PATH,
+    SHA256_RE,
+    Campaign,
+    CommandResult,
+    Mutation,
+    PlannedMutation,
+    RankedTest,
+    _campaign_receipts,
+    _lineage_accepts,
+    _load_registry,
+    _native_json_call,
+    _native_row,
+    _patch_paths,
+    _runner_components_sha256,
+    _sha256,
+    load_campaign,
+    source_drift,
+    symbol_hashes,
+)
 from conductor.mutation_scope import (
     CampaignError,
-    TestFileScope,
     _python_test_nodeids,
     _require_mapping,
     _require_string_list,
@@ -38,7 +63,6 @@ from conductor.mutation_scope import (
 )
 from conductor.mutation_scope import _require_string as _require_string  # noqa: PLC0414
 from conductor.mutation_value import (
-    ValueAnalysisSpec,
     ValueEvidenceError,
     analyze_test_value,
     cargo_attribution_supported,
@@ -47,323 +71,20 @@ from conductor.mutation_value import (
     collect_pytest_junit_batch,
     ctest_attribution_supported,
     ctest_junit_path,
-    load_value_analysis,
     pytest_attribution_supported,
     value_inspection_payload,
 )
 from conductor.snapshot_worktree import isolated_snapshot
 
-RECEIPT_SCHEMA = "llm.mutation-testing.receipt.v3"
-LEGACY_RECEIPT_SCHEMA = "llm.mutation-testing.receipt.v2"
-LEGACY_RECEIPT_ANCHOR_COMMIT = "61343f575215dd222a74fc2c060d0328692ded5e"
-LEGACY_RECEIPT_ANCHOR_TREE = "b01877ba62c32445f7649450f9b395dd70de306a"
-LEGACY_RECEIPT_PREFIX = "conductor/mutation_campaigns/receipts/"
-SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-CANONICAL_TEST_PATTERNS = _support.CANONICAL_TEST_PATTERNS
-OUTPUT_TAIL_CHARS = 12_000
-REPO_ROOT = Path(__file__).resolve().parents[1]
-RUNNER_COMPONENT_PATHS = (
-    "conductor/mutation_scope.py",
-    "conductor/mutation_testing.py",
-    "conductor/mutation_testing_support.py",
-    "conductor/mutation_value.py",
-    "conductor/snapshot_worktree.py",
-    "tooling/native/conductor-native/src/mutation_evidence.rs",
-    "tooling/native/conductor-native/src/mutation_manifest.rs",
-    "tooling/native/conductor-native/src/mutation_receipt.rs",
+# Re-exported because callers and tests reach through this module as the framework's
+# single entry point; the definitions live in mutation_scope / mutation_value.
+from conductor.mutation_scope import TestFileScope as TestFileScope  # noqa: E402,PLC0414
+from conductor.mutation_value import (  # noqa: E402,PLC0414
+    ValueAnalysisSpec as ValueAnalysisSpec,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class RankedTest:
-    """One test selected for a campaign, ordered by contract importance."""
-
-    rank: int
-    nodeid: str
-    contract: str
-    rationale: str
-
-
-@dataclass(frozen=True, slots=True)
-class PlannedMutation:
-    """A mutation design slot that contains no executable code change."""
-
-    mutation_id: str
-    target_path: str
-    contract: str
-    description: str
-    expected_killers: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class Mutation:
-    """One materialized, first-order mutation represented by a patch file."""
-
-    mutation_id: str
-    patch_file: Path
-    patch_sha256: str
-    allowed_paths: tuple[str, ...]
-    expected_killers: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class Campaign:
-    """Validated mutation campaign loaded from a machine-readable manifest."""
-
-    manifest_path: Path
-    manifest_sha256: str
-    campaign_id: str
-    title: str
-    language: str
-    mutation_engine: str
-    expected_mutations: int
-    source_sha256: Mapping[str, str]
-    ranked_tests: tuple[RankedTest, ...]
-    planned_mutations: tuple[PlannedMutation, ...]
-    mutations: tuple[Mutation, ...]
-    test_argv: tuple[str, ...]
-    timeout_seconds: int
-    blocked_process_substrings: tuple[str, ...]
-    poll_seconds: int
-    environment: Mapping[str, str]
-    host_read_dependencies: tuple[str, ...]
-    test_scopes: Mapping[str, TestFileScope] = field(default_factory=dict)
-    # Optional per-symbol pins. A path here is checked symbol-by-symbol instead
-    # of whole-file, so an edit outside the pinned functions does not drift the
-    # campaign. Absent means the old whole-file behaviour, unchanged.
-    source_symbols: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
-    value_analysis: ValueAnalysisSpec | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class CommandResult:
-    """Bounded subprocess evidence for a baseline or mutant test run."""
-
-    returncode: int | None
-    timed_out: bool
-    duration_seconds: float
-    stdout_tail: str
-    stderr_tail: str
-
-    def as_dict(self) -> dict[str, Any]:
-        """Return a JSON-safe representation."""
-
-        return {
-            "returncode": self.returncode,
-            "timed_out": self.timed_out,
-            "duration_seconds": round(self.duration_seconds, 6),
-            "stdout_tail": self.stdout_tail,
-            "stderr_tail": self.stderr_tail,
-        }
-
-
-def _native_row(model: Any, row: Mapping[str, Any]) -> Any:
-    """Materialize one normalized native row as its stable Python dataclass."""
-
-    values = {
-        name: row["id"] if name == "mutation_id" else row[name]
-        for name in model.__dataclass_fields__
-    }
-    for name in ("allowed_paths", "expected_killers"):
-        if name in values:
-            values[name] = tuple(values[name])
-    if "patch_file" in values:
-        values["patch_file"] = Path(values["patch_file"])
-    return model(**values)
-
-
-def _native_json_call(
-    function_name: str,
-    payload: Mapping[str, Any],
-) -> Any:
-    """Call one native mutation primitive and decode its JSON result."""
-
-    try:
-        from conductor import _native as runtime
-
-        operation = getattr(runtime, function_name)
-        encoded = operation(
-            json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        )
-        return json.loads(encoded)
-    except (ImportError, AttributeError, ValueError, json.JSONDecodeError) as exc:
-        raise CampaignError(str(exc)) from exc
-
-
-def _patch_paths(patch_path: Path) -> tuple[str, ...]:
-    """Extract and validate repository-relative paths from a unified diff."""
-
-    try:
-        from conductor._native import mutation_patch_paths_native
-
-        return tuple(mutation_patch_paths_native(str(patch_path)))
-    except (ImportError, AttributeError, ValueError) as exc:
-        raise CampaignError(str(exc)) from exc
-
-
-def load_campaign(path: Path, *, repo_root: Path = REPO_ROOT) -> Campaign:
-    """Load a mutation campaign through the native deterministic validator."""
-
-    root = repo_root.resolve()
-    manifest_path = path.resolve()
-    try:
-        relative_manifest = manifest_path.relative_to(root).as_posix()
-    except ValueError as exc:
-        raise CampaignError("campaign manifest must be inside the repository") from exc
-    try:
-        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise CampaignError(f"cannot load campaign {manifest_path}: {exc}") from exc
-    result = _native_json_call(
-        "load_mutation_campaign_native",
-        {"repo_root": str(root), "manifest_path": relative_manifest},
-    )
-    data = _require_mapping(result, "native mutation campaign")
-    ranked_tests = tuple(_native_row(RankedTest, row) for row in data["ranked_tests"])
-    planned_mutations = tuple(
-        _native_row(PlannedMutation, row) for row in data["planned_mutations"]
-    )
-    mutations = tuple(_native_row(Mutation, row) for row in data["mutations"])
-    test_scopes = {
-        relative: TestFileScope(
-            path=relative,
-            mode=scope["mode"],
-            inventory=scope["inventory"],
-            nodeids=tuple(scope["nodeids"]),
-        )
-        for relative, scope in data["test_scopes"].items()
-    }
-    try:
-        value_analysis = load_value_analysis(
-            raw.get("value_analysis") if isinstance(raw, dict) else None,
-            ranked_nodeids=[test.nodeid for test in ranked_tests],
-            mutation_ids=[mutation.mutation_id for mutation in planned_mutations],
-            source_paths=list(data["source_sha256"]),
-        )
-    except ValueEvidenceError as exc:
-        raise CampaignError(f"invalid value_analysis: {exc}") from exc
-    kwargs = {
-        name: data[name]
-        for name in Campaign.__dataclass_fields__
-        if name in data and name not in {"value_analysis", "test_scopes"}
-    }
-    kwargs.update(
-        manifest_path=root / data["manifest"],
-        ranked_tests=ranked_tests,
-        planned_mutations=planned_mutations,
-        mutations=mutations,
-        test_scopes=test_scopes,
-        value_analysis=value_analysis,
-    )
-    for name in (
-        "test_argv",
-        "blocked_process_substrings",
-        "host_read_dependencies",
-    ):
-        kwargs[name] = tuple(kwargs[name])
-    return Campaign(**kwargs)
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _runner_components_sha256() -> dict[str, str]:
-    """Bind every first-party module that can affect mutation execution."""
-
-    root = Path(__file__).resolve().parents[1]
-    components: dict[str, str] = {}
-    for relative in RUNNER_COMPONENT_PATHS:
-        path = root / relative
-        if not path.is_file() or path.is_symlink():
-            raise CampaignError(
-                f"mutation runner component is missing or unsafe: {relative}"
-            )
-        components[relative] = _sha256(path)
-    return components
-
-
-RUNNER_LINEAGE_PATH = "conductor/mutation_runner_lineage.json"
-
-
-def _lineage_accepts(recorded: object, repo_root: Path) -> bool:
-    """Return whether a runner-component map is explicitly accepted."""
-
-    try:
-        from conductor._native import mutation_runner_lineage_accepts_native
-
-        return bool(
-            mutation_runner_lineage_accepts_native(
-                json.dumps(
-                    {"repo_root": str(repo_root.resolve()), "recorded": recorded},
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                )
-            )
-        )
-    except (ImportError, AttributeError, ValueError, TypeError):
-        return False
-
-
-def symbol_hashes(path: Path) -> dict[str, str]:
-    """AST hash per top-level symbol, and per method, in a Python file.
-
-    `ast.dump(..., include_attributes=False)` drops line and column numbers, so a
-    comment, a docstring reflow, an import added above, or any edit to a NEIGHBOURING
-    function leaves a symbol's hash untouched. Only a change to that symbol's own
-    syntax tree moves it. That is the whole point: a campaign pins the functions its
-    mutants actually touch, and edits elsewhere in the file stop voiding it.
-
-    Raises rather than returning a partial map: a file that cannot be parsed must not
-    silently produce "no drift".
-    """
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, SyntaxError) as exc:
-        raise CampaignError(f"cannot inventory symbols in {path}: {exc}") from exc
-
-    hashes: dict[str, str] = {}
-
-    def record(qualname: str, node: ast.AST) -> None:
-        dumped = ast.dump(node, annotate_fields=True, include_attributes=False)
-        hashes[qualname] = hashlib.sha256(dumped.encode("utf-8")).hexdigest()
-
-    definition = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-    for node in tree.body:
-        if not isinstance(node, definition):
-            continue
-        record(node.name, node)
-        if isinstance(node, ast.ClassDef):
-            for child in node.body:
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    record(f"{node.name}.{child.name}", child)
-    return hashes
-
-
-def source_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
-    """Return native file drift plus CPython-AST symbol drift."""
-
-    current = {
-        relative: symbol_hashes(root / relative)
-        for relative in campaign.source_symbols
-        if (root / relative).is_file() and not (root / relative).is_symlink()
-    }
-    result = _native_json_call(
-        "mutation_source_drift_native",
-        {
-            "repo_root": str(root.resolve()),
-            "source_sha256": dict(campaign.source_sha256),
-            "source_symbols": campaign.source_symbols,
-            "symbol_hashes": current,
-        },
-    )
-    if not isinstance(result, list) or not all(isinstance(row, dict) for row in result):
-        raise CampaignError("native mutation source drift must be a list of objects")
-    return result
+from conductor.mutation_value import (  # noqa: E402,PLC0414
+    load_value_analysis as load_value_analysis,
+)
 
 
 def _ps_output() -> str:
@@ -902,25 +623,6 @@ def _select_mutations(
     return tuple(by_id[mutation_id] for mutation_id in requested)
 
 
-def _load_registry(path: Path, repo_root: Path) -> Mapping[str, Any]:
-    root = repo_root.resolve()
-    try:
-        relative = path.resolve().relative_to(root).as_posix()
-    except ValueError as exc:
-        raise CampaignError("mutation registry must be inside the repository") from exc
-    return _require_mapping(
-        _native_json_call(
-            "load_mutation_registry_native",
-            {
-                "repo_root": str(root),
-                "registry_path": relative,
-                "canonical_test_patterns": list(CANONICAL_TEST_PATTERNS),
-            },
-        ),
-        "registry",
-    )
-
-
 def _native_campaign_contract(
     campaign: Campaign,
     *,
@@ -1002,6 +704,66 @@ def _receipt_errors(
     ):
         raise CampaignError("native mutation receipt must be a list of strings")
     return result
+
+
+def receipt_drift(
+    campaigns: Sequence[Campaign],
+    repo_root: Path,
+    registry_path: Path,
+    *,
+    anchor_repo: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Return the campaigns that hold no receipt the evidence gate would accept.
+
+    `source_drift` compares a manifest's pins against the tree, so it is blind to
+    everything that ages a RECEIPT rather than a manifest: a runner component moved
+    (a receipt records the component hashes that produced it), or the manifest itself
+    was repaired (a receipt pins `manifest_sha256`). `repin` reported CLEAN over
+    exactly that evidence and left the gate to discover it later, under the misleading
+    name "missing mutation receipt".
+
+    The predicate is the gate's own -- `validate_mutation_receipt_native`, the same
+    call `verify_evidence` makes -- so repin and the gate cannot drift into two
+    different definitions of "acceptable". A campaign is stale only when NO receipt of
+    its own is clean; one good receipt is evidence however many superseded ones sit
+    beside it, and the errors reported are the closest miss, because that is the one
+    worth reading.
+    """
+
+    index = _campaign_receipts(repo_root, registry_path)
+    stale: list[dict[str, Any]] = []
+    for campaign in campaigns:
+        receipts = index.get(campaign.campaign_id, [])
+        if not receipts:
+            # No receipt at all is a missing-evidence failure the gate already names by
+            # that name; re-running it here would hide the hole behind a repin.
+            continue
+        closest: tuple[Path, list[str]] | None = None
+        for path, payload in receipts:
+            errors = _receipt_errors(
+                payload,
+                campaign,
+                repo_root,
+                receipt_path=path,
+                receipt_bytes=path.read_bytes(),
+                anchor_repo=anchor_repo,
+            )
+            if not errors:
+                closest = None
+                break
+            if closest is None or len(errors) < len(closest[1]):
+                closest = (path, errors)
+        if closest is None:
+            continue
+        stale.append(
+            {
+                "campaign_id": campaign.campaign_id,
+                "receipts": len(receipts),
+                "closest_receipt": closest[0].relative_to(repo_root).as_posix(),
+                "errors": closest[1],
+            }
+        )
+    return stale
 
 
 _ORIGINAL_LOAD_CAMPAIGN = load_campaign
@@ -1120,8 +882,31 @@ def _json_print(payload: Mapping[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
+def _declared_campaign_id(manifest: Path) -> str | None:
+    """The id a manifest claims, read without validating the rest of it.
+
+    Selecting by id needs the id/path map before anything is validated, so this reads
+    the one field and judges nothing else. A manifest too broken to parse claims no id,
+    which is the honest answer: it can still be selected by name through the strict
+    load, which will then say exactly what is wrong with it.
+    """
+
+    try:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    campaign_id = payload.get("campaign_id")
+    return campaign_id if isinstance(campaign_id, str) else None
+
+
 def _registry_campaigns(
-    registry_path: Path, *, repo_root: Path, strict: bool = True
+    registry_path: Path,
+    *,
+    repo_root: Path,
+    strict: bool = True,
+    campaign_ids: Sequence[str] | None = None,
 ) -> list[Campaign]:
     """Every campaign the registry lists, loaded and validated.
 
@@ -1130,13 +915,33 @@ def _registry_campaigns(
     matches no candidate path, so the tests it claimed stay blocked — and it keeps one
     lane's half-written manifest from refusing evidence for every other lane. Re-pinning
     stays strict: silently skipping a campaign there would drop it from the repair pass.
+
+    ``campaign_ids`` narrows the strict load to the manifests a caller actually named.
+    Loading all 400-odd of them to then discard all but one made every targeted repair
+    hostage to an unrelated lane's half-written manifest: `repin --campaign mine` aborted
+    on someone else's file, which is a refusal that teaches the wrong lesson. Selection
+    still refuses an id that names nothing — that check runs against the ids declared on
+    disk, so it keeps its meaning without validating every manifest.
     """
     payload = _load_registry(registry_path, repo_root)
+    manifests = [
+        repo_root
+        / _safe_relative_path(row["manifest"], f"registry.campaigns[{index}].manifest")
+        for index, row in enumerate(payload["campaigns"])
+    ]
+    if campaign_ids:
+        wanted = set(campaign_ids)
+        declared = {manifest: _declared_campaign_id(manifest) for manifest in manifests}
+        if wanted <= {name for name in declared.values() if name}:
+            # Narrow only when the on-disk ids provably cover everything asked for.
+            # If they do not, fall through to the full strict load so the refusal for an
+            # unknown id -- and any manifest whose id this cheap read could not see --
+            # is still decided by the real loader rather than by this shortcut.
+            manifests = [
+                manifest for manifest in manifests if declared[manifest] in wanted
+            ]
     campaigns: list[Campaign] = []
-    for index, row in enumerate(payload["campaigns"]):
-        manifest = repo_root / _safe_relative_path(
-            row["manifest"], f"registry.campaigns[{index}].manifest"
-        )
+    for manifest in manifests:
         try:
             campaigns.append(load_campaign(manifest, repo_root=repo_root))
         except CampaignError:
@@ -1149,6 +954,52 @@ def _plan_repin(selected: Mapping[str, Campaign], repo_root: Path) -> dict[str, 
     return _support.plan_repin(
         selected, repo_root, _sha256, symbol_hashes, CampaignError
     )
+
+
+def _repin_one_and_rerun(
+    campaign_id: str,
+    *,
+    selected: dict[str, Campaign],
+    by_id: dict[str, Campaign],
+    updated: dict[str, str],
+    receipts: Path,
+    repo_root: Path,
+) -> dict[str, Any]:
+    """Write one campaign's re-pinned manifest, then regenerate its receipt.
+
+    A campaign in `selected` had drifted source pins and gets the rewritten manifest;
+    one that is not was pinned correctly all along and is here only because its receipt
+    went stale under a runner change, so its manifest is left exactly as it is.
+    """
+    if campaign_id in selected:
+        manifest = selected[campaign_id].manifest_path
+        relative = manifest.relative_to(repo_root.resolve()).as_posix()
+        manifest.write_text(updated[relative], encoding="utf-8")
+        refreshed = load_campaign(manifest, repo_root=repo_root)
+        remaining = source_drift(refreshed, repo_root)
+        if remaining:
+            return {
+                "campaign_id": campaign_id,
+                "status": "REFUSED",
+                "reason": "still drifted after re-pin",
+                "drift": remaining,
+            }
+    else:
+        refreshed = by_id[campaign_id]
+    receipt_path = receipts / f"{campaign_id}_{_utc_stamp()}.json"
+    result = run_campaign(
+        refreshed, allow_mutations=True, receipt_path=receipt_path, repo_root=repo_root
+    )
+    if not receipt_path.is_file():
+        raise CampaignError(
+            f"re-run of {campaign_id!r} reported {result['status']} but published "
+            f"no receipt at {receipt_path}"
+        )
+    return {
+        "campaign_id": campaign_id,
+        "status": result["status"],
+        "receipt": result["receipt_path"],
+    }
 
 
 def repin_campaigns(
@@ -1166,6 +1017,12 @@ def repin_campaigns(
     regenerated, which is not evidence. So `--run` is what makes this command finish
     the job, and it refuses without explicit mutation authorization.
 
+    Two independent things go stale. A manifest's source pins drift when the code under
+    test moves; a campaign's RECEIPT goes stale when the runner itself moves, because
+    every receipt records the hashes of the runner components that produced it. Only
+    the first used to be checked here, so a framework edit left the evidence set
+    unusable while this command printed CLEAN.
+
     Without `--run` this is a REPORT and changes nothing on disk, so it is always safe
     to ask "what is drifted?".
     """
@@ -1174,7 +1031,9 @@ def repin_campaigns(
             "repin --run executes mutants and requires --allow-mutations"
         )
     campaigns = _support.select_campaigns(
-        _registry_campaigns(registry_path, repo_root=repo_root),
+        _registry_campaigns(
+            registry_path, repo_root=repo_root, campaign_ids=campaign_ids
+        ),
         campaign_ids,
         CampaignError,
     )
@@ -1184,69 +1043,52 @@ def repin_campaigns(
         if drift:
             drifted.append({"campaign_id": campaign.campaign_id, "drift": drift})
 
-    if not drifted:
-        return {"status": "CLEAN", "drifted": [], "rerun": []}
+    stale_receipts = receipt_drift(campaigns, repo_root, registry_path)
+
+    if not drifted and not stale_receipts:
+        return {"status": "CLEAN", "drifted": [], "stale_receipts": [], "rerun": []}
     if not run:
         return {
             "status": "DRIFTED",
             "drifted": drifted,
+            "stale_receipts": stale_receipts,
             "rerun": [],
             "hint": "re-run with --run --allow-mutations to re-pin AND regenerate receipts",
         }
 
-    selected = {
-        campaign.campaign_id: campaign
-        for campaign in campaigns
-        if any(row["campaign_id"] == campaign.campaign_id for row in drifted)
-    }
-    updated = _plan_repin(selected, repo_root)
+    by_id = {campaign.campaign_id: campaign for campaign in campaigns}
+    repin_ids = [str(row["campaign_id"]) for row in drifted]
+    # A stale receipt needs a re-run, not a re-pin: the manifest already describes the
+    # tree correctly, so rewriting it would be a no-op that hides why the receipt died.
+    rerun_only = [
+        str(row["campaign_id"])
+        for row in stale_receipts
+        if str(row["campaign_id"]) not in set(repin_ids)
+    ]
+    selected = {campaign_id: by_id[campaign_id] for campaign_id in repin_ids}
+    updated = _plan_repin(selected, repo_root) if selected else {}
     # A receipt published outside the registry's receipt directory is not evidence:
     # `research/reports/` is gitignored, so the default path this used to fall back on
     # dropped every regenerated receipt while reporting PASS.
     receipts = repo_root / _support.receipt_directory(
         _load_registry(registry_path, repo_root), CampaignError
     )
-    rerun: list[dict[str, Any]] = []
-    for entry in drifted:
-        campaign_id = str(entry["campaign_id"])
-        manifest = selected[campaign_id].manifest_path
-        relative = manifest.relative_to(repo_root.resolve()).as_posix()
-        manifest.write_text(updated[relative], encoding="utf-8")
-        refreshed = load_campaign(manifest, repo_root=repo_root)
-        remaining = source_drift(refreshed, repo_root)
-        if remaining:
-            rerun.append(
-                {
-                    "campaign_id": campaign_id,
-                    "status": "REFUSED",
-                    "reason": "still drifted after re-pin",
-                    "drift": remaining,
-                }
-            )
-            continue
-        receipt_path = receipts / f"{campaign_id}_{_utc_stamp()}.json"
-        result = run_campaign(
-            refreshed,
-            allow_mutations=True,
-            receipt_path=receipt_path,
+    rerun = [
+        _repin_one_and_rerun(
+            campaign_id,
+            selected=selected,
+            by_id=by_id,
+            updated=updated,
+            receipts=receipts,
             repo_root=repo_root,
         )
-        if not receipt_path.is_file():
-            raise CampaignError(
-                f"re-run of {campaign_id!r} reported {result['status']} but published "
-                f"no receipt at {receipt_path}"
-            )
-        rerun.append(
-            {
-                "campaign_id": campaign_id,
-                "status": result["status"],
-                "receipt": result["receipt_path"],
-            }
-        )
+        for campaign_id in (*repin_ids, *rerun_only)
+    ]
     failed = [item for item in rerun if item["status"] != "PASS"]
     return {
         "status": "REPINNED" if not failed else "FAILED",
         "drifted": drifted,
+        "stale_receipts": stale_receipts,
         "rerun": rerun,
     }
 
