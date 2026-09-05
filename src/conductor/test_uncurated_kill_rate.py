@@ -17,7 +17,13 @@ import sys
 
 import pytest
 
-from conductor.uncurated_kill_rate import generate, main, measure
+from conductor.uncurated_kill_rate import (
+    CampaignLookupError,
+    generate,
+    main,
+    measure,
+    resolve_campaigns,
+)
 
 
 def _all(source: str) -> set[int]:
@@ -265,3 +271,96 @@ def test_the_cli_writes_a_row_for_every_campaign(
     assert main() == 0
     rows = json.loads(out.read_text())
     assert [row["campaign"] for row in rows] == ["alpha", "beta"]
+
+
+def test_a_campaign_resolves_by_the_id_its_manifest_declares(
+    tmp_path: pathlib.Path,
+) -> None:
+    """`mutation_value_self_v4` lives in `mutation_value_self.json`."""
+
+    campaigns = tmp_path / "conductor" / "mutation_campaigns"
+    campaigns.mkdir(parents=True)
+    manifest = _fixture(tmp_path, {"test_subject.py": ""})
+    payload = json.loads(manifest.read_text())
+    payload["campaign_id"] = "declared_id_v4"
+    (campaigns / "on_disk_name.json").write_text(json.dumps(payload))
+
+    assert resolve_campaigns(tmp_path, ["declared_id_v4"]) == [
+        ("declared_id_v4", campaigns / "on_disk_name.json")
+    ]
+
+
+def test_an_unresolvable_campaign_is_refused_before_anything_is_measured(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A typo used to abort mid-batch, after the machine time was already spent."""
+
+    campaigns = tmp_path / "conductor" / "mutation_campaigns"
+    campaigns.mkdir(parents=True)
+    manifest = _fixture(tmp_path, {"subject.py": "", "test_subject.py": ""})
+    (campaigns / "alpha.json").write_text(manifest.read_text())
+    out = tmp_path / "results.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "uncurated_kill_rate",
+            "--root",
+            str(tmp_path),
+            "--campaign",
+            "alpha",
+            "--campaign",
+            "nope",
+            "--campaign",
+            "also_nope",
+            "--out",
+            str(out),
+        ],
+    )
+
+    with pytest.raises(CampaignLookupError) as excinfo:
+        main()
+
+    # Every unresolvable id is named, not just the first one hit.
+    assert "nope" in str(excinfo.value)
+    assert "also_nope" in str(excinfo.value)
+    # And `alpha`, which does resolve, was not measured on the way to the refusal.
+    assert not out.exists()
+
+
+def test_a_campaign_that_executes_no_subject_is_a_row_not_a_crash(
+    tmp_path: pathlib.Path,
+) -> None:
+    """`coverage json` exits 1 on an empty data file.
+
+    That killed a 17-campaign batch at campaign seven, after the machine time for
+    six had been spent. An unmeasurable campaign is a row carrying its reason.
+    """
+
+    (tmp_path / "subject.py").write_text("def unused():\n    return 1\n")
+    (tmp_path / "test_subject.py").write_text("def test_nothing():\n    assert True\n")
+    manifest = tmp_path / "campaign.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "source_sha256": {"subject.py": "", "test_subject.py": ""},
+                "baseline": {
+                    "argv": [
+                        "python",
+                        "-m",
+                        "pytest",
+                        "-q",
+                        "-o",
+                        "addopts=",
+                        "--rootdir=.",
+                        "test_subject.py",
+                    ]
+                },
+            }
+        )
+    )
+
+    res = measure(tmp_path, manifest, cap=50, seed=0, budget=300.0)
+
+    assert (res.ran, res.generated) == (0, 0)
+    assert res.note == "coverage measurement failed"

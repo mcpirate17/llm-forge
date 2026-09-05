@@ -238,14 +238,19 @@ def covered_lines(root: Path, argv: list[str], subjects: list[str], timeout: flo
     )
     if proc.returncode != 0:
         return None, (proc.stdout + proc.stderr)[-2000:]
-    subprocess.run(
+    proc = subprocess.run(
         [PY, "-m", "coverage", "json", "-o", str(report), "-q"],
         cwd=root,
         env=env,
         capture_output=True,
         text=True,
-        check=True,
     )
+    if proc.returncode != 0:
+        # "No data to report." -- the baseline ran but executed none of the
+        # subjects. Nothing to mutate here, and no reason to abandon the
+        # sixteen campaigns queued behind this one.
+        data.unlink(missing_ok=True)
+        return None, (proc.stdout + proc.stderr)[-2000:]
     payload = json.loads(report.read_text())
     out: dict[str, set[int]] = {}
     for name, block in payload["files"].items():
@@ -266,13 +271,22 @@ class Result:
     baseline_seconds: float = 0.0
     generated: int = 0
     ran: int = 0
+    # Why a row is empty. A skipped campaign and a campaign that detected
+    # nothing both read as 0 killed; only this tells them apart in the table.
+    note: str = ""
 
 
 def measure(
-    root: Path, manifest_path: Path, cap: int, seed: int, budget: float
+    root: Path,
+    manifest_path: Path,
+    cap: int,
+    seed: int,
+    budget: float,
+    *,
+    name: str | None = None,
 ) -> Result:
     manifest = json.loads(manifest_path.read_text())
-    name = manifest_path.stem
+    name = name or manifest_path.stem
     res = Result(campaign=name)
     argv = manifest["baseline"]["argv"]
     subjects = [
@@ -283,19 +297,22 @@ def measure(
         and not Path(s).name.startswith("test_")
     ]
     if not subjects:
-        print(f"  {name}: no non-test subject files, skipped")
+        res.note = "no non-test subject files"
+        print(f"  {name}: {res.note}, skipped")
         return res
 
     started = time.monotonic()
     code, out = run_scope(root, argv, timeout=600)
     res.baseline_seconds = time.monotonic() - started
     if code != 0:
+        res.note = f"baseline red (exit {code})"
         print(f"  {name}: BASELINE RED (exit {code}), skipped\n{out[-600:]}")
         return res
 
     cov, err = covered_lines(root, argv, subjects, timeout=900)
     if cov is None:
-        print(f"  {name}: coverage run failed, skipped\n{err[-400:]}")
+        res.note = "coverage measurement failed"
+        print(f"  {name}: coverage measurement failed, skipped\n{err[-400:]}")
         return res
 
     originals = {rel: (root / rel).read_text(encoding="utf-8") for rel in subjects}
@@ -305,7 +322,8 @@ def measure(
     for rel, text in originals.items():
         (root / rel).write_text(text, encoding="utf-8")
     if identity != 0:
-        print(f"  {name}: ast.unparse round-trip is not behaviour-preserving, skipped")
+        res.note = "ast.unparse round-trip is not behaviour-preserving"
+        print(f"  {name}: {res.note}, skipped")
         return res
 
     mutants: list[Mutant] = []
@@ -356,6 +374,64 @@ def measure(
     return res
 
 
+class CampaignLookupError(ValueError):
+    """A requested campaign does not resolve to a manifest in the mutated tree."""
+
+
+def _index_campaign_ids(campaign_dir: Path) -> dict[str, Path]:
+    """Every manifest in the directory, keyed by the id it declares for itself."""
+
+    index: dict[str, Path] = {}
+    for path in sorted(campaign_dir.glob("*.json")):
+        try:
+            declared = json.loads(path.read_text()).get("campaign_id")
+        except (OSError, ValueError):
+            continue
+        if isinstance(declared, str) and declared not in index:
+            index[declared] = path
+    return index
+
+
+def resolve_campaigns(root: Path, requested: list[str]) -> list[tuple[str, Path]]:
+    """Resolve every requested campaign to a manifest, or refuse the whole run.
+
+    `--campaign` reads as a campaign id, and for most campaigns the id and the
+    manifest filename are the same string -- so the two disagree rarely enough that
+    the disagreement used to surface as a `FileNotFoundError` raised in the middle
+    of the batch. The campaigns before it had been measured, the ones after it never
+    were, and the machine time was spent for a partial table. `mutation_value_self_v4`
+    is declared in `mutation_value_self.json`, which is exactly that shape.
+
+    So: match the filename first, fall back to the id the manifest declares, and
+    refuse up front naming every id that resolved to nothing. Still fail loud -- but
+    before the first mutant, not after the sixth campaign.
+    """
+
+    campaign_dir = root / "conductor/mutation_campaigns"
+    resolved: list[tuple[str, Path]] = []
+    unresolved: list[str] = []
+    by_id: dict[str, Path] | None = None
+    for cid in requested:
+        direct = campaign_dir / f"{cid}.json"
+        if direct.is_file():
+            resolved.append((cid, direct))
+            continue
+        if by_id is None:
+            by_id = _index_campaign_ids(campaign_dir)
+        found = by_id.get(cid)
+        if found is None:
+            unresolved.append(cid)
+        else:
+            resolved.append((cid, found))
+    if unresolved:
+        raise CampaignLookupError(
+            f"{len(unresolved)} campaign(s) resolve to no manifest under "
+            f"{campaign_dir}: {', '.join(unresolved)}. Nothing was measured -- "
+            "pass the manifest filename or the id the manifest declares."
+        )
+    return resolved
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -371,15 +447,15 @@ def main() -> int:
     args = ap.parse_args()
 
     root = Path(args.root)
+    campaigns = resolve_campaigns(root, args.campaign)
     deadline = time.monotonic() + args.budget_minutes * 60
     results = []
-    for cid in args.campaign:
+    for cid, manifest in campaigns:
         remaining = deadline - time.monotonic()
         if remaining <= 60:
             print(f"global budget exhausted before {cid}")
             break
-        manifest = root / "conductor/mutation_campaigns" / f"{cid}.json"
-        res = measure(root, manifest, args.cap, args.seed, remaining)
+        res = measure(root, manifest, args.cap, args.seed, remaining, name=cid)
         results.append(res)
         total = res.killed + res.survived + res.timeout
         rate = res.killed / total if total else 0.0
