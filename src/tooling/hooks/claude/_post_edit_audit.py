@@ -72,6 +72,14 @@ def audit(path: str) -> list[str]:
                     warnings.append(
                         f"{node.name}() is {length} lines at line {node.lineno}. Break it up."
                     )
+            elif isinstance(node, ast.ExceptHandler):
+                body = node.body
+                if len(body) == 1 and isinstance(
+                    body[0], (ast.Pass, ast.Continue, ast.Break)
+                ):
+                    warnings.append(
+                        f"Silent fallback at line {node.lineno}: except block only contains {type(body[0]).__name__.lower()}. Log or re-raise."
+                    )
     commented = sum(1 for line in lines if COMMENTED_CODE.match(line))
     if commented > 2:
         warnings.append(f"{commented} lines of commented-out code. Delete them.")

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import fnmatch
 import json
 from pathlib import Path
@@ -11,7 +10,13 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PATHS = ("research", "aria_core", "aria_designer")
-DEFAULT_EXCLUDES = ("*/rust/*", "*/tests/*")
+DEFAULT_EXCLUDES = (
+    "*/rust/*",
+    "*/tests/*",
+    "*/tmp/*",
+    "*/research/tmp/*",
+    "*__pycache__*",
+)
 DEFAULT_BASELINE = REPO_ROOT / "conductor" / "radon_complexity_baseline.json"
 RANKS = ("A", "B", "C", "D", "E", "F")
 
@@ -26,7 +31,11 @@ def _iter_python_files(paths: list[str], excludes: list[str]) -> list[Path]:
         base = (REPO_ROOT / raw_path).resolve()
         candidates = [base] if base.is_file() else sorted(base.rglob("*.py"))
         for path in candidates:
-            rel = path.relative_to(REPO_ROOT).as_posix()
+            rel = (
+                path.relative_to(REPO_ROOT).as_posix()
+                if path.is_relative_to(REPO_ROOT)
+                else path.as_posix()
+            )
             if any(fnmatch.fnmatch(rel, pattern) for pattern in excludes):
                 continue
             files.append(path)
@@ -47,11 +56,15 @@ def _scan(
     findings: list[dict[str, Any]] = []
     parse_errors: list[dict[str, Any]] = []
     for path in _iter_python_files(paths, excludes):
-        rel = path.relative_to(REPO_ROOT).as_posix()
+        rel = (
+            path.relative_to(REPO_ROOT).as_posix()
+            if path.is_relative_to(REPO_ROOT)
+            else path.as_posix()
+        )
         try:
             source = path.read_text(encoding="utf-8")
             blocks = cc_visit(source)
-        except (OSError, SyntaxError, ast.ASTError) as exc:
+        except (OSError, SyntaxError, ValueError, UnicodeDecodeError) as exc:
             parse_errors.append({"path": rel, "error": str(exc)})
             continue
         for block in blocks:
