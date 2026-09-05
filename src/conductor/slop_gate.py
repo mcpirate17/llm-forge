@@ -21,9 +21,26 @@ over every changed module paired with the tests that import it, and reports:
                             measured for that module.
     PROBE_FAILED            incomplete. The child exited non-zero or died before it
                             wrote a report. Nothing was measured for that module.
+    OVER_BUDGET             unmeasured. One function used its whole sweep budget, so
+    BASELINE_UNUSABLE       the constructs after it were never ablated; or the
+    UNCOMPILABLE            recorded arguments never drove the unmodified function; or
+                            the ablated source would not compile. Unlike the two above
+                            these are per CONSTRUCT, not per module: the rest of the
+                            module was measured normally, and is reported normally.
+
+    NOT_REACHED_BY_DRIVERS  a test file names this function, but the drivers picked
+                            for its module never called it. A harness miss, reported
+                            apart from a real coverage hole so neither buries the
+                            other.
 
 Advisory verdicts are deliberately not blocking: sampling cannot prove equivalence,
 so a clean sweep is a lead for a human, never a licence to delete.
+
+OVER_BUDGET exists because the alternative was worse. `PER_MODULE_TIMEOUT` kills the
+whole child, so one slow function used to cost every OTHER function in its module its
+verdict: `mutation_coverage` spent 222.5 s and reported nothing about any of its twelve
+functions, eleven of which cost 0.5 s between them. A per-function budget spends the
+overrun on the function that caused it and names what went unswept.
 
 The two incomplete verdicts are reported separately from both, and never silently:
 a check whose failure is indistinguishable from its success measures nothing. They
@@ -55,12 +72,33 @@ else:
 BLOCKING = ("REACHABLE_BUT_UNTESTED",)
 ADVISORY = ("NO_DIFFERENCE_OBSERVED", "WITHIN_NUMERIC_NOISE", "NONDETERMINISTIC")
 UNTESTED = "NOT_EXERCISED"
+# The other half of `refine_unexercised`'s split: a test file somewhere names this
+# function, but the drivers chosen for its module never called it. That is a miss in
+# how drivers are selected, not a coverage hole -- and it had no bucket either, so the
+# 26 of every 59 unexercised functions that land here were relabelled and then dropped
+# on the floor. The split the docstring describes only ever reported one of its sides.
 UNREACHED = "NOT_REACHED_BY_DRIVERS"
 # Not verdicts about the code: verdicts about the probe. A module carrying one of
 # these was not measured, and no conclusion about it may be drawn from a clean run.
 TIMEOUT = "TIMEOUT"
 PROBE_FAILED = "PROBE_FAILED"
 INCOMPLETE = (TIMEOUT, PROBE_FAILED)
+# Also verdicts about the probe rather than the code, but scoped to one CONSTRUCT
+# instead of a whole module -- so they are counted and named on their own, and NOT
+# folded into INCOMPLETE, whose members subtract their module from `modules_probed`.
+# A module holding one over-budget function WAS probed.
+#   OVER_BUDGET        the function ran out of its sweep budget before this construct
+#   BASELINE_UNUSABLE  the recorded arguments never drove the unmodified function
+#   UNCOMPILABLE       the ablated source would not compile, so no question was asked
+# The last two predate the budget and were not in any bucket: they fell off the end of
+# the classification chain and out of every summary list, so a module in which the
+# probe answered NOTHING rendered identically to one it swept clean.
+UNMEASURED = ("OVER_BUDGET", "BASELINE_UNUSABLE", "UNCOMPILABLE")
+# The healthy outcome: the construct changes behaviour and the tests notice. Counted
+# rather than listed -- three modules produce 71 of these and none of them is news --
+# but counted, because "0 blocking" means something different at 71 live constructs
+# than it does at 0.
+LIVE = "LIVE"
 STDERR_TAIL_CHARS = 2000
 WAIVERS = pathlib.Path("conductor/slop_waivers.json")
 PER_MODULE_TIMEOUT = 180
@@ -323,6 +361,9 @@ def run(
     skipped: list[str] = []
     untested: list[dict] = []
     incomplete: list[dict] = []
+    unmeasured: list[dict] = []
+    unreached: list[dict] = []
+    live = 0
 
     driven: list[tuple[str, list[str]]] = []
     for module in modules:
@@ -361,8 +402,23 @@ def run(
                 advisory.append(finding)
             elif finding["verdict"] == UNTESTED:
                 untested.append(finding)
+            elif finding["verdict"] == UNREACHED:
+                unreached.append(finding)
             elif finding["verdict"] in INCOMPLETE:
                 incomplete.append(finding)
+            elif finding["verdict"] in UNMEASURED:
+                unmeasured.append(finding)
+            elif finding["verdict"] == LIVE:
+                live += 1
+            else:
+                # Every verdict the probe can emit must land in exactly one bucket.
+                # Anything else used to fall off the end of this chain and out of
+                # every summary list -- a new verdict would have gone unreported and
+                # the run would still have said PASS.
+                raise AssertionError(
+                    f"{module}::{finding.get('qualname')} carries verdict "
+                    f"{finding['verdict']!r}, which this gate does not classify"
+                )
     # A module that timed out or crashed was not probed. Counting it in
     # modules_probed is how "0 findings" came to look like "nothing wrong".
     incomplete_modules = {f["module"] for f in incomplete}
@@ -374,6 +430,9 @@ def run(
         "advisory": advisory,
         "untested": untested,
         "incomplete": incomplete,
+        "unmeasured": unmeasured,
+        "unreached": unreached,
+        "live": live,
     }
     return (1 if blocking else 0), summary
 
@@ -410,15 +469,51 @@ def _render(summary: dict) -> None:
         tail = (f.get("stderr_tail") or "").strip().splitlines()
         for line in tail[-5:]:
             print(f"            {line}")
+    if summary.get("unreached"):
+        # Per CONSTRUCT going in, per FUNCTION coming out: a function with four
+        # ablations produced four identical lines, and the count above them said
+        # "21 function(s)" of 8 functions.
+        unreached_rows = sorted(
+            {
+                (f["module"], f["qualname"], ", ".join(f.get("named_by") or []))
+                for f in summary["unreached"]
+            }
+        )
+        print(
+            f"{len(unreached_rows)} function(s) a test file names but the drivers "
+            "chosen for their module never called -- widen the drivers, these are "
+            "not coverage holes:"
+        )
+        for module, qualname, names in unreached_rows[:8]:
+            print(f"            {module}::{qualname}  named by {names or '?'}")
+    if summary.get("unmeasured"):
+        rows = sorted(
+            {(f["verdict"], f["module"], f["qualname"]) for f in summary["unmeasured"]}
+        )
+        print(
+            f"{len(summary['unmeasured'])} construct(s) in {len(rows)} function(s) were "
+            "never measured, so nothing above says anything about them:"
+        )
+        for verdict, module, qualname in rows[:8]:
+            print(f"            [{verdict.lower()}] {module}::{qualname}")
     if summary["modules_without_drivers"]:
         print(
             f"no driver tests for {len(summary['modules_without_drivers'])} changed module(s); "
             "the probe cannot speak for them"
         )
     incomplete = summary.get("incomplete", ())
+    # Every bucket, on one line. A PASS is only readable against how much of the
+    # sweep actually produced an answer, and three of these counts were kept by
+    # nobody: the constructs the probe could not measure, the functions its own
+    # driver selection missed, and the live constructs that make "blocking=0" mean
+    # something. "blocking=0 advisory=31 probed=2" was true of a run that answered
+    # nothing about 35 constructs and 8 functions.
     print(
         f"blocking={len(summary['blocking'])} advisory={len(summary['advisory'])} "
-        f"probed={summary['modules_probed']} incomplete={len(incomplete)}"
+        f"live={summary.get('live', 0)} probed={summary['modules_probed']} "
+        f"incomplete={len(incomplete)} unmeasured={len(summary.get('unmeasured', ()))} "
+        f"unreached={len(summary.get('unreached', ()))} "
+        f"untested={len(summary.get('untested', ()))}"
     )
 
 

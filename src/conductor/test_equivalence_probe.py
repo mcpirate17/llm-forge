@@ -170,18 +170,8 @@ def test_validated_rejects_negative():
 
 
 @pytest.fixture
-def workspace(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> pathlib.Path:
-    # Anchor pytest config discovery at tmp_path: without an inifile here the nested
-    # run walks up to / looking for one, which the repo path guard rejects.
-    (tmp_path / "pytest.ini").write_text("[pytest]\n")
-    (tmp_path / "fixture_mod.py").write_text(textwrap.dedent(MODULE))
-    (tmp_path / "test_fixture_mod.py").write_text(textwrap.dedent(TESTS))
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.syspath_prepend(str(tmp_path))
-    importlib.invalidate_caches()
-    for name in ("fixture_mod", "test_fixture_mod"):
-        sys.modules.pop(name, None)
-    return tmp_path
+def workspace(probe_workspace) -> pathlib.Path:
+    return probe_workspace(MODULE, TESTS)
 
 
 def _verdicts(

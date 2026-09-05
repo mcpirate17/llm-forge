@@ -34,6 +34,7 @@ import inspect
 import json
 import pathlib
 import sys
+import time
 from typing import Any, Callable, Sequence
 
 from conductor.native_ablations import Ablation as NativeAblation
@@ -42,6 +43,22 @@ from conductor.native_ablations import ablations as native_ablations
 __all__ = ["Verdict", "AblationResult", "probe_function", "probe_module"]
 
 MAX_RECORDED_CALLS = 24
+# Wall clock ONE function's sweeps may spend before its remaining constructs are
+# reported unmeasured instead of measured. Not a taste. Measured per function over
+# five modules of this repo, 62 functions: 60 of them finish in under 1 s (p95 =
+# 0.71 s), the slowest that finishes at all is `slop_gate.probe` at 11.0 s, and then
+# the distribution jumps -- `equivalence_probe._record_many` 55.3 s,
+# `equivalence_probe.probe_function` 93.3 s, `mutation_coverage.main` 221.9 s. Those
+# are the functions whose replayed call runs a pytest suite, so one recorded call
+# costs a whole test run, and they are why the modules holding them exceeded
+# `slop_gate.PER_MODULE_TIMEOUT` and were killed -- throwing away the verdicts of
+# every OTHER function in the module. `mutation_coverage` spent 222.5 s to report
+# nothing about any of its twelve functions, eleven of which cost 0.5 s combined.
+#
+# 30 s is ~3x the slowest function that finishes, and NOTHING was measured between
+# 11.0 s and 93.3 s, so no verdict this probe reports today can change under it. It
+# reclaims 192 s of the 240 s that sample spent.
+FUNCTION_BUDGET_SECONDS = 30.0
 # Targets shared per driver run. Bounds recorder memory; see _record_many.
 RECORD_BATCH = 32
 AMPLIFIERS: tuple[tuple[str, float], ...] = (
@@ -83,6 +100,10 @@ class Verdict(str):
     # difference under it can be attributed to an ablation. A property of the code
     # under test, not of the probe -- reported, never silently folded into "clean".
     NONDETERMINISTIC = "NONDETERMINISTIC"
+    # The function's sweeps used their whole wall-clock allowance, so this construct
+    # was never ablated. A verdict about the probe, not about the code -- reported
+    # so a clean module can be read against how much of it actually ran.
+    OVER_BUDGET = "OVER_BUDGET"
 
 
 @dataclasses.dataclass
@@ -435,12 +456,51 @@ def _compare_one(
     return absolute / max(_magnitude(expected), 1e-30)
 
 
+class _Budget:
+    """Wall clock a function's sweeps may spend, and whether they ran out of it.
+
+    Held as an object rather than a deadline float because the caller needs the
+    second half: a sweep that stopped early returns the same `(0.0, n)` shape as one
+    that swept everything and found nothing, and those two must never be reported as
+    the same thing. `cut` is what separates "measured, no difference" from "never
+    sampled". Once tripped it stays tripped, so a function reports one verdict about
+    its budget rather than alternating as the clock is re-read.
+    """
+
+    __slots__ = ("clock", "deadline", "cut")
+
+    def __init__(
+        self, seconds: float | None, clock: Callable[[], float] = time.monotonic
+    ) -> None:
+        # The clock is a parameter because it is this object's only input, and a test
+        # that cannot set it has to race a real one to reach the boundaries that
+        # matter -- a sweep cut before its first call, or between two ablations.
+        self.clock = clock
+        self.deadline = None if seconds is None or seconds <= 0 else clock() + seconds
+        self.cut = False
+
+    def expired(self) -> bool:
+        if not self.cut and self.deadline is not None:
+            self.cut = self.clock() >= self.deadline
+        return self.cut
+
+
 def _sweep(
-    baseline: Callable, variant: Callable, calls: Sequence[tuple]
+    baseline: Callable,
+    variant: Callable,
+    calls: Sequence[tuple],
+    budget: _Budget | None = None,
 ) -> tuple[float, int]:
-    """Worst relative difference, and how many argument sets the baseline accepted."""
+    """Worst relative difference, and how many argument sets the baseline accepted.
+
+    The budget is checked BETWEEN calls, never inside one: a replay that has started
+    is either allowed to finish or is killed mid-call, and killing it would leave the
+    module under test in whatever state the ablated function got it to.
+    """
     worst, usable = 0.0, 0
     for args, kwargs in calls:
+        if budget is not None and budget.expired():
+            break
         diff = _compare_one(baseline, variant, args, kwargs)
         if diff is not None:
             worst = max(worst, diff)
@@ -466,7 +526,10 @@ def _unamplified(original: Any, transformed: Any) -> bool:
 
 
 def _sweep_amplified(
-    baseline: Callable, variant: Callable, calls: Sequence[tuple]
+    baseline: Callable,
+    variant: Callable,
+    calls: Sequence[tuple],
+    budget: _Budget | None = None,
 ) -> tuple[float, str | None]:
     """Worst relative difference over the amplified regimes, and which one found it.
 
@@ -495,7 +558,11 @@ def _sweep_amplified(
         for label, factor in PARAM_AMPLIFIERS
     ]
     for label, transform in plans:
+        if budget is not None and budget.expired():
+            break
         for args, kwargs in calls:
+            if budget is not None and budget.expired():
+                break
             amp_args = tuple(transform(a) for a in args)
             amp_kwargs = {k: transform(v) for k, v in kwargs.items()}
             if all(_unamplified(a, b) for a, b in zip(args, amp_args)) and all(
@@ -508,6 +575,100 @@ def _sweep_amplified(
     return worst, which
 
 
+@dataclasses.dataclass
+class _ProbeContext:
+    """Everything one construct's ablation needs that is fixed for the function.
+
+    A record rather than ten parameters: the ablation is the only thing that varies
+    across the loop below, and threading the rest through by hand is how a caller
+    ends up passing the unmodified baseline where the decorated one belongs.
+    """
+
+    qualname: str
+    source: str
+    fn_ast: ast.AST
+    module: Any
+    module_path: pathlib.Path
+    baseline: Callable
+    calls: list[tuple]
+    noise: float
+    budget: "_Budget"
+    budget_seconds: float | None
+
+
+def _probe_construct(ablation: NativeAblation, ctx: _ProbeContext) -> AblationResult:
+    """Ablate one construct and classify what the recorded calls say about it."""
+    base = AblationResult(
+        ctx.qualname,
+        ablation.rule,
+        ablation.description,
+        ablation.line,
+        Verdict.NOT_EXERCISED,
+        len(ctx.calls),
+    )
+    if not ctx.calls:
+        return base
+    if ctx.budget.expired():
+        # Cheap guard, not the correctness one: `_sweep` below would break on its
+        # first check anyway and reach the same verdict. What this saves is
+        # compiling a variant for every remaining construct in order to sweep it
+        # zero times -- 35 needless compiles on `mutation_coverage.main` alone.
+        _over_budget(base, ctx.budget_seconds)
+        return base
+    try:
+        # The engine edits module source, so the variant is read back out of the
+        # mutated module rather than handed over as a tree. Rules like
+        # ablate_function_to_none and drop_decorator rewrite the definition
+        # itself, which no function-scoped AST swap can express.
+        mutated = _node_for_qualname(
+            ast.parse(ablation.apply(ctx.source)), ctx.qualname, ctx.module_path
+        )
+        # For the decorator rule the decorator IS the construct under test, so
+        # both ends have to carry it -- otherwise the ablation and the baseline
+        # compile to the same object and every decorator reads as decorative.
+        decorated = ablation.rule == "drop_decorator"
+        against = (
+            _compile_variant(ctx.fn_ast, ctx.module, ctx.fn_ast.name, decorators=True)
+            if decorated
+            else ctx.baseline
+        )
+        variant = _compile_variant(
+            mutated, ctx.module, ctx.fn_ast.name, decorators=decorated
+        )
+    except (SyntaxError, LookupError) as exc:
+        base.verdict, base.detail = Verdict.UNCOMPILABLE, str(exc)
+        return base
+    recorded, usable = _sweep(against, variant, ctx.calls, ctx.budget)
+    base.max_diff_recorded = recorded
+    base.usable_calls = usable
+    if ctx.budget.cut:
+        # Ordered before the `usable` check on purpose: a sweep cut before its
+        # first call also reports zero usable calls, and BASELINE_UNUSABLE is a
+        # claim about the recorded arguments, which nothing here measured.
+        _over_budget(base, ctx.budget_seconds)
+        return base
+    if not usable:
+        base.verdict = Verdict.BASELINE_UNUSABLE
+        base.detail = "the recorded arguments never drove the unmodified function"
+        return base
+    if recorded > ctx.noise:
+        base.verdict = Verdict.LIVE
+        return base
+    amplified, which = _sweep_amplified(against, variant, ctx.calls, ctx.budget)
+    base.max_diff_amplified, base.amplifier = amplified, which
+    if ctx.budget.cut:
+        _over_budget(base, ctx.budget_seconds)
+        return base
+    if amplified > ctx.noise:
+        if _adjudicate_amplified(base, against, variant, ctx.calls, ctx.noise):
+            return base
+    elif max(recorded, amplified) > 0.0:
+        base.verdict = Verdict.WITHIN_NUMERIC_NOISE
+    else:
+        base.verdict = Verdict.NO_DIFFERENCE_OBSERVED
+    return base
+
+
 def probe_function(
     module_path: pathlib.Path,
     qualname: str,
@@ -518,8 +679,16 @@ def probe_function(
     calls: list[tuple] | None = None,
     ablations: Sequence[NativeAblation] | None = None,
     source: str | None = None,
+    budget_seconds: float | None = None,
 ) -> list[AblationResult]:
-    """Ablate every construct in one function and classify each by differential value."""
+    """Ablate every construct in one function and classify each by differential value.
+
+    `budget_seconds` bounds the wall clock this ONE function's sweeps may spend;
+    whatever is left unswept is reported OVER_BUDGET rather than clean. It defaults to
+    unbounded so a direct call measures everything it is asked to measure -- the
+    budget belongs to a sweep of a whole module, where an unbounded function costs the
+    other functions their verdicts. `probe_module` supplies it.
+    """
     module_name = module_name or _module_name_for(module_path)
     module = importlib.import_module(module_name)
     if source is None:
@@ -536,70 +705,39 @@ def probe_function(
 
     if calls is None:
         calls = _record_calls(module, qualname, test_args)
-    baseline = _compile_variant(fn_ast, module, fn_ast.name)
-    results: list[AblationResult] = []
-    for ablation in ablations:
-        base = AblationResult(
-            qualname,
-            ablation.rule,
-            ablation.description,
-            ablation.line,
-            Verdict.NOT_EXERCISED,
-            len(calls),
-        )
-        if not calls:
-            results.append(base)
-            continue
-        try:
-            # The engine edits module source, so the variant is read back out of the
-            # mutated module rather than handed over as a tree. Rules like
-            # ablate_function_to_none and drop_decorator rewrite the definition
-            # itself, which no function-scoped AST swap can express.
-            mutated = _node_for_qualname(
-                ast.parse(ablation.apply(source)), qualname, module_path
-            )
-            # For the decorator rule the decorator IS the construct under test, so
-            # both ends have to carry it -- otherwise the ablation and the baseline
-            # compile to the same object and every decorator reads as decorative.
-            decorated = ablation.rule == "drop_decorator"
-            against = (
-                _compile_variant(fn_ast, module, fn_ast.name, decorators=True)
-                if decorated
-                else baseline
-            )
-            variant = _compile_variant(
-                mutated, module, fn_ast.name, decorators=decorated
-            )
-        except (SyntaxError, LookupError) as exc:
-            base.verdict, base.detail = Verdict.UNCOMPILABLE, str(exc)
-            results.append(base)
-            continue
-        recorded, usable = _sweep(against, variant, calls)
-        base.max_diff_recorded = recorded
-        base.usable_calls = usable
-        if not usable:
-            base.verdict = Verdict.BASELINE_UNUSABLE
-            base.detail = "the recorded arguments never drove the unmodified function"
-            results.append(base)
-            continue
-        if recorded > noise:
-            base.verdict = Verdict.LIVE
-            results.append(base)
-            continue
-        amplified, which = _sweep_amplified(against, variant, calls)
-        base.max_diff_amplified, base.amplifier = amplified, which
-        if amplified > noise:
-            if _adjudicate_amplified(base, against, variant, calls, noise):
-                results.append(base)
-                continue
-        elif max(recorded, amplified) > 0.0:
-            base.verdict = Verdict.WITHIN_NUMERIC_NOISE
-        else:
-            base.verdict = Verdict.NO_DIFFERENCE_OBSERVED
-        results.append(base)
-
+    ctx = _ProbeContext(
+        qualname=qualname,
+        source=source,
+        fn_ast=fn_ast,
+        module=module,
+        module_path=module_path,
+        baseline=_compile_variant(fn_ast, module, fn_ast.name),
+        calls=calls,
+        noise=noise,
+        # One budget for the whole function: the point is to bound what this
+        # function's sweeps cost the module, not what any single construct costs.
+        budget=_Budget(budget_seconds),
+        budget_seconds=budget_seconds,
+    )
+    results = [_probe_construct(ablation, ctx) for ablation in ablations]
     _pool_jitter_floor(results)
     return results
+
+
+def _over_budget(base: AblationResult, seconds: float | None) -> None:
+    """Mark one construct as never sampled, and say what it would cost to sample it."""
+    base.verdict = Verdict.OVER_BUDGET
+    base.detail = (
+        f"this function used its whole {seconds:g}s sweep budget before reaching "
+        "this construct, which was never ablated; re-run "
+        "`python -m conductor.equivalence_probe <module> <tests> "
+        "--budget-seconds 0` to sweep it without a bound"
+    )
+    # A partial sweep measured no difference because it did not look, not because
+    # there is none. Carrying the numbers would invite exactly that misreading.
+    base.max_diff_recorded = None
+    base.max_diff_amplified = None
+    base.amplifier = None
 
 
 def _adjudicate_amplified(
@@ -632,6 +770,10 @@ def _adjudicate_amplified(
     #     function shows against ITSELF over the same repeats.
     # Both are paid only here, on a candidate finding, so the clean path keeps its
     # single sweep.
+    # Deliberately NOT budgeted: this path is reached only for a candidate that is
+    # about to block a merge, and a truncated control would understate the function's
+    # jitter -- which is the one direction that turns noise into a blocking finding.
+    # Six full sweeps is the price of reporting REACHABLE_BUT_UNTESTED at all.
     effect = min(
         _sweep_amplified(against, variant, calls)[0] for _ in range(CONTROL_REPEATS)
     )
@@ -703,7 +845,15 @@ def probe_module(
     only: Sequence[str] = (),
     noise: float = 1e-6,
     extra_rules: Sequence[str] = (),
+    budget_seconds: float | None = FUNCTION_BUDGET_SECONDS,
 ) -> list[AblationResult]:
+    """Probe every public function of one module, each under its own sweep budget.
+
+    The budget is PER FUNCTION, not per module, so a verdict never depends on which
+    functions were probed before it. A module-wide clock would make the same construct
+    read LIVE or OVER_BUDGET according to its position in the file, which is not a
+    property of the code.
+    """
     targets = list(only) or public_functions(module_path)
     if not targets:
         return []
@@ -730,6 +880,7 @@ def probe_module(
                 calls=recorded.get(qualname, []),
                 ablations=by_qualname.get(qualname, []),
                 source=source,
+                budget_seconds=budget_seconds,
             )
         except LookupError:
             continue
@@ -754,6 +905,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=1e-6,
         help="relative difference below which a change is round-off",
     )
+    parser.add_argument(
+        "--budget-seconds",
+        type=float,
+        default=FUNCTION_BUDGET_SECONDS,
+        help="wall clock each function's sweeps may spend before the rest of its "
+        "constructs are reported OVER_BUDGET; 0 sweeps every function to the end",
+    )
     parser.add_argument("--json", type=pathlib.Path)
     parser.add_argument(
         "--fail-on", default="", help="comma-separated verdicts to fail on"
@@ -761,7 +919,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     results = probe_module(
-        args.module, args.tests, args.function, args.noise, args.extra_rules
+        args.module,
+        args.tests,
+        args.function,
+        args.noise,
+        args.extra_rules,
+        args.budget_seconds,
     )
     if args.json:
         args.json.write_text(

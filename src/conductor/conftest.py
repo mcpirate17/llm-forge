@@ -9,12 +9,15 @@ through its ``root`` parameters instead of reading the host's files.
 
 from __future__ import annotations
 
+import importlib
 import json
 import shlex
 import shutil
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
+from typing import Callable
 
 import pytest
 
@@ -99,6 +102,34 @@ def _hook_config(
             ]
         }
     }
+
+
+@pytest.fixture
+def probe_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Callable[[str, str], Path]:
+    """Build a throwaway module and a driver test where the probe can reach them.
+
+    Both probe suites need the same six steps and differ only in the source they
+    put under test, so the steps were copied between them -- and the reasoning
+    behind them was copied too. `pytest.ini` is written because without an inifile
+    the nested run walks up to `/` looking for one, which the repo path guard
+    rejects; the modules are evicted from `sys.modules` because a second workspace
+    in the same session otherwise imports the first one's `fixture_mod`.
+    """
+
+    def build(module_src: str, tests_src: str) -> Path:
+        (tmp_path / "pytest.ini").write_text("[pytest]\n")
+        (tmp_path / "fixture_mod.py").write_text(textwrap.dedent(module_src))
+        (tmp_path / "test_fixture_mod.py").write_text(textwrap.dedent(tests_src))
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.syspath_prepend(str(tmp_path))
+        importlib.invalidate_caches()
+        for name in ("fixture_mod", "test_fixture_mod"):
+            sys.modules.pop(name, None)
+        return tmp_path
+
+    return build
 
 
 @pytest.fixture
