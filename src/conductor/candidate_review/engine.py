@@ -10,6 +10,7 @@ import secrets
 import subprocess
 import sys
 import time
+import traceback
 from collections.abc import Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
@@ -69,6 +70,9 @@ TRAILER_POLICY = "Governance-Policy"
 TRAILER_RECEIPT = "Governance-Receipt"
 INHERITED_LOCK_FD_ENV = "LLM_GOVERNANCE_COMMIT_LOCK_FD"
 INHERITED_LOCK_TOKEN_ENV = "LLM_GOVERNANCE_COMMIT_LOCK_TOKEN"
+# A crash receipt carries the tail of the traceback, not the whole thing: the last
+# frames name the defect, and an unbounded string here lands in every stored receipt.
+CRASH_TRACEBACK_CHARS = 4000
 
 
 @dataclass(frozen=True, slots=True)
@@ -603,6 +607,29 @@ def _special_results(
 
 
 def _crash_result(check_id: str, exc: Exception) -> CheckResult:
+    """Turn a check that raised into a blocking receipt that says where it raised.
+
+    Until 2026-09-05 this rendered `type(exc).__name__: exc` and dropped the
+    traceback, so a `TypeError: Object of type bytes is not JSON serializable`
+    arrived with no file, no line and no frames -- three rounds of manual
+    bisection to find the one call site that produced it. The exception crosses
+    the `ThreadPoolExecutor` boundary through `future.result()`, which preserves
+    `__traceback__`, so the frames were there the whole time.
+
+    The raise site goes in the message because that is the line an operator sees
+    in the terminal; the frames go in `evidence` because that is what the receipt
+    is for. `path` and `line` are deliberately left unset: a check declared
+    `attribution = "diff"` treats a finding naming a path outside the candidate's
+    changed files as inherited debt, and inherited findings do not block. A crash
+    must always block, so it must not carry a path.
+    """
+    frames = traceback.extract_tb(exc.__traceback__)
+    site = (
+        f" (raised at {Path(frames[-1].filename).name}:{frames[-1].lineno}"
+        f" in {frames[-1].name})"
+        if frames
+        else ""
+    )
     return CheckResult(
         check_id=check_id,
         status=CheckStatus.ERROR,
@@ -614,8 +641,13 @@ def _crash_result(check_id: str, exc: Exception) -> CheckResult:
                 severity=Severity.CRITICAL,
                 message=(
                     "check crashed inside the policy engine: "
-                    f"{type(exc).__name__}: {exc}"
+                    f"{type(exc).__name__}: {exc}{site}"
                 ),
+                evidence={
+                    "traceback": "".join(
+                        traceback.format_exception(type(exc), exc, exc.__traceback__)
+                    )[-CRASH_TRACEBACK_CHARS:]
+                },
             ).finalize()
         ],
     )

@@ -12,6 +12,7 @@ including the deferred `_result` import that keeps the two modules acyclic.
 from __future__ import annotations
 
 import json
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -29,6 +30,13 @@ def _record_for_backlog(summary: dict, ctx: ReviewContext) -> None:
     Best effort by design: a full disk or a read-only checkout must not fail a code
     review over bookkeeping. Nothing downstream reads a partial write, because the
     file is renamed into place only once it is complete.
+
+    `TypeError` is caught alongside `OSError` because `json.dumps` raises it, not
+    `OSError`, when a finding carries a value it cannot serialize -- and on
+    2026-09-05 that took the entire review down from inside a function documented
+    as best-effort (a `bytes` `stderr_tail` from `TimeoutExpired`). Caught, but
+    never silent: a summary that could not be recorded is reported on stderr, so
+    the bookkeeping failure is visible without being fatal.
     """
     from conductor.slop_ledger import GATE_FINDINGS
 
@@ -39,8 +47,11 @@ def _record_for_backlog(summary: dict, ctx: ReviewContext) -> None:
         tmp = final.with_suffix(".json.part")
         tmp.write_text(json.dumps(summary, indent=2) + "\n")
         tmp.rename(final)
-    except OSError:
-        pass
+    except (OSError, TypeError) as exc:
+        print(
+            f"slop-backlog: this run's summary was not recorded: {exc!r}",
+            file=sys.stderr,
+        )
 
 
 def _findings_from_summary(summary: dict) -> list[Finding]:
@@ -101,7 +112,7 @@ def _findings_from_summary(summary: dict) -> list[Finding]:
                 "measurement, not the absence of a finding"
             ),
             help=(
-                "Re-run `python -m conductor.slop_gate --only <module>` to see the "
+                "Re-run `python -m conductor.slop_gate --module <module>` to see the "
                 "child's own output, or narrow the module's drivers."
             ),
             evidence={
