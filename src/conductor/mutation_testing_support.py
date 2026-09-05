@@ -16,6 +16,9 @@ import subprocess
 import time
 from typing import Any, Callable, Container, Mapping, Protocol, Sequence, TypeVar
 
+# Imports nothing from `conductor`, so this stays circular-safe.
+from conductor.mutation_patch_apply import PatchApplyError, apply_patch_text
+
 
 CANONICAL_TEST_PATTERNS = (
     "**/test_*.py",
@@ -423,22 +426,46 @@ def apply_mutation(
             f"mutation {mutation.mutation_id!r} patch changed after campaign load: "
             f"expected {mutation.patch_sha256}, got {actual_patch_sha256}"
         )
-    for command in (
+    # `git apply` stays the primary path, unchanged. It decides every patch it can
+    # apply, byte for byte, exactly as it always has -- so any patch that has ever
+    # produced a receipt is applied by the same code that produced it.
+    #
+    # The anchored applier runs ONLY where git refused. That state used to abort the
+    # whole campaign before any mutant executed, so no receipt can exist for it, and
+    # nothing an existing receipt recorded can change here. What it buys is the
+    # layout fragility: git places a hunk by the line numbers in its `@@` header and
+    # the three context lines around it, so an edit to a NEIGHBOURING line, or an
+    # append past an EOF-anchored hunk, retires a mutant whose mutated construct is
+    # untouched.
+    check = subprocess.run(
         ["git", "apply", "--check", str(mutation.patch_file)],
-        ["git", "apply", str(mutation.patch_file)],
-    ):
-        proc = subprocess.run(
-            command,
+        cwd=snapshot_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if check.returncode == 0:
+        applied = subprocess.run(
+            ["git", "apply", str(mutation.patch_file)],
             cwd=snapshot_root,
             check=False,
             capture_output=True,
             text=True,
         )
-        if proc.returncode != 0:
+        if applied.returncode != 0:
             raise error_type(
                 f"mutation {mutation.mutation_id!r} patch failed: "
-                f"{(proc.stderr or proc.stdout).strip()[:2000]}"
+                f"{(applied.stderr or applied.stdout).strip()[:2000]}"
             )
+    else:
+        try:
+            apply_patch_text(mutation.patch_file.read_text(), snapshot_root)
+        except PatchApplyError as exc:
+            raise error_type(
+                f"mutation {mutation.mutation_id!r} patch failed: "
+                f"{(check.stderr or check.stdout).strip()[:1000]}; "
+                f"anchored retry: {str(exc)[:1000]}"
+            ) from exc
     changed = subprocess.run(
         ["git", "diff", "--name-only"],
         cwd=snapshot_root,

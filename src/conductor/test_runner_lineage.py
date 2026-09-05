@@ -160,6 +160,12 @@ def test_shipped_lineage_is_wellformed_and_documented() -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 1
     assert payload["entries"], "an empty lineage should be deleted, not shipped"
+    # Components are declared, never undeclared, so an entry can only pin more
+    # paths than the entry before it -- a rename keeps the count. Pinning the
+    # progression rather than a literal set of era sizes catches the failure
+    # that matters (a new entry that forgot a component) without going stale
+    # every time a component is added.
+    previous = 0
     for entry in payload["entries"]:
         # Every entry must carry its own justification and evidence, or it is an
         # unaudited bypass rather than a narrowed pin.
@@ -171,6 +177,11 @@ def test_shipped_lineage_is_wellformed_and_documented() -> None:
             f"{entry.get('id')} does not name the diff it covers"
         )
         hashes = entry["runner_components_sha256"]
-        # Five components before the native decomposition (2026-09-01), eight after.
-        assert len(hashes) in {5, 8}, "a lineage entry must pin every runner component"
+        assert hashes, f"{entry.get('id')} pins no runner component at all"
+        assert len(hashes) >= previous, (
+            f"{entry.get('id')} pins {len(hashes)} components where the entry "
+            f"before it pinned {previous}; a lineage entry must pin every "
+            "runner component of its era"
+        )
+        previous = len(hashes)
         assert all(len(v) == 64 for v in hashes.values())

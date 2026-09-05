@@ -45,6 +45,7 @@ OUTPUT_TAIL_CHARS = 12_000
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNNER_COMPONENT_PATHS = (
     "conductor/mutation_campaign_model.py",
+    "conductor/mutation_patch_apply.py",
     "conductor/mutation_scope.py",
     "conductor/mutation_testing.py",
     "conductor/mutation_testing_support.py",

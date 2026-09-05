@@ -83,7 +83,14 @@ def test_a_rotted_anchor_is_reported_and_a_live_patch_is_not(tmp_path: Path) -> 
     assert verdict is not None
     assert verdict["reason"] == "DOES_NOT_APPLY"
     assert verdict["mutation_id"] == "rotted"
-    assert "source.py" in verdict["detail"]
+    # Two independent refusals are reported, and either one alone would let a
+    # truncation of the other pass unnoticed -- so both halves are pinned.
+    git_reason, separator, anchored_reason = verdict["detail"].partition(
+        "; anchored retry: "
+    )
+    assert separator
+    assert "source.py" in git_reason
+    assert "source.py" in anchored_reason
 
 
 def test_the_check_runs_against_the_repo_root_not_the_process_directory(
@@ -93,14 +100,21 @@ def test_the_check_runs_against_the_repo_root_not_the_process_directory(
 
     _git_repo(tmp_path)
     live = _mutation("live", _patch(tmp_path, "live", "VALUE = 1", "VALUE = 2"))
-    campaign = _campaign(tmp_path, "corpus", (live,))
+    rotted = _mutation("rotted", _patch(tmp_path, "rotted", "VALUE = 9", "VALUE = 2"))
+    campaign = _campaign(tmp_path, "corpus", (live, rotted))
+    # The process directory is a tree the rotted patch applies to cleanly. A check
+    # that reads it instead of the repo root returns early and calls a dead mutant
+    # live -- the failure this test exists for.
     elsewhere = tmp_path.parent / "elsewhere"
     elsewhere.mkdir()
     _git_repo(elsewhere)
-    (elsewhere / "source.py").write_text("VALUE = 99\n", encoding="utf-8")
+    (elsewhere / "source.py").write_text("VALUE = 9\n", encoding="utf-8")
     monkeypatch.chdir(elsewhere)
 
     assert mutation_patch_audit._patch_verdict(campaign, live, tmp_path) is None
+    rotted_verdict = mutation_patch_audit._patch_verdict(campaign, rotted, tmp_path)
+    assert rotted_verdict is not None
+    assert rotted_verdict["reason"] == "DOES_NOT_APPLY"
     stale = mutation_patch_audit._patch_verdict(campaign, live, elsewhere)
     assert stale is not None and stale["reason"] == "DOES_NOT_APPLY"
 
@@ -342,6 +356,109 @@ def test_one_acceptable_receipt_covers_a_campaign_and_none_leaves_it_uncovered(
     assert unusable["receipts"] == 2
 
 
+def _measured(campaign: mutation_testing.Campaign) -> mutation_testing.Campaign:
+    """The same campaign, with the question `which of my tests detect anything`."""
+
+    return dataclasses.replace(
+        campaign,
+        value_analysis=mutation_testing.ValueAnalysisSpec(
+            adapter="pytest",
+            baseline_repetitions=1,
+            contracts=(),
+            tests=(),
+            mutation_contracts={},
+        ),
+    )
+
+
+def test_a_campaign_is_unmeasured_or_its_inert_tests_are_named(tmp_path: Path) -> None:
+    """Two different failures, and neither may be reported as the other.
+
+    A campaign with no `value_analysis` has never been asked which of its tests
+    detect anything -- that is not the same as being asked and answering `none`,
+    and a corpus that conflates them cannot tell an unaudited campaign from an
+    audited one full of tests that kill nothing.
+    """
+
+    current = {"conductor/mutation_testing.py": "a" * 64}
+    stale_runner = {"conductor/mutation_testing.py": "b" * 64}
+    unmeasured_campaign = _campaign(tmp_path, "unmeasured", ())
+    measured = _measured(_campaign(tmp_path, "measured", ()))
+    value = {
+        "tests": [
+            {"nodeid": "t.py::test_kills", "classification": "CORE"},
+            {"nodeid": "t.py::test_inert", "classification": "DELETE_CANDIDATE"},
+        ]
+    }
+
+    unmeasured, inert = mutation_patch_audit._value_verdicts(
+        [unmeasured_campaign, measured],
+        {
+            "measured": [
+                {
+                    "status": "PASS",
+                    "runner_components_sha256": dict(current),
+                    "generated_at": "20260905T000000Z",
+                    "test_value": value,
+                }
+            ]
+        },
+        current,
+        tmp_path,
+    )
+    assert [row["campaign_id"] for row in unmeasured] == ["unmeasured"]
+    assert unmeasured[0]["reason"] == "NO_VALUE_ANALYSIS"
+    assert [row["nodeid"] for row in inert] == ["t.py::test_inert"]
+    assert inert[0]["reason"] == "KILLS_NOTHING"
+
+    # A verdict only counts when a receipt this runner could have produced carries
+    # it. Reading an unacceptable receipt would let a stale run silence the corpus.
+    _, none_from_stale = mutation_patch_audit._value_verdicts(
+        [measured],
+        {
+            "measured": [
+                {
+                    "status": "PASS",
+                    "runner_components_sha256": dict(stale_runner),
+                    "generated_at": "20260905T000000Z",
+                    "test_value": value,
+                }
+            ]
+        },
+        current,
+        tmp_path,
+    )
+    assert none_from_stale == []
+
+
+def test_the_newest_acceptable_receipt_is_the_one_that_speaks(tmp_path: Path) -> None:
+    """Older receipts describe tests that have since changed; the newest wins."""
+
+    current = {"conductor/mutation_testing.py": "a" * 64}
+    campaign = _campaign(tmp_path, "corpus", ())
+    old = {
+        "status": "PASS",
+        "runner_components_sha256": dict(current),
+        "generated_at": "20260901T000000Z",
+        "test_value": {"tests": [{"nodeid": "t.py::a", "classification": "CORE"}]},
+    }
+    new = {
+        "status": "PASS",
+        "runner_components_sha256": dict(current),
+        "generated_at": "20260905T000000Z",
+        "test_value": {"tests": [{"nodeid": "t.py::a", "classification": "CORE"}]},
+    }
+
+    chosen = mutation_patch_audit._acceptable_receipt(
+        campaign, {"corpus": [new, old]}, current, tmp_path
+    )
+    assert chosen is not None and chosen["generated_at"] == "20260905T000000Z"
+    assert (
+        mutation_patch_audit._acceptable_receipt(campaign, {}, current, tmp_path)
+        is None
+    )
+
+
 def _found(**kwargs: set[str]) -> dict[str, set[str]]:
     return {key: kwargs.get(key, set()) for key in mutation_patch_audit.BASELINE_KEYS}
 
@@ -364,6 +481,11 @@ def test_every_dimension_reduces_to_comparable_ids(tmp_path: Path) -> None:
         {
             "interpreters": [{"campaign_id": "pinned"}],
             "evidence": [{"campaign_id": "uncovered"}],
+            "unmeasured": [{"campaign_id": "unmeasured"}],
+            "inert_tests": [
+                {"campaign_id": "one", "nodeid": "t.py::test_x"},
+                {"campaign_id": "two", "nodeid": "t.py::test_x"},
+            ],
         },
     )
 
@@ -371,6 +493,14 @@ def test_every_dimension_reduces_to_comparable_ids(tmp_path: Path) -> None:
     assert found["unloadable_manifests"] == {"broken.json"}
     assert found["host_pinned_interpreters"] == {"pinned"}
     assert found["uncovered_campaigns"] == {"uncovered"}
+    assert found["campaigns_without_value_analysis"] == {"unmeasured"}
+    # An inert test is keyed by campaign AND nodeid for the same reason a stale
+    # mutant is: two campaigns can name the same test.
+    assert found["tests_that_kill_nothing"] == {
+        "one::t.py::test_x",
+        "two::t.py::test_x",
+    }
+    assert set(found) == set(mutation_patch_audit.BASELINE_KEYS)
 
 
 def test_the_baseline_ratchet_bites_in_both_directions(tmp_path: Path) -> None:
@@ -449,8 +579,12 @@ def test_the_exit_code_and_summary_carry_the_verdict(
         "campaigns": 1,
         "host_pinned_interpreters": 1,
         "uncovered_campaigns": 0,
+        "campaigns_without_value_analysis": 1,
+        "tests_that_kill_nothing": 1,
         "interpreters": [{"campaign_id": "pinned"}],
         "evidence": [],
+        "unmeasured": [{"campaign_id": "unmeasured"}],
+        "inert_tests": [{"campaign_id": "corpus", "nodeid": "t.py::test_x"}],
     }
     monkeypatch.setattr(
         mutation_patch_audit,
@@ -475,15 +609,37 @@ def test_the_exit_code_and_summary_carry_the_verdict(
 
     args = ["--baseline", str(baseline)]
 
-    record(stale_mutations=["corpus::rotted"], host_pinned_interpreters=["pinned"])
+    record(
+        stale_mutations=["corpus::rotted"],
+        host_pinned_interpreters=["pinned"],
+        campaigns_without_value_analysis=["unmeasured"],
+        tests_that_kill_nothing=["corpus::t.py::test_x"],
+    )
     assert mutation_patch_audit.main([*args, "--summary"]) == 0
     reported = json.loads(capsys.readouterr().out)
     assert "stale" not in reported["patches"]
     assert "interpreters" not in reported["reproducibility"]
+    # The rows are dropped; the counts are what CI reads, so they survive.
+    assert "unmeasured" not in reported["reproducibility"]
+    assert "inert_tests" not in reported["reproducibility"]
     assert reported["patches"]["stale_mutations"] == 1
     assert reported["patches"]["stale_campaigns"] == {"corpus": 1}
     assert reported["reproducibility"]["host_pinned_interpreters"] == 1
+    assert reported["reproducibility"]["campaigns_without_value_analysis"] == 1
+    assert reported["reproducibility"]["tests_that_kill_nothing"] == 1
     assert reported["status"] == "CLEAN"
+
+    # A test that stops detecting anything is a regression in its own right, and
+    # is not a rotted patch -- so it exits 7, not 6.
+    record(
+        stale_mutations=["corpus::rotted"],
+        host_pinned_interpreters=["pinned"],
+        campaigns_without_value_analysis=["unmeasured"],
+    )
+    assert mutation_patch_audit.main(args) == 7
+    assert json.loads(capsys.readouterr().out)["reproducibility"]["baseline"][
+        "new_tests_that_kill_nothing"
+    ] == ["corpus::t.py::test_x"]
 
     record(host_pinned_interpreters=["pinned"])
     assert mutation_patch_audit.main(args) == 6
@@ -525,6 +681,8 @@ def test_write_baseline_records_instead_of_judging(
         lambda *_a, **_k: {
             "interpreters": [{"campaign_id": "pinned"}],
             "evidence": [{"campaign_id": "uncovered"}],
+            "unmeasured": [{"campaign_id": "unmeasured"}],
+            "inert_tests": [{"campaign_id": "corpus", "nodeid": "t.py::test_x"}],
         },
     )
     baseline = tmp_path / "baseline.json"
@@ -540,3 +698,5 @@ def test_write_baseline_records_instead_of_judging(
     assert recorded["stale_mutations"] == ["corpus::rotted"]
     assert recorded["host_pinned_interpreters"] == ["pinned"]
     assert recorded["uncovered_campaigns"] == ["uncovered"]
+    assert recorded["campaigns_without_value_analysis"] == ["unmeasured"]
+    assert recorded["tests_that_kill_nothing"] == ["corpus::t.py::test_x"]

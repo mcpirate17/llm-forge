@@ -29,13 +29,26 @@ whole-file pin by declaring which older runners are semantically equivalent. A
 receipt matching neither the current runner nor any lineage entry is not evidence,
 and it says ``PASS`` while not being evidence. Nothing surfaced that count before.
 
-The three share one expensive step -- loading every registered manifest -- and
+The fourth is whether its tests are worth running at all. A PASS says the
+mutants died; it says nothing about which tests killed them. `value_analysis`
+answers that, and 298 of 441 registered campaigns do not carry it -- they have
+never been asked. Of the ones that have, 228 tests came back DELETE_CANDIDATE:
+measured, in a run where every mutant died, to kill none of them. Both are the
+check-box this corpus is supposed to be the opposite of, and neither was a
+number before. The repair for a DELETE_CANDIDATE is the mutant it uniquely
+kills, never deleting the test -- a test that kills nothing is first evidence
+that the corpus is missing a mutant.
+
+The four share one expensive step -- loading every registered manifest -- and
 differ only in what they then ask, so they are one walk.
 
 The patch work is one ``git apply --check`` process per mutant -- fork/exec bound,
 not compute -- so it is spread across a thread pool rather than ported native: the
-interpreter is idle in ``waitpid`` either way. The two added dimensions are dict
-comparisons over the manifests already in memory and cost nothing measurable.
+interpreter is idle in ``waitpid`` either way. A mutant git refuses is retried
+in-process against ``mutation_patch_apply``, mirroring what the runner does, so a
+verdict here means what a run would mean. The three added dimensions are dict
+comparisons over the manifests and receipts already in memory and cost nothing
+measurable.
 """
 
 from __future__ import annotations
@@ -48,6 +61,7 @@ from pathlib import Path
 import subprocess
 from typing import Any
 
+from conductor.mutation_patch_apply import PatchApplyError, check_patch_text
 from conductor.mutation_scope import CampaignError, _safe_relative_path
 from conductor.mutation_testing import (
     REPO_ROOT,
@@ -75,17 +89,25 @@ def _patch_verdict(
             "reason": "HASH_DRIFT",
             "detail": f"expected {mutation.patch_sha256}, got {actual}",
         }
-    proc = subprocess.run(
+    # Mirror the runner exactly: `git apply --check` first, the anchored applier
+    # only where git refused. A verdict that disagreed with the runner would be
+    # worse than no verdict at all.
+    check = subprocess.run(
         ["git", "apply", "--check", str(patch)],
         cwd=repo_root,
         check=False,
         capture_output=True,
         text=True,
     )
-    if proc.returncode != 0:
+    if check.returncode == 0:
+        return None
+    try:
+        check_patch_text(patch.read_text(), repo_root)
+    except PatchApplyError as exc:
         return row | {
             "reason": "DOES_NOT_APPLY",
-            "detail": (proc.stderr or proc.stdout).strip()[:400],
+            "detail": f"{(check.stderr or check.stdout).strip()[:200]}; "
+            f"anchored retry: {str(exc)[:200]}",
         }
     return None
 
@@ -198,6 +220,78 @@ def _evidence_verdict(
     }
 
 
+def _acceptable_receipt(
+    campaign: Campaign,
+    receipts: Mapping[str, list[Mapping[str, Any]]],
+    current: Mapping[str, str],
+    repo_root: Path,
+) -> Mapping[str, Any] | None:
+    """The newest receipt that vouches for this campaign, or ``None``.
+
+    Newest by ``generated_at``, not by filename: a campaign accumulates a receipt
+    per run and only the latest describes the tests it ships today. Reading an
+    older one would report classifications that a later run already repaired.
+    """
+
+    rows = [
+        row
+        for row in receipts.get(campaign.campaign_id, [])
+        if _receipt_rejection(row, current, repo_root) is None
+    ]
+    if not rows:
+        return None
+    return max(rows, key=lambda row: str(row.get("generated_at") or ""))
+
+
+def _value_verdicts(
+    campaigns: Sequence[Campaign],
+    receipts: Mapping[str, list[Mapping[str, Any]]],
+    current: Mapping[str, str],
+    repo_root: Path,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Campaigns that never measured their tests, and tests measured to kill nothing.
+
+    Two different failures. A campaign with no ``value_analysis`` has never been
+    asked whether any of its tests detects anything -- its PASS says the mutants
+    died, not that the suite earns the machine time. A campaign that HAS asked and
+    got ``DELETE_CANDIDATE`` back has a measured answer: in a run where every other
+    mutant died, that test killed none of them.
+
+    Reported separately because the repairs are different. The first is a missing
+    measurement. The second is a missing mutant -- the fix is the one this test
+    uniquely kills, never deleting the test.
+    """
+
+    unmeasured: list[dict[str, str]] = []
+    inert: list[dict[str, str]] = []
+    for campaign in campaigns:
+        if campaign.value_analysis is None:
+            unmeasured.append(
+                {
+                    "campaign_id": campaign.campaign_id,
+                    "reason": "NO_VALUE_ANALYSIS",
+                    "detail": "nothing measures which of its tests detect anything",
+                }
+            )
+            continue
+        receipt = _acceptable_receipt(campaign, receipts, current, repo_root)
+        value = receipt.get("test_value") if isinstance(receipt, Mapping) else None
+        if not isinstance(value, Mapping):
+            continue
+        for row in value.get("tests") or []:
+            if not isinstance(row, Mapping):
+                continue
+            if row.get("classification") == "DELETE_CANDIDATE":
+                inert.append(
+                    {
+                        "campaign_id": campaign.campaign_id,
+                        "nodeid": str(row.get("nodeid")),
+                        "reason": "KILLS_NOTHING",
+                    }
+                )
+    return unmeasured, inert
+
+
 def audit_reproducibility(
     campaigns: Sequence[Campaign],
     registry: Mapping[str, Any],
@@ -231,14 +325,21 @@ def audit_reproducibility(
         is not None
     ]
     absent = [row for row in interpreters if row["reason"] == "INTERPRETER_ABSENT"]
+    unmeasured, inert = _value_verdicts(campaigns, receipts, current, repo_root)
     return {
         "campaigns": len(campaigns),
         "receipt_files": sum(len(rows) for rows in receipts.values()),
         "host_pinned_interpreters": len(interpreters),
         "absent_interpreters": len(absent),
         "uncovered_campaigns": len(evidence),
+        "campaigns_without_value_analysis": len(unmeasured),
+        "tests_that_kill_nothing": len(inert),
         "interpreters": sorted(interpreters, key=lambda row: row["campaign_id"]),
         "evidence": sorted(evidence, key=lambda row: row["campaign_id"]),
+        "unmeasured": sorted(unmeasured, key=lambda row: row["campaign_id"]),
+        "inert_tests": sorted(
+            inert, key=lambda row: (row["campaign_id"], row["nodeid"])
+        ),
     }
 
 
@@ -248,6 +349,8 @@ BASELINE_KEYS = (
     "unloadable_manifests",
     "host_pinned_interpreters",
     "uncovered_campaigns",
+    "campaigns_without_value_analysis",
+    "tests_that_kill_nothing",
 )
 PATCH_KEYS = ("stale_mutations", "unloadable_manifests")
 
@@ -278,7 +381,7 @@ def _load_baseline(path: Path, repo_root: Path) -> dict[str, set[str]]:
 def _findings(
     patches: Mapping[str, Any], repro: Mapping[str, Any]
 ) -> dict[str, set[str]]:
-    """Every finding across the three dimensions, as comparable ids."""
+    """Every finding across every dimension, as comparable ids."""
 
     return {
         "stale_mutations": {
@@ -289,6 +392,12 @@ def _findings(
             str(row["campaign_id"]) for row in repro["interpreters"]
         },
         "uncovered_campaigns": {str(row["campaign_id"]) for row in repro["evidence"]},
+        "campaigns_without_value_analysis": {
+            str(row["campaign_id"]) for row in repro["unmeasured"]
+        },
+        "tests_that_kill_nothing": {
+            f"{row['campaign_id']}::{row['nodeid']}" for row in repro["inert_tests"]
+        },
     }
 
 
@@ -407,7 +516,8 @@ def _write_baseline(path: Path, repo_root: Path, found: Mapping[str, set[str]]) 
         "schema_version": 1,
         "note": (
             "Registered mutants and campaigns that are not reproducible on a fresh "
-            "checkout. This file is a ratchet: mutation_patch_audit fails on any id "
+            "checkout, plus the campaigns and tests nothing has measured to be worth "
+            "running. This file is a ratchet: mutation_patch_audit fails on any id "
             "that appears and is not listed here, and on any id listed here that no "
             "longer fails. It only ever shrinks."
         ),
@@ -476,7 +586,7 @@ def main(argv: list[str] | None = None) -> int:
         result["reproducibility"] = {
             key: value
             for key, value in repro.items()
-            if key not in ("interpreters", "evidence")
+            if key not in ("interpreters", "evidence", "unmeasured", "inert_tests")
         }
     print(json.dumps(result, indent=2, sort_keys=True))
     if any(
