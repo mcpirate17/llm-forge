@@ -1,21 +1,31 @@
-"""Branch policy: naming, fast-forward integration pushes, and claim binding.
+"""Branch policy: naming, claim binding, and the rules checkable without a push.
 
-Encodes the rules that the 2026-08-29 governance reset requires so a pre-push hook can
-enforce them instead of relying on agents to self-police:
+Encodes the rules the 2026-08-29 governance reset requires. They were originally
+written to be enforced by a pre-push hook. Git hooks are disabled in this repo on
+purpose (``core.hooksPath`` -> ``.git/governance/nohooks``, see that README), so the
+hook never ran and the push-decision half of this module sat with no caller for
+eight days. That half is gone as of 2026-09-06 -- deleted rather than tested, on
+Tim's decision. What remains is checked *at rest*, by ``audit_repo`` below, which
+runs on demand instead of waiting for a hook that will not fire.
 
-1. Exactly one integration branch (``w7-trident-program``) plus its mirror (``master``).
-   Both are fast-forward only.
-2. Feature branches are named ``<agent>/<topic>-<yyyymmdd>``.
+Rules and where each is checked now:
+
+1. Exactly one integration branch (``master``; ``w7-trident-program`` is retired but
+   still recognised). It may not diverge from its remote -- ``audit_repo``.
+2. Feature branches are named ``<agent>/<topic>-<yyyymmdd>`` -- ``audit_repo``, and
+   ``bind_branch`` refuses an unparseable name.
 3. A feature branch is bound to one claim id; an agent may not fan out a second live
-   branch onto the same claim (the failure mode this module exists to close).
-4. A non-fast-forward update to a feature branch requires ``--force-with-lease``; a bare
-   ``--force`` is refused, and so is an update whose force mode this process cannot
-   establish (see ``detect_force_mode``).
+   branch onto the same claim (the failure mode this module exists to close) --
+   ``bind_branch`` at write time, ``audit_repo`` for drift after the fact.
+4. *(withdrawn)* A non-fast-forward feature push required ``--force-with-lease``.
+   This one is genuinely unenforceable at rest: nothing in the repo records how a
+   push was invoked, and the old code guessed by reading the parent process's
+   ``/proc/<ppid>/cmdline``. It needs a hook to mean anything. It is not enforced,
+   and this module no longer pretends otherwise.
 5. ``merged_branches`` names feature branches already an ancestor of the integration
-   branch -- safe to delete.
-6. An integration branch may not receive a commit that exists on no other pushed ref
-   (``refs/remotes/*`` or ``refs/snapshots/**``) -- i.e. direct, unreviewed commits to
-   the integration line are refused even when the push itself is a fast-forward.
+   branch -- safe to delete. Reported by ``workspace_hygiene``.
+6. Commits on no other pushed ref -- ``local_only_commits``, reported by
+   ``workspace_hygiene.local_only_commit_exposure``.
 
 Library API plus ``python -m conductor.branch_policy <subcommand>`` CLI; see ``main()``
 for the subcommand list. Reports and refusals only -- this module never deletes a ref,
@@ -26,7 +36,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -34,12 +43,8 @@ from pathlib import Path
 from typing import Sequence
 
 from conductor._native import (
-    branch_policy_evaluate_feature_push_native,
-    branch_policy_evaluate_integration_push_native,
-    branch_policy_force_mode_from_tokens_native,
     branch_policy_second_branch_conflict_native,
     branch_policy_stamp_age_hours_native,
-    branch_policy_suggest_name_native,
     branch_policy_validate_bindings_native,
     branch_policy_validate_name_native,
 )
@@ -95,11 +100,6 @@ class ParsedBranch:
     agent: str
     topic: str
     date: str
-
-
-def suggest_branch_name(name: str) -> str:
-    """Best-effort corrected name for an error message. Never authoritative."""
-    return branch_policy_suggest_name_native(name, datetime.now(UTC).strftime("%Y%m%d"))
 
 
 def validate_branch_name(name: str) -> ParsedBranch:
@@ -246,16 +246,14 @@ def load_bindings(repo: Path) -> tuple[BranchBinding, ...]:
     return tuple(BranchBinding(**row) for row in rows)
 
 
-def _write_bindings(repo: Path, bindings: Sequence[BranchBinding]) -> Path:
-    path = binding_store_path(repo)
+def _write_bindings(repo: Path, bindings: Sequence[BranchBinding]) -> None:
     write_json_atomic(
-        path,
+        binding_store_path(repo),
         {
             "schema_version": BRANCH_BINDINGS_SCHEMA_VERSION,
             "bindings": [asdict(binding) for binding in bindings],
         },
     )
-    return path
 
 
 def bind_branch(
@@ -296,32 +294,6 @@ def unbind_branch(repo: Path, *, branch: str) -> bool:
     return True
 
 
-def record_push(
-    repo: Path, *, branch: str, when: datetime | None = None
-) -> BranchBinding | None:
-    """Stamp ``last_push_at`` on an existing binding after an ALLOWED push. No-op if unbound."""
-    existing = load_bindings(repo)
-    moment = (when or datetime.now(UTC)).isoformat()
-    updated: list[BranchBinding] = []
-    found: BranchBinding | None = None
-    for binding in existing:
-        if binding.branch == branch:
-            found = BranchBinding(
-                branch=binding.branch,
-                claim_id=binding.claim_id,
-                owner=binding.owner,
-                created_at=binding.created_at,
-                last_push_at=moment,
-                pr_number=binding.pr_number,
-            )
-            updated.append(found)
-        else:
-            updated.append(binding)
-    if found is not None:
-        _write_bindings(repo, updated)
-    return found
-
-
 def binding_is_stale(binding: BranchBinding, *, now: datetime) -> bool:
     """No push in ``STALE_PUSH_HOURS`` is stale regardless of PR state (offline signal)."""
     reference = binding.last_push_at or binding.created_at
@@ -329,132 +301,55 @@ def binding_is_stale(binding: BranchBinding, *, now: datetime) -> bool:
     return hours > STALE_PUSH_HOURS
 
 
-def _force_mode_from_tokens(tokens: Sequence[str]) -> str:
-    """Pure token-classification core of ``detect_force_mode`` (unit-testable)."""
-    return branch_policy_force_mode_from_tokens_native(list(tokens))
+def audit_repo(repo: Path) -> tuple[str, ...]:
+    """Every branch-policy rule that can be decided with no push in flight.
 
-
-def detect_force_mode() -> str:
-    """Best-effort read of the parent git process's argv (Linux ``/proc`` only).
-
-    Git's pre-push hook protocol does not pass the ``--force``/``--force-with-lease``
-    flag to the hook via argv or env -- there is no portable signal. On Linux the
-    invoking ``git push`` process is our parent, so its ``/proc/<ppid>/cmdline`` is a
-    best-effort proxy. Returns one of "lease", "bare", "none" (push seen, no force
-    flag), or "unknown" (detection was not possible; callers must not treat this as
-    "no force flag" -- see ``evaluate_push``).
+    One string per violation, empty when the repo is clean. Rules 1-3 of the module
+    docstring; rule 4 is unenforceable without a hook and rules 5-6 are reported by
+    ``workspace_hygiene``, which already renders them for a human.
     """
-    try:
-        raw = Path(f"/proc/{os.getppid()}/cmdline").read_bytes()
-    except OSError:
-        return "unknown"
-    tokens = [part.decode("utf-8", "replace") for part in raw.split(b"\x00") if part]
-    return _force_mode_from_tokens(tokens)
-
-
-def _missing_provenance(
-    repo: Path, *, branch: str, remote_old: str, remote_new: str
-) -> tuple[str, ...]:
-    """Commits about to land on an integration branch present on no OTHER pushed ref."""
-    other_refs = [
-        ref for ref in _refs(repo, "refs/remotes") if not ref.endswith(f"/{branch}")
-    ]
-    other_refs += _refs(repo, "refs/snapshots")
-    exclude = other_refs if remote_old in ("", _ZERO_SHA) else [remote_old, *other_refs]
-    args = ["rev-list", remote_new, "--not", *exclude]
-    return tuple(line for line in _run_git(repo, args).splitlines() if line)
-
-
-@dataclass(frozen=True, slots=True)
-class PushDecision:
-    allowed: bool
-    branch: str
-    force_mode: str
-    reasons: tuple[str, ...]
-
-
-def evaluate_push(
-    repo: Path,
-    *,
-    branch: str,
-    remote_old: str,
-    remote_new: str,
-    declared_force_with_lease: bool = False,
-    declared_force: bool = False,
-) -> PushDecision:
-    """The full pre-push decision for one ref update. Never mutates state."""
-    if declared_force_with_lease and declared_force:
-        raise BranchPolicyError("pass at most one of --force-with-lease / --force")
-    force_mode = (
-        "lease"
-        if declared_force_with_lease
-        else "bare"
-        if declared_force
-        else detect_force_mode()
-    )
-    fast_forward = is_fast_forward(repo, old=remote_old, new=remote_new)
-    reasons: list[str] = []
-    if is_integration_branch(branch):
-        reasons.extend(
-            _evaluate_integration_push(
-                repo, branch, remote_old, remote_new, fast_forward
-            )
-        )
-    else:
-        reasons.extend(_evaluate_feature_push(repo, branch, fast_forward, force_mode))
-    return PushDecision(
-        allowed=not reasons,
-        branch=branch,
-        force_mode=force_mode,
-        reasons=tuple(reasons),
-    )
-
-
-def _evaluate_integration_push(
-    repo: Path, branch: str, remote_old: str, remote_new: str, fast_forward: bool
-) -> list[str]:
-    # The provenance rev-list only runs when the push is actually a fast-forward,
-    # exactly as before; the refusal text is Rust's.
-    if fast_forward:
-        missing = list(
-            _missing_provenance(
-                repo, branch=branch, remote_old=remote_old, remote_new=remote_new
-            )
-        )
-    else:
-        missing = []
-    return branch_policy_evaluate_integration_push_native(
-        branch, remote_old, remote_new, fast_forward, missing
-    )
-
-
-def _evaluate_feature_push(
-    repo: Path, branch: str, fast_forward: bool, force_mode: str
-) -> list[str]:
-    """Refusal reasons for a feature-branch push. Decision text comes from Rust."""
-    store_text = _read_binding_store_text(repo)
+    findings: list[str] = []
     live = [ref.removeprefix("refs/heads/") for ref in _refs(repo, "refs/heads")]
-    try:
-        return branch_policy_evaluate_feature_push_native(
-            branch,
-            fast_forward,
-            force_mode,
-            datetime.now(UTC).strftime("%Y%m%d"),
-            store_text,
-            live,
-        )
-    except ValueError as exc:
-        raise BranchPolicyError(str(exc)) from exc
+
+    # Rule 1: an integration branch must not have diverged from its remote.
+    for name in live:
+        if not is_integration_branch(name):
+            continue
+        remote = f"refs/remotes/origin/{name}"
+        if remote not in _refs(repo, "refs/remotes/origin"):
+            continue
+        if not is_fast_forward(repo, old=remote, new=name):
+            findings.append(
+                f"rule 1: integration branch {name!r} has diverged from origin/{name}; "
+                "landing it would rewrite the integration line"
+            )
+
+    # Rule 2: every live feature branch parses as <agent>/<topic>-<yyyymmdd>.
+    for name in live:
+        if is_integration_branch(name):
+            continue
+        try:
+            validate_branch_name(name)
+        except BranchPolicyError as exc:
+            # Every naming refusal already carries its own suggested name.
+            findings.append(f"rule 2: branch {name!r} is misnamed: {exc}")
+
+    # Rule 3: no claim carries more than one live branch.
+    by_claim: dict[str, list[str]] = {}
+    for binding in load_bindings(repo):
+        if binding.branch in live:
+            by_claim.setdefault(binding.claim_id, []).append(binding.branch)
+    for claim_id, branches in sorted(by_claim.items()):
+        if len(branches) > 1:
+            findings.append(
+                f"rule 3: claim {claim_id} has {len(branches)} live branches "
+                f"({', '.join(sorted(branches))}); one claim, one branch"
+            )
+
+    return tuple(findings)
 
 
 # --------------------------------------------------------------------------- CLI
-
-
-def _rev_parse_or_zero(repo: Path, ref: str) -> str:
-    completed = subprocess.run(
-        ["git", "rev-parse", ref], cwd=repo, capture_output=True, text=True, check=False
-    )
-    return completed.stdout.strip() if completed.returncode == 0 else _ZERO_SHA
 
 
 def _cmd_check_branch(args: argparse.Namespace) -> int:
@@ -473,85 +368,6 @@ def _cmd_check_branch(args: argparse.Namespace) -> int:
             f"OK: {args.name} -> agent={parsed.agent} topic={parsed.topic} date={parsed.date}"
         )
     return 0
-
-
-def _stdin_ref_updates() -> list[tuple[str, str, str, str]]:
-    """Parse git's pre-push hook stdin protocol.
-
-    Git feeds a real pre-push hook one line per ref update: ``<local ref> <local sha1>
-    <remote ref> <remote sha1>``. It does NOT pass ``--branch`` -- that flag exists for
-    manual/test invocation of this CLI. When stdin is a TTY (nothing piped in) there is
-    nothing to read; an empty list means "no ref updates", not "read failed".
-    """
-    import sys
-
-    if sys.stdin.isatty():
-        return []
-    updates: list[tuple[str, str, str, str]] = []
-    for line in sys.stdin:
-        parts = line.split()
-        if len(parts) == 4:
-            updates.append((parts[0], parts[1], parts[2], parts[3]))
-    return updates
-
-
-def _decide_explicit(repo: Path, args: argparse.Namespace) -> PushDecision:
-    remote_ref = args.remote_ref or f"refs/remotes/origin/{args.branch}"
-    remote_old = _rev_parse_or_zero(repo, remote_ref)
-    remote_new = _run_git(repo, ["rev-parse", args.branch]).strip()
-    return evaluate_push(
-        repo,
-        branch=args.branch,
-        remote_old=remote_old,
-        remote_new=remote_new,
-        declared_force_with_lease=args.force_with_lease,
-        declared_force=args.force,
-    )
-
-
-def _decide_from_update(
-    repo: Path, update: tuple[str, str, str, str], args: argparse.Namespace
-) -> PushDecision:
-    local_ref, local_sha, _remote_ref, remote_sha = update
-    branch = local_ref.removeprefix("refs/heads/")
-    return evaluate_push(
-        repo,
-        branch=branch,
-        remote_old=remote_sha,
-        remote_new=local_sha,
-        declared_force_with_lease=args.force_with_lease,
-        declared_force=args.force,
-    )
-
-
-def _report_decision(decision: PushDecision, *, as_json: bool) -> None:
-    if as_json:
-        print(json.dumps(asdict(decision)))
-    elif decision.allowed:
-        print(f"ALLOW: {decision.branch} (force_mode={decision.force_mode})")
-    else:
-        print(f"REFUSE: {decision.branch}")
-        for reason in decision.reasons:
-            print(f"  - {reason}")
-
-
-def _cmd_check_push(args: argparse.Namespace) -> int:
-    """``--branch`` given: single explicit decision (manual/test use). Otherwise: read
-    git's real pre-push stdin protocol, one decision per ref update (hook use)."""
-    repo = Path.cwd()
-    if args.branch:
-        decisions = [_decide_explicit(repo, args)]
-    else:
-        updates = _stdin_ref_updates()
-        if not updates:
-            print("no ref updates on stdin; nothing to check")
-            return 0
-        decisions = [_decide_from_update(repo, update, args) for update in updates]
-    for decision in decisions:
-        if decision.allowed and not is_integration_branch(decision.branch):
-            record_push(repo, branch=decision.branch)
-        _report_decision(decision, as_json=args.json)
-    return 0 if all(decision.allowed for decision in decisions) else 1
 
 
 def _cmd_bind(args: argparse.Namespace) -> int:
@@ -581,6 +397,19 @@ def _cmd_unbind(args: argparse.Namespace) -> int:
     else:
         print(f"{'UNBOUND' if removed else 'NO BINDING'}: {args.branch}")
     return 0 if removed else 1
+
+
+def _cmd_audit(args: argparse.Namespace) -> int:
+    findings = audit_repo(Path.cwd())
+    if args.json:
+        print(json.dumps({"ok": not findings, "findings": list(findings)}))
+    elif not findings:
+        print("OK: no branch-policy violations")
+    else:
+        print(f"VIOLATIONS: {len(findings)}")
+        for finding in findings:
+            print(f"  - {finding}")
+    return 1 if findings else 0
 
 
 def _cmd_status(args: argparse.Namespace) -> int:
@@ -635,18 +464,11 @@ def main(argv: list[str] | None = None) -> int:
     check_branch.add_argument("--json", action="store_true")
     check_branch.set_defaults(func=_cmd_check_branch)
 
-    check_push = sub.add_parser("check-push", help="the full pre-push decision")
-    check_push.add_argument(
-        "--branch",
-        default=None,
-        help="explicit single-branch mode; omit to read git's pre-push stdin protocol",
+    audit = sub.add_parser(
+        "audit", help="check every rule decidable without a push; exits 1 on violations"
     )
-    check_push.add_argument("--remote-ref", default=None)
-    force_group = check_push.add_mutually_exclusive_group()
-    force_group.add_argument("--force-with-lease", action="store_true")
-    force_group.add_argument("--force", action="store_true")
-    check_push.add_argument("--json", action="store_true")
-    check_push.set_defaults(func=_cmd_check_push)
+    audit.add_argument("--json", action="store_true")
+    audit.set_defaults(func=_cmd_audit)
 
     bind = sub.add_parser("bind", help="bind a branch to a claim id")
     bind.add_argument("--branch", required=True)

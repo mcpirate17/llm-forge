@@ -100,8 +100,8 @@ def _write_binding_row(repo: Path, *, branch: str, claim_id: str, owner: str) ->
     """Append a binding row straight to the store, bypassing bind_branch's own guard.
 
     Used to simulate a fan-out that already happened (e.g. a hand-edited store, or a
-    binding written before the guard existed) so evaluate_push's independent, push-time
-    re-check of the same rule can be exercised on its own.
+    binding written before the guard existed) so ``audit_repo``'s independent,
+    after-the-fact re-check of the same rule can be exercised on its own.
     """
     path = bp.binding_store_path(repo)
     existing = (
@@ -196,19 +196,6 @@ class TestValidateBranchName:
         ):
             with pytest.raises(bp.BranchPolicyError, match=r"try '"):
                 bp.validate_branch_name(bad)
-
-    def test_suggest_branch_name_is_itself_valid(self) -> None:
-        for bad in (
-            "nodate",
-            "Claude/topic-20260829",
-            "claude/topic-20260229",
-            "bad name here",
-            # an agent slug that survives slugification but still starts with a
-            # digit: the suggestion must prefix it, or it is not itself valid.
-            "9team/topic-20260829",
-        ):
-            suggestion = bp.suggest_branch_name(bad)
-            bp.validate_branch_name(suggestion)  # must not raise
 
 
 class TestIsIntegrationBranch:
@@ -406,6 +393,19 @@ class TestBranchClaimBinding:
 
 
 class TestBindingStore:
+    def test_store_lives_at_the_governance_path_other_tooling_reads(
+        self, repo: Path
+    ) -> None:
+        """The location is a contract, not an implementation detail.
+
+        Every test below reaches the store through ``binding_store_path``, so a
+        mutant that empties either path segment moves the store and stays green in
+        all of them. This is the one test that names the location outright.
+        """
+        assert bp.binding_store_path(repo) == (
+            bp.git_common_dir(repo) / "governance" / "branch-bindings.json"
+        )
+
     def test_load_bindings_missing_file_is_empty(self, repo: Path) -> None:
         assert bp.load_bindings(repo) == ()
 
@@ -512,27 +512,7 @@ class TestBindingStore:
         assert bp.unbind_branch(repo, branch="claude/none-20260829") is False
 
 
-class TestRecordPushAndStaleness:
-    def test_record_push_updates_existing_binding(self, repo: Path) -> None:
-        _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-20260829")
-        bp.bind_branch(
-            repo, branch="claude/topic-20260829", claim_id="c1", owner="claude"
-        )
-        when = datetime(2026, 8, 29, 12, 0, tzinfo=UTC)
-        updated = bp.record_push(repo, branch="claude/topic-20260829", when=when)
-        assert updated is not None
-        assert updated.last_push_at == when.isoformat()
-
-    def test_record_push_noop_for_unbound_branch(self, repo: Path) -> None:
-        # another branch IS bound: a no-op must still return None rather than
-        # reach for whatever binding happens to be in the store.
-        _checkout_new(repo, "claude/other-20260829")
-        bp.bind_branch(
-            repo, branch="claude/other-20260829", claim_id="c1", owner="claude"
-        )
-        assert bp.record_push(repo, branch="claude/none-20260829") is None
-
+class TestBindingStaleness:
     def _binding(self, *, created_at: datetime) -> bp.BranchBinding:
         return bp.BranchBinding(
             branch="claude/topic-20260829",
@@ -563,237 +543,97 @@ class TestRecordPushAndStaleness:
         assert bp.binding_is_stale(binding, now=now) is True
 
 
-# --------------------------------------------------------------------------- force-mode detection
+# --------------------------------------------------------------------------- at-rest audit
 
 
-class TestForceModeFromTokens:
-    def test_no_push_token_is_unknown(self) -> None:
-        assert bp._force_mode_from_tokens(["git", "status"]) == "unknown"
+class TestAuditRepo:
+    """``audit_repo`` replaces the deleted pre-push guard for the rules that survive.
 
-    def test_push_with_no_flags_is_none(self) -> None:
-        assert bp._force_mode_from_tokens(["git", "push", "origin", "main"]) == "none"
+    Rule 4 (force mode) has no test because it has no implementation: it cannot be
+    decided without the push command line, and the module says so rather than
+    guessing from ``/proc``.
+    """
 
-    def test_push_with_force_with_lease_is_lease(self) -> None:
-        assert (
-            bp._force_mode_from_tokens(["git", "push", "--force-with-lease"]) == "lease"
-        )
-
-    def test_push_with_force_with_lease_equals_ref_is_lease(self) -> None:
-        assert (
-            bp._force_mode_from_tokens(
-                ["git", "push", "--force-with-lease=refs/heads/x:abc"]
-            )
-            == "lease"
-        )
-
-    def test_push_with_bare_long_force_is_bare(self) -> None:
-        assert bp._force_mode_from_tokens(["git", "push", "--force"]) == "bare"
-
-    def test_push_with_bare_short_force_is_bare(self) -> None:
-        assert bp._force_mode_from_tokens(["git", "push", "-f"]) == "bare"
-
-    def test_lease_checked_before_bare_when_both_present(self) -> None:
-        # Malformed in practice, but proves lease detection isn't short-circuited by a
-        # stray bare-force token earlier in argv.
-        assert (
-            bp._force_mode_from_tokens(["git", "push", "-f", "--force-with-lease"])
-            == "lease"
-        )
-
-
-# --------------------------------------------------------------------------- evaluate_push: feature branches
-
-
-class TestEvaluatePushFeatureBranch:
-    def test_fast_forward_push_allowed_regardless_of_force_mode(
-        self, repo: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_clean_repo_has_no_findings(self, repo: Path) -> None:
         _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-20260829")
-        sha = _rev_parse(repo, "claude/topic-20260829")
-        monkeypatch.setattr(bp, "detect_force_mode", lambda: "unknown")
-        decision = bp.evaluate_push(
-            repo, branch="claude/topic-20260829", remote_old=sha, remote_new=sha
-        )
-        assert decision.allowed is True
+        assert bp.audit_repo(repo) == ()
 
-    def test_non_ff_with_declared_lease_is_allowed(self, repo: Path) -> None:
+    def test_integration_branch_ahead_of_its_remote_is_silent(self, repo: Path) -> None:
+        """Ahead is a fast-forward, which is exactly what rule 1 permits."""
         base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-20260829", start=base)
-        old_tip = _commit(repo, "b.txt")
-        _git(repo, "reset", "--hard", base)
-        new_tip = _commit(repo, "c.txt")
-        decision = bp.evaluate_push(
-            repo,
-            branch="claude/topic-20260829",
-            remote_old=old_tip,
-            remote_new=new_tip,
-            declared_force_with_lease=True,
-        )
-        assert decision.allowed is True
-        assert decision.force_mode == "lease"
+        _git(repo, "update-ref", "refs/remotes/origin/master", base)
+        _commit(repo, "b.txt")
+        assert bp.audit_repo(repo) == ()
 
-    def test_non_ff_with_declared_bare_force_is_refused(self, repo: Path) -> None:
-        base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-20260829", start=base)
-        old_tip = _commit(repo, "b.txt")
-        _git(repo, "reset", "--hard", base)
-        new_tip = _commit(repo, "c.txt")
-        decision = bp.evaluate_push(
-            repo,
-            branch="claude/topic-20260829",
-            remote_old=old_tip,
-            remote_new=new_tip,
-            declared_force=True,
-        )
-        assert decision.allowed is False
-        assert any("bare --force" in r for r in decision.reasons)
-
-    def test_non_ff_with_undeclared_none_force_mode_is_refused(
-        self, repo: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-20260829", start=base)
-        old_tip = _commit(repo, "b.txt")
-        _git(repo, "reset", "--hard", base)
-        new_tip = _commit(repo, "c.txt")
-        monkeypatch.setattr(bp, "detect_force_mode", lambda: "none")
-        decision = bp.evaluate_push(
-            repo, branch="claude/topic-20260829", remote_old=old_tip, remote_new=new_tip
-        )
-        assert decision.allowed is False
-        assert any("no force flag was declared" in r for r in decision.reasons)
-
-    def test_non_ff_with_undetectable_force_mode_is_refused(
-        self, repo: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-20260829", start=base)
-        old_tip = _commit(repo, "b.txt")
-        _git(repo, "reset", "--hard", base)
-        new_tip = _commit(repo, "c.txt")
-        monkeypatch.setattr(bp, "detect_force_mode", lambda: "unknown")
-        decision = bp.evaluate_push(
-            repo, branch="claude/topic-20260829", remote_old=old_tip, remote_new=new_tip
-        )
-        assert decision.allowed is False
-        assert any("could not be established" in r for r in decision.reasons)
-
-    def test_both_force_flags_declared_raises(self, repo: Path) -> None:
-        sha = _commit(repo, "a.txt")
-        with pytest.raises(bp.BranchPolicyError, match="at most one"):
-            bp.evaluate_push(
-                repo,
-                branch="claude/topic-20260829",
-                remote_old=sha,
-                remote_new=sha,
-                declared_force_with_lease=True,
-                declared_force=True,
-            )
-
-    def test_invalid_branch_name_surfaces_as_a_reason(self, repo: Path) -> None:
-        sha = _commit(repo, "a.txt")
-        decision = bp.evaluate_push(
-            repo, branch="Bad Name", remote_old=sha, remote_new=sha
-        )
-        assert decision.allowed is False
-        assert any(
-            "invalid agent slug" in r or "no '<agent>/' segment" in r
-            for r in decision.reasons
-        )
-
-    def test_second_live_branch_same_claim_refused_at_push_time(
+    def test_integration_branch_diverged_from_its_remote_is_reported(
         self, repo: Path
     ) -> None:
         base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-a-20260829", start=base)
-        _git(repo, "checkout", "--quiet", "master")
-        _checkout_new(repo, "claude/topic-b-20260829", start=base)
-        _write_binding_row(
-            repo, branch="claude/topic-a-20260829", claim_id="c1", owner="claude"
-        )
-        _write_binding_row(
-            repo, branch="claude/topic-b-20260829", claim_id="c1", owner="claude"
-        )
-        tip = _rev_parse(repo, "claude/topic-b-20260829")
-        decision = bp.evaluate_push(
-            repo, branch="claude/topic-b-20260829", remote_old="", remote_new=tip
-        )
-        assert decision.allowed is False
-        assert any("already bound to live branch" in r for r in decision.reasons)
+        _git(repo, "update-ref", "refs/remotes/origin/master", base)
+        # Rewrite the tip: origin/master is no longer an ancestor of master, so
+        # landing this would rewrite the integration line rather than extend it.
+        _git(repo, "commit", "--quiet", "--amend", "-m", "rewritten")
+        findings = bp.audit_repo(repo)
+        assert len(findings) == 1
+        assert "rule 1" in findings[0]
+        assert "diverged" in findings[0]
 
-    def test_no_conflict_when_the_other_bound_branch_is_gone(self, repo: Path) -> None:
-        base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-b-20260829", start=base)
-        _write_binding_row(
-            repo, branch="claude/topic-a-20260829", claim_id="c1", owner="claude"
-        )
-        _write_binding_row(
-            repo, branch="claude/topic-b-20260829", claim_id="c1", owner="claude"
-        )
-        tip = _rev_parse(repo, "claude/topic-b-20260829")
-        decision = bp.evaluate_push(
-            repo, branch="claude/topic-b-20260829", remote_old="", remote_new=tip
-        )
-        assert decision.allowed is True
-
-
-# --------------------------------------------------------------------------- evaluate_push: integration branches
-
-
-class TestEvaluatePushIntegrationBranch:
-    def test_non_ff_refused_regardless_of_provenance(self, repo: Path) -> None:
-        old = _commit(repo, "a.txt")
-        new = _commit(repo, "b.txt")
-        # reversed roles => not a fast-forward
-        decision = bp.evaluate_push(
-            repo, branch="master", remote_old=new, remote_new=old
-        )
-        assert decision.allowed is False
-        assert any("fast-forward" in r for r in decision.reasons)
-
-    def test_ff_with_provenance_on_another_pushed_ref_is_allowed(
+    def test_integration_branch_with_no_remote_counterpart_is_silent(
         self, repo: Path
     ) -> None:
-        base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/feat-20260829", start=base)
-        feat_sha = _commit(repo, "feature.txt")
-        _git(repo, "update-ref", "refs/remotes/origin/claude/feat-20260829", feat_sha)
-        _git(repo, "checkout", "--quiet", "master")
-        _git(repo, "merge", "--ff-only", "--quiet", "claude/feat-20260829")
-        decision = bp.evaluate_push(
-            repo, branch="master", remote_old=base, remote_new=feat_sha
-        )
-        assert decision.allowed is True
+        """A local-only master has nothing to have diverged from -- not a violation."""
+        _commit(repo, "a.txt")
+        assert bp.audit_repo(repo) == ()
 
-    def test_ff_without_provenance_anywhere_else_is_refused(self, repo: Path) -> None:
-        base = _commit(repo, "a.txt")
-        direct = _commit(repo, "direct.txt")
-        decision = bp.evaluate_push(
-            repo, branch="master", remote_old=base, remote_new=direct
-        )
-        assert decision.allowed is False
-        assert any(
-            "not already present on any other pushed ref" in r for r in decision.reasons
-        )
+    def test_misnamed_feature_branch_is_reported(self, repo: Path) -> None:
+        _commit(repo, "a.txt")
+        _git(repo, "branch", "not-a-valid-name")
+        findings = bp.audit_repo(repo)
+        assert len(findings) == 1
+        assert "rule 2" in findings[0]
+        assert "not-a-valid-name" in findings[0]
+        # The refusal's own suggestion is the actionable half: a name to rename *to*.
+        assert "try 'not-a-valid-name/topic-" in findings[0]
 
-    def test_new_integration_ref_with_zero_old_and_no_other_refs_is_refused(
+    def test_well_named_feature_branch_is_silent(self, repo: Path) -> None:
+        _commit(repo, "a.txt")
+        _git(repo, "branch", "claude/topic-20260906")
+        assert bp.audit_repo(repo) == ()
+
+    def test_two_live_branches_on_one_claim_are_reported(self, repo: Path) -> None:
+        _commit(repo, "a.txt")
+        for branch in ("claude/first-20260906", "claude/second-20260906"):
+            _git(repo, "branch", branch)
+            _write_binding_row(repo, branch=branch, claim_id="claim-x", owner="claude")
+        findings = bp.audit_repo(repo)
+        assert len(findings) == 1
+        assert "rule 3" in findings[0]
+        assert "claim-x" in findings[0]
+        assert "claude/first-20260906" in findings[0]
+        assert "claude/second-20260906" in findings[0]
+
+    def test_one_claim_one_branch_is_silent(self, repo: Path) -> None:
+        _commit(repo, "a.txt")
+        _git(repo, "branch", "claude/only-20260906")
+        _write_binding_row(
+            repo, branch="claude/only-20260906", claim_id="claim-x", owner="claude"
+        )
+        assert bp.audit_repo(repo) == ()
+
+    def test_a_binding_whose_branch_is_gone_does_not_count_as_fan_out(
         self, repo: Path
     ) -> None:
-        sha = _commit(repo, "a.txt")
-        decision = bp.evaluate_push(
-            repo, branch="master", remote_old="", remote_new=sha
+        """Only *live* branches count -- a stale row for a deleted branch is not a
+        second branch, which is the whole point of intersecting with refs/heads."""
+        _commit(repo, "a.txt")
+        _git(repo, "branch", "claude/live-20260906")
+        _write_binding_row(
+            repo, branch="claude/live-20260906", claim_id="claim-x", owner="claude"
         )
-        assert decision.allowed is False
-
-    def test_mirror_branch_is_treated_as_integration_too(self, repo: Path) -> None:
-        old = _commit(repo, "a.txt")
-        new = _commit(repo, "b.txt")
-        decision = bp.evaluate_push(
-            repo, branch="master", remote_old=new, remote_new=old
+        _write_binding_row(
+            repo, branch="claude/deleted-20260906", claim_id="claim-x", owner="claude"
         )
-        assert decision.allowed is False
-        assert any("fast-forward" in r for r in decision.reasons)
+        assert bp.audit_repo(repo) == ()
 
 
 # --------------------------------------------------------------------------- CLI
@@ -825,74 +665,6 @@ class TestCli:
             "topic": "topic",
             "date": "20260829",
         }
-
-    def test_check_push_explicit_branch_allow(
-        self,
-        repo: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-20260829")
-        monkeypatch.chdir(repo)
-        rc = bp.main(["check-push", "--branch", "claude/topic-20260829"])
-        assert rc == 0
-        assert "ALLOW" in capsys.readouterr().out
-        assert bp.load_bindings(repo) == ()  # no binding exists, nothing to record
-
-    def test_check_push_explicit_branch_refuse(
-        self,
-        repo: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        monkeypatch.chdir(repo)
-        rc = bp.main(["check-branch", "bad name"])
-        assert rc == 1
-        capsys.readouterr()
-        # the branch must EXIST, or check-push exits 2 down the error path
-        # without ever reaching the refusal it is supposed to be testing.
-        _commit(repo, "a.txt")
-        _checkout_new(repo, "Bad_Name")
-        rc = bp.main(["check-push", "--branch", "Bad_Name"])
-        assert rc == 1
-        assert "REFUSE" in capsys.readouterr().out
-
-    def test_check_push_stdin_protocol_allow(
-        self,
-        repo: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        import io
-
-        _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-20260829")
-        tip = _rev_parse(repo, "claude/topic-20260829")
-        monkeypatch.chdir(repo)
-        stdin_line = f"refs/heads/claude/topic-20260829 {tip} refs/heads/claude/topic-20260829 {'0' * 40}\n"
-        fake_stdin = io.StringIO(stdin_line)
-        fake_stdin.isatty = lambda: False  # type: ignore[method-assign]
-        monkeypatch.setattr("sys.stdin", fake_stdin)
-        rc = bp.main(["check-push"])
-        assert rc == 0
-        assert "ALLOW" in capsys.readouterr().out
-
-    def test_check_push_no_stdin_and_no_branch_is_a_noop(
-        self,
-        repo: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        import io
-
-        monkeypatch.chdir(repo)
-        fake_stdin = io.StringIO("")
-        fake_stdin.isatty = lambda: False  # type: ignore[method-assign]
-        monkeypatch.setattr("sys.stdin", fake_stdin)
-        rc = bp.main(["check-push"])
-        assert rc == 0
-        assert "nothing to check" in capsys.readouterr().out
 
     def test_bind_and_unbind_cli(
         self,
@@ -951,3 +723,28 @@ class TestCli:
         monkeypatch.chdir(repo)
         rc = bp.main(["exposed"])
         assert rc == 0
+
+    def test_audit_exits_zero_and_says_so_on_a_clean_repo(
+        self,
+        repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _commit(repo, "a.txt")
+        monkeypatch.chdir(repo)
+        assert bp.main(["audit"]) == 0
+        assert capsys.readouterr().out.startswith("OK:")
+
+    def test_audit_exits_one_and_prints_each_violation(
+        self,
+        repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _commit(repo, "a.txt")
+        _git(repo, "branch", "Not-A-Valid-Name")
+        monkeypatch.chdir(repo)
+        assert bp.main(["audit"]) == 1
+        out = capsys.readouterr().out
+        assert "VIOLATIONS: 1" in out
+        assert "Not-A-Valid-Name" in out

@@ -213,24 +213,6 @@ fn validate_name(name: &str, today: &str) -> Result<(String, String, String, Str
     ))
 }
 
-// --------------------------------------------------------------------------- force mode
-
-fn force_mode_from_tokens(tokens: &[String]) -> String {
-    if !tokens.iter().any(|t| t == "push") {
-        return "unknown".to_owned();
-    }
-    if tokens
-        .iter()
-        .any(|t| t == "--force-with-lease" || t.starts_with("--force-with-lease="))
-    {
-        return "lease".to_owned();
-    }
-    if tokens.iter().any(|t| t == "--force" || t == "-f") {
-        return "bare".to_owned();
-    }
-    "none".to_owned()
-}
-
 // --------------------------------------------------------------------------- stamps
 
 /// Civil-date to days since the epoch (Howard Hinnant's algorithm); valid for the
@@ -523,88 +505,6 @@ fn second_branch_conflict(
         })
 }
 
-// --------------------------------------------------------------------------- decisions
-
-fn feature_push_reasons(
-    branch: &str,
-    fast_forward: bool,
-    force_mode: &str,
-    today: &str,
-    store_text: Option<&str>,
-    live: &[String],
-) -> Result<Vec<String>, String> {
-    let mut reasons = Vec::new();
-    if let Err(message) = validate_name(branch, today) {
-        reasons.push(message);
-    }
-    if !fast_forward {
-        if force_mode == "bare" {
-            reasons.push(format!(
-                "non-fast-forward push to {} used a bare --force; \
-                 policy requires --force-with-lease",
-                python_repr(branch),
-            ));
-        } else if force_mode != "lease" {
-            let detail = if force_mode == "none" {
-                "no force flag was declared".to_owned()
-            } else {
-                "force mode could not be established from hook context (git's \
-                 pre-push protocol exposes no argv/env for it); re-run explicitly as \
-                 `check-push --force-with-lease` once lease safety is confirmed"
-                    .to_owned()
-            };
-            reasons.push(format!(
-                "non-fast-forward push to {} is refused by default: {detail}",
-                python_repr(branch),
-            ));
-        }
-    }
-    let bindings = validate_store(store_text.unwrap_or(EMPTY_STORE))?;
-    if let Some(binding) = bindings.iter().find(|b| b.branch == branch) {
-        if let Some(conflict) = second_branch_conflict(live, &bindings, branch, &binding.claim_id) {
-            reasons.push(conflict);
-        }
-    }
-    Ok(reasons)
-}
-
-fn integration_push_reasons(
-    branch: &str,
-    remote_old: &str,
-    remote_new: &str,
-    fast_forward: bool,
-    missing: &[String],
-) -> Vec<String> {
-    if !fast_forward {
-        let old_prefix = if remote_old.is_empty() {
-            "(new)".to_owned()
-        } else {
-            remote_old.chars().take(8).collect()
-        };
-        return vec![format!(
-            "integration branch {} requires a fast-forward push; {} is not an ancestor of {}",
-            python_repr(branch),
-            old_prefix,
-            remote_new.chars().take(8).collect::<String>(),
-        )];
-    }
-    if missing.is_empty() {
-        return Vec::new();
-    }
-    vec![format!(
-        "integration branch {} would carry {} commit(s) not already present on any other \
-         pushed ref: {}",
-        python_repr(branch),
-        missing.len(),
-        missing
-            .iter()
-            .take(5)
-            .map(|sha| sha.chars().take(8).collect::<String>())
-            .collect::<Vec<_>>()
-            .join(", "),
-    )]
-}
-
 // --------------------------------------------------------------------------- pyo3
 
 #[pyfunction]
@@ -613,16 +513,6 @@ fn branch_policy_validate_name_native(
     today: &str,
 ) -> PyResult<(String, String, String, String)> {
     validate_name(name, today).map_err(PyValueError::new_err)
-}
-
-#[pyfunction]
-fn branch_policy_suggest_name_native(name: &str, today: &str) -> String {
-    suggest_branch_name(name, today)
-}
-
-#[pyfunction]
-fn branch_policy_force_mode_from_tokens_native(tokens: Vec<String>) -> String {
-    force_mode_from_tokens(&tokens)
 }
 
 /// Hours between ``stamp`` and ``now`` as f64. Invalid stamps raise ``ValueError``
@@ -666,45 +556,9 @@ fn branch_policy_second_branch_conflict_native(
     ))
 }
 
-#[pyfunction]
-fn branch_policy_evaluate_feature_push_native(
-    branch: &str,
-    fast_forward: bool,
-    force_mode: &str,
-    today: &str,
-    store_text: Option<&str>,
-    live_branches: Vec<String>,
-) -> PyResult<Vec<String>> {
-    feature_push_reasons(
-        branch,
-        fast_forward,
-        force_mode,
-        today,
-        store_text,
-        &live_branches,
-    )
-    .map_err(PyValueError::new_err)
-}
-
-#[pyfunction]
-fn branch_policy_evaluate_integration_push_native(
-    branch: &str,
-    remote_old: &str,
-    remote_new: &str,
-    fast_forward: bool,
-    missing: Vec<String>,
-) -> Vec<String> {
-    integration_push_reasons(branch, remote_old, remote_new, fast_forward, &missing)
-}
-
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(
         branch_policy_validate_name_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(branch_policy_suggest_name_native, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        branch_policy_force_mode_from_tokens_native,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(
@@ -717,14 +571,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(
         branch_policy_second_branch_conflict_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        branch_policy_evaluate_feature_push_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        branch_policy_evaluate_integration_push_native,
         module
     )?)?;
     Ok(())
@@ -821,43 +667,6 @@ mod tests {
     }
 
     #[test]
-    fn force_mode_classification() {
-        let push = |extra: &str| -> Vec<String> {
-            ["git", "push", extra]
-                .iter()
-                .map(|s| (*s).to_owned())
-                .collect()
-        };
-        assert_eq!(
-            force_mode_from_tokens(&["git".into(), "status".into()]),
-            "unknown"
-        );
-        assert_eq!(
-            force_mode_from_tokens(&["git".into(), "push".into(), "origin".into(), "main".into()]),
-            "none"
-        );
-        assert_eq!(force_mode_from_tokens(&push("--force-with-lease")), "lease");
-        assert_eq!(
-            force_mode_from_tokens(&push("--force-with-lease=refs/heads/x:abc")),
-            "lease"
-        );
-        assert_eq!(force_mode_from_tokens(&push("--force")), "bare");
-        assert_eq!(
-            force_mode_from_tokens(&["git".into(), "push".into(), "-f".into()]),
-            "bare"
-        );
-        assert_eq!(
-            force_mode_from_tokens(&[
-                "git".into(),
-                "push".into(),
-                "-f".into(),
-                "--force-with-lease".into()
-            ]),
-            "lease"
-        );
-    }
-
-    #[test]
     fn stamps_parse_like_fromisoformat() {
         let (us, aware) = parse_stamp("2026-08-29T12:00:00+00:00").unwrap();
         assert!(aware);
@@ -929,64 +738,6 @@ mod tests {
         assert!(message.unwrap().contains("already bound to live branch"));
         let dead: Vec<String> = vec![];
         assert!(second_branch_conflict(&dead, &bindings, "claude/b-20260829", "c1").is_none());
-    }
-
-    #[test]
-    fn feature_reasons_cover_each_refusal() {
-        let empty_live: Vec<String> = vec![];
-        let bare =
-            feature_push_reasons("claude/t-20260829", false, "bare", TODAY, None, &empty_live)
-                .unwrap();
-        assert!(bare.iter().any(|r| r.contains("bare --force")));
-        let none =
-            feature_push_reasons("claude/t-20260829", false, "none", TODAY, None, &empty_live)
-                .unwrap();
-        assert!(none
-            .iter()
-            .any(|r| r.contains("no force flag was declared")));
-        let unknown = feature_push_reasons(
-            "claude/t-20260829",
-            false,
-            "unknown",
-            TODAY,
-            None,
-            &empty_live,
-        )
-        .unwrap();
-        assert!(unknown
-            .iter()
-            .any(|r| r.contains("could not be established")));
-        let bad_name =
-            feature_push_reasons("Bad Name", true, "none", TODAY, None, &empty_live).unwrap();
-        assert!(bad_name
-            .iter()
-            .any(|r| r.contains("invalid agent slug") || r.contains("no '<agent>/' segment")));
-        let ff = feature_push_reasons("claude/t-20260829", true, "none", TODAY, None, &empty_live)
-            .unwrap();
-        assert!(ff.is_empty());
-    }
-
-    #[test]
-    fn integration_reasons_match_python_messages() {
-        let reasons = integration_push_reasons("master", "abcdef12", "12345678", false, &[]);
-        assert_eq!(
-            reasons[0],
-            "integration branch 'master' requires a fast-forward push; \
-             abcdef12 is not an ancestor of 12345678"
-        );
-        let reasons = integration_push_reasons("master", "", "1234567890abcdef", false, &[]);
-        assert!(reasons[0].contains("(new) is not an ancestor"));
-        let missing: Vec<String> = [
-            "11111111", "22222222", "33333333", "44444444", "55555555", "66666666", "77777777",
-        ]
-        .iter()
-        .map(|p| format!("{p}00000000000000000000000000000000"))
-        .collect();
-        let reasons = integration_push_reasons("master", "aaaaaaaa", "bbbbbbbb", true, &missing);
-        assert!(reasons[0].contains("would carry 7 commit(s)"));
-        assert!(reasons[0].ends_with(": 11111111, 22222222, 33333333, 44444444, 55555555"));
-        let reasons = integration_push_reasons("master", "aaaaaaaa", "bbbbbbbb", true, &[]);
-        assert!(reasons.is_empty());
     }
 
     #[test]
