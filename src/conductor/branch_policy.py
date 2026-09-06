@@ -27,13 +27,22 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import subprocess
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Sequence
 
+from conductor._native import (
+    branch_policy_evaluate_feature_push_native,
+    branch_policy_evaluate_integration_push_native,
+    branch_policy_force_mode_from_tokens_native,
+    branch_policy_second_branch_conflict_native,
+    branch_policy_stamp_age_hours_native,
+    branch_policy_suggest_name_native,
+    branch_policy_validate_bindings_native,
+    branch_policy_validate_name_native,
+)
 from conductor.candidate_review.git_source import git_common_dir
 from conductor.candidate_review.model import write_json_atomic
 from conductor.candidate_review.ownership import (
@@ -62,9 +71,6 @@ INTEGRATION_BRANCHES: tuple[str, ...] = (
 )
 
 BRANCH_BINDINGS_SCHEMA_VERSION = 1
-_BINDING_FIELDS = frozenset(
-    {"branch", "claim_id", "owner", "created_at", "last_push_at", "pr_number"}
-)
 
 # A feature branch is EXPOSED (workspace_hygiene.stale_feature_branches) once it has
 # gone this long without a push, or this long without an associated PR. Defined once
@@ -72,12 +78,6 @@ _BINDING_FIELDS = frozenset(
 STALE_PUSH_HOURS = 6.0
 STALE_PR_HOURS = 24.0
 
-_AGENT_RE = re.compile(r"^[a-z][a-z0-9-]*$")
-_TAIL_RE = re.compile(r"^(?P<topic>[a-z0-9][a-z0-9-]*)-(?P<date>\d{8})$")
-_EXPECTED_SHAPE = (
-    "expected shape: <agent>/<topic>-<yyyymmdd> "
-    "(agent=[a-z][a-z0-9-]*, topic=[a-z0-9][a-z0-9-]*, date=8-digit valid calendar date)"
-)
 _ZERO_SHA = "0" * 40
 
 
@@ -97,37 +97,9 @@ class ParsedBranch:
     date: str
 
 
-def _slugify(raw: str) -> str:
-    lowered = raw.strip().lower()
-    slug = re.sub(r"[^a-z0-9-]+", "-", lowered).strip("-")
-    return re.sub(r"-{2,}", "-", slug)
-
-
 def suggest_branch_name(name: str) -> str:
     """Best-effort corrected name for an error message. Never authoritative."""
-    agent_raw, _, rest_raw = name.partition("/")
-    agent = _slugify(agent_raw) or "agent"
-    if not agent[0].isalpha():
-        agent = f"a{agent}"
-    date_match = re.search(r"(\d{8})$", rest_raw)
-    if date_match and _valid_calendar_date(date_match.group(1)):
-        date = date_match.group(1)
-        topic_raw = rest_raw[: date_match.start()].rstrip("-")
-    else:
-        date = datetime.now(UTC).strftime("%Y%m%d")
-        topic_raw = (
-            rest_raw if not date_match else rest_raw[: date_match.start()].rstrip("-")
-        )
-    topic = _slugify(topic_raw) or "topic"
-    return f"{agent}/{topic}-{date}"
-
-
-def _valid_calendar_date(date: str) -> bool:
-    try:
-        datetime.strptime(date, "%Y%m%d")
-    except ValueError:
-        return False
-    return True
+    return branch_policy_suggest_name_native(name, datetime.now(UTC).strftime("%Y%m%d"))
 
 
 def validate_branch_name(name: str) -> ParsedBranch:
@@ -136,31 +108,13 @@ def validate_branch_name(name: str) -> ParsedBranch:
     Each violated rule raises with a distinct message so a caller (or a test) can
     verify which check fired, rather than a single opaque "invalid name".
     """
-    suggestion = suggest_branch_name(name)
-    if "/" not in name:
-        raise BranchPolicyError(
-            f"branch name {name!r} has no '<agent>/' segment; {_EXPECTED_SHAPE}; "
-            f"try {suggestion!r}"
+    try:
+        raw, agent, topic, date = branch_policy_validate_name_native(
+            name, datetime.now(UTC).strftime("%Y%m%d")
         )
-    agent, _, rest = name.partition("/")
-    if not _AGENT_RE.match(agent):
-        raise BranchPolicyError(
-            f"branch name {name!r} has an invalid agent slug {agent!r}; "
-            f"{_EXPECTED_SHAPE}; try {suggestion!r}"
-        )
-    tail = _TAIL_RE.match(rest)
-    if not tail:
-        raise BranchPolicyError(
-            f"branch name {name!r} has no '<topic>-<yyyymmdd>' segment after "
-            f"'{agent}/'; {_EXPECTED_SHAPE}; try {suggestion!r}"
-        )
-    topic, date = tail["topic"], tail["date"]
-    if not _valid_calendar_date(date):
-        raise BranchPolicyError(
-            f"branch name {name!r} has an invalid calendar date {date!r} (yyyymmdd); "
-            f"{_EXPECTED_SHAPE}; try {suggestion!r}"
-        )
-    return ParsedBranch(raw=name, agent=agent, topic=topic, date=date)
+    except ValueError as exc:
+        raise BranchPolicyError(str(exc)) from exc
+    return ParsedBranch(raw=raw, agent=agent, topic=topic, date=date)
 
 
 def _run_git(repo: Path, args: Sequence[str]) -> str:
@@ -269,44 +223,27 @@ def binding_store_path(repo: Path) -> Path:
     return git_common_dir(repo) / "governance" / "branch-bindings.json"
 
 
-def _binding_from_payload(payload: object) -> BranchBinding:
-    if not isinstance(payload, dict) or set(payload) != _BINDING_FIELDS:
-        raise BranchPolicyError("branch binding has an invalid schema")
-    branch = str(payload["branch"])
-    claim_id = str(payload["claim_id"])
-    owner = str(payload["owner"])
-    created_at = str(payload["created_at"])
-    last_push_raw = payload["last_push_at"]
-    last_push_at = None if last_push_raw is None else str(last_push_raw)
-    pr_number = payload["pr_number"]
-    if pr_number is not None and not isinstance(pr_number, int):
-        raise BranchPolicyError(f"binding {branch!r} pr_number must be int or null")
-    if not branch or not claim_id or not owner or not created_at:
-        raise BranchPolicyError("branch binding is missing a required field")
-    return BranchBinding(branch, claim_id, owner, created_at, last_push_at, pr_number)
+def _read_binding_store_text(repo: Path) -> str | None:
+    """Raw binding-store text, or ``None`` when the store does not exist."""
+    path = binding_store_path(repo)
+    if not path.is_file():
+        return None
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise BranchPolicyError(f"branch binding store is unreadable: {exc}") from exc
 
 
 def load_bindings(repo: Path) -> tuple[BranchBinding, ...]:
-    path = binding_store_path(repo)
-    if not path.is_file():
+    """Parse and validate the store in Rust; the file policy stays in Python."""
+    text = _read_binding_store_text(repo)
+    if text is None:
         return ()
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise BranchPolicyError(f"branch binding store is unreadable: {exc}") from exc
-    if not isinstance(payload, dict) or set(payload) != {"schema_version", "bindings"}:
-        raise BranchPolicyError("branch binding store has an invalid top-level schema")
-    if payload["schema_version"] != BRANCH_BINDINGS_SCHEMA_VERSION or not isinstance(
-        payload["bindings"], list
-    ):
-        raise BranchPolicyError(
-            "branch binding store schema version or bindings are invalid"
-        )
-    bindings = tuple(_binding_from_payload(item) for item in payload["bindings"])
-    names = [binding.branch for binding in bindings]
-    if len(names) != len(set(names)):
-        raise BranchPolicyError("branch binding store contains duplicate branches")
-    return bindings
+        rows = json.loads(branch_policy_validate_bindings_native(text))
+    except ValueError as exc:
+        raise BranchPolicyError(str(exc)) from exc
+    return tuple(BranchBinding(**row) for row in rows)
 
 
 def _write_bindings(repo: Path, bindings: Sequence[BranchBinding]) -> Path:
@@ -321,31 +258,6 @@ def _write_bindings(repo: Path, bindings: Sequence[BranchBinding]) -> Path:
     return path
 
 
-def _second_branch_conflict(
-    live_branches: Sequence[str],
-    existing: Sequence[BranchBinding],
-    *,
-    branch: str,
-    claim_id: str,
-) -> str | None:
-    """Refuse when ``claim_id`` is already bound to a different LIVE branch.
-
-    This is the fan-out guard: one claim id may back exactly one live branch at a time.
-    """
-    live = set(live_branches)
-    for binding in existing:
-        if (
-            binding.claim_id == claim_id
-            and binding.branch != branch
-            and binding.branch in live
-        ):
-            return (
-                f"claim {claim_id!r} is already bound to live branch {binding.branch!r}; "
-                "a second live branch on the same claim is refused"
-            )
-    return None
-
-
 def bind_branch(
     repo: Path, *, branch: str, claim_id: str, owner: str, now: datetime | None = None
 ) -> BranchBinding:
@@ -356,7 +268,9 @@ def bind_branch(
         )
     existing = load_bindings(repo)
     live = [ref.removeprefix("refs/heads/") for ref in _refs(repo, "refs/heads")]
-    conflict = _second_branch_conflict(live, existing, branch=branch, claim_id=claim_id)
+    conflict = branch_policy_second_branch_conflict_native(
+        live, _read_binding_store_text(repo), branch, claim_id
+    )
     if conflict is not None:
         raise BranchPolicyError(conflict)
     moment = now or datetime.now(UTC)
@@ -410,26 +324,14 @@ def record_push(
 
 def binding_is_stale(binding: BranchBinding, *, now: datetime) -> bool:
     """No push in ``STALE_PUSH_HOURS`` is stale regardless of PR state (offline signal)."""
-    reference = datetime.fromisoformat(binding.last_push_at or binding.created_at)
-    hours = (now - reference).total_seconds() / 3600.0
+    reference = binding.last_push_at or binding.created_at
+    hours = branch_policy_stamp_age_hours_native(reference, now.isoformat())
     return hours > STALE_PUSH_HOURS
 
 
 def _force_mode_from_tokens(tokens: Sequence[str]) -> str:
-    """Pure token-classification core of ``detect_force_mode`` (unit-testable).
-
-    "push" must appear in ``tokens`` at all -- otherwise we are not even looking at a
-    ``git push`` invocation and the result is "unknown", not "none".
-    """
-    if "push" not in tokens:
-        return "unknown"
-    if any(
-        t == "--force-with-lease" or t.startswith("--force-with-lease=") for t in tokens
-    ):
-        return "lease"
-    if any(t in ("--force", "-f") for t in tokens):
-        return "bare"
-    return "none"
+    """Pure token-classification core of ``detect_force_mode`` (unit-testable)."""
+    return branch_policy_force_mode_from_tokens_native(list(tokens))
 
 
 def detect_force_mode() -> str:
@@ -511,56 +413,38 @@ def evaluate_push(
 def _evaluate_integration_push(
     repo: Path, branch: str, remote_old: str, remote_new: str, fast_forward: bool
 ) -> list[str]:
-    if not fast_forward:
-        return [
-            f"integration branch {branch!r} requires a fast-forward push; "
-            f"{remote_old[:8] or '(new)'} is not an ancestor of {remote_new[:8]}"
-        ]
-    missing = _missing_provenance(
-        repo, branch=branch, remote_old=remote_old, remote_new=remote_new
+    # The provenance rev-list only runs when the push is actually a fast-forward,
+    # exactly as before; the refusal text is Rust's.
+    if fast_forward:
+        missing = list(
+            _missing_provenance(
+                repo, branch=branch, remote_old=remote_old, remote_new=remote_new
+            )
+        )
+    else:
+        missing = []
+    return branch_policy_evaluate_integration_push_native(
+        branch, remote_old, remote_new, fast_forward, missing
     )
-    if not missing:
-        return []
-    return [
-        f"integration branch {branch!r} would carry {len(missing)} commit(s) not already "
-        "present on any other pushed ref: " + ", ".join(sha[:8] for sha in missing[:5])
-    ]
 
 
 def _evaluate_feature_push(
     repo: Path, branch: str, fast_forward: bool, force_mode: str
 ) -> list[str]:
-    reasons: list[str] = []
+    """Refusal reasons for a feature-branch push. Decision text comes from Rust."""
+    store_text = _read_binding_store_text(repo)
+    live = [ref.removeprefix("refs/heads/") for ref in _refs(repo, "refs/heads")]
     try:
-        validate_branch_name(branch)
-    except BranchPolicyError as exc:
-        reasons.append(str(exc))
-    if not fast_forward:
-        if force_mode == "bare":
-            reasons.append(
-                f"non-fast-forward push to {branch!r} used a bare --force; "
-                "policy requires --force-with-lease"
-            )
-        elif force_mode != "lease":
-            detail = (
-                "no force flag was declared"
-                if force_mode == "none"
-                else "force mode could not be established from hook context (git's "
-                "pre-push protocol exposes no argv/env for it); re-run explicitly as "
-                "`check-push --force-with-lease` once lease safety is confirmed"
-            )
-            reasons.append(
-                f"non-fast-forward push to {branch!r} is refused by default: {detail}"
-            )
-    binding = next((b for b in load_bindings(repo) if b.branch == branch), None)
-    if binding is not None:
-        live = [ref.removeprefix("refs/heads/") for ref in _refs(repo, "refs/heads")]
-        conflict = _second_branch_conflict(
-            live, load_bindings(repo), branch=branch, claim_id=binding.claim_id
+        return branch_policy_evaluate_feature_push_native(
+            branch,
+            fast_forward,
+            force_mode,
+            datetime.now(UTC).strftime("%Y%m%d"),
+            store_text,
+            live,
         )
-        if conflict is not None:
-            reasons.append(conflict)
-    return reasons
+    except ValueError as exc:
+        raise BranchPolicyError(str(exc)) from exc
 
 
 # --------------------------------------------------------------------------- CLI
@@ -704,8 +588,9 @@ def _cmd_status(args: argparse.Namespace) -> int:
     now = datetime.now(UTC)
     rows = []
     for binding in load_bindings(repo):
-        reference = datetime.fromisoformat(binding.last_push_at or binding.created_at)
-        age_hours = (now - reference).total_seconds() / 3600.0
+        age_hours = branch_policy_stamp_age_hours_native(
+            binding.last_push_at or binding.created_at, now.isoformat()
+        )
         rows.append(
             {
                 **asdict(binding),

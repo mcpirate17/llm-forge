@@ -6,6 +6,7 @@
 
 mod a2a_compaction;
 mod a2a_retention;
+mod branch_policy;
 mod candidate_structure;
 mod context_telemetry;
 mod dead_tests;
@@ -28,6 +29,7 @@ use pyo3::prelude::*;
 fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     a2a_compaction::register(module)?;
     a2a_retention::register(module)?;
+    branch_policy::register(module)?;
     candidate_structure::register(module)?;
     context_telemetry::register(module)?;
     dead_tests::register(module)?;
