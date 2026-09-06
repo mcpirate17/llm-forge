@@ -14,7 +14,16 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
-from typing import Any, Callable, Container, Mapping, Protocol, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Container,
+    Mapping,
+    MutableMapping,
+    Protocol,
+    Sequence,
+    TypeVar,
+)
 
 # Imports nothing from `conductor`, so this stays circular-safe.
 from conductor.mutation_patch_apply import PatchApplyError, apply_patch_text
@@ -573,6 +582,89 @@ def plan_repin(
     except (ImportError, AttributeError, ValueError) as exc:
         raise error_type(str(exc)) from exc
     return dict(plans)
+
+
+TEST_NODEID_TABLE_KEY = "test_nodeid_table"
+_INTERNED_NODEID_FIELDS = ("failed_nodeids", "missing_nodeids", "ambiguous_nodeids")
+
+
+class ReceiptEncodingError(Exception):
+    """A receipt's interned nodeid indices do not resolve against its table."""
+
+
+def intern_test_attribution(
+    receipt: MutableMapping[str, Any], report: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Index one batch report's ranked nodeids into a table shared by the receipt.
+
+    A campaign records every ranked test's outcome for every mutant, so the same
+    ~70-character nodeid is written once per (test, mutant) pair: 3591 times in the
+    campaign that first crossed `max_file_bytes`, most of them beside the word
+    "PASSED". Interning replaces that repetition with an integer index and nothing
+    else. Outcomes, case counts and durations are carried through unchanged --
+    `test_value` reads the full pass/fail matrix to compute domination and breaks
+    the MERGE/CORE tie on `runtime_seconds_median`, so dropping either to save
+    bytes would change verdicts.
+
+    Only ranked nodeids are interned. `unmapped_cases` and `unranked_failures` name
+    cases OUTSIDE the ranked scope; they are a different, unbounded namespace and
+    stay literal so the table cannot be read as the campaign's ranked set.
+    """
+
+    table = receipt.setdefault(TEST_NODEID_TABLE_KEY, [])
+    index = {nodeid: position for position, nodeid in enumerate(table)}
+
+    def position(nodeid: str) -> int:
+        if nodeid not in index:
+            index[nodeid] = len(table)
+            table.append(nodeid)
+        return index[nodeid]
+
+    interned = dict(report)
+    tests = report.get("tests")
+    if isinstance(tests, Mapping):
+        interned["tests"] = {
+            str(position(nodeid)): dict(row) for nodeid, row in tests.items()
+        }
+    for field in _INTERNED_NODEID_FIELDS:
+        values = report.get(field)
+        if isinstance(values, list):
+            interned[field] = [position(nodeid) for nodeid in values]
+    return interned
+
+
+def expand_test_attribution(
+    receipt: Mapping[str, Any], attribution: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Resolve interned indices back to nodeids; the exact inverse of interning.
+
+    A receipt written before interning carries no table and is returned unchanged,
+    so one reader handles both encodings. An index the table cannot resolve is a
+    corrupt receipt, not a missing test, and refuses rather than guessing.
+    """
+
+    table = receipt.get(TEST_NODEID_TABLE_KEY)
+    if not isinstance(table, list):
+        return dict(attribution)
+
+    def nodeid(value: Any) -> str:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ReceiptEncodingError(f"interned nodeid is not an index: {value!r}")
+        if not 0 <= value < len(table):
+            raise ReceiptEncodingError(
+                f"interned nodeid index {value} is outside a table of {len(table)}"
+            )
+        return str(table[value])
+
+    expanded = dict(attribution)
+    tests = attribution.get("tests")
+    if isinstance(tests, Mapping):
+        expanded["tests"] = {nodeid(int(key)): dict(row) for key, row in tests.items()}
+    for field in _INTERNED_NODEID_FIELDS:
+        values = attribution.get(field)
+        if isinstance(values, list):
+            expanded[field] = [nodeid(value) for value in values]
+    return expanded
 
 
 def atomic_json(path: Path, payload: Mapping[str, Any]) -> None:

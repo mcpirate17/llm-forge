@@ -72,6 +72,7 @@ from conductor.mutation_scope import (
     _load_test_scopes as _load_test_scopes,  # noqa: PLC0414
 )
 from conductor.mutation_scope import _require_string as _require_string  # noqa: PLC0414
+from conductor.mutation_testing_support import intern_test_attribution
 from conductor.mutation_value import (
     ValueEvidenceError,
     cargo_attribution_supported,
@@ -491,7 +492,7 @@ def _run_mutants(
         }
         row["killer_attribution"] = killer_verdict(mutation, report, outcome)
         if report is not None:
-            row["test_attribution"] = report
+            row["test_attribution"] = intern_test_attribution(receipt, report)
             reports[mutation.mutation_id] = report
         receipt["mutants"].append(row)
         _atomic_json(output_path, receipt)
