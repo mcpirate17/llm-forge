@@ -12,13 +12,11 @@ from conductor.a2a_compaction import (
     COORDINATION_STATUSES,
     MAX_COMPACT_SUMMARY_BYTES,
     MAX_DATA_KIND_BYTES,
-    MAX_INPUT_MESSAGES,
     MAX_METADATA_BYTES,
     MAX_PROTOCOL_SUMMARY_BYTES,
     MAX_SUPERSEDES,
     CompactionError,
     compact_message,
-    compact_threads,
     validate_coordination_v2,
 )
 
@@ -234,118 +232,9 @@ def _assert_all_emitted_prose_labels_obey_utf8_byte_bounds() -> None:
     assert receipt["data_kind"].endswith("…")
 
 
-def _assert_oversized_row_metadata_fails_closed() -> None:
+def test_oversized_row_metadata_fails_closed() -> None:
     row = _row()
     row["sender"] = "é" * MAX_METADATA_BYTES
 
     with pytest.raises(CompactionError, match="sender"):
         compact_message(row)
-
-
-def test_thread_grouping_is_order_independent_and_preserves_provenance() -> None:
-    rows = [
-        _row(
-            "m2",
-            data=_v2(summary="second", status="resolved"),
-            created_at="2026-08-30T12:02:00+00:00",
-        ),
-        _row(
-            "m1",
-            data=_v2(summary="first", status="open"),
-            created_at="2026-08-30T12:01:00+00:00",
-        ),
-        _row("legacy", body="standalone"),
-    ]
-
-    forward = compact_threads(rows)
-    reverse = compact_threads(reversed(rows))
-
-    assert forward == reverse
-    assert forward["thread_count"] == 2
-    assert forward["message_count"] == 3
-    thread = next(t for t in forward["threads"] if t["thread_id"] == "thread-1")
-    assert thread["message_ids"] == ["m1", "m2"]
-    assert thread["actionable_message_ids"] == ["m1"]
-    assert len(thread["provenance"]) == 2
-    assert len(thread["thread_sha256"]) == 64
-    _assert_thread_detail_bound_never_omits_an_actionable_receipt()
-    _assert_supersession_edges_are_preserved_without_inferring_resolution()
-
-
-def _assert_thread_detail_bound_never_omits_an_actionable_receipt() -> None:
-    rows = [
-        _row(
-            f"m{index}",
-            data=_v2(
-                summary=f"message {index}",
-                status="open" if index < 2 else "resolved",
-            ),
-            created_at=f"2026-08-30T12:0{index}:00+00:00",
-        )
-        for index in range(4)
-    ]
-
-    digest = compact_threads(rows, max_messages_per_thread=2)
-    thread = digest["threads"][0]
-
-    assert [message["message_id"] for message in thread["messages"]] == ["m0", "m1"]
-    assert thread["message_ids"] == ["m0", "m1", "m2", "m3"]
-    assert thread["actionable_count"] == 2
-    assert thread["omitted_message_details"] == 2
-    assert len(thread["provenance"]) == 4
-
-
-def test_thread_detail_bound_fails_closed_when_actionable_messages_do_not_fit() -> None:
-    rows = [
-        _row(f"m{index}", data=_v2(summary=str(index), status="blocked"))
-        for index in range(3)
-    ]
-
-    with pytest.raises(CompactionError, match="actionable messages"):
-        compact_threads(rows, max_messages_per_thread=2)
-
-
-def _assert_supersession_edges_are_preserved_without_inferring_resolution() -> None:
-    rows = [
-        _row("old", data=_v2(summary="old", status="open")),
-        _row(
-            "new",
-            data=_v2(
-                summary="replacement",
-                status="informational",
-                supersedes=["old", "external"],
-            ),
-            created_at="2026-08-30T12:01:00+00:00",
-        ),
-    ]
-
-    thread = compact_threads(rows)["threads"][0]
-
-    assert thread["actionable_message_ids"] == ["old"]
-    assert thread["supersession_edges"] == [
-        {"message_id": "new", "supersedes": "old"},
-        {"message_id": "new", "supersedes": "external"},
-    ]
-
-
-def _assert_duplicate_rows_are_deduplicated_but_conflicts_fail_closed() -> None:
-    row = _row()
-    assert compact_threads([row, dict(row)])["message_count"] == 1
-
-    conflict = dict(row)
-    conflict["body"] = "different"
-    with pytest.raises(CompactionError, match="conflicting duplicate"):
-        compact_threads([row, conflict])
-
-
-def test_global_and_requested_bounds_fail_closed() -> None:
-    with pytest.raises(CompactionError, match="max_threads"):
-        compact_threads([_row("m1")], max_threads=0)
-    with pytest.raises(CompactionError, match="max_messages_per_thread"):
-        compact_threads([_row("m1")], max_messages_per_thread=True)
-    with pytest.raises(CompactionError, match="exceeding max_threads"):
-        compact_threads([_row("m1"), _row("m2")], max_threads=1)
-    with pytest.raises(CompactionError, match="at most"):
-        compact_threads(_row(f"m-{index}") for index in range(MAX_INPUT_MESSAGES + 1))
-    _assert_oversized_row_metadata_fails_closed()
-    _assert_duplicate_rows_are_deduplicated_but_conflicts_fail_closed()

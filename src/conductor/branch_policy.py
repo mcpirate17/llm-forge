@@ -22,8 +22,15 @@ Rules and where each is checked now:
    push was invoked, and the old code guessed by reading the parent process's
    ``/proc/<ppid>/cmdline``. It needs a hook to mean anything. It is not enforced,
    and this module no longer pretends otherwise.
-5. ``merged_branches`` names feature branches already an ancestor of the integration
-   branch -- safe to delete. Reported by ``workspace_hygiene``.
+5. *(moved, not lost)* Feature branches already an ancestor of the integration branch
+   are safe to delete. ``merged_branches`` computed that list here and
+   ``branch_claim_binding`` matched a branch's diff against its agent's live claims;
+   the docstring claimed ``workspace_hygiene`` reported them, and it never called
+   either. Both were deleted on 2026-09-06 as duplicates, not as withdrawn rules:
+   the live safe-to-delete list is ``workspace_hygiene.redundant_branches``, which is
+   wired into the exposure report and is the stricter of the two -- it refuses to call
+   a branch deletable while a worktree on it holds uncommitted work. Claim-to-branch
+   binding is owned by ``bind_branch`` / ``load_bindings`` / ``audit_repo`` below.
 6. Commits on no other pushed ref -- ``local_only_commits``, reported by
    ``workspace_hygiene.local_only_commit_exposure``.
 
@@ -50,19 +57,10 @@ from conductor._native import (
 )
 from conductor.candidate_review.git_source import git_common_dir
 from conductor.candidate_review.model import write_json_atomic
-from conductor.candidate_review.ownership import (
-    OwnershipClaim,
-    load_claims,
-    paths_overlap,
-)
 
 # The integration line. `w7-trident-program` held this until 2026-08-30, when it was
-# retired and master became the line; the constant was never moved with it. That was
-# not cosmetic: `merged_branches` and `branch_claim_binding` default to this value, and
-# with w7 deleted from every checkout they raised
-#   BranchPolicyError: git merge-base --is-ancestor <branch> w7-trident-program failed:
-#   fatal: Not a valid object name w7-trident-program
-# rather than answering, so the "safe to delete" list could not be computed at all.
+# retired and master became the line; the constant was not moved with it until
+# 2026-09-05, so every default-argument caller resolved a ref that no checkout had.
 INTEGRATION_BRANCH = "master"
 
 # Retired integration lines. They no longer exist as refs, but a name that was once the
@@ -170,42 +168,6 @@ def local_only_commits(repo: Path, branch: str = "HEAD") -> tuple[dict[str, str]
             "subject": _run_git(repo, ["log", "-1", "--format=%s", sha]).strip(),
         }
         for sha in shas
-    )
-
-
-def merged_branches(
-    repo: Path, integration_branch: str = INTEGRATION_BRANCH
-) -> tuple[str, ...]:
-    """Feature branches whose tip is an ancestor of ``integration_branch`` -- safe to delete."""
-    out = []
-    for ref in _refs(repo, "refs/heads"):
-        short = ref.removeprefix("refs/heads/")
-        if is_integration_branch(short) or short == integration_branch:
-            continue
-        if is_fast_forward(repo, old=short, new=integration_branch):
-            out.append(short)
-    return tuple(sorted(out))
-
-
-def changed_files(repo: Path, base: str, branch: str) -> tuple[str, ...]:
-    output = _run_git(repo, ["diff", "--name-only", f"{base}...{branch}"])
-    return tuple(sorted(line for line in output.splitlines() if line))
-
-
-def branch_claim_binding(
-    repo: Path, branch: str, *, integration_branch: str = INTEGRATION_BRANCH
-) -> tuple[OwnershipClaim, ...]:
-    """Active claims owned by the branch's agent whose paths intersect its changed files."""
-    parsed = validate_branch_name(branch)
-    changed = changed_files(repo, integration_branch, branch)
-    claims, _digest = load_claims(repo)
-    now = datetime.now(UTC)
-    return tuple(
-        claim
-        for claim in claims
-        if claim.owner == parsed.agent
-        and claim.active(now)
-        and any(paths_overlap(path, f) for path in claim.paths for f in changed)
     )
 
 

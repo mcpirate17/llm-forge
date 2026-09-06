@@ -10,6 +10,38 @@ from conductor import mutation_coverage
 from conductor.mutation_testing import CampaignError
 
 
+def _registry_patterns(registry_path: Path, repo_root: Path) -> tuple[str, ...]:
+    """Reach the registry-pattern native call the way production reaches it.
+
+    `discover_test_paths` folds patterns into `mutation_test_inventory_native`
+    since the 2026-08-31 Rust port (#136), which left named Python wrappers for
+    this and for `git` path listing with no caller; both were deleted 2026-09-06
+    and re-expressed here so these fail-closed cases keep their coverage.
+    """
+    from conductor._native import mutation_registry_patterns_native
+
+    return tuple(
+        mutation_coverage._native_or_campaign(
+            mutation_registry_patterns_native,
+            str(repo_root),
+            str(registry_path),
+            list(mutation_coverage.CANONICAL_TEST_PATTERNS),
+        )
+    )
+
+
+def _git_paths(repo_root: Path, args: list[str]) -> tuple[str, ...]:
+    from conductor._native import mutation_git_paths_native
+
+    return tuple(
+        mutation_coverage._native_or_campaign(
+            mutation_git_paths_native,
+            str(repo_root),
+            list(args),
+        )
+    )
+
+
 def _init_repo(path: Path) -> Path:
     path.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
@@ -147,7 +179,7 @@ def test_inventory_finds_rust_tests_no_glob_matches(tmp_path: Path) -> None:
         "pub fn two() -> u8 { 2 }\n", encoding="utf-8"
     )
 
-    patterns = mutation_coverage._registry_patterns(registry, repo)
+    patterns = _registry_patterns(registry, repo)
     # The registry's globs are why this file needs a content predicate: none of
     # them matches a Rust unit test living in the module it tests.
     assert not mutation_coverage.is_test_path(
@@ -242,29 +274,29 @@ def test_safe_relative_path_and_registry_errors(tmp_path: Path) -> None:
     outside = tmp_path / "outside.json"
     outside.write_text("{}", encoding="utf-8")
     with pytest.raises(CampaignError, match="inside the repository"):
-        mutation_coverage._registry_patterns(outside, Path("/home/tim/Projects/LLM"))
+        _registry_patterns(outside, Path("/home/tim/Projects/LLM"))
     repo = _init_repo(tmp_path / "repo")
     bad = repo / "conductor/mutation_campaigns/registry.json"
     bad.parent.mkdir(parents=True)
     bad.write_text("not json", encoding="utf-8")
     with pytest.raises(CampaignError, match="cannot load"):
-        mutation_coverage._registry_patterns(bad, repo)
+        _registry_patterns(bad, repo)
     bad.write_text("[]\n", encoding="utf-8")
     with pytest.raises(CampaignError, match="JSON object"):
-        mutation_coverage._registry_patterns(bad, repo)
+        _registry_patterns(bad, repo)
     bad.write_text('{"test_patterns": []}\n', encoding="utf-8")
     with pytest.raises(CampaignError, match="test_patterns"):
-        mutation_coverage._registry_patterns(bad, repo)
+        _registry_patterns(bad, repo)
     bad.write_text('{"test_patterns": ["never-a-test"]}\n', encoding="utf-8")
     with pytest.raises(CampaignError, match="canonical inventory"):
-        mutation_coverage._registry_patterns(bad, repo)
+        _registry_patterns(bad, repo)
 
 
 def test_git_failure_and_cache_skip(tmp_path: Path) -> None:
     not_git = tmp_path / "not-git"
     not_git.mkdir()
     with pytest.raises(CampaignError, match="git"):
-        mutation_coverage._git_paths(not_git, ["status"])
+        _git_paths(not_git, ["status"])
     assert mutation_coverage._should_skip(Path("research/cache/foo/test_x.py"))
     assert mutation_coverage._should_skip(Path(".venv/lib/test_x.py"))
 

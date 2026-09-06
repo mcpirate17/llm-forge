@@ -206,7 +206,6 @@ def test_duplicate_body_git_and_cli_fail_closed(
         "_changed_python_files",
         lambda _base_ref=None: [],
     )
-    assert check_duplicate_function_bodies._staged_python_files() == []
     monkeypatch.setattr(
         check_duplicate_function_bodies, "_duplicate_pairs", lambda _ref=None: []
     )

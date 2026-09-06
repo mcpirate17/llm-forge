@@ -1,31 +1,30 @@
 #!/usr/bin/env python3
 """Fail-closed authority boundary for local generative models.
 
-Local models are useful clerks, not reviewers or operators.  This module keeps
-the trust decision independent from any provider name: a runtime-bound
-``user`` or ``frontier_model`` authority may approve work where repository law
-allows it, while ``local_model`` never may.
+Local models are useful clerks, not reviewers or operators.  The rule is enforced
+on the *prompt* side: ``prompt_requests_authority`` detects an approval or
+operational-decision request and ``deny_local_ai_command`` refuses it when the
+runtime is local.  That is the whole of the enforcement.
+
+The verdict side -- classifying the authority attached to an approval *record* as
+``user`` / ``frontier_model`` / ``local_model`` and rejecting the last -- shipped
+here as an ``ApprovalAuthority`` enum and an ``approval_authority_allowed``
+predicate, and nothing ever called either: no approval record in this repo carries
+an authority label to check.  Both were deleted on 2026-09-06.  This is recorded
+debt, not a retired rule: if approval records grow an authority field, that check
+has to come back with a caller attached.
 """
 
 from __future__ import annotations
 
 import re
 import shlex
-from enum import StrEnum
 from pathlib import Path
 from typing import Final
 
 
 class LocalAIPolicyError(ValueError):
     """A local-model request crossed the clerical-only trust boundary."""
-
-
-class ApprovalAuthority(StrEnum):
-    """Provider-agnostic authority classes bound by the calling runtime."""
-
-    USER = "user"
-    FRONTIER_MODEL = "frontier_model"
-    LOCAL_MODEL = "local_model"
 
 
 ALLOWED_LOCAL_TASKS: Final[frozenset[str]] = frozenset(
@@ -81,16 +80,6 @@ _AUTHORITY_PATTERNS: Final[tuple[re.Pattern[str], ...]] = tuple(
         r".{0,50}\b(?:launch|relaunch|resume|continue|start|conduct|promote)\w*\b",
     )
 )
-
-
-def approval_authority_allowed(authority: str | ApprovalAuthority) -> bool:
-    """Return whether a runtime-bound authority class may approve work."""
-
-    try:
-        normalized = ApprovalAuthority(authority)
-    except ValueError:
-        return False
-    return normalized in {ApprovalAuthority.USER, ApprovalAuthority.FRONTIER_MODEL}
 
 
 def prompt_requests_authority(prompt: str) -> bool:

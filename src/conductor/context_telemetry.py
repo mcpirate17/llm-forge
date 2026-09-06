@@ -16,20 +16,6 @@ DEFAULT_PATH: Final[Path] = (
 MAX_LOG_BYTES: Final[int] = 10 * 1024 * 1024
 
 
-def model_visible_output(tool_name: str, tool_output: Any) -> Any:
-    """Project a tool response onto what the agent actually sees.
-
-    Edit and Write echo the whole file back to the hook (``originalFile``,
-    ``content``) while the agent sees a confirmation and the patch; measuring
-    the raw envelope credited Edit with 22 % of all tool bytes (2026-09-01).
-    Other tools are measured as delivered.
-    """
-
-    from conductor._native import context_telemetry_model_visible_output_native
-
-    return context_telemetry_model_visible_output_native(tool_name, tool_output)
-
-
 def event(payload: Any) -> dict[str, Any]:
     """Reduce one hook payload to counts and non-sensitive routing labels."""
 

@@ -75,10 +75,6 @@ def _changed_python_files(base_ref: str | None = None) -> list[str]:
     ]
 
 
-def _staged_python_files() -> list[str]:
-    return _changed_python_files()
-
-
 def _merge_base(from_ref: str) -> str:
     proc = _git(["merge-base", from_ref, "HEAD"])
     if proc.returncode != 0:

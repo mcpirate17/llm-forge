@@ -279,23 +279,6 @@ def _skip_vulture_source(path: PurePosixPath) -> bool:
     )
 
 
-def _stable_dup_key(first_path: str, second_path: str, fragment: str) -> str:
-    """Content-hash identity for a clone pair, stable across unrelated line drift.
-
-    Keying on the duplicated text itself (not line numbers) means an edit
-    elsewhere in either file doesn't spuriously "un-baseline" an existing,
-    already-reviewed clone pair.
-    """
-    normalized = "\n".join(line.rstrip() for line in fragment.strip("\n").splitlines())
-    from conductor._native import stable_duplicate_key_native
-
-    return stable_duplicate_key_native(
-        first_path,
-        second_path,
-        normalized.encode("utf-8", "surrogateescape"),
-    )
-
-
 def _write_baseline(path: Path, entries: list[dict], *, root: Path = ROOT) -> None:
     keyed: dict[str, dict] = {}
     for entry in entries:

@@ -192,7 +192,17 @@ def test_event_measures_edit_and_write_as_the_agent_sees_them() -> None:
     assert edit["output_bytes"] < 200
     assert write["output_bytes"] < 100
     assert bash["output_bytes"] > 10_000
-    assert telemetry.model_visible_output("Edit", "not a mapping") == "not a mapping"
+    # The projection Edit/Write get measured through: they echo the whole file back
+    # to the hook (`originalFile`, `content`) while the agent sees a confirmation and
+    # the patch, and measuring the raw envelope credited Edit with 22 % of all tool
+    # bytes (2026-09-01). `event` above is the only production caller; a Python
+    # wrapper around the same native entry point sat unused and was cut 2026-09-06.
+    from conductor._native import context_telemetry_model_visible_output_native
+
+    assert (
+        context_telemetry_model_visible_output_native("Edit", "not a mapping")
+        == "not a mapping"
+    )
 
 
 def test_hook_context_event_counts_a_deny_reason_as_injected_context() -> None:

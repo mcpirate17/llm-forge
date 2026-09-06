@@ -16,8 +16,6 @@ from typing import Any
 
 from conductor._native import (
     is_mutation_test_path_native,
-    mutation_git_paths_native,
-    mutation_registry_patterns_native,
     mutation_rust_test_surface_native,
     mutation_test_inventory_native,
     normalize_mutation_path_native,
@@ -68,17 +66,6 @@ def _safe_relative_path(value: str, label: str) -> str:
     return _native_or_campaign(normalize_mutation_path_native, value, label)
 
 
-def _registry_patterns(registry_path: Path, repo_root: Path) -> tuple[str, ...]:
-    return tuple(
-        _native_or_campaign(
-            mutation_registry_patterns_native,
-            str(repo_root),
-            str(registry_path),
-            list(CANONICAL_TEST_PATTERNS),
-        )
-    )
-
-
 def is_test_path(path: str, patterns: Sequence[str]) -> bool:
     """Return whether a repository-relative path matches mutation test patterns."""
 
@@ -105,16 +92,6 @@ def is_rust_test_surface(path: str, *, repo_root: Path = REPO_ROOT) -> bool:
     """
 
     return mutation_rust_test_surface_native(str(repo_root), path)
-
-
-def _git_paths(repo_root: Path, args: Sequence[str]) -> tuple[str, ...]:
-    return tuple(
-        _native_or_campaign(
-            mutation_git_paths_native,
-            str(repo_root),
-            list(args),
-        )
-    )
 
 
 def _should_skip(relative: PurePosixPath) -> bool:

@@ -300,7 +300,6 @@ def test_shell_unquoted_and_env_assignment() -> None:
 
 
 def test_local_ai_policy_fail_closed_edge_cases() -> None:
-    assert not local_ai_policy.approval_authority_allowed("unverified")
     with pytest.raises(local_ai_policy.LocalAIPolicyError, match="not clerical"):
         local_ai_policy.require_clerical_task("approval", "summarize notes")
     assert (

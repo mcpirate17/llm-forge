@@ -228,11 +228,6 @@ fn hook_installer_merge_install_native(
 ) -> PyResult<String> {
     let mut config =
         parse_payload(config_json, "provider config").map_err(PyValueError::new_err)?;
-    if !config.is_object() {
-        return Err(PyValueError::new_err(
-            "provider config root must be a JSON object",
-        ));
-    }
     let spec = parse_payload(spec_json, "provider spec").map_err(PyValueError::new_err)?;
     let spec_object = spec
         .as_object()
@@ -258,11 +253,9 @@ fn hook_installer_merge_install_native(
     let hooks = root
         .entry("hooks".to_owned())
         .or_insert_with(|| Value::Object(Map::new()));
-    let Some(hooks_object) = hooks.as_object_mut() else {
-        return Err(PyValueError::new_err(
-            "top-level 'hooks' must be a JSON object",
-        ));
-    };
+    let hooks_object = hooks
+        .as_object_mut()
+        .expect("without_managed_hooks refused a non-object 'hooks'");
 
     let mut hook = Map::new();
     hook.insert("type".to_owned(), Value::String("command".to_owned()));
@@ -361,8 +354,28 @@ mod tests {
         assert!(is_managed_command(&parts, managed));
         let reordered = shlex_split("python -m x --m conductor.a2a_session_start").unwrap();
         assert!(!is_managed_command(&reordered, managed));
+        // The pair only has to be adjacent, not first: a hook that carries provider
+        // flags ahead of the module is still ours.
+        let trailing =
+            shlex_split("python --provider codex -m conductor.a2a_session_start").unwrap();
+        assert!(is_managed_command(&trailing, managed));
+        // A second -m later in the argv still names us, so the scan cannot stop at
+        // the first -m it finds.
+        let second = shlex_split("python -m other.module -m conductor.a2a_session_start").unwrap();
+        assert!(is_managed_command(&second, managed));
+        // --module is a different flag; only -m binds the module argument.
+        let long_flag = shlex_split("python --module conductor.a2a_session_start x").unwrap();
+        assert!(!is_managed_command(&long_flag, managed));
         assert!(!is_managed_hook(
             &serde_json::json!({"command": "'"}),
+            managed
+        ));
+        assert!(!is_managed_hook(
+            &serde_json::json!({"command": 7}),
+            managed
+        ));
+        assert!(!is_managed_hook(
+            &serde_json::json!("not an object"),
             managed
         ));
     }

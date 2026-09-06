@@ -10,6 +10,25 @@ import pytest
 from conductor import hook_installer as installer
 
 
+def _is_managed_hook(value: object) -> bool:
+    """Recognise a hook entry this installer owns, for the assertions below.
+
+    Production strips managed hooks with ``hook_installer_without_managed_native``
+    and never needed this per-entry form; the Python copy shipped in
+    ``hook_installer`` with no caller and moved here on 2026-09-06. The adjacency
+    matrix it used to assert -- which argv shapes count as ours -- is asserted in
+    Rust against ``is_managed_command`` itself, where the behaviour lives.
+    """
+    from conductor._native import hook_installer_is_managed_native
+
+    if not isinstance(value, dict):
+        return False
+    command = value.get("command")
+    if not isinstance(command, str):
+        return False
+    return hook_installer_is_managed_native(command, installer.MANAGED_MODULE)
+
+
 def _config_path(root: Path, provider: str) -> Path:
     return root / installer.PROVIDERS[provider].relative_path
 
@@ -31,7 +50,7 @@ def _managed_commands(payload: dict[str, object]) -> list[str]:
             if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
                 continue
             for hook in group["hooks"]:
-                if isinstance(hook, dict) and installer._is_managed_hook(hook):
+                if isinstance(hook, dict) and _is_managed_hook(hook):
                     command = hook.get("command")
                     assert isinstance(command, str)
                     commands.append(command)
@@ -236,41 +255,6 @@ def test_startup_command_round_trips_adversarial_identity() -> None:
 def test_startup_command_rejects_blank_identity() -> None:
     with pytest.raises(installer.HookInstallerError, match="blank"):
         installer.startup_command(installer.PROVIDERS["codex"], identity="  ")
-
-
-def test_is_managed_hook_requires_adjacent_module_flag() -> None:
-    managed = f"{sys.executable} -m conductor.a2a_session_start --provider codex"
-    assert installer._is_managed_hook({"command": managed}) is True
-    assert (
-        installer._is_managed_hook(
-            {"command": f"{sys.executable} -m other.module --provider codex"}
-        )
-        is False
-    )
-    assert (
-        installer._is_managed_hook(
-            {
-                "command": f"{sys.executable} --provider codex -m conductor.a2a_session_start"
-            }
-        )
-        is True
-    )
-    assert (
-        installer._is_managed_hook(
-            {"command": f"{sys.executable} --module conductor.a2a_session_start x"}
-        )
-        is False
-    )
-    assert (
-        installer._is_managed_hook(
-            {
-                "command": f"{sys.executable} -m other.module -m conductor.a2a_session_start"
-            }
-        )
-        is True
-    )
-    assert installer._is_managed_hook({"command": 7}) is False
-    assert installer._is_managed_hook("not a dict") is False
 
 
 def test_merge_install_rejects_non_object_root() -> None:

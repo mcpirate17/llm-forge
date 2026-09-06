@@ -519,6 +519,47 @@ def test_evidence_scan_fails_closed_on_unsafe_inputs(
     assert _snapshot(store) == before
 
 
+def test_oversized_evidence_is_refused_before_the_file_is_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The size bound exists to refuse a huge file without loading it.
+
+    The native scanner enforces the same per-file limit, so an oversized file is
+    rejected either way and the message text is nearly identical -- only the path
+    differs (absolute from here, repository-relative from the native side). That
+    makes the refusal itself worthless as evidence that this guard ran. Sabotaging
+    ``read_bytes`` for the offending file is the discriminator: reaching the read
+    at all means the pre-read bound is gone and a multi-gigabyte receipt would be
+    pulled into memory before anything objected.
+    """
+
+    store = _make_store(tmp_path)
+    _insert_message(store, "kept")
+    reports = tmp_path / "research" / "reports"
+    reports.mkdir(parents=True)
+    path = reports / "unsafe_receipt.json"
+    path.write_text(json.dumps({"padding": "x" * retention.MAX_EVIDENCE_FILE_BYTES}))
+    resolved = path.resolve()
+    before = _snapshot(store)
+    real_read_bytes = Path.read_bytes
+
+    def guarded_read_bytes(self: Path) -> bytes:
+        if self.resolve() == resolved:
+            raise AssertionError(f"oversized evidence file was read: {self}")
+        return real_read_bytes(self)
+
+    monkeypatch.setattr(Path, "read_bytes", guarded_read_bytes)
+
+    with pytest.raises(A2aError) as excinfo:
+        _compact(store, apply=True)
+    monkeypatch.undo()
+
+    assert str(excinfo.value) == (
+        f"evidence file exceeds {retention.MAX_EVIDENCE_FILE_BYTES} bytes: {resolved}"
+    )
+    assert _snapshot(store) == before
+
+
 def test_evidence_drift_aborts_and_rolls_back_the_batch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -14,6 +14,24 @@ from conductor import run_duplicate_audit
 CPD_NAMESPACE = "https://pmd-code.org/schema/cpd-report"
 
 
+def _stable_dup_key(first_path: str, second_path: str, fragment: str) -> str:
+    """Content-hash identity for a clone pair, as the baseline stores it.
+
+    Production gets the key from ``normalize_jscpd_report_native``; the Python
+    reimplementation that shipped in ``run_duplicate_audit`` had no caller and
+    moved here on 2026-09-06, where its only job is to let these tests stub
+    ``_jscpd_collect_duplicates`` with entries the baseline round-trip accepts.
+    """
+    normalized = "\n".join(line.rstrip() for line in fragment.strip("\n").splitlines())
+    from conductor._native import stable_duplicate_key_native
+
+    return stable_duplicate_key_native(
+        first_path,
+        second_path,
+        normalized.encode("utf-8", "surrogateescape"),
+    )
+
+
 def _git(repo: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
 
@@ -309,7 +327,7 @@ def test_jscpd_live_scan_uses_git_visible_sources(
         fragment = "DUPLICATE_INDEX_SENTINEL = 1"
         return [
             {
-                "key": run_duplicate_audit._stable_dup_key(first, second, fragment),
+                "key": _stable_dup_key(first, second, fragment),
                 "firstFile": first,
                 "secondFile": second,
                 "lines": 10,
@@ -557,7 +575,7 @@ def test_baseline_count_and_entry_keys_are_validated(
 
 def _dup_entry(first: str, second: str, fragment: str, *, lines: int = 10) -> dict:
     return {
-        "key": run_duplicate_audit._stable_dup_key(first, second, fragment),
+        "key": _stable_dup_key(first, second, fragment),
         "firstFile": first,
         "secondFile": second,
         "lines": lines,
@@ -683,9 +701,7 @@ def test_jscpd_index_check_reads_staged_baseline(tmp_path: Path, monkeypatch) ->
     second.write_text(fragment + "\n", encoding="utf-8")
     _git(repo, "add", "research/first.py", "conductor/second.py")
     entry = {
-        "key": run_duplicate_audit._stable_dup_key(
-            "research/first.py", "conductor/second.py", fragment
-        ),
+        "key": _stable_dup_key("research/first.py", "conductor/second.py", fragment),
         "firstFile": "research/first.py",
         "secondFile": "conductor/second.py",
         "lines": 10,
@@ -716,9 +732,7 @@ def test_pmd_index_check_reads_staged_baseline(tmp_path: Path, monkeypatch) -> N
         run_duplicate_audit.PMD_CPD_BASELINE_RELATIVE.as_posix(),
     )
     entry = {
-        "key": run_duplicate_audit._stable_dup_key(
-            "research/first.py", "conductor/second.py", fragment
-        ),
+        "key": _stable_dup_key("research/first.py", "conductor/second.py", fragment),
         "firstFile": "research/first.py",
         "secondFile": "conductor/second.py",
         "lines": 10,

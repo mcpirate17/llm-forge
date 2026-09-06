@@ -13,38 +13,17 @@ from typing import Any, Final, Protocol, cast
 
 from conductor._native import (
     a2a_compact_message_native,
-    a2a_compact_threads_native,
     a2a_validate_coordination_v2_native,
 )
 
-SCHEMA_VERSION: Final[int] = 1
 AUTHORITY: Final[str] = "deterministic-a2a-compaction"
 
 MAX_PROTOCOL_SUMMARY_BYTES: Final[int] = 1_024
 MAX_COMPACT_SUMMARY_BYTES: Final[int] = 320
-MAX_IDENTIFIER_CHARS: Final[int] = 128
 MAX_SUPERSEDES: Final[int] = 32
-MAX_INPUT_MESSAGES: Final[int] = 256
-MAX_THREADS: Final[int] = 64
-MAX_MESSAGES_PER_THREAD: Final[int] = 8
-MAX_DETAILED_MESSAGES: Final[int] = 32
-MAX_RAW_FIELD_BYTES: Final[int] = 1 << 20
 MAX_METADATA_BYTES: Final[int] = 512
 MAX_DATA_KIND_BYTES: Final[int] = 64
 
-COORDINATION_V2_FIELDS: Final[frozenset[str]] = frozenset(
-    {
-        "kind",
-        "thread_id",
-        "summary",
-        "status",
-        "requires_response",
-        "supersedes",
-    }
-)
-COORDINATION_V2_OPTIONAL_FIELDS: Final[frozenset[str]] = frozenset(
-    COORDINATION_V2_FIELDS - {"kind"}
-)
 COORDINATION_STATUSES: Final[frozenset[str]] = frozenset(
     {
         "open",
@@ -140,19 +119,3 @@ def compact_message(row: Any) -> dict[str, Any]:
     """Return a compact, source-bound receipt for one A2A message row."""
 
     return _native_result(a2a_compact_message_native, _row_payload(row))
-
-
-def compact_threads(
-    rows: Iterable[Any],
-    *,
-    max_threads: int = MAX_THREADS,
-    max_messages_per_thread: int = MAX_MESSAGES_PER_THREAD,
-) -> dict[str, Any]:
-    """Group rows into deterministic bounded thread digests."""
-
-    request = {
-        "rows": [_row_payload(row) for row in rows],
-        "max_threads": max_threads,
-        "max_messages_per_thread": max_messages_per_thread,
-    }
-    return _native_result(a2a_compact_threads_native, request)

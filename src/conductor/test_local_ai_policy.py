@@ -20,13 +20,6 @@ def _run_hook(hook: Path, payload: dict[str, object]) -> dict[str, object]:
     return json.loads(completed.stdout)["hookSpecificOutput"]
 
 
-def test_only_user_or_frontier_may_approve() -> None:
-    assert policy.approval_authority_allowed("user") is True
-    assert policy.approval_authority_allowed("frontier_model") is True
-    assert policy.approval_authority_allowed("local_model") is False
-    assert policy.approval_authority_allowed("unknown") is False
-
-
 def test_clerical_classes_accept_low_risk_prompts() -> None:
     for task in policy.ALLOWED_LOCAL_TASKS:
         assert policy.require_clerical_task(task, "Summarize and organize these notes")

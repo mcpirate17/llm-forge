@@ -122,17 +122,6 @@ def startup_command(
     return hook_installer_shlex_join_native(command)
 
 
-def _is_managed_hook(value: Any) -> bool:
-    from conductor._native import hook_installer_is_managed_native
-
-    if not isinstance(value, dict):
-        return False
-    command = value.get("command")
-    if not isinstance(command, str):
-        return False
-    return hook_installer_is_managed_native(command, MANAGED_MODULE)
-
-
 def _without_managed_hooks(config: dict[str, Any]) -> dict[str, Any]:
     from conductor._native import hook_installer_without_managed_native
 

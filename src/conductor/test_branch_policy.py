@@ -15,9 +15,6 @@ from pathlib import Path
 import pytest
 
 from conductor import branch_policy as bp
-from conductor.candidate_review import ownership as ownership_mod
-from conductor.candidate_review.model import sha256_json
-from conductor.candidate_review.ownership import create_claim
 
 # --------------------------------------------------------------------------- fixtures
 
@@ -57,43 +54,6 @@ def _checkout_new(repo: Path, branch: str, *, start: str | None = None) -> None:
 
 def _rev_parse(repo: Path, ref: str) -> str:
     return _git(repo, "rev-parse", ref).strip()
-
-
-def _write_claim(
-    repo: Path,
-    *,
-    owner: str,
-    paths: list[str],
-    justification: str = "test claim",
-    created_at: datetime | None = None,
-    expires_at: datetime | None = None,
-) -> ownership_mod.OwnershipClaim:
-    """Write a claim directly so expiry can be placed in the past deterministically."""
-    now = datetime.now(UTC)
-    created_at = created_at or now
-    expires_at = expires_at or (now + timedelta(hours=1))
-    normalized = tuple(sorted({ownership_mod.normalize_claim_path(p) for p in paths}))
-    created_iso = created_at.isoformat()
-    expires_iso = expires_at.isoformat()
-    identity = sha256_json(
-        {
-            "owner": owner,
-            "paths": normalized,
-            "justification": justification,
-            "created_at": created_iso,
-            "expires_at": expires_iso,
-        }
-    )
-    claim = ownership_mod.OwnershipClaim(
-        claim_id=f"claim-{identity[:20]}",
-        owner=owner,
-        paths=normalized,
-        justification=justification,
-        created_at=created_iso,
-        expires_at=expires_iso,
-    )
-    ownership_mod._write_claims(repo, [claim])
-    return claim
 
 
 def _write_binding_row(repo: Path, *, branch: str, claim_id: str, owner: str) -> None:
@@ -204,8 +164,7 @@ class TestIsIntegrationBranch:
 
     def test_the_constant_names_the_current_line(self) -> None:
         # The regression this guards: the constant lagged the integration line by four
-        # days, and because merged_branches and branch_claim_binding default to it, both
-        # raised BranchPolicyError on a repo where the retired branch no longer exists.
+        # days, so every caller that defaulted to it resolved a ref no checkout had.
         assert bp.INTEGRATION_BRANCH == "master"
         assert bp.INTEGRATION_BRANCHES[0] == bp.INTEGRATION_BRANCH
 
@@ -297,96 +256,6 @@ class TestLocalOnlyCommits:
         newer = _commit(repo, "b.txt")
         rows = bp.local_only_commits(repo, "master")
         assert [row["sha"] for row in rows] == [newer]
-
-
-# --------------------------------------------------------------------------- merged branches
-
-
-class TestMergedBranches:
-    def test_includes_branch_whose_tip_is_an_ancestor(self, repo: Path) -> None:
-        base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/x-20260829", start=base)
-        _git(repo, "checkout", "--quiet", "master")
-        _commit(repo, "b.txt")
-        assert "claude/x-20260829" in bp.merged_branches(repo)
-
-    def test_excludes_branch_with_a_unique_commit(self, repo: Path) -> None:
-        base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/y-20260829", start=base)
-        _commit(repo, "unique.txt")
-        _git(repo, "checkout", "--quiet", "master")
-        assert "claude/y-20260829" not in bp.merged_branches(repo)
-
-    def test_excludes_integration_branches_themselves(self, repo: Path) -> None:
-        base = _commit(repo, "a.txt")
-        # A retired line whose tip is an ancestor of master satisfies the ancestry
-        # test, so only the integration-name check keeps it off the delete list.
-        _checkout_new(repo, "w7-trident-program", start=base)
-        _git(repo, "checkout", "--quiet", "master")
-        _commit(repo, "b.txt")
-        result = bp.merged_branches(repo)
-        assert "master" not in result
-        assert "w7-trident-program" not in result
-
-
-# --------------------------------------------------------------------------- claim binding resolution
-
-
-class TestBranchClaimBinding:
-    def _feature_branch_with_changed_file(
-        self, repo: Path, branch: str, filename: str
-    ) -> None:
-        _commit(repo, "base.txt")
-        _checkout_new(repo, branch)
-        (repo / filename).write_text("x\n", encoding="utf-8")
-        _git(repo, "add", "--all")
-        _git(repo, "commit", "--quiet", "-m", f"add {filename}")
-
-    def test_matches_owner_and_overlapping_path(self, repo: Path) -> None:
-        self._feature_branch_with_changed_file(repo, "claude/topic-20260829", "src.py")
-        claim = create_claim(
-            repo, owner="claude", paths=["src.py"], justification="t", max_minutes=60
-        )
-        matches = bp.branch_claim_binding(repo, "claude/topic-20260829")
-        assert claim in matches
-
-    def test_excludes_non_overlapping_path(self, repo: Path) -> None:
-        self._feature_branch_with_changed_file(repo, "claude/topic-20260829", "src.py")
-        create_claim(
-            repo, owner="claude", paths=["other.py"], justification="t", max_minutes=60
-        )
-        assert bp.branch_claim_binding(repo, "claude/topic-20260829") == ()
-
-    def test_excludes_different_owner(self, repo: Path) -> None:
-        self._feature_branch_with_changed_file(repo, "claude/topic-20260829", "src.py")
-        create_claim(
-            repo, owner="fable-5", paths=["src.py"], justification="t", max_minutes=60
-        )
-        assert bp.branch_claim_binding(repo, "claude/topic-20260829") == ()
-
-    def test_excludes_expired_claim(self, repo: Path) -> None:
-        self._feature_branch_with_changed_file(repo, "claude/topic-20260829", "src.py")
-        now = datetime.now(UTC)
-        _write_claim(
-            repo,
-            owner="claude",
-            paths=["src.py"],
-            created_at=now - timedelta(hours=2),
-            expires_at=now - timedelta(hours=1),
-        )
-        assert bp.branch_claim_binding(repo, "claude/topic-20260829") == ()
-
-    def test_includes_active_claim(self, repo: Path) -> None:
-        self._feature_branch_with_changed_file(repo, "claude/topic-20260829", "src.py")
-        now = datetime.now(UTC)
-        claim = _write_claim(
-            repo,
-            owner="claude",
-            paths=["src.py"],
-            created_at=now,
-            expires_at=now + timedelta(hours=1),
-        )
-        assert claim in bp.branch_claim_binding(repo, "claude/topic-20260829")
 
 
 # --------------------------------------------------------------------------- binding store
