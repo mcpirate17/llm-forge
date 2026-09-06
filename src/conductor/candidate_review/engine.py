@@ -52,6 +52,7 @@ from conductor.candidate_review.policy import (
     CheckPolicy,
     apply_exceptions,
     baseline_receipts,
+    unmatched_exceptions,
 )
 from conductor.candidate_review.verification import (
     check_test_evidence,
@@ -803,6 +804,20 @@ def _review_binding(
     )
 
 
+def examined_paths(results: Sequence[CheckResult]) -> dict[str, set[str]]:
+    """Every path each check actually read, by check id.
+
+    A check can be reported in more than one result -- a sharded run, or a
+    special-cased second pass -- so the sets are unioned rather than assigned.
+    Taking the last result instead would say a check never opened files it did,
+    which reads downstream as "nothing examined that path".
+    """
+    examined: dict[str, set[str]] = {}
+    for result in results:
+        examined.setdefault(result.check_id, set()).update(result.files)
+    return examined
+
+
 def _build_receipt(
     ctx: ReviewContext,
     *,
@@ -837,6 +852,9 @@ def _build_receipt(
             "schema_version": ctx.policy.schema_version,
             "block_at": ctx.policy.block_at.value,
             "baseline_expires": ctx.policy.baseline_expires.isoformat(),
+            "unmatched_exceptions": list(
+                unmatched_exceptions(ctx.policy, examined_paths(results), findings)
+            ),
         },
         engine=engine,
         graph=selection.graph,

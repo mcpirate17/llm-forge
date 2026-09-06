@@ -172,6 +172,7 @@ def test_select_uses_registry_matchers():
         "crg_refresh_report_session",
         "session_start",
         "session_handoff",
+        "native_freshness",
     ]
     assert [s.name for s in runner.select("PreToolUse", {"tool_name": "Glob"})] == [
         "crg_refresh_report_pre"

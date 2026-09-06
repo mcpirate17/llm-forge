@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 import subprocess
@@ -92,70 +93,69 @@ def test_query_graph_relationships(context_repo: Path) -> None:
     crg_dir.mkdir(parents=True)
     db_path = crg_dir / "graph.db"
 
-    conn = sqlite3.connect(db_path)
-    conn.execute("""
-        CREATE TABLE nodes (
-            id INTEGER PRIMARY KEY,
-            kind TEXT,
-            name TEXT,
-            qualified_name TEXT,
-            file_path TEXT,
-            line_start INTEGER,
-            line_end INTEGER,
-            language TEXT,
-            parent_name TEXT,
-            params TEXT,
-            return_type TEXT,
-            modifiers TEXT,
-            is_test INTEGER DEFAULT 0,
-            file_hash TEXT,
-            extra TEXT DEFAULT '{}',
-            updated_at REAL DEFAULT 0.0,
-            signature TEXT,
-            community_id INTEGER DEFAULT 0
+    with contextlib.closing(sqlite3.connect(db_path)) as conn:
+        conn.execute("""
+            CREATE TABLE nodes (
+                id INTEGER PRIMARY KEY,
+                kind TEXT,
+                name TEXT,
+                qualified_name TEXT,
+                file_path TEXT,
+                line_start INTEGER,
+                line_end INTEGER,
+                language TEXT,
+                parent_name TEXT,
+                params TEXT,
+                return_type TEXT,
+                modifiers TEXT,
+                is_test INTEGER DEFAULT 0,
+                file_hash TEXT,
+                extra TEXT DEFAULT '{}',
+                updated_at REAL DEFAULT 0.0,
+                signature TEXT,
+                community_id INTEGER DEFAULT 0
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE edges (
+                id INTEGER PRIMARY KEY,
+                kind TEXT,
+                source_qualified TEXT,
+                target_qualified TEXT,
+                file_path TEXT,
+                line INTEGER DEFAULT 0,
+                extra TEXT DEFAULT '{}',
+                updated_at REAL DEFAULT 0.0,
+                confidence REAL DEFAULT 1.0,
+                confidence_tier TEXT DEFAULT 'EXTRACTED'
+            )
+        """)
+
+        src_abs = str((context_repo / "pkg" / "engine.py").resolve())
+        caller_abs = str((context_repo / "pkg" / "caller.py").resolve())
+
+        conn.execute(
+            "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
+            ("pkg.engine.run", "run", src_abs),
         )
-    """)
-    conn.execute("""
-        CREATE TABLE edges (
-            id INTEGER PRIMARY KEY,
-            kind TEXT,
-            source_qualified TEXT,
-            target_qualified TEXT,
-            file_path TEXT,
-            line INTEGER DEFAULT 0,
-            extra TEXT DEFAULT '{}',
-            updated_at REAL DEFAULT 0.0,
-            confidence REAL DEFAULT 1.0,
-            confidence_tier TEXT DEFAULT 'EXTRACTED'
+        conn.execute(
+            "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
+            ("pkg.caller.invoke", "invoke", caller_abs),
         )
-    """)
+        conn.execute(
+            "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
+            ("pkg.sub.helper", "helper", "pkg/sub.py"),
+        )
 
-    src_abs = str((context_repo / "pkg" / "engine.py").resolve())
-    caller_abs = str((context_repo / "pkg" / "caller.py").resolve())
-
-    conn.execute(
-        "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
-        ("pkg.engine.run", "run", src_abs),
-    )
-    conn.execute(
-        "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
-        ("pkg.caller.invoke", "invoke", caller_abs),
-    )
-    conn.execute(
-        "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
-        ("pkg.sub.helper", "helper", "pkg/sub.py"),
-    )
-
-    conn.execute(
-        "INSERT INTO edges (source_qualified, target_qualified, kind) VALUES (?, ?, ?)",
-        ("pkg.caller.invoke", "pkg.engine.run", "calls"),
-    )
-    conn.execute(
-        "INSERT INTO edges (source_qualified, target_qualified, kind) VALUES (?, ?, ?)",
-        ("pkg.engine.run", "pkg.sub.helper", "calls"),
-    )
-    conn.commit()
-    conn.close()
+        conn.execute(
+            "INSERT INTO edges (source_qualified, target_qualified, kind) VALUES (?, ?, ?)",
+            ("pkg.caller.invoke", "pkg.engine.run", "calls"),
+        )
+        conn.execute(
+            "INSERT INTO edges (source_qualified, target_qualified, kind) VALUES (?, ?, ?)",
+            ("pkg.engine.run", "pkg.sub.helper", "calls"),
+        )
+        conn.commit()
 
     callers, callees, status = query_graph_relationships(context_repo, "pkg/engine.py")
     assert status == "ok"
@@ -289,29 +289,28 @@ def test_query_graph_with_target_symbol(context_repo: Path) -> None:
     crg_dir.mkdir(parents=True, exist_ok=True)
     db_path = crg_dir / "graph.db"
 
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY, kind TEXT, name TEXT, qualified_name TEXT, file_path TEXT, line_start INTEGER, line_end INTEGER, language TEXT, parent_name TEXT, params TEXT, return_type TEXT, modifiers TEXT, is_test INTEGER DEFAULT 0, file_hash TEXT, extra TEXT DEFAULT '{}', updated_at REAL DEFAULT 0.0, signature TEXT, community_id INTEGER DEFAULT 0)"
-    )
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS edges (id INTEGER PRIMARY KEY, kind TEXT, source_qualified TEXT, target_qualified TEXT, file_path TEXT, line INTEGER DEFAULT 0, extra TEXT DEFAULT '{}', updated_at REAL DEFAULT 0.0, confidence REAL DEFAULT 1.0, confidence_tier TEXT DEFAULT 'EXTRACTED')"
-    )
+    with contextlib.closing(sqlite3.connect(db_path)) as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY, kind TEXT, name TEXT, qualified_name TEXT, file_path TEXT, line_start INTEGER, line_end INTEGER, language TEXT, parent_name TEXT, params TEXT, return_type TEXT, modifiers TEXT, is_test INTEGER DEFAULT 0, file_hash TEXT, extra TEXT DEFAULT '{}', updated_at REAL DEFAULT 0.0, signature TEXT, community_id INTEGER DEFAULT 0)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS edges (id INTEGER PRIMARY KEY, kind TEXT, source_qualified TEXT, target_qualified TEXT, file_path TEXT, line INTEGER DEFAULT 0, extra TEXT DEFAULT '{}', updated_at REAL DEFAULT 0.0, confidence REAL DEFAULT 1.0, confidence_tier TEXT DEFAULT 'EXTRACTED')"
+        )
 
-    src_abs = str((context_repo / "pkg" / "engine.py").resolve())
-    conn.execute(
-        "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
-        ("pkg.engine.run", "run", src_abs),
-    )
-    conn.execute(
-        "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
-        ("pkg.caller.invoke", "invoke", "pkg/caller.py"),
-    )
-    conn.execute(
-        "INSERT INTO edges (source_qualified, target_qualified, kind) VALUES (?, ?, ?)",
-        ("pkg.caller.invoke", "pkg.engine.run", "calls"),
-    )
-    conn.commit()
-    conn.close()
+        src_abs = str((context_repo / "pkg" / "engine.py").resolve())
+        conn.execute(
+            "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
+            ("pkg.engine.run", "run", src_abs),
+        )
+        conn.execute(
+            "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?, ?, ?)",
+            ("pkg.caller.invoke", "invoke", "pkg/caller.py"),
+        )
+        conn.execute(
+            "INSERT INTO edges (source_qualified, target_qualified, kind) VALUES (?, ?, ?)",
+            ("pkg.caller.invoke", "pkg.engine.run", "calls"),
+        )
+        conn.commit()
 
     callers, callees, status = query_graph_relationships(
         context_repo, "pkg/engine.py", target_symbol="run"

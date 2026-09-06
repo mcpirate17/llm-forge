@@ -22,10 +22,14 @@ from conductor.candidate_review.checks import (
     Severity,
     check_import_declaration,
 )
+from conductor.candidate_review import import_declaration
 from conductor.candidate_review.import_declaration import (
+    base_distributions,
     canonical_name,
     declared_distributions,
     imported_modules,
+    in_base_dependency_tree,
+    optional_only_imports,
     nearest_manifest,
     requirement_name,
     undeclared_imports,
@@ -285,3 +289,172 @@ def test_an_unreadable_manifest_is_itself_the_finding(
     )
     result = check_import_declaration(ctx)
     assert [f.rule_id for f in result.findings] == ["unreadable-manifest"]
+
+
+def test_base_distributions_excludes_everything_optional() -> None:
+    """`[project] dependencies` and the project's own name, nothing else.
+
+    The radon defect (2026-09-05) was a name written down in an extra and a
+    dependency-group -- declared by the wide rule, absent from every job that
+    installs the base set. Separating the two questions is the whole fix.
+    """
+
+    assert base_distributions(MANIFEST) == {"polars", "probe"}
+
+
+def test_an_extra_only_import_is_reported_in_a_base_dependency_tree() -> None:
+    """Declared, but not where it runs: the defect the wide rule cannot see."""
+
+    found = optional_only_imports(
+        "import scipy\n",
+        base=("polars",),
+        declared=("polars", "scipy"),
+        distributions={"scipy": ["scipy"]},
+        stdlib=(),
+    )
+    assert found == (("scipy", ("scipy",)),)
+
+
+def test_an_entirely_undeclared_import_is_not_reported_twice() -> None:
+    """One omission, one finding: `undeclared_imports` already owns this shape.
+
+    Reporting it from both rules would double every finding and make the count
+    meaningless as a measure of how much is wrong.
+    """
+
+    found = optional_only_imports(
+        "import yaml\n",
+        base=("polars",),
+        declared=("polars",),
+        distributions={"yaml": ["PyYAML"]},
+        stdlib=(),
+    )
+    assert found == ()
+
+
+def test_a_type_checking_import_does_not_execute() -> None:
+    """A guarded import cannot break an install, so it cannot be this finding.
+
+    The `else` branch of the same guard is the runtime branch and must survive,
+    or the skip would hide a real import.
+    """
+
+    source = (
+        "from typing import TYPE_CHECKING\n"
+        "if TYPE_CHECKING:\n"
+        "    import scipy\n"
+        "else:\n"
+        "    import polars\n"
+        "import yaml\n"
+    )
+    assert imported_modules(source) == frozenset({"typing", "scipy", "polars", "yaml"})
+    assert imported_modules(source, runtime_only=True) == frozenset(
+        {"typing", "polars", "yaml"}
+    )
+
+
+def test_the_qualified_type_checking_spelling_is_also_a_guard() -> None:
+    """`if typing.TYPE_CHECKING:` is the same guard written the other way."""
+
+    source = "import typing\nif typing.TYPE_CHECKING:\n    import scipy\n"
+    assert imported_modules(source, runtime_only=True) == frozenset({"typing"})
+
+
+def test_the_strict_rule_governs_the_trees_that_run_on_base_dependencies() -> None:
+    """conductor/ and tooling/ run in jobs that install the base set only.
+
+    conftest.py is excluded wherever it lives -- it executes only under pytest,
+    which by construction has pytest.
+    """
+
+    assert in_base_dependency_tree("conductor/radon_complexity.py")
+    assert in_base_dependency_tree("tooling/hooks/dispatch/runner.py")
+    assert not in_base_dependency_tree("conductor/conftest.py")
+
+
+def test_the_check_blocks_an_extra_only_import_in_a_base_dependency_tree(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The finding that would have caught radon before it reached the commit path."""
+
+    ctx = _context(
+        monkeypatch,
+        tmp_path,
+        {"conductor/mod.py": "import scipy\n"},
+        _change("conductor/mod.py"),
+        distributions={"scipy": ["scipy"]},
+    )
+    result = check_import_declaration(ctx)
+    assert [(f.rule_id, f.path) for f in result.findings] == [
+        ("base-dependency-required", "conductor/mod.py")
+    ]
+    assert result.findings[0].severity is Severity.CRITICAL
+    assert result.metrics["base_dependency_files"] == 1
+
+
+def test_the_strict_rule_leaves_the_wheel_packages_alone(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """research/ ships as a wheel whose extras a consumer opts into by name.
+
+    Sixty files there import one; widening the rule to cover them is a
+    per-tree packaging decision, not a side effect of this check.
+    """
+
+    ctx = _context(
+        monkeypatch,
+        tmp_path,
+        {"research/mod.py": "import scipy\n"},
+        _change("research/mod.py"),
+        distributions={"scipy": ["scipy"]},
+    )
+    result = check_import_declaration(ctx)
+    assert result.findings == []
+    assert result.metrics["base_dependency_files"] == 0
+
+
+def test_the_probe_may_import_pytest_at_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """KB-CI-01 grants test-only tools; the exemption is keyed to one path."""
+
+    monkeypatch.setitem(
+        import_declaration.RUNTIME_TEST_TOOL_EXEMPTIONS,
+        "conductor/probe.py",
+        frozenset({"pytest"}),
+    )
+    ctx = _context(
+        monkeypatch,
+        tmp_path,
+        {"conductor/probe.py": "def run():\n    import pytest\n"},
+        _change("conductor/probe.py"),
+        distributions={"pytest": ["pytest"]},
+    )
+    assert check_import_declaration(ctx).findings == []
+
+
+def test_an_exemption_that_covers_nothing_is_reported(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A grant nobody uses is a grant waiting to cover the next import silently.
+
+    Advisory, not blocking: the file is correct today, and the entry is the
+    thing to delete.
+    """
+
+    monkeypatch.setitem(
+        import_declaration.RUNTIME_TEST_TOOL_EXEMPTIONS,
+        "conductor/probe.py",
+        frozenset({"pytest"}),
+    )
+    ctx = _context(
+        monkeypatch,
+        tmp_path,
+        {"conductor/probe.py": "import polars\n"},
+        _change("conductor/probe.py"),
+        distributions={"pytest": ["pytest"], "polars": ["polars"]},
+    )
+    result = check_import_declaration(ctx)
+    assert [(f.rule_id, f.severity) for f in result.findings] == [
+        ("stale-exemption", Severity.MEDIUM)
+    ]

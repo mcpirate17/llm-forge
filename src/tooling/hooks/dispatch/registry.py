@@ -242,6 +242,14 @@ HOOKS: Final[tuple[HookSpec, ...]] = (
         "$CLAUDE_PROJECT_DIR/.claude/hooks/session-handoff.sh",
         argv=("tooling/hooks/claude/session-handoff.sh",),
     ),
+    HookSpec(
+        "native_freshness",
+        "SessionStart",
+        "",
+        5,
+        "",
+        adapter="native_freshness_report",
+    ),
 )
 
 

@@ -58,6 +58,15 @@ def human_summary(receipt: ReviewReceipt) -> str:
         lines.append(
             f"- ... {len(receipt.findings) - len(shown)} more findings in the JSON receipt"
         )
+    # A stale exemption reads as live governance while excusing nothing, and it is
+    # invisible in the findings list precisely because it matched none of them. It
+    # is named here, and nowhere near the blocking count -- removing it is the
+    # owner's debt, not this candidate's problem.
+    for stale in receipt.policy.get("unmatched_exceptions", ()):
+        lines.append(
+            f"- STALE exception {stale['id']} ({stale['owner']}, expires {stale['expires']}): "
+            f"{stale['check']} read {stale['path']} and it excused nothing"
+        )
     return "\n".join(lines) + "\n"
 
 

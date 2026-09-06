@@ -8,7 +8,7 @@ import tomllib
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any, Collection, Iterable, Mapping, Sequence
 
 from conductor.candidate_review.model import (
     Change,
@@ -1055,6 +1055,44 @@ def baseline_receipts(
             }
         )
     return receipts
+
+
+def unmatched_exceptions(
+    policy: Policy,
+    examined: Mapping[str, Collection[str]],
+    findings: Sequence[Finding],
+) -> tuple[dict[str, str], ...]:
+    """Exceptions whose own check read their file and found nothing to excuse.
+
+    An exception naming a path no check examined is not dead -- this candidate
+    simply did not touch it, and saying so on every run would bury the signal.
+    One whose check *did* read the file and produced no finding it covers is
+    stale: the code was fixed, or a fingerprint drifted, and what is left reads
+    as live governance while excusing nothing. `mut-testing-oversized-func`
+    outlived its finding by weeks that way.
+
+    Reported, never blocking. A stale exemption is somebody's debt to remove,
+    not a reason to fail the candidate that happened to touch the file.
+    """
+    matched = {finding.exception_id for finding in findings}
+    stale: list[dict[str, str]] = []
+    for exception in policy.exceptions:
+        if exception.exception_id in matched:
+            continue
+        seen = examined.get(exception.check_id, ())
+        if not any(fnmatch.fnmatchcase(path, exception.path) for path in seen):
+            continue
+        stale.append(
+            {
+                "id": exception.exception_id,
+                "check": exception.check_id,
+                "rule": exception.rule_id or "",
+                "path": exception.path,
+                "owner": exception.owner,
+                "expires": exception.expires.isoformat(),
+            }
+        )
+    return tuple(stale)
 
 
 def apply_exceptions(policy: Policy, findings: list[Finding]) -> list[Finding]:
