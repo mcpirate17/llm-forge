@@ -104,6 +104,12 @@ class Verdict(str):
     # was never ablated. A verdict about the probe, not about the code -- reported
     # so a clean module can be read against how much of it actually ran.
     OVER_BUDGET = "OVER_BUDGET"
+    # The driver tests DID call the function, but none of the arguments they handed
+    # it could be isolated from the baseline run, so replaying them would have let
+    # the two ends share mutable state. Distinct from NOT_EXERCISED, which claims
+    # the tests never reached the function at all -- reporting one as the other is
+    # a clean verdict standing in for a measurement that could not be made.
+    ARGUMENTS_UNCOPYABLE = "ARGUMENTS_UNCOPYABLE"
 
 
 @dataclasses.dataclass
@@ -115,6 +121,10 @@ class AblationResult:
     verdict: str
     calls_seen: int
     usable_calls: int = 0
+    # Calls the driver tests made that were never recorded because their arguments
+    # could not be isolated. Carried on every result so a clean sweep can be read
+    # against how much of the function's real traffic it actually saw.
+    dropped_calls: int = 0
     max_diff_recorded: float | None = None
     max_diff_amplified: float | None = None
     amplifier: str | None = None
@@ -130,8 +140,25 @@ class AblationResult:
 # --------------------------------------------------------------------------- copy
 
 
+class UncopyableValue(Exception):
+    """A recorded argument that cannot be isolated from the run that produced it."""
+
+    def __init__(self, value: Any, cause: BaseException) -> None:
+        self.type_name = type(value).__qualname__
+        self.cause = cause
+        super().__init__(f"{self.type_name}: {cause}")
+
+
 def _clone(value: Any) -> Any:
-    """Deep copy that understands tensors, so in-place callees cannot poison replay."""
+    """Deep copy that understands tensors, so in-place callees cannot poison replay.
+
+    Raises rather than handing back the original on failure. Returning the original
+    is the same object on both ends of the comparison: an in-place callee mutates it
+    during the baseline run, the variant then runs against the already-mutated value,
+    the difference disappears, and the construct reports NO_DIFFERENCE_OBSERVED --
+    a clean verdict produced by the probe's own aliasing rather than by the code.
+    An argument that cannot be isolated is evidence that cannot be collected.
+    """
     torch = sys.modules.get("torch")
     if torch is not None and torch.is_tensor(value):
         return value.detach().clone()
@@ -141,8 +168,10 @@ def _clone(value: Any) -> Any:
         return {k: _clone(v) for k, v in value.items()}
     try:
         return copy.deepcopy(value)
-    except Exception:
-        return value
+    except UncopyableValue:
+        raise
+    except Exception as exc:  # noqa: BLE001 - any failure to isolate is the same fact
+        raise UncopyableValue(value, exc) from exc
 
 
 def _magnitude(value: Any) -> float:
@@ -273,9 +302,24 @@ def _compile_variant(
 # ---------------------------------------------------------------------- recording
 
 
+@dataclasses.dataclass
+class Recording:
+    """What one driver run saw of a function: the calls kept, and the calls lost.
+
+    Two lists rather than one, because a dropped call is not a call that did not
+    happen. Folding them together is what let a function whose every argument is
+    uncopyable report NOT_EXERCISED -- indistinguishable from a function the tests
+    never touch, and repaired by a different change entirely.
+    """
+
+    calls: list[tuple[tuple, dict]] = dataclasses.field(default_factory=list)
+    # One entry per dropped call, naming the type that could not be isolated.
+    dropped: list[str] = dataclasses.field(default_factory=list)
+
+
 def _make_recorder(
     target: Callable[..., Any], limit: int = MAX_RECORDED_CALLS
-) -> tuple[Callable[..., Any], list[tuple[tuple, dict]]]:
+) -> tuple[Callable[..., Any], Recording]:
     """Wrap ``target`` in a real function that keeps the arguments the tests hand it.
 
     It has to be a function, not a callable object: a method is reached through the
@@ -283,19 +327,26 @@ def _make_recorder(
     instance silently drops the receiver, every replay then raises, and every ablation
     reports "no difference" -- a clean sweep that measured nothing.
     """
-    calls: list[tuple[tuple, dict]] = []
+    recording = Recording()
 
     @functools.wraps(target)
     def recorder(*args: Any, **kwargs: Any) -> Any:
-        if len(calls) < limit:
+        if len(recording.calls) + len(recording.dropped) < limit:
             try:
-                calls.append((_clone(args), _clone(kwargs)))
-            except Exception:
-                pass
+                recording.calls.append((_clone(args), _clone(kwargs)))
+            except UncopyableValue as exc:
+                # Recorded as a loss, never as silence. An argument that cannot be
+                # isolated here would alias across the two ends of every replay, so
+                # the call is refused rather than kept -- and saying so is what
+                # separates "the tests never called this" from "we could not keep
+                # what they called it with".
+                recording.dropped.append(exc.type_name)
+            except Exception as exc:  # noqa: BLE001 - cloning must not break the suite
+                recording.dropped.append(type(exc).__qualname__)
         return target(*args, **kwargs)
 
     recorder.__equivalence_recorder__ = True  # type: ignore[attr-defined]
-    return recorder, calls
+    return recorder, recording
 
 
 def _bind_sites(module: Any, qualname: str) -> list[tuple[Any, str]]:
@@ -333,8 +384,8 @@ def _bind_sites(module: Any, qualname: str) -> list[tuple[Any, str]]:
 
 def _install_recorder(
     module: Any, qualname: str
-) -> tuple[list[tuple], list[tuple]] | None:
-    """Patch every site `qualname` is reachable through. Returns (restores, calls)."""
+) -> tuple[list[tuple], Recording] | None:
+    """Patch every site `qualname` is reachable through. Returns (restores, recording)."""
     try:
         sites = _bind_sites(module, qualname)
     except (AttributeError, LookupError, RuntimeError):
@@ -346,19 +397,19 @@ def _install_recorder(
         if isinstance(original, staticmethod)
         else getattr(owner, attr)
     )
-    recorder, calls = _make_recorder(original)
+    recorder, recording = _make_recorder(original)
     restores = []
     for site_owner, site_attr in sites:
         restores.append(
             (site_owner, site_attr, getattr(site_owner, site_attr, original))
         )
         setattr(site_owner, site_attr, recorder)
-    return restores, calls
+    return restores, recording
 
 
-def _record_calls(module: Any, qualname: str, test_args: Sequence[str]) -> list[tuple]:
+def _record_calls(module: Any, qualname: str, test_args: Sequence[str]) -> Recording:
     """Record one function's real arguments by running its driver tests."""
-    return _record_many(module, [qualname], test_args).get(qualname, [])
+    return _record_many(module, [qualname], test_args).get(qualname, Recording())
 
 
 def _record_many(
@@ -366,7 +417,7 @@ def _record_many(
     qualnames: Sequence[str],
     test_args: Sequence[str],
     batch: int = RECORD_BATCH,
-) -> dict[str, list[tuple]]:
+) -> dict[str, Recording]:
     """Record every target's real arguments, sharing driver runs between them.
 
     The driver suite does not care which function is being watched, so running it
@@ -381,18 +432,18 @@ def _record_many(
     """
     import pytest
 
-    out: dict[str, list[tuple]] = {}
+    out: dict[str, Recording] = {}
     for start in range(0, len(qualnames), batch):
         chunk = qualnames[start : start + batch]
         restores: list[tuple] = []
-        pending: dict[str, list[tuple]] = {}
+        pending: dict[str, Recording] = {}
         for qualname in chunk:
             installed = _install_recorder(module, qualname)
             if installed is None:
                 continue
-            site_restores, calls = installed
+            site_restores, recording = installed
             restores.extend(site_restores)
-            pending[qualname] = calls
+            pending[qualname] = recording
         if not pending:
             continue
         try:
@@ -423,6 +474,16 @@ def _compare_one(
     """
     raised_baseline = raised_variant = None
     expected = actual = None
+    # Both ends get their own copy, made BEFORE either runs. Cloning inside the
+    # try below would let a failure to isolate be caught as though the call itself
+    # raised -- one side "raising" and the other not reads as an infinite
+    # difference, so an argument the probe cannot copy would report every construct
+    # around it LIVE. It is the absence of evidence, so it returns None.
+    try:
+        baseline_args, baseline_kwargs = _clone(args), _clone(kwargs)
+        variant_args, variant_kwargs = _clone(args), _clone(kwargs)
+    except UncopyableValue:
+        return None
     # SystemExit is a BaseException, so `except Exception` used to let it past both
     # handlers and out of the probe process entirely. A recorded call to a module's
     # argparse `main()` is replayed outside the test that faked `sys.argv`, argparse
@@ -430,11 +491,11 @@ def _compare_one(
     # measurement -- 148.7 s spent to report nothing for `uncurated_kill_rate.py`.
     # Exiting is a behaviour of the call like any other raise; measure it as one.
     try:
-        expected = baseline(*_clone(args), **_clone(kwargs))
+        expected = baseline(*baseline_args, **baseline_kwargs)
     except (Exception, SystemExit) as exc:  # noqa: BLE001 - the outcome IS the measurement
         raised_baseline = exc
     try:
-        actual = variant(*_clone(args), **_clone(kwargs))
+        actual = variant(*variant_args, **variant_kwargs)
     except (Exception, SystemExit) as exc:  # noqa: BLE001
         raised_variant = exc
 
@@ -604,6 +665,9 @@ class _ProbeContext:
     module_path: pathlib.Path
     baseline: Callable
     calls: list[tuple]
+    # Calls the driver made that could not be recorded. Held beside `calls` so a
+    # construct with nothing to sweep can say which of the two reasons it is.
+    dropped: tuple[str, ...]
     noise: float
     budget: "_Budget"
     budget_seconds: float | None
@@ -618,8 +682,22 @@ def _probe_construct(ablation: NativeAblation, ctx: _ProbeContext) -> AblationRe
         ablation.line,
         Verdict.NOT_EXERCISED,
         len(ctx.calls),
+        dropped_calls=len(ctx.dropped),
     )
     if not ctx.calls:
+        if ctx.dropped:
+            # The tests DID drive this function. Every argument they handed it was
+            # refused because replaying it would have aliased mutable state across
+            # the two ends, so there is no evidence here either way -- which is a
+            # different claim from "nothing calls this", and is reported as one.
+            base.verdict = Verdict.ARGUMENTS_UNCOPYABLE
+            names = sorted(set(ctx.dropped))
+            base.detail = (
+                f"{len(ctx.dropped)} recorded call(s) dropped: their arguments "
+                f"({', '.join(names[:5])}) cannot be isolated from the run that "
+                "produced them, so a replay would share mutable state with the "
+                "baseline; nothing was measured"
+            )
         return base
     if ctx.budget.expired():
         # Cheap guard, not the correctness one: `_sweep` below would break on its
@@ -703,6 +781,7 @@ def probe_function(
     noise: float = 1e-6,
     extra_rules: Sequence[str] = (),
     calls: list[tuple] | None = None,
+    dropped: Sequence[str] = (),
     ablations: Sequence[NativeAblation] | None = None,
     source: str | None = None,
     budget_seconds: float | None = None,
@@ -730,7 +809,8 @@ def probe_function(
         return []
 
     if calls is None:
-        calls = _record_calls(module, qualname, test_args)
+        recording = _record_calls(module, qualname, test_args)
+        calls, dropped = recording.calls, tuple(recording.dropped)
     ctx = _ProbeContext(
         qualname=qualname,
         source=source,
@@ -739,6 +819,7 @@ def probe_function(
         module_path=module_path,
         baseline=_compile_variant(fn_ast, module, fn_ast.name),
         calls=calls,
+        dropped=tuple(dropped),
         noise=noise,
         # One budget for the whole function: the point is to bound what this
         # function's sweeps cost the module, not what any single construct costs.
@@ -903,7 +984,8 @@ def probe_module(
                 module_name=module_name,
                 noise=noise,
                 extra_rules=extra_rules,
-                calls=recorded.get(qualname, []),
+                calls=recorded.get(qualname, Recording()).calls,
+                dropped=tuple(recorded.get(qualname, Recording()).dropped),
                 ablations=by_qualname.get(qualname, []),
                 source=source,
                 budget_seconds=budget_seconds,

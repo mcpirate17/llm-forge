@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import json
 import os
 import re
@@ -318,61 +319,18 @@ def query_graph_relationships(
     seen_callers: set[str] = set()
 
     try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-        cursor = conn.cursor()
-
-        target_clause = "WHERE target.file_path IN (?, ?) "
-        params: list[Any] = [abs_path, norm_path]
-        if target_symbol:
-            target_clause += "AND target.name = ? "
-            params.append(target_symbol)
-
-        caller_sql = f"""
-            SELECT DISTINCT source.qualified_name, edge.kind, source.file_path
-            FROM nodes AS target
-            JOIN edges AS edge ON edge.target_qualified = target.qualified_name
-            JOIN nodes AS source ON source.qualified_name = edge.source_qualified
-            {target_clause}
-            AND edge.kind != 'contains'
-            ORDER BY source.qualified_name
-            LIMIT 50
-        """
-        for qname, kind, fpath in cursor.execute(caller_sql, params).fetchall():
-            rel_qname = _rel_path(repo, qname)
-            rel_fpath = _rel_path(repo, fpath or "")
-            seen_callers.add(rel_fpath)
-            callers.append(
-                GraphRelationship(
-                    qualified_name=rel_qname, kind=kind, file_path=rel_fpath
-                )
+        # `closing`, not a bare assignment and not `with conn:`. The connection was
+        # closed on the last line of this block, so any failure while executing or
+        # fetching -- a corrupt page, a schema written by a newer graph build, a
+        # query interrupted mid-fetch -- jumped straight to the handler below and
+        # leaked the handle. `with conn:` would not have fixed it either: that is a
+        # TRANSACTION context, and it commits or rolls back without ever closing.
+        with contextlib.closing(
+            sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        ) as conn:
+            callers, callees = _read_relationships(
+                conn, repo, abs_path, norm_path, target_symbol, seen_callers
             )
-
-        source_clause = "WHERE source.file_path IN (?, ?) "
-        callee_params: list[Any] = [abs_path, norm_path]
-        if target_symbol:
-            source_clause += "AND source.name = ? "
-            callee_params.append(target_symbol)
-
-        callee_sql = f"""
-            SELECT DISTINCT target.qualified_name, edge.kind, target.file_path
-            FROM nodes AS source
-            JOIN edges AS edge ON edge.source_qualified = source.qualified_name
-            JOIN nodes AS target ON target.qualified_name = edge.target_qualified
-            {source_clause}
-            AND edge.kind != 'contains'
-            ORDER BY target.qualified_name
-            LIMIT 50
-        """
-        for qname, kind, fpath in cursor.execute(callee_sql, callee_params).fetchall():
-            rel_qname = _rel_path(repo, qname)
-            rel_fpath = _rel_path(repo, fpath or "")
-            callees.append(
-                GraphRelationship(
-                    qualified_name=rel_qname, kind=kind, file_path=rel_fpath
-                )
-            )
-
-        conn.close()
         status = "ok"
     except sqlite3.Error as exc:
         status = f"unavailable (sqlite error: {exc})"
@@ -385,6 +343,72 @@ def query_graph_relationships(
                 seen_callers.add(syn_rel.file_path)
 
     return callers, callees, status
+
+
+def _read_relationships(
+    conn: sqlite3.Connection,
+    repo: Path,
+    abs_path: str,
+    norm_path: str,
+    target_symbol: str | None,
+    seen_callers: set[str],
+) -> tuple[list[GraphRelationship], list[GraphRelationship]]:
+    """Immediate callers and callees for one file, read from an open connection.
+
+    Split out so the caller owns the connection's lifetime and nothing in here can
+    return past a close.
+    """
+    callers: list[GraphRelationship] = []
+    callees: list[GraphRelationship] = []
+    cursor = conn.cursor()
+    target_clause = "WHERE target.file_path IN (?, ?) "
+    params: list[Any] = [abs_path, norm_path]
+    if target_symbol:
+        target_clause += "AND target.name = ? "
+        params.append(target_symbol)
+
+    caller_sql = f"""
+        SELECT DISTINCT source.qualified_name, edge.kind, source.file_path
+        FROM nodes AS target
+        JOIN edges AS edge ON edge.target_qualified = target.qualified_name
+        JOIN nodes AS source ON source.qualified_name = edge.source_qualified
+        {target_clause}
+        AND edge.kind != 'contains'
+        ORDER BY source.qualified_name
+        LIMIT 50
+    """
+    for qname, kind, fpath in cursor.execute(caller_sql, params).fetchall():
+        rel_qname = _rel_path(repo, qname)
+        rel_fpath = _rel_path(repo, fpath or "")
+        seen_callers.add(rel_fpath)
+        callers.append(
+            GraphRelationship(qualified_name=rel_qname, kind=kind, file_path=rel_fpath)
+        )
+
+    source_clause = "WHERE source.file_path IN (?, ?) "
+    callee_params: list[Any] = [abs_path, norm_path]
+    if target_symbol:
+        source_clause += "AND source.name = ? "
+        callee_params.append(target_symbol)
+
+    callee_sql = f"""
+        SELECT DISTINCT target.qualified_name, edge.kind, target.file_path
+        FROM nodes AS source
+        JOIN edges AS edge ON edge.source_qualified = source.qualified_name
+        JOIN nodes AS target ON target.qualified_name = edge.target_qualified
+        {source_clause}
+        AND edge.kind != 'contains'
+        ORDER BY target.qualified_name
+        LIMIT 50
+    """
+    for qname, kind, fpath in cursor.execute(callee_sql, callee_params).fetchall():
+        rel_qname = _rel_path(repo, qname)
+        rel_fpath = _rel_path(repo, fpath or "")
+        callees.append(
+            GraphRelationship(qualified_name=rel_qname, kind=kind, file_path=rel_fpath)
+        )
+
+    return callers, callees
 
 
 def get_file_context(

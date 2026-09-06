@@ -9,18 +9,28 @@ shared checkout.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import subprocess
-import sys
 import time
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from conductor import mutation_testing_support as _support
+from conductor.mutation_receipt_build import (  # noqa: F401 - re-exported
+    _BARE_INTERPRETERS,
+    _default_receipt_path,
+    _open_receipt,
+    _pin_interpreter,
+    _resolve_receipt_path,
+    _score_receipt,
+    _torch_version,
+    _utc_stamp,
+    killer_enforcement,
+)
 from conductor.mutation_campaign_model import (  # noqa: F401
     CANONICAL_TEST_PATTERNS,
     LEGACY_RECEIPT_ANCHOR_COMMIT,
@@ -64,7 +74,6 @@ from conductor.mutation_scope import (
 from conductor.mutation_scope import _require_string as _require_string  # noqa: PLC0414
 from conductor.mutation_value import (
     ValueEvidenceError,
-    analyze_test_value,
     cargo_attribution_supported,
     collect_cargo_libtest_batch,
     collect_ctest_junit_batch,
@@ -200,28 +209,6 @@ def _link_mutation_patches(
     )
 
 
-_BARE_INTERPRETERS = frozenset({"python", "python3"})
-
-
-def _pin_interpreter(argv: Sequence[str]) -> list[str]:
-    """Resolve a bare ``python`` argv[0] to the runner's own interpreter.
-
-    A bare name resolves through the invoking shell's PATH, so the same manifest
-    ran under whichever venv the agent happened to have active (torch 2.12.1 in
-    the project ``.venv`` vs 2.13.0 in ``~/venvs/llm``), and the receipt could not
-    tell. Evidence must bind the interpreter the runner itself was started with.
-    """
-    return _support.pin_interpreter(
-        argv, bare_interpreters=_BARE_INTERPRETERS, executable=sys.executable
-    )
-
-
-def _torch_version(interpreter: str) -> str | None:
-    """Best-effort torch version of ``interpreter`` for receipt provenance."""
-
-    return _support.torch_version(interpreter)
-
-
 def _run_command(
     argv: Sequence[str],
     *,
@@ -306,40 +293,6 @@ def killer_verdict(
     return verdict
 
 
-def killer_enforcement(mutants: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Fold per-mutant verdicts into the campaign's contract-binding verdict.
-
-    Three outcomes, and the middle one is the point. `ENFORCED` means every kill
-    was traced to a test the mutant's contract named. `UNAVAILABLE` means the
-    harness produces no per-test evidence at all -- a property of the batch that
-    the campaign cannot fix, so it is reported and not punished. `REFUSED` means
-    the campaign's own claims did not hold: a kill landed on the wrong test, or
-    a batch that *can* attribute did not attribute this one, which is how a
-    mutant that breaks the build or the collection reads as a kill.
-    """
-
-    def ids(status: str) -> list[str]:
-        return [
-            row["id"]
-            for row in mutants
-            if row["killer_attribution"]["status"] == status
-        ]
-
-    misattributed = ids("MISATTRIBUTED")
-    unattributed = ids("UNAVAILABLE")
-    unattributed_runs = ids("UNATTRIBUTED")
-    return {
-        "status": "REFUSED"
-        if misattributed or unattributed_runs
-        else "UNAVAILABLE"
-        if unattributed
-        else "ENFORCED",
-        "misattributed": misattributed,
-        "unattributed": unattributed,
-        "unattributed_runs": unattributed_runs,
-    }
-
-
 def _run_campaign_command(
     campaign: Campaign,
     *,
@@ -414,28 +367,38 @@ def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
     _support.atomic_json(path, payload)
 
 
-def _utc_stamp() -> str:
-    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+@contextlib.contextmanager
+def _prepared_snapshot(campaign: Campaign, repo_root: Path) -> Iterator[Path]:
+    """A disposable snapshot with the campaign's inputs linked in, hash-checked.
+
+    The baseline and every mutant need the same four steps in the same order,
+    and the drift check has to run inside the snapshot before anything is linked
+    into it: a run against a snapshot whose sources moved measures a different
+    program than the receipt says it did. Sharing one context manager is what
+    stops the two loops from drifting apart.
+    """
+
+    with isolated_snapshot(repo_root) as snapshot:
+        if drift := source_drift(campaign, snapshot.worktree):
+            raise CampaignError(f"snapshot source hashes drifted: {drift}")
+        _link_mutation_patches(campaign, snapshot.worktree, repo_root)
+        _link_host_dependencies(campaign, snapshot.worktree, repo_root)
+        yield snapshot.worktree
 
 
-def _default_receipt_path(campaign: Campaign, repo_root: Path) -> Path:
-    return (
-        repo_root
-        / "research/reports/mutation_testing"
-        / f"{campaign.campaign_id}_{_utc_stamp()}.json"
-    )
-
-
-def run_campaign(
+def _admit_run(
     campaign: Campaign,
     *,
     allow_mutations: bool,
-    wait_seconds: int = 0,
-    receipt_path: Path | None = None,
-    mutation_ids: Sequence[str] | None = None,
-    repo_root: Path = REPO_ROOT,
-) -> dict[str, Any]:
-    """Run a ready campaign in disposable snapshots and write a JSON receipt."""
+    mutation_ids: Sequence[str] | None,
+    wait_seconds: int,
+    repo_root: Path,
+) -> tuple[Mutation, ...]:
+    """Refuse the run unless the campaign is ready, permitted and unopposed.
+
+    Every gate here raises before a snapshot exists, so a refusal costs nothing
+    and leaves no receipt claiming a run happened.
+    """
 
     inspection = inspect_campaign(campaign, repo_root=repo_root)
     if inspection["status"] != "READY":
@@ -449,112 +412,120 @@ def run_campaign(
     if blockers:
         detail = ", ".join(f"pid={row['pid']}" for row in blockers)
         raise CampaignError(f"resource gate is BUSY after wait: {detail}")
+    return selected
 
-    runner_components = _runner_components_sha256()
-    receipt: dict[str, Any] = {
-        "schema_version": RECEIPT_SCHEMA,
-        "campaign_id": campaign.campaign_id,
-        "manifest": campaign.manifest_path.relative_to(repo_root).as_posix(),
-        "manifest_sha256": campaign.manifest_sha256,
-        "runner_sha256": runner_components["conductor/mutation_testing.py"],
-        "runner_components_sha256": runner_components,
-        "language": campaign.language,
-        "mutation_engine": campaign.mutation_engine,
-        "generated_at": datetime.now(UTC).isoformat(),
-        "status": "RUNNING",
-        "source_sha256": dict(campaign.source_sha256),
-        "source_symbols": {k: dict(v) for k, v in campaign.source_symbols.items()},
-        "test_scopes": _test_scopes_payload(campaign),
-        "test_argv": list(campaign.test_argv),
-        "interpreter": _pin_interpreter(campaign.test_argv)[0],
-        "torch_version": _torch_version(_pin_interpreter(campaign.test_argv)[0]),
-        "expected_campaign_mutations": campaign.expected_mutations,
-        "selected_mutations": [mutation.mutation_id for mutation in selected],
-        "complete_campaign": len(selected) == campaign.expected_mutations,
-        "baseline": None,
-        "mutants": [],
-        "mutation_score": None,
-        "test_value": None,
-        "killer_enforcement": None,
-    }
-    if receipt_path is None:
-        output_path = _default_receipt_path(campaign, repo_root)
-    else:
-        output_path = (
-            receipt_path if receipt_path.is_absolute() else repo_root / receipt_path
-        )
-        output_path = output_path.resolve()
-    try:
-        receipt_relative = output_path.relative_to(repo_root.resolve()).as_posix()
-    except ValueError as exc:
-        raise CampaignError("receipt path must be inside the repository") from exc
 
-    try:
-        baseline_reports: list[Mapping[str, Any]] = []
-        baseline_results: list[dict[str, Any]] = []
-        repetitions = (
-            campaign.value_analysis.baseline_repetitions
-            if campaign.value_analysis is not None
-            else 1
-        )
-        for repetition in range(1, repetitions + 1):
-            with isolated_snapshot(repo_root) as snapshot:
-                if drift := source_drift(campaign, snapshot.worktree):
-                    raise CampaignError(f"snapshot source hashes drifted: {drift}")
-                _link_mutation_patches(campaign, snapshot.worktree, repo_root)
-                _link_host_dependencies(campaign, snapshot.worktree, repo_root)
-                baseline, report = _run_campaign_command(
-                    campaign,
-                    snapshot_root=snapshot.worktree,
-                    report_name=f"baseline-{repetition}",
-                )
-            baseline_results.append(baseline.as_dict())
-            if report is not None:
-                baseline_reports.append(report)
-            if baseline.timed_out or baseline.returncode != 0:
-                receipt["baseline"] = baseline_results[0]
-                receipt["baseline_repetitions"] = baseline_results
-                receipt["status"] = "BASELINE_FAILED"
-                _atomic_json(output_path, receipt)
-                raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
-        receipt["baseline"] = baseline_results[0]
-        if campaign.value_analysis is not None:
-            receipt["baseline_repetitions"] = baseline_results
+def _run_baselines(
+    campaign: Campaign, receipt: dict[str, Any], output_path: Path, repo_root: Path
+) -> list[Mapping[str, Any]]:
+    """Run the unmutated tree, once or once per configured repetition.
 
-        mutant_reports: dict[str, Mapping[str, Any]] = {}
-        for mutation in selected:
-            with isolated_snapshot(repo_root) as snapshot:
-                if drift := source_drift(campaign, snapshot.worktree):
-                    raise CampaignError(f"snapshot source hashes drifted: {drift}")
-                _link_mutation_patches(campaign, snapshot.worktree, repo_root)
-                _link_host_dependencies(campaign, snapshot.worktree, repo_root)
-                _apply_mutation(mutation, snapshot.worktree)
-                result, report = _run_campaign_command(
-                    campaign,
-                    snapshot_root=snapshot.worktree,
-                    report_name=f"mutant-{len(receipt['mutants']) + 1}",
-                )
-            outcome = (
-                "TIMED_OUT"
-                if result.timed_out
-                else "SURVIVED"
-                if result.returncode == 0
-                else "KILLED"
+    A baseline that fails means the campaign cannot distinguish a mutant from a
+    broken tree, so the receipt is written as BASELINE_FAILED and the run stops:
+    scoring mutants against a red baseline would call every one of them killed.
+    """
+
+    reports: list[Mapping[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    repetitions = (
+        campaign.value_analysis.baseline_repetitions
+        if campaign.value_analysis is not None
+        else 1
+    )
+    for repetition in range(1, repetitions + 1):
+        with _prepared_snapshot(campaign, repo_root) as worktree:
+            baseline, report = _run_campaign_command(
+                campaign, snapshot_root=worktree, report_name=f"baseline-{repetition}"
             )
-            row: dict[str, Any] = {
-                "id": mutation.mutation_id,
-                "patch_sha256": mutation.patch_sha256,
-                "allowed_paths": list(mutation.allowed_paths),
-                "expected_killers": list(mutation.expected_killers),
-                "outcome": outcome,
-                "test_result": result.as_dict(),
-            }
-            row["killer_attribution"] = killer_verdict(mutation, report, outcome)
-            if report is not None:
-                row["test_attribution"] = report
-                mutant_reports[mutation.mutation_id] = report
-            receipt["mutants"].append(row)
+        results.append(baseline.as_dict())
+        if report is not None:
+            reports.append(report)
+        if baseline.timed_out or baseline.returncode != 0:
+            receipt["baseline"] = results[0]
+            receipt["baseline_repetitions"] = results
+            receipt["status"] = "BASELINE_FAILED"
             _atomic_json(output_path, receipt)
+            raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+    receipt["baseline"] = results[0]
+    if campaign.value_analysis is not None:
+        receipt["baseline_repetitions"] = results
+    return reports
+
+
+def _run_mutants(
+    campaign: Campaign,
+    selected: Sequence[Mutation],
+    receipt: dict[str, Any],
+    output_path: Path,
+    repo_root: Path,
+) -> dict[str, Mapping[str, Any]]:
+    """Run each mutant in its own snapshot, appending a row per result.
+
+    The receipt is rewritten after every mutant rather than once at the end, so
+    a run killed halfway leaves evidence for the mutants that did complete.
+    """
+
+    reports: dict[str, Mapping[str, Any]] = {}
+    for mutation in selected:
+        with _prepared_snapshot(campaign, repo_root) as worktree:
+            _apply_mutation(mutation, worktree)
+            result, report = _run_campaign_command(
+                campaign,
+                snapshot_root=worktree,
+                report_name=f"mutant-{len(receipt['mutants']) + 1}",
+            )
+        outcome = (
+            "TIMED_OUT"
+            if result.timed_out
+            else "SURVIVED"
+            if result.returncode == 0
+            else "KILLED"
+        )
+        row: dict[str, Any] = {
+            "id": mutation.mutation_id,
+            "patch_sha256": mutation.patch_sha256,
+            "allowed_paths": list(mutation.allowed_paths),
+            "expected_killers": list(mutation.expected_killers),
+            "outcome": outcome,
+            "test_result": result.as_dict(),
+        }
+        row["killer_attribution"] = killer_verdict(mutation, report, outcome)
+        if report is not None:
+            row["test_attribution"] = report
+            reports[mutation.mutation_id] = report
+        receipt["mutants"].append(row)
+        _atomic_json(output_path, receipt)
+    return reports
+
+
+def run_campaign(
+    campaign: Campaign,
+    *,
+    allow_mutations: bool,
+    wait_seconds: int = 0,
+    receipt_path: Path | None = None,
+    mutation_ids: Sequence[str] | None = None,
+    repo_root: Path = REPO_ROOT,
+) -> dict[str, Any]:
+    """Run a ready campaign in disposable snapshots and write a JSON receipt."""
+
+    selected = _admit_run(
+        campaign,
+        allow_mutations=allow_mutations,
+        mutation_ids=mutation_ids,
+        wait_seconds=wait_seconds,
+        repo_root=repo_root,
+    )
+    receipt = _open_receipt(campaign, selected, repo_root)
+    output_path, receipt_relative = _resolve_receipt_path(
+        campaign, receipt_path, repo_root
+    )
+
+    try:
+        baseline_reports = _run_baselines(campaign, receipt, output_path, repo_root)
+        mutant_reports = _run_mutants(
+            campaign, selected, receipt, output_path, repo_root
+        )
     except CampaignError as exc:
         if receipt["status"] == "RUNNING":
             receipt["status"] = "ERROR"
@@ -569,38 +540,7 @@ def run_campaign(
             f"mutation campaign crashed; receipt={output_path}: {exc}"
         ) from exc
 
-    killed = sum(row["outcome"] == "KILLED" for row in receipt["mutants"])
-    survived = sum(row["outcome"] == "SURVIVED" for row in receipt["mutants"])
-    timed_out = sum(row["outcome"] == "TIMED_OUT" for row in receipt["mutants"])
-    denominator = killed + survived
-    receipt["mutation_score"] = killed / denominator if denominator else None
-    receipt["survivors"] = [
-        row["id"] for row in receipt["mutants"] if row["outcome"] == "SURVIVED"
-    ]
-    receipt["classification_required"] = list(receipt["survivors"])
-    receipt["killer_enforcement"] = killer_enforcement(receipt["mutants"])
-    mutation_status = (
-        "PASS"
-        if killed == len(selected) and not survived and not timed_out
-        else "FAIL"
-        if survived
-        else "ERROR"
-    )
-    if receipt["killer_enforcement"]["status"] == "REFUSED":
-        mutation_status = "FAIL"
-    if campaign.value_analysis is not None:
-        receipt["test_value"] = analyze_test_value(
-            campaign.value_analysis,
-            baseline_reports=baseline_reports,
-            mutant_reports=mutant_reports,
-            mutant_outcomes={row["id"]: row["outcome"] for row in receipt["mutants"]},
-        )
-    receipt["status"] = (
-        mutation_status
-        if receipt["test_value"] is None
-        or receipt["test_value"].get("status") == "PASS"
-        else "FAIL"
-    )
+    _score_receipt(campaign, receipt, selected, baseline_reports, mutant_reports)
     receipt["receipt_path"] = receipt_relative
     _atomic_json(output_path, receipt)
     return receipt

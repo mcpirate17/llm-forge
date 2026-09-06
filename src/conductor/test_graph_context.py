@@ -423,3 +423,97 @@ def test_format_markdown_binning_survives_test_substring_in_name() -> None:
     assert "test_mutation_testing.py:72" in tested_by
     assert "test_graph_context.py::context_repo" in tested_by
     assert "_apply_mutation" not in tested_by
+
+
+# ----------------------------------------------- connection lifetime
+
+
+class _SpyCursor:
+    """A cursor that fails where a real one does: executing, or fetching."""
+
+    def __init__(self, fail_on: str) -> None:
+        self._fail_on = fail_on
+
+    def execute(self, *_args: object, **_kwargs: object) -> "_SpyCursor":
+        if self._fail_on == "execute":
+            raise sqlite3.OperationalError("database disk image is malformed")
+        return self
+
+    def fetchall(self) -> list[tuple[str, str, str]]:
+        # Separate from execute on purpose: sqlite3 streams rows, so a corrupt page
+        # in the middle of a result set raises HERE, long after the statement was
+        # accepted. A cleanup proved only against a failing execute would miss it.
+        raise sqlite3.DatabaseError("malformed database schema")
+
+
+class _SpyConnection:
+    def __init__(self, fail_on: str) -> None:
+        self._fail_on = fail_on
+        self.closed = False
+
+    def cursor(self) -> _SpyCursor:
+        return _SpyCursor(self._fail_on)
+
+    def close(self) -> None:
+        self.closed = True
+
+
+@pytest.mark.parametrize("fail_on", ["execute", "fetch"])
+def test_a_failed_query_still_closes_the_connection(
+    context_repo: Path, monkeypatch: pytest.MonkeyPatch, fail_on: str
+) -> None:
+    """A read that raises must not leak the handle.
+
+    The close used to be the last statement of the try block, so every sqlite error
+    jumped over it into the handler. Each leaked connection holds a file descriptor
+    and a read lock on graph.db for the life of the process; the review path calls
+    this once per changed file, so a corrupt graph turns one bad query into a
+    descriptor exhaustion that looks nothing like its cause.
+
+    `with conn:` is not the fix and is the reason this test asserts on close()
+    rather than on the status string: a connection context manager commits or rolls
+    back the transaction and leaves the connection open.
+    """
+    from conductor import graph_context
+
+    crg_dir = context_repo / ".code-review-graph"
+    crg_dir.mkdir(parents=True, exist_ok=True)
+    (crg_dir / "graph.db").write_bytes(b"")
+
+    spy = _SpyConnection(fail_on)
+    monkeypatch.setattr(graph_context.sqlite3, "connect", lambda *a, **k: spy)
+
+    callers, callees, status = query_graph_relationships(context_repo, "sample.py")
+
+    assert spy.closed, f"the connection leaked when the query failed on {fail_on}"
+    assert status.startswith("unavailable (sqlite error:")
+    assert (callers, callees) == ([], []), "a failed read must report no relationships"
+
+
+def test_a_successful_query_closes_the_connection_too(
+    context_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Or the leak simply moves to the path that runs on every review."""
+    from conductor import graph_context
+
+    crg_dir = context_repo / ".code-review-graph"
+    crg_dir.mkdir(parents=True, exist_ok=True)
+    (crg_dir / "graph.db").write_bytes(b"")
+
+    class _EmptyCursor:
+        def execute(self, *_a: object, **_k: object) -> "_EmptyCursor":
+            return self
+
+        def fetchall(self) -> list[tuple[str, str, str]]:
+            return []
+
+    class _OkConnection(_SpyConnection):
+        def cursor(self) -> _EmptyCursor:  # type: ignore[override]
+            return _EmptyCursor()
+
+    spy = _OkConnection("never")
+    monkeypatch.setattr(graph_context.sqlite3, "connect", lambda *a, **k: spy)
+
+    _, _, status = query_graph_relationships(context_repo, "sample.py")
+    assert status == "ok"
+    assert spy.closed

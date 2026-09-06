@@ -18,6 +18,7 @@ import importlib
 import pathlib
 import sys
 import textwrap
+import threading
 
 import pytest
 
@@ -742,3 +743,135 @@ def test_a_sweep_with_no_floor_returns_the_true_maximum() -> None:
     assert (usable, settled) == (1, True)
     assert first == pytest.approx(0.001, rel=1e-3)
     assert first < worst
+
+
+# ------------------------------------------------------- replay isolation
+
+
+class _Uncopyable:
+    """Mutable state that ``copy.deepcopy`` refuses, exactly as a real one does.
+
+    A lock, a socket, an open file, a live database handle: an object carrying one
+    is common in this repo's own call traffic, and every one of them makes
+    ``deepcopy`` raise. It is mutable as well, which is the half that matters --
+    an immutable uncopyable value shared between two runs is harmless.
+    """
+
+    def __init__(self, items: list[str]) -> None:
+        self.items = items
+        self.lock = threading.Lock()
+
+
+def _consume(payload: _Uncopyable) -> int:
+    """Reads its argument destructively, like any queue or cursor consumer."""
+
+    return len(payload.items.pop()) if payload.items else 0
+
+
+def test_an_uncopyable_argument_is_refused_rather_than_shared() -> None:
+    """_clone must raise, not hand back the original.
+
+    Returning the original is the same object on both ends of the comparison. The
+    baseline mutates it, the variant then runs against the mutated value, and the
+    difference the probe reports is its own aliasing rather than the ablation's
+    effect -- in either direction: a real effect erased, or an invented one.
+    """
+    from conductor import equivalence_probe as ep
+
+    payload = _Uncopyable(["abcd"])
+    with pytest.raises(ep.UncopyableValue) as caught:
+        ep._clone(payload)
+    assert caught.value.type_name == "_Uncopyable"
+    # The nesting matters as much as the top level: an uncopyable value reached
+    # through a list or a dict is the ordinary case, since arguments arrive as a
+    # tuple. A guard that only fires on a bare value would let every real call past.
+    with pytest.raises(ep.UncopyableValue):
+        ep._clone(([payload], {"k": payload}))
+    assert payload.items == ["abcd"], "refusing to clone must not disturb the original"
+
+
+def test_the_baseline_never_differs_from_itself_on_an_uncopyable_argument() -> None:
+    """The control that catches replay aliasing: identical code, identical inputs.
+
+    Comparing a function against ITSELF can only ever report no difference. When
+    _clone handed back the original, `_consume` popped the single item during the
+    baseline run and the second run found the list empty -- 4 against 0, an
+    infinite relative difference reported for a function compared with itself, and
+    every construct around it read LIVE for a reason that is not in the code.
+    """
+    from conductor import equivalence_probe as ep
+
+    payload = _Uncopyable(["abcd"])
+    assert ep._compare_one(_consume, _consume, (payload,), {}) is None
+    assert payload.items == ["abcd"], "an unusable input must not be consumed"
+
+
+def test_a_dropped_recording_is_counted_rather_than_swallowed() -> None:
+    """The recorder must say what it lost.
+
+    A silently skipped call is indistinguishable from a call that never happened,
+    and the two have opposite repairs: one needs a copyable argument, the other
+    needs a driver test.
+    """
+    from conductor import equivalence_probe as ep
+
+    recorder, recording = ep._make_recorder(_consume)
+    assert recorder(_Uncopyable(["ab"])) == 2
+    assert recorder(_Uncopyable(["xyz"])) == 3
+    assert recording.calls == [], "an uncopyable argument must not be recorded"
+    assert recording.dropped == ["_Uncopyable", "_Uncopyable"]
+    # The call still reaches the real function: the recorder is installed while the
+    # driver suite runs, so refusing to record must never change what the suite does.
+    kept, keeping = ep._make_recorder(_consume)
+    assert kept(_Uncopyable(["ab"])) == 2
+    assert keeping.dropped == ["_Uncopyable"]
+
+
+def test_the_drop_limit_counts_refused_calls_too() -> None:
+    """Otherwise a function whose arguments are all uncopyable retries forever.
+
+    The cap exists to bound recorder memory and the driver's own runtime; counting
+    only the kept calls means a function called ten thousand times with an
+    uncopyable argument pays the clone cost ten thousand times and keeps nothing.
+    """
+    from conductor import equivalence_probe as ep
+
+    recorder, recording = ep._make_recorder(_consume, limit=3)
+    for _ in range(10):
+        recorder(_Uncopyable(["ab"]))
+    assert len(recording.dropped) == 3
+
+
+def test_uncopyable_arguments_report_unusable_evidence_not_a_clean_sweep(
+    workspace: pathlib.Path,
+) -> None:
+    """ARGUMENTS_UNCOPYABLE, never NOT_EXERCISED.
+
+    NOT_EXERCISED says the driver tests do not reach this function -- the repair is
+    to write one. Here the tests reach it on every call and the probe cannot keep
+    what they pass. Reporting the second as the first sends the reader to fix a
+    test that already exists.
+    """
+    from conductor import equivalence_probe as ep
+
+    module_path = workspace / "fixture_mod.py"
+    qualname = ep.public_functions(module_path)[0]
+    results = ep.probe_function(
+        module_path,
+        qualname,
+        ["test_fixture_mod.py"],
+        calls=[],
+        dropped=("_Uncopyable", "Lock"),
+    )
+    assert results, "the fixture function must have at least one ablation"
+    for result in results:
+        assert result.verdict == ep.Verdict.ARGUMENTS_UNCOPYABLE
+        assert result.dropped_calls == 2
+        assert "_Uncopyable" in result.detail and "Lock" in result.detail
+    # And with nothing dropped the verdict is still the honest NOT_EXERCISED, or
+    # the new one would swallow the case it was carved out of.
+    untouched = ep.probe_function(
+        module_path, qualname, ["test_fixture_mod.py"], calls=[]
+    )
+    assert {r.verdict for r in untouched} == {ep.Verdict.NOT_EXERCISED}
+    assert {r.dropped_calls for r in untouched} == {0}

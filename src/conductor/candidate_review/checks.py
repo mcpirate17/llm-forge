@@ -33,6 +33,7 @@ from conductor.candidate_review.model import (
 )
 from conductor.candidate_review.ownership import OwnershipError, load_claims
 from conductor.candidate_review.policy import CheckPolicy, Policy
+from conductor.candidate_review.scan_ledger import ScanLedger
 
 SECRET_PATTERNS = {
     "private-key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -981,10 +982,13 @@ def check_native_source(ctx: ReviewContext) -> CheckResult:
     findings: list[Finding] = []
     files = _changed_files(ctx, {"native"})
     dangerous = re.compile(r"\b(?:gets|strcpy|strcat|sprintf|system|popen)\s*\(")
+    # Every file this check reads is one the candidate changed, so an unreadable
+    # one is not a gap in some background corpus -- it is the check declaring a
+    # PASS over native source nobody scanned for unsafe APIs.
+    ledger = ScanLedger("native-source")
     for rel in files:
-        try:
-            text = (ctx.snapshot / rel).read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        text = ledger.read_text(ctx.snapshot, rel)
+        if text is None:
             continue
         for match in dangerous.finditer(text):
             findings.append(
@@ -997,7 +1001,16 @@ def check_native_source(ctx: ReviewContext) -> CheckResult:
                     message=f"unsafe native API admitted: {match.group(0).strip()}",
                 )
             )
-    return _result("native-source", started, findings, files=files)
+    findings.extend(
+        ledger.incomplete_findings(
+            adjudicated=set(files),
+            severity=Severity.CRITICAL,
+            subject="changed native source",
+        )
+    )
+    return _result(
+        "native-source", started, findings, files=files, metrics=ledger.metrics()
+    )
 
 
 BUILTIN_CHECKS["native-source"] = check_native_source
@@ -1025,6 +1038,7 @@ def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
     bodies: dict[str, list[tuple[str, str, int]]] = {}
     changed_bodies: set[tuple[str, str, int]] = set()
     records: list[tuple[str, str]] = []
+    ledger = ScanLedger("duplicate-function-bodies")
     for path in ctx.snapshot.rglob("*.py"):
         if any(
             part in {".venv", "node_modules", "__pycache__", ".run"}
@@ -1032,10 +1046,10 @@ def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
         ):
             continue
         rel = path.relative_to(ctx.snapshot).as_posix()
-        try:
-            records.append((rel, path.read_text(encoding="utf-8")))
-        except (OSError, UnicodeDecodeError):
+        source = ledger.read_text(ctx.snapshot, rel)
+        if source is None:
             continue
+        records.append((rel, source))
     native_files = json.loads(duplicate_body_fingerprints_native(records, "candidate"))
     for native_file in native_files:
         rel = native_file["path"]
@@ -1075,13 +1089,21 @@ def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
                 )
             )
             emitted.add(location)
+    findings.extend(
+        ledger.incomplete_findings(
+            adjudicated=set(changed),
+            severity=Severity.HIGH,
+            subject="candidate source",
+        )
+    )
     return _result(
         "duplicate-function-bodies",
         started,
         findings,
         files=changed,
         metrics={
-            "candidate_function_bodies": sum(len(items) for items in bodies.values())
+            "candidate_function_bodies": sum(len(items) for items in bodies.values()),
+            **ledger.metrics(),
         },
     )
 

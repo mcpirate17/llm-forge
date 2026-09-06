@@ -12,6 +12,7 @@ from typing import Any
 from conductor._native import candidate_structure_facts_native
 from conductor.candidate_review.checks import ReviewContext, _changed_files, _result
 from conductor.candidate_review.model import CheckResult, Finding, Severity
+from conductor.candidate_review.scan_ledger import ScanLedger
 
 CHECK_ID = "structure-audit"
 SKIP_DIRECTORIES = frozenset({".venv", "node_modules", "__pycache__", ".run", ".git"})
@@ -20,19 +21,25 @@ GROWTH_METHODS = frozenset(
 )
 
 
-def _snapshot_records(snapshot: Path) -> list[tuple[str, str]]:
-    """Return readable Python sources in deterministic relative-path order."""
+def _snapshot_records(snapshot: Path) -> tuple[list[tuple[str, str]], ScanLedger]:
+    """Readable Python sources in relative-path order, with what was skipped.
+
+    The ledger comes back beside the records rather than being discarded: the
+    audit reasons about the whole tree, so a file it could not open is a hole in
+    the cross-module facts -- one the caller has to be able to report.
+    """
 
     records: list[tuple[str, str]] = []
+    ledger = ScanLedger(CHECK_ID)
     for path in sorted(snapshot.rglob("*.py")):
         if SKIP_DIRECTORIES.intersection(path.parts):
             continue
-        try:
-            source = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        rel = path.relative_to(snapshot).as_posix()
+        source = ledger.read_text(snapshot, rel)
+        if source is None:
             continue
-        records.append((path.relative_to(snapshot).as_posix(), source))
-    return records
+        records.append((rel, source))
+    return records, ledger
 
 
 def _normalize_expression(source: str) -> str:
@@ -222,7 +229,7 @@ def check_structure_audit(ctx: ReviewContext) -> CheckResult:
     if not changed:
         return _result(CHECK_ID, started)
 
-    records = _snapshot_records(ctx.snapshot)
+    records, ledger = _snapshot_records(ctx.snapshot)
     sources = dict(records)
     payload = json.loads(candidate_structure_facts_native(records, sorted(changed)))
     orders: dict[tuple[str, str], list[tuple[str, int]]] = defaultdict(list)
@@ -260,11 +267,18 @@ def check_structure_audit(ctx: ReviewContext) -> CheckResult:
     findings.extend(_lock_findings(changed, orders))
     findings.extend(_abstraction_findings(changed, declared, subclasses))
     findings.extend(_config_findings(changed, keys))
+    findings.extend(
+        ledger.incomplete_findings(
+            adjudicated=changed,
+            severity=Severity.HIGH,
+            subject="candidate source",
+        )
+    )
     findings.sort(key=lambda item: (item.path or "", item.line or 0, item.rule_id))
     return _result(
         CHECK_ID,
         started,
         findings,
         files=sorted(changed),
-        metrics={"modules_indexed": payload["modules_indexed"]},
+        metrics={"modules_indexed": payload["modules_indexed"], **ledger.metrics()},
     )

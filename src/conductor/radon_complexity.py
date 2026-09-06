@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PATHS = ("research", "aria_core", "aria_designer")
+DEFAULT_PATHS = ("conductor", "research", "aria_core", "aria_designer")
 DEFAULT_EXCLUDES = (
     "*/rust/*",
     "*/tests/*",
@@ -91,10 +91,19 @@ def _counts(findings: list[dict[str, Any]]) -> dict[str, int]:
     return counts
 
 
-def _load_baseline(path: Path) -> set[str]:
+def _load_baseline(path: Path) -> dict[str, int]:
+    """Map each grandfathered key to the worst score it is allowed to hold."""
+
     raw = json.loads(path.read_text(encoding="utf-8"))
     entries = raw.get("findings", raw if isinstance(raw, list) else [])
-    return {str(item["key"]) for item in entries}
+    baseline: dict[str, int] = {}
+    for item in entries:
+        key = str(item["key"])
+        complexity = int(item["complexity"])
+        # Two blocks can share path::name. Keeping the larger score would let
+        # the smaller one grow up to it unnoticed, so the lowest one binds.
+        baseline[key] = min(complexity, baseline.get(key, complexity))
+    return baseline
 
 
 def _write_baseline(
@@ -144,27 +153,66 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _describe(item: dict[str, Any]) -> str:
+    return (
+        f"{item['complexity']:3d} {item['rank']} "
+        f"{item['path']}:{item['line']} {item['type']} {item['name']}"
+    )
+
+
 def _run_check(
     baseline_path: Path,
     findings: list[dict[str, Any]],
     minimum_rank: str,
 ) -> int:
-    baseline_keys = _load_baseline(baseline_path)
+    baseline = _load_baseline(baseline_path)
     current = [
         item for item in findings if _rank_at_or_above(item["rank"], minimum_rank)
     ]
-    new_findings = [item for item in current if item["key"] not in baseline_keys]
-    if not new_findings:
-        print(f"Complexity ratchet passed: no new {minimum_rank}-F blocks.")
-        return 0
-    print(
-        f"Complexity ratchet failed: {len(new_findings)} new {minimum_rank}-F blocks."
+    new_findings = [item for item in current if item["key"] not in baseline]
+    worsened = [
+        item
+        for item in current
+        if item["key"] in baseline and item["complexity"] > baseline[item["key"]]
+    ]
+    # A grandfathered block that improved -- including one that fell below the
+    # minimum rank and left the flagged set -- is reported so the baseline can
+    # be tightened. Left unsaid, the recorded debt only ever rots upward.
+    best: dict[str, int] = {}
+    for item in findings:
+        key = item["key"]
+        if key in baseline:
+            best[key] = min(item["complexity"], best.get(key, item["complexity"]))
+    improved = sorted(
+        (key, baseline[key], score)
+        for key, score in best.items()
+        if score < baseline[key]
     )
-    for item in new_findings[:50]:
+
+    if improved:
+        print(f"{len(improved)} grandfathered blocks improved; run refresh-baseline:")
+        for key, was, now in improved[:50]:
+            print(f"  {was} -> {now}  {key}")
+
+    if not new_findings and not worsened:
+        print(f"Complexity ratchet passed: no new or worsened {minimum_rank}-F blocks.")
+        return 0
+
+    if new_findings:
         print(
-            f"{item['complexity']:3d} {item['rank']} "
-            f"{item['path']}:{item['line']} {item['type']} {item['name']}"
+            f"Complexity ratchet failed: {len(new_findings)} "
+            f"new {minimum_rank}-F blocks."
         )
+        for item in new_findings[:50]:
+            print(_describe(item))
+    if worsened:
+        print(
+            f"Complexity ratchet failed: {len(worsened)} grandfathered blocks worsened."
+        )
+        for item in worsened[:50]:
+            print(
+                f"{_describe(item)}  ({baseline[item['key']]} -> {item['complexity']})"
+            )
     return 1
 
 

@@ -90,10 +90,19 @@ INCOMPLETE = (TIMEOUT, PROBE_FAILED)
 #   OVER_BUDGET        the function ran out of its sweep budget before this construct
 #   BASELINE_UNUSABLE  the recorded arguments never drove the unmodified function
 #   UNCOMPILABLE       the ablated source would not compile, so no question was asked
+#   ARGUMENTS_UNCOPYABLE  the drivers DID call the function, but no argument could be
+#                      isolated from the baseline run, so replaying one would have
+#                      shared mutable state; distinct from NOT_EXERCISED, which claims
+#                      the tests never reached it
 # The last two predate the budget and were not in any bucket: they fell off the end of
 # the classification chain and out of every summary list, so a module in which the
 # probe answered NOTHING rendered identically to one it swept clean.
-UNMEASURED = ("OVER_BUDGET", "BASELINE_UNUSABLE", "UNCOMPILABLE")
+UNMEASURED = (
+    "OVER_BUDGET",
+    "BASELINE_UNUSABLE",
+    "UNCOMPILABLE",
+    "ARGUMENTS_UNCOPYABLE",
+)
 # The healthy outcome: the construct changes behaviour and the tests notice. Counted
 # rather than listed -- three modules produce 71 of these and none of them is news --
 # but counted, because "0 blocking" means something different at 71 live constructs
