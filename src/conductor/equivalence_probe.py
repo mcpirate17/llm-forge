@@ -38,6 +38,7 @@ import time
 from typing import Any, Callable, Sequence
 
 from conductor.native_ablations import Ablation as NativeAblation
+from conductor.probe_replay_stubs import replay_stub_overrides
 from conductor.native_ablations import ablations as native_ablations
 
 __all__ = ["Verdict", "AblationResult", "probe_function", "probe_module"]
@@ -826,7 +827,10 @@ def probe_function(
         budget=_Budget(budget_seconds),
         budget_seconds=budget_seconds,
     )
-    results = [_probe_construct(ablation, ctx) for ablation in ablations]
+    results = []
+    with replay_stub_overrides(module):
+        for ablation in ablations:
+            results.append(_probe_construct(ablation, ctx))
     _pool_jitter_floor(results)
     return results
 

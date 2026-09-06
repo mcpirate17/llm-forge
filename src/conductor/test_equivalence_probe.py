@@ -875,3 +875,108 @@ def test_uncopyable_arguments_report_unusable_evidence_not_a_clean_sweep(
     )
     assert {r.verdict for r in untouched} == {ep.Verdict.NOT_EXERCISED}
     assert {r.dropped_calls for r in untouched} == {0}
+
+
+def test_replay_stub_overrides_swaps_attributes_and_captured_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both seams swap and restore: module attributes AND defaults bound at def time.
+
+    Patching the attribute alone leaves `def query(..., embedder=embed_text)`
+    reaching the live broker through its captured default -- which is exactly the
+    stall the stub exists to prevent, so a stub that misses defaults measures
+    nothing while claiming to have fixed the timeout.
+    """
+    import tempfile
+    import types
+
+    from conductor import probe_replay_stubs as prs
+
+    def _real_embed(text: str) -> list[float]:
+        raise AssertionError("live broker reached")
+
+    real_path = pathlib.Path("/server/real/index.jsonl")
+    module = types.ModuleType("fixture_probe_stub_target")
+    module.embed_text = _real_embed
+    module.INDEX_PATH = real_path
+
+    def query(embedder=_real_embed, path=real_path):
+        return embedder, path
+
+    query.__module__ = module.__name__  # stub lookup filters on __module__
+    module.query = query
+    original_defaults = query.__defaults__
+
+    def _stub_embed(text: str) -> list[float]:
+        return [0.0]
+
+    spec = {"embed_text": _stub_embed, "INDEX_PATH": prs.TMP_PATH}
+    monkeypatch.setitem(prs.REPLAY_STUBS, module.__name__, spec)
+    with prs.replay_stub_overrides(module):
+        assert module.embed_text is _stub_embed
+        assert str(module.INDEX_PATH).startswith(tempfile.gettempdir())
+        assert module.query.__defaults__[0] is _stub_embed
+        assert str(module.query.__defaults__[1]).startswith(tempfile.gettempdir())
+    assert module.embed_text is _real_embed
+    assert module.INDEX_PATH is real_path
+    assert module.query.__defaults__ == original_defaults
+
+
+def test_replay_stub_creates_then_deletes_attrs_that_did_not_exist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stub for an attribute the module lacks must not leak after the probe."""
+    import types
+
+    from conductor import probe_replay_stubs as prs
+
+    module = types.ModuleType("fixture_probe_stub_missing")
+    marker = object()
+    monkeypatch.setitem(prs.REPLAY_STUBS, module.__name__, {"ghost": marker})
+    with prs.replay_stub_overrides(module):
+        assert module.ghost is marker
+    assert not hasattr(module, "ghost")
+
+
+def test_stub_embeddings_are_deterministic_and_satisfy_the_meta_contract() -> None:
+    """Same text, same vector; and the stub metadata must pass the real validator.
+
+    A stub whose metadata `assert_embedding_meta` rejects turns every replay into
+    an unrelated raise -- identically on both ends, so verdicts survive, but the
+    sweep then measures exception paths no live call ever took.
+    """
+    from conductor import probe_replay_stubs as prs
+    from conductor.kb_retrieve import assert_embedding_meta
+
+    first = prs._stub_embed_text("abc")
+    assert prs._stub_embed_text("abc") == first
+    assert len(first) == prs.STUB_DIMENSION
+    assert prs._stub_embed_text("abc", purpose="query") != first
+    assert prs._stub_embed_text("abc", purpose="query") == prs._stub_embed_text(
+        "abc", purpose="query"
+    )
+
+    batch = prs._stub_embed_batch(["x", "y"])
+    assert len(batch.vectors) == 2
+    assert all(len(v) == prs.STUB_DIMENSION for v in batch.vectors)
+    payload = {"embedding": batch.metadata}
+    assert assert_embedding_meta(payload) == batch.metadata
+
+
+def test_unlisted_modules_get_no_overrides() -> None:
+    """Stubbing keys on the module name, so same-named attributes elsewhere
+    are left completely alone."""
+    import types
+
+    from conductor import probe_replay_stubs as prs
+
+    module = types.ModuleType("fixture_probe_stub_unlisted")
+    module.embed_text = prs._stub_embed_text
+    module.INDEX_PATH = "/tmp/real-index.jsonl"
+    before_embed = module.embed_text
+    before_path = module.INDEX_PATH
+    with prs.replay_stub_overrides(module):
+        assert module.embed_text is before_embed
+        assert module.INDEX_PATH is before_path
+    assert module.embed_text is before_embed
+    assert module.INDEX_PATH is before_path
