@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{Map, Value};
 
 const VALUE_SCHEMA: &str = "llm.mutation-testing.test-value.v1";
-const ADAPTER: &str = "pytest-junit";
+const ADAPTERS: [&str; 3] = ["pytest-junit", "ctest-junit", "cargo-libtest"];
 const CLASSIFICATIONS: [&str; 4] = [
     "CORE",
     "INTENTIONAL_REDUNDANCY",
@@ -177,6 +177,16 @@ fn parse_pairs(text: &str) -> Result<Vec<(Value, Value)>, String> {
     serde_json::from_str(text).map_err(|error| format!("invalid mutation contract order: {error}"))
 }
 
+/// Whether a ranked nodeid's file hosts its own tests instead of being a test file.
+///
+/// Rust unit tests live in a `#[cfg(test)] mod` inside the module they exercise, so the
+/// path of a cargo nodeid is production source. Refusing it as a contract's active path
+/// would make value analysis unreachable for every in-module Rust campaign. Python test
+/// files are separate files and stay excluded.
+fn is_in_module_test_path(path: &str) -> bool {
+    path.ends_with(".rs")
+}
+
 fn load_spec(
     value_json: &str,
     mutation_pairs_json: &str,
@@ -196,10 +206,10 @@ fn load_spec(
         return Err("value_analysis.enabled must be true when present".to_owned());
     }
     let adapter = required_string(raw.adapter.as_ref(), "value_analysis.adapter")?;
-    if adapter != ADAPTER {
+    if !ADAPTERS.contains(&adapter.as_str()) {
         return Err(format!(
-            "value_analysis.adapter must be {}",
-            python_repr(Some(&Value::String(ADAPTER.to_owned())))
+            "value_analysis.adapter must be one of {}",
+            python_string_list(&ADAPTERS.map(str::to_owned))
         ));
     }
     let repetitions = raw
@@ -219,6 +229,7 @@ fn load_spec(
     let test_paths: HashSet<&str> = ranked_nodeids
         .iter()
         .map(|nodeid| nodeid.split("::").next().unwrap_or(nodeid))
+        .filter(|path| !is_in_module_test_path(path))
         .collect();
     let source_path_set: HashSet<&str> = source_paths.iter().map(String::as_str).collect();
     let mut contracts = Vec::with_capacity(raw_contracts.len());
@@ -913,4 +924,50 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(admission_errors_native, module)?)?;
     module.add_function(wrap_pyfunction!(test_value_receipt_errors_native, module)?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn spec_for(path: &str) -> Result<Option<ValueSpec>, String> {
+        let value = format!(
+            r#"{{"enabled": true, "adapter": "pytest-junit", "baseline_repetitions": 2,
+                 "required_contracts": [
+                   {{"id": "c", "criticality": "critical", "active_paths": ["{path}"]}}],
+                 "tests": [{{"nodeid": "{path}::t", "contract_id": "c"}}],
+                 "mutation_contracts": {{"m": "c"}}}}"#
+        );
+        load_spec(
+            &value,
+            r#"[["m", "c"]]"#,
+            &[format!("{path}::t")],
+            &["m".to_owned()],
+            &[path.to_owned()],
+        )
+    }
+
+    #[test]
+    fn a_rust_source_may_carry_its_own_contracts() {
+        let spec = spec_for("tooling/native/conductor-native/src/mutation_value.rs")
+            .expect("in-module rust tests must not refuse their own source");
+        assert_eq!(spec.expect("spec").contracts.len(), 1);
+    }
+
+    #[test]
+    fn a_python_test_file_is_still_refused_as_a_contract_path() {
+        let error = spec_for("conductor/test_mutation_value.py")
+            .expect_err("a python test file is not production");
+        assert!(
+            error.contains("active paths are tests, not production"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn only_rust_paths_are_exempt_from_the_test_path_refusal() {
+        assert!(is_in_module_test_path("a/b/c.rs"));
+        assert!(!is_in_module_test_path("a/b/test_c.py"));
+        assert!(!is_in_module_test_path("a/b/c.rs.py"));
+    }
 }

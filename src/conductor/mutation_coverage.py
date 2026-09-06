@@ -18,6 +18,7 @@ from conductor._native import (
     is_mutation_test_path_native,
     mutation_git_paths_native,
     mutation_registry_patterns_native,
+    mutation_rust_test_surface_native,
     mutation_test_inventory_native,
     normalize_mutation_path_native,
     plan_mutation_scaffold_native,
@@ -92,6 +93,18 @@ def is_test_path(path: str, patterns: Sequence[str]) -> bool:
         path,
         list(patterns),
     )
+
+
+def is_rust_test_surface(path: str, *, repo_root: Path = REPO_ROOT) -> bool:
+    """Return whether a Rust source declares tests, reading the file to decide.
+
+    Rust puts unit tests in the module they test, so the glob patterns that
+    answer :func:`is_test_path` for every other language answer nothing here.
+    This is the second half of the inventory's test-surface question, and the
+    only half a filename cannot settle.
+    """
+
+    return mutation_rust_test_surface_native(str(repo_root), path)
 
 
 def _git_paths(repo_root: Path, args: Sequence[str]) -> tuple[str, ...]:

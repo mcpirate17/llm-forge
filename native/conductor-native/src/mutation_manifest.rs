@@ -456,9 +456,14 @@ fn validate_value_analysis(
             "invalid value_analysis: value_analysis.enabled must be true when present".to_owned(),
         );
     }
-    if payload.get("adapter").and_then(Value::as_str) != Some("pytest-junit") {
+    if !matches!(
+        payload.get("adapter").and_then(Value::as_str),
+        Some("pytest-junit" | "ctest-junit" | "cargo-libtest")
+    ) {
         return Err(
-            "invalid value_analysis: value_analysis.adapter must be 'pytest-junit'".to_owned(),
+            "invalid value_analysis: value_analysis.adapter must be 'pytest-junit', \
+             'ctest-junit' or 'cargo-libtest'"
+                .to_owned(),
         );
     }
     let repetitions = payload

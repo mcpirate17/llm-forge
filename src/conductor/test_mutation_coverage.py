@@ -97,6 +97,67 @@ def test_discover_and_changed_paths_include_untracked_tests(tmp_path: Path) -> N
     assert changed == ("research/tests/test_new.py",)
 
 
+def test_rust_test_surface_reads_the_file_not_the_name(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    src = repo / "crate/src"
+    src.mkdir(parents=True)
+    (src / "declares.rs").write_text(
+        "pub fn one() -> u8 { 1 }\n\n"
+        "#[cfg(test)]\nmod tests {\n"
+        "    #[test]\n    fn it_works() {}\n"
+        "    #[tokio::test]\n    async fn it_awaits() {}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    (src / "gates_only.rs").write_text(
+        "#[cfg(test)]\nuse std::fmt;\n"
+        "#[cfg_attr(test, derive(Debug))]\npub struct Thing;\n"
+        "// #[test] fn commented_out() {}\n",
+        encoding="utf-8",
+    )
+    (src / "plain.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+
+    assert mutation_coverage.is_rust_test_surface(
+        "crate/src/declares.rs", repo_root=repo
+    )
+    # Gating attributes and a commented-out test declare nothing, and only Rust
+    # sources are asked the question at all.
+    assert not mutation_coverage.is_rust_test_surface(
+        "crate/src/gates_only.rs", repo_root=repo
+    )
+    assert not mutation_coverage.is_rust_test_surface(
+        "crate/src/plain.py", repo_root=repo
+    )
+    assert not mutation_coverage.is_rust_test_surface(
+        "crate/src/absent.rs", repo_root=repo
+    )
+
+
+def test_inventory_finds_rust_tests_no_glob_matches(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    registry = _registry(repo)
+    unit = repo / "tooling/native/demo/src/lib.rs"
+    unit.parent.mkdir(parents=True)
+    unit.write_text(
+        "pub fn one() -> u8 { 1 }\n\n#[cfg(test)]\nmod tests {\n"
+        "    #[test]\n    fn one_is_one() { assert_eq!(super::one(), 1); }\n}\n",
+        encoding="utf-8",
+    )
+    (repo / "tooling/native/demo/src/plumbing.rs").write_text(
+        "pub fn two() -> u8 { 2 }\n", encoding="utf-8"
+    )
+
+    patterns = mutation_coverage._registry_patterns(registry, repo)
+    # The registry's globs are why this file needs a content predicate: none of
+    # them matches a Rust unit test living in the module it tests.
+    assert not mutation_coverage.is_test_path(
+        "tooling/native/demo/src/lib.rs", patterns
+    )
+    assert mutation_coverage.discover_test_paths(registry, repo_root=repo) == (
+        "tooling/native/demo/src/lib.rs",
+    )
+
+
 def test_coverage_report_uses_verify_evidence(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

@@ -29,6 +29,8 @@ from conductor._native import (
 
 VALUE_SCHEMA = "llm.mutation-testing.test-value.v1"
 ADAPTER = "pytest-junit"
+CTEST_ADAPTER = "ctest-junit"
+CARGO_ADAPTER = "cargo-libtest"
 
 
 class ValueEvidenceError(ValueError):

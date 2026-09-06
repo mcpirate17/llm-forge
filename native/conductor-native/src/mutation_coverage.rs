@@ -224,6 +224,61 @@ fn is_mutation_test_path_native(path: &str, patterns: Vec<String>) -> bool {
     is_mutation_test_path(path, &patterns)
 }
 
+/// Read the attribute path out of a `#[...]` line: `#[tokio::test]` is
+/// `tokio::test`, `#[cfg(test)]` is `cfg`.
+fn rust_attribute_path(trimmed: &str) -> Option<&str> {
+    let rest = trimmed.strip_prefix("#[")?;
+    let end = rest.find(['(', ']'])?;
+    Some(rest[..end].trim())
+}
+
+/// Does this Rust source declare tests?
+///
+/// Rust puts unit tests in the module they test, so no filename glob can find
+/// them: `**/test_*.rs` matches nothing real, and an inventory built from
+/// globs alone reports zero Rust test files while the repository has dozens.
+/// Deciding it needs the file's contents, not its name.
+///
+/// The rule is the attribute path, the same one `mutation_manifest`'s nodeid
+/// reader applies: an attribute whose final segment is `test` declares a test,
+/// so `#[test]` and `#[tokio::test]` both count, while `#[cfg(test)]` and
+/// `#[cfg_attr(test, ..)]` gate code rather than declare one and do not.
+/// Requiring `#[` at the START of the trimmed line is also what excludes a
+/// commented-out test: `// #[test]` does not begin an attribute. A separate
+/// comment guard reads as protection but is unreachable, and a mutation run
+/// proved it -- deleting it changed no outcome.
+fn declares_rust_tests(source: &str) -> bool {
+    source.lines().any(|line| {
+        rust_attribute_path(line.trim())
+            .is_some_and(|path| path.rsplit("::").next().unwrap_or(path) == "test")
+    })
+}
+
+/// A `.rs` file is a test surface when it declares tests. An unreadable file
+/// is not one: the inventory reports what it can see, and a path git lists
+/// that the filesystem cannot open is a different failure.
+fn is_rust_test_surface(repo_root: &Path, relative: &str) -> bool {
+    relative.ends_with(".rs")
+        && fs::read_to_string(repo_root.join(relative))
+            .is_ok_and(|source| declares_rust_tests(&source))
+}
+
+/// Is this path a mutation test surface?
+///
+/// Two questions, because neither language answers for the other: the registry's
+/// globs decide it for every named test file, and the file's contents decide it
+/// for Rust. Asking only the first is what left the inventory blind to a tree of
+/// unit tests; asking only the second would drop every Python and JavaScript
+/// test on the floor.
+fn is_inventory_surface(repo_root: &Path, normalized: &str, patterns: &[String]) -> bool {
+    is_mutation_test_path(normalized, patterns) || is_rust_test_surface(repo_root, normalized)
+}
+
+#[pyfunction]
+fn mutation_rust_test_surface_native(repo_root: &str, path: &str) -> bool {
+    is_rust_test_surface(Path::new(repo_root), path)
+}
+
 fn git_paths(repo_root: &str, args: &[String]) -> Result<Vec<String>, String> {
     let output = Command::new("git")
         .args(args)
@@ -320,7 +375,7 @@ fn mutation_test_inventory_native(
             .join("/");
         if !seen.insert(normalized.clone())
             || should_skip_mutation_path(&normalized, &skip)
-            || !is_mutation_test_path(&normalized, &patterns)
+            || !is_inventory_surface(Path::new(repo_root), &normalized, &patterns)
         {
             continue;
         }
@@ -520,7 +575,109 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(is_mutation_test_path_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_git_paths_native, module)?)?;
     module.add_function(wrap_pyfunction!(should_skip_mutation_path_native, module)?)?;
+    module.add_function(wrap_pyfunction!(mutation_rust_test_surface_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_test_inventory_native, module)?)?;
     module.add_function(wrap_pyfunction!(plan_mutation_scaffold_native, module)?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        declares_rust_tests, is_inventory_surface, is_rust_test_surface, rust_attribute_path,
+    };
+
+    #[test]
+    fn attribute_path_stops_at_the_first_delimiter() {
+        assert_eq!(rust_attribute_path("#[test]"), Some("test"));
+        assert_eq!(rust_attribute_path("#[tokio::test]"), Some("tokio::test"));
+        assert_eq!(rust_attribute_path("#[cfg(test)]"), Some("cfg"));
+        assert_eq!(rust_attribute_path("#[ cfg_attr (test)]"), Some("cfg_attr"));
+        assert_eq!(rust_attribute_path("fn test() {}"), None);
+        assert_eq!(rust_attribute_path("#[unterminated"), None);
+    }
+
+    #[test]
+    fn a_test_attribute_marks_the_file() {
+        assert!(declares_rust_tests("#[test]\nfn one() {}\n"));
+        assert!(declares_rust_tests(
+            "    #[tokio::test]\n    async fn two() {}\n"
+        ));
+    }
+
+    #[test]
+    fn gating_attributes_are_not_test_declarations() {
+        // The whole point of the attribute-path rule: `#[cfg(test)]` marks the
+        // module a test lives in, and a file can carry one with every test
+        // since removed.
+        assert!(!declares_rust_tests("#[cfg(test)]\nmod tests {}\n"));
+        assert!(!declares_rust_tests(
+            "#[cfg_attr(test, derive(Debug))]\nstruct S;\n"
+        ));
+    }
+
+    #[test]
+    fn a_commented_out_test_does_not_count() {
+        assert!(!declares_rust_tests("// #[test]\n// fn gone() {}\n"));
+        assert!(!declares_rust_tests(
+            "/// #[tokio::test]\n/// async fn gone() {}\n"
+        ));
+        // The attribute has to OPEN the line; trailing prose after a real one
+        // is still a declaration.
+        assert!(declares_rust_tests(
+            "#[test] // still a test\nfn one() {}\n"
+        ));
+    }
+
+    #[test]
+    fn plain_rust_source_declares_nothing() {
+        assert!(!declares_rust_tests("pub fn one() -> u8 {\n    1\n}\n"));
+        // Ordinary Rust is full of attributes; carrying one is not declaring a
+        // test, or every crate in the tree would be a test surface.
+        assert!(!declares_rust_tests(
+            "#[derive(Debug)]\npub struct S;\n\n#[inline]\npub fn two() -> u8 {\n    2\n}\n"
+        ));
+        assert!(!declares_rust_tests(""));
+    }
+
+    #[test]
+    fn only_rust_paths_are_rust_surfaces() {
+        let dir = std::env::temp_dir().join(format!(
+            "conductor-native-rust-surface-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        std::fs::write(dir.join("with.rs"), "#[test]\nfn one() {}\n").expect("write");
+        std::fs::write(dir.join("without.rs"), "pub fn one() {}\n").expect("write");
+        std::fs::write(dir.join("with.py"), "#[test]\n").expect("write");
+
+        assert!(is_rust_test_surface(&dir, "with.rs"));
+        assert!(!is_rust_test_surface(&dir, "without.rs"));
+        // A `.py` file carrying the same bytes is not a Rust surface, and an
+        // absent path is not one either.
+        assert!(!is_rust_test_surface(&dir, "with.py"));
+        assert!(!is_rust_test_surface(&dir, "absent.rs"));
+
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn a_surface_is_admitted_by_either_name_or_contents() {
+        let dir = std::env::temp_dir().join(format!(
+            "conductor-native-inventory-surface-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        std::fs::write(dir.join("lib.rs"), "#[test]\nfn one() {}\n").expect("write");
+        std::fs::write(dir.join("plumbing.rs"), "pub fn one() {}\n").expect("write");
+        let patterns = vec!["test_*.py".to_owned()];
+
+        // Named like a test but absent from disk: the glob still admits it.
+        assert!(is_inventory_surface(&dir, "test_thing.py", &patterns));
+        // No glob matches a Rust unit test; only its contents do.
+        assert!(is_inventory_surface(&dir, "lib.rs", &patterns));
+        assert!(!is_inventory_surface(&dir, "plumbing.rs", &patterns));
+
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
 }

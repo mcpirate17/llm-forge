@@ -672,6 +672,105 @@ def test_a_rust_kill_by_an_undeclared_test_is_misattributed() -> None:
     }
 
 
+def _routing_campaign(
+    manifest: Path,
+    nodeids: Sequence[str],
+    argv: Sequence[str],
+    value_analysis: mutation_value.ValueAnalysisSpec | None = None,
+) -> mutation_testing.Campaign:
+    ranked = tuple(
+        mutation_testing.RankedTest(i + 1, n, "c", "r") for i, n in enumerate(nodeids)
+    )
+    return mutation_testing.Campaign(
+        manifest_path=manifest,
+        manifest_sha256="0" * 64,
+        campaign_id="routing_probe",
+        title="routing probe",
+        language="rust",
+        mutation_engine="reviewed_unified_diff",
+        expected_mutations=0,
+        source_sha256={},
+        ranked_tests=ranked,
+        planned_mutations=(),
+        mutations=(),
+        test_argv=tuple(argv),
+        timeout_seconds=10,
+        blocked_process_substrings=(),
+        poll_seconds=1,
+        environment={},
+        host_read_dependencies=(),
+        value_analysis=value_analysis,
+    )
+
+
+def _routing_spec(adapter: str, nodeid: str) -> mutation_value.ValueAnalysisSpec:
+    return mutation_value.ValueAnalysisSpec(
+        adapter=adapter,
+        baseline_repetitions=2,
+        contracts=(mutation_value.ValueContract("c", "critical", ("src/lib.rs",)),),
+        tests=(mutation_value.ValueTest(nodeid, "c", False),),
+        mutation_contracts={"m": "c"},
+    )
+
+
+def test_value_analysis_reaches_the_native_collectors(tmp_path: Path) -> None:
+    """Value analysis is not a pytest feature; it is a per-test kill matrix.
+
+    The classifier reads `report["tests"][nodeid]["outcome"]`, which the cargo and
+    ctest collectors produce in exactly the shape the pytest one does. Refusing
+    every non-pytest batch made value analysis unreachable for every Rust, C and
+    C++ campaign in the repo -- the tests those campaigns ship could never be
+    classified, so their receipts could never say whether the tests were worth
+    keeping. What still has to refuse is a batch that attributes NOTHING, and a
+    manifest whose adapter names a harness that will not run.
+    """
+
+    rust = "tooling/native/conductor-native/src/mutation_manifest.rs::test_alpha"
+    manifest = tmp_path / "campaign.json"
+    manifest.write_text("{}", encoding="utf-8")
+
+    def fake_run_command(argv, *, cwd, timeout_seconds, environment, stdout_sink=None):
+        if stdout_sink is not None:
+            stdout_sink("test manifest::tests::test_alpha ... FAILED\n")
+        return "result"
+
+    original = mutation_testing._run_command  # noqa: SLF001
+    mutation_testing._run_command = fake_run_command  # noqa: SLF001
+    try:
+        # A cargo batch that declares value analysis reaches the libtest collector
+        # and comes back with the matrix, instead of being refused.
+        campaign = _routing_campaign(
+            manifest, [rust], ("cargo", "test"), _routing_spec("cargo-libtest", rust)
+        )
+        _, report = mutation_testing._run_campaign_command(  # noqa: SLF001
+            campaign, snapshot_root=tmp_path, report_name="batch"
+        )
+        assert report["tests"][rust]["outcome"] == "FAILED"
+
+        # The adapter label must name the collector that actually runs, or the
+        # receipt reads as evidence from a harness that never executed.
+        mislabelled = _routing_campaign(
+            manifest, [rust], ("cargo", "test"), _routing_spec("pytest-junit", rust)
+        )
+        with pytest.raises(mutation_testing.CampaignError, match="cargo-libtest"):
+            mutation_testing._run_campaign_command(  # noqa: SLF001
+                mislabelled, snapshot_root=tmp_path, report_name="batch"
+            )
+
+        # A batch no collector can attribute still refuses: value analysis without
+        # a kill matrix would classify every test off an empty report.
+        opaque = "tests/suite.js"
+        blind = _routing_campaign(
+            manifest, [opaque], ("npm", "test"), _routing_spec("pytest-junit", opaque)
+        )
+        with pytest.raises(mutation_testing.CampaignError, match="attributes failures"):
+            mutation_testing._run_campaign_command(  # noqa: SLF001
+                blind, snapshot_root=tmp_path, report_name="batch"
+            )
+    finally:
+        mutation_testing._run_command = original  # noqa: SLF001
+
+
 def test_a_rust_batch_is_routed_to_the_libtest_collector(tmp_path: Path) -> None:
     """The adapter only pays off if the batch actually reaches it.
 

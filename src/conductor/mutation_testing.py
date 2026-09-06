@@ -74,6 +74,9 @@ from conductor.mutation_scope import (
 from conductor.mutation_scope import _require_string as _require_string  # noqa: PLC0414
 from conductor.mutation_testing_support import intern_test_attribution
 from conductor.mutation_value import (
+    ADAPTER,
+    CARGO_ADAPTER,
+    CTEST_ADAPTER,
     ValueEvidenceError,
     cargo_attribution_supported,
     collect_cargo_libtest_batch,
@@ -294,6 +297,34 @@ def killer_verdict(
     return verdict
 
 
+def _require_declared_adapter(
+    campaign: Campaign, ranked_nodeids: Sequence[str]
+) -> None:
+    """Refuse a value_analysis whose adapter names a harness it will not run under.
+
+    The collector is chosen by nodeid shape, so a manifest is free to claim any
+    adapter it likes and still get a matrix. That makes the label decorative, and a
+    cargo campaign labelled `pytest-junit` reads as evidence from a harness that never
+    ran. Bind the label to the collector instead.
+    """
+
+    if campaign.value_analysis is None:
+        return
+    if pytest_attribution_supported(campaign.test_argv, ranked_nodeids):
+        expected = ADAPTER
+    elif ctest_attribution_supported(ranked_nodeids):
+        expected = CTEST_ADAPTER
+    elif cargo_attribution_supported(ranked_nodeids):
+        expected = CARGO_ADAPTER
+    else:
+        return
+    if campaign.value_analysis.adapter != expected:
+        raise CampaignError(
+            f"value_analysis.adapter is {campaign.value_analysis.adapter!r} but this "
+            f"batch is collected as {expected!r}"
+        )
+
+
 def _run_campaign_command(
     campaign: Campaign,
     *,
@@ -303,11 +334,21 @@ def _run_campaign_command(
     """Run one batch, adding per-test evidence with no test-mutant Cartesian loop."""
 
     ranked_nodeids = [test.nodeid for test in campaign.ranked_tests]
+    _require_declared_adapter(campaign, ranked_nodeids)
     if not pytest_attribution_supported(campaign.test_argv, ranked_nodeids):
-        if campaign.value_analysis is not None:
+        # Value analysis needs a per-test kill matrix, not a pytest one: it reads
+        # `report["tests"][nodeid]["outcome"]`, which the ctest and cargo collectors
+        # below produce in the same shape. Refusing everything but pytest made value
+        # analysis unreachable for every Rust, C and C++ campaign in the repo.
+        if campaign.value_analysis is not None and not (
+            ctest_attribution_supported(ranked_nodeids)
+            or cargo_attribution_supported(ranked_nodeids)
+        ):
             raise CampaignError(
-                "value analysis needs a pytest batch whose ranked tests are "
-                "Python nodeids and whose argv does not already set --junitxml"
+                "value analysis needs a batch that attributes failures per test: a "
+                "pytest batch whose ranked tests are Python nodeids and whose argv "
+                "does not already set --junitxml, a ctest batch, or a cargo libtest "
+                "batch whose ranked tests are uniquely named `<path>.rs::<fn>`"
             )
         if ctest_attribution_supported(ranked_nodeids):
             return collect_ctest_junit_batch(
