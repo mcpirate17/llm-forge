@@ -136,7 +136,10 @@ def _init_repo(path: Path) -> Path:
 
 def _commit_all(repo: Path, message: str) -> str:
     _git(repo, "add", "--all")
-    _git(repo, "commit", "--quiet", "--message", message)
+    # Fixture commits carry the `Agent:` trailer real commits in this repo carry,
+    # so a CI-surface fixture is not reported as unattributed. Tests that need a
+    # commit without one build it with `_commit_dated`.
+    _git(repo, "commit", "--quiet", "--message", f"{message}\n\nAgent: llm-fixture\n")
     return _git(repo, "rev-parse", "HEAD")
 
 
@@ -2834,3 +2837,270 @@ def test_changed_lines_pair_a_move_that_leaves_an_alias_shim(tmp_path: Path) -> 
 
     assert changed["pkg/mod.py"] == {10}
     assert changed["tools/mod.py"] == {1}
+
+
+def _research_context(
+    repo: Path, tmp_path: Path, snapshot: Path, entries: Any, candidate: Candidate
+) -> ReviewContext:
+    return ReviewContext(
+        repo=repo,
+        snapshot=snapshot,
+        candidate=candidate,
+        entries=entries,
+        policy=load_policy(resolve_policy_path()),
+        surface="ci",
+        profile="full",
+        owner=None,
+        runtime_dir=tmp_path / "runtime",
+    )
+
+
+def _research_rules(
+    repo: Path,
+    tmp_path: Path,
+    *,
+    tests: tuple[str, ...] = (),
+) -> tuple[set[str], dict[str, object]]:
+    """Run research-integrity over the staged index and report its rule ids."""
+
+    policy = load_policy(resolve_policy_path())
+    candidate = classify_candidate(resolve_candidate(repo, kind="index"), policy)
+    selection = ReviewTestSelection(tests=tests, graph={}, findings=())
+    with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
+        context = _research_context(repo, tmp_path, snapshot, entries, candidate)
+        result = check_research_evidence(context, selection)
+    return {finding.rule_id for finding in result.findings}, dict(result.metrics)
+
+
+# A file whose existing prose already trips both triggers: "score" arms the
+# provenance rule and "device"/"NaN" arm the numerical rule.
+_NUMERICAL_PROSE = """# Memory measure
+
+The ledger writes a score per candidate.
+It runs on one device and rejects NaN inputs.
+
+See `../OLD_REPORT.md` for the postmortem.
+"""
+
+
+def test_research_integrity_arms_on_changed_lines_not_the_whole_file(
+    tmp_path: Path,
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    doc = repo / "component_fab" / "notes.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text(_NUMERICAL_PROSE, encoding="utf-8")
+    _commit_all(repo, "seed")
+    doc.write_text(
+        _NUMERICAL_PROSE.replace("`../OLD_REPORT.md`", "`research/notes/report.md`"),
+        encoding="utf-8",
+    )
+    _git(repo, "add", "--all")
+
+    rules, metrics = _research_rules(repo, tmp_path)
+
+    assert metrics["armed_on"] == "changed-lines"
+    assert rules == set()
+
+
+def test_research_integrity_still_fires_on_a_line_this_change_added(
+    tmp_path: Path,
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    doc = repo / "component_fab" / "notes.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text(_NUMERICAL_PROSE, encoding="utf-8")
+    _commit_all(repo, "seed")
+    doc.write_text(
+        _NUMERICAL_PROSE + "\nThe reader now promotes on a float16 dtype.\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "--all")
+
+    rules, metrics = _research_rules(repo, tmp_path)
+
+    assert metrics["armed_on"] == "changed-lines"
+    assert "missing-numerical-device-tests" in rules
+    assert "incomplete-result-provenance" in rules
+
+
+def test_research_integrity_reads_provenance_the_candidate_did_not_touch(
+    tmp_path: Path,
+) -> None:
+    """Evidence recorded by an earlier change still counts as evidence."""
+
+    repo = _init_repo(tmp_path / "repo")
+    doc = repo / "component_fab" / "notes.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text(
+        "# Run\n\nbaseline: control\nseed: 11\nconfig: sweep.toml\n"
+        "fingerprint: abc123\n",
+        encoding="utf-8",
+    )
+    _commit_all(repo, "seed")
+    doc.write_text(
+        doc.read_text(encoding="utf-8") + "\nThe promoted candidate is recorded.\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "--all")
+
+    rules, _ = _research_rules(repo, tmp_path)
+
+    assert "incomplete-result-provenance" not in rules
+
+
+def test_research_integrity_falls_back_to_whole_files_when_the_diff_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    doc = repo / "component_fab" / "notes.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text(_NUMERICAL_PROSE, encoding="utf-8")
+    _commit_all(repo, "seed")
+    doc.write_text(
+        _NUMERICAL_PROSE.replace("`../OLD_REPORT.md`", "`research/notes/report.md`"),
+        encoding="utf-8",
+    )
+    _git(repo, "add", "--all")
+
+    def _explode(*_args: object, **_kwargs: object) -> dict[str, set[int]]:
+        raise GitSourceError("diff unavailable")
+
+    monkeypatch.setattr(review_checks, "changed_line_numbers", _explode)
+    rules, metrics = _research_rules(repo, tmp_path)
+
+    assert metrics["armed_on"] == "whole-files"
+    assert "GitSourceError" in str(metrics["diff_error"])
+    assert "missing-numerical-device-tests" in rules
+    assert "incomplete-result-provenance" in rules
+
+
+def _commit_dated(repo: Path, message: str, when: str) -> str:
+    """Commit everything with an explicit author/committer date."""
+
+    _git(repo, "add", "--all")
+    env = dict(os.environ, GIT_AUTHOR_DATE=when, GIT_COMMITTER_DATE=when)
+    completed = subprocess.run(
+        ["git", "commit", "--quiet", "--message", message],
+        cwd=repo,
+        capture_output=True,
+        check=False,
+        text=True,
+        env=env,
+    )
+    if completed.returncode:
+        pytest.fail(f"dated commit failed: {completed.stderr.strip()}")
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def _attestation_for_range(
+    repo: Path, tmp_path: Path, *, base_ref: str, target_ref: str
+) -> tuple[dict[str, object], CheckResult]:
+    policy = load_policy(resolve_policy_path())
+    candidate = classify_candidate(
+        resolve_candidate(repo, kind="range", base_ref=base_ref, target_ref=target_ref),
+        policy,
+    )
+    with materialize_tree(repo, candidate.tree_oid) as (snapshot, entries):
+        context = ReviewContext(
+            repo=repo,
+            snapshot=snapshot,
+            candidate=candidate,
+            entries=entries,
+            policy=policy,
+            surface="ci",
+            profile="fast",
+            owner=None,
+            runtime_dir=tmp_path / "runtime-attestation",
+        )
+        return review_engine._bypass_evidence(context)
+
+
+_AFTER_CUTOFF = "2026-09-07T09:00:00+00:00"
+_BEFORE_CUTOFF = "2026-09-01T09:00:00+00:00"
+# Far enough back that moving the cutoff earlier cannot silently make the
+# unreadable-date test agree with the exemption test.
+_LONG_BEFORE_CUTOFF = "2026-01-02T09:00:00+00:00"
+
+
+def test_ci_attestation_flags_commits_with_no_agent_trailer(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    (repo / "seed.txt").write_text("base\n", encoding="utf-8")
+    base = _commit_dated(repo, "baseline", _AFTER_CUTOFF)
+    (repo / "seed.txt").write_text("one\n", encoding="utf-8")
+    first = _commit_dated(repo, "feat(x): one", _AFTER_CUTOFF)
+    (repo / "seed.txt").write_text("two\n", encoding="utf-8")
+    second = _commit_dated(repo, "feat(x): two", _AFTER_CUTOFF)
+
+    evidence, result = _attestation_for_range(
+        repo, tmp_path, base_ref=base, target_ref=second
+    )
+
+    assert evidence["unattributed_commits"] == [first, second]
+    unattributed = [
+        finding
+        for finding in result.findings
+        if finding.rule_id == "commit-agent-unattributed"
+    ]
+    assert len(unattributed) == 1
+    # HIGH is what blocks: `block_at = "high"`, and policy severity never reaches
+    # findings, so the constructor's severity is the whole enforcement.
+    assert unattributed[0].severity is Severity.HIGH
+    assert unattributed[0].evidence["commits"] == [first, second]
+
+
+def test_ci_attestation_accepts_an_agent_trailer_beside_other_trailers(
+    tmp_path: Path,
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    (repo / "seed.txt").write_text("base\n", encoding="utf-8")
+    base = _commit_dated(repo, "baseline", _AFTER_CUTOFF)
+    (repo / "seed.txt").write_text("one\n", encoding="utf-8")
+    tip = _commit_dated(
+        repo,
+        "feat(x): one\n\nAgent: llm-04\nCo-Authored-By: Someone <s@example.invalid>\n",
+        _AFTER_CUTOFF,
+    )
+
+    evidence, result = _attestation_for_range(
+        repo, tmp_path, base_ref=base, target_ref=tip
+    )
+
+    assert evidence["unattributed_commits"] == []
+    assert all(
+        finding.rule_id != "commit-agent-unattributed" for finding in result.findings
+    )
+
+
+def test_ci_attestation_exempts_commits_written_before_the_rule(
+    tmp_path: Path,
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    (repo / "seed.txt").write_text("base\n", encoding="utf-8")
+    base = _commit_dated(repo, "baseline", _BEFORE_CUTOFF)
+    (repo / "seed.txt").write_text("one\n", encoding="utf-8")
+    _commit_dated(repo, "feat(x): predates the rule", _BEFORE_CUTOFF)
+    (repo / "seed.txt").write_text("two\n", encoding="utf-8")
+    head = _commit_dated(repo, "feat(x): after the rule", _AFTER_CUTOFF)
+
+    evidence, _ = _attestation_for_range(repo, tmp_path, base_ref=base, target_ref=head)
+
+    # Both commits are in the range; only the one written after the cutoff is charged.
+    assert evidence["commits_examined"] == 2
+    assert evidence["unattributed_commits"] == [head]
+
+
+def test_agent_trailer_requirement_fails_closed_on_an_unreadable_date(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    (repo / "seed.txt").write_text("base\n", encoding="utf-8")
+    head = _commit_dated(repo, "baseline", _LONG_BEFORE_CUTOFF)
+
+    assert review_engine._agent_trailer_required(repo, head) is False
+
+    class _Garbage:
+        stdout = b"not-a-date\n"
+
+    monkeypatch.setattr(review_engine, "run_git", lambda *a, **k: _Garbage())
+    assert review_engine._agent_trailer_required(repo, head) is True

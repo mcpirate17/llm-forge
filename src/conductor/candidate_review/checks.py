@@ -11,7 +11,7 @@ import re
 import time
 import tokenize
 import tomllib
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -914,6 +914,50 @@ def check_performance_evidence(
     )
 
 
+def _research_texts(
+    ctx: ReviewContext, novel_changes: Sequence[Change]
+) -> tuple[str, str, str]:
+    """``(trigger_text, evidence_text, diff_error)`` for the novel changes.
+
+    Two different questions read two different texts. *What did this candidate
+    do?* is answered by the lines it added or altered, so that is what arms the
+    rules below. *What evidence stands behind it?* may have been recorded by an
+    earlier change, so that still reads each changed file whole.
+
+    Arming on whole files charged a change for words it never wrote: any edit to
+    a file that merely mentioned a device or a NaN demanded dtype/device tests,
+    and a documentation-only change selects no tests at all, so no edit to such
+    a file could pass. Fail-closed is preserved -- if the diff cannot be read,
+    every changed file arms the rules exactly as before.
+    """
+
+    evidence_parts: list[str] = []
+    sources: dict[str, str] = {}
+    for change in novel_changes:
+        try:
+            text = (ctx.snapshot / change.path).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        sources[change.path] = text
+        evidence_parts.append(text)
+    evidence_text = "\n".join(evidence_parts)
+    try:
+        changed_lines = changed_line_numbers(ctx.repo, ctx.candidate, sorted(sources))
+    except (RuntimeError, ValueError, OSError) as exc:
+        # Not swallowed: the caller reports the reason in the check metrics, and
+        # the whole-file text it falls back to is the stricter of the two.
+        return evidence_text, evidence_text, f"{type(exc).__name__}: {exc}"
+    trigger_parts: list[str] = []
+    for path, text in sources.items():
+        lines = text.splitlines()
+        trigger_parts.extend(
+            lines[number - 1]
+            for number in sorted(changed_lines.get(path, set()))
+            if 1 <= number <= len(lines)
+        )
+    return "\n".join(trigger_parts), evidence_text, ""
+
+
 def check_research_evidence(
     ctx: ReviewContext, selection: TestSelection
 ) -> CheckResult:
@@ -932,13 +976,8 @@ def check_research_evidence(
             test_text += (ctx.snapshot / test).read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-    changed_text = ""
-    for change in novel_changes:
-        try:
-            changed_text += (ctx.snapshot / change.path).read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-    combined = changed_text + "\n" + test_text
+    changed_text, evidence_text, diff_error = _research_texts(ctx, novel_changes)
+    combined = evidence_text + "\n" + test_text
     if re.search(r"(?i)(?:promot|baseline|metric|score|receipt)", changed_text):
         missing = [
             token
@@ -974,6 +1013,10 @@ def check_research_evidence(
         started,
         findings,
         files=[change.path for change in novel_changes] + list(selection.tests),
+        metrics={
+            "armed_on": "whole-files" if diff_error else "changed-lines",
+            "diff_error": diff_error,
+        },
     )
 
 

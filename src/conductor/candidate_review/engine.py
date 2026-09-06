@@ -6,6 +6,7 @@ import fcntl
 import hmac
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -69,6 +70,16 @@ SPECIAL_CHECKS = {
 TRAILER_TREE = "Governance-Tree"
 TRAILER_POLICY = "Governance-Policy"
 TRAILER_RECEIPT = "Governance-Receipt"
+# Squash-merge rewrites the author of every landed commit to the account that
+# merges, so `git log` cannot say which session did the work. GitHub concatenates
+# the commit messages, so a trailer is the one identifier that survives -- which
+# is why CLAUDE.md requires it and why this is the place it is enforced.
+AGENT_TRAILER = re.compile(r"^Agent:[ \t]*([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*$", re.M)
+# Enforced from five minutes after 06f725eb0 put the rule in CLAUDE.md, not
+# retroactively: commits that predate it were written under no such obligation,
+# and failing them would strand branches already in flight. A rebase rewrites the
+# committer date, so a rewritten old commit is a new commit and is gated like one.
+AGENT_TRAILER_REQUIRED_FROM = datetime(2026, 9, 6, 15, 0, tzinfo=UTC)
 INHERITED_LOCK_FD_ENV = "LLM_GOVERNANCE_COMMIT_LOCK_FD"
 INHERITED_LOCK_TOKEN_ENV = "LLM_GOVERNANCE_COMMIT_LOCK_TOKEN"
 # A crash receipt carries the tail of the traceback, not the whole thing: the last
@@ -505,6 +516,70 @@ def _trailers(message: str) -> dict[str, str]:
     return trailers
 
 
+def _agent_trailer_required(repo: Path, commit_oid: str) -> bool:
+    """Whether `commit_oid` was written after the `Agent:` trailer became a rule.
+
+    Fail-closed on an unreadable date: a commit whose committer date cannot be
+    parsed is treated as current, so a malformed date cannot buy an exemption.
+    """
+
+    raw = (
+        run_git(repo, ["show", "-s", "--format=%cI", commit_oid])
+        .stdout.decode("utf-8", "replace")
+        .strip()
+    )
+    try:
+        committed = datetime.fromisoformat(raw)
+    except ValueError:
+        return True
+    if committed.tzinfo is None:
+        committed = committed.replace(tzinfo=UTC)
+    return committed >= AGENT_TRAILER_REQUIRED_FROM
+
+
+def _ci_commit_attestations(
+    ctx: ReviewContext,
+) -> tuple[list[str], list[str], list[str], list[str]]:
+    """``(commits, missing, mismatched, unattributed)`` over the candidate range.
+
+    Each commit is read once and charged against every rule that reads a commit
+    message, so the range costs one `git show` per commit rather than one per
+    rule.
+    """
+
+    raw = run_git(
+        ctx.repo,
+        [
+            "rev-list",
+            "--reverse",
+            f"{ctx.candidate.base_commit_oid}..{ctx.candidate.commit_oid}",
+        ],
+    ).stdout.decode()
+    commits = [line for line in raw.splitlines() if line]
+    missing: list[str] = []
+    mismatched: list[str] = []
+    unattributed: list[str] = []
+    for commit_oid in commits:
+        message = _commit_message(ctx.repo, commit_oid)
+        trailers = _trailers(message)
+        tree_oid = (
+            run_git(ctx.repo, ["rev-parse", f"{commit_oid}^{{tree}}"])
+            .stdout.decode()
+            .strip()
+        )
+        if not trailers:
+            missing.append(commit_oid)
+        elif trailers.get(TRAILER_TREE) != tree_oid:
+            mismatched.append(commit_oid)
+        # Regex first: the date lookup is a subprocess, and an attributed commit
+        # -- the normal case -- never needs one.
+        if not AGENT_TRAILER.search(message) and _agent_trailer_required(
+            ctx.repo, commit_oid
+        ):
+            unattributed.append(commit_oid)
+    return commits, missing, mismatched, unattributed
+
+
 def _bypass_evidence(ctx: ReviewContext) -> tuple[dict[str, object], CheckResult]:
     started = time.perf_counter()
     findings: list[Finding] = []
@@ -531,36 +606,32 @@ def _bypass_evidence(ctx: ReviewContext) -> tuple[dict[str, object], CheckResult
         and ctx.candidate.commit_oid
         and ctx.candidate.base_commit_oid
     ):
-        raw = run_git(
-            ctx.repo,
-            [
-                "rev-list",
-                "--reverse",
-                f"{ctx.candidate.base_commit_oid}..{ctx.candidate.commit_oid}",
-            ],
-        ).stdout.decode()
-        commits = [line for line in raw.splitlines() if line]
-        missing: list[str] = []
-        mismatched: list[str] = []
-        for commit_oid in commits:
-            trailers = _trailers(_commit_message(ctx.repo, commit_oid))
-            tree_oid = (
-                run_git(ctx.repo, ["rev-parse", f"{commit_oid}^{{tree}}"])
-                .stdout.decode()
-                .strip()
-            )
-            if not trailers:
-                missing.append(commit_oid)
-            elif trailers.get(TRAILER_TREE) != tree_oid:
-                mismatched.append(commit_oid)
+        commits, missing, mismatched, unattributed = _ci_commit_attestations(ctx)
         evidence.update(
             {
                 "commits_examined": len(commits),
                 "missing_attestations": missing,
                 "mismatched_attestations": mismatched,
+                "unattributed_commits": unattributed,
                 "equivalent_ci_review": True,
             }
         )
+        if unattributed:
+            findings.append(
+                Finding(
+                    check_id="attestation",
+                    rule_id="commit-agent-unattributed",
+                    severity=Severity.HIGH,
+                    message=(
+                        f"{len(unattributed)} candidate commit(s) carry no `Agent:` "
+                        "trailer naming the session that wrote them; squash-merge "
+                        "rewrites the author, so the trailer is the only record "
+                        "that survives. Add `Agent: <session-name>` beside "
+                        "`Co-Authored-By:` and amend or rebase"
+                    ),
+                    evidence={"commits": unattributed},
+                )
+            )
         if missing or mismatched:
             findings.append(
                 Finding(
