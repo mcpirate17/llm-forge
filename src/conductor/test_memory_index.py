@@ -3,11 +3,13 @@ from __future__ import annotations
 import fcntl
 import json
 import hashlib
+import random
 from pathlib import Path
 
 import pytest
 
 from conductor import memory_index
+from conductor.memory_index import HEADING_PREFIXES
 
 
 def _embedding_meta(*, dimension: int = 2, num_gpu: int = 0) -> dict[str, object]:
@@ -574,3 +576,138 @@ def test_main_reports_retrieve_error_and_exits_2(
     assert exit_code == 2
     err = json.loads(capsys.readouterr().err)
     assert err == {"error": "index produced zero chunks"}
+
+
+# --- native chunking differential (memory_chunking.rs) -----------------------
+# ``chunk_text`` delegates to Rust; the reference below is the retired Python
+# chunker kept as the byte-parity contract. Randomized documents are compared
+# chunk-for-chunk (source, path, title, text) across both modes.
+
+
+def _reference_chunk_text(
+    text: str, source_id: str, path_name: str, full_path: str, mode: str
+) -> list[dict[str, str]]:
+    text = text.strip()
+    if not text:
+        return []
+    if mode == "whole":
+        return [
+            {
+                "source": source_id,
+                "path": full_path,
+                "title": path_name,
+                "text": text[:3000],
+            }
+        ]
+    chunks: list[dict[str, str]] = []
+    buf: list[str] = []
+    title = path_name
+    size = 0
+
+    def flush() -> None:
+        nonlocal buf, size
+        body = "\n".join(buf).strip()
+        if body:
+            chunks.append(
+                {
+                    "source": source_id,
+                    "path": full_path,
+                    "title": title,
+                    "text": body[:3000],
+                }
+            )
+        buf, size = [], 0
+
+    for line in text.splitlines():
+        if line.startswith(HEADING_PREFIXES) and size >= 400:
+            flush()
+            title = line.lstrip("#").strip() or path_name
+        buf.append(line)
+        size += len(line) + 1
+        if size >= 1500:
+            flush()
+    flush()
+    return chunks or [
+        {
+            "source": source_id,
+            "path": full_path,
+            "title": path_name,
+            "text": text[:1500],
+        }
+    ]
+
+
+def _reference_chunk(
+    text: str, source_id: str, path: Path, mode: str
+) -> list[dict[str, str]]:
+    return _reference_chunk_text(text, source_id, path.name, str(path), mode)
+
+
+def test_chunk_text_randomized_matches_python_reference() -> None:
+    # fixed seed: identical across machines, pins parity round-for-round
+    rng = random.Random(20260906)
+    topics = ["alpha", "beta", "gamma", "delta"]
+    for round_index in range(60):
+        lines: list[str] = []
+        for _ in range(rng.choice([1, 4, 40, 120])):
+            kind = rng.choice(["text", "heading", "blank", "space"])
+            if kind == "text":
+                lines.append(rng.choice(topics) * rng.choice([1, 20, 80]))
+            elif kind == "heading":
+                level = rng.choice(["", "#", "##", "###", "#### ", "##### "])
+                lines.append(f"{level} {rng.choice(topics)}")
+            elif kind == "blank":
+                lines.append("")
+            else:
+                lines.append("   ")
+        document = "\n".join(lines)
+        mode = rng.choice(["chunk", "whole"])
+        for mode_try in {mode, "chunk"}:
+            got = memory_index.chunk_text(
+                document, source_id="s", path=Path("docs/n.md"), mode=mode_try
+            )
+            want = _reference_chunk(document, "s", Path("docs/n.md"), mode_try)
+            assert got == want, f"round {round_index} mode {mode_try} diverged"
+
+
+def test_chunk_text_exotic_boundaries_parity() -> None:
+    for sample in ["\x1cA\x1dB\x1eC", "a\r\nb\rc\vd\x0cf", "a b c", " x "]:
+        for mode in ("chunk", "whole"):
+            got = memory_index.chunk_text(
+                sample, source_id="s", path=Path("docs/n.md"), mode=mode
+            )
+            want = _reference_chunk(sample, "s", Path("docs/n.md"), mode)
+            assert got == want
+
+
+def test_chunk_text_heading_only_falls_back_to_file_name_title() -> None:
+    chunks = memory_index.chunk_text(
+        "# ###", source_id="s", path=Path("docs/n.md"), mode="chunk"
+    )
+    assert len(chunks) == 1
+    assert chunks[0]["title"] == "n.md"
+    assert chunks[0]["path"] == str(Path("docs/n.md"))
+
+
+def test_chunk_text_whole_mode_caps_at_3000() -> None:
+    document = "x" * 9000
+    chunks = memory_index.chunk_text(
+        document, source_id="s", path=Path("docs/n.md"), mode="whole"
+    )
+    assert len(chunks) == 1
+    assert chunks[0]["text"] == "x" * 3000
+    assert chunks[0]["title"] == "n.md"
+
+
+def test_chunk_text_maps_native_tuple_fields_into_dict_fields() -> None:
+    chunks = memory_index.chunk_text(
+        "body", source_id="src", path=Path("docs/n.md"), mode="whole"
+    )
+    assert chunks == [
+        {
+            "source": "src",
+            "path": str(Path("docs/n.md")),
+            "title": "n.md",
+            "text": "body",
+        }
+    ]

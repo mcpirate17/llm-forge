@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+import random
 import urllib.error
 from pathlib import Path
 
@@ -412,3 +414,83 @@ def test_save_index_writes_atomically_and_cleans_up_temp_file(tmp_path: Path) ->
     with pytest.raises(TypeError):
         kb_retrieve.save_index(unserializable_index, path)
     assert list(tmp_path.glob(f".{path.name}.*.tmp")) == []
+
+
+# --- native scoring boundary differential (kb_retrieve.rs) -------------------
+# The dot product, sort and normalization run in Rust; these tests drive them
+# through the production ``query_index``/``_l2_normalize`` paths and hold them
+# to the exact Python arithmetic the port replaced (CPython 3.12 sum() is
+# Neumaier-compensated, so bit parity is the contract).
+
+
+def _reference_dot(left: list[float], right: list[float]) -> float:
+    """The expression the native dot replaced: builtin sum() over zip()."""
+    return sum(a * b for a, b in zip(left, right, strict=True))
+
+
+def _score_via_query_index(
+    query: list[float],
+    cards: list[dict[str, object]],
+    top_k: int,
+) -> list[kb_retrieve.ScoredCard]:
+    """Run the production query_index path with the embedding stubbed out."""
+
+    def embed(text: str) -> list[float]:
+        return query
+
+    index: dict[str, object] = {"embedding": {}, "cards": cards}
+    return kb_retrieve.query_index("find", index, top_k=top_k, embedder=embed)
+
+
+def test_native_scoring_matches_builtin_sum_bit_for_bit() -> None:
+    # fixed seed: identical across machines, pins parity round-for-round
+    rng = random.Random(20260905)
+    for _ in range(32):
+        dim = rng.choice([8, 64, 1024])
+        query = [rng.uniform(-1.0, 1.0) for _ in range(dim)]
+        cards = [
+            {
+                "name": "c0",
+                "path": "n/c0.md",
+                "text": "t0",
+                "vector": [rng.uniform(-1000.0, 1000.0) for _ in range(dim)],
+            },
+        ]
+        hits = _score_via_query_index(query, cards, 1)
+        assert hits[0].score == _reference_dot(query, cards[0]["vector"])
+        assert (hits[0].name, hits[0].path, hits[0].text) == ("c0", "n/c0.md", "t0")
+
+
+def test_native_scoring_keeps_index_order_on_ties() -> None:
+    cards = [
+        {"name": f"c{i}", "path": f"n/c{i}.md", "text": "t", "vector": [1.0, 0.0]}
+        for i in range(4)
+    ]
+    hits = _score_via_query_index([1.0, 0.0], cards, 4)
+    assert [hit.name for hit in hits] == ["c0", "c1", "c2", "c3"]
+
+
+def test_native_scoring_truncates_to_top_k() -> None:
+    cards = [
+        {"name": f"c{i}", "path": "n", "text": "t", "vector": [float(i + 1)]}
+        for i in range(10)
+    ]
+    hits = _score_via_query_index([1.0], cards, 3)
+    assert [hit.name for hit in hits] == ["c9", "c8", "c7"]
+
+
+def test_native_scoring_dim_mismatch_maps_to_retrieve_error() -> None:
+    cards = [{"name": "c3", "path": "p", "text": "t", "vector": [1.0, 2.0]}]
+    with pytest.raises(
+        kb_retrieve.RetrieveError, match=r"vector dim mismatch for c3: 2 != 3"
+    ):
+        _score_via_query_index([1.0, 2.0, 3.0], cards, 1)
+
+
+def test_native_l2_normalize_matches_builtin_sum_reference() -> None:
+    rng = random.Random(20260907)
+    for _ in range(32):
+        vector = [rng.uniform(-1e6, 1e6) for _ in range(rng.choice([4, 64, 512]))]
+        norm = math.sqrt(sum(x * x for x in vector))
+        expected = [x / norm for x in vector]
+        assert kb_retrieve._l2_normalize(vector) == expected

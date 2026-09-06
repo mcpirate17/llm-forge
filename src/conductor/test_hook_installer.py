@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shlex
+import sys
 from pathlib import Path
 
 import pytest
@@ -217,3 +218,92 @@ def _assert_invalid_json_fails_without_writes(tmp_path: Path) -> None:
     )
     assert path.read_text() == "{not json\n"
     assert not installer.backup_path(path).exists()
+
+
+# --- native boundary differential (hook_installer.rs) ------------------------
+# shlex scanning/join/merge rules run in Rust; these tests drive the
+# production wrappers and hold them to the Python semantics the port replaced.
+
+
+def test_startup_command_round_trips_adversarial_identity() -> None:
+    for identity in ["it's", '$HOME a"b', "x y", "a\\b"]:
+        spec = installer.PROVIDERS["codex"]
+        command = installer.startup_command(spec, identity=identity)
+        parsed = shlex.split(command)
+        assert parsed[-1] == identity
+
+
+def test_startup_command_rejects_blank_identity() -> None:
+    with pytest.raises(installer.HookInstallerError, match="blank"):
+        installer.startup_command(installer.PROVIDERS["codex"], identity="  ")
+
+
+def test_is_managed_hook_requires_adjacent_module_flag() -> None:
+    managed = f"{sys.executable} -m conductor.a2a_session_start --provider codex"
+    assert installer._is_managed_hook({"command": managed}) is True
+    assert (
+        installer._is_managed_hook(
+            {"command": f"{sys.executable} -m other.module --provider codex"}
+        )
+        is False
+    )
+    assert (
+        installer._is_managed_hook(
+            {
+                "command": f"{sys.executable} --provider codex -m conductor.a2a_session_start"
+            }
+        )
+        is True
+    )
+    assert (
+        installer._is_managed_hook(
+            {"command": f"{sys.executable} --module conductor.a2a_session_start x"}
+        )
+        is False
+    )
+    assert (
+        installer._is_managed_hook(
+            {
+                "command": f"{sys.executable} -m other.module -m conductor.a2a_session_start"
+            }
+        )
+        is True
+    )
+    assert installer._is_managed_hook({"command": 7}) is False
+    assert installer._is_managed_hook("not a dict") is False
+
+
+def test_merge_install_rejects_non_object_root() -> None:
+    with pytest.raises(installer.HookInstallerError, match="JSON object"):
+        installer.merge_install(["not", "a", "dict"], installer.PROVIDERS["codex"], "x")
+
+
+def test_merge_uninstall_keeps_foreign_groups_intact() -> None:
+    config = {
+        "hooks": {
+            "SessionStart": [
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": (
+                                f"{sys.executable} -m conductor.a2a_session_start"
+                                " --provider codex"
+                            ),
+                        }
+                    ]
+                }
+            ],
+            "UserPromptSubmit": [
+                {
+                    "matcher": ".*",
+                    "hooks": [{"type": "command", "command": "echo foreign"}],
+                }
+            ],
+        },
+        "model": "x",
+    }
+    merged = installer.merge_uninstall(config)
+    assert merged["model"] == "x"
+    assert merged["hooks"]["UserPromptSubmit"] == config["hooks"]["UserPromptSubmit"]
+    assert "SessionStart" not in merged["hooks"]

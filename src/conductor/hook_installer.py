@@ -9,10 +9,8 @@ previous file state beside the provider config so rollback is lossless.
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import os
-import shlex
 import stat
 import sys
 import tempfile
@@ -119,60 +117,31 @@ def startup_command(
         command.extend(("--state-dir", str(state_dir)))
     if spec.once_per_session:
         command.append("--once-per-session")
-    return shlex.join(command)
+    from conductor._native import hook_installer_shlex_join_native
+
+    return hook_installer_shlex_join_native(command)
 
 
 def _is_managed_hook(value: Any) -> bool:
+    from conductor._native import hook_installer_is_managed_native
+
     if not isinstance(value, dict):
         return False
     command = value.get("command")
     if not isinstance(command, str):
         return False
-    try:
-        parts = shlex.split(command)
-    except ValueError:
-        return False
-    return any(
-        parts[index : index + 2] == ["-m", MANAGED_MODULE]
-        for index in range(max(0, len(parts) - 1))
-    )
+    return hook_installer_is_managed_native(command, MANAGED_MODULE)
 
 
 def _without_managed_hooks(config: dict[str, Any]) -> dict[str, Any]:
-    updated = copy.deepcopy(config)
-    hooks = updated.get("hooks")
-    if hooks is None:
-        return updated
-    if not isinstance(hooks, dict):
-        raise HookInstallerError("top-level 'hooks' must be a JSON object")
-    for event in list(hooks):
-        groups = hooks[event]
-        if not isinstance(groups, list):
-            raise HookInstallerError(f"hooks.{event} must be a JSON array")
-        kept_groups: list[Any] = []
-        for group in groups:
-            if not isinstance(group, dict):
-                kept_groups.append(group)
-                continue
-            commands = group.get("hooks")
-            if not isinstance(commands, list):
-                kept_groups.append(group)
-                continue
-            kept_commands = [item for item in commands if not _is_managed_hook(item)]
-            if kept_commands:
-                new_group = copy.deepcopy(group)
-                new_group["hooks"] = kept_commands
-                kept_groups.append(new_group)
-            elif any(key not in ("hooks", "matcher") for key in group):
-                new_group = copy.deepcopy(group)
-                new_group["hooks"] = []
-                kept_groups.append(new_group)
-        if kept_groups:
-            hooks[event] = kept_groups
-        else:
-            hooks.pop(event)
-    if not hooks:
-        updated.pop("hooks", None)
+    from conductor._native import hook_installer_without_managed_native
+
+    try:
+        updated = json.loads(
+            hook_installer_without_managed_native(json.dumps(config), MANAGED_MODULE)
+        )
+    except ValueError as exc:
+        raise HookInstallerError(str(exc)) from exc
     return updated
 
 
@@ -181,26 +150,28 @@ def merge_install(
 ) -> dict[str, Any]:
     """Return a config containing exactly one managed hook for ``spec``."""
 
+    from conductor._native import hook_installer_merge_install_native
+
     if not isinstance(config, dict):
         raise HookInstallerError("provider config root must be a JSON object")
-    updated = _without_managed_hooks(dict(config))
-    hooks = updated.setdefault("hooks", {})
-    if not isinstance(hooks, dict):
-        raise HookInstallerError("top-level 'hooks' must be a JSON object")
-    hook: dict[str, Any] = {
-        "type": "command",
-        "command": command,
+    spec_facts = {
+        "event": spec.event,
         "timeout": spec.timeout,
+        "include_matcher": spec.include_matcher,
+        "install_hook_name": spec.name in ("qwen", "grok"),
     }
-    if spec.name in ("qwen", "grok"):
-        hook["name"] = MANAGED_NAME
-    group: dict[str, Any] = {"hooks": [hook]}
-    if spec.include_matcher:
-        group["matcher"] = ""
-    groups = hooks.setdefault(spec.event, [])
-    if not isinstance(groups, list):
-        raise HookInstallerError(f"hooks.{spec.event} must be a JSON array")
-    groups.append(group)
+    try:
+        updated = json.loads(
+            hook_installer_merge_install_native(
+                json.dumps(dict(config)),
+                json.dumps(spec_facts),
+                command,
+                MANAGED_NAME,
+                MANAGED_MODULE,
+            )
+        )
+    except ValueError as exc:
+        raise HookInstallerError(str(exc)) from exc
     return updated
 
 

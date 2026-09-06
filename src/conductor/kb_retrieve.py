@@ -54,15 +54,13 @@ class EmbeddingBatch:
     metadata: dict[str, Any]
 
 
-def _dot(left: list[float], right: list[float]) -> float:
-    return sum(a * b for a, b in zip(left, right, strict=True))
-
-
 def _l2_normalize(vec: list[float]) -> list[float]:
-    norm = math.sqrt(sum(x * x for x in vec))
-    if norm == 0.0:
-        raise RetrieveError("embedding is the zero vector")
-    return [x / norm for x in vec]
+    from conductor._native import kb_retrieve_l2_normalize_native
+
+    try:
+        return kb_retrieve_l2_normalize_native(vec)
+    except ValueError as exc:
+        raise RetrieveError(str(exc)) from exc
 
 
 def assert_embedding_meta(payload: dict[str, Any]) -> dict[str, Any]:
@@ -354,23 +352,17 @@ def query_index(
         )
     else:
         qvec = embedder(QUERY_INSTRUCT + query.strip())
-    scored: list[ScoredCard] = []
-    for card in index["cards"]:
-        vec = card["vector"]
-        if len(vec) != len(qvec):
-            raise RetrieveError(
-                f"vector dim mismatch for {card['name']}: {len(vec)} != {len(qvec)}"
-            )
-        scored.append(
-            ScoredCard(
-                name=str(card["name"]),
-                path=str(card["path"]),
-                score=float(_dot(qvec, vec)),
-                text=str(card["text"]),
-            )
-        )
-    scored.sort(key=lambda row: row.score, reverse=True)
-    return scored[:top_k]
+    from conductor._native import kb_retrieve_score_cards_native
+
+    try:
+        hits = kb_retrieve_score_cards_native(qvec, index["cards"], top_k)
+    except ValueError as exc:
+        raise RetrieveError(str(exc)) from exc
+    scored = [
+        ScoredCard(name=name, path=path, score=score, text=text)
+        for name, path, score, text in hits
+    ]
+    return scored
 
 
 def main(argv: list[str] | None = None) -> int:

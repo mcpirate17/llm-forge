@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from conductor._native import (
+    memory_index_chunk_text_native,
     memory_index_metadata_native,
     memory_index_query_file_native,
     memory_index_score_rows_native,
@@ -177,53 +178,13 @@ def iter_source_files(entry: dict[str, Any]) -> Iterator[Path]:
 def chunk_text(
     text: str, *, source_id: str, path: Path, mode: str
 ) -> list[dict[str, str]]:
-    text = text.strip()
-    if not text:
-        return []
-    if mode == "whole":
-        return [
-            {
-                "source": source_id,
-                "path": str(path),
-                "title": path.name,
-                "text": text[: MAX_CHUNK_CHARS * 2],
-            }
-        ]
-    chunks: list[dict[str, str]] = []
-    buf: list[str] = []
-    title = path.name
-    size = 0
+    """Split indexed text into bounded chunks (native: see ``memory_chunking.rs``)."""
 
-    def flush() -> None:
-        nonlocal buf, size
-        body = "\n".join(buf).strip()
-        if body:
-            chunks.append(
-                {
-                    "source": source_id,
-                    "path": str(path),
-                    "title": title,
-                    "text": body[: MAX_CHUNK_CHARS * 2],
-                }
-            )
-        buf, size = [], 0
-
-    for line in text.splitlines():
-        if line.startswith(HEADING_PREFIXES) and size >= 400:
-            flush()
-            title = line.lstrip("#").strip() or path.name
-        buf.append(line)
-        size += len(line) + 1
-        if size >= MAX_CHUNK_CHARS:
-            flush()
-    flush()
-    return chunks or [
-        {
-            "source": source_id,
-            "path": str(path),
-            "title": path.name,
-            "text": text[:MAX_CHUNK_CHARS],
-        }
+    return [
+        {"source": source, "path": chunk_path, "title": title, "text": body}
+        for source, chunk_path, title, body in memory_index_chunk_text_native(
+            text, source_id, str(path), path.name, mode
+        )
     ]
 
 
