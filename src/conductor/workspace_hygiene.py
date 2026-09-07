@@ -42,6 +42,7 @@ from conductor.candidate_review.ownership import (
     paths_overlap,
 )
 from conductor.dead_tests import tracked_files
+from conductor.worktree_lease import is_linked_worktree, lease_state
 
 ROOT = Path(__file__).resolve().parents[1]
 CAMPAIGN_DIR = "conductor/mutation_campaigns"
@@ -79,6 +80,11 @@ class Report:
     gh_available: bool = True
     local_only_commit_exposure: list[dict[str, str]] = field(default_factory=list)
     stale_dirty_files: list[dict[str, str]] = field(default_factory=list)
+    worktree_leases: list[dict[str, object]] = field(default_factory=list)
+    checkout_drift: dict[str, object] = field(default_factory=dict)
+
+    def overdue_leases(self) -> list[dict[str, object]]:
+        return [r for r in self.worktree_leases if r["status"] != "leased"]
 
     def is_clean(self) -> bool:
         return not any(
@@ -95,6 +101,8 @@ class Report:
                 self.stale_feature_branches,
                 self.local_only_commit_exposure,
                 self.stale_dirty_files,
+                self.overdue_leases(),
+                self.checkout_drift.get("behind", 0),
             )
         )
 
@@ -273,6 +281,44 @@ def landed_worktrees(live_ref: str, repo: Path = ROOT) -> list[dict[str, object]
             }
         )
     return out
+
+
+def checkout_drift(repo: Path = ROOT) -> dict[str, object]:
+    """How far the main checkout has fallen behind the remote line, and why.
+
+    The shared checkout is a mirror: work is done in worktrees and lands through
+    a PR, so the checkout should never be anything but even with origin. On
+    2026-09-07 it was five commits behind with 314 dirty paths, and no check said
+    so -- every existing measure looked at branches, worktrees and claims, none
+    at the tree everybody actually sits in.
+
+    ``blocked_by`` is the part that makes this actionable rather than another
+    number: a fast-forward is refused only by *tracked* files that differ, so it
+    names those and nothing else. Untracked files never block one, which is why
+    the 314 dirty paths turned out to be a fast-forward away from clean.
+    """
+
+    remote = _live_ref_or_default(repo)
+    behind = _git_in(repo, "rev-list", "--count", f"HEAD..{remote}").strip()
+    ahead = _git_in(repo, "rev-list", "--count", f"{remote}..HEAD").strip()
+    incoming = {
+        line
+        for line in _git_in(repo, "diff", "--name-only", f"HEAD..{remote}").splitlines()
+        if line
+    }
+    modified = {
+        line
+        for line in _git_in(repo, "diff", "--name-only", "HEAD").splitlines()
+        if line
+    }
+    blocked = sorted(incoming & modified)
+    return {
+        "remote": remote,
+        "behind": int(behind),
+        "ahead": int(ahead),
+        "fast_forwardable": int(behind) > 0 and int(ahead) == 0 and not blocked,
+        "blocked_by": blocked,
+    }
 
 
 def _upstream_was_deleted(repo: Path, branch: str) -> bool:
@@ -724,11 +770,58 @@ def build_report(live_ref: str) -> Report:
         gh_available=gh_available,
         local_only_commit_exposure=local_only_commit_exposure(),
         stale_dirty_files=stale_dirty_files(),
+        worktree_leases=lease_state(
+            Path(e["worktree"])
+            for e in _worktree_entries()
+            if e.get("worktree") and is_linked_worktree(Path(e["worktree"]))
+        ),
+        checkout_drift=checkout_drift(),
     )
+
+
+def _render_drift_and_leases(report: Report) -> list[str]:
+    """The two states that let the shared checkout and its worktrees go stale."""
+
+    drift = report.checkout_drift
+    lines: list[str] = []
+    if drift.get("behind"):
+        lines.append(
+            f"CHECKOUT BEHIND -- {drift['behind']} commit(s) behind {drift['remote']}"
+        )
+        if drift.get("fast_forwardable"):
+            lines.append("  a fast-forward makes it even; untracked files are kept")
+            lines.append("  make checkout-sync")
+        else:
+            for path in drift.get("blocked_by") or []:
+                lines.append(f"  blocked by local edit: {path}")
+            if drift.get("ahead"):
+                lines.append(
+                    f"  and {drift['ahead']} commit(s) ahead: this checkout is "
+                    "carrying work nobody else can see"
+                )
+
+    overdue = report.overdue_leases()
+    lines.append(
+        f"WORKTREES PAST THEIR LEASE -- ask the owner, then remove ({len(overdue)})"
+    )
+    for row in overdue:
+        if row["status"] == "unleased":
+            lines.append(
+                f"  {row['worktree']} -- no lease: created outside `make worktree`, "
+                "so nobody knows what it is for"
+            )
+            continue
+        lines.append(
+            f"  {row['worktree']} [{row['branch']}] -- {row['owner']}, "
+            f"{row['overdue_minutes']} min overdue: {row['purpose']}"
+        )
+    return lines
 
 
 def render(report: Report) -> str:
     lines = [f"workspace hygiene | live line: {report.live_ref}", ""]
+    lines.extend(_render_drift_and_leases(report))
+    lines.append("")
 
     safe = [r for r in report.redundant_branches if "blocked_by" not in r]
     blocked = [r for r in report.redundant_branches if "blocked_by" in r]
