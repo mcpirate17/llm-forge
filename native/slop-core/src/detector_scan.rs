@@ -34,7 +34,18 @@ struct Fallback {
     value: usize,
 }
 
-type ScanOutput = (usize, usize, Vec<String>, Vec<String>, Py<PyList>);
+/// God-file count, god-function count, god files, god functions, fallbacks,
+/// and the files CPython could not parse. The last is not a finding: it is the
+/// part of the scan that did not happen, and the caller has to decide what a
+/// partial audit is worth rather than being handed one that looks complete.
+type ScanOutput = (
+    usize,
+    usize,
+    Vec<String>,
+    Vec<String>,
+    Py<PyList>,
+    Vec<String>,
+);
 
 fn load_files(paths: Vec<String>, repo: Option<String>) -> Result<Vec<LoadedFile>, String> {
     let repo = repo.map(PathBuf::from);
@@ -131,40 +142,17 @@ fn function_findings(
     Ok(findings)
 }
 
-fn body_facts<'py>(handler: &Bound<'py, PyAny>) -> PyResult<(bool, Vec<Bound<'py, PyAny>>)> {
-    let mut has_raise = false;
+/// Every call anywhere in `handler`'s body.
+fn body_facts<'py>(handler: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let mut calls = Vec::new();
     for statement in list_items(&handler.getattr("body")?)? {
         for node in descendants(&statement)? {
-            match type_name(&node)?.as_str() {
-                "Raise" => has_raise = true,
-                "Call" => calls.push(node),
-                _ => {}
+            if type_name(&node)?.as_str() == "Call" {
+                calls.push(node);
             }
         }
     }
-    Ok((has_raise, calls))
-}
-
-fn handler_signals(calls: &[Bound<'_, PyAny>]) -> PyResult<bool> {
-    for call in calls {
-        let function = call.getattr("func")?;
-        match type_name(&function)?.as_str() {
-            "Name" if matches!(string_attr(&function, "id")?.as_str(), "print" | "warn") => {
-                return Ok(true);
-            }
-            "Attribute"
-                if matches!(
-                    string_attr(&function, "attr")?.as_str(),
-                    "critical" | "error" | "exception" | "warning" | "warn"
-                ) =>
-            {
-                return Ok(true);
-            }
-            _ => {}
-        }
-    }
-    Ok(false)
+    Ok(calls)
 }
 
 fn handler_is_broad(handler: &Bound<'_, PyAny>) -> PyResult<bool> {
@@ -203,13 +191,12 @@ fn fallback_candidate(
     relative: &str,
 ) -> PyResult<Option<Fallback>> {
     let body = list_items(&handler.getattr("body")?)?;
-    let (has_raise, calls) = body_facts(handler)?;
-    if has_raise {
-        return Ok(None);
-    }
-    if handler_signals(&calls)? {
-        return Ok(None);
-    }
+    // A handler that raises, logs or prints is not silent -- and both shapes are
+    // already excluded by the two tests below, so neither needs a guard of its
+    // own. `Raise` is not one of the statement kinds either test accepts, and a
+    // call disqualifies `silent_default` outright while being something no
+    // `Pass`, `Continue` or `Break` can contain.
+    let calls = body_facts(handler)?;
     let control_only = body.iter().try_fold(true, |all, statement| {
         Ok::<_, PyErr>(
             all && matches!(
@@ -289,7 +276,16 @@ fn fallback_to_dict<'py>(py: Python<'py>, finding: Fallback) -> PyResult<Bound<'
     Ok(output)
 }
 
-/// Return god-file, god-function, and silent-fallback findings in input/AST order.
+/// Return god-file, god-function, and silent-fallback findings in input/AST
+/// order, plus the files CPython could not parse.
+///
+/// The unparsable list is the point of the sixth element. A file with no AST
+/// still has lines, so the god-file check lands on it and dropping the file
+/// outright would lose a real finding; but the two AST-based detectors did not
+/// run on it, and an audit that reports their silence as a clean result is
+/// telling the caller something it never checked. The caller decides what to do
+/// with a partial scan -- it is not this function's to decide, and it is not
+/// nobody's.
 #[pyfunction]
 #[pyo3(signature = (paths, repo, allowed_files, allowed_functions, god_file_lines, god_func_lines))]
 pub(crate) fn audit_detector_scan(
@@ -310,6 +306,7 @@ pub(crate) fn audit_detector_scan(
     let mut god_files = Vec::new();
     let mut god_functions = Vec::new();
     let mut fallbacks = Vec::new();
+    let mut unparsable = Vec::new();
     for file in files {
         let lines = file.source.matches('\n').count() + 1;
         if lines > god_file_lines
@@ -323,7 +320,13 @@ pub(crate) fn audit_detector_scan(
         }
         let tree = match ast.call_method1("parse", (&file.source, file.path.to_string_lossy())) {
             Ok(tree) => tree,
-            Err(error) if error.is_instance_of::<PySyntaxError>(py) => continue,
+            // The line-based god-file check above needs no AST, so the file
+            // keeps that finding; only the AST half is missing, and it is
+            // reported as missing rather than dropped.
+            Err(error) if error.is_instance_of::<PySyntaxError>(py) => {
+                unparsable.push(file.relative.clone());
+                continue;
+            }
             Err(error) => return Err(error),
         };
         let nodes = breadth_first(&tree).map_err(|error| {
@@ -361,6 +364,7 @@ pub(crate) fn audit_detector_scan(
         god_files,
         god_functions,
         output.unbind(),
+        unparsable,
     ))
 }
 
