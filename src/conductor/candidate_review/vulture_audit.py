@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -122,6 +123,28 @@ def _validate_entry(key: str, entry: object) -> dict[str, object]:
     return dict(entry)
 
 
+# A vulture whitelist names the symbols a *project* intentionally keeps alive, so it
+# is project knowledge and conductor cannot own the host's list. Default to the host's
+# path, honour an override, and pass it to vulture only when it is actually there: a
+# standalone install -- or any other project -- has no such file, and naming a missing
+# path makes vulture exit non-zero, at which point every finding is untrusted. Leaving
+# it out is not a silent weakening; an unfiltered run reports strictly more, never less.
+WHITELIST_ENV = "CONDUCTOR_VULTURE_WHITELIST"
+DEFAULT_WHITELIST = "research/tools/vulture_whitelist.py"
+
+
+def whitelist_args(root: Path | None = None) -> tuple[str, ...]:
+    """The whitelist argument for a vulture command, empty when there is none."""
+
+    configured = os.environ.get(WHITELIST_ENV, DEFAULT_WHITELIST)
+    if not configured:
+        return ()
+    path = Path(configured)
+    if root is not None and not path.is_absolute():
+        path = root / path
+    return (str(path),) if path.is_file() else ()
+
+
 def run_audit(
     baseline_path: Path,
     paths: Sequence[str],
@@ -140,7 +163,7 @@ def run_audit(
     command = [
         executable,
         *paths,
-        "research/tools/vulture_whitelist.py",
+        *whitelist_args(),
         "--min-confidence",
         "80",
         "--exclude",

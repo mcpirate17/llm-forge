@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from conductor._native import guardrail_ast_metrics_native
+from conductor.candidate_review.vulture_audit import whitelist_args
 from conductor.audit_root import (
     AuditRootError,
     print_audit_provenance,
@@ -302,7 +303,7 @@ def _vulture_issues(
     command = _resolve_tool_command(
         "vulture",
         *target_list,
-        "research/tools/vulture_whitelist.py",
+        *whitelist_args(),
         "--min-confidence",
         "80",
         "--exclude",

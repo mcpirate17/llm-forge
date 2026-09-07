@@ -20,6 +20,13 @@ dependencies = [
   "numpy>=1.26",
   "pydantic>=2",
   "pyyaml>=6.0",
+  # conductor/radon_complexity.py imports radon.complexity at call time, and the
+  # complexity ratchet runs in candidate_policy.toml's pre-commit profile -- so it is
+  # on the commit path, not merely the audit path. The host declares it for exactly
+  # this reason (pyproject.toml); omitting it here is the same KB-CI-01 shape one
+  # level down: every developer venv carries it, so a standalone install is the only
+  # place the omission is visible.
+  "radon>=6.0.1",
   "starlette>=0.45",
   "uvicorn>=0.30",
 ]
@@ -48,19 +55,21 @@ packages = ["src/conductor", "src/tooling"]
 conductor-native = { path = "native/conductor-native" }
 slop-core = { path = "native/slop-core" }
 
-# The three Rust sources below are runner components: `mutation_testing.py` hashes
-# them into every receipt's `runner_components_sha256`, which is what binds a receipt
-# to the code that produced it. It resolves them relative to the installed
-# `conductor/` package's parent -- the repo root in a checkout, site-packages in an
-# install -- so a wheel that omits them cannot compute the map at all, and every
-# mutation command raises `runner component is missing or unsafe`. Shipping the real
-# files at the path the resolver already looks in keeps the hashes identical in both
-# layouts; a copy under a different name would drift and make the map meaningless.
-# 110 KB total.
-[tool.hatch.build.targets.wheel.force-include]
-"native/conductor-native/src/mutation_evidence.rs" = "tooling/native/conductor-native/src/mutation_evidence.rs"
-"native/conductor-native/src/mutation_manifest.rs" = "tooling/native/conductor-native/src/mutation_manifest.rs"
-"native/conductor-native/src/mutation_receipt.rs" = "tooling/native/conductor-native/src/mutation_receipt.rs"
+# Three Rust sources are runner components: `mutation_testing.py` hashes them into
+# every receipt's `runner_components_sha256`, which is what binds a receipt to the code
+# that produced it. It resolves them relative to the installed `conductor/` package's
+# parent -- the repo root in a checkout, site-packages in an install -- so a tree that
+# omits them cannot compute the map at all, and every mutation command raises
+# `runner component is missing or unsafe`.
+#
+# They ship as ordinary package data under `src/tooling/native/conductor-native/src/`,
+# placed there by the standalone layout in tooling-standalone-smoke. That one copy
+# satisfies both layouts at once: the checkout resolves it directly, and the
+# `src/tooling` package above carries it into the wheel at the same relative path, so
+# the hashes are identical either way. A force-include pointing at the crate under
+# native/ would land a *second* file at that same wheel path and hatchling refuses the
+# build outright -- the two mechanisms cannot coexist, and package data is the one that
+# also fixes the checkout. 110 KB total.
 
 # OS prerequisite for conductor.project_context's additive Linux resolver.
 # Informational package metadata: pip/uv do not install system executables.

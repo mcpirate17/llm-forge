@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from conductor.candidate_review.vulture_audit import (
+    WHITELIST_ENV,
     VultureAuditError,
     _iso_date,
     _key,
@@ -58,7 +59,24 @@ def test_vulture_baseline_rejects_count_and_key_mismatch(tmp_path: Path) -> None
         _load_baseline(path)
 
 
-def test_vulture_audit_blocks_new_real_finding(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "whitelist_exists", [True, False], ids=["whitelist-present", "whitelist-absent"]
+)
+def test_vulture_audit_blocks_new_real_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, whitelist_exists: bool
+) -> None:
+    """A new finding blocks, and it blocks whether or not a whitelist exists.
+
+    The second case is the one that discriminates. A vulture whitelist names symbols
+    a *project* deliberately keeps alive, so conductor cannot assume one is on disk;
+    `whitelist_args` drops the argument when the configured path is absent. Passing a
+    missing path instead makes vulture exit 1 with "could not be found" and no
+    findings, which `run_audit` must read as an untrusted analyzer -- so the failure
+    is a raised VultureAuditError, not a missed finding, and asserting the exit code
+    alone would not tell the two apart. The present case proves the argument is still
+    handed over when it is real.
+    """
+
     source = tmp_path / "candidate.py"
     source.write_text(
         "def live():\n    if False:\n        return 1\n    return 2\n",
@@ -66,6 +84,10 @@ def test_vulture_audit_blocks_new_real_finding(tmp_path: Path) -> None:
     )
     baseline = tmp_path / "baseline.json"
     baseline.write_text(json.dumps(_baseline({})), encoding="utf-8")
+    whitelist = tmp_path / "whitelist.py"
+    if whitelist_exists:
+        whitelist.write_text("live\n", encoding="utf-8")
+    monkeypatch.setenv(WHITELIST_ENV, str(whitelist))
 
     assert run_audit(baseline, [str(source)]) == 1
 

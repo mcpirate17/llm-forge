@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import shlex
 import shutil
 import subprocess
@@ -162,9 +163,23 @@ def hook_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         )
     _write_program(root / ".claude" / "hooks" / "post-bash-graph.sh", _POST_HOOK)
     (root / ".agent_hooks").mkdir()
-    shutil.copy(
-        REPO_ROOT / ".agent_hooks" / "crg_gate.py",
+    # The launcher is a host-checkout artifact, not something the package ships:
+    # `conductor init` writes the dispatch launcher, never this one, so a standalone
+    # install has none to copy and copying one coupled these tests to the host repo.
+    # Synthesize it instead -- its entire contract is to name the checkout it serves
+    # and exec the packaged body below under the same interpreter, which is what the
+    # tests here actually exercise.
+    _write_program(
         root / ".agent_hooks" / "crg_gate.py",
+        "#!/usr/bin/env python3\n"
+        "import os\n"
+        "import sys\n"
+        "from pathlib import Path\n"
+        "\n"
+        "PROJECT_DIR = Path(__file__).resolve().parents[1]\n"
+        'os.environ["PROJECT_DIR"] = str(PROJECT_DIR)\n'
+        'BODY = PROJECT_DIR / "tooling/hooks/agent/crg_gate.py"\n'
+        "os.execv(sys.executable, [sys.executable, str(BODY), *sys.argv[1:]])\n",
     )
     # The launcher above execs the tooling body it finds under its own checkout.
     gate_body = root / "tooling" / "hooks" / "agent" / "crg_gate.py"
@@ -177,3 +192,61 @@ def hook_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(active_state, "ROOT", root)
     active_state.save_active_state(root / "conductor" / "active_state.json")
     return root
+
+
+# Tests whose subject is something only a host project has. `_project_hooks.py`
+# documents CONDUCTOR_PROJECT_TEST_PLUGIN="" as the standalone case -- conductor
+# installed with no host project behind it -- and there these have nothing to
+# assert against. Keeping the inventory here rather than as decorators in the test
+# files has two payoffs: the whole host-coupling surface of this suite is one list
+# you can read and shrink, and each test's own body stays the statement of what it
+# proves, unqualified by where it happens to be running.
+#
+# This list is debt, not architecture. Every entry is a place conductor reaches
+# outside its own boundary; the goal is for it to reach zero.
+HOST_PROJECT_TESTS: dict[str, str] = {
+    "test_candidate_review_cli_policy.py::test_latency_benchmark_uses_isolated_real_git_candidates": (
+        "the benchmark's subject is the host governance surface -- GOVERNANCE_PATHS "
+        "names .github/CODEOWNERS, AGENTS.md, the Makefile and research/notes"
+    ),
+    "test_mutation_campaign_generate.py::test_a_generated_rust_manifest_loads_as_a_generated_campaign": (
+        "rust_subjects() rglobs Cargo.toml from the package root; a standalone root "
+        "holds no crates, so there is nothing to plan a campaign against"
+    ),
+    "test_mutation_engine_cargo.py::test_the_campaign_under_test_is_wired_end_to_end": (
+        "the wired campaign pins tooling/native/snapshot-retention, a host crate"
+    ),
+    "test_mutation_engine_mull.py::test_the_campaign_under_test_is_wired_end_to_end": (
+        "the wired campaign pins aria_core/src/cpu/adaptive_routing.cpp, a declared "
+        "project package outside conductor's boundary"
+    ),
+    "test_mutation_testing.py::test_campaign_ranks_every_test_contiguously_and_materializes_six_mutations": (
+        "the fixture campaign nm_f6_phase22_20m_active.json is research/-scoped and "
+        "validates test scopes under research/tests/ -- a boundary violation in its "
+        "own right, and the fixture should become a conductor-scoped campaign"
+    ),
+    "test_mutation_testing.py::test_inspection_reports_ready_with_six_materialized_patches": (
+        "same research/-scoped fixture campaign as the test above"
+    ),
+    "test_repo_index.py::test_the_index_resolves_every_import_the_ast_matcher_did": (
+        "the thresholds describe the host tree's scale; a standalone install has no "
+        "host tree to find and the guard has nothing to say"
+    ),
+    "test_repo_index.py::test_the_index_is_not_degenerate": (
+        "same host-tree scale thresholds as the test above"
+    ),
+}
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Skip the host-coupled tests when conductor is installed without a project."""
+
+    if os.environ.get("CONDUCTOR_PROJECT_TEST_PLUGIN") != "":
+        return
+    for item in items:
+        key = f"{Path(str(item.fspath)).name}::{item.originalname or item.name}"
+        reason = HOST_PROJECT_TESTS.get(key)
+        if reason is not None:
+            item.add_marker(pytest.mark.skip(reason=f"no host project: {reason}"))

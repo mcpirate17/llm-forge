@@ -25,6 +25,15 @@ import pytest
 from conductor.equivalence_ablations import generate_ablations
 from conductor.equivalence_probe import Verdict, probe_function
 
+# The probe itself never imports torch -- equivalence_probe.py reaches it through
+# `sys.modules.get("torch")` and decides its absence. What needs it is the corpus
+# below: every subject is a tensor construct, because the verdicts these tests pin
+# were all first reached wrongly on tensor code. torch is a host dependency and not
+# one of conductor's, so a standalone install has no way to run them. Skip the file
+# there rather than shipping a torch requirement the package does not otherwise have;
+# wherever torch exists -- the host repo, CI -- all of them still run.
+pytest.importorskip("torch")
+
 MODULE = '''
 import dataclasses
 import functools

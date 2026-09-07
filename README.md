@@ -43,24 +43,42 @@ project owns (policy, ledger, registry) are created once and never rewritten.
 doctor finds a dead hook; a run that writes ends with the doctor and fails loud on a
 dead hook.
 
+## Host seams
+
+Two environment variables carry what only a project can know. Both default to the host
+repository's layout, so nothing changes for this tree; a standalone install overrides or
+ignores them.
+
+| Variable | Meaning |
+|---|---|
+| `CONDUCTOR_PROJECT_TEST_PLUGIN=""` | This install has no host project behind it. The suite's host-coupled tests skip; `conductor/_project_hooks.py` defines the signal and `conductor/conftest.py` holds the inventory of what it excuses. |
+| `CONDUCTOR_VULTURE_WHITELIST` | The project's vulture whitelist, default `research/tools/vulture_whitelist.py`. A whitelist names the symbols a *project* intentionally keeps alive, so conductor cannot own the list. When the configured path is absent the argument is dropped rather than passed: naming a missing file makes vulture exit 1 with no findings, and every finding it would have reported is then untrusted. Dropping it is not a silent weakening — an unfiltered run reports strictly more, never less. |
+
 ## Last rehearsal
 
-2026-09-03, tree `35b584d52dd6` (branch `tooling-conductor-init`), editable install 20 s,
-pytest: **1280 passed, 48 failed, 9 errors, 1 skipped**, exit 1. Foreign half: wheel
-install 16.5 s, `hook-doctor | PASS dead=0 warn=0 total=4`, force-push **deny**, both
-modules import from `.venv-foreign/lib/python3.12/site-packages`. Two blockers the
-rehearsal found and this branch fixed: the launcher shebang and the dispatcher's PATH
-prepend resolved the venv interpreter's symlink out to `/usr/bin/python3.12`.
+2026-09-07, tree `c78b238e47d5` (branch `llm-31/standalone-smoke-20260907`), install
+31.0 s, pytest: **1858 passed, 12 skipped, 1 failed**, exit 1. Foreign half: wheel
+install 27.6 s, `hook-doctor | PASS dead=0 warn=0 total=4`, force-push **deny**, both
+modules import from `.venv-foreign/lib/python3.12/site-packages`.
 
-Remaining pytest-phase couplings (host paths and host packages, none an import from the
-monorepo by the package itself):
+The single failure is not a host coupling:
+`test_mutation_coverage.py::test_mutation_testing_cli_inspect_verify_and_refuse`
+(`assert 3 == 0`) is `mutation_testing inspect` refusing on `source_hash_drift` against
+`conductor/mutation_scope.py`. It fails identically inside this repository and on
+master, and is one of the two contract tests PR #360 repairs.
 
-| count | first line | coupling |
-|---|---|---|
-| 18 | `ModuleNotFoundError: No module named 'torch'` | `test_equivalence_probe` imports torch; a host extra, not a wheel dependency |
-| 17 + 2 | `CampaignError: mutation runner component is missing or unsafe: tooling/native/conductor-native/src/mutation_evidence.rs` / `cannot inventory ... research/tests/...` | `test_mutation_testing`, `test_mutation_value` pin host-repo paths |
-| 9 | `FileNotFoundError: <dest>/src/.agent_hooks/...` | `test_local_ai_policy`, `test_workspace_eval`, `test_workspace_runtime_matrix` derive `.agent_hooks` from the package parent |
-| 3 + 1 | vulture whitelist / `research/tools/vulture_whitelist.py` | `test_vulture_audit`, `test_mutation_testing` read host files |
-| 1 + 1 + 1 | `.github/CODEOWNERS`, `vault_health.py`, `assert 2 == 1` | `test_candidate_review_cli_policy`, `test_guardrail_audit` expect repo files |
-| 1 + 1 + 1 | `only 674 imports checked`, `assert 91 > 200`, `assert 3 == 0` | `test_repo_index`, `test_mutation_coverage` measure the host tree |
-| 1 | `test_launcher_is_tracked_and_executable` | `tooling/hooks/dispatch/test_registry.py` expects the launcher at `<root>/.claude/hooks/dispatch.py`; the standalone layout keeps it at `hooks/dispatch.py` |
+The 12 skips are the host-coupling surface that remains, and they are an inventory
+rather than a scattering of decorators: eight in `conductor/conftest.py`, one in
+`tooling/hooks/dispatch/conftest.py`, one module-level `importorskip("torch")` in
+`test_equivalence_probe.py`, and two that predate this work. Each entry names the host
+artifact it needs — `.github/CODEOWNERS`, a crate under `tooling/native/`, an
+`aria_core` source, a `research/`-scoped fixture campaign, host-tree scale thresholds,
+the launcher `conductor init` writes. **That list is debt, not architecture**; the goal
+is for it to reach zero, and shrinking it is what a later rehearsal should show.
+
+For comparison, the 2026-09-03 rehearsal on `tooling-conductor-init` (tree `35b584d52dd6`)
+was **1280 passed, 48 failed, 9 errors, 1 skipped**. The errors and 47 of the failures
+were host couplings in the package itself: host path literals in `run_audit` and
+`_vulture_issues`, `.agent_hooks` derived from the package parent, runner components
+resolved out of the monorepo, and a `research/tools/vault_health.py` path standing in
+for a synthesized fixture.

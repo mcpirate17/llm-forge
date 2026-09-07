@@ -8,10 +8,21 @@ import pytest
 from conductor import guardrail_audit
 
 
-def test_iter_files_accepts_explicit_file_target() -> None:
-    files = guardrail_audit._iter_files(
-        ["research/tools/vault_health.py"], staged_only=False
-    )
+def test_iter_files_accepts_explicit_file_target(tmp_path, monkeypatch) -> None:
+    """A named file resolves to itself, not to a walk of the directory holding it.
+
+    The subject is synthesized rather than borrowed from the surrounding checkout.
+    Naming a real repository path made this a test of that path's continued
+    existence as well as of `_iter_files`, and it only ever passed inside this
+    project -- the sibling below is what actually discriminates the two readings.
+    """
+
+    monkeypatch.setattr(guardrail_audit, "ROOT", tmp_path)
+    (tmp_path / "tools").mkdir()
+    (tmp_path / "tools/vault_health.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "tools/sibling.py").write_text("y = 2\n", encoding="utf-8")
+
+    files = guardrail_audit._iter_files(["tools/vault_health.py"], staged_only=False)
 
     assert [path.name for path in files] == ["vault_health.py"]
 
