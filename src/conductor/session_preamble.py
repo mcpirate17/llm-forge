@@ -69,7 +69,10 @@ def _exposure_line() -> str:
         return f"EXPOSED: unavailable ({exc}). python -m conductor.workspace_hygiene"
     return (
         f"EXPOSED: {counts['local_only_commits']} local-only commit(s), "
-        f"{counts['stale_dirty_files']} stale dirty file(s), branches skipped (needs gh). "
+        f"{counts['stale_dirty_files']} stale dirty file(s), "
+        f"{counts['landed_worktrees'] if counts['worktrees_skipped'] is None else 'unknown'}"
+        " finished worktree(s) to remove, "
+        "branches skipped (needs gh). "
         "python -m conductor.workspace_hygiene"
     )
 

@@ -67,6 +67,8 @@ class Report:
     redundant_branches: list[dict[str, str]] = field(default_factory=list)
     stale_worktrees: list[str] = field(default_factory=list)
     dirty_worktrees: list[dict[str, object]] = field(default_factory=list)
+    landed_worktrees: list[dict[str, object]] = field(default_factory=list)
+    landed_ref: str = ""
     expired_claims: list[dict[str, str]] = field(default_factory=list)
     idle_claims: list[dict[str, str]] = field(default_factory=list)
     unpushed_work: list[dict[str, str]] = field(default_factory=list)
@@ -83,6 +85,7 @@ class Report:
             (
                 self.redundant_branches,
                 self.stale_worktrees,
+                self.landed_worktrees,
                 self.expired_claims,
                 self.idle_claims,
                 self.unpushed_work,
@@ -144,13 +147,11 @@ def _dirty_worktree_branches() -> list[dict[str, str]]:
     ]
 
 
-def worktree_state() -> tuple[list[str], list[dict[str, object]]]:
-    """(worktrees whose directory is gone, worktrees holding uncommitted work)."""
-    stale: list[str] = []
-    dirty: list[dict[str, object]] = []
+def _worktree_entries(repo: Path = ROOT) -> list[dict[str, str]]:
+    """Parse ``git worktree list --porcelain`` into one record per worktree."""
     current: dict[str, str] = {}
     entries: list[dict[str, str]] = []
-    for line in _git("worktree", "list", "--porcelain").splitlines():
+    for line in _git_in(repo, "worktree", "list", "--porcelain").splitlines():
         if not line:
             if current:
                 entries.append(current)
@@ -160,21 +161,31 @@ def worktree_state() -> tuple[list[str], list[dict[str, object]]]:
         current[key] = value
     if current:
         entries.append(current)
+    return entries
 
-    for entry in entries:
+
+def _uncommitted(path: str) -> list[str]:
+    status = subprocess.run(
+        ["git", "-C", path, "status", "--porcelain", "--untracked-files=all"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return [line for line in status.stdout.splitlines() if line.strip()]
+
+
+def worktree_state() -> tuple[list[str], list[dict[str, object]]]:
+    """(worktrees whose directory is gone, worktrees holding uncommitted work)."""
+    stale: list[str] = []
+    dirty: list[dict[str, object]] = []
+    for entry in _worktree_entries():
         path = entry.get("worktree", "")
         if not path:
             continue
         if not Path(path).is_dir():
             stale.append(path)
             continue
-        status = subprocess.run(
-            ["git", "-C", path, "status", "--porcelain", "--untracked-files=all"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        changes = [line for line in status.stdout.splitlines() if line.strip()]
+        changes = _uncommitted(path)
         if changes:
             dirty.append(
                 {
@@ -185,6 +196,116 @@ def worktree_state() -> tuple[list[str], list[dict[str, object]]]:
                 }
             )
     return stale, dirty
+
+
+def _live_ref_or_default(repo: Path = ROOT) -> str:
+    """The ref the hook judges containment against: the remote integration line.
+
+    Prefers ``origin/master`` over the local branch. A local ``master`` can sit days
+    behind origin -- this checkout was 3 commits behind while four PRs landed -- and a
+    worktree judged against a stale local tip reads as unlanded long after its work
+    merged, which is the opposite of the nag this check exists to produce.
+
+    Raises rather than guessing when neither exists: a containment check with no line
+    to check against would silently report every worktree as finished.
+    """
+    candidates = (
+        f"origin/{branch_policy.INTEGRATION_BRANCH}",
+        branch_policy.INTEGRATION_BRANCH,
+    )
+    for ref in candidates:
+        probe = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", ref],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if probe.returncode == 0:
+            return ref
+    raise HygieneError(
+        f"{repo}: no integration line to judge worktrees against "
+        f"(tried {', '.join(candidates)})"
+    )
+
+
+def landed_worktrees(live_ref: str, repo: Path = ROOT) -> list[dict[str, object]]:
+    """Worktrees that have finished: clean, and holding nothing the live line lacks.
+
+    This is the category the report was missing. Stale registrations and dirty trees
+    were already classified, so a worktree whose work had *landed* fell through both
+    and was reported as nothing at all -- which is why worktrees accumulated with
+    nothing ever asking for them back.
+
+    Cleanliness is required, never inferred from the branch. A worktree can sit exactly
+    on its remote tip and still hold every line of value in unstaged files; deleting one
+    on ref containment alone destroys work silently (codex/tooling-migration-20260906,
+    2026-09-07: 59 unstaged paths behind a tip identical to its remote). The main
+    checkout is excluded outright -- it is not a candidate for removal at any time.
+    """
+    main = repo.resolve()
+    out: list[dict[str, object]] = []
+    for entry in _worktree_entries(repo):
+        path = entry.get("worktree", "")
+        if not path or not Path(path).is_dir():
+            continue
+        if Path(path).resolve() == main:
+            continue
+        if _uncommitted(path):
+            continue
+        head = entry.get("HEAD", "")
+        if not head:
+            continue
+        branch = entry.get("branch", "").removeprefix("refs/heads/")
+        contained = _git_in(repo, "rev-list", "--count", f"{live_ref}..{head}").strip()
+        if contained == "0":
+            reason = f"contained in {live_ref}"
+        elif _upstream_was_deleted(repo, branch):
+            reason = "merged and pruned: its remote branch is gone"
+        else:
+            continue
+        out.append(
+            {
+                "worktree": path,
+                "branch": branch or "(detached)",
+                "head": head[:8],
+                "reason": reason,
+            }
+        )
+    return out
+
+
+def _upstream_was_deleted(repo: Path, branch: str) -> bool:
+    """True when ``branch`` was pushed once and its remote ref no longer exists.
+
+    Squash-merging rewrites the commits, so a landed branch is never an ancestor of the
+    line it landed on -- ``git cherry`` and ``rev-list`` both call it unmerged forever.
+    What does move is the remote ref: every PR here lands with ``--delete-branch``, so
+    a branch that has upstream config pointing at a ref origin no longer has is a
+    branch whose PR closed.
+
+    A branch that was never pushed has no upstream config and is never matched, so
+    unpushed work cannot be swept this way. The remaining false positive -- a remote
+    branch deleted without merging -- costs nothing: ``git worktree remove`` deletes
+    the working directory, never the branch or its commits. That is why the clean
+    check above is the load-bearing guard, not this one.
+    """
+    if not branch:
+        return False
+    remote = _git_in_quiet(repo, "config", "--get", f"branch.{branch}.remote").strip()
+    merge = _git_in_quiet(repo, "config", "--get", f"branch.{branch}.merge").strip()
+    if not remote or not merge:
+        return False
+    tracked = f"refs/remotes/{remote}/{merge.removeprefix('refs/heads/')}"
+    return not _git_in_quiet(repo, "rev-parse", "--verify", "--quiet", tracked).strip()
+
+
+def _git_in_quiet(repo: Path, *args: str) -> str:
+    """``_git_in`` for probes where a non-zero exit is an answer, not a failure."""
+    done = subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True, check=False
+    )
+    return done.stdout if done.returncode == 0 else ""
 
 
 def _claim_store() -> list[dict[str, object]]:
@@ -561,15 +682,29 @@ def cheap_exposure_counts(repo: Path = ROOT) -> dict[str, object]:
     reported by the full report / ``exposed`` CLI instead; this function says so
     rather than silently omitting it.
     """
+    try:
+        landed: int | None = len(landed_worktrees(_live_ref_or_default(repo), repo))
+        worktrees_skipped = None
+    except HygieneError as exc:
+        # A repo with no integration line cannot be judged for containment. Report that
+        # instead of a 0, which would read as "nothing to clean up", and keep the other
+        # two counts rather than losing the whole line to one unanswerable check.
+        landed, worktrees_skipped = None, str(exc)
     return {
         "local_only_commits": len(branch_policy.local_only_commits(repo)),
         "stale_dirty_files": len(stale_dirty_files(repo=repo)),
+        "landed_worktrees": landed,
+        "worktrees_skipped": worktrees_skipped,
         "branches_skipped": "PR lookup needs `gh`; run `python -m conductor.workspace_hygiene`",
     }
 
 
 def build_report(live_ref: str) -> Report:
     stale, dirty = worktree_state()
+    # Removal is judged against the remote line, not ``live_ref``. A worktree is
+    # only finished once its work reached origin; a local branch that is behind
+    # would report finished worktrees as unfinished and the nag would never fire.
+    landed_ref = _live_ref_or_default()
     orphans, dangling = manifest_state()
     stale_branches, gh_available = stale_feature_branches(live_ref)
     return Report(
@@ -577,6 +712,8 @@ def build_report(live_ref: str) -> Report:
         redundant_branches=redundant_branches(live_ref, {_default_branch(), live_ref}),
         stale_worktrees=stale,
         dirty_worktrees=dirty,
+        landed_worktrees=landed_worktrees(landed_ref),
+        landed_ref=landed_ref,
         expired_claims=expired_claims(),
         idle_claims=idle_claims(),
         unpushed_work=unpushed_work(),
@@ -609,6 +746,17 @@ def render(report: Report) -> str:
     )
     for path in report.stale_worktrees:
         lines.append(f"  {path}")
+
+    lines.append("")
+    lines.append(
+        f"SAFE TO REMOVE -- worktrees whose work is already on {report.landed_ref} "
+        f"({len(report.landed_worktrees)})"
+    )
+    for row in report.landed_worktrees:
+        lines.append(
+            f"  {row['head']}  {row['worktree']} [{row['branch']}] -- {row['reason']}\n"
+            f"      git worktree remove {row['worktree']}"
+        )
 
     lines.append("")
     lines.append(
