@@ -122,15 +122,28 @@ def binary() -> str:
 
 
 def _plugin(version: str) -> str:
-    """The clang pass plugin that embeds the mutants into the build."""
+    """Where the clang pass plugin that embeds the mutants lives.
 
-    path = Path(f"/usr/lib/mull-ir-frontend-{version}")
-    if not path.is_file():
+    Path construction only. Assembling the configure argv must not depend on
+    what is installed on the host, or the resulting flags cannot be asserted
+    anywhere the toolchain is absent -- which is every CI runner. The refusal
+    lives in `_require_plugin`, which the build path calls before a build is
+    paid for, so a missing plugin still fails at exactly the same moment.
+    """
+
+    return f"/usr/lib/mull-ir-frontend-{version}"
+
+
+def _require_plugin(version: str) -> str:
+    """Refuse a host with no pass plugin, before any build work starts."""
+
+    path = _plugin(version)
+    if not Path(path).is_file():
         raise CampaignError(
             f"the Mull pass plugin is not at {path}; without it the build "
             "carries no mutants and every campaign would report an empty corpus"
         )
-    return str(path)
+    return path
 
 
 def _executables(campaign: _core.GeneratedCampaign) -> tuple[str, ...]:
@@ -173,7 +186,9 @@ def _configure_argv(
         f"-DCMAKE_CXX_FLAGS={flags}",
         # The profile runtime has to be linked in, or the binary runs fine and
         # writes no .profraw, and the coverage filter silently sees nothing.
-        "-DCMAKE_EXE_LINKER_FLAGS=-fprofile-instr-generate",
+        # detect-secrets reads the flag as a base64 high-entropy string; it is a
+        # clang linker flag, and the scan only sees it because this file changed.
+        "-DCMAKE_EXE_LINKER_FLAGS=-fprofile-instr-generate",  # pragma: allowlist secret
     ]
     for define in campaign.options.get("cmake_args", ()):
         argv.append(str(define))
@@ -428,39 +443,19 @@ def _profile(
     return profdata
 
 
-def execute(
+def _build(
     campaign: _core.GeneratedCampaign,
-    receipt: dict[str, Any],
-    *,
-    binary: str,
     worktree: Path,
+    build: Path,
+    version: str,
+    *,
+    receipt: dict[str, Any],
     output_path: Path,
+    environment: dict[str, str],
 ) -> None:
-    """Build the instrumented corpus, cover it, mutate it, fill the receipt."""
+    """Configure and build the instrumented corpus, or refuse with the receipt written."""
 
-    if drifted := _core.drift(campaign, worktree):
-        raise CampaignError(f"snapshot source hashes drifted: {drifted}")
-    version = _llvm_version(campaign)
-    wanted = _tool(
-        "mull-runner",
-        version,
-        f"the manifest pins llvm_version={version}",
-    )
-    if Path(binary).resolve() != Path(wanted).resolve():
-        raise CampaignError(
-            f"the resolved runner {binary} is not the manifest's {wanted}: a "
-            f"runner built for another LLVM release reads the pass plugin's "
-            f"output as an unmutated binary"
-        )
-    profdata_tool = _tool(
-        "llvm-profdata", version, f"install llvm-{version} beside clang-{version}"
-    )
-    environment = {
-        **campaign.environment,
-        "PATH": os.environ.get("PATH", ""),
-    }
-
-    build = worktree / str(campaign.options.get("build_dir", ".mull-build"))
+    _require_plugin(version)  # before the first build command, as it always was
     for argv in (
         _configure_argv(campaign, worktree, build, version),
         ["cmake", "--build", str(build)],
@@ -479,23 +474,17 @@ def execute(
                 f"the instrumented build failed: {result.stderr_tail[-800:]}"
             )
 
-    # The declared suite gate. The per-executable runs below exist to produce
-    # coverage profiles, one file each; this is the campaign's own statement of
-    # what "the tests pass" means, and it runs before any mutation work is paid
-    # for. Every mutant after an already-red suite would read as caught.
-    baseline_argv = list(campaign.test_argv)
-    baseline, _ = _core.run(
-        baseline_argv,
-        cwd=build,
-        timeout_seconds=campaign.run_timeout_seconds,
-        environment=environment,
-    )
-    receipt["baseline_argv"] = baseline_argv
-    receipt["baseline"] = baseline.as_dict()
-    if baseline.timed_out or baseline.returncode != 0:
-        receipt["status"] = "BASELINE_FAILED"
-        _core.atomic_json(output_path, receipt)
-        raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+
+def _engine_reports(
+    campaign: _core.GeneratedCampaign,
+    binary: str,
+    build: Path,
+    *,
+    receipt: dict[str, Any],
+    environment: dict[str, str],
+    profdata_tool: str,
+) -> list[dict[str, Any]]:
+    """Cover then mutate every declared executable; one Elements report each."""
 
     reports = []
     for name in _executables(campaign):
@@ -537,6 +526,78 @@ def execute(
             reports.append(json.loads(path.read_text(encoding="utf-8")))
         except json.JSONDecodeError as exc:
             raise CampaignError(f"Mull's report at {path} is not JSON: {exc}") from exc
+    return reports
+
+
+def execute(
+    campaign: _core.GeneratedCampaign,
+    receipt: dict[str, Any],
+    *,
+    binary: str,
+    worktree: Path,
+    output_path: Path,
+) -> None:
+    """Build the instrumented corpus, cover it, mutate it, fill the receipt."""
+
+    if drifted := _core.drift(campaign, worktree):
+        raise CampaignError(f"snapshot source hashes drifted: {drifted}")
+    version = _llvm_version(campaign)
+    wanted = _tool(
+        "mull-runner",
+        version,
+        f"the manifest pins llvm_version={version}",
+    )
+    if Path(binary).resolve() != Path(wanted).resolve():
+        raise CampaignError(
+            f"the resolved runner {binary} is not the manifest's {wanted}: a "
+            f"runner built for another LLVM release reads the pass plugin's "
+            f"output as an unmutated binary"
+        )
+    profdata_tool = _tool(
+        "llvm-profdata", version, f"install llvm-{version} beside clang-{version}"
+    )
+    environment = {
+        **campaign.environment,
+        "PATH": os.environ.get("PATH", ""),
+    }
+
+    build = worktree / str(campaign.options.get("build_dir", ".mull-build"))
+    _build(
+        campaign,
+        worktree,
+        build,
+        version,
+        receipt=receipt,
+        output_path=output_path,
+        environment=environment,
+    )
+
+    # The declared suite gate. The per-executable runs below exist to produce
+    # coverage profiles, one file each; this is the campaign's own statement of
+    # what "the tests pass" means, and it runs before any mutation work is paid
+    # for. Every mutant after an already-red suite would read as caught.
+    baseline_argv = list(campaign.test_argv)
+    baseline, _ = _core.run(
+        baseline_argv,
+        cwd=build,
+        timeout_seconds=campaign.run_timeout_seconds,
+        environment=environment,
+    )
+    receipt["baseline_argv"] = baseline_argv
+    receipt["baseline"] = baseline.as_dict()
+    if baseline.timed_out or baseline.returncode != 0:
+        receipt["status"] = "BASELINE_FAILED"
+        _core.atomic_json(output_path, receipt)
+        raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+
+    reports = _engine_reports(
+        campaign,
+        binary,
+        build,
+        receipt=receipt,
+        environment=environment,
+        profdata_tool=profdata_tool,
+    )
 
     receipt["engine_version"] = reports[0].get("config", {}).get("mullVersion")
     every = _rows(_merge(reports), worktree)

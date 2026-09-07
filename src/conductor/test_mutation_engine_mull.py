@@ -24,7 +24,8 @@ from conductor.mutation_engine_mull import (
     _rows,
     _slice,
 )
-from conductor.mutation_engine_generated import load_generated_campaign
+from conductor import mutation_engine_mull as mull
+from conductor.mutation_engine_generated import CommandResult, load_generated_campaign
 from conductor.mutation_scope import CampaignError
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -455,3 +456,344 @@ def test_the_committed_campaign_makes_uninitialised_reads_deterministic() -> Non
     assert campaign().environment.get("MALLOC_PERTURB_"), (
         "an uninitialised read must fail the same way every run"
     )
+
+
+# --------------------------------------------------------------- orchestration
+#
+# `_build` and `_engine_reports` were the two halves of `execute`, and nothing
+# had ever run either of them: every test above stops at the argv. A build that
+# reports success it never earned, or a corpus quietly measured over one
+# executable instead of two, is exactly the failure this adapter exists to make
+# impossible -- so the orchestration is driven here against a faked `_core.run`.
+
+
+def _result(returncode: int = 0, *, stderr: str = "") -> CommandResult:
+    """One finished command, in the shape `_core.run` hands its caller."""
+
+    return CommandResult(
+        returncode=returncode,
+        timed_out=False,
+        duration_seconds=0.0,
+        stdout_tail="",
+        stderr_tail=stderr,
+    )
+
+
+def _recorded_runs(
+    monkeypatch: pytest.MonkeyPatch, *outcomes: CommandResult
+) -> list[list[str]]:
+    """Replace `_core.run` with a recorder, returning the argv list it fills."""
+
+    calls: list[list[str]] = []
+
+    def fake_run(argv, *, cwd, timeout_seconds, environment):
+        calls.append([str(arg) for arg in argv])
+        index = len(calls) - 1
+        return (outcomes[index] if index < len(outcomes) else _result()), ""
+
+    monkeypatch.setattr(mull._core, "run", fake_run)
+    return calls
+
+
+def _installed_plugin(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Pretend the host carries the pass plugin, so `_build` gets past its gate."""
+
+    plugin = tmp_path / "mull-ir-frontend-18"
+    plugin.write_text("", encoding="utf-8")
+    monkeypatch.setattr(mull, "_plugin", lambda version: str(plugin))
+
+
+def test_a_host_with_no_pass_plugin_is_refused_before_a_configure_is_paid_for(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cmake configure of the kernel suite is minutes of machine time.
+
+    The pass plugin is what puts the mutants into the object files, so a build
+    without it produces a clean binary and the campaign reports an empty corpus
+    as a pass. The refusal has to come first, not after the build is paid for.
+    """
+
+    calls = _recorded_runs(monkeypatch)
+    receipt: dict[str, object] = {}
+    output = tmp_path / "receipt.json"
+    with pytest.raises(CampaignError, match="mull-ir-frontend-99"):
+        mull._build(
+            campaign(),
+            tmp_path,
+            tmp_path / "build",
+            "99",
+            receipt=receipt,
+            output_path=output,
+            environment={},
+        )
+    assert calls == []
+    assert receipt == {}
+    assert not output.exists()
+
+
+def test_a_failed_configure_lands_in_the_receipt_and_never_reaches_the_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A configure that fails must stop the run and say so on disk.
+
+    Running `cmake --build` over a failed configure builds the previous tree, so
+    the corpus would be measured against stale objects; and a receipt left
+    unwritten is a campaign that failed silently.
+    """
+
+    _installed_plugin(monkeypatch, tmp_path)
+    calls = _recorded_runs(monkeypatch, _result(1, stderr="ninja: not found"))
+    receipt: dict[str, object] = {}
+    output = tmp_path / "receipt.json"
+    with pytest.raises(CampaignError, match="the instrumented build failed"):
+        mull._build(
+            campaign(),
+            tmp_path,
+            tmp_path / "build",
+            "18",
+            receipt=receipt,
+            output_path=output,
+            environment={},
+        )
+    assert len(calls) == 1
+    assert "--build" not in calls[0]
+    assert receipt["status"] == "BASELINE_FAILED"
+    assert json.loads(output.read_text(encoding="utf-8"))["status"] == "BASELINE_FAILED"
+
+
+def test_a_clean_configure_and_build_are_both_recorded_in_the_order_they_ran(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both commands belong in the receipt, or the build is unauditable.
+
+    The receipt is the only record that the corpus under measurement came from
+    an instrumented configure at all; a build step that runs but is not recorded
+    leaves a campaign nobody can reproduce.
+    """
+
+    _installed_plugin(monkeypatch, tmp_path)
+    build = tmp_path / "build"
+    calls = _recorded_runs(monkeypatch, _result(), _result())
+    receipt: dict[str, object] = {}
+    mull._build(
+        campaign(),
+        tmp_path,
+        build,
+        "18",
+        receipt=receipt,
+        output_path=tmp_path / "receipt.json",
+        environment={},
+    )
+    assert calls[0][:1] == ["cmake"]
+    assert calls[1] == ["cmake", "--build", str(build)]
+    assert len(receipt["build"]) == 2
+    assert "status" not in receipt
+
+
+def _built_tree(tmp_path: Path, *, reports: bool) -> tuple[Path, tuple[str, ...]]:
+    """A build directory holding every declared executable, reports optional."""
+
+    build = tmp_path / "build"
+    build.mkdir()
+    names = _executables(campaign())
+    for name in names:
+        (build / name).write_text("", encoding="utf-8")
+    if reports:
+        report_dir = build / "mull-reports"
+        report_dir.mkdir()
+        for name in names:
+            (report_dir / f"{Path(name).name}.json").write_text(
+                json.dumps(report(mutant(status="Killed"))), encoding="utf-8"
+            )
+    return build, names
+
+
+def test_every_declared_executable_is_covered_and_mutated_into_its_own_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two declared executables must produce two profiles and two reports.
+
+    Mull scores per binary. Stopping after the first one measures half the
+    corpus and reports the number as if it covered all of it -- the campaign
+    would go green while an entire suite went unmeasured.
+    """
+
+    build, names = _built_tree(tmp_path, reports=True)
+    profiled: list[str] = []
+
+    def fake_profile(executable, build_dir, name, **kwargs):
+        profiled.append(name)
+        return build_dir / f"{name}.profdata"
+
+    monkeypatch.setattr(mull, "_profile", fake_profile)
+    calls = _recorded_runs(monkeypatch, _result(), _result())
+    receipt: dict[str, object] = {}
+    reports = mull._engine_reports(
+        campaign(),
+        "/bin/mull-runner-18",
+        build,
+        receipt=receipt,
+        environment={},
+        profdata_tool="/bin/llvm-profdata-18",
+    )
+    assert profiled == [Path(name).name for name in names]
+    assert len(calls) == len(names)
+    assert len(reports) == len(names)
+    assert len(receipt["engine_result"]) == len(names)
+
+
+def test_a_missing_elements_report_stops_the_run_and_names_the_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """mull-runner exits non-zero whenever mutants survived, which is ordinary.
+
+    The report is what decides the campaign, so its absence is the real failure
+    and it cannot be inferred from the exit code. Reading past it would raise
+    something about a missing file from deep inside the JSON parser instead.
+    """
+
+    build, _ = _built_tree(tmp_path, reports=False)
+    monkeypatch.setattr(
+        mull, "_profile", lambda executable, build_dir, name, **kwargs: build_dir
+    )
+    _recorded_runs(monkeypatch, _result(1))
+    with pytest.raises(CampaignError, match="wrote no Elements report") as raised:
+        mull._engine_reports(
+            campaign(),
+            "/bin/mull-runner-18",
+            build,
+            receipt={},
+            environment={},
+            profdata_tool="/bin/llvm-profdata-18",
+        )
+    assert "test_kernels.json" in str(raised.value)
+
+
+# ------------------------------------------------------------------- execute
+#
+# `execute` is the only caller of everything above, and the four refusals it
+# owns -- drifted sources, a runner from another LLVM release, a red baseline,
+# and a report whose mutants all fall outside the declared scope -- are each the
+# difference between a campaign that means something and one that reports a
+# number over nothing. None of them had ever been run.
+
+
+def _engine_report() -> dict[str, object]:
+    """One Elements report carrying a killed, in-scope mutant and a version."""
+
+    return {**report(mutant(status="Killed")), "config": {"mullVersion": "18.0.0"}}
+
+
+def _drive_execute(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    binary: str = "/bin/mull-runner-18",
+    drifted: dict[str, str] | None = None,
+    baseline: int = 0,
+    reports: list[dict[str, object]] | None = None,
+) -> tuple[dict[str, object], list[list[str]]]:
+    """Run `execute` with every subprocess and both halves of the build faked."""
+
+    monkeypatch.setattr(mull._core, "drift", lambda campaign, worktree: drifted or {})
+    monkeypatch.setattr(
+        mull, "_tool", lambda name, version, hint: f"/bin/{name}-{version}"
+    )
+    monkeypatch.setattr(mull, "_build", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        mull,
+        "_engine_reports",
+        lambda *args, **kwargs: [_engine_report()] if reports is None else reports,
+    )
+    calls = _recorded_runs(monkeypatch, _result(baseline))
+    receipt: dict[str, object] = {}
+    mull.execute(
+        campaign(),
+        receipt,
+        binary=binary,
+        worktree=REPO_ROOT,
+        output_path=tmp_path / "receipt.json",
+    )
+    return receipt, calls
+
+
+def test_a_run_over_drifted_sources_is_refused_before_anything_is_built(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The manifest pins the hashes of the sources it was reviewed against.
+
+    Mull generates its own mutants, so a campaign over changed sources is not a
+    re-run of the reviewed corpus -- it is a different corpus reported under the
+    reviewed campaign's name.
+    """
+
+    with pytest.raises(CampaignError, match="snapshot source hashes drifted"):
+        _drive_execute(
+            monkeypatch, tmp_path, drifted={"aria_core/src/cpu/norm.cpp": "0"}
+        )
+
+
+def test_a_runner_from_another_llvm_release_is_refused_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pass plugin and the runner have to come from the same release.
+
+    A mismatched runner reads the plugin's output as an unmutated binary and
+    reports every mutant as survived -- or, worse, as nothing at all.
+    """
+
+    with pytest.raises(CampaignError, match="is not the manifest's"):
+        _drive_execute(monkeypatch, tmp_path, binary="/bin/mull-runner-17")
+
+
+def test_a_red_baseline_stops_the_campaign_and_is_written_to_the_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every mutant after an already-red suite reads as caught.
+
+    The declared suite runs before any mutation work is paid for, and a failure
+    has to reach disk: a campaign that stopped because its own baseline was
+    broken must never be indistinguishable from one that never started.
+    """
+
+    output = tmp_path / "receipt.json"
+    with pytest.raises(CampaignError, match="unmutated baseline failed"):
+        _drive_execute(monkeypatch, tmp_path, baseline=1)
+    assert json.loads(output.read_text(encoding="utf-8"))["status"] == "BASELINE_FAILED"
+
+
+def test_a_clean_run_records_the_baseline_the_engine_version_and_the_scoped_corpus(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The receipt is the campaign's whole output; every field of it is load-bearing.
+
+    `mutants_reported` against `mutants_in_scope` is what tells a reader that
+    the scope filter dropped what it was meant to drop, rather than that Mull
+    mutated less than anyone thought.
+    """
+
+    receipt, calls = _drive_execute(monkeypatch, tmp_path)
+    assert calls == [list(campaign().test_argv)]
+    assert receipt["baseline_argv"] == list(campaign().test_argv)
+    assert receipt["engine_version"] == "18.0.0"
+    assert [row["outcome"] for row in receipt["mutants"]] == ["KILLED"]
+    assert receipt["engine_summary"]["mutants_in_scope"] == 1
+    assert "status" not in receipt
+
+
+def test_a_corpus_that_all_falls_outside_the_declared_scope_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Mull mutates every translation unit in the binary, its own tests included.
+
+    A report whose mutants are all out of scope means the campaign measured
+    something nobody declared; scoring the empty remainder would report a
+    perfect campaign over no mutants at all.
+    """
+
+    outside = {
+        **report(mutant(status="Killed"), path="aria_designer/runtime/tests/t.cpp"),
+        "config": {"mullVersion": "18.0.0"},
+    }
+    with pytest.raises(CampaignError, match="score an empty corpus"):
+        _drive_execute(monkeypatch, tmp_path, reports=[outside])
