@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import time
+from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
@@ -234,6 +235,45 @@ def _run_command(
 
 
 KILLER_FAILURE_OUTCOMES = frozenset({"FAILED", "ERROR"})
+
+
+def _is_routine_kill(outcome: str, attribution: Mapping[str, Any]) -> bool:
+    """A mutant that died exactly as its contract predicted.
+
+    Across the published corpus 11597 of 11660 mutants land here, and for those the
+    run's narrative -- the ranked pass/fail matrix and the pytest stdout tail --
+    only restates what `killer_attribution` already proves, at roughly 13 KB a row.
+    Survivors, timeouts and kills the contract did not predict keep every byte,
+    because those are the rows anyone ever reads.
+    """
+
+    return outcome == "KILLED" and attribution.get("status") == "CONFIRMED"
+
+
+def _attribution_summary(report: Mapping[str, Any]) -> dict[str, Any]:
+    """A routine kill's attribution with the transcript folded to counts.
+
+    Every field a reader can act on survives literally: the failing nodeids, the
+    ranked tests the batch could not map, and the batch's own completeness. Only
+    `tests` -- one row per ranked test per mutant, overwhelmingly the word PASSED
+    beside a duration -- collapses, and it collapses to the tally that is all the
+    full matrix was ever consulted for at rest.
+    """
+
+    counts: Counter[str] = Counter()
+    tests = report.get("tests")
+    if isinstance(tests, Mapping):
+        for row in tests.values():
+            if isinstance(row, Mapping):
+                counts[str(row.get("outcome"))] += 1
+    summary: dict[str, Any] = {
+        key: list(value)
+        for key in ("failed_nodeids", "missing_nodeids", "unmapped_cases")
+        if isinstance(value := report.get(key), list)
+    }
+    summary["status"] = report.get("status")
+    summary["ranked_outcome_counts"] = dict(sorted(counts.items()))
+    return summary
 
 
 def killer_verdict(
@@ -508,6 +548,7 @@ def _run_mutants(
     """
 
     reports: dict[str, Mapping[str, Any]] = {}
+    plans = {plan.mutation_id: plan for plan in campaign.planned_mutations}
     for mutation in selected:
         with _prepared_snapshot(campaign, repo_root) as worktree:
             _apply_mutation(mutation, worktree)
@@ -531,9 +572,27 @@ def _run_mutants(
             "outcome": outcome,
             "test_result": result.as_dict(),
         }
+        # The manifest already says in one line what this mutant breaks and why it
+        # should be caught; carrying it onto the row is what lets a receipt be read
+        # rather than decoded.
+        if (planned := plans.get(mutation.mutation_id)) is not None:
+            row["contract"] = planned.contract
+            row["description"] = planned.description
         row["killer_attribution"] = killer_verdict(mutation, report, outcome)
+        routine = _is_routine_kill(outcome, row["killer_attribution"])
+        if routine:
+            # The tail is the story of a test failing on cue. `killer_attribution`
+            # already names which test and proves it was the predicted one.
+            for tail in ("stdout_tail", "stderr_tail"):
+                row["test_result"].pop(tail, None)
         if report is not None:
-            row["test_attribution"] = intern_test_attribution(receipt, report)
+            row["test_attribution"] = (
+                _attribution_summary(report)
+                if routine
+                else intern_test_attribution(receipt, report)
+            )
+            # The live report is what `analyze_test_value` reads; it keeps the full
+            # matrix regardless of what the receipt goes on to persist.
             reports[mutation.mutation_id] = report
         receipt["mutants"].append(row)
         _atomic_json(output_path, receipt)
