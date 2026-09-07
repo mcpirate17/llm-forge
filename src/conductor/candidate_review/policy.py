@@ -117,7 +117,10 @@ ALLOWED_WAIVER_KEYS = {
 }
 VALID_CLASSES = {
     "binary",
+    "cfamily",
+    "cfamily_host",
     "config",
+    "cuda",
     "dependency",
     "docs",
     "generated",
@@ -129,6 +132,7 @@ VALID_CLASSES = {
     "python",
     "python_dependency",
     "research_result",
+    "rust",
     "rust_dependency",
     "shell",
     "source",
@@ -356,8 +360,17 @@ def _intrinsic_classes(
     classes: set[str] = set()
     if suffix in {".py", ".pyi"}:
         classes.update({"python", "source"})
-    elif suffix in {".c", ".cc", ".cpp", ".cxx", ".cu", ".cuh", ".h", ".hpp", ".rs"}:
-        classes.update({"native", "source"})
+    elif suffix == ".rs":
+        classes.update({"native", "source", "rust"})
+    elif suffix in {".c", ".cc", ".cpp", ".cxx", ".cu", ".cuh", ".h", ".hpp"}:
+        classes.update({"native", "source", "cfamily"})
+        # clang-format and clang-tidy parse C and C++; nvcc's CUDA dialect is
+        # theirs only with --cuda-gpu-arch and a CUDA toolkit, so .cu/.cuh get
+        # their own class and stay out of the C-family tool wrappers.
+        if suffix in {".cu", ".cuh"}:
+            classes.add("cuda")
+        else:
+            classes.add("cfamily_host")
     elif suffix in {".js", ".jsx", ".ts", ".tsx", ".css"}:
         classes.update({"source", "web"})
     elif suffix in {".sh", ".bash"}:
