@@ -26,6 +26,11 @@ absent crates only if the import is still broken afterwards.
 ``--no-deps`` so the server's other pins (fastmcp, a2a-sdk) are left alone, and the
 import is re-run to prove it. An interpreter that does not exist -- CI, or any host
 that never installed the server -- is a skip, not a failure.
+
+:func:`session_findings` is the same question asked at SessionStart, where nobody is
+waiting on an answer and the session that needs it is the one already looking at a
+dead server. It buys the disk half unconditionally and the import probe only once a
+mismatch is in hand.
 """
 
 from __future__ import annotations
@@ -50,6 +55,10 @@ ABSENT = "absent"
 IMPORT_PROBE = "import conductor.crg_server"
 PURELIB_PROBE = "import sysconfig; print(sysconfig.get_paths()['purelib'])"
 TIMEOUT_SECONDS = 900
+# A SessionStart hook may not wait fifteen minutes on a wedged interpreter. Both
+# probes it runs are sub-second measured (startup, and 0.26 s for the import), so
+# this is a bound on pathology, not a budget the healthy path spends.
+SESSION_TIMEOUT_SECONDS = 20
 
 
 @dataclass(frozen=True)
@@ -81,13 +90,13 @@ def server_interpreter(root: Path) -> tuple[Path, Path, dict[str, str]]:
     return Path(argv[0]), cwd, env
 
 
-def purelib(interpreter: Path) -> Path:
+def purelib(interpreter: Path, timeout: float = TIMEOUT_SECONDS) -> Path:
     """Ask the interpreter for its own site-packages rather than guessing the layout."""
     done = subprocess.run(
         [str(interpreter), "-c", PURELIB_PROBE],
         capture_output=True,
         text=True,
-        timeout=TIMEOUT_SECONDS,
+        timeout=timeout,
     )
     if done.returncode != 0:
         raise ProbeError(
@@ -107,7 +116,12 @@ def skews(packages: Path, declared: tuple[Crate, ...]) -> tuple[Skew, ...]:
     return tuple(found)
 
 
-def imports_server(interpreter: Path, cwd: Path, env: dict[str, str]) -> str | None:
+def imports_server(
+    interpreter: Path,
+    cwd: Path,
+    env: dict[str, str],
+    timeout: float = TIMEOUT_SECONDS,
+) -> str | None:
     """None when the server module imports; otherwise the last line of the failure."""
     done = subprocess.run(
         [str(interpreter), "-c", IMPORT_PROBE],
@@ -115,7 +129,7 @@ def imports_server(interpreter: Path, cwd: Path, env: dict[str, str]) -> str | N
         env={**os.environ, **env},
         capture_output=True,
         text=True,
-        timeout=TIMEOUT_SECONDS,
+        timeout=timeout,
     )
     if done.returncode == 0:
         return None
@@ -212,6 +226,57 @@ def run(root: Path, check_only: bool) -> tuple[str, list[str]]:
     if remaining is not None:
         return "FAIL", [*detail, f"reinstalled {names}, still broken: {remaining}"]
     return "SYNCED", [*detail, f"reinstalled {names} into {interpreter}"]
+
+
+def session_findings(root: Path) -> tuple[str, ...]:
+    """The drift a session needs told about, bought as cheaply as it can be bought.
+
+    A SessionStart hook cannot afford :func:`run`: that probes the import
+    unconditionally and may go on to build a crate. So this asks the question off
+    disk first -- ``dist-info`` directory names against the versions this tree
+    declares -- and spends the import probe only once a mismatch is already in
+    hand, to separate *dead now* from *due to die at the next symbol*. A checkout
+    in step pays one interpreter startup and stops.
+
+    Absent crates are not drift here either, for the reason in the module
+    docstring, so ``slop_core`` never buys the probe. What this trades away is the
+    skew that leaves every version equal -- a rebuilt wheel whose surface moved --
+    which stays the job of ``make crg-check``.
+    """
+    try:
+        interpreter, cwd, env = server_interpreter(root)
+    except ProbeError:
+        # A checkout that does not declare the server has nothing to compare, the
+        # same silence native_freshness keeps for a checkout with no .venv.
+        return ()
+    if skipped(root, interpreter, None) is not None:
+        return ()
+    packages = purelib(interpreter, timeout=SESSION_TIMEOUT_SECONDS)
+    if skipped(root, interpreter, packages) is not None:
+        return ()
+
+    mismatched = [one for one in skews(packages, crates(root)) if not one.absent]
+    if not mismatched:
+        return ()
+    lines = [f"{one.line()}; `make crg-sync`" for one in mismatched]
+    failure = imports_server(interpreter, cwd, env, timeout=SESSION_TIMEOUT_SECONDS)
+    if failure is None:
+        lines.append("the server still imports; `make crg-sync` before it stops")
+    else:
+        lines.append(
+            f"cannot import conductor.crg_server: {failure} -- every new session "
+            "gets CONNECTION_CLOSED until `make crg-sync` runs"
+        )
+    return tuple(lines)
+
+
+def session_report(root: Path) -> str:
+    """The SessionStart block, empty when the server's interpreter matches the tree."""
+    found = session_findings(root)
+    if not found:
+        return ""
+    lines = "\n".join(f"- {line}" for line in found)
+    return f"GRAPH SERVER natives out of date in {root}:\n{lines}"
 
 
 def main(argv: list[str]) -> int:

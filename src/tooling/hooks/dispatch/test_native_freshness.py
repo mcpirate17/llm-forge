@@ -279,3 +279,36 @@ def test_the_hook_is_registered_on_session_start():
     assert spec.adapter == "native_freshness_report"
     assert not spec.fail_closed
     assert spec.timeout <= registry.event_timeout("SessionStart")
+
+
+_SERVER_BLOCK = "GRAPH SERVER natives out of date in /x:\n- demo-native: 1 installed, 2 declared; `make crg-sync`"
+
+
+def _stub_server_report(monkeypatch: pytest.MonkeyPatch, text: str) -> None:
+    """The graph server's half, whose own contracts live in test_crg_venv_sync."""
+    monkeypatch.setattr(adapters.crg_venv_sync, "session_report", lambda root: text)
+
+
+def test_the_adapter_carries_both_interpreters(
+    checkout: Path, monkeypatch: pytest.MonkeyPatch
+):
+    (checkout / "tooling/native/demo-native/src/lib.rs").write_text("// changed\n")
+    _stub_gate(monkeypatch, checkout)
+    _stub_server_report(monkeypatch, _SERVER_BLOCK)
+    context = adapters.native_freshness_report(_Ctx({}))["hookSpecificOutput"][
+        "additionalContext"
+    ]
+    assert "NATIVE TOOLING out of date" in context
+    assert "GRAPH SERVER natives out of date" in context
+    assert "\n\n" in context  # two blocks, not one run-on paragraph
+
+
+def test_a_stale_graph_server_alone_is_worth_a_block(
+    checkout: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """The venv can be in step while the interpreter that runs the server is not."""
+    _stub_gate(monkeypatch, checkout)
+    _stub_server_report(monkeypatch, _SERVER_BLOCK)
+    output = adapters.native_freshness_report(_Ctx({}))
+    assert output is not None
+    assert output["hookSpecificOutput"]["additionalContext"] == _SERVER_BLOCK

@@ -19,6 +19,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from conductor import crg_venv_sync
 from tooling.hooks.dispatch import native_freshness
 from tooling.hooks.dispatch.paths import body_path
 
@@ -253,7 +254,13 @@ def obsidian_session_end(ctx: Any) -> None:
 
 
 def native_freshness_report(ctx: Any) -> dict[str, Any] | None:
-    """Does the session's venv carry the native tooling this tree builds?
+    """Do the interpreters this session depends on carry the natives this tree builds?
+
+    Two of them, and they go stale independently. The checkout's own ``.venv``
+    runs the hooks and the gate; the interpreter named in ``.mcp.json`` runs the
+    code-review-graph server off this same tree, so a crate bump kills it with
+    ``CONNECTION_CLOSED`` and the session sees a transport fault rather than a
+    version skew. The second block names the cause the first cannot.
 
     Asked of the *session's* checkout, not ``ctx.root``: a worktree re-execs into
     its own ``.venv``, and the stale one is exactly the venv nobody is looking at.
@@ -264,9 +271,14 @@ def native_freshness_report(ctx: Any) -> dict[str, Any] | None:
     """
     try:
         gate = _body(ctx, "tooling/hooks/agent/crg_gate.py")
-        text = native_freshness.report(gate.session_checkout(ctx.payload))
+        checkout = gate.session_checkout(ctx.payload)
+        blocks = (
+            native_freshness.report(checkout),
+            crg_venv_sync.session_report(checkout),
+        )
     except Exception as exc:  # noqa: BLE001 - never hold a session on this
         return {"systemMessage": f"[native_freshness] check failed: {exc!r}"}
+    text = "\n\n".join(block for block in blocks if block)
     if not text:
         return None
     return {

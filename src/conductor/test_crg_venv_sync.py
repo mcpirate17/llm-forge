@@ -246,3 +246,71 @@ def test_uv_env_drops_the_inherited_virtualenv(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("PATH", os.environ["PATH"])
     assert "VIRTUAL_ENV" not in sync.uv_env()
     assert sync.uv_env()["PATH"] == os.environ["PATH"]
+
+
+def test_a_checkout_in_step_is_silent_at_session_start(tree: Path) -> None:
+    installed(packages_of(tree), "conductor-native", "0.1.30")
+    assert sync.session_report(tree) == ""
+
+
+def test_a_version_skew_names_the_crate_and_the_remedy(tree: Path) -> None:
+    installed(packages_of(tree), "conductor-native", "0.1.25")
+    report = sync.session_report(tree)
+    assert report.startswith("GRAPH SERVER natives out of date in ")
+    # The remedy rides on the crate's own line: which version is which is
+    # test_version_mismatch_is_drift's contract, not this one's.
+    assert any(
+        line.startswith("- conductor-native:") and line.endswith("; `make crg-sync`")
+        for line in report.splitlines()
+    )
+
+
+def test_a_skew_the_server_still_survives_says_so(tree: Path) -> None:
+    installed(packages_of(tree), "conductor-native", "0.1.25")
+    assert any("still imports" in line for line in sync.session_findings(tree))
+
+
+def test_a_skew_that_killed_the_server_names_connection_closed(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    installed(packages_of(tree), "conductor-native", "0.1.25")
+    monkeypatch.setenv("FAKE_IMPORT_ERROR", "cannot import name 'new_symbol_native'")
+    lines = sync.session_findings(tree)
+    assert any("CONNECTION_CLOSED" in line for line in lines)
+    assert any("new_symbol_native" in line for line in lines)
+
+
+def test_an_absent_crate_never_buys_the_import_probe(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The expensive probe is what absent-is-not-drift exists to avoid paying."""
+    crate_dir(tree, "slop-core", "0.1.6")
+    installed(packages_of(tree), "conductor-native", "0.1.30")
+    monkeypatch.setattr(
+        sync,
+        "imports_server",
+        lambda *_, **__: pytest.fail("probed for an absent crate"),
+    )
+    assert sync.session_findings(tree) == ()
+
+
+def test_an_undeclared_server_is_silent_at_session_start(tmp_path: Path) -> None:
+    """A foreign checkout starts sessions too, and has nothing to compare."""
+    assert sync.session_findings(tmp_path) == ()
+
+
+def test_the_session_probes_never_wait_the_install_timeout(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    installed(packages_of(tree), "conductor-native", "0.1.25")
+    waits: list[float] = []
+    spawn = sync.subprocess.run
+
+    def recording(*args: object, **kwargs: object):
+        waits.append(kwargs["timeout"])
+        return spawn(*args, **kwargs)
+
+    monkeypatch.setattr(sync.subprocess, "run", recording)
+    sync.session_findings(tree)
+    assert sync.SESSION_TIMEOUT_SECONDS < sync.TIMEOUT_SECONDS
+    assert waits == [sync.SESSION_TIMEOUT_SECONDS, sync.SESSION_TIMEOUT_SECONDS]
