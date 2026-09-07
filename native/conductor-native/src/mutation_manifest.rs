@@ -70,6 +70,54 @@ pub(crate) struct CampaignContract {
     pub(crate) value_analysis_payload: Option<Value>,
     pub(crate) value_analysis: Option<ValueContract>,
     pub(crate) source_drifted: bool,
+    /// True when the mutants come from an engine rather than from a committed patch list.
+    ///
+    /// The two kinds of campaign prove different things and cannot share an acceptance rule.
+    /// A patch campaign names its mutants in the manifest, so the gate can demand that every
+    /// one of them died and that the score is exactly 1.0. A generated campaign takes whatever
+    /// the engine finds in the source tree, and 1.0 is not a reachable target there -- real
+    /// suites leave equivalent mutants that no test can kill. Demanding it anyway would mean
+    /// no generated campaign could ever land, which is how a corpus nobody chose gets locked
+    /// out in favour of one somebody did.
+    #[serde(default)]
+    pub(crate) generated: bool,
+    /// The survivor ids this campaign has already accepted, for a generated campaign.
+    ///
+    /// This is the ratchet. A run passes when it introduces no survivor outside this set,
+    /// which is a stricter question than a percentage: closing one gap while opening another
+    /// leaves the score untouched and fails here.
+    #[serde(default)]
+    pub(crate) survivor_baseline: Vec<String>,
+    /// Digests of the test files a generated campaign ran, keyed by repository-relative path.
+    ///
+    /// A patch campaign lists its tests in `source_sha256` because it mutates them as source.
+    /// A generated campaign mutates only the subject, so the tests need their own map -- without
+    /// it the receipt would still be accepted after the test file was edited, which is evidence
+    /// about a test that no longer exists.
+    #[serde(default)]
+    pub(crate) test_sha256: Value,
+}
+
+/// Engines that take their mutants from the source tree instead of from a committed patch list.
+pub(crate) const GENERATED_ENGINES: [&str; 3] = ["cargo-mutants", "fest", "mull"];
+
+impl CampaignContract {
+    /// Whether this campaign's evidence can speak for `test_path`.
+    ///
+    /// The two schemas record the tests they ran in different places, so asking the contract
+    /// keeps the caller from having to know which kind of campaign it is holding.
+    pub(crate) fn covers_test(&self, test_path: &str) -> bool {
+        if self.generated {
+            return self
+                .test_sha256
+                .as_object()
+                .is_some_and(|tests| tests.contains_key(test_path));
+        }
+        self.source_sha256
+            .as_object()
+            .is_some_and(|sources| sources.contains_key(test_path))
+            && self.ranked_test_paths.iter().any(|path| path == test_path)
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -779,6 +827,144 @@ fn rust_fn_name(line: &str) -> Option<String> {
     Some(rest[..end].to_owned())
 }
 
+/// Read a `{repository-relative path: sha256}` map, rejecting anything that is not one.
+///
+/// Both digest maps in a manifest are compared against a receipt byte for byte, so a
+/// loosely-typed entry here would fail later as an unexplained mismatch rather than as the
+/// malformed manifest it is.
+fn digest_map(payload: &Map<String, Value>, key: &str) -> Result<Map<String, Value>, String> {
+    let raw = object(payload.get(key), key)?;
+    let mut digests = Map::new();
+    for (raw_path, raw_digest) in raw {
+        let path = safe_relative(raw_path, &format!("{key} path"))?;
+        let digest = raw_digest
+            .as_str()
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| format!("{key}[{path}] must be a non-empty string"))?;
+        if !valid_sha256(digest) {
+            return Err(format!("{key}[{path}] must be a lowercase SHA-256 digest"));
+        }
+        digests.insert(path, Value::String(digest.to_owned()));
+    }
+    if digests.is_empty() {
+        return Err(format!("{key} must name at least one file"));
+    }
+    Ok(digests)
+}
+
+/// Build the contract for a campaign whose mutants come from an engine.
+///
+/// Deliberately much smaller than the patch-based loader, because almost everything that one
+/// validates is curation: the ranked test list, the per-mutant contracts and rationales, the
+/// planned-mutation slots, the killer assignments. None of it exists here, and none of it can,
+/// since no human chose the mutants. What remains is the part that actually pins evidence to
+/// code -- which tests ran, which sources were mutated, and which survivors were already
+/// accepted -- and that is what this reads.
+fn generated_campaign_contract(
+    payload: &Map<String, Value>,
+    manifest_bytes: Vec<u8>,
+    relative_manifest: &str,
+    mutation_engine: &str,
+) -> Result<CampaignContract, String> {
+    let generator = object(payload.get("generator"), "generator")?;
+    let source_sha256 = digest_map(payload, "source_sha256")?;
+    let test_sha256 = digest_map(payload, "test_sha256")?;
+
+    let test_argv = string_list(payload.get("test_argv"), "test_argv")?;
+    if test_argv.is_empty() {
+        return Err("test_argv must be a non-empty list".to_owned());
+    }
+    // `pytest a.py b.py` names its files; `ctest` and `cargo test` run a whole suite and name
+    // none. Both are honest, and a suite runner covers more than it declares, never less. What
+    // is not honest is naming some and quietly claiming another, so the check bites there.
+    let named: Vec<&String> = test_sha256
+        .keys()
+        .filter(|path| test_argv.iter().any(|argument| &argument == path))
+        .collect();
+    if !named.is_empty() && named.len() != test_sha256.len() {
+        let missing: Vec<&str> = test_sha256
+            .keys()
+            .filter(|path| !named.contains(path))
+            .map(String::as_str)
+            .collect();
+        return Err(format!(
+            "test_argv names some declared tests but not {}",
+            missing.join(", ")
+        ));
+    }
+
+    let mut survivor_baseline = Vec::new();
+    match payload.get("survivor_baseline") {
+        Some(Value::Array(rows)) => {
+            for (index, row) in rows.iter().enumerate() {
+                let id = row
+                    .as_str()
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| {
+                        format!("survivor_baseline[{index}] must be a non-empty string")
+                    })?;
+                survivor_baseline.push(id.to_owned());
+            }
+        }
+        _ => return Err("survivor_baseline must be a list".to_owned()),
+    }
+    let unique: BTreeSet<&String> = survivor_baseline.iter().collect();
+    if unique.len() != survivor_baseline.len() {
+        return Err("survivor_baseline contains duplicate mutant ids".to_owned());
+    }
+
+    let timeout_seconds = generator
+        .get("run_timeout_seconds")
+        .and_then(Value::as_u64)
+        .filter(|value| *value >= 1)
+        .ok_or_else(|| "generator.run_timeout_seconds must be a positive integer".to_owned())?;
+
+    let environment = payload
+        .get("environment")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+
+    // The scope is complete by construction: a generated campaign runs the whole test command,
+    // never a hand-picked subset of node ids, so there is no partial mode for it to be in.
+    let mut test_scopes = Map::new();
+    for path in test_sha256.keys() {
+        test_scopes.insert(
+            path.clone(),
+            json!({"mode": "complete", "selection": "test_argv"}),
+        );
+    }
+
+    Ok(CampaignContract {
+        campaign_id: required_string(payload, "campaign_id", "campaign_id")?,
+        title: required_string(payload, "title", "title")?,
+        language: required_string(payload, "language", "language")?,
+        mutation_engine: mutation_engine.to_owned(),
+        expected_mutations: 0,
+        manifest: relative_manifest.to_owned(),
+        manifest_sha256: format!("{:x}", Sha256::digest(manifest_bytes)),
+        source_sha256: Value::Object(source_sha256),
+        source_symbols: Value::Object(Map::new()),
+        test_scopes,
+        ranked_tests: Vec::new(),
+        ranked_test_paths: test_sha256.keys().cloned().collect(),
+        planned_mutations: Vec::new(),
+        mutations: Vec::new(),
+        test_argv,
+        timeout_seconds,
+        blocked_process_substrings: Vec::new(),
+        poll_seconds: 0,
+        environment,
+        host_read_dependencies: Vec::new(),
+        value_analysis_payload: None,
+        value_analysis: None,
+        source_drifted: false,
+        generated: true,
+        survivor_baseline,
+        test_sha256: Value::Object(test_sha256),
+    })
+}
+
 pub(crate) fn load_campaign_contract(
     root: &Path,
     relative_manifest: &str,
@@ -799,6 +985,19 @@ pub(crate) fn load_campaign_contract(
             "unsupported schema_version={}; expected 1",
             python_repr(payload.get("schema_version"))
         ));
+    }
+    let declared_engine = payload
+        .get("mutation_engine")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    if GENERATED_ENGINES.contains(&declared_engine.as_str()) {
+        return generated_campaign_contract(
+            &payload,
+            manifest_bytes,
+            relative_manifest,
+            &declared_engine,
+        );
     }
     let expected_mutations = payload
         .get("expected_mutations")
@@ -1348,6 +1547,9 @@ pub(crate) fn load_campaign_contract(
         value_analysis_payload: payload.get("value_analysis").cloned(),
         value_analysis,
         source_drifted,
+        generated: false,
+        survivor_baseline: Vec::new(),
+        test_sha256: Value::Object(Map::new()),
     })
 }
 
@@ -2041,5 +2243,142 @@ mod c_inventory_tests {
         assert_eq!(c_test_fn_name("static void test_cb(int x) {"), None);
         assert_eq!(c_test_fn_name("static void helper(void) {"), None);
         assert_eq!(c_test_fn_name("void test_ok(void) {"), None);
+    }
+}
+
+#[cfg(test)]
+mod generated_campaign_tests {
+    use serde_json::{json, Map, Value};
+
+    use super::{generated_campaign_contract, CampaignContract};
+
+    /// A manifest with two declared tests and a command that names both.
+    fn payload(overrides: Value) -> Map<String, Value> {
+        let mut base = json!({
+            "schema_version": 1,
+            "campaign_id": "subject_fest_20260906",
+            "title": "Subject under fest",
+            "language": "python",
+            "mutation_engine": "fest",
+            "generator": {
+                "engine": "fest",
+                "source": ["conductor/subject.py"],
+                "run_timeout_seconds": 900,
+                "jobs": 1
+            },
+            "source_sha256": {"conductor/subject.py": "a".repeat(64)},
+            "test_sha256": {
+                "conductor/test_subject.py": "b".repeat(64),
+                "conductor/test_subject_extra.py": "c".repeat(64)
+            },
+            "test_argv": [
+                "python", "-m", "pytest", "-q",
+                "conductor/test_subject.py",
+                "conductor/test_subject_extra.py"
+            ],
+            "survivor_baseline": ["constant_replace-abc123456789-0"]
+        });
+        let object = base.as_object_mut().expect("object");
+        for (key, value) in overrides.as_object().expect("overrides object") {
+            if value.is_null() {
+                object.remove(key);
+            } else {
+                object.insert(key.clone(), value.clone());
+            }
+        }
+        object.clone()
+    }
+
+    fn contract(overrides: Value) -> Result<CampaignContract, String> {
+        generated_campaign_contract(
+            &payload(overrides),
+            b"manifest bytes".to_vec(),
+            "conductor/mutation_campaigns/subject_fest_20260906.json",
+            "fest",
+        )
+    }
+
+    #[test]
+    fn a_generated_manifest_declares_no_mutants_and_a_complete_scope() {
+        let contract = contract(json!({})).expect("contract");
+        assert!(contract.generated);
+        // The engine decides how many mutants exist, so the manifest cannot promise a count.
+        assert_eq!(contract.expected_mutations, 0);
+        assert!(contract.planned_mutations.is_empty());
+        assert!(contract.mutations.is_empty());
+        assert_eq!(
+            contract.ranked_test_paths,
+            vec![
+                "conductor/test_subject.py".to_owned(),
+                "conductor/test_subject_extra.py".to_owned()
+            ]
+        );
+        for scope in contract.test_scopes.values() {
+            assert_eq!(scope.get("mode").and_then(Value::as_str), Some("complete"));
+        }
+        assert_eq!(
+            contract.survivor_baseline,
+            vec!["constant_replace-abc123456789-0".to_owned()]
+        );
+        assert!(contract.covers_test("conductor/test_subject.py"));
+        assert!(!contract.covers_test("conductor/test_elsewhere.py"));
+    }
+
+    #[test]
+    fn a_command_naming_some_declared_tests_but_not_all_is_refused() {
+        let error = contract(json!({
+            "test_argv": ["python", "-m", "pytest", "-q", "conductor/test_subject.py"]
+        }))
+        .expect_err("partial test_argv must be refused");
+        assert!(
+            error.contains("conductor/test_subject_extra.py"),
+            "error should name the test left out: {error}"
+        );
+    }
+
+    #[test]
+    fn a_suite_runner_that_names_no_test_file_is_accepted() {
+        // `cargo test` and `ctest` run everything and name nothing. A suite runner covers more
+        // than it declares, never less, so declaring tests it does not spell out is honest.
+        let contract = contract(json!({"test_argv": ["cargo", "test", "--release"]}))
+            .expect("suite runner contract");
+        assert_eq!(contract.test_argv, vec!["cargo", "test", "--release"]);
+        assert_eq!(contract.ranked_test_paths.len(), 2);
+    }
+
+    #[test]
+    fn a_duplicated_baseline_id_is_refused() {
+        let error = contract(json!({
+            "survivor_baseline": ["dup-000000000000-0", "dup-000000000000-0"]
+        }))
+        .expect_err("duplicate baseline ids must be refused");
+        assert!(error.contains("duplicate"), "{error}");
+    }
+
+    #[test]
+    fn a_manifest_without_test_digests_is_refused() {
+        // Without these a receipt outlives the tests it describes.
+        let error = contract(json!({"test_sha256": null})).expect_err("missing test_sha256");
+        assert!(error.contains("test_sha256"), "{error}");
+        let error = contract(json!({"test_sha256": {}})).expect_err("empty test_sha256");
+        assert!(error.contains("test_sha256"), "{error}");
+    }
+
+    #[test]
+    fn a_manifest_without_a_run_timeout_is_refused() {
+        let error = contract(json!({
+            "generator": {"engine": "fest", "source": ["conductor/subject.py"]}
+        }))
+        .expect_err("missing run_timeout_seconds");
+        assert!(error.contains("run_timeout_seconds"), "{error}");
+    }
+
+    #[test]
+    fn a_missing_survivor_baseline_is_refused_but_an_empty_one_is_not() {
+        // An absent baseline is an unanswered question; an empty one is the answer "none yet".
+        let error = contract(json!({"survivor_baseline": null})).expect_err("missing baseline");
+        assert!(error.contains("survivor_baseline"), "{error}");
+        let contract = contract(json!({"survivor_baseline": []})).expect("empty baseline");
+        assert!(contract.survivor_baseline.is_empty());
     }
 }

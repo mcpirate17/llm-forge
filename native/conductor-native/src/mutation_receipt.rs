@@ -1,6 +1,6 @@
 //! Receipt loading and immutable mutation-evidence validation.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -424,6 +424,119 @@ fn value_receipt_errors(value: Option<&Value>, contract: &ValueContract) -> Vec<
     errors
 }
 
+/// Check the runner that produced a receipt is the runner on disk, or a recorded ancestor.
+///
+/// Shared by both acceptance rules: whichever kind of campaign a receipt belongs to, evidence
+/// produced by a runner nobody can reconstruct is not evidence.
+fn runner_errors(payload: &Map<String, Value>, context: &ValidationContext<'_>) -> Vec<String> {
+    let mut errors = Vec::new();
+    if let Some(error) = &context.runner.error {
+        errors.push(error.clone());
+    } else if let Some(components) = &context.runner.components {
+        let recorded = payload.get("runner_components_sha256");
+        if recorded != Some(components) && !lineage_accepts(recorded, context.repo_root) {
+            errors.push("runner component hash map mismatch".to_owned());
+        } else if recorded == Some(components)
+            && payload.get("runner_sha256").and_then(Value::as_str)
+                != context.runner.mutation_testing_sha256.as_deref()
+        {
+            errors.push("runner hash mismatch".to_owned());
+        }
+    }
+    errors
+}
+
+/// Whether a generated campaign's receipt is current, complete and within its ratchet.
+///
+/// The patch-based rule this replaces demands `mutation_score == 1.0` and a `KILLED` outcome for
+/// every mutant the manifest names. Applied to a generated corpus that rule is unsatisfiable, and
+/// the shape of the old evidence shows what it cost: 482 of 483 scored campaigns in this
+/// repository publish exactly 1.0, because a campaign that scored anything else could not land.
+/// The only way to hit the target was to choose the mutants, and choosing them is what made the
+/// number meaningless.
+///
+/// So the question asked here is different, and not a weaker one. The engine picks the mutants,
+/// the manifest records which of them are already known to survive, and a run passes only when it
+/// introduces no survivor outside that set. A percentage can be held flat while a real gap opens,
+/// because closing one mutant pays for losing another; a survivor set cannot. It also means a
+/// campaign can land honestly at 0.63 and still refuse the next commit that makes the suite worse,
+/// which is the whole point of measuring in the first place.
+fn generated_receipt_errors(
+    payload: &Map<String, Value>,
+    campaign: &CampaignContract,
+    context: &ValidationContext<'_>,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    if payload.get("schema_version").and_then(Value::as_str) != Some(RECEIPT_SCHEMA) {
+        errors.push("receipt schema is not current".to_owned());
+    }
+    // A patch receipt carries the same campaign fields, so without this a hand-authored receipt
+    // could be offered as evidence for a generated campaign and skip the ratchet entirely.
+    if payload.get("mutants_are_generated") != Some(&Value::Bool(true)) {
+        errors.push("receipt does not record engine-generated mutants".to_owned());
+    }
+    match payload.get("status").and_then(Value::as_str) {
+        Some("PASS") | Some("RATCHET_HELD") => {}
+        other => errors.push(format!(
+            "status={}",
+            python_repr(other.map(Value::from).as_ref())
+        )),
+    }
+    if payload.get("campaign_id").and_then(Value::as_str) != Some(&campaign.campaign_id) {
+        errors.push("campaign_id mismatch".to_owned());
+    }
+    if payload.get("manifest").and_then(Value::as_str) != Some(&campaign.manifest) {
+        errors.push("manifest path mismatch".to_owned());
+    }
+    if payload.get("manifest_sha256").and_then(Value::as_str) != Some(&campaign.manifest_sha256) {
+        errors.push("manifest hash mismatch".to_owned());
+    }
+    if payload.get("source_sha256") != Some(&campaign.source_sha256) {
+        errors.push("source hash map mismatch".to_owned());
+    }
+    if payload.get("test_sha256") != Some(&campaign.test_sha256) {
+        errors.push("test hash map mismatch".to_owned());
+    }
+    errors.extend(runner_errors(payload, context));
+    // The adapter is the half of the runner that decides what a mutant even is, and it lives
+    // outside the runner component map, so an unrecorded adapter would let the corpus change
+    // silently underneath a baseline that still looked satisfied.
+    for key in ["core_sha256", "adapter_sha256"] {
+        if payload
+            .get(key)
+            .and_then(Value::as_str)
+            .is_none_or(|value| value.trim().is_empty())
+        {
+            errors.push(format!("{key} is missing"));
+        }
+    }
+    match payload.get("survivors").and_then(Value::as_array) {
+        None => errors.push("survivors must be a list".to_owned()),
+        Some(rows) => {
+            let baseline: BTreeSet<&str> = campaign
+                .survivor_baseline
+                .iter()
+                .map(String::as_str)
+                .collect();
+            let mut escaped: Vec<&str> = rows
+                .iter()
+                .filter_map(Value::as_str)
+                .filter(|id| !baseline.contains(id))
+                .collect();
+            escaped.sort_unstable();
+            escaped.dedup();
+            if !escaped.is_empty() {
+                errors.push(format!(
+                    "{} survivor(s) outside the recorded baseline: {}",
+                    escaped.len(),
+                    escaped.join(", ")
+                ));
+            }
+        }
+    }
+    errors
+}
+
 pub(crate) fn receipt_errors(
     receipt: &Receipt,
     campaign: &CampaignContract,
@@ -433,6 +546,9 @@ pub(crate) fn receipt_errors(
         .value
         .as_object()
         .expect("receipt loader requires object");
+    if campaign.generated {
+        return generated_receipt_errors(payload, campaign, context);
+    }
     let mut errors = Vec::new();
     let schema = payload.get("schema_version").and_then(Value::as_str);
     let anchored_legacy = schema == Some(LEGACY_RECEIPT_SCHEMA);
@@ -462,19 +578,7 @@ pub(crate) fn receipt_errors(
         errors.push("manifest hash mismatch".to_owned());
     }
     if !anchored_legacy {
-        if let Some(error) = &context.runner.error {
-            errors.push(error.clone());
-        } else if let Some(components) = &context.runner.components {
-            let recorded = payload.get("runner_components_sha256");
-            if recorded != Some(components) && !lineage_accepts(recorded, context.repo_root) {
-                errors.push("runner component hash map mismatch".to_owned());
-            } else if recorded == Some(components)
-                && payload.get("runner_sha256").and_then(Value::as_str)
-                    != context.runner.mutation_testing_sha256.as_deref()
-            {
-                errors.push("runner hash mismatch".to_owned());
-            }
-        }
+        errors.extend(runner_errors(payload, context));
     }
     if payload.get("source_sha256") != Some(&campaign.source_sha256) {
         errors.push("source hash map mismatch".to_owned());
@@ -645,4 +749,159 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod generated_receipt_tests {
+    use std::path::Path;
+
+    use serde_json::{json, Map, Value};
+
+    use super::{generated_receipt_errors, AnchorConfig, RunnerState, ValidationContext};
+    use crate::mutation_manifest::CampaignContract;
+
+    const MANIFEST: &str = "conductor/mutation_campaigns/subject_fest_20260906.json";
+
+    fn campaign() -> CampaignContract {
+        serde_json::from_value(json!({
+            "campaign_id": "subject_fest_20260906",
+            "title": "Subject under fest",
+            "language": "python",
+            "mutation_engine": "fest",
+            "expected_mutations": 0,
+            "manifest": MANIFEST,
+            "manifest_sha256": "a".repeat(64),
+            "source_sha256": {"conductor/subject.py": "b".repeat(64)},
+            "source_symbols": {},
+            "test_scopes": {},
+            "ranked_tests": [],
+            "ranked_test_paths": ["conductor/test_subject.py"],
+            "planned_mutations": [],
+            "mutations": [],
+            "test_argv": ["python", "-m", "pytest", "-q", "conductor/test_subject.py"],
+            "timeout_seconds": 900,
+            "blocked_process_substrings": [],
+            "poll_seconds": 0,
+            "environment": {},
+            "host_read_dependencies": [],
+            "value_analysis_payload": null,
+            "value_analysis": null,
+            "source_drifted": false,
+            "generated": true,
+            "survivor_baseline": ["constant_replace-abc123456789-0"],
+            "test_sha256": {"conductor/test_subject.py": "c".repeat(64)}
+        }))
+        .expect("campaign contract")
+    }
+
+    /// A receipt that agrees with the campaign on every pinned digest.
+    fn receipt(overrides: Value) -> Map<String, Value> {
+        let campaign = campaign();
+        let mut base = json!({
+            "schema_version": "llm.mutation-testing.receipt.v3",
+            "mutants_are_generated": true,
+            "status": "PASS",
+            "campaign_id": campaign.campaign_id,
+            "manifest": MANIFEST,
+            "manifest_sha256": campaign.manifest_sha256,
+            "source_sha256": campaign.source_sha256,
+            "test_sha256": campaign.test_sha256,
+            "core_sha256": "d".repeat(64),
+            "adapter_sha256": "e".repeat(64),
+            "survivors": ["constant_replace-abc123456789-0"]
+        });
+        let object = base.as_object_mut().expect("object");
+        for (key, value) in overrides.as_object().expect("overrides object") {
+            if value.is_null() {
+                object.remove(key);
+            } else {
+                object.insert(key.clone(), value.clone());
+            }
+        }
+        object.clone()
+    }
+
+    fn errors(overrides: Value) -> Vec<String> {
+        // No runner components on disk means the runner check has nothing to compare against,
+        // which isolates these tests to the generated-campaign rule they are about.
+        let runner = RunnerState {
+            components: None,
+            error: None,
+            mutation_testing_sha256: None,
+        };
+        let anchor = AnchorConfig {
+            repo: String::new(),
+            commit: String::new(),
+            tree: String::new(),
+            receipt_prefix: String::new(),
+        };
+        let context = ValidationContext {
+            repo_root: Path::new("/nonexistent"),
+            anchor_repo: Path::new("/nonexistent"),
+            runner: &runner,
+            anchor: &anchor,
+        };
+        generated_receipt_errors(&receipt(overrides), &campaign(), &context)
+    }
+
+    #[test]
+    fn a_run_that_stays_inside_its_baseline_is_accepted() {
+        assert_eq!(errors(json!({})), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_clean_run_is_accepted_even_though_the_score_is_not_one() {
+        // This is the whole point of the second rule: the patch rule demanded score == 1.0,
+        // which is why 482 of 483 scored campaigns published exactly 1.0.
+        assert_eq!(errors(json!({"survivors": []})), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_survivor_outside_the_baseline_is_reported_by_id() {
+        let found = errors(json!({
+            "survivors": ["constant_replace-abc123456789-0", "operator_swap-0123456789ab-2"]
+        }));
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("operator_swap-0123456789ab-2"),
+            "{found:?}"
+        );
+        assert!(found[0].starts_with("1 survivor(s)"), "{found:?}");
+    }
+
+    #[test]
+    fn a_receipt_that_does_not_declare_generated_mutants_is_refused() {
+        // Otherwise a hand-authored patch receipt could be offered here and skip the ratchet.
+        let found = errors(json!({"mutants_are_generated": null}));
+        assert!(
+            found.iter().any(|e| e.contains("engine-generated")),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_receipt_whose_tests_have_changed_is_refused() {
+        let found = errors(json!({
+            "test_sha256": {"conductor/test_subject.py": "f".repeat(64)}
+        }));
+        assert!(
+            found.iter().any(|e| e == "test hash map mismatch"),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_receipt_without_an_adapter_digest_is_refused() {
+        let found = errors(json!({"adapter_sha256": ""}));
+        assert!(
+            found.iter().any(|e| e == "adapter_sha256 is missing"),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_failing_status_cannot_be_offered_as_evidence() {
+        let found = errors(json!({"status": "FAIL"}));
+        assert!(found.iter().any(|e| e.starts_with("status=")), "{found:?}");
+    }
 }

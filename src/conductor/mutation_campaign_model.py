@@ -185,6 +185,33 @@ def _patch_paths(patch_path: Path) -> tuple[str, ...]:
         raise CampaignError(str(exc)) from exc
 
 
+def _test_scope_from_native(relative: str, scope: Mapping[str, Any]) -> TestFileScope:
+    """Build one test scope from the native loader's row.
+
+    A generated campaign names its test files in the run command instead of
+    enumerating nodeids, so the loader reports `selection: "test_argv"` and no
+    inventory. Reading `inventory` unconditionally is what made every generated
+    manifest unloadable from Python while the native validator accepted it.
+    """
+
+    selection = scope.get("selection", "nodeids")
+    if selection == "test_argv":
+        return TestFileScope(
+            path=relative,
+            mode=scope["mode"],
+            inventory="",
+            nodeids=(),
+            selection=selection,
+        )
+    return TestFileScope(
+        path=relative,
+        mode=scope["mode"],
+        inventory=scope["inventory"],
+        nodeids=tuple(scope["nodeids"]),
+        selection=selection,
+    )
+
+
 def load_campaign(path: Path, *, repo_root: Path = REPO_ROOT) -> Campaign:
     """Load a mutation campaign through the native deterministic validator."""
 
@@ -209,12 +236,7 @@ def load_campaign(path: Path, *, repo_root: Path = REPO_ROOT) -> Campaign:
     )
     mutations = tuple(_native_row(Mutation, row) for row in data["mutations"])
     test_scopes = {
-        relative: TestFileScope(
-            path=relative,
-            mode=scope["mode"],
-            inventory=scope["inventory"],
-            nodeids=tuple(scope["nodeids"]),
-        )
+        relative: _test_scope_from_native(relative, scope)
         for relative, scope in data["test_scopes"].items()
     }
     try:

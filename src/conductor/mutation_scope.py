@@ -20,12 +20,19 @@ class CampaignError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class TestFileScope:
-    """Explicit inventory proving which tests a campaign covers in one file."""
+    """Proof of which tests a campaign covers in one file.
+
+    A reviewed-patch campaign proves it by enumerating nodeids taken from an
+    `inventory` of the file. A generated campaign proves it differently: its run
+    command names the file, so every test in it runs and there is nothing to
+    enumerate. `selection` says which proof this row carries.
+    """
 
     path: str
     mode: str
     inventory: str
     nodeids: tuple[str, ...]
+    selection: str = "nodeids"
 
 
 class _RankedNode(Protocol):
@@ -170,11 +177,15 @@ def _test_scopes_payload(
     campaign: _CampaignWithScopes,
 ) -> dict[str, dict[str, object]]:
     return {
-        path: {
-            "mode": scope.mode,
-            "inventory": scope.inventory,
-            "nodeids": list(scope.nodeids),
-        }
+        path: (
+            {"mode": scope.mode, "selection": scope.selection}
+            if scope.selection == "test_argv"
+            else {
+                "mode": scope.mode,
+                "inventory": scope.inventory,
+                "nodeids": list(scope.nodeids),
+            }
+        )
         for path, scope in sorted(campaign.test_scopes.items())
     }
 

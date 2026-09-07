@@ -125,16 +125,7 @@ pub fn verify_mutation_evidence_native(py: Python<'_>, request_json: &str) -> Py
     for test_path in &normalized {
         let matching: Vec<&CampaignContract> = campaigns
             .iter()
-            .filter(|campaign| {
-                campaign
-                    .source_sha256
-                    .as_object()
-                    .is_some_and(|sources| sources.contains_key(test_path))
-                    && campaign
-                        .ranked_test_paths
-                        .iter()
-                        .any(|path| path == test_path)
-            })
+            .filter(|campaign| campaign.covers_test(test_path))
             .collect();
         let mut candidates: Vec<(String, String, &CampaignContract, &Receipt)> = Vec::new();
         let mut rejection_reasons = Vec::new();
