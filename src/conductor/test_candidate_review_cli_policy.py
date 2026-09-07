@@ -537,7 +537,18 @@ def test_ownership_state_rejects_tampering_and_broad_claims(tmp_path: Path) -> N
     repo = _init_repo(tmp_path / "repo")
     (repo / "base.txt").write_text("base\n", encoding="utf-8")
     _commit_all(repo, "baseline")
-    for path in ("research", "../escape", "/absolute", "conductor/**"):
+    # The last two are how a *list* arrives where one path was expected:
+    # `CLAIM_PATHS='a, b'` and `--paths a,b` both reach here as a single string.
+    # Accepted, they become a claim over a path no file has, which overlaps
+    # nothing and reports success while protecting nothing.
+    for path in (
+        "research",
+        "../escape",
+        "/absolute",
+        "conductor/**",
+        "conductor/gate.py,conductor/kb_retrieve.py",
+        "conductor/gate.py conductor/kb_retrieve.py",
+    ):
         with pytest.raises(OwnershipError, match="narrow and repository-relative"):
             review_ownership.normalize_claim_path(path)
     with pytest.raises(OwnershipError, match="max time must be"):

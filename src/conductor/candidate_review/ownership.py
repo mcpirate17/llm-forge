@@ -207,6 +207,14 @@ def touch_claim(repo: Path, claim_id: str, *, now: datetime | None = None) -> bo
     return True
 
 
+# Characters that never appear in a path this repository tracks, and that a
+# caller only ever gets into one by handing a *list* to something expecting a
+# single path. `--paths a,b` and `CLAIM_PATHS="a, b"` both arrive here as one
+# string; without this the claim is created over a literal path named "a,b",
+# overlaps nothing, and reports success while protecting nothing at all.
+_PATH_SEPARATORS = ",;:"
+
+
 def normalize_claim_path(raw: str) -> str:
     value = raw.strip().rstrip("/")
     path = PurePosixPath(value)
@@ -216,6 +224,8 @@ def normalize_claim_path(raw: str) -> str:
         or value in _BROAD_ROOTS
         or any(part in {"", ".", ".."} for part in path.parts)
         or any(character in value for character in "*?[")
+        or any(character in value for character in _PATH_SEPARATORS)
+        or any(character.isspace() for character in value)
     ):
         raise OwnershipError(
             f"claim path must be narrow and repository-relative: {raw!r}"
