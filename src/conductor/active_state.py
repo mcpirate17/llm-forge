@@ -20,6 +20,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
+from conductor.session_policy import load_session_policy
+
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 ACTIVE_STATE_PATH: Final[Path] = ROOT / "conductor" / "active_state.json"
 CURRENT_WORK_PATH: Final[Path] = ROOT / ".current_work.md"
@@ -39,17 +41,7 @@ class ActiveState:
     last_updated: str = field(
         default_factory=lambda: dt.datetime.now(dt.timezone.utc).isoformat()
     )
-    standing_mandates: list[str] = field(
-        default_factory=lambda: [
-            "NOVEL_MECHANISMS_ONLY: Never replace novel lane with softmax/QKV twins. Gate drops are defects to fix.",
-            "GRAPH_GATE: Call code-review-graph MCP before any Edit/Write.",
-            "EAGER_REQUIRED: Paired comparisons and loss-sensitive probes use --compile-mode default.",
-            "CLAIM_REQUIRED: Create narrow claim before editing (make governance-claim).",
-            'MEMORY_RETRIEVE: Do not dump .current_work.md into context and do not write research into it. Query `python -m conductor.memory_index query "<task>" --top-k 8` and `python -m conductor.kb_retrieve query "<task>" --top-k 5`. Status ≤12 lines via `python -m conductor.handoff append`. Findings: research/notes then `memory_index index`. Code: code-review-graph MCP.',
-            "AVO_USER_GATED: Autonomous variation (AVO) loops are user-invoked only. When a task is a continuous-improvement goal (iterative metric optimization, variation/evolution loops), prompt Tim first — 'This is a continuous-improvement goal — invoke AVO?' — and wait for his answer before starting any loop.",
-            "LOCAL_AI_CLERICAL_ONLY: Local models have zero approval authority. Use them only for notes, summaries, organization, or compaction. Never use local output to approve, authorize, sign off, promote, launch, resume, continue, or spend optimizer/GPU on work or runs. Only Tim or a runtime-verified frontier model may approve where policy permits; multi-hour training still requires Tim's explicit approval.",
-        ]
-    )
+    standing_mandates: list[str] = field(default_factory=list)
     active_headings: list[str] = field(default_factory=list)
     active_claims: list[dict[str, Any]] = field(default_factory=list)
 
@@ -106,7 +98,9 @@ def generate_active_state(repo: Path = ROOT) -> ActiveState:
     """Construct an updated ActiveState object from live repo sources."""
     headings = parse_top_headings(limit=4, current_work_path=repo / ".current_work.md")
     claims = parse_active_claims(repo)
+    policy = load_session_policy(repo)
     return ActiveState(
+        standing_mandates=list(policy.standing_mandates),
         active_headings=headings,
         active_claims=claims,
     )

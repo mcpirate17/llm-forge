@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -38,17 +38,25 @@ def test_generate_and_save_active_state(tmp_path: Path, monkeypatch) -> None:
     assert target_json.exists()
     payload = json.loads(target_json.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 1
-    assert len(payload["standing_mandates"]) >= 3
-    assert any("MEMORY_RETRIEVE" in item for item in payload["standing_mandates"])
-    assert any("handoff append" in item for item in payload["standing_mandates"])
-    assert any(
-        "LOCAL_AI_CLERICAL_ONLY" in item for item in payload["standing_mandates"]
-    )
-    assert any(
-        "zero approval authority" in item for item in payload["standing_mandates"]
-    )
+    assert payload["standing_mandates"] == []
     assert state.schema_version == 1
     assert not list(tmp_path.glob(".active_state.json.*.tmp"))
+
+
+def test_generate_active_state_uses_selected_repository_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    (repository / "pyproject.toml").write_text(
+        "[tool.conductor.session]\n"
+        'preamble = ["PROJECT: policy"]\n'
+        'standing_mandates = ["PROJECT_RULE: required"]\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(active_state, "parse_active_claims", lambda _repo: [])
+    state = active_state.generate_active_state(repository)
+    assert state.standing_mandates == ["PROJECT_RULE: required"]
 
 
 def test_generate_active_state_uses_alternate_repo_headings(
@@ -77,7 +85,7 @@ def test_generate_active_state_uses_alternate_repo_headings(
 
 
 def test_validate_active_state_rejects_expired_claim() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     state = active_state.ActiveState(
         last_updated=now.isoformat(),
         active_claims=[

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 from pathlib import Path
 import subprocess
+import sys
 from typing import Any, Callable
 
 
@@ -149,6 +151,33 @@ def check_hook_noops(
             failures.append(f"{launcher}-obsidian-noop")
 
 
+def _preamble_env() -> dict[str, str]:
+    """Import the package that supplied this runtime check from a foreign cwd."""
+    environment = os.environ.copy()
+    package_root = str(Path(__file__).resolve().parents[1])
+    inherited = environment.get("PYTHONPATH")
+    environment["PYTHONPATH"] = (
+        os.pathsep.join((package_root, inherited)) if inherited else package_root
+    )
+    return environment
+
+
+def _is_session_start_payload(output: str) -> bool:
+    """Validate the hook envelope without requiring a project policy."""
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError:
+        return False
+    hook_output = (
+        payload.get("hookSpecificOutput") if isinstance(payload, dict) else None
+    )
+    return (
+        isinstance(hook_output, dict)
+        and hook_output.get("hookEventName") == "SessionStart"
+        and isinstance(hook_output.get("additionalContext"), str)
+    )
+
+
 def check_preamble_and_grok(
     root: Path,
     failures: list[str],
@@ -159,20 +188,28 @@ def check_preamble_and_grok(
     grok_argv: Callable[[], list[str]],
 ) -> None:
     """Validate the injected preamble and Grok's trusted project hook discovery."""
+    root = root.resolve()
     preamble = run_command(
         [
-            "python",
+            sys.executable,
+            "-P",
             "-m",
             "conductor.session_preamble",
             "hook",
             "--state",
             str(root / "conductor" / "active_state.json"),
+            "--repo",
+            str(root),
         ],
+        cwd=root,
+        env=_preamble_env(),
         timeout=30,
     )
-    preamble_ok = preamble.returncode == 0 and "MISSION:" in preamble.stdout
+    hook_payload_valid = _is_session_start_payload(preamble.stdout)
+    preamble_ok = preamble.returncode == 0 and hook_payload_valid
     evidence["session-preamble"] = {
         "returncode": preamble.returncode,
+        "hook_payload_valid": hook_payload_valid,
         "passed": preamble_ok,
         "stdout_sha256": sha256_bytes(preamble.stdout.encode()),
     }

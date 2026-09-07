@@ -28,7 +28,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from conductor._project_hooks import DEFAULT_TEST_PLUGIN
 from conductor._native import tooling_boundary_facts_native
 
 PROJECT_PACKAGES: tuple[str, ...] = (
@@ -50,12 +49,6 @@ HOOK_EXCLUDED_SUBDIR = "project"
 # literal; the value must match exactly. Widening this list is a boundary decision,
 # so every entry carries why.
 ALLOWLIST: tuple[tuple[str, str, str, str], ...] = (
-    (
-        "_project_hooks.py",
-        "string",
-        DEFAULT_TEST_PLUGIN.split(":")[0],
-        "default CONDUCTOR_PROJECT_TEST_PLUGIN spec, resolved via importlib only",
-    ),
     (
         "tooling_boundary.py",
         "string",

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from conductor import workspace_runtime_matrix as matrix
+from conductor import workspace_runtime_support as support
 
 
 def _cell(status: matrix.ReceiptStatus) -> matrix.CellReceipt:
@@ -201,6 +204,137 @@ def test_grok_inspect_command_is_injectable(monkeypatch: pytest.MonkeyPatch) -> 
         "-m",
         "conductor.grok_inspect_stub",
     ]
+
+
+def _valid_grok_inspect(root: Path) -> str:
+    return json.dumps(
+        {
+            "projectRoot": str(root),
+            "projectTrusted": True,
+            "hooks": [
+                {
+                    "event": "pre_tool_use",
+                    "matcher": "Read|read|read_file",
+                    "source": {"path": str(root / ".grok" / "hooks")},
+                },
+                {
+                    "event": "pre_tool_use",
+                    "matcher": "Bash|run_shell_command|shell",
+                    "source": {"path": str(root / ".grok" / "hooks")},
+                },
+            ],
+        }
+    )
+
+
+def test_runtime_support_uses_foreign_root_and_accepts_empty_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    supplied_root = Path("foreign-project")
+    root = supplied_root.resolve()
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    def run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((argv, kwargs))
+        if argv[:4] == [sys.executable, "-P", "-m", "conductor.session_preamble"]:
+            return subprocess.CompletedProcess(
+                argv,
+                0,
+                json.dumps(
+                    {
+                        "hookSpecificOutput": {
+                            "hookEventName": "SessionStart",
+                            "additionalContext": "",
+                        }
+                    }
+                ),
+                "",
+            )
+        return subprocess.CompletedProcess(argv, 0, _valid_grok_inspect(root), "")
+
+    failures: list[str] = []
+    evidence: dict[str, object] = {}
+    support.check_preamble_and_grok(
+        supplied_root,
+        failures,
+        evidence,
+        run_command=run,
+        sha256_bytes=lambda _raw: "digest",
+        grok_argv=lambda: ["grok", "inspect", "--json"],
+    )
+
+    argv, kwargs = calls[0]
+    assert argv == [
+        sys.executable,
+        "-P",
+        "-m",
+        "conductor.session_preamble",
+        "hook",
+        "--state",
+        str(root / "conductor" / "active_state.json"),
+        "--repo",
+        str(root),
+    ]
+    assert kwargs["cwd"] == root
+    assert kwargs["timeout"] == 30
+    environment = kwargs["env"]
+    assert isinstance(environment, dict)
+    assert environment["PYTHONPATH"].split(os.pathsep)[0] == str(
+        Path(support.__file__).resolve().parents[1]
+    )
+    assert failures == []
+    assert evidence["session-preamble"] == {
+        "returncode": 0,
+        "hook_payload_valid": True,
+        "passed": True,
+        "stdout_sha256": "digest",
+    }
+    assert evidence["grok-inspect"]["passed"] is True  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        "not json",
+        json.dumps({"hookSpecificOutput": {"hookEventName": "Other"}}),
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "SessionStart",
+                    "additionalContext": [],
+                }
+            }
+        ),
+    ],
+)
+def test_runtime_support_refuses_malformed_preamble_payload(
+    tmp_path: Path, output: str
+) -> None:
+    root = tmp_path / "generic-project"
+
+    def run(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        stdout = (
+            output
+            if argv[:4] == [sys.executable, "-P", "-m", "conductor.session_preamble"]
+            else _valid_grok_inspect(root)
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout, "")
+
+    failures: list[str] = []
+    evidence: dict[str, object] = {}
+    support.check_preamble_and_grok(
+        root,
+        failures,
+        evidence,
+        run_command=run,
+        sha256_bytes=lambda _raw: "digest",
+        grok_argv=lambda: ["grok", "inspect", "--json"],
+    )
+
+    assert failures == ["session-preamble"]
+    assert evidence["session-preamble"]["hook_payload_valid"] is False  # type: ignore[index]
+    assert evidence["grok-inspect"]["passed"] is True  # type: ignore[index]
 
 
 def test_launcher_specs_cover_required_programs() -> None:

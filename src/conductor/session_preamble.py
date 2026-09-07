@@ -15,47 +15,20 @@ import sys
 from pathlib import Path
 from typing import Any, Final
 
+from conductor.session_policy import SessionPolicyError, load_session_policy
+
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 ACTIVE_STATE_PATH: Final[Path] = ROOT / "conductor" / "active_state.json"
 MAX_INJECT_CHARS: Final[int] = 2200
 MAX_A2A_CHARS: Final[int] = 1200
 MAX_HEADINGS: Final[int] = 4
 
-MISSION: Final[str] = (
-    "MISSION: Beat frontier models with novel non-QKV mechanisms. "
-    "Never replace a novel lane with a softmax/QKV twin. Gate drops are defects."
-)
-RETRIEVE: Final[str] = (
-    "RETRIEVE (do not dump .current_work.md): "
-    '`python -m conductor.kb_retrieve query "<task>" --top-k 5` then '
-    '`python -m conductor.memory_index query "<task>" --top-k 8`. '
-    "Code: code-review-graph MCP provider=openai model=qwen3-embed-cpu. "
-    "Status: `python -m conductor.handoff append` (max 12 lines). "
-    "Findings: research/notes/ then `memory_index index`."
-)
-FLEET: Final[str] = (
-    "FLEET: embed http://127.0.0.1:7317/v1 (GPU-guest, num_ctx=2048, unload). "
-    "Clerk qwen3.5:9b GPU-always, clerical-only, zero approval authority; "
-    "never gate work or runs on local output. Do not load 27B. "
-    "Paired probes: --compile-mode default (KB-HW-01)."
-)
-MUTATION: Final[str] = (
-    "MUTATION: new/changed tests need a registered campaign PASS receipt. "
-    "`make mutation-coverage`. Mutation runs are pre-approved (Tim, "
-    "2026-08-31); disposable worktrees only, receipts still mandatory."
-)
-DELEGATE: Final[str] = (
-    "DELEGATE: searches touching >3 files, bulk reads, and summaries go to a "
-    "subagent; keep the session context for decisions. Prefer "
-    "ast_context_tool/query_graph over whole-file Read (>=400 lines: slice)."
-)
-
 
 class PreambleError(ValueError):
     """Rejected session preamble."""
 
 
-def _exposure_line() -> str:
+def _exposure_line(repo: Path = ROOT) -> str:
     """Cheap EXPOSED summary for the inject. Degrades visibly rather than crashing the
     hook or silently disappearing -- see ``workspace_hygiene.cheap_exposure_counts``
     for why the branch-staleness check (needs ``gh``, ~10s over this repo's branch
@@ -64,7 +37,7 @@ def _exposure_line() -> str:
     try:
         from conductor.workspace_hygiene import cheap_exposure_counts
 
-        counts = cheap_exposure_counts()
+        counts = cheap_exposure_counts(repo)
     except (ImportError, RuntimeError, OSError) as exc:
         return f"EXPOSED: unavailable ({exc}). python -m conductor.workspace_hygiene"
     return (
@@ -102,7 +75,9 @@ def load_state(
     return payload
 
 
-def compact_state(state: dict[str, Any], *, include_exposure: bool = True) -> str:
+def compact_state(
+    state: dict[str, Any], *, include_exposure: bool = True, repo: Path = ROOT
+) -> str:
     mandates = state.get("standing_mandates")
     mandate_ids: list[str] = []
     if isinstance(mandates, list):
@@ -119,16 +94,12 @@ def compact_state(state: dict[str, Any], *, include_exposure: bool = True) -> st
     claims = state.get("active_claims")
     n_claims = len(claims) if isinstance(claims, list) else 0
     lines = [
-        MISSION,
-        RETRIEVE,
-        FLEET,
-        MUTATION,
-        DELEGATE,
+        *load_session_policy(repo).preamble,
         "MANDATES: " + (", ".join(mandate_ids) if mandate_ids else "none"),
         f"CLAIMS: {n_claims} active. Inspect with `make governance-claims`.",
     ]
     if include_exposure:
-        lines.append(_exposure_line())
+        lines.append(_exposure_line(repo))
     if heading_lines:
         lines.append("HEADINGS:")
         lines.extend(heading_lines)
@@ -141,8 +112,12 @@ def render_text(
     a2a_name: str = "",
     a2a_summary: str = "",
     max_chars: int = MAX_INJECT_CHARS,
+    repo: Path = ROOT,
 ) -> str:
-    body = compact_state(state if state is not None else load_state())
+    selected_state = state
+    if selected_state is None:
+        selected_state = load_state(repo / "conductor" / "active_state.json")
+    body = compact_state(selected_state, repo=repo)
     name = a2a_name.strip()
     summary = a2a_summary.strip()
     if name and summary:
@@ -164,8 +139,11 @@ def hook_payload(
     state: dict[str, Any] | None = None,
     a2a_name: str = "",
     a2a_summary: str = "",
+    repo: Path = ROOT,
 ) -> dict[str, Any]:
-    text = render_text(state=state, a2a_name=a2a_name, a2a_summary=a2a_summary)
+    text = render_text(
+        state=state, a2a_name=a2a_name, a2a_summary=a2a_summary, repo=repo
+    )
     return {
         "hookSpecificOutput": {
             "hookEventName": event_name,
@@ -179,32 +157,62 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("command", choices=["text", "hook"])
     parser.add_argument("--a2a-name", default=os.environ.get("A2A_AGENT_NAME", ""))
     parser.add_argument("--a2a-summary", default=os.environ.get("A2A_SUMMARY", ""))
-    parser.add_argument("--state", type=Path, default=ACTIVE_STATE_PATH)
+    parser.add_argument("--state", type=Path)
+    parser.add_argument("--repo", type=Path)
     args = parser.parse_args(argv)
+    if args.state is None:
+        repo = args.repo or ROOT
+        state_path = repo / "conductor" / "active_state.json"
+        refresh = None
+    else:
+        state_path = args.state
+        refresh = None
+        inferred_repo = (
+            state_path.parent.parent
+            if state_path.name == "active_state.json"
+            and state_path.parent.name == "conductor"
+            else None
+        )
+        if args.repo is None:
+            if inferred_repo is None:
+                parser.error(
+                    "--repo is required when --state is not <repo>/conductor/active_state.json"
+                )
+            repo = inferred_repo
+        else:
+            repo = args.repo
+            if inferred_repo is not None and repo.resolve() != inferred_repo.resolve():
+                parser.error(
+                    "--repo conflicts with the repository implied by canonical --state"
+                )
     try:
-        state = load_state(args.state)
-    except PreambleError as exc:
+        state = load_state(state_path, refresh=refresh)
+        if args.command == "text":
+            sys.stdout.write(
+                render_text(
+                    state=state,
+                    a2a_name=args.a2a_name,
+                    a2a_summary=args.a2a_summary,
+                    repo=repo,
+                )
+            )
+            if not args.a2a_summary:
+                sys.stdout.write("\n")
+            return 0
+        print(
+            json.dumps(
+                hook_payload(
+                    state=state,
+                    a2a_name=args.a2a_name,
+                    a2a_summary=args.a2a_summary,
+                    repo=repo,
+                )
+            )
+        )
+        return 0
+    except (PreambleError, SessionPolicyError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
-    if args.command == "text":
-        sys.stdout.write(
-            render_text(
-                state=state, a2a_name=args.a2a_name, a2a_summary=args.a2a_summary
-            )
-        )
-        if not args.a2a_summary:
-            sys.stdout.write("\n")
-        return 0
-    print(
-        json.dumps(
-            hook_payload(
-                state=state,
-                a2a_name=args.a2a_name,
-                a2a_summary=args.a2a_summary,
-            )
-        )
-    )
-    return 0
 
 
 if __name__ == "__main__":

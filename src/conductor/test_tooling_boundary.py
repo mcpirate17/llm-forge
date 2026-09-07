@@ -9,8 +9,10 @@ file must pass the contract it tests, so it never spells one.
 
 from __future__ import annotations
 
-import importlib.util
+import re
+import sys
 import textwrap
+from types import ModuleType
 from pathlib import Path
 
 import pytest
@@ -139,27 +141,17 @@ def test_rule_a_ignores_non_module_strings(tmp_path: Path) -> None:
     assert [v.line for v in found] == [5, 6]
 
 
-def test_rule_a_allowlist_covers_the_default_plugin_string_only(tmp_path: Path) -> None:
-    default = _project_hooks.DEFAULT_TEST_PLUGIN
-    module = default.split(":")[0]
+def test_rule_a_rejects_host_plugin_string_in_generic_module(tmp_path: Path) -> None:
+    plugin = f"{PKG}.tests._path_guard:register"
     pkg = _tree(
         tmp_path,
         {
-            "conductor/_project_hooks.py": f"""
-                DEFAULT = "{default}"
-                OTHER = "{module}_extra:register"
-                CHILD = "{module}.child:register"
-                def f():
-                    from {module} import register
-                    return register
-                """,
-            "conductor/other.py": f'DEFAULT = "{default}"\n',
+            "conductor/_project_hooks.py": f'PLUGIN = "{plugin}"\n',
+            "conductor/other.py": f'PLUGIN = "{plugin}"\n',
         },
     )
     assert _lines(tb.check_project_imports(pkg)) == {
-        ("conductor/_project_hooks.py", 3),
-        ("conductor/_project_hooks.py", 4),
-        ("conductor/_project_hooks.py", 6),
+        ("conductor/_project_hooks.py", 1),
         ("conductor/other.py", 1),
     }
 
@@ -287,23 +279,152 @@ def test_rule_d_flags_a_seam_importing_anything_but_the_crate(tmp_path: Path) ->
 # --- _project_hooks: the guard is configuration -----------------------------------
 
 
-def test_project_hooks_unset_resolves_the_default_spec(
-    monkeypatch: pytest.MonkeyPatch,
+def _plugin_config(tmp_path: Path, content: str) -> object:
+    (tmp_path / "pyproject.toml").write_text(content, encoding="utf-8")
+    return type("Config", (), {"rootpath": tmp_path})()
+
+
+def test_project_hooks_unset_without_configuration_resolves_none(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.delenv(_project_hooks.PLUGIN_ENV, raising=False)
-    module_name, function_name = _project_hooks.DEFAULT_TEST_PLUGIN.split(":")
-    if importlib.util.find_spec(module_name.split(".")[0]) is None:
-        with pytest.raises(ImportError, match=_project_hooks.PLUGIN_ENV):
-            _project_hooks.resolve_test_plugin(None)
-        return
-    plugin = _project_hooks.resolve_test_plugin(None)
-    assert plugin is not None and plugin.__name__ == function_name
-    calls: list[object] = []
+    assert _project_hooks.resolve_test_plugin(None) is None
+    calls: list[tuple[str | None, str]] = []
     monkeypatch.setattr(
-        _project_hooks, "resolve_test_plugin", lambda spec: calls.append
+        _project_hooks,
+        "resolve_test_plugin",
+        lambda spec, *, source: calls.append((spec, source)),
     )
-    _project_hooks.register_test_path_guard("cfg")  # type: ignore[arg-type]
-    assert calls == ["cfg"]
+    config = type("Config", (), {"rootpath": tmp_path})()
+    _project_hooks.register_test_path_guard(config)  # type: ignore[arg-type]
+    assert calls == [(None, _project_hooks._CONFIG_KEY)]  # noqa: SLF001
+
+
+def test_project_hooks_invokes_configured_callable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = _plugin_config(
+        tmp_path,
+        '[tool.conductor.pytest]\ntest_plugin = "test_host_plugin:register"\n',
+    )
+    host = ModuleType("test_host_plugin")
+    received: list[object] = []
+    host.register = received.append  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, host.__name__, host)
+    monkeypatch.delenv(_project_hooks.PLUGIN_ENV, raising=False)
+    _project_hooks.register_test_path_guard(config)  # type: ignore[arg-type]
+    assert received == [config]
+
+
+def test_project_hooks_environment_bypasses_malformed_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = _plugin_config(tmp_path, "[tool")
+    monkeypatch.setenv(_project_hooks.PLUGIN_ENV, "")
+    _project_hooks.register_test_path_guard(config)  # type: ignore[arg-type]
+    calls: list[tuple[str | None, str]] = []
+    monkeypatch.setattr(
+        _project_hooks,
+        "resolve_test_plugin",
+        lambda spec, *, source: calls.append((spec, source)),
+    )
+    monkeypatch.setenv(_project_hooks.PLUGIN_ENV, "override.plugin:register")
+    _project_hooks.register_test_path_guard(config)  # type: ignore[arg-type]
+    assert calls == [("override.plugin:register", _project_hooks.PLUGIN_ENV)]
+
+
+def test_project_hooks_refuse_unreadable_or_oversized_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = _plugin_config(tmp_path, "[tool]\n")
+    config_path = tmp_path / "pyproject.toml"
+    original_open = Path.open
+
+    def denied(self: Path, *args: object, **kwargs: object) -> object:
+        if self == config_path:
+            raise PermissionError("denied")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", denied)
+    with pytest.raises(ValueError, match="cannot read configuration"):
+        _project_hooks._configured_test_plugin(config)  # noqa: SLF001
+    monkeypatch.undo()
+    config = _plugin_config(tmp_path, "x" * (_project_hooks._CONFIG_LIMIT + 1))  # noqa: SLF001
+    with pytest.raises(ValueError, match="exceeds 64 KiB"):
+        _project_hooks._configured_test_plugin(config)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "content",
+    ("", "[tool]\n", "[tool.conductor]\n", "[tool.conductor.pytest]\n"),
+)
+def test_project_hooks_missing_config_sections_resolve_none(
+    tmp_path: Path, content: str
+) -> None:
+    selector, _source = _project_hooks._configured_test_plugin(  # noqa: SLF001
+        _plugin_config(tmp_path, content)  # type: ignore[arg-type]
+    )
+    assert selector is None
+
+
+def test_project_hooks_config_and_environment_precedence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = _plugin_config(
+        tmp_path,
+        '[tool.conductor.pytest]\ntest_plugin = "host.plugin:register"\n',
+    )
+    calls: list[tuple[str | None, str]] = []
+    monkeypatch.setattr(
+        _project_hooks,
+        "resolve_test_plugin",
+        lambda spec, *, source: calls.append((spec, source)),
+    )
+    monkeypatch.delenv(_project_hooks.PLUGIN_ENV, raising=False)
+    _project_hooks.register_test_path_guard(config)  # type: ignore[arg-type]
+    monkeypatch.setenv(_project_hooks.PLUGIN_ENV, "")
+    _project_hooks.register_test_path_guard(config)  # type: ignore[arg-type]
+    monkeypatch.setenv(_project_hooks.PLUGIN_ENV, "override.plugin:register")
+    _project_hooks.register_test_path_guard(config)  # type: ignore[arg-type]
+    assert calls[0][0] == "host.plugin:register"
+    assert calls[0][1].endswith(_project_hooks._CONFIG_KEY)  # noqa: SLF001
+    assert calls[1:] == [
+        ("", _project_hooks.PLUGIN_ENV),
+        ("override.plugin:register", _project_hooks.PLUGIN_ENV),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("content", "match"),
+    (
+        ("[tool", "invalid TOML configuration"),
+        ("[tool]\nconductor = []\n", "[tool.conductor] must be a table"),
+        ("[tool.conductor]\npytest = []\n", "[tool.conductor.pytest] must be a table"),
+        (
+            "[tool.conductor.pytest]\ntest_plugin = 1\n",
+            "test_plugin must be a string",
+        ),
+    ),
+)
+def test_project_hooks_refuse_malformed_or_wrong_type_config(
+    tmp_path: Path, content: str, match: str
+) -> None:
+    with pytest.raises(ValueError, match=re.escape(match)):
+        _project_hooks._configured_test_plugin(  # noqa: SLF001
+            _plugin_config(tmp_path, content)  # type: ignore[arg-type]
+        )
+
+
+def test_project_hooks_refuse_noncallable_configured_attribute(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv(_project_hooks.PLUGIN_ENV, raising=False)
+    config = _plugin_config(
+        tmp_path,
+        '[tool.conductor.pytest]\ntest_plugin = "conductor._project_hooks:PLUGIN_ENV"\n',
+    )
+    with pytest.raises(TypeError, match="not callable"):
+        _project_hooks.register_test_path_guard(config)  # type: ignore[arg-type]
 
 
 def test_project_hooks_empty_spec_means_no_guard(

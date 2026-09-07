@@ -61,3 +61,13 @@ slop-core = { path = "native/slop-core" }
 "native/conductor-native/src/mutation_evidence.rs" = "tooling/native/conductor-native/src/mutation_evidence.rs"
 "native/conductor-native/src/mutation_manifest.rs" = "tooling/native/conductor-native/src/mutation_manifest.rs"
 "native/conductor-native/src/mutation_receipt.rs" = "tooling/native/conductor-native/src/mutation_receipt.rs"
+
+# OS prerequisite for conductor.project_context's additive Linux resolver.
+# Informational package metadata: pip/uv do not install system executables.
+# The resolver fails closed if this fixed executable or its required options
+# are unavailable. Portable doctor integration remains extraction tasks T12/T14.
+[tool.conductor.runtime-requirements.git]
+executable = "/usr/bin/git"
+minimum-version = "2.31"
+platforms = ["linux"]
+required-by = ["conductor.project_context"]
