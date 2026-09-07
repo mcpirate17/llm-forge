@@ -7,18 +7,20 @@ statements and constant conditions, because ruff's dead-code rules stop at unuse
 *names*. "Fail loud -- no silent fallbacks, no swallowed exceptions" had a
 classifier written for it, but only the repository audit ever called it.
 
-The detectors live in Rust: `slop_core.style_scan_files` reads comments and dead
-code with tree-sitter, `slop_core.fallback_scan_files` classifies exception
-handlers against CPython's own AST. This module is argv, line scoping and
-printing.
+The detectors live in Rust. For Python, `slop_core.style_scan_files` reads
+comments and dead code with tree-sitter and `slop_core.fallback_scan_files`
+classifies exception handlers against CPython's own AST. For Rust,
+`slop_core.rust_scan_files` reports `.unwrap()` and `todo!()` outside test
+scope -- "fail loud" in the language this repository's compute is written in.
+This module is argv, line scoping and printing for both.
 
 Scoping is by changed line, not changed file. Measured over the 3301 tracked
 Python files the rules report 704 pre-existing findings, 591 of them swallowed
-errors. Reporting those would red-gate a candidate for lines it never touched,
-which is how a check gets bypassed. Reporting only the lines it wrote refuses
-the first *new* one at the commit that writes it, and leaves the rest to the
-person who eventually edits that line -- the same converging shape as
-clang-format's line scoping.
+errors; over the 127 tracked Rust files, 38 across four files. Reporting those
+would red-gate a candidate for lines it never touched, which is how a check gets
+bypassed. Reporting only the lines it wrote refuses the first *new* one at the
+commit that writes it, and leaves the rest to the person who eventually edits
+that line -- the same converging shape as clang-format's line scoping.
 """
 
 from __future__ import annotations
@@ -39,9 +41,18 @@ RULES = (
     "failure/silent-fallback",
 )
 
+RUST_RULES = (
+    "dead/rust-stub",
+    "failure/rust-unwrap",
+)
 
-def _scan(paths: list[str]) -> list[dict]:
-    """Findings for `paths`, from the native scanner.
+# The suffixes each language's scanners can read. The gate hands a check every
+# file in its classes, and `rust` carries the lockfile and the manifests too.
+SUFFIXES = {"python": ".py", "rust": ".rs"}
+
+
+def _scan(paths: list[str], language: str) -> list[dict]:
+    """Findings for `paths`, from the native scanners for `language`.
 
     The import is deferred so `--version` answers on a machine where the
     extension has not been built, which is the one question the gate's tool
@@ -49,6 +60,8 @@ def _scan(paths: list[str]) -> list[dict]:
     """
     import slop_core
 
+    if language == "rust":
+        return list(slop_core.rust_scan_files(paths))
     findings = list(slop_core.style_scan_files(paths))
     findings += list(slop_core.fallback_scan_files(paths))
     # Two scanners, each sorted within itself, would otherwise report a file
@@ -90,19 +103,20 @@ def scope(findings: list[dict], base: str, root: Path) -> tuple[list[dict], list
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", default="")
+    parser.add_argument("--language", choices=sorted(SUFFIXES), default="python")
     parser.add_argument("--version", action="store_true")
     parser.add_argument("files", nargs="*")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if args.version:
-        print("style-scan 2")
+        print("style-scan 3")
         return 0
 
-    paths = [f for f in args.files if f.endswith(".py")]
+    paths = [f for f in args.files if f.endswith(SUFFIXES[args.language])]
     if not paths:
         return 0
 
     root = Path.cwd().resolve()
-    findings = _scan(paths)
+    findings = _scan(paths, args.language)
     kept, unreadable = scope(findings, args.base, root)
     for message in unreadable:
         print(f"style-scan: {message}", file=sys.stderr)

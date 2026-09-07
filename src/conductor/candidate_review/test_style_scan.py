@@ -78,13 +78,15 @@ def test_an_undiffable_file_is_reported_rather_than_raised(tmp_path, monkeypatch
 def test_only_python_files_reach_the_scanner(monkeypatch):
     """The gate hands this check every changed file in the candidate's classes."""
     seen: list[list[str]] = []
-    monkeypatch.setattr(style_scan, "_scan", lambda paths: seen.append(paths) or [])
+    monkeypatch.setattr(
+        style_scan, "_scan", lambda paths, language: seen.append(paths) or []
+    )
     style_scan.main(["a.py", "notes.md", "Makefile"])
     assert seen == [["a.py"]]
 
 
 def test_a_candidate_with_no_python_never_builds_the_scanner(monkeypatch):
-    def refuse(paths):
+    def refuse(paths, language):
         raise AssertionError("the scanner must not run")
 
     monkeypatch.setattr(style_scan, "_scan", refuse)
@@ -95,7 +97,7 @@ def test_version_answers_without_the_native_extension(monkeypatch, capsys):
     """The gate's tool preflight asks this before it decides to schedule the
     check, on a machine where the extension may not be built yet."""
 
-    def refuse(paths):
+    def refuse(paths, language):
         raise AssertionError("the scanner must not run")
 
     monkeypatch.setattr(style_scan, "_scan", refuse)
@@ -105,7 +107,7 @@ def test_version_answers_without_the_native_extension(monkeypatch, capsys):
 
 def test_an_undiffable_file_fails_the_check(monkeypatch, tmp_path):
     """Scoping that cannot be computed is not scoping that found nothing."""
-    monkeypatch.setattr(style_scan, "_scan", lambda paths: [finding()])
+    monkeypatch.setattr(style_scan, "_scan", lambda paths, language: [finding()])
     monkeypatch.setattr(
         style_scan, "scope", lambda rows, base, root: ([], ["git diff failed"])
     )
@@ -113,13 +115,13 @@ def test_an_undiffable_file_fails_the_check(monkeypatch, tmp_path):
 
 
 def test_a_surviving_finding_fails_the_check(monkeypatch):
-    monkeypatch.setattr(style_scan, "_scan", lambda paths: [finding()])
+    monkeypatch.setattr(style_scan, "_scan", lambda paths, language: [finding()])
     monkeypatch.setattr(style_scan, "scope", lambda rows, base, root: (rows, []))
     assert style_scan.main(["a.py"]) == 1
 
 
 def test_findings_scoped_away_leave_the_check_passing(monkeypatch):
-    monkeypatch.setattr(style_scan, "_scan", lambda paths: [finding()])
+    monkeypatch.setattr(style_scan, "_scan", lambda paths, language: [finding()])
     monkeypatch.setattr(style_scan, "scope", lambda rows, base, root: ([], []))
     assert style_scan.main(["a.py"]) == 0
 
@@ -127,7 +129,7 @@ def test_findings_scoped_away_leave_the_check_passing(monkeypatch):
 def test_findings_are_printed_where_the_gate_captures_them(monkeypatch, capsys):
     """The gate reads a failing command's stderr into the finding it reports; a
     finding printed to stdout is a red gate with no reason attached."""
-    monkeypatch.setattr(style_scan, "_scan", lambda paths: [finding(line=7)])
+    monkeypatch.setattr(style_scan, "_scan", lambda paths, language: [finding(line=7)])
     monkeypatch.setattr(style_scan, "scope", lambda rows, base, root: (rows, []))
     style_scan.main(["a.py"])
     captured = capsys.readouterr()
@@ -147,7 +149,7 @@ def test_a_swallowed_error_is_reported_under_the_published_rule_name(tmp_path):
     pytest.importorskip("slop_core")
     source = tmp_path / "swallow.py"
     source.write_text("try:\n    risky()\nexcept ValueError:\n    pass\n")
-    rules = {row["rule"] for row in style_scan._scan([str(source)])}
+    rules = {row["rule"] for row in style_scan._scan([str(source)], "python")}
     assert rules == {"failure/silent-fallback"}
     assert "failure/silent-fallback" in style_scan.RULES
 
@@ -172,9 +174,47 @@ def test_both_scanners_report_one_pass_down_the_file(tmp_path):
         "def stub():\n"
         "    pass\n"
     )
-    rows = style_scan._scan([str(source)])
+    rows = style_scan._scan([str(source)], "python")
     assert [row["rule"] for row in rows] == [
         "failure/silent-fallback",
         "dead/empty-function",
     ]
     assert [row["line"] for row in rows] == [4, 8]
+
+
+def test_only_rust_files_reach_the_rust_scanner(monkeypatch):
+    """`rust` is a wider class than `.rs`: it carries Cargo.toml and the lockfile."""
+    seen: list[list[str]] = []
+    monkeypatch.setattr(
+        style_scan, "_scan", lambda paths, language: seen.append(paths) or []
+    )
+    style_scan.main(["--language", "rust", "a.rs", "Cargo.toml", "Cargo.lock", "b.py"])
+    assert seen == [["a.rs"]]
+
+
+def test_the_language_reaches_the_scanner(monkeypatch):
+    """One module drives two scanners; picking the wrong one reports nothing."""
+    seen: list[str] = []
+    monkeypatch.setattr(
+        style_scan, "_scan", lambda paths, language: seen.append(language) or []
+    )
+    style_scan.main(["--language", "rust", "a.rs"])
+    style_scan.main(["a.py"])
+    assert seen == ["rust", "python"]
+
+
+def test_the_published_rust_rule_list_matches_the_scanner():
+    """Two lists of rule names drift; this one refuses to."""
+    slop_core = pytest.importorskip("slop_core")
+    assert tuple(sorted(slop_core.rust_scan_rules())) == style_scan.RUST_RULES
+
+
+def test_a_production_unwrap_is_reported_under_the_published_rule_name(tmp_path):
+    """The Rust rules come from a third scanner and a third grammar, so nothing
+    but an end-to-end scan proves their names are the published ones."""
+    pytest.importorskip("slop_core")
+    source = tmp_path / "sample.rs"
+    source.write_text("fn run(v: Vec<u32>) -> u32 {\n    *v.first().unwrap()\n}\n")
+    rows = style_scan._scan([str(source)], "rust")
+    assert [row["rule"] for row in rows] == ["failure/rust-unwrap"]
+    assert "failure/rust-unwrap" in style_scan.RUST_RULES
