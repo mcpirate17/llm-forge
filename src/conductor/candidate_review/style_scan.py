@@ -7,16 +7,22 @@ statements and constant conditions, because ruff's dead-code rules stop at unuse
 *names*. "Fail loud -- no silent fallbacks, no swallowed exceptions" had a
 classifier written for it, but only the repository audit ever called it.
 
+A fourth rule is configuration rather than style: a URL, an address or a UUID
+written into the call that uses it is a name for something outside this
+repository that a reader cannot find and a deployment cannot override. The rule
+asks only that it be bound once at the top of the file.
+
 The detectors live in Rust. For Python, `slop_core.style_scan_files` reads
-comments and dead code with tree-sitter and `slop_core.fallback_scan_files`
+comments, dead code and wired-in addresses with tree-sitter and `slop_core.fallback_scan_files`
 classifies exception handlers against CPython's own AST. For Rust,
 `slop_core.rust_scan_files` reports `.unwrap()` and `todo!()` outside test
 scope -- "fail loud" in the language this repository's compute is written in.
 This module is argv, line scoping and printing for both.
 
-Scoping is by changed line, not changed file. Measured over the 3301 tracked
-Python files the rules report 704 pre-existing findings, 591 of them swallowed
-errors; over the 127 tracked Rust files, 38 across four files. Reporting those
+Scoping is by changed line, not changed file. Measured over the 3303 tracked
+Python files the rules report 720 pre-existing findings, 591 of them swallowed
+errors and 16 hardcoded endpoints; over the 127 tracked Rust files, 38 across
+four files. Reporting those
 would red-gate a candidate for lines it never touched, which is how a check gets
 bypassed. Reporting only the lines it wrote refuses the first *new* one at the
 commit that writes it, and leaves the rest to the person who eventually edits
@@ -35,6 +41,8 @@ RULES = (
     "comment/change-meta",
     "comment/effort-narrative",
     "comment/trivial-restatement",
+    "config/hardcoded-endpoint",
+    "config/hardcoded-id",
     "dead/constant-condition",
     "dead/empty-function",
     "dead/unreachable-statement",
@@ -108,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("files", nargs="*")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if args.version:
-        print("style-scan 3")
+        print("style-scan 4")
         return 0
 
     paths = [f for f in args.files if f.endswith(SUFFIXES[args.language])]

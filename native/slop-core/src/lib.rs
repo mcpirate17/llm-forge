@@ -418,3 +418,6 @@ mod detector_scan_tests;
 
 #[cfg(test)]
 mod rust_scan_tests;
+
+#[cfg(test)]
+mod config_scan_tests;

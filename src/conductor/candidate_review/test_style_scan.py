@@ -218,3 +218,26 @@ def test_a_production_unwrap_is_reported_under_the_published_rule_name(tmp_path)
     rows = style_scan._scan([str(source)], "rust")
     assert [row["rule"] for row in rows] == ["failure/rust-unwrap"]
     assert "failure/rust-unwrap" in style_scan.RUST_RULES
+
+
+def test_a_wired_in_endpoint_is_reported_under_the_published_rule_name(tmp_path):
+    """The rule that fires on a call, and the two exemptions that decide where.
+
+    An end-to-end scan is the only thing that proves the name the gate prints is
+    the name the scanner emits, and that the module-level binding the message
+    asks for is actually the shape that satisfies it.
+    """
+    pytest.importorskip("slop_core")
+    source = tmp_path / "client.py"
+    source.write_text(
+        "def probe():\n    return get('http://127.0.0.1:7317/v1/embeddings')\n"
+    )
+    rows = style_scan._scan([str(source)], "python")
+    assert [row["rule"] for row in rows] == ["config/hardcoded-endpoint"]
+    assert "config/hardcoded-endpoint" in style_scan.RULES
+
+    source.write_text(
+        "EMBEDDINGS = 'http://127.0.0.1:7317/v1/embeddings'\n\n"
+        "def probe():\n    return get(EMBEDDINGS)\n"
+    )
+    assert style_scan._scan([str(source)], "python") == []

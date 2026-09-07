@@ -31,6 +31,10 @@ pub struct Finding {
 /// Escape hatches, spelled like the ones detector_scan.rs already honours.
 const ALLOW_STUB: &str = "guardrail: allow-stub";
 
+/// Escape hatches for the two configuration rules, spelled the same way.
+const ALLOW_ENDPOINT: &str = "guardrail: allow-endpoint";
+const ALLOW_ID: &str = "guardrail: allow-id";
+
 /// Comments this scan never reads: machine directives and tracked debt.
 const DIRECTIVES: &[&str] = &[
     "noqa",
@@ -552,6 +556,160 @@ fn scan_condition(source: &Source, node: Node, path: &str, out: &mut Vec<Finding
     });
 }
 
+/// A path whose contents are test material. A fixture names a host or an id on
+/// purpose, and hoisting it to a module constant would say less about the case
+/// than the literal sitting in it does.
+fn is_test_path(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    name.starts_with("test_")
+        || name.ends_with("_test.py")
+        || name == "conftest.py"
+        || path.starts_with("tests/")
+        || path.contains("/tests/")
+}
+
+/// True when `text` is a URL or a bare IPv4 address, either optionally carrying
+/// a port and a path.
+///
+/// The whole literal has to be the address rather than contain one: a sentence
+/// that mentions a URL is documentation, and a literal that *is* one is a name
+/// for something outside this repository. Schema and namespace URIs are caught
+/// alongside endpoints on purpose -- nothing is connected to, but they are the
+/// same kind of external name, and the same one place is where to keep them.
+fn is_endpoint(text: &str) -> bool {
+    let rest = match text.strip_prefix("https://") {
+        Some(rest) => rest,
+        None => match text.strip_prefix("http://") {
+            Some(rest) => rest,
+            None => return is_ipv4_endpoint(text),
+        },
+    };
+    !rest.contains(char::is_whitespace)
+        && rest
+            .chars()
+            .next()
+            .is_some_and(|first| first.is_ascii_alphanumeric())
+}
+
+/// `127.0.0.1`, `127.0.0.1:7317`, `10.0.0.4/metrics` -- the same address with
+/// the scheme left off, which is how a socket call spells it.
+fn is_ipv4_endpoint(text: &str) -> bool {
+    if text.contains(char::is_whitespace) {
+        return false;
+    }
+    let host = match text.split(['/', ':']).next() {
+        Some(host) => host,
+        None => return false,
+    };
+    let mut octets = 0;
+    for octet in host.split('.') {
+        if !matches!(octet.parse::<u16>(), Ok(value) if value <= 255 && !octet.is_empty()) {
+            return false;
+        }
+        octets += 1;
+    }
+    octets == 4
+}
+
+/// Exactly a canonical UUID: 8-4-4-4-12 hexadecimal digits.
+fn is_uuid(text: &str) -> bool {
+    const WIDTHS: [usize; 5] = [8, 4, 4, 4, 12];
+    let groups: Vec<&str> = text.split('-').collect();
+    groups.len() == WIDTHS.len()
+        && groups.iter().zip(WIDTHS).all(|(group, width)| {
+            group.len() == width && group.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
+}
+
+/// The bytes between the quotes, for a plain literal only.
+///
+/// A string carrying an interpolation is assembled at run time, and the piece
+/// in front of the first `{` is a scheme, not an address.
+fn string_content<'a>(source: &Source<'a>, node: Node) -> Option<&'a str> {
+    let mut content = None;
+    for child in named(node) {
+        match child.kind() {
+            "interpolation" => return None,
+            "string_content" => {
+                if content.is_some() {
+                    return None;
+                }
+                content = Some(source.text(child));
+            }
+            _ => {}
+        }
+    }
+    content
+}
+
+/// True when the literal is (part of) the value of a module- or class-level
+/// binding, which is exactly where this rule is asking for it to be: named once
+/// near the top of the file, where a reader looking for what this module talks
+/// to finds it and a deployment can override it in one place.
+fn is_named_binding(node: Node) -> bool {
+    let mut assigned = false;
+    let mut current = node;
+    while let Some(parent) = current.parent() {
+        match parent.kind() {
+            // A method body is not the top of the file, whatever encloses it.
+            "function_definition" | "lambda" => return false,
+            "assignment" => assigned = true,
+            "module" => return assigned,
+            _ => {}
+        }
+        current = parent;
+    }
+    false
+}
+
+/// A bare string statement: a docstring, or prose left standing. Either way it
+/// is being read, not connected to.
+fn is_bare_string(node: Node) -> bool {
+    node.parent()
+        .is_some_and(|parent| parent.kind() == "expression_statement")
+}
+
+fn scan_literal(source: &Source, node: Node, path: &str, out: &mut Vec<Finding>) {
+    if is_bare_string(node) || is_named_binding(node) {
+        return;
+    }
+    let Some(text) = string_content(source, node) else {
+        return;
+    };
+    let line = source.line_of(node);
+    if is_endpoint(text) {
+        if source.suppressed(line, ALLOW_ENDPOINT) {
+            return;
+        }
+        out.push(Finding {
+            path: path.to_string(),
+            line,
+            rule: "config/hardcoded-endpoint",
+            message: format!(
+                "`{}` is a URL written into the call that uses it: bind it to a \
+                 module-level constant, so what this module talks to is visible in \
+                 one place and can be pointed elsewhere without editing this line \
+                 -- or write down why with `# {ALLOW_ENDPOINT}`",
+                truncate(text)
+            ),
+        });
+        return;
+    }
+    if is_uuid(text) && !source.suppressed(line, ALLOW_ID) {
+        out.push(Finding {
+            path: path.to_string(),
+            line,
+            rule: "config/hardcoded-id",
+            message: format!(
+                "`{}` is a fixed identifier with no name on it: bind it to a \
+                 module-level constant that says what it identifies -- or write down \
+                 why with `# {ALLOW_ID}`",
+                truncate(text)
+            ),
+        });
+    }
+}
+
 /// Walk the tree once, dispatching each node to the rules that care about it.
 pub fn scan_source(path: &str, source_text: &str) -> Result<Vec<Finding>, String> {
     let tree =
@@ -567,10 +725,15 @@ pub fn scan_source(path: &str, source_text: &str) -> Result<Vec<Finding>, String
     let mut findings = Vec::new();
     let mut comments = Vec::new();
 
+    // Test material names hosts and ids on purpose, so the configuration rules
+    // stand down there; every other rule in this module applies everywhere.
+    let configuration = !is_test_path(path);
+
     let mut stack = vec![tree.root_node()];
     while let Some(node) = stack.pop() {
         match node.kind() {
             "comment" => comments.push(node),
+            "string" if configuration => scan_literal(&source, node, path, &mut findings),
             "function_definition" => scan_function(&source, node, path, &mut findings),
             "block" => scan_block(&source, node, path, &mut findings),
             "if_statement" | "elif_clause" | "while_statement" => {
@@ -647,6 +810,8 @@ pub fn style_scan_rules() -> Vec<&'static str> {
         "comment/change-meta",
         "comment/effort-narrative",
         "comment/trivial-restatement",
+        "config/hardcoded-endpoint",
+        "config/hardcoded-id",
         "dead/constant-condition",
         "dead/empty-function",
         "dead/unreachable-statement",
