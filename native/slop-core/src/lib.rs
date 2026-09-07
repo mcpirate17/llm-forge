@@ -21,6 +21,7 @@ pub mod ledger;
 pub mod python_ast;
 pub mod repository_scan;
 pub mod rules;
+pub mod style_scan;
 
 use engine::{Ablation, Rule};
 use pyo3::prelude::*;
@@ -390,6 +391,8 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m
     )?)?;
     m.add_function(wrap_pyfunction!(repository_scan::audit_repository_scan, m)?)?;
+    m.add_function(wrap_pyfunction!(style_scan::style_scan_files, m)?)?;
+    m.add_function(wrap_pyfunction!(style_scan::style_scan_rules, m)?)?;
     m.add_class::<PyTestIndex>()?;
     Ok(())
 }
@@ -402,3 +405,6 @@ mod index_tests;
 
 #[cfg(test)]
 mod ledger_tests;
+
+#[cfg(test)]
+mod style_scan_tests;
