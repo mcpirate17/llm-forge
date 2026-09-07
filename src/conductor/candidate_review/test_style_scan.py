@@ -138,4 +138,43 @@ def test_findings_are_printed_where_the_gate_captures_them(monkeypatch, capsys):
 def test_the_published_rule_list_matches_the_scanner(monkeypatch):
     """Two lists of rule names drift; this one refuses to."""
     slop_core = pytest.importorskip("slop_core")
-    assert tuple(slop_core.style_scan_rules()) == style_scan.RULES
+    assert tuple(slop_core.style_scan_rules()) == style_scan.RULES[:-1]
+
+
+def test_a_swallowed_error_is_reported_under_the_published_rule_name(tmp_path):
+    """The fallback rule comes from a different scanner and a different parser,
+    so nothing but an end-to-end scan proves its name is the published one."""
+    pytest.importorskip("slop_core")
+    source = tmp_path / "swallow.py"
+    source.write_text("try:\n    risky()\nexcept ValueError:\n    pass\n")
+    rules = {row["rule"] for row in style_scan._scan([str(source)])}
+    assert rules == {"failure/silent-fallback"}
+    assert "failure/silent-fallback" in style_scan.RULES
+
+
+def test_both_scanners_report_one_pass_down_the_file(tmp_path):
+    """Concatenating two separately sorted lists reports the file twice over.
+
+    The swallow is early and the empty function is late, so appending one
+    scanner's rows to the other's comes out descending and only the sort
+    rescues it.
+    """
+    pytest.importorskip("slop_core")
+    source = tmp_path / "mixed.py"
+    source.write_text(
+        "def swallow():\n"
+        "    try:\n"
+        "        risky()\n"
+        "    except ValueError:\n"
+        "        pass\n"
+        "\n"
+        "\n"
+        "def stub():\n"
+        "    pass\n"
+    )
+    rows = style_scan._scan([str(source)])
+    assert [row["rule"] for row in rows] == [
+        "failure/silent-fallback",
+        "dead/empty-function",
+    ]
+    assert [row["line"] for row in rows] == [4, 8]

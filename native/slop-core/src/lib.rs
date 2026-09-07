@@ -366,6 +366,7 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m
     )?)?;
     m.add_function(wrap_pyfunction!(detector_scan::audit_detector_scan, m)?)?;
+    m.add_function(wrap_pyfunction!(detector_scan::fallback_scan_files, m)?)?;
     m.add_function(wrap_pyfunction!(
         consolidation::audit_consolidation_normalize,
         m
@@ -408,3 +409,6 @@ mod ledger_tests;
 
 #[cfg(test)]
 mod style_scan_tests;
+
+#[cfg(test)]
+mod detector_scan_tests;

@@ -1,6 +1,6 @@
 [package]
 name = "slop-core"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 description = "Native ablation engine — parses Python and emits byte-span edits that remove one construct at a time"
 

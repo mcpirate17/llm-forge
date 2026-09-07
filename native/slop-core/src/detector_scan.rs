@@ -15,6 +15,7 @@ use crate::python_ast::{ast_children, descendants, list_items, string_attr, type
 
 const ALLOW_GOD_FILE: &str = "# guardrail: allow-god-file";
 const ALLOW_GOD_FUNCTION: &str = "# guardrail: allow-god-function";
+const ALLOW_FALLBACK: &str = "guardrail: allow-fallback";
 
 struct LoadedFile {
     path: PathBuf,
@@ -26,6 +27,7 @@ struct LoadedFile {
 struct Fallback {
     relative: String,
     line: usize,
+    end_line: usize,
     exception: String,
     severity: &'static str,
     confidence: f64,
@@ -238,9 +240,12 @@ fn fallback_candidate(
         ast.call_method1("unparse", (&exception_type,))?.extract()?
     };
     let (confidence, value, severity) = fallback_rank(bare, broad, control_only);
+    let line: usize = handler.getattr("lineno")?.extract()?;
+    let end_line: Option<usize> = handler.getattr("end_lineno")?.extract()?;
     Ok(Some(Fallback {
         relative: relative.to_owned(),
-        line: handler.getattr("lineno")?.extract()?,
+        line,
+        end_line: end_line.unwrap_or(line),
         exception,
         severity,
         confidence,
@@ -357,4 +362,60 @@ pub(crate) fn audit_detector_scan(
         god_functions,
         output.unbind(),
     ))
+}
+
+/// Silent-fallback findings for `paths`, shaped like `style_scan`'s rows so one
+/// gate wrapper can line-scope both lists together.
+///
+/// This is the same classifier the repository audit runs, behind a different
+/// door. Two things differ, and both follow from being a gate rather than a
+/// report. A file CPython cannot parse is an error here, not a skip: an audit
+/// can pass over one broken file among thousands, but a gate that scans the
+/// candidate's own changed files and reports nothing for the one that will not
+/// parse has given a pass it did not earn. And a handler may opt out with
+/// `# guardrail: allow-fallback` anywhere in its body -- a swallow that someone
+/// wrote down a reason for is a decision, and the rule's job is to catch the
+/// ones nobody decided.
+#[pyfunction]
+pub fn fallback_scan_files(py: Python<'_>, paths: Vec<String>) -> PyResult<Py<PyList>> {
+    let ast = py.import("ast")?;
+    let mut rows: Vec<(String, usize, String)> = Vec::new();
+    for raw in paths {
+        let path = PathBuf::from(&raw);
+        let bytes = fs::read(&path).map_err(|error| {
+            PyValueError::new_err(format!(
+                "fallback scan cannot read {}: {error}",
+                path.display()
+            ))
+        })?;
+        let source = String::from_utf8_lossy(&bytes).into_owned();
+        let relative = raw.replace('\\', "/");
+        let tree = ast.call_method1("parse", (&source, &relative))?;
+        let nodes = breadth_first(&tree)?;
+        let lines: Vec<&str> = source.split('\n').collect();
+        for finding in fallback_findings(&ast, &nodes, &relative)? {
+            let span = finding.line.saturating_sub(1)..finding.end_line.min(lines.len());
+            if lines[span].iter().any(|line| line.contains(ALLOW_FALLBACK)) {
+                continue;
+            }
+            rows.push((finding.relative, finding.line, finding.exception));
+        }
+    }
+    rows.sort();
+    let out = PyList::empty(py);
+    for (relative, line, exception) in rows {
+        let row = PyDict::new(py);
+        row.set_item("path", relative)?;
+        row.set_item("line", line)?;
+        row.set_item("rule", "failure/silent-fallback")?;
+        row.set_item(
+            "message",
+            format!(
+                "except {exception} swallows the error: re-raise it, log it at error \
+                 level, or write down why with `# guardrail: allow-fallback`"
+            ),
+        )?;
+        out.append(row)?;
+    }
+    Ok(out.unbind())
 }

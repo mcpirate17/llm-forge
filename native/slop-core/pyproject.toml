@@ -9,7 +9,7 @@ build-backend = "maturin"
 
 [project]
 name = "slop-core"
-version = "0.1.7"
+version = "0.1.8"
 description = "Native ablation engine and repository test index for the equivalence probe"
 requires-python = ">=3.11"
 

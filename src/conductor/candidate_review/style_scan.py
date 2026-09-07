@@ -1,16 +1,20 @@
-"""Refuse effort-signalling comments and dead scaffolding on the lines a candidate wrote.
+"""Refuse effort-signalling comments, dead scaffolding and swallowed errors.
 
-Two rules in CLAUDE.md had no detector at all. "No effort-signaling code" is
-unenforced because no Python linter reads comments -- ruff discards them before
-it starts. Dead scaffolding is unenforced for stubs, unreachable statements and
-constant conditions, because ruff's dead-code rules stop at unused *names*.
+Three rules in CLAUDE.md had no detector reaching the gate. "No effort-signaling
+code" is unenforced because no Python linter reads comments -- ruff discards them
+before it starts. Dead scaffolding is unenforced for stubs, unreachable
+statements and constant conditions, because ruff's dead-code rules stop at unused
+*names*. "Fail loud -- no silent fallbacks, no swallowed exceptions" had a
+classifier written for it, but only the repository audit ever called it.
 
-The detectors live in Rust (`slop_core.style_scan_files`, tree-sitter over the
-whole file); this module is argv, line scoping and printing.
+The detectors live in Rust: `slop_core.style_scan_files` reads comments and dead
+code with tree-sitter, `slop_core.fallback_scan_files` classifies exception
+handlers against CPython's own AST. This module is argv, line scoping and
+printing.
 
 Scoping is by changed line, not changed file. Measured over the 3301 tracked
-Python files the rules report 113 pre-existing findings, mostly benign section
-labels. Reporting those would red-gate a candidate for lines it never touched,
+Python files the rules report 704 pre-existing findings, 591 of them swallowed
+errors. Reporting those would red-gate a candidate for lines it never touched,
 which is how a check gets bypassed. Reporting only the lines it wrote refuses
 the first *new* one at the commit that writes it, and leaves the rest to the
 person who eventually edits that line -- the same converging shape as
@@ -32,6 +36,7 @@ RULES = (
     "dead/constant-condition",
     "dead/empty-function",
     "dead/unreachable-statement",
+    "failure/silent-fallback",
 )
 
 
@@ -44,7 +49,13 @@ def _scan(paths: list[str]) -> list[dict]:
     """
     import slop_core
 
-    return list(slop_core.style_scan_files(paths))
+    findings = list(slop_core.style_scan_files(paths))
+    findings += list(slop_core.fallback_scan_files(paths))
+    # Two scanners, each sorted within itself, would otherwise report a file
+    # twice over: every comment finding, then every swallowed error. One pass
+    # down the file is the order the reader is going to read it in.
+    findings.sort(key=lambda row: (row["path"], row["line"], row["rule"]))
+    return findings
 
 
 def in_range(line: int, ranges: tuple[tuple[int, int], ...]) -> bool:
@@ -83,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("files", nargs="*")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if args.version:
-        print("style-scan 1")
+        print("style-scan 2")
         return 0
 
     paths = [f for f in args.files if f.endswith(".py")]
