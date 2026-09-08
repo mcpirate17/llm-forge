@@ -407,6 +407,11 @@ def test_a_campaign_is_unmeasured_or_its_inert_tests_are_named(tmp_path: Path) -
     detect anything -- that is not the same as being asked and answering `none`,
     and a corpus that conflates them cannot tell an unaudited campaign from an
     audited one full of tests that kill nothing.
+
+    The same conflation from the other side: a generated campaign cannot declare
+    a `value_analysis`, because which tests kill which machine-generated mutants
+    is not knowable until the run has happened. Its measurement arrives in the
+    receipt, and reading only the manifest calls every one of them unmeasured.
     """
 
     current = {"conductor/mutation_testing.py": "a" * 64}
@@ -458,6 +463,26 @@ def test_a_campaign_is_unmeasured_or_its_inert_tests_are_named(tmp_path: Path) -
         tmp_path,
     )
     assert none_from_stale == []
+
+    # A campaign whose manifest declares nothing is measured by its receipt, and
+    # is unmeasured only when neither place carries the answer.
+    generated_unmeasured, generated_inert = mutation_patch_audit._value_verdicts(
+        [unmeasured_campaign],
+        {
+            "unmeasured": [
+                {
+                    "status": "PASS",
+                    "runner_components_sha256": dict(current),
+                    "generated_at": "20260908T000000Z",
+                    "test_value": value,
+                }
+            ]
+        },
+        current,
+        tmp_path,
+    )
+    assert generated_unmeasured == []
+    assert [row["nodeid"] for row in generated_inert] == ["t.py::test_inert"]
 
 
 def test_the_newest_acceptable_receipt_is_the_one_that_speaks(tmp_path: Path) -> None:

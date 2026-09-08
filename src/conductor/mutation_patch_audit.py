@@ -272,23 +272,29 @@ def _value_verdicts(
     Reported separately because the repairs are different. The first is a missing
     measurement. The second is a missing mutant -- the fix is the one this test
     uniquely kills, never deleting the test.
+
+    The measurement is looked for in the receipt, not only in the manifest. A
+    hand-authored campaign declares its `value_analysis` up front; a generated
+    one cannot, because nothing knows which tests kill which machine-generated
+    mutants until the run has happened. Reading only the manifest therefore
+    marked every generated campaign as never-measured no matter what its receipt
+    carried, and the receipt is where the measurement actually lands.
     """
 
     unmeasured: list[dict[str, str]] = []
     inert: list[dict[str, str]] = []
     for campaign in campaigns:
-        if campaign.value_analysis is None:
-            unmeasured.append(
-                {
-                    "campaign_id": campaign.campaign_id,
-                    "reason": "NO_VALUE_ANALYSIS",
-                    "detail": "nothing measures which of its tests detect anything",
-                }
-            )
-            continue
         receipt = _acceptable_receipt(campaign, receipts, current, repo_root)
         value = receipt.get("test_value") if isinstance(receipt, Mapping) else None
         if not isinstance(value, Mapping):
+            if campaign.value_analysis is None:
+                unmeasured.append(
+                    {
+                        "campaign_id": campaign.campaign_id,
+                        "reason": "NO_VALUE_ANALYSIS",
+                        "detail": "nothing measures which of its tests detect anything",
+                    }
+                )
             continue
         for row in value.get("tests") or []:
             if not isinstance(row, Mapping):

@@ -80,17 +80,20 @@ def test_every_receipt_field_a_row_carries_is_pinned() -> None:
     """The row keys are the receipt's schema, and nothing else checks them.
 
     The survivor baseline matches on `id`; `path`, `line` and `operator` are
-    what make a survivor readable to whoever has to close it. A rename or a
-    dropped field would land silently and only surface as an unreadable
-    ratchet months later.
+    what make a survivor readable to whoever has to close it. `byte_offset` and
+    `byte_length` are what attribution re-applies the mutant with, and a line
+    number cannot separate two mutants on one line. A rename or a dropped field
+    would land silently and only surface as an unreadable ratchet months later.
     """
 
-    (row,) = _rows({"results": [result("Survived", line=42)]}, WORKTREE)
+    (row,) = _rows({"results": [result("Survived", line=42, offset=17)]}, WORKTREE)
     assert set(row) == {
         "id",
         "outcome",
         "path",
         "line",
+        "byte_offset",
+        "byte_length",
         "operator",
         "original_text",
         "mutated_text",
@@ -98,6 +101,7 @@ def test_every_receipt_field_a_row_carries_is_pinned() -> None:
         "duration_seconds",
     }
     assert row["line"] == 42
+    assert (row["byte_offset"], row["byte_length"]) == (17, len(row["original_text"]))
     assert row["operator"] == "constant_replace"
     assert row["original_text"] == '"gh"'
     assert row["mutated_text"] == '""'
@@ -149,6 +153,14 @@ def test_an_unknown_engine_status_is_refused_not_guessed() -> None:
 
     with pytest.raises(CampaignError, match="unknown status"):
         _rows({"results": [result("Flaky")]}, WORKTREE)
+
+    # A result carrying no status at all is the same refusal, and the message
+    # has to show the empty string rather than a stand-in: "unknown status ''"
+    # says the field was absent, which is a different bug from a new spelling.
+    missing = result("Killed")
+    del missing["status"]
+    with pytest.raises(CampaignError, match="unknown status ''"):
+        _rows({"results": [missing]}, WORKTREE)
 
 
 def test_coverage_is_measured_over_directories_never_a_single_file() -> None:

@@ -26,6 +26,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from conductor import mutation_attribution as _attribution
 from conductor import mutation_engine_generated as _core
 from conductor.mutation_scope import CampaignError
 
@@ -107,6 +108,11 @@ def _row(
         "outcome": _OUTCOMES[status],
         "path": relative_path,
         "line": mutant["line"],
+        # Byte span, not just the line: attribution re-applies the mutation
+        # after the run, and a line number cannot locate two mutants that sit
+        # on the same line.
+        "byte_offset": mutant["byte_offset"],
+        "byte_length": mutant["byte_length"],
         "operator": mutant["mutator_name"],
         "original_text": mutant["original_text"],
         "mutated_text": mutant["mutated_text"],
@@ -263,6 +269,16 @@ def execute(
         int(report.get("mutants_generated") or 0),
         int(report.get("mutants_tested") or 0),
         campaign.source,
+    )
+    # Inside the snapshot, and only here: attribution re-applies every killed
+    # mutant in this worktree, which the caller destroys the moment `execute`
+    # returns.
+    _attribution.attribute(
+        campaign,
+        receipt,
+        worktree=worktree,
+        environment=_environment(campaign),
+        interpreter=sys.executable,
     )
 
 
