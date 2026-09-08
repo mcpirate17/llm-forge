@@ -329,3 +329,143 @@ def test_render_distinguishes_pass_fail_and_refused() -> None:
 def test_exit_codes_are_distinct() -> None:
     """A refusal is not a pass and is not a fail; conflating them is the bug."""
     assert len({gate.EXIT_PASS, gate.EXIT_FAIL, gate.EXIT_REFUSED}) == 3
+
+
+# ---------------------------------------------------------------------------
+# Mutation corpus audit
+# ---------------------------------------------------------------------------
+
+
+def _corpus_result(**moves: list[str]) -> dict[str, object]:
+    """A result shaped like `audit_corpus`, with every baseline key present.
+
+    Findings are passed as `new_<key>` / `resolved_<key>`; everything else is
+    empty, so a test that pins one dimension cannot pass because another one
+    happened to be dirty.
+    """
+
+    from conductor.mutation_patch_audit import BASELINE_KEYS
+
+    delta: dict[str, object] = {}
+    for key in BASELINE_KEYS:
+        delta[f"new_{key}"] = moves.get(f"new_{key}", [])
+        delta[f"resolved_{key}"] = moves.get(f"resolved_{key}", [])
+    regressed = any(delta[f"new_{key}"] for key in BASELINE_KEYS)
+    stale = any(delta[f"resolved_{key}"] for key in BASELINE_KEYS)
+    delta["status"] = (
+        "REGRESSED" if regressed else "BASELINE_STALE" if stale else "CLEAN"
+    )
+    return {
+        "status": delta["status"],
+        "campaigns": 492,
+        "reproducibility": {"baseline": delta},
+    }
+
+
+@pytest.fixture
+def export_with_registry(tmp_path: Path) -> Path:
+    export = tmp_path / "tree"
+    (export / "conductor" / "mutation_campaigns").mkdir(parents=True)
+    (export / gate.MUTATION_REGISTRY).write_text('{"campaigns": []}', encoding="utf-8")
+    return export
+
+
+def _stub_audit(monkeypatch, result: dict[str, object], seen: dict[str, object]):
+    def fake(registry, *, repo_root, summary=False, **kwargs):
+        seen["registry"] = registry
+        seen["repo_root"] = repo_root
+        seen["summary"] = summary
+        return result
+
+    monkeypatch.setattr("conductor.mutation_patch_audit.audit_corpus", fake)
+
+
+def test_corpus_audit_passes_at_the_recorded_baseline(
+    export_with_registry: Path, monkeypatch
+) -> None:
+    seen: dict[str, object] = {}
+    _stub_audit(monkeypatch, _corpus_result(), seen)
+    phase = gate.mutation_corpus_audit(export_with_registry)
+    assert phase.ok
+    assert phase.name == "mutation-corpus"
+    assert phase.evidence["status"] == "CLEAN"
+    assert phase.evidence["exit_code"] == 0
+
+
+def test_corpus_audit_reads_the_export_not_the_working_tree(
+    export_with_registry: Path, monkeypatch
+) -> None:
+    """The phase must never bill another lane's uncommitted campaigns to this one."""
+
+    seen: dict[str, object] = {}
+    _stub_audit(monkeypatch, _corpus_result(), seen)
+    gate.mutation_corpus_audit(export_with_registry)
+    assert seen["repo_root"] == export_with_registry
+    assert seen["registry"] == export_with_registry / gate.MUTATION_REGISTRY
+
+
+def test_corpus_audit_fails_on_a_newly_rotted_mutant(
+    export_with_registry: Path, monkeypatch
+) -> None:
+    seen: dict[str, object] = {}
+    _stub_audit(
+        monkeypatch,
+        _corpus_result(new_stale_mutations=["some_campaign::some_mutant"]),
+        seen,
+    )
+    phase = gate.mutation_corpus_audit(export_with_registry)
+    assert not phase.ok
+    assert phase.evidence["exit_code"] == 6
+    assert "some_campaign::some_mutant" in phase.detail
+
+
+def test_corpus_audit_fails_when_a_baseline_entry_stops_failing(
+    export_with_registry: Path, monkeypatch
+) -> None:
+    """The ratchet is strict in both directions; a shrunk baseline must be recorded."""
+
+    seen: dict[str, object] = {}
+    _stub_audit(
+        monkeypatch,
+        _corpus_result(resolved_stale_mutations=["some_campaign::repaired"]),
+        seen,
+    )
+    phase = gate.mutation_corpus_audit(export_with_registry)
+    assert not phase.ok
+    assert phase.evidence["exit_code"] == 6
+    assert "some_campaign::repaired" in phase.detail
+
+
+def test_corpus_audit_fails_on_a_non_patch_regression(
+    export_with_registry: Path, monkeypatch
+) -> None:
+    """Exit 7, not 6: the finding is real but no lane rotted a foreign patch."""
+
+    seen: dict[str, object] = {}
+    _stub_audit(
+        monkeypatch,
+        _corpus_result(new_tests_that_kill_nothing=["c::test_x"]),
+        seen,
+    )
+    phase = gate.mutation_corpus_audit(export_with_registry)
+    assert not phase.ok
+    assert phase.evidence["exit_code"] == 7
+    assert "c::test_x" in phase.detail
+
+
+def test_corpus_audit_refuses_when_the_candidate_has_no_registry(
+    tmp_path: Path,
+) -> None:
+    export = tmp_path / "tree"
+    export.mkdir()
+    with pytest.raises(gate.GateRefusal, match="no mutation registry"):
+        gate.mutation_corpus_audit(export)
+
+
+def test_corpus_detail_truncates_long_id_lists_but_keeps_the_count() -> None:
+    ids = [f"c::m{index}" for index in range(5)]
+    detail = gate._corpus_detail("REGRESSED", {"stale_mutations": ids}, {})
+    assert "stale_mutations 5" in detail
+    assert "c::m0" in detail
+    assert "..." in detail
+    assert "c::m4" not in detail

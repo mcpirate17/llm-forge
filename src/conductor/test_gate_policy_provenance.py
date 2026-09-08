@@ -38,6 +38,25 @@ class _StubPolicy:
     mutation_waivers: tuple[object, ...] = ()
 
 
+@pytest.fixture(autouse=True)
+def _inert_corpus_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The `repo` fixture is a one-file candidate with no campaign registry.
+
+    `mutation_corpus_audit` walks the registered corpus and refuses a candidate
+    that declares none, which every fixture here is. Nothing in this module is
+    about that phase, so it is made inert exactly as `_StubPolicy` makes the
+    policy inert. Its own contracts live in `test_gate.py`.
+    """
+
+    monkeypatch.setattr(
+        gate,
+        "mutation_corpus_audit",
+        lambda export_root: gate.PhaseResult(
+            name="mutation-corpus", ok=True, detail="stubbed for this module"
+        ),
+    )
+
+
 def _run_gate(repo: Path, json_out: Path) -> None:
     gate.run_gate(
         repo,

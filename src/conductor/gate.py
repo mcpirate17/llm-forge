@@ -541,7 +541,7 @@ def clean_clone_closure(repo: Path, export_root: Path) -> PhaseResult:
     """
     try:
         from conductor.workspace_hygiene import untracked_import_closure
-    except ImportError as exc:  # pragma: no cover - import wiring is environmental
+    except ImportError as exc:
         raise GateRefusal(f"clean-clone closure check is unavailable: {exc}") from exc
     tracked = {line for line in _git(["ls-files"], repo=repo).splitlines() if line}
     records = untracked_import_closure(tracked)
@@ -561,6 +561,105 @@ def clean_clone_closure(repo: Path, export_root: Path) -> PhaseResult:
         detail="no untracked import dependencies",
         evidence={},
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 -- registered mutant corpus still applies
+# ---------------------------------------------------------------------------
+
+
+MUTATION_REGISTRY = Path("conductor/mutation_campaigns/registry.json")
+
+
+def mutation_corpus_audit(export_root: Path) -> PhaseResult:
+    """Every registered mutant must still apply to the candidate tree.
+
+    CI runs `make mutation-patch-audit` as a step of its own, so without this
+    phase the gate could pass on a tree CI then rejected -- which is not a gap in
+    coverage but a broken promise, since this command exists to never report a
+    pass CI could fail on. It happened on #371: widening one condition in
+    `component_fab/fab.py` rotted a mutant belonging to a campaign that branch
+    never touched, and nothing local could have said so.
+
+    The audit runs against the export rather than the working tree because it
+    reads campaigns, patches and receipts from disk. A shared checkout always
+    carries other lanes' uncommitted campaigns, and billing those to this lane
+    would make the phase red for reasons the author cannot fix.
+    """
+
+    try:
+        from conductor.mutation_patch_audit import (
+            BASELINE_KEYS,
+            audit_corpus,
+            corpus_exit_code,
+        )
+        from conductor.mutation_scope import CampaignError
+    except ImportError as exc:
+        raise GateRefusal(f"mutation corpus audit is unavailable: {exc}") from exc
+
+    registry = export_root / MUTATION_REGISTRY
+    if not registry.is_file():
+        raise GateRefusal(
+            f"candidate tree has no mutation registry at {MUTATION_REGISTRY}"
+        )
+
+    try:
+        result = audit_corpus(registry, repo_root=export_root, summary=True)
+    except CampaignError as exc:
+        raise GateRefusal(f"mutation corpus audit did not run: {exc}") from exc
+
+    delta = result["reproducibility"]["baseline"]
+    exit_code = corpus_exit_code(result)
+    regressions = {
+        key: delta[f"new_{key}"] for key in BASELINE_KEYS if delta.get(f"new_{key}")
+    }
+    resolved = {
+        key: delta[f"resolved_{key}"]
+        for key in BASELINE_KEYS
+        if delta.get(f"resolved_{key}")
+    }
+    evidence = {
+        "status": delta["status"],
+        "exit_code": exit_code,
+        "campaigns": result["campaigns"],
+        "new": regressions,
+        "resolved": resolved,
+    }
+    if exit_code == 0:
+        return PhaseResult(
+            name="mutation-corpus",
+            ok=True,
+            detail=f"{result['campaigns']} registered campaign(s) reproduce at the recorded baseline",
+            evidence=evidence,
+        )
+    return PhaseResult(
+        name="mutation-corpus",
+        ok=False,
+        detail=_corpus_detail(delta["status"], regressions, resolved),
+        evidence=evidence,
+    )
+
+
+def _corpus_detail(
+    status: str,
+    regressions: dict[str, list[str]],
+    resolved: dict[str, list[str]],
+) -> str:
+    """Name the ids, not just the counts: the repair is per-id."""
+
+    def render(label: str, rows: dict[str, list[str]]) -> str:
+        parts = [
+            f"{key} {len(ids)} ({', '.join(ids[:3])}{'...' if len(ids) > 3 else ''})"
+            for key, ids in rows.items()
+        ]
+        return f"{label} " + "; ".join(parts)
+
+    segments = []
+    if regressions:
+        segments.append(render("new", regressions))
+    if resolved:
+        segments.append(render("baseline entries no longer failing:", resolved))
+    return f"{status}: " + " | ".join(segments)
 
 
 # ---------------------------------------------------------------------------
@@ -615,6 +714,7 @@ def run_gate(
         base_oid = resolve_base_commit(repo, base_ref, target_ref)
         phases.append(waiver_activation(policy.mutation_waivers, base_oid))
         phases.append(clean_clone_closure(repo, export_root))
+        phases.append(mutation_corpus_audit(export_root))
         if not skip_review:
             review_phase, _payload = run_review(
                 repo,

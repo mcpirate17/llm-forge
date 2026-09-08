@@ -528,6 +528,74 @@ def _write_baseline(path: Path, repo_root: Path, found: Mapping[str, set[str]]) 
     )
 
 
+def audit_corpus(
+    registry_path: Path,
+    *,
+    repo_root: Path = REPO_ROOT,
+    baseline: Path = DEFAULT_BASELINE,
+    max_workers: int = 16,
+    summary: bool = False,
+    write_baseline: bool = False,
+) -> dict[str, Any]:
+    """One walk of the registered corpus, judged against the recorded debt.
+
+    ``repo_root`` is a parameter and not ``REPO_ROOT`` because the gate runs this
+    against its *exported* candidate tree rather than the working tree. Every
+    reader here -- manifests, patches, receipts, the baseline -- resolves from
+    disk, so in a shared checkout the working tree carries whatever campaigns
+    other lanes have in flight, and those must not decide this lane's verdict.
+    """
+
+    loaded = load_registered_campaigns(registry_path, repo_root=repo_root)
+    registry, campaigns, _unloadable = loaded
+    patches = audit_patches(
+        registry_path, repo_root=repo_root, max_workers=max_workers, loaded=loaded
+    )
+    repro = audit_reproducibility(campaigns, registry, repo_root=repo_root)
+
+    found = _findings(patches, repro)
+    if write_baseline:
+        _write_baseline(baseline, repo_root, found)
+        delta: dict[str, Any] = {"status": "RECORDED"}
+    else:
+        delta = _baseline_delta(found, _load_baseline(baseline, repo_root))
+    repro = repro | {"baseline": delta}
+
+    result = {
+        "status": delta["status"],
+        "repo_root": patches["repo_root"],
+        "campaigns": patches["campaigns"],
+        "patches": patches,
+        "reproducibility": repro,
+    }
+    if summary:
+        result["patches"] = {
+            key: value for key, value in patches.items() if key != "stale"
+        }
+        result["reproducibility"] = {
+            key: value
+            for key, value in repro.items()
+            if key not in ("interpreters", "evidence", "unmeasured", "inert_tests")
+        }
+    return result
+
+
+def corpus_exit_code(result: Mapping[str, Any]) -> int:
+    """The audit's verdict as an exit status, shared by the CLI and the gate.
+
+    6 is reserved for the patch dimensions moving in either direction: a rotted
+    mutant is the one finding a lane can introduce without ever touching the
+    campaign that owns it.
+    """
+
+    delta = result["reproducibility"]["baseline"]
+    if any(
+        delta.get(f"{side}_{key}") for key in PATCH_KEYS for side in ("new", "resolved")
+    ):
+        return 6
+    return 0 if delta["status"] in ("CLEAN", "RECORDED") else 7
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -559,41 +627,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    loaded = load_registered_campaigns(args.registry, repo_root=REPO_ROOT)
-    registry, campaigns, _unloadable = loaded
-    patches = audit_patches(args.registry, max_workers=args.max_workers, loaded=loaded)
-    repro = audit_reproducibility(campaigns, registry)
-
-    found = _findings(patches, repro)
-    if args.write_baseline:
-        _write_baseline(args.baseline, REPO_ROOT, found)
-        delta = {"status": "RECORDED"}
-    else:
-        delta = _baseline_delta(found, _load_baseline(args.baseline, REPO_ROOT))
-    repro = repro | {"baseline": delta}
-
-    result = {
-        "status": delta["status"],
-        "repo_root": patches["repo_root"],
-        "campaigns": patches["campaigns"],
-        "patches": patches,
-        "reproducibility": repro,
-    }
-    if args.summary:
-        result["patches"] = {
-            key: value for key, value in patches.items() if key != "stale"
-        }
-        result["reproducibility"] = {
-            key: value
-            for key, value in repro.items()
-            if key not in ("interpreters", "evidence", "unmeasured", "inert_tests")
-        }
+    result = audit_corpus(
+        args.registry,
+        baseline=args.baseline,
+        max_workers=args.max_workers,
+        summary=args.summary,
+        write_baseline=args.write_baseline,
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
-    if any(
-        delta.get(f"{side}_{key}") for key in PATCH_KEYS for side in ("new", "resolved")
-    ):
-        return 6
-    return 0 if delta["status"] in ("CLEAN", "RECORDED") else 7
+    return corpus_exit_code(result)
 
 
 if __name__ == "__main__":
