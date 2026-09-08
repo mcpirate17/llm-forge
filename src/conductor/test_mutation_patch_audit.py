@@ -321,6 +321,35 @@ def test_a_receipt_is_evidence_only_when_a_known_runner_produced_it(
         )
         == "runner components match neither this runner nor any lineage entry"
     )
+    # A generated campaign passes with RATCHET_HELD rather than PASS -- its verdict
+    # is the survivor set, not the score -- and `mutation_engine_generated` exits 0
+    # on either. While this accepted only PASS, every generated campaign was
+    # permanently NO_ACCEPTABLE_RECEIPT: the audit could not see one as covered
+    # however well it ran, so the engines that exist to remove hand-authored
+    # mutants could not produce evidence the audit would take. The runner-component
+    # check still applies, which is what makes this narrower than widening the set.
+    assert (
+        mutation_patch_audit._receipt_rejection(
+            {"status": "RATCHET_HELD", "runner_components_sha256": dict(current)},
+            current,
+            tmp_path,
+        )
+        is None
+    )
+    assert (
+        mutation_patch_audit._receipt_rejection(
+            {
+                "status": "RATCHET_HELD",
+                "runner_components_sha256": {"conductor/mutation_testing.py": "b" * 64},
+            },
+            current,
+            tmp_path,
+        )
+        == "runner components match neither this runner nor any lineage entry"
+    )
+    assert mutation_patch_audit.PASSING_RECEIPT_STATUSES == frozenset(
+        {"PASS", "RATCHET_HELD"}
+    )
 
 
 def test_one_acceptable_receipt_covers_a_campaign_and_none_leaves_it_uncovered(

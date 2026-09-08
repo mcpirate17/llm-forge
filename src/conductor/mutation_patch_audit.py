@@ -177,13 +177,25 @@ def _receipts_by_campaign(
     return index
 
 
+# The two statuses a passing campaign publishes. A patch campaign passes with
+# ``PASS``; a generated one passes with ``RATCHET_HELD``, because its verdict is
+# the survivor set rather than the score -- no mutant survived that did not
+# survive the recorded baseline. ``mutation_engine_generated`` already exits 0 on
+# either, so accepting only ``PASS`` here made every generated campaign
+# permanently ``NO_ACCEPTABLE_RECEIPT``: the corpus audit could not see a
+# generated campaign as covered however well it ran. Restated rather than
+# imported because every receipt in the repository pins that module's hash, so an
+# export added there would invalidate all of them.
+PASSING_RECEIPT_STATUSES = frozenset({"PASS", "RATCHET_HELD"})
+
+
 def _receipt_rejection(
     receipt: Mapping[str, Any], current: Mapping[str, str], repo_root: Path
 ) -> str | None:
     """Why this receipt is not usable evidence, or ``None`` when it is."""
 
     status = receipt.get("status")
-    if status != "PASS":
+    if status not in PASSING_RECEIPT_STATUSES:
         return f"status={status}"
     recorded = receipt.get("runner_components_sha256")
     if not isinstance(recorded, dict):
