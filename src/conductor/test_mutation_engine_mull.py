@@ -9,6 +9,7 @@ without which the runner reports unreached code as survived.
 
 from __future__ import annotations
 
+import os
 import json
 from pathlib import Path
 
@@ -692,23 +693,36 @@ def _drive_execute(
     drifted: dict[str, str] | None = None,
     baseline: int = 0,
     reports: list[dict[str, object]] | None = None,
+    faked: dict[str, object] | None = None,
+    subject: object | None = None,
 ) -> tuple[dict[str, object], list[list[str]]]:
-    """Run `execute` with every subprocess and both halves of the build faked."""
+    """Run `execute` with every subprocess and both halves of the build faked.
+
+    `faked` collects what `execute` handed the two stubs. Without it the build
+    directory and the child environment are computed and then dropped on the
+    floor, so a mutant that empties either one changes nothing any test can see.
+    """
+
+    seen: dict[str, object] = {} if faked is None else faked
+
+    def _fake_build(campaign, worktree, build, version, **kwargs):
+        seen["build"] = build
+        seen["environment"] = kwargs.get("environment")
+
+    def _fake_reports(*args, **kwargs):
+        seen["report_args"] = [*args, *kwargs.values()]
+        return [_engine_report()] if reports is None else reports
 
     monkeypatch.setattr(mull._core, "drift", lambda campaign, worktree: drifted or {})
     monkeypatch.setattr(
         mull, "_tool", lambda name, version, hint: f"/bin/{name}-{version}"
     )
-    monkeypatch.setattr(mull, "_build", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        mull,
-        "_engine_reports",
-        lambda *args, **kwargs: [_engine_report()] if reports is None else reports,
-    )
+    monkeypatch.setattr(mull, "_build", _fake_build)
+    monkeypatch.setattr(mull, "_engine_reports", _fake_reports)
     calls = _recorded_runs(monkeypatch, _result(baseline))
     receipt: dict[str, object] = {}
     mull.execute(
-        campaign(),
+        campaign() if subject is None else subject,
         receipt,
         binary=binary,
         worktree=REPO_ROOT,
@@ -772,13 +786,63 @@ def test_a_clean_run_records_the_baseline_the_engine_version_and_the_scoped_corp
     mutated less than anyone thought.
     """
 
-    receipt, calls = _drive_execute(monkeypatch, tmp_path)
+    faked: dict[str, object] = {}
+    receipt, calls = _drive_execute(monkeypatch, tmp_path, faked=faked)
     assert calls == [list(campaign().test_argv)]
     assert receipt["baseline_argv"] == list(campaign().test_argv)
     assert receipt["engine_version"] == "18.0.0"
     assert [row["outcome"] for row in receipt["mutants"]] == ["KILLED"]
     assert receipt["engine_summary"]["mutants_in_scope"] == 1
+    assert receipt["engine_summary"]["mutants_reported"] == 1
+    assert receipt["engine_summary"]["files_mutated"] == ["aria_core/src/cpu/norm.cpp"]
     assert "status" not in receipt
+    # The build directory and the child environment never reach the receipt, so
+    # the stubs are the only place their construction is observable.
+    assert faked["build"] == REPO_ROOT / ".mull-build"
+    assert faked["environment"]["PATH"] == os.environ["PATH"]
+    assert "/bin/llvm-profdata-18" in faked["report_args"]
+
+
+def test_the_build_directory_is_the_manifest_option_and_falls_back_to_mull_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The committed manifest sets `build_dir` to the same string as the default.
+
+    So neither half of `options.get("build_dir", ".mull-build")` is observable
+    from the committed campaign alone: drop the key and the default supplies the
+    same path, change the default and the key overrides it. A campaign that
+    declared a build directory outside the worktree would still have been built
+    in `.mull-build`, and nothing would have said so.
+    """
+
+    declared = campaign()
+    declared.options = dict(declared.options, build_dir="elsewhere")
+    faked: dict[str, object] = {}
+    _drive_execute(monkeypatch, tmp_path, faked=faked, subject=declared)
+    assert faked["build"] == REPO_ROOT / "elsewhere"
+
+    absent = campaign()
+    absent.options = {k: v for k, v in absent.options.items() if k != "build_dir"}
+    faked = {}
+    _drive_execute(monkeypatch, tmp_path, faked=faked, subject=absent)
+    assert faked["build"] == REPO_ROOT / ".mull-build"
+
+
+def test_a_host_with_no_PATH_hands_the_build_an_empty_one_not_a_fabricated_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`os.environ.get("PATH", "")` has a fallback no ordinary run ever takes.
+
+    Every host that runs this has a PATH, so the default is dead weight until
+    the day it is not, and then it decides what the build can execute. Pinning
+    it to the empty string keeps a PATH-less host failing at the first missing
+    tool rather than searching somewhere nobody chose.
+    """
+
+    monkeypatch.delenv("PATH", raising=False)
+    faked: dict[str, object] = {}
+    _drive_execute(monkeypatch, tmp_path, faked=faked)
+    assert faked["environment"]["PATH"] == ""
 
 
 def test_a_corpus_that_all_falls_outside_the_declared_scope_is_refused(

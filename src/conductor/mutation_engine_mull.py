@@ -134,8 +134,13 @@ def _plugin(version: str) -> str:
     return f"/usr/lib/mull-ir-frontend-{version}"
 
 
-def _require_plugin(version: str) -> str:
-    """Refuse a host with no pass plugin, before any build work starts."""
+def _require_plugin(version: str) -> None:
+    """Refuse a host with no pass plugin, before any build work starts.
+
+    The path is not returned: `_configure_argv` calls `_plugin` itself, so a
+    returned value would be discarded at the only call site, and a mutant that
+    replaced it with `None` would be unkillable by any test.
+    """
 
     path = _plugin(version)
     if not Path(path).is_file():
@@ -143,7 +148,6 @@ def _require_plugin(version: str) -> str:
             f"the Mull pass plugin is not at {path}; without it the build "
             "carries no mutants and every campaign would report an empty corpus"
         )
-    return path
 
 
 def _executables(campaign: _core.GeneratedCampaign) -> tuple[str, ...]:
@@ -257,6 +261,10 @@ def _slice(source: str, location: Mapping[str, Any]) -> str:
     return "\n".join(body)
 
 
+_GLOB_TOKEN = re.compile(r"\*\*|[*?]|[^*?]+")
+_GLOB_CLASS = {"**": ".*", "*": "[^/]*", "?": "[^/]"}
+
+
 @lru_cache(maxsize=None)
 def _matcher(pattern: str) -> re.Pattern[str]:
     """A glob compiled with `**` crossing directory separators and `*` not.
@@ -266,24 +274,20 @@ def _matcher(pattern: str) -> re.Pattern[str]:
     directory and silently misses one in a subdirectory of it. A campaign whose
     scope quietly shrank when someone added a subdirectory would keep reporting
     green over a corpus it had stopped measuring.
+
+    The scan is a `findall` rather than an index walked by hand so that no
+    single-token edit can stop it advancing: five mutants of the arithmetic this
+    replaces ran forever and scored the campaign ERROR instead of failing it.
+    `_GLOB_TOKEN` alternates longest-first, so `**` wins over `*` and a run of
+    literal characters is escaped in one piece — `re.escape` over a run is the
+    concatenation of the per-character escapes, so the emitted pattern is
+    identical to the one the hand-walked index produced.
     """
 
-    out = []
-    index = 0
-    while index < len(pattern):
-        char = pattern[index]
-        if pattern.startswith("**", index):
-            out.append(".*")
-            index += 2
-        elif char == "*":
-            out.append("[^/]*")
-            index += 1
-        elif char == "?":
-            out.append("[^/]")
-            index += 1
-        else:
-            out.append(re.escape(char))
-            index += 1
+    out = [
+        _GLOB_CLASS.get(token) or re.escape(token)
+        for token in _GLOB_TOKEN.findall(pattern)
+    ]
     return re.compile(f"^{''.join(out)}$")
 
 
