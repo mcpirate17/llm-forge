@@ -679,3 +679,45 @@ def atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+class _RunnableCampaign(Protocol):
+    """The part of a campaign that decides whether a hand run can score anything."""
+
+    campaign_id: str
+    mutation_engine: str
+    mutations: Sequence[Any]
+    planned_mutations: Sequence[Any]
+
+
+def vacuous_run_reason(
+    campaign: _RunnableCampaign, generated_engines: Container[str]
+) -> str | None:
+    """Why scoring `campaign` by hand would report PASS over an empty mutant set.
+
+    Both shapes reach the hand runner with nothing to kill: a generated campaign
+    whose mutants only exist once its engine has produced them, and a campaign
+    that carries planned mutations but never materialized them. `None` when the
+    campaign has real mutants to score.
+    """
+
+    if campaign.mutation_engine in generated_engines:
+        return (
+            f"campaign {campaign.campaign_id} declares the generated engine "
+            f"{campaign.mutation_engine!r}. Its mutants do not exist until the "
+            "engine produces them, so this runner would score an empty set and "
+            "call it PASS. Run it with "
+            "`python -m conductor.mutation_engine_generated run` instead."
+        )
+    if not campaign.mutations:
+        planned = (
+            f" (only {len(campaign.planned_mutations)} planned)"
+            if campaign.planned_mutations
+            else ""
+        )
+        return (
+            f"campaign {campaign.campaign_id} carries no materialized mutations"
+            f"{planned}. A run with nothing to kill cannot produce evidence and "
+            "must not report PASS."
+        )
+    return None

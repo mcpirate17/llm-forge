@@ -11,6 +11,7 @@ from typing import Callable, Iterator
 
 import pytest
 
+from conductor import mutation_engine_generated
 from conductor import mutation_testing
 
 
@@ -61,7 +62,21 @@ def test_inspection_reports_ready_with_six_materialized_patches(
 def test_run_requires_explicit_mutation_authority_before_creating_snapshot(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Every run this runner could not honestly score is refused before the snapshot.
+
+    Three of them. No `--allow-mutations`. A generated-engine manifest, whose
+    mutants do not exist until the engine produces them, so this runner would
+    select the empty mutation tuple, score nothing and write `status: PASS` with
+    `mutants: 0` -- a receipt asserting a campaign passed without a single mutant
+    having been applied. And a reviewed campaign that is all design slots: ten
+    scaffold manifests in this repository declare planned mutations and
+    materialize none, and scoring them produced a PASS meaning only that the
+    empty set was empty. `isolated_snapshot` is wired to fail, so a refusal that
+    arrives late fails here too.
+    """
+
     campaign = _temporary_campaign(tmp_path)
+    receipt = tmp_path / "receipt.json"
     monkeypatch.setattr(mutation_testing, "source_drift", lambda *_args: [])
     monkeypatch.setattr(mutation_testing, "blocking_processes", lambda *_args: [])
 
@@ -74,6 +89,37 @@ def test_run_requires_explicit_mutation_authority_before_creating_snapshot(
         mutation_testing.run_campaign(
             campaign, allow_mutations=False, repo_root=tmp_path
         )
+
+    # Every engine carrying an adapter is refused, so the refusal and the
+    # adapter table cannot drift apart and re-open the vacuous path for
+    # whichever engine a restated list left out.
+    engines = sorted(mutation_engine_generated.GENERATED_ENGINES)
+    assert engines, "GENERATED_ENGINES is empty; this test would assert nothing"
+    for engine in engines:
+        generated = replace(campaign, mutation_engine=engine, mutations=())
+        with pytest.raises(mutation_testing.CampaignError) as excinfo:
+            mutation_testing.run_campaign(
+                generated,
+                allow_mutations=True,
+                receipt_path=receipt,
+                repo_root=tmp_path,
+            )
+        message = str(excinfo.value)
+        assert repr(engine) in message
+        assert "conductor.mutation_engine_generated" in message
+        assert not receipt.exists()
+
+    empty = replace(campaign, mutations=())
+    assert empty.mutation_engine not in mutation_engine_generated.GENERATED_ENGINES
+    assert empty.planned_mutations, "the planned/materialized gap is the point"
+    with pytest.raises(mutation_testing.CampaignError) as excinfo:
+        mutation_testing.run_campaign(
+            empty, allow_mutations=True, receipt_path=receipt, repo_root=tmp_path
+        )
+    message = str(excinfo.value)
+    assert "no materialized mutations" in message
+    assert "only 2 planned" in message
+    assert not receipt.exists()
 
 
 def test_rank_gaps_fail_closed(tmp_path: Path) -> None:

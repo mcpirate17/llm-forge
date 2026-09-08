@@ -61,6 +61,7 @@ from conductor.mutation_campaign_model import (  # noqa: F401
     source_drift,
     symbol_hashes,
 )
+from conductor.mutation_engine_generated import GENERATED_ENGINES
 from conductor.mutation_scope import (
     CampaignError,
     _python_test_nodeids,
@@ -73,7 +74,10 @@ from conductor.mutation_scope import (
     _load_test_scopes as _load_test_scopes,  # noqa: PLC0414
 )
 from conductor.mutation_scope import _require_string as _require_string  # noqa: PLC0414
-from conductor.mutation_testing_support import intern_test_attribution
+from conductor.mutation_testing_support import (
+    intern_test_attribution,
+    vacuous_run_reason,
+)
 from conductor.mutation_value import (
     ADAPTER,
     CARGO_ADAPTER,
@@ -482,6 +486,8 @@ def _admit_run(
     and leaves no receipt claiming a run happened.
     """
 
+    if reason := vacuous_run_reason(campaign, GENERATED_ENGINES):
+        raise CampaignError(reason)
     inspection = inspect_campaign(campaign, repo_root=repo_root)
     if inspection["status"] != "READY":
         raise CampaignError(
