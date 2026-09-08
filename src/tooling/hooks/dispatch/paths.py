@@ -47,10 +47,18 @@ def own_interpreter(project_root: Path, current: str) -> Path | None:
     its own ``.venv`` and never the main checkout's. Returns ``None`` when there is
     nothing to switch to -- either the caller already runs it, or the checkout has
     no ``.venv`` -- and the caller decides what to say about that.
+
+    The comparison is between the two interpreters' *directories*, resolved, and never
+    between the interpreter files themselves. A venv's ``bin/python`` is a symlink to
+    the base interpreter it was created from, so resolving both files collapses
+    ``/usr/bin/python3`` onto ``.venv/bin/python`` and this returns ``None`` for exactly
+    the caller it exists to redirect. That is how a second, unmaintained venv stayed
+    load-bearing here for weeks without appearing in any config: every hook ran under
+    whichever interpreter ``PATH`` happened to give.
     """
     own = project_root / ".venv" / "bin" / "python"
     if not own.is_file():
         return None
-    if Path(current).resolve() == own.resolve():
+    if Path(current).parent.resolve() == own.parent.resolve():
         return None
     return own

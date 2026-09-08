@@ -89,13 +89,28 @@ def test_the_interpreter_bin_does_not_follow_the_venv_symlink(
     assert paths.interpreter_bin() == str(venv)
 
 
-def _venv(root: Path) -> Path:
-    """A checkout with its own interpreter, as `own_interpreter` expects to find it."""
-    python = root / ".venv" / "bin" / "python"
-    python.parent.mkdir(parents=True, exist_ok=True)
-    python.write_text('#!/bin/sh\nexec /usr/bin/env python3 "$@"\n', encoding="utf-8")
-    python.chmod(0o755)
-    return python
+def _base_interpreter(tmp_path: Path) -> Path:
+    """The system interpreter a venv gets created from, carrying no project tooling."""
+    base = tmp_path / "usr" / "bin" / "python3"
+    base.parent.mkdir(parents=True, exist_ok=True)
+    base.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    base.chmod(0o755)
+    return base
+
+
+def _venv(root: Path, base: Path) -> Path:
+    """A checkout's own interpreter, laid out the way `uv venv` actually builds one.
+
+    `bin/python` is a *symlink to the base interpreter*, not a script of its own, and
+    that is the whole difficulty this function has to survive: a fixture that writes a
+    real file makes the venv and its base trivially distinguishable, so every check
+    below passes while production -- where they resolve to the same inode -- fails.
+    """
+    bin_dir = root / ".venv" / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    (bin_dir / "python").symlink_to(base)
+    (bin_dir / "python3").symlink_to("python")
+    return bin_dir / "python"
 
 
 def test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller(
@@ -112,7 +127,8 @@ def test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller(
     """
     foreign = "/some/other/venv/bin/python"
     main, worktree = tmp_path / "main", tmp_path / "worktree"
-    main_python, worktree_python = _venv(main), _venv(worktree)
+    base = _base_interpreter(tmp_path)
+    main_python, worktree_python = _venv(main, base), _venv(worktree, base)
     assert paths.own_interpreter(main, foreign) == main_python
     assert paths.own_interpreter(worktree, foreign) == worktree_python
 
@@ -122,21 +138,28 @@ def test_own_interpreter_is_none_when_the_caller_already_runs_it(
 ) -> None:
     """No re-exec loop: the correct interpreter must not be told to switch to itself."""
     root = tmp_path / "checkout"
-    python = _venv(root)
+    python = _venv(root, _base_interpreter(tmp_path))
     assert paths.own_interpreter(root, str(python)) is None
 
 
-def test_own_interpreter_resolves_before_comparing(tmp_path: Path) -> None:
-    """A symlink to the checkout's python is the same interpreter, not a foreign one.
+def test_own_interpreter_compares_directories_not_resolved_interpreters(
+    tmp_path: Path,
+) -> None:
+    """The base interpreter a venv links to is a foreign caller, not the checkout's own.
 
-    Comparing the raw strings would re-exec every time a caller reached the venv
-    through a link -- the loop the env guard exists to bound, fired on every hook.
+    `.venv/bin/python` is a symlink to that base, so a comparison that resolves both
+    *files* makes them the same inode and answers None for the one caller the function
+    exists to redirect. Every hook then runs under whatever interpreter PATH gave --
+    observed here for weeks, under a second venv no config mentioned. The venv's `bin`
+    is the boundary; resolving the directories keeps a symlinked checkout path working
+    without ever following the interpreter link out of the venv.
     """
     root = tmp_path / "checkout"
-    python = _venv(root)
-    link = tmp_path / "link-to-python"
-    link.symlink_to(python)
-    assert paths.own_interpreter(root, str(link)) is None
+    base = _base_interpreter(tmp_path)
+    python = _venv(root, base)
+    assert python.resolve() == base, "fixture must reproduce the venv/base collapse"
+    assert paths.own_interpreter(root, str(base)) == python
+    assert paths.own_interpreter(root, str(python.parent / "python3")) is None
 
 
 def test_own_interpreter_is_none_when_the_checkout_has_no_venv(tmp_path: Path) -> None:
