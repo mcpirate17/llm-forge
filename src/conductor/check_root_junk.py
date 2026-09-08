@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pre-commit hook: reject junk files at the repo root.
+"""Repo guard: reject junk files at the repo root.
 
 Forbidden patterns at the repo root (NOT in subdirs):
 - *PLAN*.md, *HANDOFF*.md           — plan/handoff docs belong in tasks/
@@ -7,8 +7,8 @@ Forbidden patterns at the repo root (NOT in subdirs):
 - unused.*                          — placeholder cruft
 
 User-blessed `*DO_NOT_DELETE*.txt` files at root are explicitly allowed
-(personal command/key reference notes). See feedback_do_not_delete_marker
-memory and tasks/cleanup/cleanup_summary.md.
+(personal command/key reference notes). Contract recorded in
+tasks/cleanup/cleanup_summary.md.
 """
 
 from __future__ import annotations
@@ -21,8 +21,14 @@ FORBIDDEN_GLOBS = ("*PLAN*.md", "*HANDOFF*.md", "*.log", "metrics.jsonl", "unuse
 
 
 def is_forbidden(path: str) -> bool:
+    """True when ``path`` is a junk file sitting directly at the repo root."""
+
     p = PurePosixPath(path)
-    if p.parent != PurePosixPath("."):
+    # A single part is the whole test for "at the root": "PLAN.md" -> ("PLAN.md",),
+    # "tasks/PLAN.md" -> two, "/PLAN.md" -> ("/", "PLAN.md"). Comparing the parent
+    # against PurePosixPath(".") says the same thing but spells one value two ways
+    # -- PurePosixPath("") is PurePosixPath(".") -- so no test can tell them apart.
+    if len(p.parts) != 1:
         return False
     name = p.name
     if "DO_NOT_DELETE" in name:
