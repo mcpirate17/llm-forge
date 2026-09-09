@@ -16,7 +16,10 @@ Rules (each is a mutation-campaign contract):
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Any, Final
+
+from conductor._native import hook_merge_native
 
 SEPARATOR: Final[str] = "\n\n"
 _RANK: Final[dict[str, int]] = {"allow": 1, "ask": 2, "deny": 3}
@@ -42,6 +45,15 @@ def _specific(output: dict[str, Any]) -> dict[str, Any]:
 
 
 def merge(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
+    payload = [
+        {"name": outcome.name, "output": outcome.output, "error": outcome.error,
+         "fail_closed": outcome.fail_closed}
+        for outcome in outcomes
+    ]
+    return json.loads(hook_merge_native(event, json.dumps(payload)))
+
+
+def _merge_reference(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
     votes: list[tuple[str, str]] = []
     contexts: list[str] = []
     system: list[str] = []

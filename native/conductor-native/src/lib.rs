@@ -15,6 +15,7 @@ mod fleet_status;
 mod git_source;
 mod guardrail_ast;
 mod hook_installer;
+mod hook_merge;
 mod kb_retrieve;
 mod memory_chunking;
 mod memory_index;
@@ -41,6 +42,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     fleet_status::register(module)?;
     guardrail_ast::register(module)?;
     hook_installer::register(module)?;
+    hook_merge::register(module)?;
     git_source::register(module)?;
     mutation_coverage::register(module)?;
     mutation_evidence::register(module)?;
