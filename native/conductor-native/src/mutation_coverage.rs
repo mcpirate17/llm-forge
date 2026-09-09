@@ -550,7 +550,7 @@ fn plan_mutation_scaffold_native(
             id: "first_order_placeholder",
             target_path: planned_target,
             contract: "replace with the first-order defect this test must kill",
-            description: "Materialize one reviewed unified diff. Do not generate mutants automatically and do not edit the shared checkout.",
+            description: "Conductor generates mutants in a disposable snapshot; do not edit the shared checkout.",
             expected_killers: [&nodeids[0]],
         }],
         mutations: Vec::new(),

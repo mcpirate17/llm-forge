@@ -1,9 +1,8 @@
-"""Fail-closed, language-neutral orchestration for explicit mutation campaigns.
+"""Fail-closed, language-neutral orchestration for automatic mutation campaigns.
 
-The framework deliberately does not generate mutants. A campaign names small,
-reviewable patch files and the exact tests that must detect them. Every baseline
-and mutant runs in a disposable snapshot of the current worktree, never in the
-shared checkout.
+Engine-backed campaigns generate mutants from the declared source in disposable
+snapshots; reviewed patch campaigns remain supported for exceptional cases.
+Every baseline and mutant runs outside the shared checkout.
 """
 
 from __future__ import annotations

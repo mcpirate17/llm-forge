@@ -1772,13 +1772,14 @@ pub fn plan_mutation_repin_native(
             value_error(format!("cannot load campaign {}: {error}", path.display()))
         })?;
         for (relative, recorded) in sources {
-            if !source_symbols.contains_key(&relative) {
-                let Some(actual) = source_hashes.get(&relative) else {
-                    continue;
-                };
-                if actual != &recorded && text.matches(&recorded).count() == 1 {
-                    text = text.replacen(&recorded, actual, 1);
-                }
+            // A symbolic pin narrows drift reporting, but the file digest remains part of the
+            // manifest contract. Refresh both atomically so an automatic generated campaign
+            // cannot remain NOT_READY after a source change in a symbolically pinned file.
+            let Some(actual) = source_hashes.get(&relative) else {
+                continue;
+            };
+            if actual != &recorded && text.matches(&recorded).count() == 1 {
+                text = text.replacen(&recorded, actual, 1);
             }
         }
         for (relative, symbols) in source_symbols {
@@ -2380,5 +2381,65 @@ mod generated_campaign_tests {
         assert!(error.contains("survivor_baseline"), "{error}");
         let contract = contract(json!({"survivor_baseline": []})).expect("empty baseline");
         assert!(contract.survivor_baseline.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod mutation_manifest_repin_tests {
+    use std::collections::HashMap;
+    use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::plan_mutation_repin_native;
+
+    static NEXT_TREE: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn repin_refreshes_file_and_symbol_digests_for_a_symbolically_pinned_source() {
+        let serial = NEXT_TREE.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "llm-mutation-repin-{}-{serial}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("create temporary repository");
+        let manifest = root.join("campaign.json");
+        let old_file = "a".repeat(64);
+        let new_file = "b".repeat(64);
+        let old_symbol = "c".repeat(64);
+        let new_symbol = "d".repeat(64);
+        fs::write(
+            &manifest,
+            format!(
+                r#"{{"source_sha256":{{"src/subject.rs":"{old_file}"}},"source_symbols":{{"src/subject.rs":{{"subject":"{old_symbol}"}}}}}}"#
+            ),
+        )
+        .expect("write manifest");
+
+        let rows = plan_mutation_repin_native(
+            root.to_str().expect("utf-8 root"),
+            vec![(
+                "campaign.json".to_owned(),
+                HashMap::from([("src/subject.rs".to_owned(), old_file.clone())]),
+                HashMap::from([(
+                    "src/subject.rs".to_owned(),
+                    HashMap::from([("subject".to_owned(), old_symbol.clone())]),
+                )]),
+            )],
+            HashMap::from([("src/subject.rs".to_owned(), new_file.clone())]),
+            HashMap::from([(
+                "src/subject.rs".to_owned(),
+                HashMap::from([("subject".to_owned(), new_symbol.clone())]),
+            )]),
+        )
+        .expect("repin plan");
+
+        assert_eq!(rows.len(), 1);
+        let rewritten = &rows[0].1;
+        assert!(rewritten.contains(&new_file));
+        assert!(rewritten.contains(&new_symbol));
+        assert!(!rewritten.contains(&old_file));
+        assert!(!rewritten.contains(&old_symbol));
+        let _ = fs::remove_dir_all(root);
     }
 }

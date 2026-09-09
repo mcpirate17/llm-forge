@@ -184,3 +184,56 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(hook_merge_native, module)?)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::hook_merge_native;
+    use serde_json::Value;
+
+    #[test]
+    fn pretool_fail_closed_error_beats_allow_and_preserves_context() {
+        let result: Value = serde_json::from_str(
+            &hook_merge_native(
+                "PreToolUse",
+                r#"[
+                  {"name":"allow","output":{"hookSpecificOutput":{"permissionDecision":"allow","additionalContext":"kept"}},"error":null,"fail_closed":false},
+                  {"name":"gate","output":null,"error":"boom","fail_closed":true}
+                ]"#,
+            )
+            .expect("merge should succeed"),
+        )
+        .expect("result must be JSON");
+        let specific = &result["hookSpecificOutput"];
+        assert_eq!(specific["permissionDecision"], "deny");
+        assert_eq!(specific["additionalContext"], "kept");
+        assert!(result["systemMessage"]
+            .as_str()
+            .unwrap()
+            .contains("HOOK ERROR [gate]"));
+    }
+
+    #[test]
+    fn later_rewrite_wins_and_reports_conflict() {
+        let result: Value = serde_json::from_str(
+            &hook_merge_native(
+                "PostToolUse",
+                r#"[
+                  {"name":"first","output":{"hookSpecificOutput":{"updatedToolOutput":{"value":1}}},"error":null,"fail_closed":false},
+                  {"name":"second","output":{"hookSpecificOutput":{"updatedToolOutput":{"value":2}},"continue":false,"stopReason":"done"},"error":null,"fail_closed":false}
+                ]"#,
+            )
+            .expect("merge should succeed"),
+        )
+        .expect("result must be JSON");
+        assert_eq!(
+            result["hookSpecificOutput"]["updatedToolOutput"]["value"],
+            2
+        );
+        assert_eq!(result["continue"], false);
+        assert_eq!(result["stopReason"], "done");
+        assert!(result["systemMessage"]
+            .as_str()
+            .unwrap()
+            .contains("HOOK CONFLICT [second]"));
+    }
+}

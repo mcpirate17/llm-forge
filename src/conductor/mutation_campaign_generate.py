@@ -34,6 +34,7 @@ ENGINE_SLUG = {"fest": "fest", "cargo-mutants": "cargo", "mull": "mull"}
 SKIP_PARTS = frozenset(
     {
         ".git",
+        ".mutation-native-crate",
         ".mull-build",
         ".tox",
         "__pycache__",
@@ -470,6 +471,85 @@ def write(
     return written
 
 
+def refresh_rust_campaign(
+    campaign: str,
+    *,
+    sources: Sequence[str] = (),
+    repo_root: Path = REPO_ROOT,
+) -> str:
+    """Regenerate one existing cargo-mutants manifest without erasing its ratchet.
+
+    This is the automatic refresh path after a source or inline-test change.  It
+    derives every pin from the current crate tree and retains only the recorded
+    survivor baseline, which is evidence produced by the engine rather than an
+    agent-authored field.
+    """
+
+    relative = campaign.removeprefix(f"{CAMPAIGN_DIR}/")
+    if not relative.endswith(".json"):
+        relative = f"{relative}.json"
+    path = repo_root / CAMPAIGN_DIR / relative
+    try:
+        existing = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CampaignError(f"cannot load generated campaign {path}: {exc}") from exc
+    if not isinstance(existing, dict) or existing.get("mutation_engine") != "cargo-mutants":
+        raise CampaignError(f"{path} is not a cargo-mutants generated campaign")
+    options = (existing.get("generator") or {}).get("options") or {}
+    package = options.get("package")
+    manifest_path = options.get("manifest_path")
+    if not isinstance(package, str) or not isinstance(manifest_path, str):
+        raise CampaignError(f"{path} has no generated cargo package")
+    candidates = [row for row in rust_subjects(repo_root) if row["package"] == package]
+    subject = next(
+        (
+            row
+            for row in candidates
+            if row["manifest"] == manifest_path
+        ),
+        None,
+    )
+    if subject is None and len(candidates) == 1:
+        # A prior generator version could pin its own disposable snapshot. Once
+        # snapshots are excluded, the sole real package is the unambiguous repair.
+        subject = candidates[0]
+    if subject is None:
+        raise CampaignError(f"generated cargo package {package!r} no longer exists")
+    generator = existing.get("generator") or {}
+    refreshed = cargo_manifest(
+        subject,
+        campaign_id=str(existing.get("campaign_id") or path.stem),
+        repo_root=repo_root,
+        jobs=int(generator.get("jobs", 4)),
+        run_timeout_seconds=int(generator.get("run_timeout_seconds", 1800)),
+    )
+    if sources:
+        requested = set(sources)
+        available = set(subject["files"])
+        unknown = sorted(requested - available)
+        if unknown:
+            raise CampaignError(
+                f"scoped source is not in {package!r}: {unknown}"
+            )
+        selected = sorted(requested)
+        package_root = Path(subject["root"])
+        refreshed["generator"]["source"] = [
+            (Path(path).relative_to(package_root)).as_posix() for path in selected
+        ]
+        refreshed["source_sha256"] = {
+            path: _sha256(repo_root / path) for path in selected
+        }
+        # Rust unit tests are colocated with their source.  Binding just these
+        # files keeps the receipt specific to the requested test surface even
+        # though cargo-mutants invokes Cargo's unit-test harness.
+        refreshed["test_sha256"] = dict(refreshed["source_sha256"])
+    refreshed["survivor_baseline"] = list(existing.get("survivor_baseline") or [])
+    if "survivor_baseline_note" in existing:
+        refreshed["survivor_baseline_note"] = existing["survivor_baseline_note"]
+    path.write_text(json.dumps(refreshed, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path.relative_to(repo_root).as_posix()
+
+
 def _summarise(result: Mapping[str, Any], *, verbose: bool) -> dict[str, Any]:
     manifests = list(result["manifests"])
     payload: dict[str, Any] = {
@@ -507,9 +587,31 @@ def main(argv: list[str] | None = None) -> int:
         "write", parents=[shared], help="write one manifest per subject"
     )
     write_parser.add_argument("--force", action="store_true")
+    refresh_parser = subparsers.add_parser(
+        "refresh", help="automatically refresh one existing generated Rust campaign"
+    )
+    refresh_parser.add_argument("campaign", help="campaign id or manifest filename")
+    refresh_parser.add_argument(
+        "--source",
+        action="append",
+        default=[],
+        help="repository-relative Rust source to mutate and bind as its test surface",
+    )
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "refresh":
+            print(
+                json.dumps(
+                    {
+                        "refreshed": refresh_rust_campaign(
+                            args.campaign, sources=args.source
+                        )
+                    },
+                    indent=2,
+                )
+            )
+            return 0
         result = plan(
             args.language,
             owner=args.owner,

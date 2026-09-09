@@ -2,7 +2,8 @@
 
 The runner in ``conductor.mutation_testing`` stays the receipt authority. This
 module discovers test files, checks them against registered PASS receipts, and
-scaffolds a campaign stub. It does not generate mutants or run campaigns.
+scaffolds a campaign contract. The conductor runner selects the registered
+engine and generates mutants in its disposable snapshot.
 """
 
 from __future__ import annotations
@@ -299,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
     scaffold = subparsers.add_parser(
         "scaffold",
         parents=[shared],
-        help="write a NOT_READY campaign stub; does not generate mutants",
+        help="write a NOT_READY campaign contract for conductor-generated mutants",
     )
     scaffold.add_argument("test_path")
     scaffold.add_argument(

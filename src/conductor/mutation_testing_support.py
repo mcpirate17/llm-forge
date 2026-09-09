@@ -606,7 +606,6 @@ def plan_repin(
         relative
         for campaign in selected.values()
         for relative in campaign.source_sha256
-        if relative not in campaign.source_symbols
     }
     try:
         from conductor._native import plan_mutation_repin_native
