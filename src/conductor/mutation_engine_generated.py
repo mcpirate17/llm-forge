@@ -1,10 +1,8 @@
-"""Shared core for mutation campaigns whose mutants are generated, not written.
+"""Shared core for conductor-managed campaigns whose mutants are engine-generated.
 
-Every campaign in this repository declares `mutation_engine: reviewed_unified_diff`:
-an agent writes each mutant as a committed patch, and the same agent then scores
-the damage it chose to do. 482 of 483 scored campaigns publish exactly 1.0 while
-the mechanical sweep of the same code kills 60.6%. A corpus that an agent selects
-measures the agent's selection, not the tests.
+Only this automatic path may execute mutation testing. Legacy patch campaigns and
+receipts are retained as archival provenance, never as an executable fallback.
+A corpus that an agent selects measures the agent's selection, not the tests.
 
 A generated engine takes the mutants from the source tree instead, so nobody can
 curate them, and the number that matters stops being the score -- it is the

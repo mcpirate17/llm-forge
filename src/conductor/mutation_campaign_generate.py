@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-"""Write generated-engine campaign manifests from the tree, instead of by hand.
+"""Automatically derive conductor engine-campaign manifests from the tree.
 
-The 489 committed campaigns are hand-authored: an agent picks the mutants, writes
-each one as a reviewed patch, and then scores the damage it chose. That is why
-482 of 483 publish exactly 1.0 while a mechanical sweep of the same code kills
-60.6%. The generated engines fixed the mutant selection, but the *targets* were
-still chosen by hand -- three campaigns covering ~2,000 of 761,780 Python lines
-and one of nine Rust crates.
+Automatic conductor mutation testing has two deliberate stages: this module
+enumerates mutable subjects, pairs them with tests, and writes engine manifests;
+``mutation_engine_generated`` then invokes the engine in a disposable snapshot
+and produces source-bound evidence. Agents do neither stage manually.
 
-This module removes the remaining hand step. It enumerates what can be mutated,
-pairs each subject with the tests that name it, and emits a manifest per subject.
-Nothing here generates or scores a mutant; `mutation_engine_generated` still owns
-that, and deliberately so -- every receipt in the repository pins that module's
-hash, so a `generate` subcommand added there would invalidate all of them.
+Historic patch campaigns are archival provenance only. They do not participate in
+manifest discovery, mutation generation, campaign execution, or acceptance.
 
 `plan` is also the answer to a question that is not about mutation at all: a
 subject it reports as unpaired has no test named after it, and mutating code no

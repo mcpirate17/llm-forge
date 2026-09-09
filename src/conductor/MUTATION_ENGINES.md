@@ -1,11 +1,18 @@
 # Generated mutation engines
 
+## Current execution policy
+
+Only conductor-managed, engine-generated mutation campaigns may execute. Agents
+must not author, apply, score, re-pin, or run patch-based mutants manually.
+Legacy patch manifests and receipts remain archival provenance only; they are not
+an executable testing path.
+
 Mutation testing asks one question: **if I introduce a realistic bug, does any
 test notice?** The score is the share of introduced bugs the suite caught.
 
 ## Why this replaced the old system
 
-The 489 campaigns under `conductor/mutation_campaigns/` declare
+The historic 489 campaigns under `conductor/mutation_campaigns/` declare
 `mutation_engine: reviewed_unified_diff`. An agent chose each bug, wrote it as a
 committed patch, and then scored the suite on catching the bugs it had chosen.
 **482 of 483 scored campaigns publish exactly 1.0.** A mechanical sweep of the
@@ -134,11 +141,11 @@ patch campaigns always have, through two steps:
 What differs is the acceptance rule, because the two kinds of campaign prove
 different things:
 
-| | patch campaign | generated campaign |
-|---|---|---|
-| `mutation_engine` | `reviewed_unified_diff`, `mutmut`, `cosmic-ray` | `fest`, `cargo-mutants`, `mull` |
-| accepted when | score is exactly 1.0 and every named mutant died | no survivor falls outside `survivor_baseline` |
-| what green means | the chosen mutants all die | nothing got worse than the recorded run |
+| | conductor-generated campaign |
+|---|---|
+| `mutation_engine` | `fest`, `cargo-mutants`, `mull` |
+| accepted when | no survivor falls outside `survivor_baseline` |
+| what green means | nothing got worse than the recorded run |
 
 The old rule is the reason the old numbers looked the way they did: it *required*
 `mutation_score == 1.0`, so a corpus nobody curated could never have been

@@ -344,7 +344,12 @@ REGISTRY_TEXT = _dump_json(
         "test_patterns": ["**/test_*.py", "**/*_test.py"],
         "receipt_directories": ["conductor/mutation_campaigns/receipts"],
         "campaigns": [],
-        "engine_adapters": {"python": ["reviewed_unified_diff"]},
+        "engine_adapters": {
+            "python": ["fest"],
+            "rust": ["cargo-mutants"],
+            "c": ["mull"],
+            "cpp": ["mull"],
+        },
     }
 )
 
