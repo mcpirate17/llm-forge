@@ -183,10 +183,13 @@ def test_advisory_reminds_on_test_file_writes() -> None:
     assert guard.evaluate_payload(payload) is None
     advisory = guard.advisory_for_payload(payload)
     assert advisory is not None
-    assert "mutation campaign" in advisory
+    assert "Mutation evidence covers ONLY the files you changed" in advisory
     response = guard.hook_response(None, protocol="codex", advisory=advisory)
     assert response is not None
-    assert "mutation campaign" in response["hookSpecificOutput"]["additionalContext"]
+    assert (
+        "Mutation evidence covers ONLY the files you changed"
+        in response["hookSpecificOutput"]["additionalContext"]
+    )
 
 
 def test_advisory_covers_javascript_specs_and_skips_non_tests() -> None:
@@ -234,7 +237,7 @@ def test_main_reads_stdin_and_emits_advisory(monkeypatch, capsys) -> None:
     )
     assert guard.main() == 0
     out = capsys.readouterr().out
-    assert "mutation campaign" in out
+    assert "Mutation evidence covers ONLY the files you changed" in out
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO("not-json"))
     assert guard.main() == 0
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO("[]"))

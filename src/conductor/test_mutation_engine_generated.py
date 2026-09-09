@@ -20,6 +20,7 @@ from conductor.mutation_engine_generated import (
     manifest_engine,
     mutant_id,
     pinned,
+    record_survivor_baseline,
     require_executed,
     score,
 )
@@ -289,3 +290,64 @@ def test_the_defaults_are_the_ones_the_manifests_were_written_against(
     assert campaign.seed == 0
     assert campaign.jobs == 1
     assert campaign.mutant_timeout_seconds == 30
+
+
+def test_the_first_run_records_its_own_survivor_baseline(tmp_path: Path) -> None:
+    """A fresh campaign is otherwise permanently red, and nobody may hand-fix it.
+
+    Without a baseline every survivor is a new survivor, so the first honest run
+    of a generated campaign FAILs and the only way out used to be an agent
+    typing the survivor set into the manifest -- exactly the hand-authoring the
+    automated-only rule forbids. The tool writes it instead, once, from what the
+    engine found, and re-scores in place so the receipt the run publishes is the
+    ratcheted one rather than the red one it started as.
+    """
+
+    path = manifest(tmp_path)
+    campaign = load_generated_campaign(path)
+    assert campaign.survivor_baseline_recorded is False
+
+    receipt: dict = {
+        "mutants": [
+            {"id": "a", "outcome": "SURVIVED"},
+            {"id": "k", "outcome": "KILLED"},
+        ]
+    }
+    score(campaign, receipt)
+    assert receipt["status"] == "FAIL"
+
+    assert record_survivor_baseline(campaign, receipt) is True
+    assert receipt["status"] == "RATCHET_HELD"
+    assert receipt["new_survivors"] == []
+    assert receipt["survivor_baseline_recorded_by_this_run"] is True
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written["survivor_baseline"] == ["a"]
+    assert written["survivor_baseline_recorded"] is True
+    assert "survivor_baseline_recorded_at" in written
+    # The receipt has to name the manifest it now describes, not the one it read.
+    assert receipt["manifest_sha256"] == campaign.manifest_sha256
+
+    # Exactly once: a second run inherits the live ratchet instead of moving it.
+    again = load_generated_campaign(path)
+    second: dict = {"mutants": [{"id": "b", "outcome": "SURVIVED"}]}
+    score(again, second)
+    assert record_survivor_baseline(again, second) is False
+    assert second["status"] == "FAIL"
+    assert second["new_survivors"] == ["b"]
+
+
+def test_an_errored_run_never_becomes_a_baseline(tmp_path: Path) -> None:
+    """An ERROR measured nothing; its survivors are absence of evidence.
+
+    Recording them would bless every gap the run failed to probe as a known,
+    accepted survivor -- a permanently green campaign built out of a crash.
+    """
+
+    path = manifest(tmp_path)
+    campaign = load_generated_campaign(path)
+    receipt = {"status": "ERROR", "survivors": ["a", "b"]}
+
+    assert record_survivor_baseline(campaign, receipt) is False
+    assert campaign.survivor_baseline_recorded is False
+    assert "survivor_baseline" not in json.loads(path.read_text(encoding="utf-8"))

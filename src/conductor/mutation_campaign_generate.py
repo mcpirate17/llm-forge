@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Automatically derive conductor engine-campaign manifests from the tree.
 
+SCOPE RULE -- mutate only what you changed. A campaign covers the files this
+branch modified and the tests that exercise them, nothing else. That is the
+default here: with no flags, planning is restricted to ``git diff --name-only
+<base>...HEAD`` plus the dirty working tree, so a three-file change plans three
+campaigns in about a second. A whole-tree sweep requires ``--all-files`` and is
+a maintenance operation, not something an agent does while landing a change.
+
 Automatic conductor mutation testing has two deliberate stages: this module
 enumerates mutable subjects, pairs them with tests, and writes engine manifests;
 ``mutation_engine_generated`` then invokes the engine in a disposable snapshot
@@ -18,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -228,10 +236,14 @@ def fest_manifest(
         "source_sha256": {source: _sha256(repo_root / source)},
         "test_sha256": {test: _sha256(repo_root / test) for test in tests},
         "survivor_baseline": [],
+        "survivor_baseline_recorded": False,
         "survivor_baseline_note": (
-            "Empty until the first run records it. An empty baseline means every "
-            "survivor is a new survivor, so the first run reports the whole gap "
-            "rather than silently accepting it."
+            "Empty and unrecorded. The FIRST engine run writes this list itself "
+            "and flips survivor_baseline_recorded to true; every later run is "
+            "scored against it, so a survivor that appears afterwards is a test "
+            "that stopped defending its code. No agent ever writes this field -- "
+            "hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded "
+            "baseline is why a fresh campaign used to be red on every run."
         ),
     }
 
@@ -329,10 +341,14 @@ def cargo_manifest(
             for relative in rust_test_files(subject, repo_root=repo_root)
         },
         "survivor_baseline": [],
+        "survivor_baseline_recorded": False,
         "survivor_baseline_note": (
-            "Empty until the first run records it. An empty baseline means every "
-            "survivor is a new survivor, so the first run reports the whole gap "
-            "rather than silently accepting it."
+            "Empty and unrecorded. The FIRST engine run writes this list itself "
+            "and flips survivor_baseline_recorded to true; every later run is "
+            "scored against it, so a survivor that appears afterwards is a test "
+            "that stopped defending its code. No agent ever writes this field -- "
+            "hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded "
+            "baseline is why a fresh campaign used to be red on every run."
         ),
     }
 
@@ -369,6 +385,122 @@ def existing_subjects(repo_root: Path = REPO_ROOT) -> set[str]:
     return covered
 
 
+def changed_sources(
+    base: str = "origin/master", *, repo_root: Path = REPO_ROOT
+) -> set[str]:
+    """Repo-relative paths this branch touched: ``base...HEAD`` plus the dirty tree.
+
+    This is the default scope of a campaign. An agent that changed three files
+    mutates three files; a repo-wide sweep is a separate, explicitly requested
+    maintenance run (``--all-files``). Untracked files count -- a brand new
+    module is exactly the thing whose tests have never been mutated.
+    """
+
+    def _git(*args: str) -> list[str]:
+        proc = subprocess.run(
+            ("git", "-C", str(repo_root), *args),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return []
+        return [line for line in proc.stdout.splitlines() if line.strip()]
+
+    paths = set(_git("diff", "--name-only", f"{base}...HEAD"))
+    paths |= set(_git("diff", "--name-only", "HEAD"))
+    paths |= set(_git("ls-files", "--others", "--exclude-standard"))
+    return {p for p in paths if (repo_root / p).exists()}
+
+
+def _plan_python(
+    *,
+    repo_root: Path,
+    covered: set[str],
+    scope: set[str] | None,
+    owner: str,
+    day: str,
+    run_timeout_seconds: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+    """Manifests, unpaired subjects and already-covered sources for python."""
+
+    paired, unpaired = python_subjects(repo_root)
+    if scope is not None:
+        # A changed test is in scope as much as a changed source: editing only
+        # `test_x.py` is exactly the case the campaign for `x.py` must cover.
+        paired = [
+            s
+            for s in paired
+            if s["source"] in scope or any(t in scope for t in s["tests"])
+        ]
+        unpaired = [s for s in unpaired if s["source"] in scope]
+    already = sorted(s["source"] for s in paired if s["source"] in covered)
+    paired = [s for s in paired if s["source"] not in covered]
+    slugs = _unique_slugs([str(s["source"]) for s in paired])
+    manifests = [
+        fest_manifest(
+            subject,
+            campaign_id=_campaign_id(owner, slugs[str(subject["source"])], "fest", day),
+            repo_root=repo_root,
+            run_timeout_seconds=run_timeout_seconds,
+        )
+        for subject in paired
+    ]
+    return manifests, unpaired, already
+
+
+def _plan_rust(
+    *,
+    repo_root: Path,
+    covered: set[str],
+    scope: set[str] | None,
+    owner: str,
+    day: str,
+    jobs: int,
+    run_timeout_seconds: int,
+) -> tuple[list[dict[str, Any]], list[str], list[dict[str, Any]]]:
+    """Manifests, already-covered packages and crates with no tests, for rust."""
+
+    crates = rust_subjects(repo_root)
+    if scope is not None:
+        crates = [
+            c
+            for c in crates
+            if any(p == str(c["root"]) or p.startswith(f"{c['root']}/") for p in scope)
+        ]
+    already = sorted(c["package"] for c in crates if c["package"] in covered)
+    crates = [c for c in crates if c["package"] not in covered]
+    slugs = _unique_slugs([str(c["root"]) for c in crates])
+    manifests: list[dict[str, Any]] = []
+    untested: list[dict[str, Any]] = []
+    for subject in crates:
+        # A crate with no tests is reported rather than raised: it is a finding
+        # about the repository, not a fault in the request, and one untested
+        # crate must not stop the other eight being planned.
+        try:
+            manifests.append(
+                cargo_manifest(
+                    subject,
+                    campaign_id=_campaign_id(
+                        owner, slugs[str(subject["root"])], "cargo-mutants", day
+                    ),
+                    repo_root=repo_root,
+                    jobs=jobs,
+                    run_timeout_seconds=run_timeout_seconds,
+                )
+            )
+        except CampaignError as exc:
+            untested.append(
+                {
+                    "package": str(subject["package"]),
+                    "root": str(subject["root"]),
+                    "lines": int(subject.get("lines", 0)),
+                    "reason": str(exc),
+                }
+            )
+    return manifests, already, untested
+
+
 def plan(
     language: str,
     *,
@@ -377,64 +509,50 @@ def plan(
     day: str | None = None,
     jobs: int = 4,
     run_timeout_seconds: int = 1800,
+    only_sources: Sequence[str] | None = None,
+    include_covered: bool = False,
 ) -> dict[str, Any]:
-    """What `write` would emit, plus the subjects it refuses to emit anything for."""
+    """What `write` would emit, plus the subjects it refuses to emit anything for.
+
+    ``only_sources`` is the scope rule: pass the paths this branch changed and
+    nothing else is planned. ``None`` means the whole tree, which callers should
+    reach only when the operator asked for a maintenance sweep.
+
+    ``include_covered`` plans a subject an existing campaign already names. The
+    incumbent is usually broader than the change -- one campaign over five engine
+    modules, rotted by an edit to one of them -- and re-running it costs an hour
+    to answer a question about a single file. A second, narrower campaign is the
+    supported answer; the newest valid receipt wins the evidence row, and the
+    incumbent stays registered rather than being retired to make room.
+    """
 
     if language not in ("python", "rust"):
         raise CampaignError(f"unknown language {language!r}; known: python, rust")
     day = day or datetime.now(UTC).strftime("%Y%m%d")
-    covered = existing_subjects(repo_root)
-    untested: list[dict[str, Any]] = []
-    manifests: list[dict[str, Any]] = []
+    covered = set() if include_covered else existing_subjects(repo_root)
+    scope = set(only_sources) if only_sources is not None else None
     unpaired: list[dict[str, Any]] = []
-    already: list[str] = []
+    untested: list[dict[str, Any]] = []
 
     if language == "python":
-        paired, unpaired = python_subjects(repo_root)
-        already = sorted(s["source"] for s in paired if s["source"] in covered)
-        paired = [s for s in paired if s["source"] not in covered]
-        slugs = _unique_slugs([str(s["source"]) for s in paired])
-        for subject in paired:
-            key = str(subject["source"])
-            manifests.append(
-                fest_manifest(
-                    subject,
-                    campaign_id=_campaign_id(owner, slugs[key], "fest", day),
-                    repo_root=repo_root,
-                    run_timeout_seconds=run_timeout_seconds,
-                )
-            )
+        manifests, unpaired, already = _plan_python(
+            repo_root=repo_root,
+            covered=covered,
+            scope=scope,
+            owner=owner,
+            day=day,
+            run_timeout_seconds=run_timeout_seconds,
+        )
     else:
-        crates = rust_subjects(repo_root)
-        already = sorted(c["package"] for c in crates if c["package"] in covered)
-        crates = [c for c in crates if c["package"] not in covered]
-        slugs = _unique_slugs([str(c["root"]) for c in crates])
-        for subject in crates:
-            key = str(subject["root"])
-            # A crate with no tests is reported rather than raised: it is a
-            # finding about the repository, not a fault in the request, and one
-            # untested crate must not stop the other eight being planned.
-            try:
-                manifests.append(
-                    cargo_manifest(
-                        subject,
-                        campaign_id=_campaign_id(
-                            owner, slugs[key], "cargo-mutants", day
-                        ),
-                        repo_root=repo_root,
-                        jobs=jobs,
-                        run_timeout_seconds=run_timeout_seconds,
-                    )
-                )
-            except CampaignError as exc:
-                untested.append(
-                    {
-                        "package": str(subject["package"]),
-                        "root": str(subject["root"]),
-                        "lines": int(subject.get("lines", 0)),
-                        "reason": str(exc),
-                    }
-                )
+        manifests, already, untested = _plan_rust(
+            repo_root=repo_root,
+            covered=covered,
+            scope=scope,
+            owner=owner,
+            day=day,
+            jobs=jobs,
+            run_timeout_seconds=run_timeout_seconds,
+        )
 
     return {
         "language": language,
@@ -582,6 +700,7 @@ def _summarise(result: Mapping[str, Any], *, verbose: bool) -> dict[str, Any]:
     manifests = list(result["manifests"])
     payload: dict[str, Any] = {
         "status": "READY",
+        "scope": result.get("scope", "all-files"),
         "language": result["language"],
         "campaigns": len(manifests),
         "subjects_without_a_named_test": len(result["unpaired"]),
@@ -596,6 +715,25 @@ def _summarise(result: Mapping[str, Any], *, verbose: bool) -> dict[str, Any]:
     return payload
 
 
+def _branch_scope(base: str, *, repo_root: Path = REPO_ROOT) -> list[str]:
+    """The default subject set: what this branch changed, and nothing else.
+
+    Refusing an empty scope is the point. A campaign that plans nothing because
+    the branch changed nothing is a maintenance sweep asked for by accident, and
+    the whole-tree run it would become is the behaviour this rule exists to stop.
+    """
+
+    scope = sorted(changed_sources(base, repo_root=repo_root))
+    if not scope:
+        raise CampaignError(
+            f"nothing changed against {base}: mutation campaigns cover the files "
+            "this branch modified and the tests that exercise them. Pass "
+            "--all-files only for an explicitly requested whole-tree maintenance "
+            "sweep."
+        )
+    return scope
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI: `plan` reports what would be written, `write` writes it."""
 
@@ -606,6 +744,29 @@ def main(argv: list[str] | None = None) -> int:
     shared.add_argument("--jobs", type=int, default=4, help="Rust workers per crate")
     shared.add_argument("--run-timeout", type=int, default=1800)
     shared.add_argument("--only", action="append", default=[])
+    shared.add_argument(
+        "--include-covered",
+        action="store_true",
+        help=(
+            "also plan sources an existing campaign already names. Use when the "
+            "incumbent campaign is broader than your change and a narrow second "
+            "campaign is cheaper than re-running it; the incumbent stays."
+        ),
+    )
+    shared.add_argument(
+        "--base",
+        default="origin/master",
+        help="branch base for the changed-file scope (default: origin/master)",
+    )
+    shared.add_argument(
+        "--all-files",
+        action="store_true",
+        help=(
+            "maintenance sweep of the WHOLE TREE. The default -- and the only "
+            "thing an agent landing a change should run -- is the files this "
+            "branch changed."
+        ),
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     plan_parser = subparsers.add_parser(
         "plan", parents=[shared], help="report what would be written; writes nothing"
@@ -629,23 +790,23 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "refresh":
-            print(
-                json.dumps(
-                    {
-                        "refreshed": refresh_rust_campaign(
-                            args.campaign, sources=args.source
-                        )
-                    },
-                    indent=2,
-                )
-            )
+            refreshed = refresh_rust_campaign(args.campaign, sources=args.source)
+            print(json.dumps({"refreshed": refreshed}, indent=2))
             return 0
+        scope = None if args.all_files else _branch_scope(args.base)
         result = plan(
             args.language,
             owner=args.owner,
             jobs=args.jobs,
             run_timeout_seconds=args.run_timeout,
+            only_sources=scope,
+            include_covered=args.include_covered,
         )
+        result = {
+            **result,
+            "scope": "all-files" if args.all_files else f"changed vs {args.base}",
+            "scoped_paths": 0 if scope is None else len(scope),
+        }
         if args.only:
             wanted = set(args.only)
             kept = [

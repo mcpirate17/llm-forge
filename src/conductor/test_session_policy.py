@@ -16,7 +16,7 @@ EXPECTED_PREAMBLE = (
     "MISSION: Beat frontier models with novel non-QKV mechanisms. Never replace a novel lane with a softmax/QKV twin. Gate drops are defects.",
     'RETRIEVE (do not dump .current_work.md): `python -m conductor.kb_retrieve query "<task>" --top-k 5` then `python -m conductor.memory_index query "<task>" --top-k 8`. Code: code-review-graph MCP provider=openai model=qwen3-embed-cpu. Status: `python -m conductor.handoff append` (max 12 lines). Findings: research/notes/ then `memory_index index`.',
     "FLEET: embed http://127.0.0.1:7317/v1 (GPU-guest, num_ctx=2048, unload). Clerk qwen3.5:9b GPU-always, clerical-only, zero approval authority; never gate work or runs on local output. Do not load 27B. Paired probes: --compile-mode default (KB-HW-01).",
-    "MUTATION: new/changed tests need a registered campaign PASS receipt. `make mutation-coverage`. Mutation runs are pre-approved (Tim, 2026-08-31); disposable worktrees only, receipts still mandatory.",
+    "MUTATION: mutate ONLY the files you changed and their tests -- never repo-wide. `make mutation-plan` then `make mutation-generate` then `make mutation-engine-run`; automatic engines only, hand-authored mutants/manifests/baselines/receipts are forbidden (KB-MUT-02). A missing receipt is debt in the PR body, not a blocker.",
     "DELEGATE: searches touching >3 files, bulk reads, and summaries go to a subagent; keep the session context for decisions. Prefer ast_context_tool/query_graph over whole-file Read (>=400 lines: slice).",
 )
 EXPECTED_MANDATES = (

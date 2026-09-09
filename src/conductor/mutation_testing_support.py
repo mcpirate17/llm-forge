@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import time
 from typing import (
@@ -409,6 +410,45 @@ def torch_version(interpreter: str) -> str | None:
     return probe.stdout.strip() or None
 
 
+GROUP_DRAIN_SECONDS = 30
+
+
+class OrphanedProcessGroupError(RuntimeError):
+    """A timed-out command left descendants that SIGKILL did not reap."""
+
+
+def _kill_process_group(
+    proc: subprocess.Popen[str], drain_seconds: int = GROUP_DRAIN_SECONDS
+) -> tuple[str, str]:
+    """SIGKILL the whole session a timed-out command owns, then drain its pipes.
+
+    `subprocess.run(..., timeout=)` kills only the direct child. Every engine
+    here runs mutants out of process -- fest with `backend = "subprocess"`,
+    cargo-mutants and mull the same way -- so killing the engine alone leaves
+    one pytest per in-flight mutant orphaned and unbounded. On 2026-09-08 four
+    such mutant processes ran 18 hours at 100% CPU after their engine was
+    timed out. The command is started with `start_new_session=True`, so it is
+    its own session and group leader and its pgid is its pid; one `killpg`
+    reaps the engine and every mutant it spawned.
+    """
+
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        # guardrail: allow-fallback -- the group is gone, which is the outcome
+        # this call exists to produce. It races the command's own exit on every
+        # run that finishes microseconds after the timeout expires, and there is
+        # nothing left to report: the drain below still collects the output.
+        pass
+    try:
+        return proc.communicate(timeout=drain_seconds)
+    except subprocess.TimeoutExpired as exc:
+        raise OrphanedProcessGroupError(
+            f"pgid {proc.pid} still held its pipes {drain_seconds}s after "
+            f"SIGKILL; surviving descendants must be killed by hand: {proc.args}"
+        ) from exc
+
+
 def run_command(
     argv: Sequence[str],
     *,
@@ -434,41 +474,40 @@ def run_command(
     env.update(environment)
     resolved_argv = pin_argv(argv)
     started = time.monotonic()
-    try:
-        proc = subprocess.run(
-            resolved_argv,
-            cwd=cwd,
-            env=env,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-        )
-    except subprocess.TimeoutExpired as exc:
-        duration = time.monotonic() - started
-        stdout = (
-            exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        )
-        stderr = (
-            exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        )
-        if stdout_sink is not None:
-            stdout_sink(stdout)
-        return result_factory(
-            returncode=None,
-            timed_out=True,
-            duration_seconds=duration,
-            stdout_tail=stdout[-output_tail_chars:],
-            stderr_tail=stderr[-output_tail_chars:],
-        )
+    with subprocess.Popen(
+        resolved_argv,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        # The command owns a fresh session, so the timeout path can kill every
+        # process it spawned rather than only the process it started.
+        start_new_session=True,
+    ) as proc:
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = _kill_process_group(proc)
+            duration = time.monotonic() - started
+            if stdout_sink is not None:
+                stdout_sink(stdout)
+            return result_factory(
+                returncode=None,
+                timed_out=True,
+                duration_seconds=duration,
+                stdout_tail=stdout[-output_tail_chars:],
+                stderr_tail=stderr[-output_tail_chars:],
+            )
+        returncode = proc.returncode
     if stdout_sink is not None:
-        stdout_sink(proc.stdout)
+        stdout_sink(stdout)
     return result_factory(
-        returncode=proc.returncode,
+        returncode=returncode,
         timed_out=False,
         duration_seconds=time.monotonic() - started,
-        stdout_tail=proc.stdout[-output_tail_chars:],
-        stderr_tail=proc.stderr[-output_tail_chars:],
+        stdout_tail=stdout[-output_tail_chars:],
+        stderr_tail=stderr[-output_tail_chars:],
     )
 
 
@@ -586,53 +625,6 @@ def receipt_directory(registry: Mapping[str, Any], error_type: type[Exception]) 
             "has nowhere to be published where the evidence gate will read it"
         )
     return str(directories[0])
-
-
-def plan_repin(
-    selected: Mapping[str, Any],
-    repo_root: Path,
-    sha256: Callable[[Path], str],
-    symbol_hashes: Callable[[Path], dict[str, str]],
-    error_type: type[Exception],
-) -> dict[str, str]:
-    """Re-pinned manifest text for each selected campaign, keyed by relative path."""
-
-    symbol_paths = {
-        relative
-        for campaign in selected.values()
-        for relative in campaign.source_symbols
-    }
-    source_paths = {
-        relative
-        for campaign in selected.values()
-        for relative in campaign.source_sha256
-    }
-    try:
-        from conductor._native import plan_mutation_repin_native
-
-        plans = plan_mutation_repin_native(
-            str(repo_root.resolve()),
-            [
-                (
-                    campaign.manifest_path.relative_to(repo_root.resolve()).as_posix(),
-                    dict(campaign.source_sha256),
-                    {
-                        path: dict(pins)
-                        for path, pins in campaign.source_symbols.items()
-                    },
-                )
-                for campaign in selected.values()
-            ],
-            {
-                path: sha256(repo_root / path)
-                for path in source_paths
-                if (repo_root / path).is_file()
-            },
-            {path: symbol_hashes(repo_root / path) for path in symbol_paths},
-        )
-    except (ImportError, AttributeError, ValueError) as exc:
-        raise error_type(str(exc)) from exc
-    return dict(plans)
 
 
 TEST_NODEID_TABLE_KEY = "test_nodeid_table"

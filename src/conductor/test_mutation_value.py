@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 import copy
-from contextlib import contextmanager
 from pathlib import Path
 import sys
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -360,93 +360,6 @@ def test_value_analysis_fails_closed_on_flakes_and_cross_contract_kills() -> Non
     assert any("has no test map" in error for error in incomplete["errors"])
 
 
-def test_runner_value_analysis_scales_with_mutants_not_tests(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_contract"
-    spec = _spec()
-    manifest = tmp_path / "campaign.json"
-    manifest.write_text("{}\n", encoding="utf-8")
-    patch = tmp_path / "mutant.patch"
-    patch.write_text("patch\n", encoding="utf-8")
-    campaign = mutation_testing.Campaign(
-        manifest_path=manifest,
-        manifest_sha256="0" * 64,
-        campaign_id="value",
-        title="value",
-        language="python",
-        mutation_engine="reviewed_unified_diff",
-        expected_mutations=1,
-        source_sha256={},
-        ranked_tests=(mutation_testing.RankedTest(1, nodeid, "contract", "critical"),),
-        planned_mutations=(
-            mutation_testing.PlannedMutation(
-                "mutant", "source.py", "contract", "defect", (nodeid,)
-            ),
-        ),
-        mutations=(
-            mutation_testing.Mutation(
-                "mutant", patch, "0" * 64, ("source.py",), (nodeid,)
-            ),
-        ),
-        test_argv=("python", "-m", "pytest", nodeid),
-        timeout_seconds=10,
-        blocked_process_substrings=(),
-        poll_seconds=1,
-        environment={},
-        host_read_dependencies=(),
-        value_analysis=spec,
-    )
-    calls: list[str] = []
-
-    @contextmanager
-    def snapshot(_repo: Path):
-        yield SimpleNamespace(worktree=tmp_path)
-
-    def run_batch(
-        _campaign: mutation_testing.Campaign,
-        *,
-        snapshot_root: Path,
-        report_name: str,
-    ):
-        del snapshot_root
-        calls.append(report_name)
-        outcome = "FAILED" if report_name.startswith("mutant") else "PASSED"
-        return (
-            mutation_testing.CommandResult(
-                returncode=1 if outcome == "FAILED" else 0,
-                timed_out=False,
-                duration_seconds=0.01,
-                stdout_tail="",
-                stderr_tail="",
-            ),
-            _report({nodeid: (outcome, 0.01)}),
-        )
-
-    monkeypatch.setattr(
-        mutation_testing, "inspect_campaign", lambda *_a, **_k: {"status": "READY"}
-    )
-    monkeypatch.setattr(mutation_testing, "_wait_for_idle", lambda *_a, **_k: [])
-    monkeypatch.setattr(mutation_testing, "isolated_snapshot", snapshot)
-    monkeypatch.setattr(mutation_testing, "source_drift", lambda *_a, **_k: [])
-    monkeypatch.setattr(mutation_testing, "_link_mutation_patches", lambda *_a: None)
-    monkeypatch.setattr(mutation_testing, "_link_host_dependencies", lambda *_a: None)
-    monkeypatch.setattr(mutation_testing, "_apply_mutation", lambda *_a: None)
-    monkeypatch.setattr(mutation_testing, "_run_campaign_command", run_batch)
-    result = mutation_testing.run_campaign(
-        campaign,
-        allow_mutations=True,
-        receipt_path=Path("receipt.json"),
-        repo_root=tmp_path,
-    )
-    assert calls == ["baseline-1", "baseline-2", "mutant-1"]
-    assert result["status"] == "PASS"
-    assert result["test_value"]["retained_core"] == [nodeid]
-    assert result["test_value"]["subprocess_scaling"] == (
-        "baseline_repetitions + mutants"
-    )
-
-
 def test_value_admission_rejects_unmeasured_and_low_value_new_tests() -> None:
     core = "conductor/test_mutation_value.py::test_core"
     redundant = "conductor/test_mutation_value.py::test_redundant"
@@ -672,6 +585,27 @@ def test_a_rust_kill_by_an_undeclared_test_is_misattributed() -> None:
     }
 
 
+# Everything a routing probe never varies. Held as a mapping rather than spelled
+# out in the call so the helper stays short enough not to duplicate the campaign
+# builders the other probes in this module keep inline.
+_ROUTING_PROBE_FIELDS: dict[str, Any] = {
+    "manifest_sha256": "0" * 64,
+    "campaign_id": "routing_probe",
+    "title": "routing probe",
+    "language": "rust",
+    "mutation_engine": "reviewed_unified_diff",
+    "expected_mutations": 0,
+    "source_sha256": {},
+    "planned_mutations": (),
+    "mutations": (),
+    "timeout_seconds": 10,
+    "blocked_process_substrings": (),
+    "poll_seconds": 1,
+    "environment": {},
+    "host_read_dependencies": (),
+}
+
+
 def _routing_campaign(
     manifest: Path,
     nodeids: Sequence[str],
@@ -683,23 +617,10 @@ def _routing_campaign(
     )
     return mutation_testing.Campaign(
         manifest_path=manifest,
-        manifest_sha256="0" * 64,
-        campaign_id="routing_probe",
-        title="routing probe",
-        language="rust",
-        mutation_engine="reviewed_unified_diff",
-        expected_mutations=0,
-        source_sha256={},
         ranked_tests=ranked,
-        planned_mutations=(),
-        mutations=(),
         test_argv=tuple(argv),
-        timeout_seconds=10,
-        blocked_process_substrings=(),
-        poll_seconds=1,
-        environment={},
-        host_read_dependencies=(),
         value_analysis=value_analysis,
+        **_ROUTING_PROBE_FIELDS,
     )
 
 

@@ -145,12 +145,6 @@ struct SourceDriftRequest {
     symbol_hashes: HashMap<String, HashMap<String, String>>,
 }
 
-type RepinManifest = (
-    String,
-    HashMap<String, String>,
-    HashMap<String, HashMap<String, String>>,
-);
-
 #[derive(Debug, Deserialize)]
 struct InspectRequest {
     campaign: CampaignContract,
@@ -1757,50 +1751,6 @@ pub fn inspect_mutation_campaign_native(request_json: &str) -> PyResult<String> 
 }
 
 #[pyfunction]
-pub fn plan_mutation_repin_native(
-    repo_root: &str,
-    manifests: Vec<RepinManifest>,
-    source_hashes: HashMap<String, String>,
-    symbol_hashes: HashMap<String, HashMap<String, String>>,
-) -> PyResult<Vec<(String, String)>> {
-    let root = lexical_absolute(Path::new(repo_root)).map_err(value_error)?;
-    let mut rows = Vec::with_capacity(manifests.len());
-    for (raw_manifest, sources, source_symbols) in manifests {
-        let manifest = safe_relative(&raw_manifest, "campaign manifest").map_err(value_error)?;
-        let path = root.join(&manifest);
-        let mut text = fs::read_to_string(&path).map_err(|error| {
-            value_error(format!("cannot load campaign {}: {error}", path.display()))
-        })?;
-        for (relative, recorded) in sources {
-            // A symbolic pin narrows drift reporting, but the file digest remains part of the
-            // manifest contract. Refresh both atomically so an automatic generated campaign
-            // cannot remain NOT_READY after a source change in a symbolically pinned file.
-            let Some(actual) = source_hashes.get(&relative) else {
-                continue;
-            };
-            if actual != &recorded && text.matches(&recorded).count() == 1 {
-                text = text.replacen(&recorded, actual, 1);
-            }
-        }
-        for (relative, symbols) in source_symbols {
-            let Some(current) = symbol_hashes.get(&relative) else {
-                continue;
-            };
-            for (symbol, recorded) in symbols {
-                let Some(actual) = current.get(&symbol) else {
-                    continue;
-                };
-                if actual != &recorded && text.matches(&recorded).count() == 1 {
-                    text = text.replacen(&recorded, actual, 1);
-                }
-            }
-        }
-        rows.push((manifest, text));
-    }
-    Ok(rows)
-}
-
-#[pyfunction]
 pub fn mutation_patch_paths_native(path: &str) -> PyResult<Vec<String>> {
     patch_paths(Path::new(path)).map_err(value_error)
 }
@@ -1810,7 +1760,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(load_mutation_registry_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_source_drift_native, module)?)?;
     module.add_function(wrap_pyfunction!(inspect_mutation_campaign_native, module)?)?;
-    module.add_function(wrap_pyfunction!(plan_mutation_repin_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_patch_paths_native, module)?)?;
     Ok(())
 }
@@ -2381,65 +2330,5 @@ mod generated_campaign_tests {
         assert!(error.contains("survivor_baseline"), "{error}");
         let contract = contract(json!({"survivor_baseline": []})).expect("empty baseline");
         assert!(contract.survivor_baseline.is_empty());
-    }
-}
-
-#[cfg(test)]
-mod mutation_manifest_repin_tests {
-    use std::collections::HashMap;
-    use std::fs;
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    use super::plan_mutation_repin_native;
-
-    static NEXT_TREE: AtomicU64 = AtomicU64::new(0);
-
-    #[test]
-    fn repin_refreshes_file_and_symbol_digests_for_a_symbolically_pinned_source() {
-        let serial = NEXT_TREE.fetch_add(1, Ordering::Relaxed);
-        let root = std::env::temp_dir().join(format!(
-            "llm-mutation-repin-{}-{serial}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(&root).expect("create temporary repository");
-        let manifest = root.join("campaign.json");
-        let old_file = "a".repeat(64);
-        let new_file = "b".repeat(64);
-        let old_symbol = "c".repeat(64);
-        let new_symbol = "d".repeat(64);
-        fs::write(
-            &manifest,
-            format!(
-                r#"{{"source_sha256":{{"src/subject.rs":"{old_file}"}},"source_symbols":{{"src/subject.rs":{{"subject":"{old_symbol}"}}}}}}"#
-            ),
-        )
-        .expect("write manifest");
-
-        let rows = plan_mutation_repin_native(
-            root.to_str().expect("utf-8 root"),
-            vec![(
-                "campaign.json".to_owned(),
-                HashMap::from([("src/subject.rs".to_owned(), old_file.clone())]),
-                HashMap::from([(
-                    "src/subject.rs".to_owned(),
-                    HashMap::from([("subject".to_owned(), old_symbol.clone())]),
-                )]),
-            )],
-            HashMap::from([("src/subject.rs".to_owned(), new_file.clone())]),
-            HashMap::from([(
-                "src/subject.rs".to_owned(),
-                HashMap::from([("subject".to_owned(), new_symbol.clone())]),
-            )]),
-        )
-        .expect("repin plan");
-
-        assert_eq!(rows.len(), 1);
-        let rewritten = &rows[0].1;
-        assert!(rewritten.contains(&new_file));
-        assert!(rewritten.contains(&new_symbol));
-        assert!(!rewritten.contains(&old_file));
-        assert!(!rewritten.contains(&old_symbol));
-        let _ = fs::remove_dir_all(root);
     }
 }

@@ -1,20 +1,24 @@
-"""Fail-closed, language-neutral orchestration for automatic mutation campaigns.
+"""Read-only inspection and evidence verification for mutation campaigns.
 
-Engine-backed campaigns generate mutants from the declared source in disposable
-snapshots; reviewed patch campaigns remain supported for exceptional cases.
-Every baseline and mutant runs outside the shared checkout.
+This module no longer executes anything. Mutation evidence is produced only by
+the conductor-managed automatic engines -- ``conductor.mutation_campaign_generate``
+to build a campaign and ``conductor.mutation_engine_generated run`` to run it
+(fest for Python, cargo-mutants for Rust, Mull for C/C++). Hand-authored mutants,
+manifests, patches, survivor baselines and receipt hashes are forbidden
+(KB-MUT-02). The campaign executor and the ``repin`` driver that used to live
+here were removed on 2026-09-08; what remains reads the frozen corpus and
+verifies receipts.
 """
 
 from __future__ import annotations
 
 import argparse
-import contextlib
 import json
 import os
 import subprocess
 import time
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -60,7 +64,6 @@ from conductor.mutation_campaign_model import (  # noqa: F401
     source_drift,
     symbol_hashes,
 )
-from conductor.mutation_engine_generated import GENERATED_ENGINES
 from conductor.mutation_scope import (
     CampaignError,
     _python_test_nodeids,
@@ -73,10 +76,6 @@ from conductor.mutation_scope import (
     _load_test_scopes as _load_test_scopes,  # noqa: PLC0414
 )
 from conductor.mutation_scope import _require_string as _require_string  # noqa: PLC0414
-from conductor.mutation_testing_support import (
-    intern_test_attribution,
-    vacuous_run_reason,
-)
 from conductor.mutation_value import (
     ADAPTER,
     CARGO_ADAPTER,
@@ -91,7 +90,6 @@ from conductor.mutation_value import (
     pytest_attribution_supported,
     value_inspection_payload,
 )
-from conductor.snapshot_worktree import isolated_snapshot
 
 # Re-exported because callers and tests reach through this module as the framework's
 # single entry point; the definitions live in mutation_scope / mutation_value.
@@ -201,20 +199,6 @@ def _materialize(source: Path, destination: Path) -> None:
     link error falls back to a byte copy.
     """
     _support.materialize(source, destination)
-
-
-def _link_mutation_patches(
-    campaign: Campaign, snapshot_root: Path, host_root: Path
-) -> None:
-    """Copy reviewed patch artifacts into snapshots without staging them."""
-
-    _support.link_mutation_patches(
-        campaign,
-        snapshot_root,
-        host_root,
-        sha256=_sha256,
-        error_type=CampaignError,
-    )
 
 
 def _run_command(
@@ -440,233 +424,6 @@ def _run_campaign_command(
         )
     except ValueEvidenceError as exc:
         raise CampaignError(f"cannot instrument value analysis: {exc}") from exc
-
-
-def _apply_mutation(mutation: Mutation, snapshot_root: Path) -> None:
-    _support.apply_mutation(
-        mutation, snapshot_root, sha256=_sha256, error_type=CampaignError
-    )
-
-
-def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
-    _support.atomic_json(path, payload)
-
-
-@contextlib.contextmanager
-def _prepared_snapshot(campaign: Campaign, repo_root: Path) -> Iterator[Path]:
-    """A disposable snapshot with the campaign's inputs linked in, hash-checked.
-
-    The baseline and every mutant need the same four steps in the same order,
-    and the drift check has to run inside the snapshot before anything is linked
-    into it: a run against a snapshot whose sources moved measures a different
-    program than the receipt says it did. Sharing one context manager is what
-    stops the two loops from drifting apart.
-    """
-
-    with isolated_snapshot(repo_root) as snapshot:
-        if drift := source_drift(campaign, snapshot.worktree):
-            raise CampaignError(f"snapshot source hashes drifted: {drift}")
-        _link_mutation_patches(campaign, snapshot.worktree, repo_root)
-        _link_host_dependencies(campaign, snapshot.worktree, repo_root)
-        yield snapshot.worktree
-
-
-def _admit_run(
-    campaign: Campaign,
-    *,
-    allow_mutations: bool,
-    mutation_ids: Sequence[str] | None,
-    wait_seconds: int,
-    repo_root: Path,
-) -> tuple[Mutation, ...]:
-    """Refuse the run unless the campaign is ready, permitted and unopposed.
-
-    Every gate here raises before a snapshot exists, so a refusal costs nothing
-    and leaves no receipt claiming a run happened.
-    """
-
-    if reason := vacuous_run_reason(campaign, GENERATED_ENGINES):
-        raise CampaignError(reason)
-    inspection = inspect_campaign(campaign, repo_root=repo_root)
-    if inspection["status"] != "READY":
-        raise CampaignError(
-            "campaign is NOT_READY: " + "; ".join(inspection["readiness_reasons"])
-        )
-    if not allow_mutations:
-        raise CampaignError("refusing mutation run without --allow-mutations")
-    selected = _select_mutations(campaign, mutation_ids)
-    blockers = _wait_for_idle(campaign, wait_seconds)
-    if blockers:
-        detail = ", ".join(f"pid={row['pid']}" for row in blockers)
-        raise CampaignError(f"resource gate is BUSY after wait: {detail}")
-    return selected
-
-
-def _run_baselines(
-    campaign: Campaign, receipt: dict[str, Any], output_path: Path, repo_root: Path
-) -> list[Mapping[str, Any]]:
-    """Run the unmutated tree, once or once per configured repetition.
-
-    A baseline that fails means the campaign cannot distinguish a mutant from a
-    broken tree, so the receipt is written as BASELINE_FAILED and the run stops:
-    scoring mutants against a red baseline would call every one of them killed.
-    """
-
-    reports: list[Mapping[str, Any]] = []
-    results: list[dict[str, Any]] = []
-    repetitions = (
-        campaign.value_analysis.baseline_repetitions
-        if campaign.value_analysis is not None
-        else 1
-    )
-    for repetition in range(1, repetitions + 1):
-        with _prepared_snapshot(campaign, repo_root) as worktree:
-            baseline, report = _run_campaign_command(
-                campaign, snapshot_root=worktree, report_name=f"baseline-{repetition}"
-            )
-        results.append(baseline.as_dict())
-        if report is not None:
-            reports.append(report)
-        if baseline.timed_out or baseline.returncode != 0:
-            receipt["baseline"] = results[0]
-            receipt["baseline_repetitions"] = results
-            receipt["status"] = "BASELINE_FAILED"
-            _atomic_json(output_path, receipt)
-            raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
-    receipt["baseline"] = results[0]
-    if campaign.value_analysis is not None:
-        receipt["baseline_repetitions"] = results
-    return reports
-
-
-def _run_mutants(
-    campaign: Campaign,
-    selected: Sequence[Mutation],
-    receipt: dict[str, Any],
-    output_path: Path,
-    repo_root: Path,
-) -> dict[str, Mapping[str, Any]]:
-    """Run each mutant in its own snapshot, appending a row per result.
-
-    The receipt is rewritten after every mutant rather than once at the end, so
-    a run killed halfway leaves evidence for the mutants that did complete.
-    """
-
-    reports: dict[str, Mapping[str, Any]] = {}
-    plans = {plan.mutation_id: plan for plan in campaign.planned_mutations}
-    for mutation in selected:
-        with _prepared_snapshot(campaign, repo_root) as worktree:
-            _apply_mutation(mutation, worktree)
-            result, report = _run_campaign_command(
-                campaign,
-                snapshot_root=worktree,
-                report_name=f"mutant-{len(receipt['mutants']) + 1}",
-            )
-        outcome = (
-            "TIMED_OUT"
-            if result.timed_out
-            else "SURVIVED"
-            if result.returncode == 0
-            else "KILLED"
-        )
-        row: dict[str, Any] = {
-            "id": mutation.mutation_id,
-            "patch_sha256": mutation.patch_sha256,
-            "allowed_paths": list(mutation.allowed_paths),
-            "expected_killers": list(mutation.expected_killers),
-            "outcome": outcome,
-            "test_result": result.as_dict(),
-        }
-        # The manifest already says in one line what this mutant breaks and why it
-        # should be caught; carrying it onto the row is what lets a receipt be read
-        # rather than decoded.
-        if (planned := plans.get(mutation.mutation_id)) is not None:
-            row["contract"] = planned.contract
-            row["description"] = planned.description
-        row["killer_attribution"] = killer_verdict(mutation, report, outcome)
-        routine = _is_routine_kill(outcome, row["killer_attribution"])
-        if routine:
-            # The tail is the story of a test failing on cue. `killer_attribution`
-            # already names which test and proves it was the predicted one.
-            for tail in ("stdout_tail", "stderr_tail"):
-                row["test_result"].pop(tail, None)
-        if report is not None:
-            row["test_attribution"] = (
-                _attribution_summary(report)
-                if routine
-                else intern_test_attribution(receipt, report)
-            )
-            # The live report is what `analyze_test_value` reads; it keeps the full
-            # matrix regardless of what the receipt goes on to persist.
-            reports[mutation.mutation_id] = report
-        receipt["mutants"].append(row)
-        _atomic_json(output_path, receipt)
-    return reports
-
-
-def run_campaign(
-    campaign: Campaign,
-    *,
-    allow_mutations: bool,
-    wait_seconds: int = 0,
-    receipt_path: Path | None = None,
-    mutation_ids: Sequence[str] | None = None,
-    repo_root: Path = REPO_ROOT,
-) -> dict[str, Any]:
-    """Run a ready campaign in disposable snapshots and write a JSON receipt."""
-
-    selected = _admit_run(
-        campaign,
-        allow_mutations=allow_mutations,
-        mutation_ids=mutation_ids,
-        wait_seconds=wait_seconds,
-        repo_root=repo_root,
-    )
-    receipt = _open_receipt(campaign, selected, repo_root)
-    output_path, receipt_relative = _resolve_receipt_path(
-        campaign, receipt_path, repo_root
-    )
-
-    try:
-        baseline_reports = _run_baselines(campaign, receipt, output_path, repo_root)
-        mutant_reports = _run_mutants(
-            campaign, selected, receipt, output_path, repo_root
-        )
-    except CampaignError as exc:
-        if receipt["status"] == "RUNNING":
-            receipt["status"] = "ERROR"
-            receipt["error"] = str(exc)
-            _atomic_json(output_path, receipt)
-        raise
-    except Exception as exc:
-        receipt["status"] = "ERROR"
-        receipt["error"] = f"{type(exc).__name__}: {exc}"
-        _atomic_json(output_path, receipt)
-        raise CampaignError(
-            f"mutation campaign crashed; receipt={output_path}: {exc}"
-        ) from exc
-
-    _score_receipt(campaign, receipt, selected, baseline_reports, mutant_reports)
-    receipt["receipt_path"] = receipt_relative
-    _atomic_json(output_path, receipt)
-    return receipt
-
-
-def _select_mutations(
-    campaign: Campaign, mutation_ids: Sequence[str] | None
-) -> tuple[Mutation, ...]:
-    if mutation_ids is None:
-        return campaign.mutations
-    requested = tuple(mutation_ids)
-    if not requested:
-        raise CampaignError("at least one --mutation id is required")
-    if len(set(requested)) != len(requested):
-        raise CampaignError(f"duplicate --mutation ids: {requested}")
-    by_id = {mutation.mutation_id: mutation for mutation in campaign.mutations}
-    unknown = sorted(set(requested) - set(by_id))
-    if unknown:
-        raise CampaignError(f"unknown mutation ids: {unknown}")
-    return tuple(by_id[mutation_id] for mutation_id in requested)
 
 
 def _native_campaign_contract(
@@ -996,204 +753,22 @@ def _registry_campaigns(
     return campaigns
 
 
-def _plan_repin(selected: Mapping[str, Campaign], repo_root: Path) -> dict[str, str]:
-    return _support.plan_repin(
-        selected, repo_root, _sha256, symbol_hashes, CampaignError
-    )
-
-
-def _repin_one_and_rerun(
-    campaign_id: str,
-    *,
-    selected: dict[str, Campaign],
-    by_id: dict[str, Campaign],
-    updated: dict[str, str],
-    receipts: Path,
-    repo_root: Path,
-) -> dict[str, Any]:
-    """Write one campaign's re-pinned manifest, then regenerate its receipt.
-
-    A campaign in `selected` had drifted source pins and gets the rewritten manifest;
-    one that is not was pinned correctly all along and is here only because its receipt
-    went stale under a runner change, so its manifest is left exactly as it is.
-    """
-    if campaign_id in selected:
-        manifest = selected[campaign_id].manifest_path
-        relative = manifest.relative_to(repo_root.resolve()).as_posix()
-        manifest.write_text(updated[relative], encoding="utf-8")
-        refreshed = load_campaign(manifest, repo_root=repo_root)
-        remaining = source_drift(refreshed, repo_root)
-        if remaining:
-            return {
-                "campaign_id": campaign_id,
-                "status": "REFUSED",
-                "reason": "still drifted after re-pin",
-                "drift": remaining,
-            }
-    else:
-        refreshed = by_id[campaign_id]
-    receipt_path = receipts / f"{campaign_id}_{_utc_stamp()}.json"
-    result = run_campaign(
-        refreshed, allow_mutations=True, receipt_path=receipt_path, repo_root=repo_root
-    )
-    if not receipt_path.is_file():
-        raise CampaignError(
-            f"re-run of {campaign_id!r} reported {result['status']} but published "
-            f"no receipt at {receipt_path}"
-        )
-    return {
-        "campaign_id": campaign_id,
-        "status": result["status"],
-        "receipt": result["receipt_path"],
-    }
-
-
-def repin_campaigns(
-    registry_path: Path,
-    *,
-    campaign_ids: Sequence[str] | None = None,
-    run: bool = False,
-    allow_mutations: bool = False,
-    repo_root: Path = REPO_ROOT,
-) -> dict[str, Any]:
-    """Re-pin every drifted campaign and, with `run`, regenerate its receipt.
-
-    A re-pin without a re-run produces a manifest whose recorded digests describe the
-    current tree while its receipt describes an older one -- a receipt that was never
-    regenerated, which is not evidence. So `--run` is what makes this command finish
-    the job, and it refuses without explicit mutation authorization.
-
-    Two independent things go stale. A manifest's source pins drift when the code under
-    test moves; a campaign's RECEIPT goes stale when the runner itself moves, because
-    every receipt records the hashes of the runner components that produced it. Only
-    the first used to be checked here, so a framework edit left the evidence set
-    unusable while this command printed CLEAN.
-
-    Without `--run` this is a REPORT and changes nothing on disk, so it is always safe
-    to ask "what is drifted?".
-    """
-    if run and not allow_mutations:
-        raise CampaignError(
-            "repin --run executes mutants and requires --allow-mutations"
-        )
-    campaigns = _support.select_campaigns(
-        _registry_campaigns(
-            registry_path, repo_root=repo_root, campaign_ids=campaign_ids
-        ),
-        campaign_ids,
-        CampaignError,
-    )
-    drifted: list[dict[str, Any]] = []
-    for campaign in campaigns:
-        drift = source_drift(campaign, repo_root)
-        if drift:
-            drifted.append({"campaign_id": campaign.campaign_id, "drift": drift})
-
-    stale_receipts = receipt_drift(campaigns, repo_root, registry_path)
-
-    if not drifted and not stale_receipts:
-        return {"status": "CLEAN", "drifted": [], "stale_receipts": [], "rerun": []}
-    if not run:
-        return {
-            "status": "DRIFTED",
-            "drifted": drifted,
-            "stale_receipts": stale_receipts,
-            "rerun": [],
-            "hint": "re-run with --run --allow-mutations to re-pin AND regenerate receipts",
-        }
-
-    by_id = {campaign.campaign_id: campaign for campaign in campaigns}
-    repin_ids = [str(row["campaign_id"]) for row in drifted]
-    # A stale receipt needs a re-run, not a re-pin: the manifest already describes the
-    # tree correctly, so rewriting it would be a no-op that hides why the receipt died.
-    rerun_only = [
-        str(row["campaign_id"])
-        for row in stale_receipts
-        if str(row["campaign_id"]) not in set(repin_ids)
-    ]
-    selected = {campaign_id: by_id[campaign_id] for campaign_id in repin_ids}
-    updated = _plan_repin(selected, repo_root) if selected else {}
-    # A receipt published outside the registry's receipt directory is not evidence:
-    # `research/reports/` is gitignored, so the default path this used to fall back on
-    # dropped every regenerated receipt while reporting PASS.
-    receipts = repo_root / _support.receipt_directory(
-        _load_registry(registry_path, repo_root), CampaignError
-    )
-    rerun = [
-        _repin_one_and_rerun(
-            campaign_id,
-            selected=selected,
-            by_id=by_id,
-            updated=updated,
-            receipts=receipts,
-            repo_root=repo_root,
-        )
-        for campaign_id in (*repin_ids, *rerun_only)
-    ]
-    failed = [item for item in rerun if item["status"] != "PASS"]
-    return {
-        "status": "REPINNED" if not failed else "FAILED",
-        "drifted": drifted,
-        "stale_receipts": stale_receipts,
-        "rerun": rerun,
-    }
-
-
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry point for inspection and explicitly authorized execution."""
+    """CLI entry point: inspection and evidence verification only.
+
+    There is deliberately no ``run`` and no ``repin`` here. Producing mutation
+    evidence goes through ``conductor.mutation_engine_generated``.
+    """
 
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     inspect_parser = subparsers.add_parser(
-        "inspect", help="validate and inspect a campaign without mutations"
+        "inspect", help="validate and inspect a campaign; runs nothing"
     )
     inspect_parser.add_argument("campaign", type=Path)
-    run_parser = subparsers.add_parser(
-        "run", help="run a ready campaign in isolated snapshots"
-    )
-    run_parser.add_argument("campaign", type=Path)
-    run_parser.add_argument("--allow-mutations", action="store_true")
-    run_parser.add_argument("--wait-seconds", type=int, default=0)
-    run_parser.add_argument("--receipt", type=Path)
-    run_parser.add_argument(
-        "--mutation",
-        action="append",
-        dest="mutation_ids",
-        help="run only this mutant id (repeatable); still runs the baseline first",
-    )
-    repin_parser = subparsers.add_parser(
-        "repin",
-        help="re-pin drifted campaigns and, with --run, regenerate their receipts",
-    )
-    repin_parser.add_argument(
-        "--registry",
-        type=Path,
-        default=Path("conductor/mutation_campaigns/registry.json"),
-    )
-    repin_parser.add_argument(
-        "--campaign",
-        action="append",
-        dest="campaign_ids",
-        help="limit to this campaign id (repeatable); default is every drifted campaign",
-    )
-    repin_parser.add_argument(
-        "--run",
-        action="store_true",
-        help=(
-            "after re-pinning, RE-RUN each campaign so its receipt is regenerated. "
-            "Without this the command reports what drifted and changes nothing: a "
-            "re-pin alone produces a manifest whose receipt was never regenerated, "
-            "which is not evidence."
-        ),
-    )
-    repin_parser.add_argument(
-        "--allow-mutations",
-        action="store_true",
-        help="required with --run; mutant execution is explicitly authorized, never implied",
-    )
     verify_parser = subparsers.add_parser(
         "verify-evidence",
-        help="require current full-campaign PASS receipts for changed tests",
+        help="report which changed tests lack a current full-campaign PASS receipt",
     )
     verify_parser.add_argument(
         "--registry",
@@ -1203,33 +778,14 @@ def main(argv: list[str] | None = None) -> int:
     verify_parser.add_argument("paths", nargs="*")
     args = parser.parse_args(argv)
     try:
-        if args.command == "repin":
-            result = repin_campaigns(
-                args.registry,
-                campaign_ids=args.campaign_ids,
-                run=args.run,
-                allow_mutations=args.allow_mutations,
-            )
-            _json_print(result)
-            return 0 if result["status"] in ("CLEAN", "REPINNED") else 1
         if args.command == "verify-evidence":
             result = verify_evidence(args.registry, args.paths)
             _json_print(result)
             return 0 if result["status"] == "PASS" else 5
         campaign = load_campaign(args.campaign)
-        if args.command == "inspect":
-            result = inspect_campaign(campaign)
-            _json_print(result)
-            return 0 if result["status"] == "READY" else 3
-        result = run_campaign(
-            campaign,
-            allow_mutations=args.allow_mutations,
-            wait_seconds=args.wait_seconds,
-            receipt_path=args.receipt,
-            mutation_ids=args.mutation_ids,
-        )
+        result = inspect_campaign(campaign)
         _json_print(result)
-        return 0 if result["status"] == "PASS" else 1
+        return 0 if result["status"] == "READY" else 3
     except CampaignError as exc:
         _json_print({"status": "REFUSED", "error": str(exc)})
         return 4

@@ -4,19 +4,13 @@
 
 use std::collections::HashSet;
 use std::env;
-use std::fs::{self, File};
-use std::io::Read;
+use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use serde::ser::{SerializeMap, Serializer}; // codespell:ignore ser
-use serde::Serialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
-
-const HASH_BUFFER_BYTES: usize = 64 * 1024;
 
 fn value_error(message: impl Into<String>) -> PyErr {
     PyValueError::new_err(message.into())
@@ -385,190 +379,6 @@ fn mutation_test_inventory_native(
     Ok(selected)
 }
 
-fn sha256_file(path: &Path) -> Result<String, String> {
-    let mut file = File::open(path).map_err(|error| format!("{}: {error}", path.display()))?;
-    let mut digest = Sha256::new();
-    let mut buffer = [0_u8; HASH_BUFFER_BYTES];
-    loop {
-        let count = file
-            .read(&mut buffer)
-            .map_err(|error| format!("{}: {error}", path.display()))?;
-        if count == 0 {
-            break;
-        }
-        digest.update(&buffer[..count]);
-    }
-    let output = digest.finalize();
-    Ok(format!("{output:x}"))
-}
-
-struct OrderedSourceHashes<'a>(&'a [(String, String)]);
-
-impl Serialize for OrderedSourceHashes<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut map = serializer.serialize_map(Some(self.0.len()))?;
-        for (path, digest) in self.0 {
-            map.serialize_entry(path, digest)?;
-        }
-        map.end()
-    }
-}
-
-#[derive(Serialize)]
-struct RankedTestPayload<'a> {
-    rank: usize,
-    nodeid: &'a str,
-    contract: &'static str,
-    rationale: &'static str,
-}
-
-#[derive(Serialize)]
-struct PlannedMutationPayload<'a> {
-    id: &'static str,
-    target_path: &'a str,
-    contract: &'static str,
-    description: &'static str,
-    expected_killers: [&'a str; 1],
-}
-
-#[derive(Serialize)]
-struct BaselinePayload<'a> {
-    argv: Vec<&'a str>,
-    timeout_seconds: u32,
-}
-
-#[derive(Serialize)]
-struct ResourceGatePayload {
-    blocked_process_substrings: Vec<String>,
-    poll_seconds: u32,
-}
-
-#[derive(Serialize)]
-struct ScaffoldPayload<'a> {
-    schema_version: u32,
-    campaign_id: String,
-    title: String,
-    language: &'static str,
-    mutation_engine: &'static str,
-    expected_ranked_tests: usize,
-    expected_mutations: u32,
-    source_sha256: OrderedSourceHashes<'a>,
-    ranked_tests: Vec<RankedTestPayload<'a>>,
-    planned_mutations: [PlannedMutationPayload<'a>; 1],
-    mutations: Vec<String>,
-    baseline: BaselinePayload<'a>,
-    resource_gate: ResourceGatePayload,
-    environment: std::collections::BTreeMap<String, String>,
-    host_read_dependencies: Vec<String>,
-}
-
-fn python_path_stem(path: &str) -> &str {
-    let name = path.rsplit('/').next().unwrap_or(path);
-    match name.rfind('.') {
-        Some(index) if index > 0 && index + 1 < name.len() => &name[..index],
-        _ => name,
-    }
-}
-
-#[pyfunction]
-fn plan_mutation_scaffold_native(
-    repo_root: &str,
-    test_path: &str,
-    source_paths: Vec<String>,
-    nodeids: Vec<String>,
-) -> PyResult<String> {
-    let relative = normalize_mutation_path(test_path, "scaffold test path").map_err(value_error)?;
-    let target = Path::new(repo_root).join(&relative);
-    if !target.is_file() {
-        return Err(value_error(format!(
-            "scaffold test path does not exist: {relative}"
-        )));
-    }
-    if nodeids.is_empty() {
-        return Err(value_error(format!(
-            "{relative} contains no test functions to rank"
-        )));
-    }
-
-    let mut source_hashes = Vec::with_capacity(source_paths.len() + 1);
-    let mut seen = HashSet::with_capacity(source_paths.len() + 1);
-    source_hashes.push((relative.clone(), sha256_file(&target).map_err(value_error)?));
-    seen.insert(relative.clone());
-    for source in source_paths {
-        let source_relative =
-            normalize_mutation_path(&source, "scaffold source path").map_err(value_error)?;
-        let source_file = Path::new(repo_root).join(&source_relative);
-        if !source_file.is_file() {
-            return Err(value_error(format!(
-                "scaffold source path does not exist: {source_relative}"
-            )));
-        }
-        if seen.insert(source_relative.clone()) {
-            source_hashes.push((
-                source_relative,
-                sha256_file(&source_file).map_err(value_error)?,
-            ));
-        }
-    }
-
-    let planned_target = source_hashes
-        .iter()
-        .find_map(|(path, _)| (path != &relative).then_some(path.as_str()))
-        .unwrap_or(&relative);
-    let campaign_stem = python_path_stem(&relative);
-    let campaign_id = format!("{campaign_stem}_scaffold");
-    let ranked_tests = nodeids
-        .iter()
-        .enumerate()
-        .map(|(index, nodeid)| RankedTestPayload {
-            rank: index + 1,
-            nodeid,
-            contract: "replace with the behavioral contract this test enforces",
-            rationale: "rank by the damage a silent defect would do",
-        })
-        .collect();
-    let mut argv = vec!["python", "-m", "pytest", "-q", "-o", "addopts="];
-    argv.extend(nodeids.iter().map(String::as_str));
-    let payload = ScaffoldPayload {
-        schema_version: 1,
-        campaign_id,
-        title: format!("Scaffolded campaign for {relative}"),
-        language: if relative.ends_with(".py") {
-            "python"
-        } else {
-            "unknown"
-        },
-        mutation_engine: "reviewed_unified_diff",
-        expected_ranked_tests: nodeids.len(),
-        expected_mutations: 1,
-        source_sha256: OrderedSourceHashes(&source_hashes),
-        ranked_tests,
-        planned_mutations: [PlannedMutationPayload {
-            id: "first_order_placeholder",
-            target_path: planned_target,
-            contract: "replace with the first-order defect this test must kill",
-            description: "Conductor generates mutants in a disposable snapshot; do not edit the shared checkout.",
-            expected_killers: [&nodeids[0]],
-        }],
-        mutations: Vec::new(),
-        baseline: BaselinePayload {
-            argv,
-            timeout_seconds: 120,
-        },
-        resource_gate: ResourceGatePayload {
-            blocked_process_substrings: Vec::new(),
-            poll_seconds: 30,
-        },
-        environment: std::collections::BTreeMap::new(),
-        host_read_dependencies: Vec::new(),
-    };
-    serde_json::to_string(&payload)
-        .map_err(|error| value_error(format!("cannot serialize mutation scaffold: {error}")))
-}
-
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(normalize_mutation_path_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_registry_patterns_native, module)?)?;
@@ -577,7 +387,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(should_skip_mutation_path_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_rust_test_surface_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_test_inventory_native, module)?)?;
-    module.add_function(wrap_pyfunction!(plan_mutation_scaffold_native, module)?)?;
     Ok(())
 }
 

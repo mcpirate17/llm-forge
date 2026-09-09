@@ -117,6 +117,7 @@ class GeneratedCampaign:
         "source_sha256",
         "test_sha256",
         "survivor_baseline",
+        "survivor_baseline_recorded",
         "environment",
     )
 
@@ -151,6 +152,22 @@ class GeneratedCampaign:
         # one thing a mutation receipt is supposed to make impossible.
         self.test_sha256 = dict(_require(payload, "test_sha256", dict))
         self.survivor_baseline = tuple(sorted(payload.get("survivor_baseline", ())))
+        # A campaign that has never run has no survivor set to ratchet against,
+        # so every survivor reads as new and it is red on its first run and on
+        # every run after. The only green exit used to be hand-writing the
+        # baseline, which KB-MUT-02 forbids. Generated manifests now declare
+        # themselves unrecorded and the first run writes the list itself.
+        # Manifests predating the flag are treated as recorded: their baselines
+        # are real.
+        # No flag and an empty baseline is indistinguishable from never having
+        # run, and the two want the same treatment: record it. A non-empty
+        # baseline was recorded by definition. Manifests written before the flag
+        # existed are therefore handled without touching them.
+        self.survivor_baseline_recorded = bool(
+            payload.get(
+                "survivor_baseline_recorded", bool(payload.get("survivor_baseline"))
+            )
+        )
         self.environment = dict(payload.get("environment", {}))
         if not self.source:
             raise CampaignError("generator.source must name at least one glob")
@@ -437,6 +454,39 @@ def cap_memory() -> int | None:
     return limit
 
 
+def record_survivor_baseline(
+    campaign: GeneratedCampaign, receipt: dict[str, Any]
+) -> bool:
+    """Write a first run's survivor set into its own manifest, then re-score.
+
+    This closes the loop that made every generated campaign permanently red: no
+    baseline means every survivor is a new survivor. The tool records it, never
+    an agent, so half (a) of the mutation-evidence grant holds -- the survivors
+    are whatever the engine found, not a set anybody chose. It happens exactly
+    once per campaign; afterwards the ratchet is live and a new survivor fails.
+    """
+
+    if campaign.survivor_baseline_recorded:
+        return False
+    if receipt["status"] == "ERROR":
+        # A run that errored measured nothing; recording its survivors would
+        # bless a gap that no test actually left open.
+        return False
+    payload = json.loads(campaign.manifest_path.read_text())
+    payload["survivor_baseline"] = list(receipt["survivors"])
+    payload["survivor_baseline_recorded"] = True
+    payload["survivor_baseline_recorded_at"] = datetime.now(UTC).isoformat()
+    payload.pop("survivor_baseline_note", None)
+    _support.atomic_json(campaign.manifest_path, payload)
+    campaign.survivor_baseline = tuple(sorted(receipt["survivors"]))
+    campaign.survivor_baseline_recorded = True
+    campaign.manifest_sha256 = _sha256(campaign.manifest_path)
+    receipt["manifest_sha256"] = campaign.manifest_sha256
+    receipt["survivor_baseline_recorded_by_this_run"] = True
+    score(campaign, receipt)
+    return True
+
+
 def run_generated_campaign(
     campaign: GeneratedCampaign,
     *,
@@ -476,6 +526,7 @@ def run_generated_campaign(
         raise CampaignError(f"generated campaign crashed: {exc}") from exc
 
     score(campaign, receipt)
+    record_survivor_baseline(campaign, receipt)
     receipt["receipt_path"] = relative
     _support.atomic_json(output_path, receipt)
     return receipt

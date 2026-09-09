@@ -1,9 +1,14 @@
-"""Inventory, changed-test evidence, and campaign scaffolding for mutation testing.
+"""Inventory and changed-test evidence for mutation testing.
 
-The runner in ``conductor.mutation_testing`` stays the receipt authority. This
-module discovers test files, checks them against registered PASS receipts, and
-scaffolds a campaign contract. The conductor runner selects the registered
-engine and generates mutants in its disposable snapshot.
+This module discovers test files and checks them against registered receipts. It
+neither generates mutants nor runs campaigns, and it no longer scaffolds one: the
+``scaffold`` subcommand wrote a hand-authored campaign stub whose next step was
+"add one first-order patch", which is the manual process KB-MUT-02 forbids. It
+was removed on 2026-09-08. Campaigns come from
+``conductor.mutation_campaign_generate``, scoped to the files the branch changed.
+
+``coverage`` inventories the whole tree. That is a maintenance report, not the
+agent path -- an agent verifies its own change with ``make mutation-evidence``.
 """
 
 from __future__ import annotations
@@ -20,7 +25,6 @@ from conductor._native import (
     mutation_rust_test_surface_native,
     mutation_test_inventory_native,
     normalize_mutation_path_native,
-    plan_mutation_scaffold_native,
     should_skip_mutation_path_native,
 )
 
@@ -210,74 +214,12 @@ def _python_test_nodeids(path: Path, relative: str) -> tuple[str, ...]:
     return tuple(nodeids)
 
 
-def scaffold_campaign(
-    test_path: str,
-    *,
-    sources: Sequence[str] = (),
-    output_path: Path | None = None,
-    repo_root: Path = REPO_ROOT,
-) -> dict[str, Any]:
-    """Write a NOT_READY campaign stub bound to the current file hashes.
-
-    The stub ranks discovered tests and records planned mutation slots. A human
-    still has to review first-order patches; this function never generates them.
-    """
-
-    relative = _safe_relative_path(test_path.replace("\\", "/"), "scaffold test path")
-    target = repo_root / relative
-    if not target.is_file():
-        raise CampaignError(f"scaffold test path does not exist: {relative}")
-    nodeids = (
-        _python_test_nodeids(target, relative)
-        if relative.endswith(".py")
-        else (relative,)
-    )
-    payload = json.loads(
-        _native_or_campaign(
-            plan_mutation_scaffold_native,
-            str(repo_root),
-            relative,
-            list(sources),
-            list(nodeids),
-        )
-    )
-    campaign_id = payload["campaign_id"].removesuffix("_scaffold")
-    destination = output_path or (
-        repo_root / "conductor/mutation_campaigns" / f"{campaign_id}_scaffold.json"
-    )
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8"
-    )
-    manifest_rel = destination.resolve().relative_to(repo_root.resolve()).as_posix()
-    patches_dir = f"conductor/mutation_campaigns/patches/{payload['campaign_id']}"
-    receipt_rel = f"conductor/mutation_campaigns/receipts/{payload['campaign_id']}_<YYYYMMDD>.json"
-    return {
-        "status": "NOT_READY",
-        "manifest": manifest_rel,
-        "campaign_id": payload["campaign_id"],
-        "ranked_tests": len(payload["ranked_tests"]),
-        "suggested_governance_claim": (
-            'make governance-claim OWNER="<your-hook-owner>" CLAIM_PATHS="'
-            f'{manifest_rel} {patches_dir}/<mutant>.patch {receipt_rel}" '
-            'CLAIM_JUSTIFICATION="<agent> <batch>: mutation coverage for '
-            f'{relative}"  # one entry PER patch file; date the receipt path'
-        ),
-        "next_steps": [
-            "Review and replace placeholder contracts, then add one first-order patch.",
-            "Register the manifest in conductor/mutation_campaigns/registry.json.",
-            "Run make mutation-run; mutation runs are pre-approved (Tim, 2026-08-31).",
-            "Keep the PASS receipt under conductor/mutation_campaigns/receipts/.",
-        ],
-    }
-
-
 def _json_print(payload: Mapping[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI for coverage inventory, changed-test evidence, and scaffolding."""
+    """CLI for coverage inventory and changed-test evidence."""
 
     parser = argparse.ArgumentParser(description=__doc__)
     shared = argparse.ArgumentParser(add_help=False)
@@ -297,34 +239,15 @@ def main(argv: list[str] | None = None) -> int:
         parents=[shared],
         help="verify PASS receipts for git-changed and untracked tests",
     )
-    scaffold = subparsers.add_parser(
-        "scaffold",
-        parents=[shared],
-        help="write a NOT_READY campaign contract for conductor-generated mutants",
-    )
-    scaffold.add_argument("test_path")
-    scaffold.add_argument(
-        "--source",
-        action="append",
-        default=[],
-        help="production source to bind by SHA-256 (repeatable)",
-    )
-    scaffold.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     try:
         if args.command == "coverage":
             result = coverage_report(args.registry)
             _json_print(result)
             return 0 if result["status"] == "PASS" else 5
-        if args.command == "changed":
-            result = verify_changed(args.registry)
-            _json_print(result)
-            return 0 if result["status"] == "PASS" else 5
-        result = scaffold_campaign(
-            args.test_path, sources=args.source, output_path=args.output
-        )
+        result = verify_changed(args.registry)
         _json_print(result)
-        return 0
+        return 0 if result["status"] == "PASS" else 5
     except CampaignError as exc:
         _json_print({"status": "REFUSED", "error": str(exc)})
         return 4

@@ -2,10 +2,16 @@
 
 ## Current execution policy
 
+**Mutate only what you changed** -- the files this branch modified and the tests
+that exercise them, never the whole repository. `mutation_campaign_generate`
+scopes itself to `git diff <base>...HEAD` plus the dirty tree by default; a
+whole-tree sweep needs an explicit `--all-files` and is a maintenance job.
+
 Only conductor-managed, engine-generated mutation campaigns may execute. Agents
-must not author, apply, score, re-pin, or run patch-based mutants manually.
-Legacy patch manifests and receipts remain archival provenance only; they are not
-an executable testing path.
+must not author, apply, score, re-pin, or run patch-based mutants manually. The
+hand runner and its `repin` driver were deleted on 2026-09-08; legacy patch
+manifests and receipts remain archival provenance only, never an executable
+testing path.
 
 Mutation testing asks one question: **if I introduce a realistic bug, does any
 test notice?** The score is the share of introduced bugs the suite caught.
@@ -124,19 +130,25 @@ python -m conductor.mutation_engine_generated run     conductor/mutation_campaig
 run happens inside a disposable snapshot worktree, never in the checkout. The
 receipt path must be inside the repository.
 
-A campaign generated for the first time has an empty `survivor_baseline`, so
-every survivor is a new survivor and the first run reports the whole gap rather
-than quietly accepting it. Record that set into the manifest once you have read
-it -- and only what you have decided to accept as debt.
+A campaign generated for the first time carries
+`"survivor_baseline_recorded": false`. Its **first run records its own survivor
+set** into the manifest and flips that flag; every later run is scored against
+it. Nobody writes that field by hand -- a hand-authored baseline is exactly the
+self-grading this system exists to remove. Until this was automatic, a fresh
+campaign was red on its first run and on every run after, because with no
+baseline every survivor counts as new.
 
 ## How a run becomes gate evidence
 
-`make mutation-coverage` refuses a changed or new test file that no campaign
-covers with a current PASS receipt. Generated campaigns satisfy it the same way
-patch campaigns always have, through two steps:
+A changed test with no current receipt is recorded as debt, not a block
+(mutation-evidence grant, half (b)). When you do want a run to count as gate
+evidence:
 
 1. Append the manifest path to `conductor/mutation_campaigns/registry.json`.
-2. Publish the receipt into `conductor/mutation_campaigns/receipts/`.
+2. Publish the receipt into `conductor/mutation_campaigns/receipts/` -- but only
+   when it records a finding. Generated receipts land in the gitignored
+   `research/reports/mutation_testing/` precisely so routine green runs do not
+   become commits.
 
 What differs is the acceptance rule, because the two kinds of campaign prove
 different things:

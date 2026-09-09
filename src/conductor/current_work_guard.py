@@ -20,11 +20,12 @@ from conductor.local_ai_policy import deny_local_ai_command
 
 CURRENT_WORK_NAME: Final[str] = ".current_work.md"
 MUTATION_HINT: Final[str] = (
-    "New or changed tests require a registered mutation campaign and a "
-    "current PASS receipt before governance-check. Scaffold with "
-    "`python -m conductor.mutation_coverage scaffold PATH --source SRC`, "
-    "then run `make mutation-run`; mutation runs are pre-approved "
-    "(Tim, 2026-08-31)."
+    "Mutation evidence covers ONLY the files you changed and the tests that "
+    "exercise them -- never the whole repo. `make mutation-plan`, then "
+    "`make mutation-generate`, then `make mutation-engine-run`. Automatic "
+    "engines only; hand-authored mutants, manifests, survivor baselines and "
+    "receipts are forbidden (KB-MUT-02). A changed test with no current "
+    "receipt is debt to record in the PR body, not a reason to hold the branch."
 )
 TEST_SUFFIXES: Final[tuple[str, ...]] = (
     "_test.py",

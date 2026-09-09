@@ -11,7 +11,6 @@ from typing import Callable, Iterator
 
 import pytest
 
-from conductor import mutation_engine_generated
 from conductor import mutation_testing
 
 
@@ -57,69 +56,6 @@ def test_inspection_reports_ready_with_six_materialized_patches(
     assert result["expected_mutations"] == 5
     assert result["resource_status"] == "IDLE"
     assert all(row["materialized"] for row in result["planned_mutations"])
-
-
-def test_run_requires_explicit_mutation_authority_before_creating_snapshot(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Every run this runner could not honestly score is refused before the snapshot.
-
-    Three of them. No `--allow-mutations`. A generated-engine manifest, whose
-    mutants do not exist until the engine produces them, so this runner would
-    select the empty mutation tuple, score nothing and write `status: PASS` with
-    `mutants: 0` -- a receipt asserting a campaign passed without a single mutant
-    having been applied. And a reviewed campaign that is all design slots: ten
-    scaffold manifests in this repository declare planned mutations and
-    materialize none, and scoring them produced a PASS meaning only that the
-    empty set was empty. `isolated_snapshot` is wired to fail, so a refusal that
-    arrives late fails here too.
-    """
-
-    campaign = _temporary_campaign(tmp_path)
-    receipt = tmp_path / "receipt.json"
-    monkeypatch.setattr(mutation_testing, "source_drift", lambda *_args: [])
-    monkeypatch.setattr(mutation_testing, "blocking_processes", lambda *_args: [])
-
-    def fail_snapshot(_repo: Path):
-        pytest.fail("an unauthorized campaign must not create an isolated snapshot")
-
-    monkeypatch.setattr(mutation_testing, "isolated_snapshot", fail_snapshot)
-
-    with pytest.raises(mutation_testing.CampaignError, match="--allow-mutations"):
-        mutation_testing.run_campaign(
-            campaign, allow_mutations=False, repo_root=tmp_path
-        )
-
-    # Every engine carrying an adapter is refused, so the refusal and the
-    # adapter table cannot drift apart and re-open the vacuous path for
-    # whichever engine a restated list left out.
-    engines = sorted(mutation_engine_generated.GENERATED_ENGINES)
-    assert engines, "GENERATED_ENGINES is empty; this test would assert nothing"
-    for engine in engines:
-        generated = replace(campaign, mutation_engine=engine, mutations=())
-        with pytest.raises(mutation_testing.CampaignError) as excinfo:
-            mutation_testing.run_campaign(
-                generated,
-                allow_mutations=True,
-                receipt_path=receipt,
-                repo_root=tmp_path,
-            )
-        message = str(excinfo.value)
-        assert repr(engine) in message
-        assert "conductor.mutation_engine_generated" in message
-        assert not receipt.exists()
-
-    empty = replace(campaign, mutations=())
-    assert empty.mutation_engine not in mutation_engine_generated.GENERATED_ENGINES
-    assert empty.planned_mutations, "the planned/materialized gap is the point"
-    with pytest.raises(mutation_testing.CampaignError) as excinfo:
-        mutation_testing.run_campaign(
-            empty, allow_mutations=True, receipt_path=receipt, repo_root=tmp_path
-        )
-    message = str(excinfo.value)
-    assert "no materialized mutations" in message
-    assert "only 2 planned" in message
-    assert not receipt.exists()
 
 
 def test_rank_gaps_fail_closed(tmp_path: Path) -> None:
@@ -533,65 +469,6 @@ def _prepare_fake_run(
     monkeypatch.setattr(mutation_testing, "isolated_snapshot", snapshot)
 
 
-def test_baseline_failure_writes_fail_closed_receipt(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    campaign = _temporary_campaign(tmp_path)
-    _prepare_fake_run(monkeypatch, tmp_path)
-    monkeypatch.setattr(
-        mutation_testing,
-        "_run_command",
-        lambda *_args, **_kwargs: mutation_testing.CommandResult(
-            returncode=1,
-            timed_out=False,
-            duration_seconds=0.1,
-            stdout_tail="baseline failed",
-            stderr_tail="",
-        ),
-    )
-    receipt = tmp_path / "baseline-failed.json"
-
-    with pytest.raises(mutation_testing.CampaignError, match="baseline failed"):
-        mutation_testing.run_campaign(
-            campaign,
-            allow_mutations=True,
-            receipt_path=receipt,
-            repo_root=tmp_path,
-        )
-
-    payload = json.loads(receipt.read_text(encoding="utf-8"))
-    assert payload["status"] == "BASELINE_FAILED"
-    assert payload["mutants"] == []
-
-
-def test_mutant_timeout_is_error_not_kill(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    campaign = _temporary_campaign(tmp_path)
-    _prepare_fake_run(monkeypatch, tmp_path)
-    results = iter(
-        (
-            mutation_testing.CommandResult(0, False, 0.1, "baseline", ""),
-            mutation_testing.CommandResult(None, True, 1.0, "", "timeout"),
-        )
-    )
-    monkeypatch.setattr(
-        mutation_testing, "_run_command", lambda *_args, **_kwargs: next(results)
-    )
-    receipt = tmp_path / "timeout.json"
-
-    result = mutation_testing.run_campaign(
-        campaign,
-        allow_mutations=True,
-        mutation_ids=[campaign.mutations[0].mutation_id],
-        receipt_path=receipt,
-        repo_root=tmp_path,
-    )
-
-    assert result["status"] == "ERROR"
-    assert result["mutants"][0]["outcome"] == "TIMED_OUT"
-
-
 def _junit_writing_run(
     campaign: mutation_testing.Campaign,
     results: "Iterator[mutation_testing.CommandResult]",
@@ -638,105 +515,6 @@ def _junit_writing_run(
     return run
 
 
-def test_single_mutant_rerun_is_marked_partial(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    campaign = _temporary_campaign(tmp_path)
-    _prepare_fake_run(monkeypatch, tmp_path)
-    results = iter(
-        (
-            mutation_testing.CommandResult(0, False, 0.1, "baseline", ""),
-            mutation_testing.CommandResult(1, False, 0.1, "killed", ""),
-        )
-    )
-    selected = campaign.mutations[1].mutation_id
-    killers = {
-        killer
-        for mutation in campaign.mutations
-        if mutation.mutation_id == selected
-        for killer in mutation.expected_killers
-    }
-    monkeypatch.setattr(
-        mutation_testing,
-        "_run_command",
-        _junit_writing_run(campaign, results, killers),
-    )
-
-    result = mutation_testing.run_campaign(
-        campaign,
-        allow_mutations=True,
-        mutation_ids=[selected],
-        receipt_path=tmp_path / "partial.json",
-        repo_root=tmp_path,
-    )
-
-    assert result["status"] == "PASS"
-    assert result["complete_campaign"] is False
-    assert result["selected_mutations"] == [selected]
-    assert result["mutation_score"] == 1.0
-
-
-def test_unknown_single_mutant_fails_before_snapshot(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    campaign = _temporary_campaign(tmp_path)
-    monkeypatch.setattr(
-        mutation_testing,
-        "inspect_campaign",
-        lambda *_args, **_kwargs: {"status": "READY", "readiness_reasons": []},
-    )
-    monkeypatch.setattr(
-        mutation_testing,
-        "isolated_snapshot",
-        lambda *_args: pytest.fail("unknown selection must not create a snapshot"),
-    )
-
-    with pytest.raises(mutation_testing.CampaignError, match="unknown mutation ids"):
-        mutation_testing.run_campaign(
-            campaign,
-            allow_mutations=True,
-            mutation_ids=["does_not_exist"],
-            repo_root=tmp_path,
-        )
-
-
-def test_patch_hash_drift_is_rechecked_immediately(tmp_path: Path) -> None:
-    patch = tmp_path / "mutant.patch"
-    patch.write_text("changed after load\n", encoding="utf-8")
-    mutation = mutation_testing.Mutation(
-        mutation_id="drifted",
-        patch_file=patch,
-        patch_sha256="0" * 64,
-        allowed_paths=("example.py",),
-        expected_killers=("test_example.py::test_contract",),
-    )
-
-    with pytest.raises(
-        mutation_testing.CampaignError, match="changed after campaign load"
-    ):
-        mutation_testing._apply_mutation(mutation, tmp_path)  # noqa: SLF001
-
-
-def test_untracked_mutation_patches_are_linked_into_snapshot(tmp_path: Path) -> None:
-    campaign = mutation_testing.load_campaign(
-        mutation_testing.REPO_ROOT
-        / "conductor/mutation_campaigns/mutation_framework_self.json"
-    )
-    snapshot = tmp_path / "snapshot"
-    snapshot.mkdir()
-
-    mutation_testing._link_mutation_patches(  # noqa: SLF001
-        campaign, snapshot, mutation_testing.REPO_ROOT
-    )
-
-    for mutation in campaign.mutations:
-        relative = mutation.patch_file.relative_to(mutation_testing.REPO_ROOT)
-        linked = snapshot / relative
-        assert linked.is_file()
-        assert not linked.is_symlink()
-        assert mutation_testing._sha256(linked) == mutation.patch_sha256  # noqa: SLF001
-
-
 def test_host_read_dependencies_are_materialized_not_symlinked(tmp_path: Path) -> None:
     host = tmp_path / "host"
     (host / "reports" / "screen").mkdir(parents=True)
@@ -748,7 +526,7 @@ def test_host_read_dependencies_are_materialized_not_symlinked(tmp_path: Path) -
     campaign = dataclasses.replace(
         mutation_testing.load_campaign(
             mutation_testing.REPO_ROOT
-            / "conductor/mutation_campaigns/mutation_framework_self.json"
+            / "conductor/mutation_campaigns/claude_bash_quiet.json"
         ),
         host_read_dependencies=("reports/screen", "notes/plan.md"),
     )
@@ -775,40 +553,6 @@ def test_manifest_rejects_patch_path_escape(tmp_path: Path) -> None:
 
     with pytest.raises(mutation_testing.CampaignError, match="normalized"):
         mutation_testing.load_campaign(path, repo_root=tmp_path)
-
-
-def test_snapshot_cleanup_and_error_receipt_on_unexpected_exception(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    campaign = _temporary_campaign(tmp_path)
-    exits: list[Path] = []
-    _prepare_fake_run(monkeypatch, tmp_path, exits=exits)
-    monkeypatch.setattr(
-        mutation_testing,
-        "_run_command",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
-    )
-    receipt = tmp_path / "crash.json"
-
-    with pytest.raises(mutation_testing.CampaignError, match="campaign crashed"):
-        mutation_testing.run_campaign(
-            campaign,
-            allow_mutations=True,
-            receipt_path=receipt,
-            repo_root=tmp_path,
-        )
-
-    assert exits == [tmp_path]
-    assert json.loads(receipt.read_text(encoding="utf-8"))["status"] == "ERROR"
-
-
-def test_atomic_receipt_leaves_no_temporary_file(tmp_path: Path) -> None:
-    target = tmp_path / "receipt.json"
-
-    mutation_testing._atomic_json(target, {"status": "PASS"})  # noqa: SLF001
-
-    assert json.loads(target.read_text(encoding="utf-8")) == {"status": "PASS"}
-    assert list(tmp_path.glob(".*.tmp")) == []
 
 
 def test_mandatory_evidence_accepts_current_complete_receipts(

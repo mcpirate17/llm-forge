@@ -44,7 +44,11 @@ conductor = "conductor.__main__:main"
 kb_retrieve = "conductor.kb_retrieve:main"
 memory_index = "conductor.memory_index:main"
 candidate_review = "conductor.candidate_review.cli:main"
+# The mutation front door is the automatic path. `mutation_testing` inspects and
+# verifies; it cannot run anything -- the hand runner was removed 2026-09-08.
 mutation_testing = "conductor.mutation_testing:main"
+mutation_generate = "conductor.mutation_campaign_generate:main"
+mutation_engine = "conductor.mutation_engine_generated:main"
 agent_a2a = "conductor.agent_a2a:main"
 handoff = "conductor.handoff:main"
 

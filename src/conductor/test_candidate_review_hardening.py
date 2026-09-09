@@ -33,9 +33,9 @@ DEAD_PATH = "research/tests/test_nm_f6_phase22_chinchilla.py"
 # A dead path that is NOT tombstoned: only the evaluation-time file check can prune it.
 PRUNED_PATH = "research/tests/test_pruned_probe.py"
 CAMPAIGN_MANIFEST_RELPATHS = (
-    "conductor/mutation_campaigns/mutation_evidence_gate_v5_20260827.json",
-    "conductor/mutation_campaigns/mutation_evidence_gate_hardening_20260827.json",
-    "conductor/mutation_campaigns/mutation_evidence_gate_value_edges_20260827.json",
+    "conductor/mutation_campaigns/claude_receipt_scope_20260902.json",
+    "conductor/mutation_campaigns/claude_value_gate_scope_20260903.json",
+    "conductor/mutation_campaigns/claude_value_waivers_20260902.json",
 )
 
 

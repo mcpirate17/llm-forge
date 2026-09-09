@@ -628,16 +628,22 @@ def _missing_evidence_findings(
             Finding(
                 check_id="mutation-evidence",
                 rule_id="missing-mutation-receipt",
-                severity=Severity.CRITICAL,
+                severity=Severity.INFO,
                 message=(
                     f"{path_name}: {missing.get('reason', 'missing mutation evidence')}"
+                    " -- debt, not a block"
                 ),
                 path=path_name or None,
                 help=(
-                    "Scaffold with `python -m conductor.mutation_coverage scaffold "
-                    "PATH --source SRC`, register the campaign, then "
-                    "`make mutation-run`; mutation runs are pre-approved "
-                    "(Tim, 2026-08-31). Keep the PASS receipt."
+                    "A changed test with no current PASS receipt no longer holds a "
+                    "branch back: land it and record the missing receipt as debt in "
+                    "the PR body and the fleet debt ledger (KB-MUT-02; "
+                    "mutation-evidence-authoring grant, half (b)). If you do want "
+                    "coverage, the only permitted route is an automatic engine -- "
+                    "`make mutation-generate MUTATION_SOURCE=SRC` then "
+                    "`make mutation-engine-run MUTATION_CAMPAIGN=...`. Hand-authored "
+                    "mutants, manifests, patches and receipts are forbidden, and the "
+                    "tooling that produced them has been removed."
                 ),
                 evidence={
                     "receipt_rejections": missing.get("receipt_rejections", []),

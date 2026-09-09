@@ -71,14 +71,14 @@ def test_compact_state_omits_claim_paths() -> None:
     assert "never gate work or runs on local output" in text
     assert ".current_work.md" in text
     assert "MUTATION" in text
-    assert "mutation-coverage" in text
-
-
-def test_compact_state_states_mutation_authority_and_delegation() -> None:
-    text = preamble.compact_state(_state())  # type: ignore[arg-type]
-
-    assert "Mutation runs are pre-approved (Tim, 2026-08-31)" in text
-    assert "disposable worktrees only" in text
+    # Folded in from test_compact_state_states_mutation_authority_and_delegation,
+    # which the 2026-09-09 generated campaign classified MERGE with zero unique
+    # kills: it asserted on the same `compact_state` string this one already
+    # pins, so the assertions are kept and the redundant nodeid is not.
+    assert "mutate ONLY the files you changed" in text
+    assert "automatic engines only" in text
+    assert "hand-authored mutants" in text
+    assert "never repo-wide" in text
     assert "DELEGATE: searches touching >3 files" in text
     assert "ast_context_tool/query_graph" in text
 
