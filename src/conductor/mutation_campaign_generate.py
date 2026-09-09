@@ -471,6 +471,73 @@ def write(
     return written
 
 
+def _load_generated_cargo_campaign(
+    campaign: str, repo_root: Path
+) -> tuple[Path, dict[str, Any]]:
+    """Resolve a campaign name to its path and its parsed cargo-mutants manifest."""
+
+    relative = campaign.removeprefix(f"{CAMPAIGN_DIR}/")
+    if not relative.endswith(".json"):
+        relative = f"{relative}.json"
+    path = repo_root / CAMPAIGN_DIR / relative
+    try:
+        existing = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CampaignError(f"cannot load generated campaign {path}: {exc}") from exc
+    if not isinstance(existing, dict):
+        raise CampaignError(f"{path} is not a cargo-mutants generated campaign")
+    if existing.get("mutation_engine") != "cargo-mutants":
+        raise CampaignError(f"{path} is not a cargo-mutants generated campaign")
+    return path, existing
+
+
+def _generated_cargo_subject(
+    existing: Mapping[str, Any], path: Path, repo_root: Path
+) -> tuple[dict[str, Any], str]:
+    """Find the crate a generated cargo manifest was produced from."""
+
+    options = (existing.get("generator") or {}).get("options") or {}
+    package = options.get("package")
+    manifest_path = options.get("manifest_path")
+    if not isinstance(package, str) or not isinstance(manifest_path, str):
+        raise CampaignError(f"{path} has no generated cargo package")
+    candidates = [row for row in rust_subjects(repo_root) if row["package"] == package]
+    subject = next(
+        (row for row in candidates if row["manifest"] == manifest_path), None
+    )
+    if subject is None and len(candidates) == 1:
+        # A prior generator version could pin its own disposable snapshot. Once
+        # snapshots are excluded, the sole real package is the unambiguous repair.
+        subject = candidates[0]
+    if subject is None:
+        raise CampaignError(f"generated cargo package {package!r} no longer exists")
+    return subject, package
+
+
+def _scope_to_sources(
+    refreshed: dict[str, Any],
+    subject: Mapping[str, Any],
+    sources: Sequence[str],
+    package: str,
+    repo_root: Path,
+) -> None:
+    """Narrow a refreshed manifest to the requested subset of the crate's files."""
+
+    unknown = sorted(set(sources) - set(subject["files"]))
+    if unknown:
+        raise CampaignError(f"scoped source is not in {package!r}: {unknown}")
+    selected = sorted(set(sources))
+    package_root = Path(subject["root"])
+    refreshed["generator"]["source"] = [
+        Path(path).relative_to(package_root).as_posix() for path in selected
+    ]
+    refreshed["source_sha256"] = {path: _sha256(repo_root / path) for path in selected}
+    # Rust unit tests are colocated with their source.  Binding just these
+    # files keeps the receipt specific to the requested test surface even
+    # though cargo-mutants invokes Cargo's unit-test harness.
+    refreshed["test_sha256"] = dict(refreshed["source_sha256"])
+
+
 def refresh_rust_campaign(
     campaign: str,
     *,
@@ -485,36 +552,8 @@ def refresh_rust_campaign(
     agent-authored field.
     """
 
-    relative = campaign.removeprefix(f"{CAMPAIGN_DIR}/")
-    if not relative.endswith(".json"):
-        relative = f"{relative}.json"
-    path = repo_root / CAMPAIGN_DIR / relative
-    try:
-        existing = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise CampaignError(f"cannot load generated campaign {path}: {exc}") from exc
-    if not isinstance(existing, dict) or existing.get("mutation_engine") != "cargo-mutants":
-        raise CampaignError(f"{path} is not a cargo-mutants generated campaign")
-    options = (existing.get("generator") or {}).get("options") or {}
-    package = options.get("package")
-    manifest_path = options.get("manifest_path")
-    if not isinstance(package, str) or not isinstance(manifest_path, str):
-        raise CampaignError(f"{path} has no generated cargo package")
-    candidates = [row for row in rust_subjects(repo_root) if row["package"] == package]
-    subject = next(
-        (
-            row
-            for row in candidates
-            if row["manifest"] == manifest_path
-        ),
-        None,
-    )
-    if subject is None and len(candidates) == 1:
-        # A prior generator version could pin its own disposable snapshot. Once
-        # snapshots are excluded, the sole real package is the unambiguous repair.
-        subject = candidates[0]
-    if subject is None:
-        raise CampaignError(f"generated cargo package {package!r} no longer exists")
+    path, existing = _load_generated_cargo_campaign(campaign, repo_root)
+    subject, package = _generated_cargo_subject(existing, path, repo_root)
     generator = existing.get("generator") or {}
     refreshed = cargo_manifest(
         subject,
@@ -524,29 +563,13 @@ def refresh_rust_campaign(
         run_timeout_seconds=int(generator.get("run_timeout_seconds", 1800)),
     )
     if sources:
-        requested = set(sources)
-        available = set(subject["files"])
-        unknown = sorted(requested - available)
-        if unknown:
-            raise CampaignError(
-                f"scoped source is not in {package!r}: {unknown}"
-            )
-        selected = sorted(requested)
-        package_root = Path(subject["root"])
-        refreshed["generator"]["source"] = [
-            (Path(path).relative_to(package_root)).as_posix() for path in selected
-        ]
-        refreshed["source_sha256"] = {
-            path: _sha256(repo_root / path) for path in selected
-        }
-        # Rust unit tests are colocated with their source.  Binding just these
-        # files keeps the receipt specific to the requested test surface even
-        # though cargo-mutants invokes Cargo's unit-test harness.
-        refreshed["test_sha256"] = dict(refreshed["source_sha256"])
+        _scope_to_sources(refreshed, subject, sources, package, repo_root)
     refreshed["survivor_baseline"] = list(existing.get("survivor_baseline") or [])
     if "survivor_baseline_note" in existing:
         refreshed["survivor_baseline_note"] = existing["survivor_baseline_note"]
-    path.write_text(json.dumps(refreshed, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(refreshed, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return path.relative_to(repo_root).as_posix()
 
 

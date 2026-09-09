@@ -14,7 +14,6 @@ import signal
 import stat
 import subprocess
 import time
-import tomllib
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
