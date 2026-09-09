@@ -487,9 +487,11 @@ def test_wait_for_idle_and_host_dependencies(
     snap.mkdir()
     mutation_testing._link_host_dependencies(obj, snap, host)
     assert (snap / "dep.txt").read_text(encoding="utf-8") == "x\n"
-    assert (snap / "dep.txt").is_file()
     assert not (snap / "dep.txt").is_symlink()
-    with pytest.raises(mutation_testing.CampaignError, match="already contains"):
+    mutation_testing._link_host_dependencies(obj, snap, host)
+    (host / "dep.txt").unlink()  # break the hard link, else both copies change
+    (host / "dep.txt").write_text("uncommitted\n", encoding="utf-8")
+    with pytest.raises(mutation_testing.CampaignError, match="differs from the host"):
         mutation_testing._link_host_dependencies(obj, snap, host)
     with pytest.raises(mutation_testing.CampaignError, match="at least one"):
         mutation_testing._select_mutations(obj, [])

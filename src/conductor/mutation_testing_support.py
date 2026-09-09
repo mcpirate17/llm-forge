@@ -260,6 +260,45 @@ def evidence_result(
     }
 
 
+def _merge_host_dependency(
+    source: Path,
+    destination: Path,
+    relative: str,
+    *,
+    materialize: Callable[[Path, Path], None],
+    error_type: type[Exception],
+) -> None:
+    """Fill one declared host path into the snapshot without rewriting its tree."""
+
+    if destination.is_symlink():
+        raise error_type(
+            f"snapshot already contains host read dependency path: {relative}"
+        )
+    if not destination.exists():
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        materialize(source, destination)
+        return
+    if source.is_dir() != destination.is_dir():
+        raise error_type(
+            f"snapshot copy of host read dependency differs from the host: {relative}"
+        )
+    if not source.is_dir():
+        if source.read_bytes() != destination.read_bytes():
+            raise error_type(
+                "snapshot copy of host read dependency differs from the host: "
+                f"{relative}"
+            )
+        return
+    for child in sorted(source.iterdir()):
+        _merge_host_dependency(
+            child,
+            destination / child.name,
+            f"{relative}/{child.name}",
+            materialize=materialize,
+            error_type=error_type,
+        )
+
+
 def link_host_dependencies(
     campaign: _CampaignSupport,
     snapshot_root: Path,
@@ -268,19 +307,32 @@ def link_host_dependencies(
     materialize: Callable[[Path, Path], None],
     error_type: type[Exception],
 ) -> None:
-    """Materialize declared host-read dependencies inside a snapshot."""
+    """Materialize declared host-read dependencies inside a snapshot.
+
+    A declared path is one the snapshot -- a git tree export -- cannot supply, so
+    the host copy has to be filled in.  Refusing outright when the path already
+    exists is wrong twice over: a directory under ``research/reports`` is only
+    *partially* tracked, so the snapshot can hold the committed files and still be
+    missing every gitignored one the campaign actually reads.  Merge instead --
+    fill in what the snapshot lacks, leave what it already carries, and descend
+    rather than deciding once for a whole directory.
+
+    Divergence is the case worth refusing: when both copies hold the same path with
+    different bytes, no receipt can be attributed to either, and that is a host
+    carrying uncommitted work under a path the campaign reads.
+    """
 
     for relative in campaign.host_read_dependencies:
         source = host_root / relative
         if not source.exists():
             raise error_type(f"host read dependency is missing: {relative}")
-        destination = snapshot_root / relative
-        if destination.exists() or destination.is_symlink():
-            raise error_type(
-                f"snapshot already contains host read dependency path: {relative}"
-            )
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        materialize(source, destination)
+        _merge_host_dependency(
+            source,
+            snapshot_root / relative,
+            relative,
+            materialize=materialize,
+            error_type=error_type,
+        )
 
 
 def materialize(source: Path, destination: Path) -> None:
