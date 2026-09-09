@@ -25,6 +25,7 @@ mod mutation_manifest;
 mod mutation_receipt;
 mod mutation_value;
 mod native_reuse;
+mod project_context;
 mod receipt_auth;
 mod tooling_boundary;
 
@@ -51,6 +52,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     memory_index::register(module)?;
     mutation_value::register(module)?;
     native_reuse::register(module)?;
+    project_context::register(module)?;
     receipt_auth::register(module)?;
     tooling_boundary::register(module)?;
     Ok(())

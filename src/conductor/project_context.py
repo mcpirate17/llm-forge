@@ -8,6 +8,7 @@ discovery using the system Git executable specified by the T03a contract.
 from __future__ import annotations
 
 import os
+import json
 import selectors
 import signal
 import stat
@@ -474,17 +475,23 @@ def _open_contained_regular(root: Path, path: Path) -> int:
 
 
 def _parse_config(raw: bytes, resolved: Path) -> _Config:
+    from conductor._native import project_context_parse_config_native
+
     try:
-        parsed = tomllib.loads(raw.decode("utf-8", "strict"))
-    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        parsed = json.loads(project_context_parse_config_native(raw))
+    except ValueError as exc:
         raise _error(
-            "CONFIG_PARSE", "config", "configuration is not strict UTF-8 TOML"
+            "CONFIG_PARSE" if str(exc).startswith("CONFIG_PARSE:") else "CONFIG_SCHEMA",
+            "config",
+            str(exc).split(":", 1)[-1],
         ) from exc
-    project, paths = _config_tables(parsed)
-    project_id = _config_project_id(project)
-    policy, registry, notes = _config_paths(paths)
     return _Config(
-        resolved, sha256(raw).hexdigest(), project_id, policy, registry, notes
+        resolved,
+        sha256(raw).hexdigest(),
+        parsed["project_id"],
+        parsed["policy"],
+        parsed["registry"],
+        tuple(parsed["notes"]),
     )
 
 
