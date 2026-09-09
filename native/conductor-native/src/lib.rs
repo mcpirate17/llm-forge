@@ -11,6 +11,7 @@ mod candidate_structure;
 mod context_telemetry;
 mod dead_tests;
 mod duplicate_bodies;
+mod fleet_status;
 mod git_source;
 mod guardrail_ast;
 mod hook_installer;
@@ -37,6 +38,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     context_telemetry::register(module)?;
     dead_tests::register(module)?;
     duplicate_bodies::register(module)?;
+    fleet_status::register(module)?;
     guardrail_ast::register(module)?;
     hook_installer::register(module)?;
     git_source::register(module)?;

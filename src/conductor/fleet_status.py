@@ -111,71 +111,24 @@ def build_report() -> dict[str, Any]:
     claims = state.get("active_claims", [])
     headings = state.get("active_headings", [])
 
-    seats: dict[str, dict[str, Any]] = {}
-    names = set(peers) | set(heard) | {c.get("owner", "") for c in claims}
-    names |= {_heading_seat(h) for h in headings}
-    names.discard("")
-    for name in sorted(names):
-        peer = peers.get(name)
-        seat_claims = [c for c in claims if c.get("owner") == name]
-        expiries = sorted(
-            c.get("expires_at", "") for c in seat_claims if c.get("expires_at")
+    from conductor._native import fleet_status_build_report_native
+
+    return json.loads(
+        fleet_status_build_report_native(
+            json.dumps(peers, ensure_ascii=False),
+            json.dumps(heard, ensure_ascii=False),
+            json.dumps({"active_claims": claims, "active_headings": headings}, ensure_ascii=False),
+            json.dumps(read_worktree_procs(), ensure_ascii=False),
+            datetime.now(UTC).isoformat(timespec="seconds"),
+            str(ROOT),
         )
-        seats[name] = {
-            "a2a": (
-                f"up:{peer['port']}"
-                if peer and peer.get("status") == "up"
-                else "down"
-                if peer
-                else "NO IDENTITY"
-            ),
-            "last_heard": heard.get(name),
-            "headings": [h for h in headings if _heading_seat(h) == name],
-            "claims": len(seat_claims),
-            "claim_paths": sorted({p for c in seat_claims for p in c.get("paths", [])}),
-            "soonest_expiry": expiries[0] if expiries else None,
-        }
-    return {
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "root": str(ROOT),
-        "seats": seats,
-        "worktree_processes": read_worktree_procs(),
-    }
+    )
 
 
 def render(report: dict[str, Any]) -> str:
-    lines = [f"FLEET STATUS  {report['generated_at']}  root={report['root']}"]
-    for name, s in report["seats"].items():
-        expiry = (
-            f"  soonest-expiry={s['soonest_expiry'][:16]}Z"
-            if s["soonest_expiry"]
-            else ""
-        )
-        lines.append(f"\n● {name}  [{s['a2a']}]  claims={s['claims']}{expiry}")
-        for h in s["headings"]:
-            lines.append(f"    heading: {h}")
-        if s["last_heard"]:
-            lines.append(
-                f"    last heard {s['last_heard']['at'][:19]}: {s['last_heard']['said']}"
-            )
-        if s["claim_paths"]:
-            shown = s["claim_paths"][:4]
-            extra = len(s["claim_paths"]) - len(shown)
-            lines.append(
-                "    owns: " + ", ".join(shown) + (f" (+{extra} more)" if extra else "")
-            )
-    procs = report["worktree_processes"]
-    if procs:
-        lines.append("\nLIVE PROCESSES BY WORKTREE")
-        for tree, ps in sorted(procs.items()):
-            lines.append(f"  {tree}: {len(ps)}")
-            if not _DISPOSABLE_TREE.match(tree):
-                continue  # the shared checkout is long-lived daemons; count only
-            for p in ps[:3]:
-                lines.append(f"    {p}")
-            if len(ps) > 3:
-                lines.append(f"    … +{len(ps) - 3} more")
-    return "\n".join(lines)
+    from conductor._native import fleet_status_render_native
+
+    return fleet_status_render_native(json.dumps(report, ensure_ascii=False))
 
 
 def main(argv: list[str] | None = None) -> int:
