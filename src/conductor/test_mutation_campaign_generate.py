@@ -213,8 +213,18 @@ def _assert_names_its_own_tests(manifest: dict) -> None:
 
     source = manifest["generator"]["source"][0]
     stem = source.rsplit("/", 1)[-1].removesuffix(".py")
-    assert manifest["test_argv"][:4] == ["python", "-m", "pytest", "-q"]
-    tests = manifest["test_argv"][4:]
+    # --rootdir=. is load-bearing, not cosmetic: a nested pytest.ini under
+    # research/ or component_fab/ otherwise wins rootdir discovery and reports
+    # nodeids relative to that subtree, so nothing in the run matches a nodeid
+    # in test_argv and the campaign scores with test_value null.
+    assert manifest["test_argv"][:5] == [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--rootdir=.",
+    ]
+    tests = manifest["test_argv"][5:]
     assert tests, f"{source} was planned with no test to run"
     assert any(stem in test for test in tests), (
         f"{source} runs {tests}, none of which names it"

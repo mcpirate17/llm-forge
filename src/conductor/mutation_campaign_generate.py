@@ -218,7 +218,12 @@ def fest_manifest(
             "mutant_timeout_seconds": 30,
             "run_timeout_seconds": run_timeout_seconds,
         },
-        "test_argv": ["python", "-m", "pytest", "-q", *tests],
+        # --rootdir=. pins pytest to the repo root. Without it a nested
+        # pytest.ini (research/, component_fab/) wins rootdir discovery and
+        # every nodeid is reported relative to that subtree, so no nodeid in
+        # the report matches one in test_argv: attribution comes back
+        # NO_ATTRIBUTION and test_value is null.
+        "test_argv": ["python", "-m", "pytest", "-q", "--rootdir=.", *tests],
         "environment": {},
         "source_sha256": {source: _sha256(repo_root / source)},
         "test_sha256": {test: _sha256(repo_root / test) for test in tests},
