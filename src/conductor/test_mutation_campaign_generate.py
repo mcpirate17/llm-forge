@@ -11,21 +11,30 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
+from datetime import UTC, datetime
 
 import pytest
 
+from conductor import mutation_campaign_generate as campaign_generate
 from conductor.mutation_campaign_generate import (
     _branch_scope,
+    _explicit_scope,
+    _is_test,
     _package_name,
     _unique_slugs,
+    cargo_manifest,
     changed_sources,
+    fest_manifest,
     existing_subjects,
     plan,
+    refresh_python_campaign,
     refresh_rust_campaign,
     python_subjects,
     rust_subjects,
+    rust_test_files,
     write,
 )
+from conductor.candidate_review.ownership import create_claim
 from conductor.mutation_engine_generated import load_generated_campaign
 from conductor.mutation_scope import CampaignError
 
@@ -78,6 +87,60 @@ def test_the_package_name_comes_from_package_not_bin_or_dependencies(
     path = tmp_path / "Cargo.toml"
     path.write_text(CRATE, encoding="utf-8")
     assert _package_name(path) == "widget-core"
+    path.write_text('[dependencies]\nname = "not-a-package"\n', encoding="utf-8")
+    assert _package_name(path) is None
+    path.write_text("[package]\nname = 'quoted-package'\n", encoding="utf-8")
+    assert _package_name(path) == "quoted-package"
+    # A bare key before the first TOML section is not a package declaration.
+    # This also distinguishes the initial state from a package section that has
+    # already been seen.
+    path.write_text('name = "headerless"\n[dependencies]\n', encoding="utf-8")
+    assert _package_name(path) is None
+    # `version` is valid in `[package]`, but must not be mistaken for its name.
+    path.write_text(
+        '[package]\nversion = "0.1.0"\nname = "after-version"\n', encoding="utf-8"
+    )
+    assert _package_name(path) == "after-version"
+
+
+def test_test_file_recognition_covers_all_supported_layouts_only() -> None:
+    """A test outside the two layouts cannot silently become a mutable source."""
+
+    assert _is_test("conductor/conftest.py", "conftest.py")
+    assert _is_test("conductor/test_campaign.py", "test_campaign.py")
+    assert _is_test("research/tests/check_campaign.py", "check_campaign.py")
+    assert not _is_test("research/tools/check_campaign.py", "check_campaign.py")
+
+
+def test_fest_manifest_binds_its_generated_engine_contract(tmp_path: Path) -> None:
+    """Generated Python campaigns must retain the exact engine and timeout contract."""
+
+    tree(
+        tmp_path,
+        {"pkg/subject.py": "x = 1\n", "pkg/test_subject.py": "def test_x(): pass\n"},
+    )
+    manifest = fest_manifest(
+        {"source": "pkg/subject.py", "tests": ["pkg/test_subject.py"]},
+        campaign_id="owner_subject_fest_20260910",
+        repo_root=tmp_path,
+        run_timeout_seconds=91,
+    )
+    assert manifest["schema_version"] == 1
+    assert (
+        manifest["title"]
+        == "Generated mutants for pkg/subject.py, scored on the survivor set"
+    )
+    assert manifest["language"] == "python"
+    assert manifest["mutation_engine"] == "fest"
+    assert manifest["generator"]["exclude"] == ["**/test_*.py", "**/conftest.py"]
+    assert manifest["generator"]["operators"] == []
+    assert manifest["generator"]["seed"] == 0
+    assert manifest["generator"]["mutant_timeout_seconds"] == 30
+    assert manifest["generator"]["run_timeout_seconds"] == 91
+    assert manifest["environment"] == {}
+    assert manifest["survivor_baseline"] == []
+    assert manifest["survivor_baseline_recorded"] is False
+    assert "FIRST engine run" in manifest["survivor_baseline_note"]
 
 
 def test_a_workspace_root_declaring_no_package_is_not_a_subject(tmp_path: Path) -> None:
@@ -92,6 +155,108 @@ def test_a_workspace_root_declaring_no_package_is_not_a_subject(tmp_path: Path) 
         },
     )
     assert [c["package"] for c in rust_subjects(tmp_path)] == ["w"]
+
+
+def test_rust_test_discovery_includes_integration_and_inline_tests_but_skips_venvs(
+    tmp_path: Path,
+) -> None:
+    """The manifest must hash every test cargo executes, not build artefacts."""
+
+    tree(
+        tmp_path,
+        {
+            "crate/src/lib.rs": "#[cfg(test)]\nmod unit {}\n",
+            "crate/tests/integration.rs": "#[test]\nfn it_works() {}\n",
+            "crate/tests/.venv/generated.rs": "#[test]\nfn stale() {}\n",
+        },
+    )
+    subject = {
+        "package": "crate",
+        "root": "crate",
+        "manifest": "crate/Cargo.toml",
+        "files": ["crate/src/lib.rs"],
+    }
+    assert rust_test_files(subject, repo_root=tmp_path) == [
+        "crate/src/lib.rs",
+        "crate/tests/integration.rs",
+    ]
+
+
+def test_cargo_manifest_preserves_the_exact_scoped_engine_contract(
+    tmp_path: Path,
+) -> None:
+    """A selected Rust file must retain its crate root, pinning and limits."""
+
+    tree(
+        tmp_path,
+        {
+            "crate/src/lib.rs": "#[cfg(test)]\nmod unit {}\n",
+            "crate/tests/integration.rs": "#[test]\nfn it_works() {}\n",
+        },
+    )
+    subject = {
+        "package": "crate",
+        "root": "crate",
+        "manifest": "crate/Cargo.toml",
+        "files": ["crate/src/lib.rs"],
+    }
+    manifest = cargo_manifest(
+        subject,
+        campaign_id="owner_crate_cargo_20260910",
+        repo_root=tmp_path,
+        jobs=2,
+        run_timeout_seconds=91,
+        sources=["crate/src/lib.rs"],
+    )
+    assert manifest["schema_version"] == 1
+    assert manifest["generator"]["source"] == ["src/lib.rs"]
+    assert manifest["generator"]["exclude"] == []
+    assert manifest["generator"]["operators"] == []
+    assert manifest["generator"]["options"] == {
+        "manifest_path": "crate/Cargo.toml",
+        "package": "crate",
+        "package_root": "crate",
+    }
+    assert manifest["generator"]["seed"] == 0
+    assert manifest["generator"]["mutant_timeout_seconds"] == 30
+    assert manifest["generator"]["run_timeout_seconds"] == 91
+    assert manifest["test_argv"] == [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "crate/Cargo.toml",
+        "--package",
+        "crate",
+    ]
+    assert manifest["environment"] == {}
+    assert manifest["survivor_baseline"] == []
+    assert manifest["survivor_baseline_recorded"] is False
+    assert "FIRST engine run" in manifest["survivor_baseline_note"]
+
+
+def test_rust_planning_intersects_scope_instead_of_expanding_to_the_crate(
+    tmp_path: Path,
+) -> None:
+    """Changing one Rust file may not cause cargo-mutants to target its sibling."""
+
+    tree(
+        tmp_path,
+        {
+            "crate/Cargo.toml": '[package]\nname = "crate"\n',
+            "crate/src/lib.rs": "#[cfg(test)]\nmod unit {}\n",
+            "crate/src/sibling.rs": "pub fn sibling() {}\n",
+        },
+    )
+    planned = plan(
+        "rust",
+        repo_root=tmp_path,
+        day="20260910",
+        only_sources=["crate/src/lib.rs"],
+    )
+    assert planned["language"] == "rust"
+    assert planned["unpaired"] == []
+    assert planned["unpaired_lines"] == 0
+    assert planned["manifests"][0]["generator"]["source"] == ["src/lib.rs"]
 
 
 def test_a_crate_with_a_package_but_no_sources_is_refused(tmp_path: Path) -> None:
@@ -199,6 +364,11 @@ def test_write_refuses_to_replace_a_recorded_baseline(tmp_path: Path) -> None:
     with pytest.raises(CampaignError, match="refusing to replace"):
         write([manifest], repo_root=tmp_path)
     assert write([manifest], repo_root=tmp_path, force=True)
+    assert (
+        (tmp_path / "conductor/mutation_campaigns/x.json")
+        .read_text(encoding="utf-8")
+        .endswith("\n")
+    )
 
 
 def test_a_generated_rust_manifest_loads_as_a_generated_campaign() -> None:
@@ -297,7 +467,7 @@ def git_repo(root: Path, files: dict[str, str]) -> None:
     run("commit", "-q", "-m", "base")
 
 
-def test_the_scope_is_this_branchs_changed_files_and_nothing_else(
+def _assert_branch_scope_is_limited_to_changed_files(
     tmp_path: Path,
 ) -> None:
     """Three changed files must mutate three files, never the whole repository.
@@ -325,8 +495,14 @@ def test_the_scope_is_this_branchs_changed_files_and_nothing_else(
     git("commit", "-qam", "change one file")
     (tmp_path / "pkg/dirty.py").write_text("x = 3\n", encoding="utf-8")
     (tmp_path / "pkg/brand_new.py").write_text("x = 4\n", encoding="utf-8")
+    create_claim(
+        tmp_path,
+        owner="main",
+        paths=["pkg/committed.py", "pkg/dirty.py", "pkg/brand_new.py"],
+        justification="scope fixture owns its deliberate dirty files",
+    )
 
-    assert changed_sources("base", repo_root=tmp_path) == {
+    assert changed_sources("base", repo_root=tmp_path, owner="main") == {
         "pkg/committed.py",
         "pkg/dirty.py",
         "pkg/brand_new.py",
@@ -334,7 +510,7 @@ def test_the_scope_is_this_branchs_changed_files_and_nothing_else(
 
     # A path git still reports but that no longer exists cannot be a subject.
     (tmp_path / "pkg/committed.py").unlink()
-    assert changed_sources("base", repo_root=tmp_path) == {
+    assert changed_sources("base", repo_root=tmp_path, owner="main") == {
         "pkg/dirty.py",
         "pkg/brand_new.py",
     }
@@ -386,16 +562,127 @@ def test_the_scope_is_this_branchs_changed_files_and_nothing_else(
     assert [m["generator"]["options"]["package"] for m in rust_scoped["manifests"]] == [
         "widget-core"
     ]
+    manifest = rust_scoped["manifests"][0]
+    assert manifest["generator"]["source"] == ["src/lib.rs"]
+    assert list(manifest["source_sha256"]) == ["crates/widget/src/lib.rs"]
+    assert "crates/other/src/lib.rs" not in manifest["source_sha256"]
     assert len(plan("rust", repo_root=tmp_path, day="20260909")["manifests"]) == 2
 
 
-def test_a_base_git_cannot_resolve_yields_no_scope_rather_than_the_tree(
+def test_shared_dirty_scope_never_admits_another_lanes_files(tmp_path: Path) -> None:
+    """A shared checkout has unrelated dirt, so claims are the admission boundary."""
+
+    git_repo(tmp_path, {"pkg/mine.py": "x = 1\n", "pkg/theirs.py": "x = 1\n"})
+    (tmp_path / "pkg/mine.py").write_text("x = 2\n", encoding="utf-8")
+    (tmp_path / "pkg/theirs.py").write_text("x = 2\n", encoding="utf-8")
+    create_claim(
+        tmp_path,
+        owner="mine",
+        paths=["pkg/mine.py"],
+        justification="scope fixture lane one",
+    )
+    create_claim(
+        tmp_path,
+        owner="theirs",
+        paths=["pkg/theirs.py"],
+        justification="scope fixture lane two",
+    )
+
+    assert changed_sources("HEAD", repo_root=tmp_path, owner="mine") == {"pkg/mine.py"}
+    with pytest.raises(CampaignError, match="no active ownership claim"):
+        changed_sources("HEAD", repo_root=tmp_path, owner="missing")
+    _assert_branch_scope_is_limited_to_changed_files(tmp_path / "branch-scope")
+
+
+def test_explicit_scope_is_exact_and_does_not_read_shared_dirty_files(
     tmp_path: Path,
 ) -> None:
+    """`--only` accepts exact existing paths and rejects traversal or absent inputs."""
+
+    tree(tmp_path, {"pkg/subject.py": "x = 1\n"})
+    assert _explicit_scope(
+        ["pkg/subject.py", "pkg/subject.py"], repo_root=tmp_path
+    ) == ["pkg/subject.py"]
+    assert _explicit_scope(["pkg\\subject.py"], repo_root=tmp_path) == [
+        "pkg/subject.py"
+    ]
+    with pytest.raises(CampaignError, match="repository-relative"):
+        _explicit_scope(["./pkg/subject.py"], repo_root=tmp_path)
+    with pytest.raises(CampaignError, match="repository-relative"):
+        _explicit_scope(["../pkg/subject.py"], repo_root=tmp_path)
+    with pytest.raises(CampaignError, match="repository-relative"):
+        _explicit_scope(["/pkg/subject.py"], repo_root=tmp_path)
+    with pytest.raises(CampaignError, match="does not exist"):
+        _explicit_scope(["pkg/absent.py"], repo_root=tmp_path)
+
+
+def test_default_campaign_day_is_utc_and_an_explicit_day_wins(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Campaign ids are reproducible on request and calendar-correct by default."""
+
+    tree(
+        tmp_path,
+        {"pkg/subject.py": "x = 1\n", "pkg/test_subject.py": "def test_x(): pass\n"},
+    )
+
+    class FrozenDatetime:
+        @classmethod
+        def now(cls, tz):  # noqa: ANN001 - mirrors datetime.now
+            assert tz is not None
+            return datetime(2026, 1, 2, tzinfo=UTC)
+
+    monkeypatch.setattr(campaign_generate, "datetime", FrozenDatetime)
+    assert plan("python", repo_root=tmp_path)["manifests"][0]["campaign_id"].endswith(
+        "_20260102"
+    )
+    assert plan("python", repo_root=tmp_path, day="20261231")["manifests"][0][
+        "campaign_id"
+    ].endswith("_20261231")
+
+
+def _assert_unresolvable_base_refuses_scope(tmp_path: Path) -> None:
     """A failed git call must narrow the scope, never silently widen it."""
 
     git_repo(tmp_path, {"pkg/a.py": "x = 1\n"})
-    assert changed_sources("no-such-ref", repo_root=tmp_path) == set()
+    with pytest.raises(CampaignError, match="cannot determine mutation scope"):
+        changed_sources("no-such-ref", repo_root=tmp_path)
+
+
+def test_a_git_scope_failure_without_output_is_actionable(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """An empty Git diagnostic must still refuse scope discovery with context."""
+
+    class FailedGit:
+        returncode = 1
+        stderr = ""
+        stdout = ""
+
+    monkeypatch.setattr(
+        campaign_generate.subprocess, "run", lambda *args, **kwargs: FailedGit()
+    )
+    with pytest.raises(CampaignError, match="no output"):
+        changed_sources("HEAD", repo_root=tmp_path)
+
+
+def test_a_git_scope_failure_prefers_stderr_over_an_empty_stdout(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The diagnostic must retain stderr when Git leaves stdout empty."""
+
+    _assert_unresolvable_base_refuses_scope(tmp_path / "unresolvable-base")
+
+    class FailedGit:
+        returncode = 1
+        stderr = "unknown base"
+        stdout = ""
+
+    monkeypatch.setattr(
+        campaign_generate.subprocess, "run", lambda *args, **kwargs: FailedGit()
+    )
+    with pytest.raises(CampaignError, match="unknown base"):
+        changed_sources("HEAD", repo_root=tmp_path)
 
 
 def test_an_empty_scope_is_refused_instead_of_becoming_a_whole_tree_sweep(
@@ -432,15 +719,20 @@ def test_refresh_rebinds_a_cargo_campaign_to_the_sources_it_was_asked_for(
     payload = json.loads(path.read_text(encoding="utf-8"))
     payload["survivor_baseline"] = ["known"]
     payload["survivor_baseline_recorded"] = True
+    payload["generator"]["jobs"] = 2
+    payload["generator"]["run_timeout_seconds"] = 91
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     (tmp_path / "crates/widget/src/lib.rs").write_text(
         "#[test] fn t() { assert!(true); }\n", encoding="utf-8"
     )
-    refresh_rust_campaign(
-        payload["campaign_id"],
-        sources=["crates/widget/src/lib.rs"],
-        repo_root=tmp_path,
+    assert (
+        refresh_rust_campaign(
+            payload["campaign_id"],
+            sources=["crates/widget/src/lib.rs"],
+            repo_root=tmp_path,
+        )
+        == path.relative_to(tmp_path).as_posix()
     )
     refreshed = json.loads(path.read_text(encoding="utf-8"))
 
@@ -449,6 +741,10 @@ def test_refresh_rebinds_a_cargo_campaign_to_the_sources_it_was_asked_for(
     assert refreshed["source_sha256"] != payload["source_sha256"]
     assert refreshed["test_sha256"] == refreshed["source_sha256"]
     assert refreshed["survivor_baseline"] == ["known"]
+    assert refreshed["generator"]["jobs"] == 2
+    assert refreshed["generator"]["run_timeout_seconds"] == 91
+    assert refreshed["survivor_baseline_note"] == payload["survivor_baseline_note"]
+    assert path.read_text(encoding="utf-8").endswith("\n")
 
     # Folded in from test_refresh_refuses_a_source_the_crate_does_not_own, which
     # the 2026-09-09 generated campaign classified MERGE with zero unique kills
@@ -460,6 +756,202 @@ def test_refresh_rebinds_a_cargo_campaign_to_the_sources_it_was_asked_for(
         refresh_rust_campaign(
             payload["campaign_id"], sources=["elsewhere/lib.rs"], repo_root=tmp_path
         )
+
+
+def _assert_rust_refresh_preserves_declared_scope_and_ratchet_metadata(
+    tmp_path: Path,
+) -> None:
+    tree(
+        tmp_path,
+        {
+            "crates/widget/Cargo.toml": CRATE,
+            "crates/widget/src/lib.rs": RUST_UNIT_TESTS,
+            "crates/widget/src/extra.rs": RUST_UNIT_TESTS,
+        },
+    )
+    manifest = plan("rust", repo_root=tmp_path, day="20260909")["manifests"][0]
+    manifest["survivor_baseline"] = ["known"]
+    manifest["survivor_baseline_recorded"] = True
+    manifest["survivor_baseline_note"] = "engine note"
+    manifest["survivor_baseline_recorded_at"] = "2026-09-09T00:00:00Z"
+    path = tmp_path / write([manifest], repo_root=tmp_path)[0]
+    before_scope = manifest["generator"]["source"]
+    refresh_rust_campaign(manifest["campaign_id"], repo_root=tmp_path)
+    refreshed = json.loads(path.read_text(encoding="utf-8"))
+    assert refreshed["generator"]["source"] == before_scope
+    assert refreshed["survivor_baseline"] == ["known"]
+    assert refreshed["survivor_baseline_recorded"] is True
+    assert refreshed["survivor_baseline_note"] == "engine note"
+    assert refreshed["survivor_baseline_recorded_at"] == "2026-09-09T00:00:00Z"
+
+
+def _assert_rust_refresh_rejects_malformed_implicit_source_scope(
+    tmp_path: Path,
+) -> None:
+    tree(
+        tmp_path,
+        {
+            "crates/widget/Cargo.toml": CRATE,
+            "crates/widget/src/lib.rs": RUST_UNIT_TESTS,
+        },
+    )
+    manifest = plan("rust", repo_root=tmp_path, day="20260909")["manifests"][0]
+    manifest["generator"]["source"] = ["../escape.rs"]
+    path = tmp_path / write([manifest], repo_root=tmp_path)[0]
+    with pytest.raises(CampaignError, match="malformed generated Rust source scope"):
+        refresh_rust_campaign(manifest["campaign_id"], repo_root=tmp_path)
+    assert json.loads(path.read_text(encoding="utf-8"))["generator"]["source"] == [
+        "../escape.rs"
+    ]
+
+
+def test_declared_rust_scope_requires_a_nonempty_list_and_returns_exact_paths(
+    tmp_path: Path,
+) -> None:
+    """A non-list scope must not reach path resolution as an iterable of strings."""
+
+    assert campaign_generate._safe_declared_rust_scope("src/lib.rs") is None
+    assert campaign_generate._safe_declared_rust_scope([]) is None
+    assert campaign_generate._safe_declared_rust_scope(["src/lib.rs"]) == ["src/lib.rs"]
+
+    tree(
+        tmp_path,
+        {
+            "crates/widget/Cargo.toml": CRATE,
+            "crates/widget/src/lib.rs": RUST_UNIT_TESTS,
+        },
+    )
+    subject = rust_subjects(tmp_path)[0]
+    manifest = tmp_path / "conductor/mutation_campaigns/widget.json"
+    assert campaign_generate._declared_rust_sources(
+        {"source": ["src/lib.rs"]}, subject, manifest, tmp_path
+    ) == ["crates/widget/src/lib.rs"]
+
+
+@pytest.mark.parametrize("declared", [[], ["src/not-generated.rs"]])
+def test_rust_refresh_rejects_empty_or_unbound_implicit_scope(
+    tmp_path: Path, declared: list[str]
+) -> None:
+    tree(
+        tmp_path,
+        {
+            "crates/widget/Cargo.toml": CRATE,
+            "crates/widget/src/lib.rs": RUST_UNIT_TESTS,
+        },
+    )
+    manifest = plan("rust", repo_root=tmp_path, day="20260909")["manifests"][0]
+    manifest["generator"]["source"] = declared
+    write([manifest], repo_root=tmp_path)
+    message = "no non-empty" if not declared else "outside its current crate"
+    with pytest.raises(CampaignError, match=message):
+        refresh_rust_campaign(manifest["campaign_id"], repo_root=tmp_path)
+    _assert_rust_refresh_rejects_malformed_implicit_source_scope(tmp_path / "malformed")
+
+
+def test_rust_plan_reports_an_untested_scoped_crate_without_hiding_its_identity(
+    tmp_path: Path,
+) -> None:
+    """An untestable changed crate is a finding, with package, root and size retained."""
+
+    tree(
+        tmp_path,
+        {
+            "crates/untested/Cargo.toml": CRATE.replace("widget-core", "untested-core"),
+            "crates/untested/src/lib.rs": "pub fn f() {}\n",
+        },
+    )
+    result = plan(
+        "rust",
+        repo_root=tmp_path,
+        day="20260910",
+        only_sources=["crates/untested/src/lib.rs"],
+    )
+    assert result["manifests"] == []
+    assert result["untested"] == [
+        {
+            "package": "untested-core",
+            "root": "crates/untested",
+            "lines": 1,
+            "reason": "crate untested-core has no tests: no tests/*.rs and no #[cfg(test)] module. A mutation campaign over untested code would report every mutant as survived and prove nothing that reading the crate does not already say.",
+        }
+    ]
+
+
+def test_rust_plan_uses_zero_lines_only_for_partial_subject_metadata(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """A defensive untested finding must not invent a line count when metadata is partial."""
+
+    subject = {
+        "package": "partial",
+        "root": "partial",
+        "manifest": "partial/Cargo.toml",
+        "files": ["partial/src/lib.rs"],
+    }
+    monkeypatch.setattr(campaign_generate, "rust_subjects", lambda _root: [subject])
+
+    def unavailable(*_args, **_kwargs):
+        raise CampaignError("partial has no tests")
+
+    monkeypatch.setattr(campaign_generate, "cargo_manifest", unavailable)
+    result = plan(
+        "rust",
+        repo_root=tmp_path,
+        day="20260910",
+        only_sources=["partial/src/lib.rs"],
+    )
+    assert result["untested"] == [
+        {
+            "package": "partial",
+            "root": "partial",
+            "lines": 0,
+            "reason": "partial has no tests",
+        }
+    ]
+
+
+def test_refresh_rebinds_a_fest_campaign_without_erasing_its_baseline(
+    tmp_path: Path,
+) -> None:
+    """Automatic Python refresh updates both hashes while preserving engine evidence."""
+
+    tree(
+        tmp_path,
+        {
+            "conductor/subject.py": "x = 1\n",
+            "conductor/test_subject.py": "def test_subject(): assert True\n",
+        },
+    )
+    manifest = plan("python", repo_root=tmp_path, day="20260910")["manifests"][0]
+    path = tmp_path / write([manifest], repo_root=tmp_path)[0]
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["survivor_baseline"] = ["engine-recorded"]
+    payload["survivor_baseline_recorded"] = True
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    (tmp_path / "conductor/subject.py").write_text("x = 2\n", encoding="utf-8")
+    (tmp_path / "conductor/test_subject.py").write_text(
+        "def test_subject(): assert 2 == 2\n", encoding="utf-8"
+    )
+
+    assert refresh_python_campaign(payload["campaign_id"], repo_root=tmp_path) == (
+        path.relative_to(tmp_path).as_posix()
+    )
+    refreshed = json.loads(path.read_text(encoding="utf-8"))
+    assert path.read_text(encoding="utf-8").endswith("\n")
+    assert refreshed["survivor_baseline"] == ["engine-recorded"]
+    assert refreshed["survivor_baseline_recorded"] is True
+    assert refreshed["source_sha256"] != payload["source_sha256"]
+    assert refreshed["test_sha256"] != payload["test_sha256"]
+
+    refreshed["generator"]["source"] = []
+    path.write_text(json.dumps(refreshed), encoding="utf-8")
+    with pytest.raises(CampaignError, match="exactly one Python source"):
+        refresh_python_campaign(payload["campaign_id"], repo_root=tmp_path)
+
+    refreshed["generator"]["source"] = ["conductor/absent.py"]
+    path.write_text(json.dumps(refreshed), encoding="utf-8")
+    with pytest.raises(CampaignError, match="no longer has a named test"):
+        refresh_python_campaign(payload["campaign_id"], repo_root=tmp_path)
 
 
 def test_refresh_refuses_anything_that_is_not_a_generated_cargo_campaign(
@@ -477,6 +969,66 @@ def test_refresh_refuses_anything_that_is_not_a_generated_cargo_campaign(
 
     with pytest.raises(CampaignError, match="cannot load generated campaign"):
         refresh_rust_campaign("absent", repo_root=tmp_path)
+
+    (campaigns / "bad-cargo.json").write_text(
+        json.dumps(
+            {
+                "mutation_engine": "cargo-mutants",
+                "generator": {"options": {"package": "x"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(CampaignError, match="no generated cargo package"):
+        refresh_rust_campaign("bad-cargo", repo_root=tmp_path)
+
+
+def test_rust_refresh_repairs_one_legacy_manifest_path_and_retains_its_note(
+    tmp_path: Path,
+) -> None:
+    """A sole package may repair an old snapshot manifest, but only unambiguously."""
+
+    tree(
+        tmp_path,
+        {
+            "crates/widget/Cargo.toml": CRATE,
+            "crates/widget/src/lib.rs": RUST_UNIT_TESTS,
+        },
+    )
+    manifest = plan("rust", repo_root=tmp_path, day="20260910")["manifests"][0]
+    manifest["generator"]["options"]["manifest_path"] = "gone/Cargo.toml"
+    manifest["survivor_baseline_note"] = "engine-recorded note"
+    path = tmp_path / write([manifest], repo_root=tmp_path)[0]
+    assert refresh_rust_campaign(manifest["campaign_id"], repo_root=tmp_path) == (
+        path.relative_to(tmp_path).as_posix()
+    )
+    refreshed = json.loads(path.read_text(encoding="utf-8"))
+    assert (
+        refreshed["generator"]["options"]["manifest_path"] == "crates/widget/Cargo.toml"
+    )
+    assert refreshed["survivor_baseline_note"] == "engine-recorded note"
+    _assert_rust_refresh_preserves_declared_scope_and_ratchet_metadata(
+        tmp_path / "declared-scope"
+    )
+
+
+def test_rust_refresh_refuses_an_ambiguous_legacy_package_path(tmp_path: Path) -> None:
+    """A stale path may be repaired only when one real package matches it."""
+
+    tree(
+        tmp_path,
+        {
+            "a/Cargo.toml": CRATE,
+            "a/src/lib.rs": RUST_UNIT_TESTS,
+            "b/Cargo.toml": CRATE,
+            "b/src/lib.rs": RUST_UNIT_TESTS,
+        },
+    )
+    manifest = plan("rust", repo_root=tmp_path, day="20260910")["manifests"][0]
+    manifest["generator"]["options"]["manifest_path"] = "gone/Cargo.toml"
+    write([manifest], repo_root=tmp_path)
+    with pytest.raises(CampaignError, match="no longer exists"):
+        refresh_rust_campaign(manifest["campaign_id"], repo_root=tmp_path)
 
 
 def test_a_narrow_second_campaign_may_be_planned_over_a_covered_source(

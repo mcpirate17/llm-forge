@@ -560,9 +560,12 @@ def execute(
     profdata_tool = _tool(
         "llvm-profdata", version, f"install llvm-{version} beside clang-{version}"
     )
+    from conductor.mutation_run_scope import mull_scope_config
+
     environment = {
         **campaign.environment,
         "PATH": os.environ.get("PATH", ""),
+        "MULL_CONFIG": str(mull_scope_config(campaign, worktree)),
     }
 
     build = worktree / str(campaign.options.get("build_dir", ".mull-build"))

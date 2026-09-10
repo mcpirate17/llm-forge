@@ -117,6 +117,9 @@ class Campaign:
     # campaign. Absent means the old whole-file behaviour, unchanged.
     source_symbols: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
     value_analysis: ValueAnalysisSpec | None = None
+    generated: bool = False
+    survivor_baseline: tuple[str, ...] = ()
+    test_sha256: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,6 +270,7 @@ def load_campaign(path: Path, *, repo_root: Path = REPO_ROOT) -> Campaign:
         "host_read_dependencies",
     ):
         kwargs[name] = tuple(kwargs[name])
+    kwargs["survivor_baseline"] = tuple(data.get("survivor_baseline", ()))
     return Campaign(**kwargs)
 
 
@@ -358,18 +362,30 @@ def source_drift(campaign: Campaign, root: Path) -> list[dict[str, Any]]:
         for relative in campaign.source_symbols
         if (root / relative).is_file() and not (root / relative).is_symlink()
     }
-    result = _native_json_call(
-        "mutation_source_drift_native",
-        {
-            "repo_root": str(root.resolve()),
-            "source_sha256": dict(campaign.source_sha256),
-            "source_symbols": campaign.source_symbols,
-            "symbol_hashes": current,
-        },
-    )
-    if not isinstance(result, list) or not all(isinstance(row, dict) for row in result):
-        raise CampaignError("native mutation source drift must be a list of objects")
-    return result
+    bindings = [(campaign.source_sha256, campaign.source_symbols, current)]
+    if campaign.generated:
+        # Keep separate maps: an overlapping source/test path must satisfy both
+        # pins, and test files require full-file rather than symbol-only checks.
+        bindings.append((campaign.test_sha256, {}, {}))
+    drift = []
+    for pins, symbols, hashes in bindings:
+        result = _native_json_call(
+            "mutation_source_drift_native",
+            {
+                "repo_root": str(root.resolve()),
+                "source_sha256": dict(pins),
+                "source_symbols": symbols,
+                "symbol_hashes": hashes,
+            },
+        )
+        if not isinstance(result, list) or not all(
+            isinstance(row, dict) for row in result
+        ):
+            raise CampaignError(
+                "native mutation source drift must be a list of objects"
+            )
+        drift.extend(result)
+    return drift
 
 
 def _campaign_receipts(

@@ -28,9 +28,15 @@ import json
 import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
+from conductor.candidate_review.identity import OwnerIdentityError, resolve_owner
+from conductor.candidate_review.ownership import (
+    OwnershipError,
+    load_claims,
+    paths_overlap,
+)
 from conductor.mutation_campaign_model import REPO_ROOT, _sha256
 from conductor.mutation_scope import CampaignError
 
@@ -155,7 +161,6 @@ def _package_name(manifest: Path) -> str | None:
         if in_package and line.startswith("name"):
             _, _, value = line.partition("=")
             return value.strip().strip('"').strip("'") or None
-    return None
 
 
 def _line_count(path: Path) -> int:
@@ -292,6 +297,7 @@ def cargo_manifest(
     repo_root: Path,
     jobs: int,
     run_timeout_seconds: int,
+    sources: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """One Rust crate, scored against its own `cargo test`.
 
@@ -301,6 +307,17 @@ def cargo_manifest(
     Whether a mutant compiles cannot legitimately vary.
     """
 
+    selected = sorted(subject["files"] if sources is None else set(sources))
+    unknown = sorted(set(selected) - set(subject["files"]))
+    if unknown:
+        raise CampaignError(
+            f"scoped source is not in {subject['package']!r}: {unknown}"
+        )
+    if not selected:
+        raise CampaignError(
+            f"cargo campaign for {subject['package']!r} has no scoped Rust source"
+        )
+    package_root = Path(str(subject["root"]))
     return {
         "schema_version": 1,
         "campaign_id": campaign_id,
@@ -311,7 +328,10 @@ def cargo_manifest(
         "language": "rust",
         "mutation_engine": "cargo-mutants",
         "generator": {
-            "source": ["src/**/*.rs"],
+            "source": [
+                Path(relative).relative_to(package_root).as_posix()
+                for relative in selected
+            ],
             "exclude": [],
             "operators": [],
             "options": {
@@ -334,7 +354,7 @@ def cargo_manifest(
         ],
         "environment": {},
         "source_sha256": {
-            relative: _sha256(repo_root / relative) for relative in subject["files"]
+            relative: _sha256(repo_root / relative) for relative in selected
         },
         "test_sha256": {
             relative: _sha256(repo_root / relative)
@@ -386,9 +406,12 @@ def existing_subjects(repo_root: Path = REPO_ROOT) -> set[str]:
 
 
 def changed_sources(
-    base: str = "origin/master", *, repo_root: Path = REPO_ROOT
+    base: str = "origin/master",
+    *,
+    repo_root: Path = REPO_ROOT,
+    owner: str | None = None,
 ) -> set[str]:
-    """Repo-relative paths this branch touched: ``base...HEAD`` plus the dirty tree.
+    """Repo-relative paths this branch touched, bounded by live lane claims.
 
     This is the default scope of a campaign. An agent that changed three files
     mutates three files; a repo-wide sweep is a separate, explicitly requested
@@ -404,12 +427,40 @@ def changed_sources(
             check=False,
         )
         if proc.returncode != 0:
-            return []
+            detail = proc.stderr.strip() or proc.stdout.strip() or "no output"
+            raise CampaignError(
+                f"cannot determine mutation scope with git {' '.join(args)}: {detail}"
+            )
         return [line for line in proc.stdout.splitlines() if line.strip()]
 
     paths = set(_git("diff", "--name-only", f"{base}...HEAD"))
-    paths |= set(_git("diff", "--name-only", "HEAD"))
-    paths |= set(_git("ls-files", "--others", "--exclude-standard"))
+    dirty = set(_git("diff", "--name-only", "HEAD"))
+    dirty |= set(_git("ls-files", "--others", "--exclude-standard"))
+    if dirty:
+        try:
+            lane = owner or resolve_owner(repo_root)
+            claims, _ = load_claims(repo_root)
+        except (OwnerIdentityError, OwnershipError) as exc:
+            raise CampaignError(f"cannot resolve ownership scope: {exc}") from exc
+        now = datetime.now(UTC)
+        owned_paths = [
+            path
+            for claim in claims
+            if claim.owner == lane and claim.active(now)
+            for path in claim.paths
+        ]
+        if not owned_paths:
+            raise CampaignError(
+                f"dirty mutation scope exists but {lane!r} has no active ownership "
+                "claim. Create a narrow claim or pass --only for the exact files "
+                "you changed."
+            )
+        dirty = {
+            candidate
+            for candidate in dirty
+            if any(paths_overlap(candidate, claimed) for claimed in owned_paths)
+        }
+    paths |= dirty
     return {p for p in paths if (repo_root / p).exists()}
 
 
@@ -462,12 +513,13 @@ def _plan_rust(
     """Manifests, already-covered packages and crates with no tests, for rust."""
 
     crates = rust_subjects(repo_root)
+    scoped_sources: dict[str, list[str]] = {}
     if scope is not None:
-        crates = [
-            c
-            for c in crates
-            if any(p == str(c["root"]) or p.startswith(f"{c['root']}/") for p in scope)
-        ]
+        for crate in crates:
+            selected = sorted(set(crate["files"]) & scope)
+            if selected:
+                scoped_sources[str(crate["package"])] = selected
+        crates = [c for c in crates if str(c["package"]) in scoped_sources]
     already = sorted(c["package"] for c in crates if c["package"] in covered)
     crates = [c for c in crates if c["package"] not in covered]
     slugs = _unique_slugs([str(c["root"]) for c in crates])
@@ -487,6 +539,11 @@ def _plan_rust(
                     repo_root=repo_root,
                     jobs=jobs,
                     run_timeout_seconds=run_timeout_seconds,
+                    sources=(
+                        None
+                        if scope is None
+                        else scoped_sources[str(subject["package"])]
+                    ),
                 )
             )
         except CampaignError as exc:
@@ -597,7 +654,7 @@ def write(
 def _load_generated_cargo_campaign(
     campaign: str, repo_root: Path
 ) -> tuple[Path, dict[str, Any]]:
-    """Resolve a campaign name to its path and its parsed cargo-mutants manifest."""
+    """Resolve a campaign name to its path and parsed generated manifest."""
 
     relative = campaign.removeprefix(f"{CAMPAIGN_DIR}/")
     if not relative.endswith(".json"):
@@ -608,10 +665,51 @@ def _load_generated_cargo_campaign(
     except (OSError, json.JSONDecodeError) as exc:
         raise CampaignError(f"cannot load generated campaign {path}: {exc}") from exc
     if not isinstance(existing, dict):
-        raise CampaignError(f"{path} is not a cargo-mutants generated campaign")
-    if existing.get("mutation_engine") != "cargo-mutants":
-        raise CampaignError(f"{path} is not a cargo-mutants generated campaign")
+        raise CampaignError(f"{path} is not a generated campaign")
     return path, existing
+
+
+def refresh_python_campaign(campaign: str, *, repo_root: Path = REPO_ROOT) -> str:
+    """Regenerate one generated Python campaign while retaining its engine baseline."""
+
+    path, existing = _load_generated_cargo_campaign(campaign, repo_root)
+    if existing.get("mutation_engine") != "fest":
+        raise CampaignError(f"{path} is not a generated fest campaign")
+    generator = existing.get("generator") or {}
+    sources = generator.get("source")
+    if (
+        not isinstance(sources, list)
+        or len(sources) != 1
+        or not isinstance(sources[0], str)
+    ):
+        raise CampaignError(f"{path} must declare exactly one Python source to refresh")
+    source = sources[0]
+    subject = next(
+        (item for item in python_subjects(repo_root)[0] if item["source"] == source),
+        None,
+    )
+    if subject is None:
+        raise CampaignError(
+            f"generated Python source {source!r} no longer has a named test"
+        )
+    refreshed = fest_manifest(
+        subject,
+        campaign_id=str(existing.get("campaign_id") or path.stem),
+        repo_root=repo_root,
+        run_timeout_seconds=int(generator.get("run_timeout_seconds", 1800)),
+    )
+    for key in (
+        "survivor_baseline",
+        "survivor_baseline_recorded",
+        "survivor_baseline_note",
+        "survivor_baseline_recorded_at",
+    ):
+        if key in existing:
+            refreshed[key] = existing[key]
+    path.write_text(
+        json.dumps(refreshed, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return path.relative_to(repo_root).as_posix()
 
 
 def _generated_cargo_subject(
@@ -650,15 +748,86 @@ def _scope_to_sources(
     if unknown:
         raise CampaignError(f"scoped source is not in {package!r}: {unknown}")
     selected = sorted(set(sources))
-    package_root = Path(subject["root"])
+    package_root = repo_root / str(subject["root"])
     refreshed["generator"]["source"] = [
-        Path(path).relative_to(package_root).as_posix() for path in selected
+        (repo_root / path).relative_to(package_root).as_posix() for path in selected
     ]
     refreshed["source_sha256"] = {path: _sha256(repo_root / path) for path in selected}
     # Rust unit tests are colocated with their source.  Binding just these
     # files keeps the receipt specific to the requested test surface even
     # though cargo-mutants invokes Cargo's unit-test harness.
     refreshed["test_sha256"] = dict(refreshed["source_sha256"])
+
+
+def _safe_declared_rust_scope(value: object) -> list[str] | None:
+    """Return a generated relative Rust scope, or ``None`` when it is malformed."""
+
+    if (
+        isinstance(value, list)
+        and value
+        and not any(
+            not isinstance(item, str)
+            or not item
+            or any(token in item for token in ("*", "?", "[", "]"))
+            or Path(item).is_absolute()
+            or ".." in Path(item).parts
+            for item in value
+        )
+    ):
+        return value
+
+
+def _declared_rust_sources(
+    generator: Mapping[str, Any],
+    subject: Mapping[str, Any],
+    path: Path,
+    repo_root: Path,
+) -> list[str]:
+    """Resolve an existing generated Rust scope and refuse any crate escape."""
+
+    raw_scope = generator.get("source")
+    if not isinstance(raw_scope, list) or not raw_scope:
+        raise CampaignError(f"{path} has no non-empty generated Rust source scope")
+    declared = _safe_declared_rust_scope(raw_scope)
+    if declared is None:
+        raise CampaignError(
+            f"{path} has malformed generated Rust source scope; pass --source explicitly"
+        )
+    package_root = repo_root / str(subject["root"])
+    root_resolved = package_root.resolve()
+    allowed = {
+        (repo_root / item).relative_to(package_root).as_posix()
+        for item in subject["files"]
+    }
+    resolved = [(package_root / item).resolve() for item in declared]
+    if any(
+        candidate == root_resolved or root_resolved not in candidate.parents
+        for candidate in resolved
+    ) or any(
+        candidate.relative_to(root_resolved).as_posix() not in allowed
+        for candidate in resolved
+    ):
+        raise CampaignError(
+            f"{path} has Rust sources outside its current crate; pass --source explicitly"
+        )
+    return [
+        candidate.relative_to(repo_root.resolve()).as_posix() for candidate in resolved
+    ]
+
+
+def _retain_survivor_baseline(
+    refreshed: dict[str, Any], existing: Mapping[str, Any]
+) -> None:
+    """Carry engine-recorded ratchet metadata forward unchanged during refresh."""
+
+    for key in (
+        "survivor_baseline",
+        "survivor_baseline_recorded",
+        "survivor_baseline_note",
+        "survivor_baseline_recorded_at",
+    ):
+        if key in existing:
+            refreshed[key] = existing[key]
 
 
 def refresh_rust_campaign(
@@ -676,8 +845,13 @@ def refresh_rust_campaign(
     """
 
     path, existing = _load_generated_cargo_campaign(campaign, repo_root)
+    if existing.get("mutation_engine") != "cargo-mutants":
+        raise CampaignError(f"{path} is not a cargo-mutants generated campaign")
     subject, package = _generated_cargo_subject(existing, path, repo_root)
     generator = existing.get("generator") or {}
+    sources = list(sources) or _declared_rust_sources(
+        generator, subject, path, repo_root
+    )
     refreshed = cargo_manifest(
         subject,
         campaign_id=str(existing.get("campaign_id") or path.stem),
@@ -687,9 +861,7 @@ def refresh_rust_campaign(
     )
     if sources:
         _scope_to_sources(refreshed, subject, sources, package, repo_root)
-    refreshed["survivor_baseline"] = list(existing.get("survivor_baseline") or [])
-    if "survivor_baseline_note" in existing:
-        refreshed["survivor_baseline_note"] = existing["survivor_baseline_note"]
+    _retain_survivor_baseline(refreshed, existing)
     path.write_text(
         json.dumps(refreshed, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -715,7 +887,12 @@ def _summarise(result: Mapping[str, Any], *, verbose: bool) -> dict[str, Any]:
     return payload
 
 
-def _branch_scope(base: str, *, repo_root: Path = REPO_ROOT) -> list[str]:
+def _branch_scope(
+    base: str,
+    *,
+    repo_root: Path = REPO_ROOT,
+    owner: str | None = None,
+) -> list[str]:
     """The default subject set: what this branch changed, and nothing else.
 
     Refusing an empty scope is the point. A campaign that plans nothing because
@@ -723,7 +900,7 @@ def _branch_scope(base: str, *, repo_root: Path = REPO_ROOT) -> list[str]:
     the whole-tree run it would become is the behaviour this rule exists to stop.
     """
 
-    scope = sorted(changed_sources(base, repo_root=repo_root))
+    scope = sorted(changed_sources(base, repo_root=repo_root, owner=owner))
     if not scope:
         raise CampaignError(
             f"nothing changed against {base}: mutation campaigns cover the files "
@@ -734,13 +911,36 @@ def _branch_scope(base: str, *, repo_root: Path = REPO_ROOT) -> list[str]:
     return scope
 
 
-def main(argv: list[str] | None = None) -> int:
-    """CLI: `plan` reports what would be written, `write` writes it."""
+def _explicit_scope(paths: Sequence[str], *, repo_root: Path = REPO_ROOT) -> list[str]:
+    """Validate an exact subject list without inspecting shared checkout dirt."""
+
+    scope: list[str] = []
+    for raw in paths:
+        normalized = raw.replace("\\", "/")
+        candidate = PurePosixPath(normalized)
+        if candidate.is_absolute() or any(
+            part in {".", ".."} for part in normalized.split("/")
+        ):
+            raise CampaignError(f"--only must name a repository-relative file: {raw!r}")
+        relative = candidate.as_posix()
+        if not (repo_root / relative).is_file():
+            raise CampaignError(f"--only source does not exist: {relative}")
+        scope.append(relative)
+    if not scope:
+        raise CampaignError("--only needs at least one exact repository-relative file")
+    return sorted(set(scope))
+
+
+def _cli_parser() -> argparse.ArgumentParser:
+    """Build the generated-campaign CLI without coupling parsing to execution."""
 
     parser = argparse.ArgumentParser(description=__doc__)
     shared = argparse.ArgumentParser(add_help=False)
     shared.add_argument("language", choices=("python", "rust"))
-    shared.add_argument("--owner", default="claude")
+    shared.add_argument(
+        "--owner",
+        help="lane that owns the dirty scope and prefixes generated campaign IDs",
+    )
     shared.add_argument("--jobs", type=int, default=4, help="Rust workers per crate")
     shared.add_argument("--run-timeout", type=int, default=1800)
     shared.add_argument("--only", action="append", default=[])
@@ -777,7 +977,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     write_parser.add_argument("--force", action="store_true")
     refresh_parser = subparsers.add_parser(
-        "refresh", help="automatically refresh one existing generated Rust campaign"
+        "refresh", help="automatically refresh one existing generated engine campaign"
     )
     refresh_parser.add_argument("campaign", help="campaign id or manifest filename")
     refresh_parser.add_argument(
@@ -786,46 +986,84 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="repository-relative Rust source to mutate and bind as its test surface",
     )
-    args = parser.parse_args(argv)
+    return parser
+
+
+def _refresh_command(args: argparse.Namespace) -> str:
+    """Refresh exactly one generated campaign using its engine-specific refresh path."""
+
+    path, existing = _load_generated_cargo_campaign(args.campaign, REPO_ROOT)
+    if existing.get("mutation_engine") == "cargo-mutants":
+        return refresh_rust_campaign(args.campaign, sources=args.source)
+    if existing.get("mutation_engine") == "fest":
+        if args.source:
+            raise CampaignError(
+                "fest refresh retains its declared source; --source is Rust-only"
+            )
+        return refresh_python_campaign(args.campaign)
+    raise CampaignError(f"{path} is not a generated supported-engine campaign")
+
+
+def _campaign_scope(args: argparse.Namespace, owner: str) -> list[str] | None:
+    """Select whole-tree maintenance, explicit files, or this lane's changed files."""
+
+    if args.all_files:
+        return None
+    if args.only:
+        return _explicit_scope(args.only)
+    return _branch_scope(args.base, owner=owner)
+
+
+def _run_plan_or_write(args: argparse.Namespace) -> dict[str, Any]:
+    """Plan one bounded language surface and annotate the selected scope."""
 
     try:
-        if args.command == "refresh":
-            refreshed = refresh_rust_campaign(args.campaign, sources=args.source)
-            print(json.dumps({"refreshed": refreshed}, indent=2))
-            return 0
-        scope = None if args.all_files else _branch_scope(args.base)
-        result = plan(
-            args.language,
-            owner=args.owner,
-            jobs=args.jobs,
-            run_timeout_seconds=args.run_timeout,
-            only_sources=scope,
-            include_covered=args.include_covered,
-        )
-        result = {
-            **result,
-            "scope": "all-files" if args.all_files else f"changed vs {args.base}",
-            "scoped_paths": 0 if scope is None else len(scope),
-        }
-        if args.only:
-            wanted = set(args.only)
-            kept = [
-                m
-                for m in result["manifests"]
-                if wanted & {m["campaign_id"], *m["source_sha256"]}
-            ]
-            if not kept:
-                raise CampaignError(f"--only matched no subject: {sorted(wanted)}")
-            result = {**result, "manifests": kept}
-        if args.command == "plan":
-            print(json.dumps(_summarise(result, verbose=args.verbose), indent=2))
-            return 0
-        written = write(result["manifests"], force=args.force)
-        print(
-            json.dumps(
-                {**_summarise(result, verbose=False), "written": written}, indent=2
-            )
-        )
+        campaign_owner = args.owner or resolve_owner(REPO_ROOT)
+    except OwnerIdentityError as exc:
+        raise CampaignError(f"cannot resolve campaign owner: {exc}") from exc
+    scope = _campaign_scope(args, campaign_owner)
+    result = plan(
+        args.language,
+        owner=campaign_owner,
+        jobs=args.jobs,
+        run_timeout_seconds=args.run_timeout,
+        only_sources=scope,
+        include_covered=args.include_covered,
+    )
+    return {
+        **result,
+        "scope": (
+            "all-files"
+            if args.all_files
+            else "exact --only paths"
+            if args.only
+            else f"changed vs {args.base}"
+        ),
+        "scoped_paths": 0 if scope is None else len(scope),
+    }
+
+
+def _run_command(args: argparse.Namespace) -> dict[str, Any]:
+    """Execute parsed command work and return the compact JSON response payload."""
+
+    if args.command == "refresh":
+        return {"refreshed": _refresh_command(args)}
+    result = _run_plan_or_write(args)
+    if args.command == "plan":
+        return _summarise(result, verbose=args.verbose)
+    return {
+        **_summarise(result, verbose=False),
+        "written": write(result["manifests"], force=args.force),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI: `plan` reports what would be written, `write` writes it."""
+
+    args = _cli_parser().parse_args(argv)
+
+    try:
+        print(json.dumps(_run_command(args), indent=2))
         return 0
     except CampaignError as exc:
         print(json.dumps({"status": "REFUSED", "error": str(exc)}, indent=2))

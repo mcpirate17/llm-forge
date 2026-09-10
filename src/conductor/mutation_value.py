@@ -91,30 +91,29 @@ def load_value_analysis(
         )
     except (TypeError, ValueError) as exc:
         raise ValueEvidenceError(str(exc)) from exc
-    if native is None:
-        return None
-    payload = json.loads(native)
-    return ValueAnalysisSpec(
-        adapter=payload["adapter"],
-        baseline_repetitions=payload["baseline_repetitions"],
-        contracts=tuple(
-            ValueContract(
-                contract["id"],
-                contract["criticality"],
-                tuple(contract["active_paths"]),
-            )
-            for contract in payload["contracts"]
-        ),
-        tests=tuple(
-            ValueTest(
-                test["nodeid"],
-                test["contract_id"],
-                test["intentional_redundancy"],
-            )
-            for test in payload["tests"]
-        ),
-        mutation_contracts=dict(payload["mutation_contracts"]),
-    )
+    if native is not None:
+        payload = json.loads(native)
+        return ValueAnalysisSpec(
+            adapter=payload["adapter"],
+            baseline_repetitions=payload["baseline_repetitions"],
+            contracts=tuple(
+                ValueContract(
+                    contract["id"],
+                    contract["criticality"],
+                    tuple(contract["active_paths"]),
+                )
+                for contract in payload["contracts"]
+            ),
+            tests=tuple(
+                ValueTest(
+                    test["nodeid"],
+                    test["contract_id"],
+                    test["intentional_redundancy"],
+                )
+                for test in payload["tests"]
+            ),
+            mutation_contracts=dict(payload["mutation_contracts"]),
+        )
 
 
 def value_inspection_payload(spec: ValueAnalysisSpec | None) -> dict[str, Any]:
@@ -204,19 +203,20 @@ def parse_pytest_junit(
         else:
             outcome = "PASSED"
         try:
-            duration = float(case.attrib.get("time", "0"))
+            duration = float(case.attrib.get("time") or 0)
         except ValueError:
             duration = 0.0
         row = aggregate.setdefault(
             nodeid,
             {"outcome": "PASSED", "duration_seconds": 0.0, "cases": 0},
         )
-        if (
-            outcome == "ERROR"
-            or (outcome == "FAILED" and row["outcome"] != "ERROR")
-            or (outcome == "SKIPPED" and row["cases"] == 0)
-            or (outcome == "PASSED" and row["outcome"] == "SKIPPED")
-        ):
+        if outcome == "ERROR":
+            row["outcome"] = outcome
+        elif outcome == "FAILED" and row["outcome"] != "ERROR":
+            row["outcome"] = outcome
+        elif outcome == "SKIPPED" and row["cases"] == 0:
+            row["outcome"] = outcome
+        elif (outcome, row["outcome"]) == ("PASSED", "SKIPPED"):
             row["outcome"] = outcome
         row["duration_seconds"] += duration
         row["cases"] += 1
@@ -315,7 +315,7 @@ def parse_cargo_libtest(stdout: str, ranked_nodeids: Sequence[str]) -> dict[str,
         # libtest reports no per-test duration on stable, so no duration key is
         # written rather than a fabricated 0.0.
         row = tests.setdefault(nodeid, {"outcome": outcome, "cases": 0})
-        if outcome == "FAILED" and row["outcome"] != "FAILED":
+        if outcome == "FAILED":
             row["outcome"] = outcome
         row["cases"] += 1
         printed_names.setdefault(nodeid, set()).add(printed)
@@ -439,7 +439,7 @@ def parse_ctest_junit(
     unranked_failures: list[str] = []
     for case in root.iter("testcase"):
         name = case.attrib.get("name", "")
-        status = case.attrib.get("status", "")
+        status = case.attrib.get("status")
         if case.find("error") is not None:
             outcome = "ERROR"
         elif case.find("failure") is not None or status == "fail":
@@ -459,7 +459,7 @@ def parse_ctest_junit(
                 unranked_failures.append(name)
             continue
         try:
-            duration = float(case.attrib.get("time", "0"))
+            duration = float(case.attrib.get("time") or 0)
         except ValueError:
             duration = 0.0
         tests[nodeid] = {

@@ -29,6 +29,37 @@ from conductor.mutation_scope import CampaignError
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_direct_run_refuses_unowned_sources_before_resolving_an_engine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from conductor import mutation_engine_generated as runner
+    from conductor import mutation_run_scope
+
+    source = tmp_path / "conductor/gate_rollout.py"
+    source.parent.mkdir()
+    source.write_text("value = 1\n")
+    subject = load_generated_campaign(manifest(tmp_path))
+    seen = []
+
+    def engine(name):
+        seen.append(name)
+        raise RuntimeError("engine reached")
+
+    monkeypatch.setattr(runner, "adapter_for", engine)
+    monkeypatch.setattr(mutation_run_scope, "changed_sources", lambda *a, **kw: set())
+    with pytest.raises(CampaignError, match="outside this agent's changes"):
+        runner.run_generated_campaign(subject, allow_mutations=True, repo_root=tmp_path)
+    assert seen == []
+    monkeypatch.setattr(
+        mutation_run_scope,
+        "changed_sources",
+        lambda *a, **kw: {"conductor/gate_rollout.py"},
+    )
+    with pytest.raises(RuntimeError, match="engine reached"):
+        runner.run_generated_campaign(subject, allow_mutations=True, repo_root=tmp_path)
+    assert seen == ["fest"]
+
+
 def manifest(tmp_path: Path, **overrides: object) -> Path:
     """A minimal generated-engine manifest on disk."""
 
@@ -251,6 +282,7 @@ def test_the_optional_generator_keys_reach_the_campaign(tmp_path: Path) -> None:
             "source": ["conductor/gate_rollout.py"],
             "exclude": ["**/test_*.py"],
             "operators": ["constant_*"],
+            "options": {"package_root": "native"},
             "seed": 7,
             "jobs": 4,
             "mutant_timeout_seconds": 45,
@@ -260,6 +292,7 @@ def test_the_optional_generator_keys_reach_the_campaign(tmp_path: Path) -> None:
     campaign = load_generated_campaign(path)
     assert campaign.exclude == ("**/test_*.py",)
     assert campaign.operators == ("constant_*",)
+    assert campaign.options == {"package_root": "native"}
     assert campaign.seed == 7
     assert campaign.jobs == 4
     assert campaign.mutant_timeout_seconds == 45
@@ -303,7 +336,7 @@ def test_the_first_run_records_its_own_survivor_baseline(tmp_path: Path) -> None
     ratcheted one rather than the red one it started as.
     """
 
-    path = manifest(tmp_path)
+    path = manifest(tmp_path, survivor_baseline_note="Awaiting first measured run")
     campaign = load_generated_campaign(path)
     assert campaign.survivor_baseline_recorded is False
 
@@ -317,6 +350,7 @@ def test_the_first_run_records_its_own_survivor_baseline(tmp_path: Path) -> None
     assert receipt["status"] == "FAIL"
 
     assert record_survivor_baseline(campaign, receipt) is True
+    assert campaign.survivor_baseline_recorded is True
     assert receipt["status"] == "RATCHET_HELD"
     assert receipt["new_survivors"] == []
     assert receipt["survivor_baseline_recorded_by_this_run"] is True
@@ -325,6 +359,7 @@ def test_the_first_run_records_its_own_survivor_baseline(tmp_path: Path) -> None
     assert written["survivor_baseline"] == ["a"]
     assert written["survivor_baseline_recorded"] is True
     assert "survivor_baseline_recorded_at" in written
+    assert "survivor_baseline_note" not in written
     # The receipt has to name the manifest it now describes, not the one it read.
     assert receipt["manifest_sha256"] == campaign.manifest_sha256
 
@@ -335,6 +370,23 @@ def test_the_first_run_records_its_own_survivor_baseline(tmp_path: Path) -> None
     assert record_survivor_baseline(again, second) is False
     assert second["status"] == "FAIL"
     assert second["new_survivors"] == ["b"]
+
+
+def test_recorded_flag_and_legacy_survivors_preserve_the_ratchet(
+    tmp_path: Path,
+) -> None:
+    recorded_empty = load_generated_campaign(
+        manifest(tmp_path, survivor_baseline_recorded=True)
+    )
+    assert recorded_empty.survivor_baseline_recorded is True
+    legacy = load_generated_campaign(manifest(tmp_path, survivor_baseline=["legacy"]))
+    assert legacy.survivor_baseline_recorded is True
+    explicitly_unrecorded = load_generated_campaign(
+        manifest(
+            tmp_path, survivor_baseline=["legacy"], survivor_baseline_recorded=False
+        )
+    )
+    assert explicitly_unrecorded.survivor_baseline_recorded is False
 
 
 def test_an_errored_run_never_becomes_a_baseline(tmp_path: Path) -> None:

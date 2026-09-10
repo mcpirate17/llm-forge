@@ -119,6 +119,36 @@ def test_hook_payload_shape() -> None:
     json.dumps(payload)
 
 
+def test_a2a_context_requires_both_fields_and_budget_truncation_is_exact() -> None:
+    """A partial A2A envelope must not be injected, and clipping must stay bounded."""
+
+    without_name = preamble.render_text(
+        state=_state(),  # type: ignore[arg-type]
+        a2a_name="   ",
+        a2a_summary="private summary",
+    )
+    without_summary = preamble.render_text(
+        state=_state(),  # type: ignore[arg-type]
+        a2a_name="peer",
+        a2a_summary="   ",
+    )
+    assert "A2A compact" not in without_name
+    assert "private summary" not in without_name
+    assert "A2A compact" not in without_summary
+
+    clipped = preamble.render_text(
+        state=_state(),  # type: ignore[arg-type]
+        a2a_name="peer",
+        a2a_summary="summary " * 40,
+        max_chars=120,
+    )
+    assert len(clipped) == 120
+    assert clipped.endswith("…")
+
+    payload = preamble.hook_payload(event_name="Resume", state=_state())  # type: ignore[arg-type]
+    assert payload["hookSpecificOutput"]["hookEventName"] == "Resume"
+
+
 def _write_session_policy(
     root: Path, preamble_lines: list[str], mandates: list[str]
 ) -> None:
@@ -170,12 +200,16 @@ def test_canonical_foreign_state_uses_the_foreign_policy(
 
 
 def test_noncanonical_state_requires_repo_and_canonical_state_cannot_conflict(
-    tmp_path: Path,
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     snapshot = tmp_path / "snapshot.json"
     snapshot.write_text(json.dumps(_state()), encoding="utf-8")
     with pytest.raises(SystemExit, match="2"):
         preamble.main(["text", "--state", str(snapshot)])
+    assert (
+        "--repo is required when --state is not <repo>/conductor/active_state.json"
+        in (capsys.readouterr().err)
+    )
     first = tmp_path / "first"
     second = tmp_path / "second"
     canonical = first / "conductor" / "active_state.json"
@@ -185,6 +219,9 @@ def test_noncanonical_state_requires_repo_and_canonical_state_cannot_conflict(
     _write_session_policy(second, ["SECOND"], [])
     with pytest.raises(SystemExit, match="2"):
         preamble.main(["text", "--state", str(canonical), "--repo", str(second)])
+    assert "--repo conflicts with the repository implied by canonical --state" in (
+        capsys.readouterr().err
+    )
     assert preamble.main(["text", "--state", str(snapshot), "--repo", str(first)]) == 0
 
 
@@ -195,26 +232,41 @@ def test_text_cli(tmp_path: Path) -> None:
     assert rc == 0
 
 
-def test_load_state_rejects_malformed_explicit_cache(tmp_path: Path) -> None:
-    state_path = tmp_path / "active_state.json"
-    state_path.write_text("not json", encoding="utf-8")
-
-    with pytest.raises(preamble.PreambleError, match="unreadable"):
-        preamble.load_state(state_path, refresh=False)
-
-
-def test_load_state_refreshes_canonical_cache(monkeypatch) -> None:
-    refreshed = preamble.ACTIVE_STATE_PATH
+def test_load_state_refreshes_only_canonical_cache_and_rejects_malformed_explicit_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    refreshed = tmp_path / "canonical-active-state.json"
+    refreshed.write_text(
+        json.dumps({"schema_version": 1, "last_updated": "cached"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(preamble, "ACTIVE_STATE_PATH", refreshed)
+    calls: list[Path] = []
 
     class FakeState:
         def to_dict(self) -> dict[str, object]:
             return {"schema_version": 1, "last_updated": "fresh"}
 
-    _install_active_state_stub(monkeypatch, lambda path: FakeState())
+    def save_active_state(path: Path) -> FakeState:
+        calls.append(path)
+        return FakeState()
+
+    _install_active_state_stub(monkeypatch, save_active_state)
     assert preamble.load_state(refreshed) == {
         "schema_version": 1,
         "last_updated": "fresh",
     }
+    assert calls == [refreshed]
+
+    explicit = tmp_path / "active_state.json"
+    explicit_payload = {"schema_version": 1, "last_updated": "cached"}
+    explicit.write_text(json.dumps(explicit_payload), encoding="utf-8")
+    assert preamble.load_state(explicit) == explicit_payload
+    assert calls == [refreshed]
+
+    explicit.write_text("not json", encoding="utf-8")
+    with pytest.raises(preamble.PreambleError, match="unreadable"):
+        preamble.load_state(explicit, refresh=False)
 
 
 def test_load_state_rejects_missing_and_non_object(tmp_path: Path) -> None:
@@ -237,6 +289,24 @@ def test_compact_state_skips_non_string_mandates() -> None:
     )
     assert "KEEP" in text
     assert "keep-me" in text
+
+
+def test_compact_state_retains_later_valid_values_and_structural_labels() -> None:
+    """Malformed entries do not hide later policy, headings, or the zero-claim state."""
+
+    text = preamble.compact_state(
+        {
+            "standing_mandates": [12, "LATER: required"],
+            "active_headings": ["visible heading"],
+            "active_claims": {"not": "a list"},
+        }
+    )
+    assert "MANDATES: LATER" in text
+    assert "CLAIMS: 0 active" in text
+    assert "HEADINGS:\n- visible heading" in text
+
+    no_mandates = preamble.compact_state({"standing_mandates": [], "active_claims": []})
+    assert "MANDATES: none" in no_mandates
 
 
 def test_hook_cli_and_load_error(tmp_path: Path, capsys) -> None:
@@ -292,3 +362,37 @@ def test_cli_reports_invalid_selected_policy_without_a_traceback(
     (repository / "pyproject.toml").write_text("[tool", encoding="utf-8")
     assert preamble.main(["text", "--state", str(state_path)]) == 2
     assert "ERROR:" in capsys.readouterr().err
+
+
+def test_text_cli_newline_depends_on_a2a_summary(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Text mode remains shell-friendly without a summary and composable with one."""
+
+    state_path = tmp_path / "active_state.json"
+    state_path.write_text(json.dumps(_state()), encoding="utf-8")
+    assert (
+        preamble.main(["text", "--state", str(state_path), "--repo", str(tmp_path)])
+        == 0
+    )
+    assert capsys.readouterr().out.endswith("\n")
+
+    assert (
+        preamble.main(
+            [
+                "text",
+                "--state",
+                str(state_path),
+                "--repo",
+                str(tmp_path),
+                "--a2a-name",
+                "peer",
+                "--a2a-summary",
+                "summary",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert output.endswith("summary")
+    assert not output.endswith("summary\n")

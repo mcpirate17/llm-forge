@@ -86,9 +86,8 @@ def _function(nodeid: str) -> str | None:
     """
 
     module, separator, rest = nodeid.partition("::")
-    if not separator or not module.endswith(".py"):
-        return None
-    return f"{module}::{rest.split('[', 1)[0]}"
+    if separator and module.endswith(".py"):
+        return f"{module}::{rest.split('[', 1)[0]}"
 
 
 def _ranked(rows: Sequence[Mapping[str, Any]]) -> tuple[list[str], list[str]]:

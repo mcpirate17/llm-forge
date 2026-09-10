@@ -4,8 +4,10 @@
 
 **Mutate only what you changed** -- the files this branch modified and the tests
 that exercise them, never the whole repository. `mutation_campaign_generate`
-scopes itself to `git diff <base>...HEAD` plus the dirty tree by default; a
-whole-tree sweep needs an explicit `--all-files` and is a maintenance job.
+scopes itself to `git diff <base>...HEAD` plus the invoking owner's claimed
+dirty files. Repeated `--only` selectors narrow the task scope. `--all-files`
+is an inventory/planning option, not authorization to execute a whole-tree run.
+The runner independently refuses targets outside the agent's changed files.
 
 Only conductor-managed, engine-generated mutation campaigns may execute. Agents
 must not author, apply, score, re-pin, or run patch-based mutants manually. The
@@ -107,7 +109,7 @@ unviable mutants on the first crate measured.
 ## Using it
 
 Generate a campaign per subject -- one Python module with the tests that name it,
-or one Rust crate:
+or exact changed Rust source files with their crate's tests:
 
 ```
 python -m conductor.mutation_campaign_generate plan  rust --verbose
@@ -140,34 +142,37 @@ baseline every survivor counts as new.
 
 ## How a run becomes gate evidence
 
-A changed test with no current receipt is recorded as debt, not a block
-(mutation-evidence grant, half (b)). When you do want a run to count as gate
-evidence:
+Every new or behavior-changing test requires a current registered automatic
+`PASS` receipt before handoff or landing. A zero process exit is insufficient:
+`RATCHET_HELD` retains diagnostic survivor history but is not PASS evidence.
 
-1. Append the manifest path to `conductor/mutation_campaigns/registry.json`.
-2. Publish the receipt into `conductor/mutation_campaigns/receipts/` -- but only
-   when it records a finding. Generated receipts land in the gitignored
-   `research/reports/mutation_testing/` precisely so routine green runs do not
-   become commits.
+1. Register the manifest path in the central registry or a narrow `registry.d`
+   fragment. Registration contains pointers, not hand-authored receipt hashes.
+2. Publish the current complete PASS receipt with the runner's `--receipt`
+   option into `conductor/mutation_campaigns/receipts/`. Keep diagnostic reruns
+   in ignored `research/reports/mutation_testing/`; do not commit every run.
 
-What differs is the acceptance rule, because the two kinds of campaign prove
-different things:
+The acceptance rule is stricter than holding the engine's survivor baseline:
 
 | | conductor-generated campaign |
 |---|---|
 | `mutation_engine` | `fest`, `cargo-mutants`, `mull` |
-| accepted when | no survivor falls outside `survivor_baseline` |
-| what green means | nothing got worse than the recorded run |
+| accepted when | current complete PASS, zero survivors, consistent outcome accounting |
+| what PASS means | every scored mutant was killed; unreached/unviable mutants are reported separately |
 
-The old rule is the reason the old numbers looked the way they did: it *required*
-`mutation_score == 1.0`, so a corpus nobody curated could never have been
-registered. Both rules now live side by side in
-`tooling/native/conductor-native/src/mutation_receipt.rs`; the engine name picks
-one. No patch campaign changed.
+Native receipt validation enforces this rule independently. A recorded survivor
+baseline remains useful for regression diagnosis, but cannot authorize changed
+tests with surviving mutants. Historical patch evidence stays archival until
+replacement coverage and all retention consumers have been checked.
 
 A generated receipt additionally has to agree with its manifest on
-`test_sha256`, `core_sha256` and `adapter_sha256`, so evidence cannot outlive the
-tests it describes or the adapter that decided what a mutant was.
+`test_sha256`, `core_sha256`, `adapter_sha256`, and `scope_guard_sha256`, as well
+as runner/source pins, so evidence cannot outlive the code it describes.
+
+Legacy manifest value analysis is not an automatic-engine requirement. Missing
+optional generated `test_value` attribution is not legacy value-analysis debt;
+supplied attribution must still be valid. This applicability distinction does
+not waive current PASS, completeness, or hash checks.
 
 ## Traps that are pinned, and why
 

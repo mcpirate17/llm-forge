@@ -628,19 +628,16 @@ def _missing_evidence_findings(
             Finding(
                 check_id="mutation-evidence",
                 rule_id="missing-mutation-receipt",
-                severity=Severity.INFO,
+                severity=Severity.CRITICAL,
                 message=(
                     f"{path_name}: {missing.get('reason', 'missing mutation evidence')}"
-                    " -- debt, not a block"
+                    " -- current automatic PASS evidence is required"
                 ),
                 path=path_name or None,
                 help=(
-                    "A changed test with no current PASS receipt no longer holds a "
-                    "branch back: land it and record the missing receipt as debt in "
-                    "the PR body and the fleet debt ledger (KB-MUT-02; "
-                    "mutation-evidence-authoring grant, half (b)). If you do want "
-                    "coverage, the only permitted route is an automatic engine -- "
-                    "`make mutation-generate MUTATION_SOURCE=SRC` then "
+                    "A changed test requires a current registered PASS receipt before "
+                    "it can land. The only permitted route is an automatic engine -- "
+                    "`make mutation-generate MUTATION_GENERATE_ARGS='--only SRC'` then "
                     "`make mutation-engine-run MUTATION_CAMPAIGN=...`. Hand-authored "
                     "mutants, manifests, patches and receipts are forbidden, and the "
                     "tooling that produced them has been removed."

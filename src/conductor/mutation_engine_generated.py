@@ -360,6 +360,9 @@ def open_receipt(
         "runner_components_sha256": components,
         "adapter_sha256": _sha256(adapter_path),
         "core_sha256": _sha256(Path(__file__)),
+        "scope_guard_sha256": _sha256(
+            Path(__file__).with_name("mutation_run_scope.py")
+        ),
         "language": campaign.language,
         "mutation_engine": campaign.mutation_engine,
         "mutants_are_generated": True,
@@ -494,11 +497,17 @@ def run_generated_campaign(
     receipt_path: Path | None = None,
     repo_root: Path = REPO_ROOT,
     adapter: EngineAdapter | None = None,
+    owner: str | None = None,
+    base: str = "origin/master",
+    only: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Generate, run and score a campaign's mutants inside a disposable snapshot."""
 
     if not allow_mutations:
         raise CampaignError("refusing mutation run without --allow-mutations")
+    from conductor.mutation_run_scope import validate_run_scope
+
+    validate_run_scope(campaign, repo_root=repo_root, owner=owner, base=base, only=only)
     engine = adapter or adapter_for(campaign.mutation_engine)
     binary = engine.binary()
     receipt = open_receipt(campaign, repo_root, Path(engine.__file__))
@@ -612,6 +621,9 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("campaign", type=Path)
     run_parser.add_argument("--allow-mutations", action="store_true")
     run_parser.add_argument("--receipt", type=Path)
+    run_parser.add_argument("--owner", help="claim owner for dirty-file mutation scope")
+    run_parser.add_argument("--base", default="origin/master")
+    run_parser.add_argument("--only", action="append", default=[])
     args = parser.parse_args(argv)
 
     try:
@@ -624,6 +636,10 @@ def main(argv: list[str] | None = None) -> int:
             campaign,
             allow_mutations=args.allow_mutations,
             receipt_path=args.receipt,
+            repo_root=REPO_ROOT,
+            owner=args.owner,
+            base=args.base,
+            only=args.only,
         )
         print_json(result)
         return 0 if result["status"] in ("PASS", "RATCHET_HELD") else 1

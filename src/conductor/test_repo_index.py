@@ -117,6 +117,8 @@ def test_named_by_agrees_with_the_git_grep_it_replaces(index):
 def test_a_package_is_named_by_its_directory(index):
     assert ri.dotted_for("conductor/__init__.py") == "conductor"
     assert ri.dotted_for("conductor/slop_gate.py") == "conductor.slop_gate"
+    assert ri.dotted_for("pkg/nested/__init__.py") == "pkg.nested"
+    assert ri.dotted_for("pkg/nested/target.py") == "pkg.nested.target"
 
 
 def test_the_index_is_not_degenerate(index):

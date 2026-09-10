@@ -181,7 +181,18 @@ def test_the_build_carries_the_pass_plugin_and_both_instrumentations() -> None:
     """
 
     subject = campaign()
+    subject.options["cmake_args"] = ["-DENABLE_TESTS=ON", "-DBUILD_SHARED_LIBS=OFF"]
     argv = _configure_argv(subject, WORKTREE, Path("/b"), "18")
+    assert argv[:7] == [
+        "cmake",
+        "-S",
+        str(WORKTREE / subject.options["cmake_source_dir"]),
+        "-B",
+        "/b",
+        "-G",
+        "Ninja",
+    ]
+    assert argv[-2:] == ["-DENABLE_TESTS=ON", "-DBUILD_SHARED_LIBS=OFF"]
     flags = [a for a in argv if a.startswith("-DCMAKE_CXX_FLAGS=")]
     assert flags, "the C++ flags must be set explicitly"
     assert "-fpass-plugin=/usr/lib/mull-ir-frontend-18" in flags[0]
@@ -282,11 +293,39 @@ def test_the_original_text_is_sliced_out_of_the_source_the_report_carries() -> N
     )
     assert multi.startswith("for (int i") and multi.endswith("}")
     assert "g(i * 2);" in multi
+    assert (
+        _slice(
+            "abcd\nefgh\nijkl",
+            {"start": {"line": 1, "column": 2}, "end": {"line": 3, "column": 3}},
+        )
+        == "bcd\nefgh\nij"
+    )
     # A location past the end of the file is empty, not an IndexError.
     assert (
         _slice(
             SOURCE_TEXT,
             {"start": {"line": 99, "column": 1}, "end": {"line": 99, "column": 2}},
+        )
+        == ""
+    )
+    # Missing embedded source must not invent text for a stable mutant identity.
+    missing_source = report(mutant(line=1, column=1, end_column=2))
+    entry = missing_source["files"][str(WORKTREE / SOURCE)]
+    del entry["source"]
+    assert _rows(missing_source, WORKTREE)[0]["original_text"] == ""
+    merged = _merge([missing_source])
+    assert merged["files"][str(WORKTREE / SOURCE)]["source"] == ""
+    assert (
+        _merge([report(mutant())])["files"][str(WORKTREE / SOURCE)]["source"]
+        == SOURCE_TEXT
+    )
+    del entry["mutants"][0]["status"]
+    with pytest.raises(CampaignError, match="unknown status ''"):
+        _rows(missing_source, WORKTREE)
+    assert (
+        _slice(
+            "abc\ndef",
+            {"start": {"line": 0, "column": 1}, "end": {"line": 0, "column": 2}},
         )
         == ""
     )
@@ -705,6 +744,15 @@ def _drive_execute(
 
     seen: dict[str, object] = {} if faked is None else faked
 
+    from conductor import mutation_run_scope
+
+    def _fake_scope(selected, worktree):
+        seen["scope_source"] = selected.source
+        seen["scope_worktree"] = worktree
+        return tmp_path / "mull.yml"
+
+    monkeypatch.setattr(mutation_run_scope, "mull_scope_config", _fake_scope)
+
     def _fake_build(campaign, worktree, build, version, **kwargs):
         seen["build"] = build
         seen["environment"] = kwargs.get("environment")
@@ -800,6 +848,9 @@ def test_a_clean_run_records_the_baseline_the_engine_version_and_the_scoped_corp
     # the stubs are the only place their construction is observable.
     assert faked["build"] == REPO_ROOT / ".mull-build"
     assert faked["environment"]["PATH"] == os.environ["PATH"]
+    assert faked["environment"]["MULL_CONFIG"] == str(tmp_path / "mull.yml")
+    assert faked["scope_source"] == campaign().source
+    assert faked["scope_worktree"] == REPO_ROOT
     assert "/bin/llvm-profdata-18" in faked["report_args"]
 
 

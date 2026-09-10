@@ -99,17 +99,15 @@ def _patch_verdict(
         capture_output=True,
         text=True,
     )
-    if check.returncode == 0:
-        return None
-    try:
-        check_patch_text(patch.read_text(), repo_root)
-    except PatchApplyError as exc:
-        return row | {
-            "reason": "DOES_NOT_APPLY",
-            "detail": f"{(check.stderr or check.stdout).strip()[:200]}; "
-            f"anchored retry: {str(exc)[:200]}",
-        }
-    return None
+    if check.returncode != 0:
+        try:
+            check_patch_text(patch.read_text(), repo_root)
+        except PatchApplyError as exc:
+            return row | {
+                "reason": "DOES_NOT_APPLY",
+                "detail": f"{(check.stderr or check.stdout).strip()[:200]}; "
+                f"anchored retry: {str(exc)[:200]}",
+            }
 
 
 def _interpreter_verdict(campaign: Campaign, repo_root: Path) -> dict[str, str] | None:
@@ -125,26 +123,25 @@ def _interpreter_verdict(campaign: Campaign, repo_root: Path) -> dict[str, str] 
     if not campaign.test_argv:
         return None
     argv0 = campaign.test_argv[0]
-    if not argv0.startswith("/"):
-        return None
-    row = {"campaign_id": campaign.campaign_id, "interpreter": argv0}
-    if not Path(argv0).exists():
+    if argv0.startswith("/"):
+        row = {"campaign_id": campaign.campaign_id, "interpreter": argv0}
+        if not Path(argv0).exists():
+            return row | {
+                "reason": "INTERPRETER_ABSENT",
+                "detail": "argv[0] is an absolute path that does not exist on this host",
+            }
+        try:
+            inside = Path(argv0).resolve().is_relative_to(repo_root.resolve())
+        except (OSError, ValueError):
+            inside = False
         return row | {
-            "reason": "INTERPRETER_ABSENT",
-            "detail": "argv[0] is an absolute path that does not exist on this host",
+            "reason": "INTERPRETER_HOST_PINNED",
+            "detail": (
+                "argv[0] is an absolute path, so the campaign binds to this host's"
+                + (" checkout" if inside else " filesystem")
+                + " instead of the runner's own interpreter; use a bare `python`"
+            ),
         }
-    try:
-        inside = Path(argv0).resolve().is_relative_to(repo_root.resolve())
-    except (OSError, ValueError):
-        inside = False
-    return row | {
-        "reason": "INTERPRETER_HOST_PINNED",
-        "detail": (
-            "argv[0] is an absolute path, so the campaign binds to this host's"
-            + (" checkout" if inside else " filesystem")
-            + " instead of the runner's own interpreter; use a bare `python`"
-        ),
-    }
 
 
 def _receipts_by_campaign(
@@ -171,8 +168,10 @@ def _receipts_by_campaign(
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 continue
+            if not isinstance(payload, dict):
+                continue
             campaign_id = payload.get("campaign_id")
-            if isinstance(campaign_id, str) and isinstance(payload, dict):
+            if isinstance(campaign_id, str):
                 index.setdefault(campaign_id, []).append(payload)
     return index
 
@@ -200,9 +199,8 @@ def _receipt_rejection(
     recorded = receipt.get("runner_components_sha256")
     if not isinstance(recorded, dict):
         return "no runner component map"
-    if recorded == dict(current) or _lineage_accepts(recorded, repo_root):
-        return None
-    return "runner components match neither this runner nor any lineage entry"
+    if not (recorded == dict(current) or _lineage_accepts(recorded, repo_root)):
+        return "runner components match neither this runner nor any lineage entry"
 
 
 def _evidence_verdict(
@@ -222,14 +220,13 @@ def _evidence_verdict(
             "detail": "no receipt declares this campaign_id",
         }
     rejections = [_receipt_rejection(row, current, repo_root) for row in rows]
-    if any(reason is None for reason in rejections):
-        return None
-    return {
-        "campaign_id": campaign.campaign_id,
-        "reason": "NO_ACCEPTABLE_RECEIPT",
-        "receipts": len(rows),
-        "detail": "; ".join(sorted({str(reason) for reason in rejections})),
-    }
+    if not any(reason is None for reason in rejections):
+        return {
+            "campaign_id": campaign.campaign_id,
+            "reason": "NO_ACCEPTABLE_RECEIPT",
+            "receipts": len(rows),
+            "detail": "; ".join(sorted({str(reason) for reason in rejections})),
+        }
 
 
 def _acceptable_receipt(
@@ -250,9 +247,8 @@ def _acceptable_receipt(
         for row in receipts.get(campaign.campaign_id, [])
         if _receipt_rejection(row, current, repo_root) is None
     ]
-    if not rows:
-        return None
-    return max(rows, key=lambda row: str(row.get("generated_at") or ""))
+    if rows:
+        return max(rows, key=lambda row: str(row.get("generated_at") or ""))
 
 
 def _value_verdicts(
@@ -286,8 +282,8 @@ def _value_verdicts(
     for campaign in campaigns:
         receipt = _acceptable_receipt(campaign, receipts, current, repo_root)
         value = receipt.get("test_value") if isinstance(receipt, Mapping) else None
-        if not isinstance(value, Mapping):
-            if campaign.value_analysis is None:
+        if value is None:
+            if campaign.value_analysis is None and not campaign.generated:
                 unmeasured.append(
                     {
                         "campaign_id": campaign.campaign_id,
@@ -296,9 +292,29 @@ def _value_verdicts(
                     }
                 )
             continue
+        if not isinstance(value, Mapping) or not isinstance(value.get("tests"), list):
+            unmeasured.append(
+                {
+                    "campaign_id": campaign.campaign_id,
+                    "reason": "INVALID_VALUE_ANALYSIS",
+                    "detail": "receipt test_value must contain a tests list",
+                }
+            )
+            continue
         for row in value.get("tests") or []:
-            if not isinstance(row, Mapping):
-                continue
+            if (
+                not isinstance(row, Mapping)
+                or not isinstance(row.get("nodeid"), str)
+                or not isinstance(row.get("classification"), str)
+            ):
+                unmeasured.append(
+                    {
+                        "campaign_id": campaign.campaign_id,
+                        "reason": "INVALID_VALUE_ANALYSIS",
+                        "detail": "receipt test_value rows require nodeid and classification",
+                    }
+                )
+                break
             if row.get("classification") == "DELETE_CANDIDATE":
                 inert.append(
                     {

@@ -234,6 +234,9 @@ def test_only_killed_mutants_are_re_applied_and_none_says_why(
 def test_the_coverage_map_is_ranked_by_what_a_junit_report_can_name(
     worktree: Path,
 ) -> None:
+    assert attribution._function("crate::suite") is None
+    assert attribution._function(f"{TESTS}::test_add[one]") == ADD
+
     # A JUnit report carries a classname and a name, so a nodeid that names no
     # `.py` module cannot be matched back to a case.
     receipt = run_attribution(
