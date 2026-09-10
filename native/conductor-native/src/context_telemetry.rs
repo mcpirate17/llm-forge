@@ -4,6 +4,7 @@
 //! owns normalization, event construction, bounded locked storage, rotation, and
 //! NDJSON aggregation.
 
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::env;
 use std::fs::{self, File, OpenOptions};
@@ -601,7 +602,7 @@ fn summarize(paths: &[String], bound_bytes: i128) -> std::io::Result<Value> {
             line.clear();
         }
     }
-    rows.sort_by(|left, right| right.output_bytes.cmp(&left.output_bytes));
+    rows.sort_by_key(|row| Reverse(row.output_bytes));
     let total: u128 = rows.iter().map(|row| row.output_bytes).sum();
     for row in &mut rows {
         row.share = if total == 0 {
