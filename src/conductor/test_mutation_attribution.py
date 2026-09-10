@@ -209,6 +209,27 @@ def test_only_killed_mutants_are_re_applied_and_none_says_why(
     assert receipt["attribution"]["reason"] == "no mutant was killed"
     assert receipt["attribution"]["attributed_mutants"] == 0
 
+    # A regression that stops threading the progress callback through
+    # attribute() -> _matrix() would leave a long run just as silent as
+    # before; this pins the wiring itself, not only the formatting helper.
+    calls: list[tuple[int, int]] = []
+    attribution.attribute(
+        Campaign(),
+        {
+            "mutants": [
+                mutant("add-op-1", "a + b", "a - b"),
+                mutant("mul-op-1", "a * b", "a / b"),
+                mutant("add-op-2", "a + b", "a - b"),
+            ]
+        },
+        worktree=worktree,
+        environment={},
+        interpreter=sys.executable,
+        run=FakeRunner(worktree),
+        progress=lambda position, total: calls.append((position, total)),
+    )
+    assert calls == [(0, 3), (1, 3), (2, 3)]
+
 
 def test_the_coverage_map_is_ranked_by_what_a_junit_report_can_name(
     worktree: Path,
@@ -411,3 +432,63 @@ def test_reports_are_written_to_their_own_directory(worktree: Path) -> None:
     assert runner.reports
     for report in runner.reports:
         assert report.parent == worktree / ".attribution"
+
+
+def test_progress_prints_every_position_when_the_run_is_small(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # total=5 forces total // 10 == 0, so this pins `max(1, ...)`: a mutant
+    # that drops the floor to 0 makes `% step` divide by zero on position 0.
+    total = 5
+    for position in range(total):
+        attribution._stderr_progress(position, total)
+    lines = capsys.readouterr().err.strip().splitlines()
+    assert lines == [
+        f"attribution: {i + 1}/{total} killed mutants re-run" for i in range(total)
+    ]
+
+
+def test_progress_step_arithmetic_is_pinned_at_a_chosen_total(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # total=30 makes step = 30 // 10 == 3, landing on positions distinct
+    # from any off-by-one or operator swap in the step/modulo arithmetic.
+    total = 30
+    expected_positions = [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29]
+    for position in range(total):
+        attribution._stderr_progress(position, total)
+    lines = capsys.readouterr().err.strip().splitlines()
+    assert lines == [
+        f"attribution: {position + 1}/{total} killed mutants re-run"
+        for position in expected_positions
+    ]
+
+    # total=31 makes step = 31 // 10 == 3 too, but now the last position (30)
+    # does NOT land on that step -- it only prints via the explicit "final"
+    # check, which pins that the comparison is against `total - 1`, not
+    # `total`.
+    capsys.readouterr()  # drop the total=30 output captured above
+    off_step_total = 31
+    for position in range(off_step_total):
+        attribution._stderr_progress(position, off_step_total)
+    off_step_lines = capsys.readouterr().err.strip().splitlines()
+    assert (
+        off_step_lines[-1]
+        == f"attribution: {off_step_total}/{off_step_total} killed mutants re-run"
+    )
+    assert (off_step_total - 1 + 1) % 3 != 0  # sanity: the last position is off-step
+
+    # A larger, unrelated total (47) pins the same bound-and-bookend contract
+    # at a different scale: emitted lines stay well below the mutant count
+    # (never one line per mutant), but the run is never completely silent --
+    # the very first and very last mutant are always reported so a truncated
+    # log still shows where the run started and whether it reached the end.
+    capsys.readouterr()  # drop the total=31 output captured above
+    large_total = 47
+    for position in range(large_total):
+        attribution._stderr_progress(position, large_total)
+    large_lines = capsys.readouterr().err.strip().splitlines()
+    assert large_lines, "a run this size must not be completely silent"
+    assert len(large_lines) < large_total  # bounded, not one line per mutant
+    assert large_lines[0] == "attribution: 1/47 killed mutants re-run"
+    assert large_lines[-1] == "attribution: 47/47 killed mutants re-run"

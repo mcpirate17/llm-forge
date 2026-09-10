@@ -28,6 +28,7 @@ dropped: an attribution rate is a diagnostic, and a silent one is worthless.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
@@ -261,17 +262,45 @@ def _baselines(session: _Session, ranked: Sequence[str]) -> list[dict[str, Any]]
     return reports
 
 
+def _stderr_progress(position: int, total: int) -> None:
+    """Default heartbeat: print(flush) to stderr, bounded to ~10 lines.
+
+    The re-run loop below is the quietest, longest-running part of a generated
+    campaign -- one pytest subprocess per killed mutant, nothing on stdout or
+    stderr in between. A file with hundreds of killed mutants (or a host under
+    load from other agents) can hold that silence for many minutes, and a
+    silent process for 20 minutes is indistinguishable from a hung one: an
+    operator watching it has no signal to tell "still working" from "stuck",
+    and the reasonable response to a hang is to kill it -- which loses the
+    whole receipt, not just the time. This makes the loop's progress visible
+    without flooding the log: one line per roughly 10% of the work, plus the
+    first and last mutant.
+    """
+
+    step = max(1, total // 10)
+    if position == 0 or position == total - 1 or (position + 1) % step == 0:
+        print(
+            f"attribution: {position + 1}/{total} killed mutants re-run",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 def _matrix(
     session: _Session,
     killed: Sequence[Mapping[str, Any]],
     ranked: Sequence[str],
     summary: dict[str, Any],
+    *,
+    progress: Callable[[int, int], None] = _stderr_progress,
 ) -> dict[str, dict[str, Any]]:
     """One JUnit report per killed mutant, over that mutant's covering set."""
 
     covered = set(ranked)
+    total = len(killed)
     matrix: dict[str, dict[str, Any]] = {}
     for position, row in enumerate(killed):
+        progress(position, total)
         mutation_id = str(row["id"])
         covering = sorted(
             {
@@ -311,6 +340,7 @@ def attribute(
     environment: Mapping[str, str],
     interpreter: str,
     run: Callable[..., tuple[Any, str]] = _core.run,
+    progress: Callable[[int, int], None] = _stderr_progress,
 ) -> None:
     """Measure the kill matrix and write `test_value` into the receipt.
 
@@ -349,7 +379,7 @@ def attribute(
         run=run,
     )
     baseline_reports = _baselines(session, ranked)
-    matrix = _matrix(session, killed, ranked, summary)
+    matrix = _matrix(session, killed, ranked, summary, progress=progress)
     summary["attributed_mutants"] = len(matrix)
     if not matrix:
         summary["status"] = "NO_ATTRIBUTION"
