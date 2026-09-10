@@ -15,6 +15,14 @@
 
 set -euo pipefail
 
+HOOK_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+REPO_ROOT="${PROJECT_DIR:-$(cd "$HOOK_DIR/../../.." && pwd)}"
+# shellcheck source=/dev/null
+source "$HOOK_DIR/_runtime.sh"
+hook_pythonpath "$REPO_ROOT"
+PYTHON="$(hook_python "$REPO_ROOT")"
+cd "$REPO_ROOT"
+
 quiet() {
     echo '{"hookSpecificOutput":{"hookEventName":"PostToolUse"}}'
     exit 0
@@ -42,4 +50,4 @@ import json, os
 print(json.dumps({"hookSpecificOutput": {
     "hookEventName": "PostToolUse",
     "additionalContext": os.environ["MSG"],
-}}))' | python3 -m conductor.context_telemetry hook-context --hook post-bash-graph
+}}))' | "$PYTHON" -m conductor.context_telemetry hook-context --hook post-bash-graph

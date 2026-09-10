@@ -7,10 +7,14 @@
 # never silently dropped. Emits an empty hook result when nothing is staged.
 set -euo pipefail
 HOOK_DIR="$(dirname "$(readlink -f "$0")")"
-REPO_ROOT="${PROJECT_DIR:-$(dirname "$(dirname "$(dirname "$HOOK_DIR")")")}"
+REPO_ROOT="${PROJECT_DIR:-$(dirname \
+  "$(dirname \
+    "$(dirname "$HOOK_DIR")")")}"
+PYTHON="${HOOK_PYTHON:-$REPO_ROOT/.venv/bin/python}"
+if [[ ! -x "$PYTHON" ]]; then PYTHON="$(command -v python3)"; fi
+export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 # shellcheck source=/dev/null
 source "$HOOK_DIR/_identity.sh"
-export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 cd "$REPO_ROOT"
-python3 -m conductor.inplace_handoff hook --identity "${A2A_ID:-claude}" \
-  | python3 -m conductor.context_telemetry hook-context --hook session-handoff
+"$PYTHON" -m conductor.inplace_handoff hook --identity "${A2A_ID:-claude}" \
+  | "$PYTHON" -m conductor.context_telemetry hook-context --hook session-handoff

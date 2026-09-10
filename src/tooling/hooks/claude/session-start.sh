@@ -16,7 +16,13 @@ set -euo pipefail
 HOOK_DIR="$(dirname "$(readlink -f "$0")")"
 # The checkout this hook serves: the launcher passes PROJECT_DIR; run directly,
 # the body sits at <root>/tooling/hooks/claude/.
-REPO_ROOT="${PROJECT_DIR:-$(dirname "$(dirname "$(dirname "$HOOK_DIR")")")}"
+REPO_ROOT="${PROJECT_DIR:-$(dirname \
+  "$(dirname \
+    "$(dirname "$HOOK_DIR")")")}"
+PYTHON="${HOOK_PYTHON:-$REPO_ROOT/.venv/bin/python}"
+if [[ ! -x "$PYTHON" ]]; then PYTHON="$(command -v python3)"; fi
+export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
+cd "$REPO_ROOT"
 PROJECT_HOOK_DIR="${PROJECT_HOOK_DIR:-$REPO_ROOT/.claude/hooks/project}"
 
 HOOK_INPUT=$(cat)
@@ -43,7 +49,7 @@ fi
 export PROJECT_HOOK_CONTEXT
 
 # Auto-refresh active state (AVO Tier-0 state cache)
-( cd "$REPO_ROOT" && python3 -m conductor.active_state update >/dev/null 2>&1 & ) || true
+( cd "$REPO_ROOT" && "$PYTHON" -m conductor.active_state update >/dev/null 2>&1 & ) || true
 
 # A2A: ensure this identity's endpoint is serving, retry its queued sends, and
 # surface a bounded (<=1200 chars) unread preview in the injected context via
@@ -72,6 +78,6 @@ export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 export A2A_SUMMARY="${A2A_SUMMARY:-}"
 # hook-context records the injected additionalContext size (bytes only) and
 # passes the JSON through untouched, so hook cost shows up in the telemetry.
-python3 -m conductor.session_preamble hook --a2a-name "$A2A_ID" \
+"$PYTHON" -m conductor.session_preamble hook --a2a-name "$A2A_ID" \
   | python3 "$HOOK_DIR/_append_context.py" \
-  | python3 -m conductor.context_telemetry hook-context --hook session-start
+  | "$PYTHON" -m conductor.context_telemetry hook-context --hook session-start
