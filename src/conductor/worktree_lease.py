@@ -35,7 +35,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-LEASE_FILENAME = ".worktree-lease.json"
+LEASE_FILENAME = ".worktree-lease.json"  # Per-worktree state; gitignored. See .gitignore and KB-GOV-07.
 DEFAULT_HOURS = 8.0
 MAX_HOURS = 168.0
 SCHEMA = "worktree-lease.v1"
