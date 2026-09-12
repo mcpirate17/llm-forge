@@ -419,8 +419,9 @@ def test_pyproject_warning_on_malformed_toml(tmp_path: Path) -> None:
     assert "could not be parsed" in warnings[0]
 
 
+@pytest.mark.usefixtures("quiet_doctor")
 def test_pyproject_warning_reaches_the_plan_without_writing_pyproject(
-    tmp_path: Path, quiet_doctor: None
+    tmp_path: Path,
 ) -> None:
     project = _repo(tmp_path)
     plan_ = pi.plan(_config(project))
