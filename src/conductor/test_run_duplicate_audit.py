@@ -10,7 +10,6 @@ import pytest
 
 from conductor import run_duplicate_audit
 
-
 CPD_NAMESPACE = "https://pmd-code.org/schema/cpd-report"
 
 
@@ -40,8 +39,8 @@ def _init_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "-q")
-    (repo / "research").mkdir()
-    (repo / "conductor").mkdir()
+    (repo / "src").mkdir()
+    (repo / "native").mkdir()
     return repo
 
 
@@ -61,6 +60,18 @@ def _configure_jscpd(repo: Path, *, ignores: list[str] | None = None) -> None:
         ".gitignore",
         run_duplicate_audit.JSCPD_BASELINE_RELATIVE.as_posix(),
     )
+
+
+def _configure_pmd(repo: Path) -> None:
+    """Give the repo a resolvable ``pmd`` so ``_resolve_pmd_executable`` succeeds.
+
+    Mirrors ``_configure_jscpd``: a project-local ``node_modules/.bin/pmd`` is
+    the first thing ``_resolve_pmd_executable`` checks, so tests that monkeypatch
+    ``_run_report_command`` never need a real PMD install on PATH.
+    """
+    binary = repo / "node_modules" / ".bin" / "pmd"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    binary.write_text("#!/bin/sh\n", encoding="utf-8")
 
 
 def _write_baseline(path: Path, entries: list[dict] | None = None) -> None:
@@ -105,11 +116,14 @@ def _jscpd_emulator(
             continue
         for source in source_root.rglob("*"):
             relative = source.relative_to(cwd).as_posix()
-            if source.is_file() and not any(
-                fnmatch.fnmatchcase(relative, pattern) for pattern in patterns
+            if (
+                source.is_file()
+                and not any(
+                    fnmatch.fnmatchcase(relative, pattern) for pattern in patterns
+                )
+                and "DUPLICATE_INDEX_SENTINEL" in source.read_text(encoding="utf-8")
             ):
-                if "DUPLICATE_INDEX_SENTINEL" in source.read_text(encoding="utf-8"):
-                    matches.append(source)
+                matches.append(source)
     duplicates = []
     if len(matches) >= 2:
         duplicates.append(
@@ -300,14 +314,14 @@ def test_jscpd_live_scan_uses_git_visible_sources(
 ) -> None:
     repo = _init_repo(tmp_path)
     _configure_jscpd(repo)
-    nested_ignore = repo / "research" / ".gitignore"
+    nested_ignore = repo / "src" / ".gitignore"
     nested_ignore.write_text("reports/\n", encoding="utf-8")
-    _git(repo, "add", "research/.gitignore")
+    _git(repo, "add", "src/.gitignore")
 
-    ignored_dir = repo / "research" / "reports"
+    ignored_dir = repo / "src" / "reports"
     ignored_dir.mkdir()
     ignored = [ignored_dir / "ignored_a.py", ignored_dir / "ignored_b.py"]
-    visible = [repo / "research" / "visible_a.py", repo / "conductor" / "visible_b.py"]
+    visible = [repo / "src" / "visible_a.py", repo / "native" / "visible_b.py"]
     for path in [*ignored, *visible]:
         path.write_text("DUPLICATE_INDEX_SENTINEL = 1\n", encoding="utf-8")
 
@@ -343,49 +357,49 @@ def test_jscpd_live_scan_uses_git_visible_sources(
 
 def test_materialized_sources_are_exact_index_blobs(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
-    tracked = repo / "research" / "tracked.py"
+    tracked = repo / "src" / "tracked.py"
     tracked.write_text("INDEX_VERSION = 1\n", encoding="utf-8")
-    artifact = repo / "research" / "checkpoint.pt"
+    artifact = repo / "src" / "checkpoint.pt"
     artifact.write_bytes(b"tracked artifact must not be copied")
-    _git(repo, "add", "research/tracked.py", "research/checkpoint.pt")
+    _git(repo, "add", "src/tracked.py", "src/checkpoint.pt")
 
     tracked.write_text("WORKTREE_VERSION = 2\n", encoding="utf-8")
-    (repo / "research" / "untracked.py").write_text(
+    (repo / "src" / "untracked.py").write_text(
         "UNTRACKED_VERSION = 3\n", encoding="utf-8"
     )
 
     with run_duplicate_audit.materialized_index_sources(
-        ("research",), frozenset({".py"}), root=repo
+        ("src",), frozenset({".py"}), root=repo
     ) as snapshot:
-        assert (snapshot / "research" / "tracked.py").read_text(
+        assert (snapshot / "src" / "tracked.py").read_text(
             encoding="utf-8"
         ) == "INDEX_VERSION = 1\n"
-        assert not (snapshot / "research" / "untracked.py").exists()
-        assert not (snapshot / "research" / "checkpoint.pt").exists()
+        assert not (snapshot / "src" / "untracked.py").exists()
+        assert not (snapshot / "src" / "checkpoint.pt").exists()
 
-    _git(repo, "add", "research/tracked.py", "research/untracked.py")
+    _git(repo, "add", "src/tracked.py", "src/untracked.py")
     with run_duplicate_audit.materialized_index_sources(
-        ("research",), frozenset({".py"}), root=repo
+        ("src",), frozenset({".py"}), root=repo
     ) as snapshot:
-        assert (snapshot / "research" / "tracked.py").read_text(
+        assert (snapshot / "src" / "tracked.py").read_text(
             encoding="utf-8"
         ) == "WORKTREE_VERSION = 2\n"
-        assert (snapshot / "research" / "untracked.py").exists()
+        assert (snapshot / "src" / "untracked.py").exists()
 
 
 def test_vulture_check_ignores_untracked_but_fails_for_index_violation(
     tmp_path: Path, monkeypatch
 ) -> None:
     repo = _init_repo(tmp_path)
-    (repo / "research" / "definition.py").write_text(
+    (repo / "src" / "definition.py").write_text(
         "def shared_symbol():\n    return 1\n", encoding="utf-8"
     )
-    (repo / "research" / "consumer.py").write_text(
+    (repo / "src" / "consumer.py").write_text(
         "from .definition import shared_symbol\nRESULT = shared_symbol()\n",
         encoding="utf-8",
     )
-    _git(repo, "add", "research/definition.py", "research/consumer.py")
-    violation = repo / "research" / "untracked_violation.py"
+    _git(repo, "add", "src/definition.py", "src/consumer.py")
+    violation = repo / "src" / "untracked_violation.py"
     violation.write_text("UNUSED_INDEX_SENTINEL = object()\n", encoding="utf-8")
 
     def vulture_detector(command: list[str], **kwargs: object) -> int:
@@ -397,7 +411,7 @@ def test_vulture_check_ignores_untracked_but_fails_for_index_violation(
     monkeypatch.setattr(run_duplicate_audit, "run", vulture_detector)
 
     assert run_duplicate_audit.run_vulture(True, True, root=repo) == 0
-    _git(repo, "add", "research/untracked_violation.py")
+    _git(repo, "add", "src/untracked_violation.py")
     assert run_duplicate_audit.run_vulture(True, True, root=repo) == 1
 
 
@@ -406,17 +420,17 @@ def test_jscpd_check_ignores_untracked_but_fails_for_index_duplicates(
 ) -> None:
     repo = _init_repo(tmp_path)
     _configure_jscpd(repo)
-    (repo / "research" / "base.py").write_text("VALUE = 1\n", encoding="utf-8")
-    _git(repo, "add", "research/base.py")
-    duplicate_a = repo / "research" / "untracked_a.py"
-    duplicate_b = repo / "conductor" / "untracked_b.py"
+    (repo / "src" / "base.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _git(repo, "add", "src/base.py")
+    duplicate_a = repo / "src" / "untracked_a.py"
+    duplicate_b = repo / "native" / "untracked_b.py"
     duplicate_a.write_text("DUPLICATE_INDEX_SENTINEL = 1\n", encoding="utf-8")
     duplicate_b.write_text("DUPLICATE_INDEX_SENTINEL = 1\n", encoding="utf-8")
 
     monkeypatch.setattr(run_duplicate_audit, "_run_report_command", _jscpd_emulator)
 
     assert run_duplicate_audit.run_jscpd(True, True, root=repo) == 0
-    _git(repo, "add", "research/untracked_a.py", "conductor/untracked_b.py")
+    _git(repo, "add", "src/untracked_a.py", "native/untracked_b.py")
     assert run_duplicate_audit.run_jscpd(True, True, root=repo) == 1
 
 
@@ -424,13 +438,13 @@ def test_jscpd_snapshot_preserves_repository_relative_ignores(
     tmp_path: Path, monkeypatch
 ) -> None:
     repo = _init_repo(tmp_path)
-    _configure_jscpd(repo, ignores=["research/tests/**"])
-    ignored = repo / "research" / "tests" / "ignored.py"
+    _configure_jscpd(repo, ignores=["src/tests/**"])
+    ignored = repo / "src" / "tests" / "ignored.py"
     ignored.parent.mkdir()
     ignored.write_text("DUPLICATE_INDEX_SENTINEL = 1\n", encoding="utf-8")
-    ignored_peer = repo / "research" / "tests" / "ignored_peer.py"
+    ignored_peer = repo / "src" / "tests" / "ignored_peer.py"
     ignored_peer.write_text("DUPLICATE_INDEX_SENTINEL = 1\n", encoding="utf-8")
-    _git(repo, "add", "research/tests/ignored.py", "research/tests/ignored_peer.py")
+    _git(repo, "add", "src/tests/ignored.py", "src/tests/ignored_peer.py")
 
     # The candidate config comes from the index, not this unstaged worktree edit.
     (repo / "package.json").write_text(
@@ -468,30 +482,50 @@ def test_jscpd_snapshot_preserves_repository_relative_ignores(
     assert run_duplicate_audit.run_jscpd(True, True, root=repo) == 0
 
 
+def _make_fail_report(*, expected_tool_name: str, failure: str, corrupt_report):
+    """Build a ``_run_report_command`` double that injects one failure mode.
+
+    Shared by the jscpd and PMD "report failures are blocking" tests below --
+    both drive the same three failure modes through the same seam, differing
+    only in the tool name asserted and how a malformed report gets written.
+    """
+
+    def fail_report(
+        command: list[str], *, cwd: Path, tool_name: str
+    ) -> subprocess.CompletedProcess[str]:
+        del cwd
+        assert tool_name == expected_tool_name
+        if failure == "nonzero":
+            raise run_duplicate_audit.DuplicateAuditError(
+                f"{tool_name} exited 9; report rejected"
+            )
+        if failure == "malformed":
+            corrupt_report(command)
+        return _completed(command)
+
+    return fail_report
+
+
 @pytest.mark.parametrize("failure", ["nonzero", "missing", "malformed"])
 def test_jscpd_report_failures_are_blocking(
     tmp_path: Path, monkeypatch, failure: str
 ) -> None:
     repo = _init_repo(tmp_path)
     _configure_jscpd(repo)
-    (repo / "research" / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (repo / "src" / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
 
-    def fail_report(
-        command: list[str], *, cwd: Path, tool_name: str
-    ) -> subprocess.CompletedProcess[str]:
-        del cwd
-        assert tool_name == "jscpd"
-        if failure == "nonzero":
-            raise run_duplicate_audit.DuplicateAuditError(
-                "jscpd exited 9; report rejected"
-            )
-        if failure == "malformed":
-            output = Path(command[command.index("--output") + 1])
-            output.mkdir(parents=True, exist_ok=True)
-            (output / "jscpd-report.json").write_text("{", encoding="utf-8")
-        return _completed(command)
+    def corrupt_report(command: list[str]) -> None:
+        output = Path(command[command.index("--output") + 1])
+        output.mkdir(parents=True, exist_ok=True)
+        (output / "jscpd-report.json").write_text("{", encoding="utf-8")
 
-    monkeypatch.setattr(run_duplicate_audit, "_run_report_command", fail_report)
+    monkeypatch.setattr(
+        run_duplicate_audit,
+        "_run_report_command",
+        _make_fail_report(
+            expected_tool_name="jscpd", failure=failure, corrupt_report=corrupt_report
+        ),
+    )
     assert (
         run_duplicate_audit.run_jscpd(check=True, root=repo)
         == run_duplicate_audit.AUDIT_ERROR_EXIT_CODE
@@ -503,24 +537,21 @@ def test_pmd_report_failures_are_blocking(
     tmp_path: Path, monkeypatch, failure: str
 ) -> None:
     repo = _init_repo(tmp_path)
+    _configure_pmd(repo)
     _write_baseline(repo / run_duplicate_audit.PMD_CPD_BASELINE_RELATIVE)
-    (repo / "research" / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (repo / "src" / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
 
-    def fail_report(
-        command: list[str], *, cwd: Path, tool_name: str
-    ) -> subprocess.CompletedProcess[str]:
-        del cwd
-        assert tool_name == "pmd-cpd"
-        if failure == "nonzero":
-            raise run_duplicate_audit.DuplicateAuditError(
-                "pmd-cpd exited 9; report rejected"
-            )
-        if failure == "malformed":
-            report = Path(command[command.index("--report-file") + 1])
-            report.write_text("<pmd-cpd>", encoding="utf-8")
-        return _completed(command)
+    def corrupt_report(command: list[str]) -> None:
+        report = Path(command[command.index("--report-file") + 1])
+        report.write_text("<pmd-cpd>", encoding="utf-8")
 
-    monkeypatch.setattr(run_duplicate_audit, "_run_report_command", fail_report)
+    monkeypatch.setattr(
+        run_duplicate_audit,
+        "_run_report_command",
+        _make_fail_report(
+            expected_tool_name="pmd-cpd", failure=failure, corrupt_report=corrupt_report
+        ),
+    )
     assert (
         run_duplicate_audit.run_pmd_python(check=True, root=repo)
         == run_duplicate_audit.AUDIT_ERROR_EXIT_CODE
@@ -694,16 +725,16 @@ def test_check_against_baseline_changed_baseline_only_file_not_reported_as_cause
 def test_jscpd_index_check_reads_staged_baseline(tmp_path: Path, monkeypatch) -> None:
     repo = _init_repo(tmp_path)
     _configure_jscpd(repo)
-    first = repo / "research" / "first.py"
-    second = repo / "conductor" / "second.py"
+    first = repo / "src" / "first.py"
+    second = repo / "native" / "second.py"
     fragment = "DUPLICATE_INDEX_SENTINEL = 1"
     first.write_text(fragment + "\n", encoding="utf-8")
     second.write_text(fragment + "\n", encoding="utf-8")
-    _git(repo, "add", "research/first.py", "conductor/second.py")
+    _git(repo, "add", "src/first.py", "native/second.py")
     entry = {
-        "key": _stable_dup_key("research/first.py", "conductor/second.py", fragment),
-        "firstFile": "research/first.py",
-        "secondFile": "conductor/second.py",
+        "key": _stable_dup_key("src/first.py", "native/second.py", fragment),
+        "firstFile": "src/first.py",
+        "secondFile": "native/second.py",
         "lines": 10,
     }
     baseline = repo / run_duplicate_audit.JSCPD_BASELINE_RELATIVE
@@ -715,10 +746,53 @@ def test_jscpd_index_check_reads_staged_baseline(tmp_path: Path, monkeypatch) ->
     assert run_duplicate_audit.run_jscpd(True, True, root=repo) == 0
 
 
+def test_resolve_pmd_executable_prefers_an_explicit_override(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    _configure_pmd(repo)
+    assert (
+        run_duplicate_audit._resolve_pmd_executable(repo, "/custom/pmd")
+        == "/custom/pmd"
+    )
+
+
+def test_resolve_pmd_executable_prefers_a_project_local_binary(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = _init_repo(tmp_path)
+    _configure_pmd(repo)
+    # Even when something named "pmd" is also on PATH, the project-local binary
+    # under node_modules/.bin wins -- the same precedence jscpd resolution uses.
+    monkeypatch.setattr(
+        run_duplicate_audit.shutil, "which", lambda name: "/usr/bin/unrelated-pmd"
+    )
+    resolved = run_duplicate_audit._resolve_pmd_executable(repo)
+    assert resolved == str((repo / "node_modules" / ".bin" / "pmd").resolve())
+
+
+def test_resolve_pmd_executable_falls_back_to_path(tmp_path: Path, monkeypatch) -> None:
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(
+        run_duplicate_audit.shutil, "which", lambda name: "/usr/local/bin/pmd"
+    )
+    assert run_duplicate_audit._resolve_pmd_executable(repo) == "/usr/local/bin/pmd"
+
+
+def test_resolve_pmd_executable_raises_when_nothing_resolves(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(run_duplicate_audit.shutil, "which", lambda name: None)
+    with pytest.raises(
+        run_duplicate_audit.DuplicateAuditError, match="pmd executable is unavailable"
+    ):
+        run_duplicate_audit._resolve_pmd_executable(repo)
+
+
 def test_pmd_index_check_reads_staged_baseline(tmp_path: Path, monkeypatch) -> None:
     repo = _init_repo(tmp_path)
-    first = repo / "research" / "first.py"
-    second = repo / "conductor" / "second.py"
+    _configure_pmd(repo)
+    first = repo / "src" / "first.py"
+    second = repo / "native" / "second.py"
     fragment = "DUPLICATE_INDEX_SENTINEL = 1"
     first.write_text(fragment + "\n", encoding="utf-8")
     second.write_text(fragment + "\n", encoding="utf-8")
@@ -727,14 +801,14 @@ def test_pmd_index_check_reads_staged_baseline(tmp_path: Path, monkeypatch) -> N
     _git(
         repo,
         "add",
-        "research/first.py",
-        "conductor/second.py",
+        "src/first.py",
+        "native/second.py",
         run_duplicate_audit.PMD_CPD_BASELINE_RELATIVE.as_posix(),
     )
     entry = {
-        "key": _stable_dup_key("research/first.py", "conductor/second.py", fragment),
-        "firstFile": "research/first.py",
-        "secondFile": "conductor/second.py",
+        "key": _stable_dup_key("src/first.py", "native/second.py", fragment),
+        "firstFile": "src/first.py",
+        "secondFile": "native/second.py",
         "lines": 10,
     }
     _write_baseline(baseline, [entry])

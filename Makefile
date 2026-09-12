@@ -39,9 +39,17 @@ MUTATION_PATHS ?=
 MUTATION_GENERATE_ARGS ?=
 MUTATION_ENGINE_ARGS ?=
 
+# candidate_policy.toml's own `baseline_expires` gates every baseline at once
+# (policy.py refuses the whole review once it lapses), so a freshly generated
+# baseline expires alongside it rather than drifting out of sync on its own.
+BASELINE_EXPIRES ?= $(shell $(UV) run python -c \
+  'import tomllib; from conductor.project_paths import project_paths; \
+   print(tomllib.loads(project_paths(".").policy_path.read_text(encoding="utf-8"))["baseline_expires"])')
+
 .PHONY: test native gate candidate-review \
 	mutation-plan mutation-generate mutation-engine-run mutation-evidence \
-	mutation-coverage help
+	mutation-coverage baselines baseline-jscpd baseline-pmd baseline-complexity \
+	baseline-vulture help
 
 test:  ## Run the conductor test suite
 	@# --timeout needs pytest-timeout, which nothing in pyproject declares yet, so
@@ -94,6 +102,27 @@ mutation-evidence:  ## Verify PASS receipts for MUTATION_PATHS, or for git-chang
 
 mutation-coverage:  ## Read-only inventory of test evidence; never executes mutants
 	$(UV) run python -m conductor.mutation_coverage coverage
+
+baselines: baseline-jscpd baseline-pmd baseline-complexity baseline-vulture  ## Regenerate all four candidate-review baselines from real tool output
+
+baseline-jscpd:  ## Record current jscpd duplicate pairs as the baseline (needs jscpd on PATH)
+	$(UV) run python -m conductor.run_duplicate_audit --tool jscpd --save-baseline
+
+baseline-pmd:  ## Record current PMD-CPD duplicate pairs as the baseline (needs pmd on PATH; see README)
+	@command -v pmd >/dev/null 2>&1 || { echo "pmd not on PATH -- see README.md for the pinned release"; exit 2; }
+	$(UV) run python -m conductor.run_duplicate_audit --tool pmd-python --save-baseline
+
+baseline-complexity:  ## Record current complexity blocks as the ratchet baseline
+	@# --baseline is resolved against radon_complexity.py's own REPO_ROOT (this
+	@# package's src/ directory), not the repo root -- see [checks.complexity].
+	$(UV) run python -m conductor.radon_complexity refresh-baseline \
+		--baseline conductor/radon_complexity_baseline.json --path .
+
+baseline-vulture:  ## Record an empty justified-findings allowlist for vulture (see script docstring)
+	$(UV) run python -m conductor.candidate_review.vulture_baseline_init \
+		--baseline src/conductor/vulture_baseline.json \
+		--expires "$(BASELINE_EXPIRES)" \
+		src
 
 help:  ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
