@@ -44,7 +44,13 @@ MUTATION_ENGINE_ARGS ?=
 	mutation-coverage help
 
 test:  ## Run the conductor test suite
-	$(UV) run python -m pytest $(PYTEST_TARGET) --timeout $(PYTEST_TIMEOUT) $(PYTEST_ARGS)
+	@# --timeout needs pytest-timeout, which nothing in pyproject declares yet, so
+	@# this target fails loud with "unrecognized arguments: --timeout 600" until the
+	@# test extra carries it. Deliberate: a suite with no per-test timeout is how a
+	@# hung test becomes a hung CI job. PYTEST_TIMEOUT= disables the flag if you
+	@# need the suite before the dependency lands.
+	$(UV) run python -m pytest $(PYTEST_TARGET) \
+		$(if $(PYTEST_TIMEOUT),--timeout $(PYTEST_TIMEOUT)) $(PYTEST_ARGS)
 
 native:  ## Rebuild both Rust crates and install them into the venv
 	@# Both crates are path sources in [tool.uv.sources]; `uv sync --reinstall-package`
