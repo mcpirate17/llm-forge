@@ -1,25 +1,17 @@
 """Where the host project keeps its conductor data.
 
-``conductor`` was extracted from a monorepo that stores its candidate policy at
+``conductor`` was extracted from a monorepo that keeps its candidate policy at
 ``conductor/candidate_policy.toml`` and its mutation registry at
-``conductor/mutation_campaigns/registry.json``, both relative to the repository root.
-Those two literals were spelled out at three dozen call sites, which made the package
-unusable in any tree that does not reproduce that layout.
+``conductor/mutation_campaigns/registry.json``. Those two literals were spelled out at
+three dozen call sites, which made the package unusable in any tree with another layout.
 
-This module is the single resolution point. Every answer is *repo-root-relative*, so a
-caller that holds a candidate snapshot, an export root or a working tree joins the
-result to the root it already has. Precedence, highest first:
-
-1. ``$CONDUCTOR_CANDIDATE_POLICY`` / ``$CONDUCTOR_MUTATION_REGISTRY``;
-2. the host's ``pyproject.toml`` ``[tool.conductor]`` table, keys ``candidate_policy``
-   and ``mutation_registry`` -- read from the root being resolved, so a candidate
-   snapshot answers for itself and a checkout cannot change its verdict;
-3. the monorepo literals above, so that host needs no configuration at all.
-
-A configured value that is absolute, escapes the root or is empty is refused here. A
-configured *file* that does not exist is refused by the caller that needs it -- see
-``conductor.candidate_review.policy_path.resolve_policy_path``, which will not fall
-back to the packaged policy once the host has named one.
+This module is the single resolution point, and every answer is repo-root-relative so a
+caller joins it to the root it already holds. Precedence: the environment variables
+below; then the host's ``pyproject.toml`` ``[tool.conductor]`` table, read from the root
+being resolved so a candidate snapshot answers for itself; then the monorepo literals,
+so that host needs no configuration. A configured value that is absolute, empty or
+escaping the root is refused here; a configured file that does not exist is refused by
+the caller that needs it.
 """
 
 from __future__ import annotations
@@ -39,6 +31,10 @@ MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
 MUTATION_REGISTRY_KEY = "mutation_registry"
+DEFAULTS = {
+    CANDIDATE_POLICY_KEY: DEFAULT_CANDIDATE_POLICY,
+    MUTATION_REGISTRY_KEY: DEFAULT_MUTATION_REGISTRY,
+}
 
 
 class ProjectPathError(RuntimeError):
@@ -59,7 +55,7 @@ def _relative(raw: object, source: str) -> PurePosixPath:
 
 
 def conductor_table(root: Path) -> Mapping[str, Any]:
-    """The host's ``[tool.conductor]`` table; empty when it has no ``pyproject.toml``."""
+    """The host's ``[tool.conductor]`` table, empty when there is no manifest."""
     manifest = Path(root) / "pyproject.toml"
     if not manifest.is_file():
         return {}
@@ -74,9 +70,7 @@ def conductor_table(root: Path) -> Mapping[str, Any]:
     return table
 
 
-def _configured(
-    root: Path, *, key: str, env: str, default: PurePosixPath
-) -> tuple[PurePosixPath, bool]:
+def _configured(root: Path, key: str, env: str) -> tuple[PurePosixPath, bool]:
     """(relative path, whether the host named it) for one key."""
     raw = os.environ.get(env, "").strip()
     if raw:
@@ -85,7 +79,7 @@ def _configured(
     if key in table:
         source = f"[tool.conductor].{key} in {Path(root) / 'pyproject.toml'}"
         return _relative(table[key], source), True
-    return default, False
+    return DEFAULTS[key], False
 
 
 @dataclass(frozen=True)
@@ -115,27 +109,15 @@ class ProjectPaths:
     def campaigns_root(self) -> Path:
         return self.root / self.campaigns_relative.as_posix()
 
-    @property
-    def receipts_relative(self) -> PurePosixPath:
-        return self.campaigns_relative / "receipts"
-
 
 def project_paths(root: Path | str) -> ProjectPaths:
     """Resolve every host path against ``root``. Not cached: hosts differ per call."""
     base = Path(root)
-    policy, policy_named = _configured(
-        base,
-        key=CANDIDATE_POLICY_KEY,
-        env=CANDIDATE_POLICY_ENV,
-        default=DEFAULT_CANDIDATE_POLICY,
+    policy, named_policy = _configured(base, CANDIDATE_POLICY_KEY, CANDIDATE_POLICY_ENV)
+    registry, named_reg = _configured(
+        base, MUTATION_REGISTRY_KEY, MUTATION_REGISTRY_ENV
     )
-    registry, registry_named = _configured(
-        base,
-        key=MUTATION_REGISTRY_KEY,
-        env=MUTATION_REGISTRY_ENV,
-        default=DEFAULT_MUTATION_REGISTRY,
-    )
-    return ProjectPaths(base, policy, registry, policy_named, registry_named)
+    return ProjectPaths(base, policy, registry, named_policy, named_reg)
 
 
 def enclosing_repo(start: Path) -> Path | None:
@@ -154,10 +136,6 @@ def host_root(start: Path | None = None) -> Path:
     return enclosing_repo(base) or base
 
 
-def policy_relative(root: Path | str) -> PurePosixPath:
-    return project_paths(root).policy_relative
-
-
 def registry_relative(root: Path | str) -> PurePosixPath:
     return project_paths(root).registry_relative
 
@@ -167,11 +145,7 @@ def campaigns_relative(root: Path | str) -> PurePosixPath:
 
 
 def receipts_relative(root: Path | str) -> PurePosixPath:
-    return project_paths(root).receipts_relative
-
-
-def policy_path(root: Path | str) -> Path:
-    return project_paths(root).policy_path
+    return project_paths(root).campaigns_relative / "receipts"
 
 
 def registry_path(root: Path | str) -> Path:
