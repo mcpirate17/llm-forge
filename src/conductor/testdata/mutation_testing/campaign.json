@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "campaign_id": "toy_pack_mode_fixture",
+  "title": "Toy pack-mode fixture campaign for test_mutation_testing.py",
+  "language": "python",
+  "mutation_engine": "reviewed_unified_diff",
+  "expected_ranked_tests": 2,
+  "expected_mutations": 1,
+  "source_sha256": {
+    "src/conductor/testdata/mutation_testing/toy_module.py": "3d7bf6d827a70d1f433caf5fcecda03cdd857bb189cc2e5a135a2f732fdc81a9",
+    "src/conductor/testdata/mutation_testing/toy_module_scope.py": "7c2d2a38bdf2f84e9e911ca7a71137ce0682a66469018f8b44f4405c2fddab86"
+  },
+  "ranked_tests": [
+    {
+      "rank": 1,
+      "nodeid": "src/conductor/testdata/mutation_testing/toy_module_scope.py::check_pack_mode_is_sequential",
+      "contract": "the toy launcher stays in sequential pack mode",
+      "rationale": "This is the fixture's only assertion that reads pack_mode(), so it is the kill for the toy mutation."
+    },
+    {
+      "rank": 2,
+      "nodeid": "src/conductor/testdata/mutation_testing/toy_module_scope.py::pack_mode_is_sequential",
+      "contract": "the helper predicate agrees with the launcher's own default",
+      "rationale": "Ranking the helper alongside its caller exercises contiguous-rank and baseline-coverage checks with more than one test."
+    }
+  ],
+  "planned_mutations": [
+    {
+      "id": "pack_mode_first_order",
+      "target_path": "src/conductor/testdata/mutation_testing/toy_module.py",
+      "contract": "the toy launcher selects sequential pack mode",
+      "description": "Change the toy launcher's pack-mode return value from sequential to random in the isolated mutant only.",
+      "expected_killers": [
+        "src/conductor/testdata/mutation_testing/toy_module_scope.py::check_pack_mode_is_sequential"
+      ]
+    }
+  ],
+  "mutations": [
+    {
+      "id": "pack_mode_first_order",
+      "patch_file": "patches/pack_mode_first_order.patch",
+      "patch_sha256": "101083bc9bbf93a0bdd45a1c7702be62799c8a46a5e2ebae945cdeb6f2c020fb",
+      "allowed_paths": [
+        "src/conductor/testdata/mutation_testing/toy_module.py"
+      ],
+      "expected_killers": [
+        "src/conductor/testdata/mutation_testing/toy_module_scope.py::check_pack_mode_is_sequential"
+      ]
+    }
+  ],
+  "baseline": {
+    "timeout_seconds": 60,
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "-q",
+      "--rootdir=.",
+      "src/conductor/testdata/mutation_testing/toy_module_scope.py::check_pack_mode_is_sequential",
+      "src/conductor/testdata/mutation_testing/toy_module_scope.py::pack_mode_is_sequential"
+    ]
+  },
+  "resource_gate": {
+    "poll_seconds": 5,
+    "blocked_process_substrings": []
+  },
+  "environment": {},
+  "host_read_dependencies": [],
+  "test_scopes": {
+    "src/conductor/testdata/mutation_testing/toy_module_scope.py": {
+      "mode": "partial",
+      "inventory": "python_ast",
+      "nodeids": [
+        "src/conductor/testdata/mutation_testing/toy_module_scope.py::check_pack_mode_is_sequential",
+        "src/conductor/testdata/mutation_testing/toy_module_scope.py::pack_mode_is_sequential"
+      ]
+    }
+  }
+}

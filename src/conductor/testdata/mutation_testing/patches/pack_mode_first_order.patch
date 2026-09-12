@@ -1,0 +1,7 @@
+diff --git a/src/conductor/testdata/mutation_testing/toy_module.py b/src/conductor/testdata/mutation_testing/toy_module.py
+--- a/src/conductor/testdata/mutation_testing/toy_module.py
++++ b/src/conductor/testdata/mutation_testing/toy_module.py
+@@ -9,2 +9,2 @@
+ def pack_mode() -> str:
+-    return "sequential"
++    return "random"

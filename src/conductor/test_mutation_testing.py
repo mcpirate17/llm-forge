@@ -15,8 +15,7 @@ from conductor import mutation_testing
 
 
 CAMPAIGN_PATH = (
-    mutation_testing.REPO_ROOT
-    / "conductor/mutation_campaigns/nm_f6_phase22_20m_active.json"
+    mutation_testing.REPO_ROOT / "src/conductor/testdata/mutation_testing/campaign.json"
 )
 
 
@@ -24,25 +23,19 @@ def _campaign_payload() -> dict[str, object]:
     return json.loads(CAMPAIGN_PATH.read_text(encoding="utf-8"))
 
 
-def test_campaign_ranks_every_test_contiguously_and_materializes_six_mutations() -> (
-    None
-):
+def test_campaign_ranks_every_test_contiguously_and_materializes_its_mutation() -> None:
     campaign = mutation_testing.load_campaign(CAMPAIGN_PATH)
 
-    assert len(campaign.ranked_tests) == 28
-    assert [test.rank for test in campaign.ranked_tests] == list(range(1, 29))
-    assert campaign.expected_mutations == 5
-    assert len(campaign.planned_mutations) == 5
+    assert len(campaign.ranked_tests) == 2
+    assert [test.rank for test in campaign.ranked_tests] == [1, 2]
+    assert campaign.expected_mutations == 1
+    assert len(campaign.planned_mutations) == 1
     assert [mutation.mutation_id for mutation in campaign.mutations] == [
-        "launcher_pack_mode_first_order",
-        "accumulation_normalization_first_order",
-        "lane_slots_first_order",
-        "phase_activation_boundary_first_order",
-        "phase22_aux_gradient_first_order",
+        "pack_mode_first_order",
     ]
 
 
-def test_inspection_reports_ready_with_six_materialized_patches(
+def test_inspection_reports_ready_with_its_materialized_patch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     campaign = mutation_testing.load_campaign(CAMPAIGN_PATH)
@@ -52,8 +45,8 @@ def test_inspection_reports_ready_with_six_materialized_patches(
     result = mutation_testing.inspect_campaign(campaign)
 
     assert result["status"] == "READY"
-    assert result["materialized_mutations"] == 5
-    assert result["expected_mutations"] == 5
+    assert result["materialized_mutations"] == 1
+    assert result["expected_mutations"] == 1
     assert result["resource_status"] == "IDLE"
     assert all(row["materialized"] for row in result["planned_mutations"])
 
@@ -524,10 +517,7 @@ def test_host_read_dependencies_are_materialized_not_symlinked(tmp_path: Path) -
     snapshot = tmp_path / "snapshot"
     snapshot.mkdir()
     campaign = dataclasses.replace(
-        mutation_testing.load_campaign(
-            mutation_testing.REPO_ROOT
-            / "conductor/mutation_campaigns/claude_bash_quiet.json"
-        ),
+        mutation_testing.load_campaign(CAMPAIGN_PATH),
         host_read_dependencies=("reports/screen", "notes/plan.md"),
     )
 

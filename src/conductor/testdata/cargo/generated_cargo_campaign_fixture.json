@@ -1,0 +1,44 @@
+{
+  "campaign_id": "forge_cargo_adapter_fixture_hook_merge",
+  "title": "Fixture: conductor-native hook_merge, scoped for cargo-mutants adapter unit tests",
+  "language": "rust",
+  "mutation_engine": "cargo-mutants",
+  "schema_version": 1,
+  "environment": {},
+  "generator": {
+    "source": [
+      "src/hook_merge.rs"
+    ],
+    "exclude": [],
+    "operators": [],
+    "options": {
+      "manifest_path": "native/conductor-native/Cargo.toml",
+      "package": "conductor-native",
+      "package_root": "native/conductor-native"
+    },
+    "seed": 0,
+    "jobs": 4,
+    "mutant_timeout_seconds": 30,
+    "run_timeout_seconds": 1800
+  },
+  "test_argv": [
+    "cargo",
+    "test",
+    "--manifest-path",
+    "native/conductor-native/Cargo.toml",
+    "--package",
+    "conductor-native"
+  ],
+  "source_sha256": {
+    "native/conductor-native/src/hook_merge.rs": "28b83548b034d604c17b135522a9c0768d8de9ad652bbedaeb67530e8a7211e9"
+  },
+  "test_sha256": {
+    "native/conductor-native/src/hook_merge.rs": "28b83548b034d604c17b135522a9c0768d8de9ad652bbedaeb67530e8a7211e9"
+  },
+  "survivor_baseline": [
+    "FnValue-000000000001-0",
+    "BinaryOperator-000000000002-0"
+  ],
+  "survivor_baseline_note": "Placeholder ratchet for adapter unit tests only -- this manifest is not a live campaign and is never handed to the real cargo-mutants binary in this suite.",
+  "survivor_baseline_recorded": true
+}

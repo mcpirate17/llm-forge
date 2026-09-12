@@ -37,6 +37,7 @@ from conductor.mutation_campaign_generate import (
 from conductor.candidate_review.ownership import create_claim
 from conductor.mutation_engine_generated import load_generated_campaign
 from conductor.mutation_scope import CampaignError
+from conductor.project_paths import host_root
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -371,25 +372,22 @@ def test_write_refuses_to_replace_a_recorded_baseline(tmp_path: Path) -> None:
     )
 
 
-def test_a_generated_rust_manifest_loads_as_a_generated_campaign() -> None:
+def test_a_generated_rust_manifest_loads_as_a_generated_campaign(tmp_path: Path) -> None:
     """The generator's output must satisfy the runner's own model, not resemble it."""
 
-    result = plan("rust", day="20260907")
+    result = plan("rust", day="20260907", repo_root=host_root(Path(__file__)))
     manifest = next(
         m for m in result["manifests"] if m["generator"]["options"]["package"]
     )
-    path = Path(REPO_ROOT / "conductor/mutation_campaigns") / "_generated_probe.json"
-    try:
-        path.write_text(json.dumps(manifest), encoding="utf-8")
-        loaded = load_generated_campaign(path)
-        assert loaded.mutation_engine == "cargo-mutants"
-        assert loaded.language == "rust"
-        assert loaded.source_sha256, "every mutated file must be pinned"
-        assert "CARGO_TARGET_DIR" not in loaded.environment, (
-            "a shared build directory makes whether a mutant compiles jitter"
-        )
-    finally:
-        path.unlink(missing_ok=True)
+    path = tmp_path / "_generated_probe.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    loaded = load_generated_campaign(path)
+    assert loaded.mutation_engine == "cargo-mutants"
+    assert loaded.language == "rust"
+    assert loaded.source_sha256, "every mutated file must be pinned"
+    assert "CARGO_TARGET_DIR" not in loaded.environment, (
+        "a shared build directory makes whether a mutant compiles jitter"
+    )
 
 
 def _assert_names_its_own_tests(manifest: dict) -> None:

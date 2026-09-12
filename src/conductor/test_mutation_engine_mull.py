@@ -31,7 +31,15 @@ from conductor.mutation_scope import CampaignError
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKTREE = REPO_ROOT
-MANIFEST = "conductor/mutation_campaigns/claude_aria_kernels_mull_20260906.json"
+# The campaign this adapter was proven against lives in the monorepo this package
+# was split out of and pins aria_core/src/cpu/**, a C++ package this repo does not
+# carry. The unit tests below exercise manifest parsing, argument-building, scope
+# matching, build/configure orchestration and receipt writing and never read the
+# pinned sources from disk, so they load a byte-faithful fixture copy of that
+# manifest checked in under testdata/. It is test data, not evidence.
+# `test_the_campaign_under_test_is_wired_end_to_end` is the one test whose subject
+# is a live campaign; it reads this repo's registry through project_paths.
+MANIFEST = "conductor/testdata/mull/claude_aria_kernels_fixture.json"
 SOURCE = "aria_core/src/cpu/norm.cpp"
 
 
@@ -448,16 +456,46 @@ def test_a_recursive_glob_reaches_a_subdirectory_that_does_not_exist_yet() -> No
 
 
 def test_the_campaign_under_test_is_wired_end_to_end() -> None:
-    """The manifest this adapter was proven on is loadable and pins real files."""
+    """Every Mull campaign this repo registers is loadable and pins real files.
 
-    loaded = campaign()
-    assert loaded.mutation_engine == "mull"
-    assert loaded.language == "cpp"
-    assert loaded.jobs == 1, "a host-sized worker count makes the survivor set jitter"
-    assert loaded.survivor_baseline, "the recorded survivor baseline must not be empty"
-    assert _executables(loaded) == ("test_kernels", "test_runtime")
-    for relative in loaded.source_sha256:
-        assert (REPO_ROOT / relative).is_file(), relative
+    Category (b): the subject is *this repo's own* campaign corpus, not the
+    fixture above. The corpus is whatever ``campaigns/registry.json`` declares,
+    resolved through ``conductor.project_paths`` exactly as a real caller
+    resolves it. The monorepo campaign this adapter was proven on pinned
+    ``aria_core/src/cpu/adaptive_routing.cpp``, a package this standalone repo
+    does not carry, so it cannot be the subject here; the test skips, loudly,
+    only when the registry names no Mull campaign at all.
+    """
+
+    from conductor import project_paths
+    from conductor.mutation_engine_generated import manifest_engine
+
+    host_root = project_paths.host_root(REPO_ROOT)
+    registry_file = project_paths.registry_path(host_root)
+    rows = json.loads(registry_file.read_text(encoding="utf-8"))["campaigns"]
+    manifests = [host_root / row["manifest"] for row in rows if "manifest" in row]
+    mull_manifests = [m for m in manifests if manifest_engine(m) == "mull"]
+    if not mull_manifests:
+        pytest.skip(
+            f"{project_paths.registry_relative(host_root)} declares "
+            f"{len(rows)} campaign(s), none with mutation_engine 'mull': this "
+            "repo has no live Mull campaign to check the wiring of (the one "
+            "this adapter was proven on pinned aria_core, a monorepo package)"
+        )
+
+    for manifest_path in mull_manifests:
+        loaded = load_generated_campaign(manifest_path)
+        assert loaded.mutation_engine == "mull"
+        assert loaded.language == "cpp"
+        assert loaded.jobs == 1, (
+            "a host-sized worker count makes the survivor set jitter"
+        )
+        assert loaded.survivor_baseline, (
+            "the recorded survivor baseline must not be empty"
+        )
+        assert _executables(loaded), "a Mull campaign must declare its test executables"
+        for relative in loaded.source_sha256:
+            assert (host_root / relative).is_file(), relative
 
 
 def test_the_recorded_baseline_is_the_corrected_measurement_not_the_broken_one() -> (

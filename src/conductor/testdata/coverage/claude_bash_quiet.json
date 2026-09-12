@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "campaign_id": "claude_bash_quiet",
+  "title": "Self-contained CLI fixture campaign (inspect / verify-evidence)",
+  "language": "python",
+  "mutation_engine": "reviewed_unified_diff",
+  "expected_ranked_tests": 1,
+  "expected_mutations": 1,
+  "source_sha256": {
+    "src/conductor/testdata/coverage/claude_bash_quiet_ranked.py": "d60cf4bf06bdb8fb4564713bb2f9a0920caedf0a045ebd47e46da0ccb5be9744"
+  },
+  "test_scopes": {
+    "src/conductor/testdata/coverage/claude_bash_quiet_ranked.py": {
+      "mode": "partial",
+      "inventory": "python_ast",
+      "nodeids": [
+        "src/conductor/testdata/coverage/claude_bash_quiet_ranked.py::test_value_is_one"
+      ]
+    }
+  },
+  "ranked_tests": [
+    {
+      "rank": 1,
+      "nodeid": "src/conductor/testdata/coverage/claude_bash_quiet_ranked.py::test_value_is_one",
+      "contract": "VALUE stays 1",
+      "rationale": "single-assertion contract for the CLI inspect/verify-evidence fixture"
+    }
+  ],
+  "planned_mutations": [
+    {
+      "id": "fixture_value_flips",
+      "target_path": "src/conductor/testdata/coverage/claude_bash_quiet_ranked.py",
+      "contract": "VALUE must stay 1",
+      "description": "Flip VALUE from 1 to 2.",
+      "expected_killers": [
+        "src/conductor/testdata/coverage/claude_bash_quiet_ranked.py::test_value_is_one"
+      ]
+    }
+  ],
+  "baseline": {
+    "argv": [
+      "src/conductor/testdata/coverage/claude_bash_quiet_ranked.py"
+    ],
+    "timeout_seconds": 60
+  },
+  "mutations": [
+    {
+      "id": "fixture_value_flips",
+      "patch_file": "claude_bash_quiet_fixture_value_flips.patch",
+      "patch_sha256": "24f516cbd32bd7e9fa4cf9c1e6c0b41a678c2849dd070ad7141b1bb7be7e7814",
+      "allowed_paths": [
+        "src/conductor/testdata/coverage/claude_bash_quiet_ranked.py"
+      ],
+      "expected_killers": [
+        "src/conductor/testdata/coverage/claude_bash_quiet_ranked.py::test_value_is_one"
+      ]
+    }
+  ]
+}
