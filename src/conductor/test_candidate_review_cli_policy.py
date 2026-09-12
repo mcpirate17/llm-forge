@@ -279,10 +279,103 @@ def test_cli_commands_fail_closed_and_bind_receipts(
     assert review_cli.fix_command(args) == 2
 
 
+_PACKAGE_ROOT = Path(__file__).resolve().parent
+_REAL_CANDIDATE_REVIEW_DIR = _PACKAGE_ROOT / "candidate_review"
+
+# `benchmark._review_once` runs `python -m conductor.candidate_review.cli` with
+# `cwd=fixture.source`, so the fixture's own `conductor/` tree -- not this package's
+# editable install -- is what actually gets imported. Every GOVERNANCE_PATHS entry
+# that names a real module in this checkout must carry that module's real bytes, or
+# the subprocess fails on import (`conductor._native` re-exports the compiled
+# extension; a placeholder there is an ImportError, not a governance finding).
+_REAL_GOVERNANCE_FILES: tuple[str, ...] = (
+    "conductor/_native.py",
+    "conductor/_project_hooks.py",
+    "conductor/check_duplicate_function_bodies.py",
+    "conductor/check_protected_deletes.py",
+    "conductor/guardrail_audit.py",
+    "conductor/run_duplicate_audit.py",
+    "conductor/test_candidate_review.py",
+    "conductor/test_candidate_review_cli_policy.py",
+    "conductor/test_guardrail_audit.py",
+    "conductor/test_ref_aware_governance.py",
+    "conductor/test_run_duplicate_audit.py",
+    "conductor/test_vulture_audit.py",
+    "conductor/tooling_boundary.py",
+)
+
+
+def _synthetic_governance_source(root: Path) -> Path:
+    """A self-contained stand-in for a host project's governance surface.
+
+    `benchmark._source_paths` was written for a monorepo where `conductor/` and
+    `.github/` sit at the repository root; this package's own checkout instead
+    ships under `src/conductor/`, so `Path.cwd()` (the real repo root) is missing
+    every fixed path in `GOVERNANCE_PATHS`. Building the tree from scratch is not
+    enough on its own: the review subprocess actually imports the fixture's
+    `conductor/` modules (see the comment on `_REAL_GOVERNANCE_FILES`), so those
+    entries get this checkout's real bytes. Only the handful of paths with no real
+    counterpart here -- CI/doc/config surface, plus the policy and dead-code
+    baseline the concurrent paths-configurability change owns -- get minimal,
+    schema-valid fixture content of the test's own.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    future_expiry = (
+        (datetime.now(timezone.utc) + timedelta(days=365)).date().isoformat()
+    )
+    stub_content = {
+        ".github/CODEOWNERS": "* @mcpirate17\n",
+        ".github/workflows/governance-ci.yml": (
+            "name: governance-ci\non: [push]\njobs:\n"
+            "  noop:\n    runs-on: ubuntu-latest\n"
+            "    steps:\n      - run: 'true'\n"
+        ),
+        ".gitignore": (_PACKAGE_ROOT.parents[1] / ".gitignore").read_text(
+            encoding="utf-8"
+        ),
+        ".pre-commit-config.yaml": "repos: []\n",
+        "AGENTS.md": "# Synthetic benchmark fixture\n",
+        "Makefile": ".PHONY: noop\nnoop:\n\t@true\n",
+        review_benchmark.DEFAULT_POLICY_RELATIVE.as_posix(): _minimal_policy_text(
+            baseline_expires=future_expiry
+        ),
+        "conductor/vulture_baseline.json": json.dumps(
+            {
+                "schema_version": 1,
+                "generated_from_tree": ["0" * 8] * 5,
+                "expires": future_expiry,
+                "count": 0,
+                "entries": {},
+            }
+        ),
+        "research/notes/unified_candidate_review_architecture_2026-08-16.md": (
+            "# Synthetic benchmark fixture\n"
+        ),
+    }
+    assert set(stub_content) | set(_REAL_GOVERNANCE_FILES) == set(
+        review_benchmark.GOVERNANCE_PATHS
+    ), "GOVERNANCE_PATHS grew a path this fixture builder does not account for"
+    for relative in review_benchmark.GOVERNANCE_PATHS:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if relative in _REAL_GOVERNANCE_FILES:
+            path.write_bytes((_PACKAGE_ROOT / Path(relative).name).read_bytes())
+        else:
+            path.write_text(stub_content[relative], encoding="utf-8")
+    (root / "package-lock.json").write_text(
+        '{"lockfileVersion": 1}\n', encoding="utf-8"
+    )
+    candidate_review_dir = root / "conductor" / "candidate_review"
+    candidate_review_dir.mkdir(parents=True, exist_ok=True)
+    for source_file in sorted(_REAL_CANDIDATE_REVIEW_DIR.glob("*.py")):
+        (candidate_review_dir / source_file.name).write_bytes(source_file.read_bytes())
+    return root
+
+
 def test_latency_benchmark_uses_isolated_real_git_candidates(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    candidate_source = Path.cwd()
+    candidate_source = _synthetic_governance_source(tmp_path / "candidate_source")
     source = _init_repo(tmp_path / "source")
     source_paths = [
         *review_benchmark._source_paths(candidate_source),

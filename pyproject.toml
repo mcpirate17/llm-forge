@@ -29,10 +29,18 @@ dependencies = [
   "radon>=6.0.1",
   "starlette>=0.45",
   "uvicorn>=0.30",
+  # conductor/candidate_review/vulture_audit.py shells out to the `vulture` binary
+  # and raises VultureAuditError (fail-closed, not a skip) when it is missing from
+  # PATH. That module ships inside src/conductor and is reachable from the
+  # `candidate_review` console script, so vulture is a runtime dependency of the
+  # shipped package, not a CI-only tool -- KB-CI-01's exact shape.
+  "vulture>=2.11",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8.0"]
+# pytest-timeout backs only the `--timeout` flag used to invoke the test suite; no
+# shipped conductor module imports or shells out to it.
+test = ["pytest>=8.0", "pytest-timeout>=2.3"]
 # The code-review-graph MCP server that `conductor init` wires into .mcp.json.
 graph = ["code-review-graph==2.3.8"]
 # Both Rust crates live under native/ and are path sources below. slop-core (the

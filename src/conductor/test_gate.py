@@ -8,6 +8,7 @@ failure this module exists to prevent was a check that had never once run red.
 from __future__ import annotations
 
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -265,11 +266,20 @@ def test_sample_test_file_is_none_without_tests(tmp_path: Path) -> None:
 
 
 def test_pytest_config_check_fails_on_an_unparseable_addopts(tmp_path: Path) -> None:
-    """The `--dist loadgroup` regression: an addopts naming an absent plugin."""
+    """The `--dist loadgroup` regression: an addopts naming an absent plugin.
+
+    Uses sys.executable, not a bare "python3": preflight_pytest_config shells out
+    to run pytest, and a bare command name resolves through PATH -- on a standalone
+    checkout run without an activated venv, "python3" can be a system interpreter
+    with no pytest installed at all, which fails for the wrong reason before addopts
+    is ever parsed. sys.executable is guaranteed to be the interpreter already
+    running this suite, so pytest is importable and the check exercises addopts
+    parsing itself.
+    """
     (tmp_path / "pytest.ini").write_text(
         "[pytest]\naddopts = --this-flag-does-not-exist\n", encoding="utf-8"
     )
-    phase = gate.preflight_pytest_config(tmp_path, "python3")
+    phase = gate.preflight_pytest_config(tmp_path, sys.executable)
     assert phase.ok is False
     assert "do not parse" in phase.detail
 
@@ -279,7 +289,7 @@ def test_pytest_config_check_passes_on_a_valid_addopts(tmp_path: Path) -> None:
     (tmp_path / "pytest.ini").write_text(
         "[pytest]\naddopts = --tb=short\n", encoding="utf-8"
     )
-    phase = gate.preflight_pytest_config(tmp_path, "python3")
+    phase = gate.preflight_pytest_config(tmp_path, sys.executable)
     assert phase.ok is True
 
 
