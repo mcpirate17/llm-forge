@@ -16,6 +16,12 @@ dependencies = [
   "slop-core",
   "coverage>=7.0",
   "defusedxml>=0.7.1",
+  # conductor/mutation_engine_fest.py shells out to the `fest` binary this wheel
+  # installs. A shipped module that shells out to a tool declares it here, never
+  # only in a CI job (KB-CI-01): without it `mutation_engine_generated run` refuses
+  # with "fest is not installed" and the mutation routine this package exists to
+  # provide cannot run from a clean install at all.
+  "fest-mutate>=0.1.3",
   "httpx>=0.28",
   "numpy>=1.26",
   "pydantic>=2",
@@ -33,6 +39,10 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
+# fest refuses to mutate anything until it has a coverage map, and it collects one
+# by running the campaign's own pytest command under pytest-cov. Kept out of `test`
+# because it is the mutation engine's prerequisite, not the suite's.
+mutation = ["pytest-cov>=5.0"]
 # The code-review-graph MCP server that `conductor init` wires into .mcp.json.
 graph = ["code-review-graph==2.3.8"]
 # Both Rust crates live under native/ and are path sources below. slop-core (the

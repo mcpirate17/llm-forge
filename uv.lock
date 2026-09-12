@@ -424,6 +424,7 @@ dependencies = [
     { name = "conductor-native" },
     { name = "coverage" },
     { name = "defusedxml" },
+    { name = "fest-mutate" },
     { name = "httpx" },
     { name = "numpy" },
     { name = "pydantic" },
@@ -438,6 +439,9 @@ dependencies = [
 graph = [
     { name = "code-review-graph" },
 ]
+mutation = [
+    { name = "pytest-cov" },
+]
 test = [
     { name = "pytest" },
 ]
@@ -449,17 +453,19 @@ requires-dist = [
     { name = "conductor-native", directory = "native/conductor-native" },
     { name = "coverage", specifier = ">=7.0" },
     { name = "defusedxml", specifier = ">=0.7.1" },
+    { name = "fest-mutate", specifier = ">=0.1.3" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
+    { name = "pytest-cov", marker = "extra == 'mutation'", specifier = ">=5.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "radon", specifier = ">=6.0.1" },
     { name = "slop-core", directory = "native/slop-core" },
     { name = "starlette", specifier = ">=0.45" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]
-provides-extras = ["test", "graph"]
+provides-extras = ["test", "mutation", "graph"]
 
 [[package]]
 name = "coverage"
@@ -751,6 +757,19 @@ server = [
     { name = "uvicorn" },
     { name = "watchfiles" },
     { name = "websockets" },
+]
+
+[[package]]
+name = "fest-mutate"
+version = "0.1.3"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2e/cc/3645b68b0b8373a95f455c09c0a1bfa72d14937c977b2f7a5bc0de10c25f/fest_mutate-0.1.3-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:f538884b0c7ddd1260dbae9d0bf4fe221f5b62872fcd4cdec854701d3fd57615", size = 2967511, upload-time = "2026-03-14T09:03:42.137Z" },
+    { url = "https://files.pythonhosted.org/packages/12/aa/60f1de73f03aaf4e8cc6e822d6e82e54b072a8f645e5b5c009bc32a374a0/fest_mutate-0.1.3-py3-none-macosx_11_0_arm64.whl", hash = "sha256:8d26d81149e4dff39a1ea0c1593e238a67d7952fcb6cf6f2cdc0d4219c736666", size = 2851006, upload-time = "2026-03-14T09:03:43.89Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/c8/7eb55991496419d1fd7a309d1610c0b1a094b2967399bbea99686aa25178/fest_mutate-0.1.3-py3-none-manylinux_2_39_aarch64.whl", hash = "sha256:78931d8aa80cc1eb4ec5cc66a91219f5d4eaff48ba9d3cdcd94002cef942981e", size = 2963043, upload-time = "2026-03-14T09:03:46.316Z" },
+    { url = "https://files.pythonhosted.org/packages/07/ca/ff32e42a775c5f28684e4d7ee31ca344edca82de06b17540ed45c30fa44e/fest_mutate-0.1.3-py3-none-manylinux_2_39_x86_64.whl", hash = "sha256:05d137c5e19146417f171846d0c3af522d734cf52db9d963ae8a8cca16944679", size = 3090618, upload-time = "2026-03-14T09:03:48.112Z" },
+    { url = "https://files.pythonhosted.org/packages/95/59/51ab024b4cd1b2ee61573c9417c1cd02a72574ebe18b7f737d19e9de9ecb/fest_mutate-0.1.3-py3-none-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:d6e71b84b5c8fda7a7b7c22ff6d86cdbb49b4097c889b6ef393b1227588b0754", size = 3158185, upload-time = "2026-03-14T09:03:49.393Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/ba/818ab6c6741afdc7624c38a7e809fe67841577cab13f8baecbe0fdf1b8bc/fest_mutate-0.1.3-py3-none-win_amd64.whl", hash = "sha256:98b68e7080485915f9c30f917d05af1b4a663eec9e47cf12b99b0a17a07627ea", size = 2921279, upload-time = "2026-03-14T09:03:51.032Z" },
 ]
 
 [[package]]
@@ -1444,6 +1463,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
+]
+
+[[package]]
+name = "pytest-cov"
+version = "7.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "coverage" },
+    { name = "pluggy" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/51/a849f96e117386044471c8ec2bd6cfebacda285da9525c9106aeb28da671/pytest_cov-7.1.0.tar.gz", hash = "sha256:30674f2b5f6351aa09702a9c8c364f6a01c27aae0c1366ae8016160d1efc56b2", size = 55592, upload-time = "2026-03-21T20:11:16.284Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9d/7a/d968e294073affff457b041c2be9868a40c1c71f4a35fcc1e45e5493067b/pytest_cov-7.1.0-py3-none-any.whl", hash = "sha256:a0461110b7865f9a271aa1b51e516c9a95de9d696734a2f71e3e78f46e1d4678", size = 22876, upload-time = "2026-03-21T20:11:14.438Z" },
 ]
 
 [[package]]
