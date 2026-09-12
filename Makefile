@@ -27,6 +27,14 @@ REVIEW_ARGS ?=
 MUTATION_LANGUAGE ?= python
 MUTATION_BASE ?= origin/main
 MUTATION_CAMPAIGN ?=
+# conductor.mutation_receipt_build still defaults to the monorepo's
+# research/reports/mutation_testing/. campaigns/registry.json declares
+# campaigns/receipts as this repository's receipt directory, and a receipt written
+# anywhere else is invisible to evidence verification, so name it here.
+# `?=` is recursively expanded, so neither of these runs until the recipe needs it.
+MUTATION_RECEIPT ?= $(shell $(UV) run python -c \
+  'from conductor.project_paths import receipts_relative; print(receipts_relative("."))')
+RUN_STAMP ?= $(shell date -u +%Y%m%dT%H%M%SZ)
 MUTATION_PATHS ?=
 MUTATION_GENERATE_ARGS ?=
 MUTATION_ENGINE_ARGS ?=
@@ -67,7 +75,9 @@ mutation-generate:  ## Write campaigns for THIS BRANCH's changed files (nothing 
 mutation-engine-run:  ## Run a generated campaign through its engine in a disposable snapshot
 	@test -n "$(MUTATION_CAMPAIGN)" || { echo "Set MUTATION_CAMPAIGN=campaigns/<id>.json"; exit 2; }
 	$(UV) run python -m conductor.mutation_engine_generated run "$(MUTATION_CAMPAIGN)" \
-		--allow-mutations --base "$(MUTATION_BASE)" $(MUTATION_ENGINE_ARGS)
+		--allow-mutations --base "$(MUTATION_BASE)" \
+		$(if $(MUTATION_RECEIPT),--receipt "$(MUTATION_RECEIPT)/$(notdir $(basename $(MUTATION_CAMPAIGN)))_$(RUN_STAMP).json") \
+		$(MUTATION_ENGINE_ARGS)
 
 mutation-evidence:  ## Verify PASS receipts for MUTATION_PATHS, or for git-changed tests
 	@if [ -n "$(MUTATION_PATHS)" ]; then \
