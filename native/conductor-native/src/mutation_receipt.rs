@@ -62,6 +62,13 @@ pub(crate) struct Receipt {
 
 pub(crate) struct ValidationContext<'a> {
     pub(crate) repo_root: &'a Path,
+    /// Where a bare `conductor/...` runner-component literal resolves from -- the
+    /// package's parent directory, per this tree's own layout configuration. Distinct
+    /// from `repo_root`: a manifest path or receipt location is spelled relative to the
+    /// true repo root even under a src layout, but `core_sha256`, `scope_guard_sha256`,
+    /// `adapter_sha256` and the runner lineage file are spelled `conductor/...` and must
+    /// join onto the package's parent instead.
+    pub(crate) package_root: &'a Path,
     pub(crate) anchor_repo: &'a Path,
     pub(crate) runner: &'a RunnerState,
     pub(crate) anchor: &'a AnchorConfig,
@@ -70,6 +77,7 @@ pub(crate) struct ValidationContext<'a> {
 #[derive(Debug, Deserialize)]
 struct ReceiptValidationRequest {
     repo_root: String,
+    package_root: String,
     anchor_repo: String,
     campaign: CampaignContract,
     receipt: Value,
@@ -81,7 +89,7 @@ struct ReceiptValidationRequest {
 
 #[derive(Debug, Deserialize)]
 struct LineageRequest {
-    repo_root: String,
+    package_root: String,
     recorded: Option<Value>,
 }
 
@@ -371,11 +379,11 @@ fn legacy_receipt_anchor_errors(
     Vec::new()
 }
 
-fn lineage_accepts(recorded: Option<&Value>, repo_root: &Path) -> bool {
+fn lineage_accepts(recorded: Option<&Value>, package_root: &Path) -> bool {
     let Some(Value::Object(_)) = recorded else {
         return false;
     };
-    let path = repo_root.join("conductor/mutation_runner_lineage.json");
+    let path = package_root.join("conductor/mutation_runner_lineage.json");
     let Ok(bytes) = fs::read(path) else {
         return false;
     };
@@ -450,7 +458,7 @@ fn runner_errors(payload: &Map<String, Value>, context: &ValidationContext<'_>) 
         errors.push(error.clone());
     } else if let Some(components) = &context.runner.components {
         let recorded = payload.get("runner_components_sha256");
-        if recorded != Some(components) && !lineage_accepts(recorded, context.repo_root) {
+        if recorded != Some(components) && !lineage_accepts(recorded, context.package_root) {
             errors.push("runner component hash map mismatch".to_owned());
         } else if recorded == Some(components)
             && payload.get("runner_sha256").and_then(Value::as_str)
@@ -526,7 +534,7 @@ fn generated_receipt_errors(
     ];
     for (key, relative) in bindings {
         let recorded = payload.get(key).and_then(Value::as_str);
-        let current = sha256_file(&context.repo_root.join(relative));
+        let current = sha256_file(&context.package_root.join(relative));
         if recorded.is_none_or(|value| value.trim().is_empty()) {
             errors.push(format!("{key} is missing"));
         } else if current.as_deref() != recorded {
@@ -542,7 +550,7 @@ fn generated_receipt_errors(
     let recorded_adapter = payload.get("adapter_sha256").and_then(Value::as_str);
     match adapter_path {
         Some(relative) => {
-            let current_adapter = sha256_file(&context.repo_root.join(relative));
+            let current_adapter = sha256_file(&context.package_root.join(relative));
             if recorded_adapter.is_none_or(|value| value.trim().is_empty()) {
                 errors.push("adapter_sha256 is missing".to_owned());
             } else if current_adapter.as_deref() != recorded_adapter {
@@ -790,6 +798,7 @@ fn parse_json<T: for<'de> Deserialize<'de>>(text: &str, label: &str) -> PyResult
 pub fn validate_mutation_receipt_native(request_json: &str) -> PyResult<String> {
     let request: ReceiptValidationRequest = parse_json(request_json, "receipt request")?;
     let root = lexical_absolute(Path::new(&request.repo_root)).map_err(value_error)?;
+    let package_root = lexical_absolute(Path::new(&request.package_root)).map_err(value_error)?;
     let anchor_repo = lexical_absolute(Path::new(&request.anchor_repo)).map_err(value_error)?;
     let raw_path = request.receipt_path.unwrap_or_default();
     let path = if raw_path.is_empty() {
@@ -828,6 +837,7 @@ pub fn validate_mutation_receipt_native(request_json: &str) -> PyResult<String> 
     };
     let context = ValidationContext {
         repo_root: &root,
+        package_root: &package_root,
         anchor_repo: &anchor_repo,
         runner: &request.runner,
         anchor: &request.anchor,
@@ -839,7 +849,7 @@ pub fn validate_mutation_receipt_native(request_json: &str) -> PyResult<String> 
 #[pyfunction]
 pub fn mutation_runner_lineage_accepts_native(request_json: &str) -> PyResult<bool> {
     let request: LineageRequest = parse_json(request_json, "lineage request")?;
-    let root = lexical_absolute(Path::new(&request.repo_root)).map_err(value_error)?;
+    let root = lexical_absolute(Path::new(&request.package_root)).map_err(value_error)?;
     Ok(lineage_accepts(request.recorded.as_ref(), &root))
 }
 
@@ -986,6 +996,7 @@ mod generated_receipt_tests {
         ensure_binding_files(&root);
         let context = ValidationContext {
             repo_root: &root,
+            package_root: &root,
             anchor_repo: Path::new("/nonexistent"),
             runner: &runner,
             anchor: &anchor,
@@ -1029,6 +1040,7 @@ mod generated_receipt_tests {
         let root = repo_root();
         let context = ValidationContext {
             repo_root: &root,
+            package_root: &root,
             anchor_repo: Path::new("/nonexistent"),
             runner: &runner,
             anchor: &anchor,
@@ -1425,6 +1437,7 @@ mod generated_receipt_tests {
         };
         let context = ValidationContext {
             repo_root: &root,
+            package_root: &root,
             anchor_repo: Path::new("/nonexistent"),
             runner: &runner,
             anchor: &anchor,
@@ -1681,6 +1694,7 @@ mod generated_receipt_tests {
         ensure_binding_files(&root);
         let context = ValidationContext {
             repo_root: &root,
+            package_root: &root,
             anchor_repo: Path::new("/nonexistent"),
             runner: &runner,
             anchor: &anchor,
@@ -1720,6 +1734,7 @@ mod generated_receipt_tests {
             };
             let context = ValidationContext {
                 repo_root: &root,
+                package_root: &root,
                 anchor_repo: Path::new("/nonexistent"),
                 runner: &runner,
                 anchor: &anchor,
@@ -1749,6 +1764,69 @@ mod generated_receipt_tests {
     }
 
     #[test]
+    fn generated_bindings_resolve_against_package_root_not_repo_root() {
+        // Under a src layout `repo_root` (the git root) and `package_root` (where a bare
+        // `conductor/...` literal resolves from) differ -- `package_root` is `repo_root/src`.
+        // The core/scope-guard/adapter bindings must join `package_root`, never `repo_root`,
+        // or every receipt in a src-layout repository hashes the wrong (or absent) file.
+        let repo_root = repo_root();
+        let package_root = repo_root.join("src");
+        ensure_binding_files(&package_root);
+        let adapter = "conductor/mutation_engine_fest.py";
+        std::fs::write(package_root.join(adapter), "adapter\n").expect("adapter");
+        let mut campaign = campaign();
+        campaign.mutation_engine = "fest".to_owned();
+        let runner = RunnerState {
+            components: None,
+            error: None,
+            mutation_testing_sha256: None,
+        };
+        let anchor = AnchorConfig {
+            repo: String::new(),
+            commit: String::new(),
+            tree: String::new(),
+            receipt_prefix: String::new(),
+            registry_path: default_anchor_registry_path(),
+        };
+        let context = ValidationContext {
+            repo_root: &repo_root,
+            package_root: &package_root,
+            anchor_repo: Path::new("/nonexistent"),
+            runner: &runner,
+            anchor: &anchor,
+        };
+        let good = receipt(json!({
+            "survivors": [],
+            "core_sha256": sha256_file(&package_root.join("conductor/mutation_engine_generated.py")),
+            "scope_guard_sha256": sha256_file(&package_root.join("conductor/mutation_run_scope.py")),
+            "adapter_sha256": sha256_file(&package_root.join(adapter)),
+        }));
+        let found = generated_receipt_errors(&good, &campaign, &context);
+        assert!(
+            !found
+                .iter()
+                .any(|error| error.contains("_sha256 hash mismatch")
+                    || error.contains("_sha256 is missing")),
+            "{found:?}"
+        );
+        // A receipt bound to the (wrong) repo_root copies must still be rejected: the fix
+        // must not have made the check universally lenient, only correctly rooted.
+        let stale = receipt(json!({
+            "survivors": [],
+            "core_sha256": "f".repeat(64),
+            "scope_guard_sha256": "f".repeat(64),
+            "adapter_sha256": "f".repeat(64),
+        }));
+        let stale_found = generated_receipt_errors(&stale, &campaign, &context);
+        assert!(
+            stale_found
+                .iter()
+                .any(|error| error == "core_sha256 hash mismatch"),
+            "{stale_found:?}"
+        );
+    }
+
+    #[test]
     fn a_receipt_rejects_current_source_or_test_drift() {
         let mut campaign = campaign();
         campaign.source_drifted = true;
@@ -1767,6 +1845,7 @@ mod generated_receipt_tests {
         let root = repo_root();
         let context = ValidationContext {
             repo_root: &root,
+            package_root: &root,
             anchor_repo: Path::new("/nonexistent"),
             runner: &runner,
             anchor: &anchor,

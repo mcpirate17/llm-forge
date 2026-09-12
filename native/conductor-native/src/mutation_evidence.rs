@@ -20,6 +20,7 @@ use crate::mutation_receipt::{
 #[derive(Debug, Deserialize)]
 struct VerificationRequest {
     repo_root: String,
+    package_root: String,
     registry_path: String,
     canonical_test_patterns: Vec<String>,
     receipt_directories: Vec<String>,
@@ -89,6 +90,7 @@ pub fn plan_mutation_evidence_native(request_json: &str) -> PyResult<String> {
 pub fn verify_mutation_evidence_native(py: Python<'_>, request_json: &str) -> PyResult<String> {
     let request: VerificationRequest = parse_json(request_json, "verification request")?;
     let root = lexical_absolute(Path::new(&request.repo_root)).map_err(value_error)?;
+    let package_root = lexical_absolute(Path::new(&request.package_root)).map_err(value_error)?;
     let anchor = lexical_absolute(Path::new(&request.anchor.repo)).map_err(value_error)?;
     let registry = root.join(&request.registry_path);
     let candidate_paths: BTreeSet<String> = request.candidate_paths.iter().cloned().collect();
@@ -107,6 +109,7 @@ pub fn verify_mutation_evidence_native(py: Python<'_>, request_json: &str) -> Py
         load_receipts(py, &root, &request.receipt_directories).map_err(value_error)?;
     let context = ValidationContext {
         repo_root: &root,
+        package_root: &package_root,
         anchor_repo: &anchor,
         runner: &request.runner,
         anchor: &request.anchor,

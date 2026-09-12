@@ -1,0 +1,41 @@
+{
+  "campaign_id": "forge-evidence-hash_mutation_engine_generated_fest_20260912",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/mutation_engine_generated.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/mutation_engine_generated.py": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9"
+  },
+  "survivor_baseline": [
+    "arithmetic_op-e0a44816bc5d-4",
+    "constant_replace-1f340b9f9e9c-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-12T22:47:42.874165+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_engine_generated.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_engine_generated.py": "e3796f9deb3f2971c579cd65b8595f2774a056615675d34b1837db23690de3ee"
+  },
+  "title": "Generated mutants for src/conductor/mutation_engine_generated.py, scored on the survivor set"
+}

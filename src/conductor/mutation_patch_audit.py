@@ -72,6 +72,7 @@ from conductor.mutation_testing import (
     _runner_components_sha256,
     _sha256,
     load_campaign,
+    runner_component_root,
 )
 
 
@@ -190,9 +191,15 @@ PASSING_RECEIPT_STATUSES = frozenset({"PASS", "RATCHET_HELD"})
 
 
 def _receipt_rejection(
-    receipt: Mapping[str, Any], current: Mapping[str, str], repo_root: Path
+    receipt: Mapping[str, Any], current: Mapping[str, str], package_root: Path
 ) -> str | None:
-    """Why this receipt is not usable evidence, or ``None`` when it is."""
+    """Why this receipt is not usable evidence, or ``None`` when it is.
+
+    ``package_root`` is where a bare ``conductor/...`` runner-component path (and
+    the lineage ledger's own path) resolves from -- ``runner_component_root()`` in
+    production, or a test's isolated ``tmp_path`` stand-in -- never the git root,
+    which differs from it under a src layout.
+    """
 
     status = receipt.get("status")
     if status not in PASSING_RECEIPT_STATUSES:
@@ -200,7 +207,7 @@ def _receipt_rejection(
     recorded = receipt.get("runner_components_sha256")
     if not isinstance(recorded, dict):
         return "no runner component map"
-    if not (recorded == dict(current) or _lineage_accepts(recorded, repo_root)):
+    if not (recorded == dict(current) or _lineage_accepts(recorded, package_root)):
         return "runner components match neither this runner nor any lineage entry"
 
 
@@ -208,7 +215,7 @@ def _evidence_verdict(
     campaign: Campaign,
     receipts: Mapping[str, list[Mapping[str, Any]]],
     current: Mapping[str, str],
-    repo_root: Path,
+    package_root: Path,
 ) -> dict[str, Any] | None:
     """Why no receipt vouches for this campaign, or ``None`` when one does."""
 
@@ -220,7 +227,7 @@ def _evidence_verdict(
             "receipts": 0,
             "detail": "no receipt declares this campaign_id",
         }
-    rejections = [_receipt_rejection(row, current, repo_root) for row in rows]
+    rejections = [_receipt_rejection(row, current, package_root) for row in rows]
     if not any(reason is None for reason in rejections):
         return {
             "campaign_id": campaign.campaign_id,
@@ -234,7 +241,7 @@ def _acceptable_receipt(
     campaign: Campaign,
     receipts: Mapping[str, list[Mapping[str, Any]]],
     current: Mapping[str, str],
-    repo_root: Path,
+    package_root: Path,
 ) -> Mapping[str, Any] | None:
     """The newest receipt that vouches for this campaign, or ``None``.
 
@@ -246,7 +253,7 @@ def _acceptable_receipt(
     rows = [
         row
         for row in receipts.get(campaign.campaign_id, [])
-        if _receipt_rejection(row, current, repo_root) is None
+        if _receipt_rejection(row, current, package_root) is None
     ]
     if rows:
         return max(rows, key=lambda row: str(row.get("generated_at") or ""))
@@ -256,7 +263,7 @@ def _value_verdicts(
     campaigns: Sequence[Campaign],
     receipts: Mapping[str, list[Mapping[str, Any]]],
     current: Mapping[str, str],
-    repo_root: Path,
+    package_root: Path,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     """Campaigns that never measured their tests, and tests measured to kill nothing.
 
@@ -281,7 +288,7 @@ def _value_verdicts(
     unmeasured: list[dict[str, str]] = []
     inert: list[dict[str, str]] = []
     for campaign in campaigns:
-        receipt = _acceptable_receipt(campaign, receipts, current, repo_root)
+        receipt = _acceptable_receipt(campaign, receipts, current, package_root)
         value = receipt.get("test_value") if isinstance(receipt, Mapping) else None
         if value is None:
             if campaign.value_analysis is None and not campaign.generated:
@@ -345,6 +352,7 @@ def audit_reproducibility(
         raise CampaignError(
             f"cannot read the current runner components: {exc}"
         ) from exc
+    package_root = runner_component_root()
     directories = registry.get("receipt_directories") or []
     receipts = _receipts_by_campaign(repo_root, [str(item) for item in directories])
 
@@ -356,11 +364,11 @@ def audit_reproducibility(
     evidence = [
         verdict
         for campaign in campaigns
-        if (verdict := _evidence_verdict(campaign, receipts, current, repo_root))
+        if (verdict := _evidence_verdict(campaign, receipts, current, package_root))
         is not None
     ]
     absent = [row for row in interpreters if row["reason"] == "INTERPRETER_ABSENT"]
-    unmeasured, inert = _value_verdicts(campaigns, receipts, current, repo_root)
+    unmeasured, inert = _value_verdicts(campaigns, receipts, current, package_root)
     return {
         "campaigns": len(campaigns),
         "receipt_files": sum(len(rows) for rows in receipts.values()),

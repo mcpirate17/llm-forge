@@ -27,18 +27,26 @@ from typing import Any
 DEFAULT_CANDIDATE_POLICY = PurePosixPath("conductor/candidate_policy.toml")
 DEFAULT_MUTATION_REGISTRY = PurePosixPath("conductor/mutation_campaigns/registry.json")
 DEFAULT_PACKAGE_ROOT = PurePosixPath("conductor")
+# Where a freshly-run receipt lands when nothing named an explicit ``--receipt``. This
+# is scratch output, not the registered evidence directory (`receipts_relative`) --
+# the monorepo treats it as auto-pruned staging under `research/reports/`, which a
+# host with no `research/` tree at all must be able to repoint via `[tool.conductor]`.
+DEFAULT_MUTATION_RECEIPT_ROOT = PurePosixPath("research/reports/mutation_testing")
 
 CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"
 MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
 PACKAGE_ROOT_ENV = "CONDUCTOR_PACKAGE_ROOT"
+MUTATION_RECEIPT_ROOT_ENV = "CONDUCTOR_MUTATION_RECEIPT_ROOT"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
 MUTATION_REGISTRY_KEY = "mutation_registry"
 PACKAGE_ROOT_KEY = "package_root"
+MUTATION_RECEIPT_ROOT_KEY = "mutation_receipt_root"
 DEFAULTS = {
     CANDIDATE_POLICY_KEY: DEFAULT_CANDIDATE_POLICY,
     MUTATION_REGISTRY_KEY: DEFAULT_MUTATION_REGISTRY,
     PACKAGE_ROOT_KEY: DEFAULT_PACKAGE_ROOT,
+    MUTATION_RECEIPT_ROOT_KEY: DEFAULT_MUTATION_RECEIPT_ROOT,
 }
 
 
@@ -95,9 +103,11 @@ class ProjectPaths:
     policy_relative: PurePosixPath
     registry_relative: PurePosixPath
     package_relative: PurePosixPath
+    receipt_root_relative: PurePosixPath
     policy_configured: bool
     registry_configured: bool
     package_configured: bool
+    receipt_root_configured: bool
 
     @property
     def policy_path(self) -> Path:
@@ -121,6 +131,11 @@ class ProjectPaths:
         """The ``conductor`` package directory inside this root."""
         return self.root / self.package_relative.as_posix()
 
+    @property
+    def receipt_root_path(self) -> Path:
+        """Where a freshly-run receipt lands absent an explicit output path."""
+        return self.root / self.receipt_root_relative.as_posix()
+
 
 def project_paths(root: Path | str) -> ProjectPaths:
     """Resolve every host path against ``root``. Not cached: hosts differ per call."""
@@ -130,8 +145,19 @@ def project_paths(root: Path | str) -> ProjectPaths:
         base, MUTATION_REGISTRY_KEY, MUTATION_REGISTRY_ENV
     )
     package, named_pkg = _configured(base, PACKAGE_ROOT_KEY, PACKAGE_ROOT_ENV)
+    receipt_root, named_receipt_root = _configured(
+        base, MUTATION_RECEIPT_ROOT_KEY, MUTATION_RECEIPT_ROOT_ENV
+    )
     return ProjectPaths(
-        base, policy, registry, package, named_policy, named_reg, named_pkg
+        base,
+        policy,
+        registry,
+        package,
+        receipt_root,
+        named_policy,
+        named_reg,
+        named_pkg,
+        named_receipt_root,
     )
 
 
@@ -161,6 +187,21 @@ def campaigns_relative(root: Path | str) -> PurePosixPath:
 
 def receipts_relative(root: Path | str) -> PurePosixPath:
     return project_paths(root).campaigns_relative / "receipts"
+
+
+def mutation_receipt_root_relative(root: Path | str) -> PurePosixPath:
+    """Where a freshly-run receipt lands absent an explicit output path.
+
+    Distinct from ``receipts_relative`` -- that is the registered evidence
+    directory the gate reads back; this is scratch staging, configurable
+    per host so a tree with no ``research/`` directory is not forced to create
+    one just to run a mutation campaign without ``--receipt``.
+    """
+    return project_paths(root).receipt_root_relative
+
+
+def mutation_receipt_root(root: Path | str) -> Path:
+    return project_paths(root).receipt_root_path
 
 
 def package_relative(root: Path | str) -> PurePosixPath:

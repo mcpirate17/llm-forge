@@ -324,3 +324,84 @@ def test_this_repository_resolves_its_own_package():
     package = Path(engine.__file__).resolve().parents[1]
     root = pp.package_tree_root(package)
     assert pp.package_path(root).resolve() == package
+
+
+# --- mutation_receipt_root ---------------------------------------------------
+#
+# Scratch staging for a receipt written without an explicit ``--receipt``, distinct
+# from ``receipts_relative`` (the registered evidence directory the gate reads back).
+# The unconfigured default is the monorepo's own literal so that host's behaviour is
+# unchanged; a host with no ``research/`` tree repoints it via ``[tool.conductor]``.
+
+
+def test_mutation_receipt_root_defaults_to_the_monorepo_literal():
+    assert pp.DEFAULT_MUTATION_RECEIPT_ROOT == PurePosixPath(
+        "research/reports/mutation_testing"
+    )
+    assert pp.DEFAULTS[pp.MUTATION_RECEIPT_ROOT_KEY] == pp.DEFAULT_MUTATION_RECEIPT_ROOT
+
+
+def test_mutation_receipt_root_is_the_default_without_configuration(tmp_path):
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.receipt_root_relative == PurePosixPath(
+        "research/reports/mutation_testing"
+    )
+    assert resolved.receipt_root_configured is False
+    assert resolved.receipt_root_path == tmp_path / "research/reports/mutation_testing"
+    assert pp.mutation_receipt_root_relative(tmp_path) == PurePosixPath(
+        "research/reports/mutation_testing"
+    )
+    assert pp.mutation_receipt_root(tmp_path) == (
+        tmp_path / "research/reports/mutation_testing"
+    )
+
+
+def test_mutation_receipt_root_comes_from_the_conductor_table(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nmutation_receipt_root = "campaigns/receipts"\n')
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.receipt_root_relative == PurePosixPath("campaigns/receipts")
+    assert resolved.receipt_root_configured is True
+    assert pp.mutation_receipt_root_relative(tmp_path) == PurePosixPath(
+        "campaigns/receipts"
+    )
+    assert pp.mutation_receipt_root(tmp_path) == tmp_path / "campaigns/receipts"
+
+
+def test_mutation_receipt_root_environment_overrides_the_table(tmp_path, monkeypatch):
+    _write(tmp_path, '[tool.conductor]\nmutation_receipt_root = "campaigns/receipts"\n')
+    monkeypatch.setenv(pp.MUTATION_RECEIPT_ROOT_ENV, "scratch/mutation")
+    assert pp.mutation_receipt_root_relative(tmp_path) == PurePosixPath(
+        "scratch/mutation"
+    )
+
+
+def test_mutation_receipt_root_refuses_an_unusable_value(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nmutation_receipt_root = "/abs/receipts"\n')
+    with pytest.raises(pp.ProjectPathError):
+        pp.mutation_receipt_root_relative(tmp_path)
+
+
+def test_mutation_receipt_root_is_distinct_from_receipts_relative(tmp_path):
+    """Configuring one must not move the other -- they answer different questions."""
+    _write(
+        tmp_path,
+        "[tool.conductor]\n"
+        'mutation_registry = "campaigns/registry.json"\n'
+        'mutation_receipt_root = "campaigns/receipts"\n',
+    )
+    assert pp.receipts_relative(tmp_path) == PurePosixPath("campaigns/receipts")
+    assert pp.mutation_receipt_root_relative(tmp_path) == PurePosixPath(
+        "campaigns/receipts"
+    )
+    # Same value here by this repository's own configuration, but reached through
+    # two independent keys -- changing one alone must not move the other.
+    _write(
+        tmp_path,
+        "[tool.conductor]\n"
+        'mutation_registry = "campaigns/registry.json"\n'
+        'mutation_receipt_root = "scratch/staging"\n',
+    )
+    assert pp.receipts_relative(tmp_path) == PurePosixPath("campaigns/receipts")
+    assert pp.mutation_receipt_root_relative(tmp_path) == PurePosixPath(
+        "scratch/staging"
+    )
