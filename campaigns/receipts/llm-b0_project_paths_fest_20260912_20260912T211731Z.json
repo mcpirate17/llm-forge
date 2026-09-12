@@ -1,0 +1,2893 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 57,
+    "baseline_repetitions": 2,
+    "killed_mutants": 57,
+    "ranked_tests": 25,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.35853,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                        [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m33 passed\u001b[0m\u001b[32m in 0.10s\u001b[0m\u001b[0m\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-fix3/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_project_paths.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "llm-b0_project_paths_fest_20260912",
+  "classification_required": [],
+  "core_sha256": "63f55f69a258923bb85a3458be6a7ccfd9420e2317ebb143cb85964c118c7db1",
+  "engine_result": {
+    "duration_seconds": 13.006219,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "/llm-orchestrator-snapshot-spppcfw0/worktree/src/conductor/project_paths.py\",\n        \"line\": 144,\n        \"column\": 12,\n        \"byte_offset\": 5340,\n        \"byte_length\": 38,\n        \"original_text\": \"project_paths(root).campaigns_relative\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root\",\n        \"src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 217405022\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-spppcfw0/worktree/src/conductor/project_paths.py\",\n        \"line\": 148,\n        \"column\": 12,\n        \"byte_offset\": 5450,\n        \"byte_length\": 51,\n        \"original_text\": \"project_paths(root).campaigns_relative / \\\"receipts\\\"\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root\",\n        \"src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 218246885\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-spppcfw0/worktree/src/conductor/project_paths.py\",\n        \"line\": 148,\n        \"column\": 51,\n        \"byte_offset\": 5489,\n        \"byte_length\": 1,\n        \"original_text\": \"/\",\n        \"mutated_text\": \"*\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root\",\n        \"src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 219174529\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-spppcfw0/worktree/src/conductor/project_paths.py\",\n        \"line\": 148,\n        \"column\": 53,\n        \"byte_offset\": 5491,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"receipts\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root\",\n        \"src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 219938603\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-spppcfw0/worktree/src/conductor/project_paths.py\",\n        \"line\": 152,\n        \"column\": 12,\n        \"byte_offset\": 5560,\n        \"byte_length\": 33,\n        \"original_text\": \"project_paths(root).registry_path\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 213875457\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-spppcfw0/worktree/src/conductor/project_paths.py\",\n        \"line\": 156,\n        \"column\": 12,\n        \"byte_offset\": 5653,\n        \"byte_length\": 34,\n        \"original_text\": \"project_paths(root).campaigns_root\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 210031721\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 13,\n    \"nanos\": 1644351\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 57,
+    "mutants_generated": 81,
+    "mutants_tested": 60,
+    "no_coverage": 21,
+    "survived": 3,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-12T21:17:31.873562+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-fix3/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/llm-b0_project_paths_fest_20260912.json",
+  "manifest_sha256": "5f8f5754c9b1ab2e21df9a356262e180a6752a0cc3f76b28b09a0915b59925ba",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 921,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f128f4d1b6e1-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Where the host project keeps its conductor data.\n\n``conductor`` was extracted from a monorepo that keeps its candidate policy at\n``conductor/candidate_policy.toml`` and its mutation registry at\n``conductor/mutation_campaigns/registry.json``. Those two literals were spelled out at\nthree dozen call sites, which made the package unusable in any tree with another layout.\n\nThis module is the single resolution point, and every answer is repo-root-relative so a\ncaller joins it to the root it already holds. Precedence: the environment variables\nbelow; then the host's ``pyproject.toml`` ``[tool.conductor]`` table, read from the root\nbeing resolved so a candidate snapshot answers for itself; then the monorepo literals,\nso that host needs no configuration. A configured value that is absolute, empty or\nescaping the root is refused here; a configured file that does not exist is refused by\nthe caller that needs it.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 33,
+      "byte_offset": 1159,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f05d0d39fdd1-0",
+      "line": 26,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/candidate_policy.toml\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 44,
+      "byte_offset": 1236,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-3a07d65980fb-0",
+      "line": 27,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_campaigns/registry.json\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 28,
+      "byte_offset": 1306,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-2f7148a1caab-0",
+      "line": 29,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"CONDUCTOR_CANDIDATE_POLICY\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 1359,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ea5aaff7fb01-0",
+      "line": 30,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"CONDUCTOR_MUTATION_REGISTRY\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 1413,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-020c2647f7af-0",
+      "line": 32,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"candidate_policy\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 1456,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a1ab14f23f1a-0",
+      "line": 33,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutation_registry\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 53,
+      "byte_offset": 1641,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-4915f49aad2e-0",
+      "line": 41,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"A host project path is configured but unusable.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 1759,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0455411e3190-0",
+      "line": 45,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"A configured value as a root-relative posix path, or a loud refusal.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 1841,
+      "duration_seconds": 0.236931,
+      "id": "boolean_op-49bb7f5999d2-0",
+      "line": 46,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_a_non_string",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[   ]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 1841,
+      "duration_seconds": 0.237886,
+      "id": "negate_condition-2824711f7192-0",
+      "line": 46,
+      "mutated_text": "not (not isinstance(raw, str))",
+      "operator": "negate_condition",
+      "original_text": "not isinstance(raw, str)",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_a_non_string",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[   ]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 1984,
+      "duration_seconds": 0.212918,
+      "id": "boolean_op-49bb7f5999d2-1",
+      "line": 49,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[   ]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 1984,
+      "duration_seconds": 0.228061,
+      "id": "negate_condition-a1ba0f292ca2-0",
+      "line": 49,
+      "mutated_text": "not (not text)",
+      "operator": "negate_condition",
+      "original_text": "not text",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[   ]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2094,
+      "duration_seconds": 0.237163,
+      "id": "constant_replace-9dfa1025beec-0",
+      "line": 51,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\\\\\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2100,
+      "duration_seconds": 0.218476,
+      "id": "constant_replace-144f7ea95a66-0",
+      "line": 51,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"/\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 58,
+      "byte_offset": 2113,
+      "duration_seconds": 0.220946,
+      "id": "negate_condition-b008569472aa-0",
+      "line": 52,
+      "mutated_text": "not (path.is_absolute() or \"..\" in path.parts or not path.parts)",
+      "operator": "negate_condition",
+      "original_text": "path.is_absolute() or \"..\" in path.parts or not path.parts",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2132,
+      "duration_seconds": 0.215011,
+      "id": "boolean_op-d5cd278834f0-0",
+      "line": 52,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2135,
+      "duration_seconds": 0.212972,
+      "id": "constant_replace-40b4627a1540-0",
+      "line": 52,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"..\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2140,
+      "duration_seconds": 0.22296,
+      "id": "comparison_op-cd23cc654614-0",
+      "line": 52,
+      "mutated_text": "not in",
+      "operator": "comparison_op",
+      "original_text": "in",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2154,
+      "duration_seconds": 0.227364,
+      "id": "boolean_op-d5cd278834f0-1",
+      "line": 52,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2157,
+      "duration_seconds": 0.213223,
+      "id": "boolean_op-49bb7f5999d2-2",
+      "line": 52,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[../registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[/abs/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values[a/../../b]"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2265,
+      "duration_seconds": 0.219805,
+      "id": "return_value-16b50685ff02-0",
+      "line": 54,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "path",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[  campaigns/registry.json  -campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns/registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[campaigns\\\\registry.json-campaigns/registry.json]",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values[registry.json-registry.json]"
+      ]
+    },
+    {
+      "byte_length": 77,
+      "byte_offset": 2330,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-22469376320d-0",
+      "line": 58,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The host's ``[tool.conductor]`` table, empty when there is no manifest.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2434,
+      "duration_seconds": 0.207851,
+      "id": "arithmetic_op-75363833dd60-0",
+      "line": 59,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 2436,
+      "duration_seconds": 0.211299,
+      "id": "constant_replace-26172b75b6a6-0",
+      "line": 59,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"pyproject.toml\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2460,
+      "duration_seconds": 0.216189,
+      "id": "boolean_op-49bb7f5999d2-3",
+      "line": 60,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 2460,
+      "duration_seconds": 0.230287,
+      "id": "negate_condition-82b417ab5a7e-0",
+      "line": 60,
+      "mutated_text": "not (not manifest.is_file())",
+      "operator": "negate_condition",
+      "original_text": "not manifest.is_file()",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2499,
+      "duration_seconds": 0.213098,
+      "id": "return_value-39a6ba2dff87-0",
+      "line": 61,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{}",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 2604,
+      "duration_seconds": 0.233667,
+      "id": "constant_replace-e85eae4da7af-0",
+      "line": 64,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tool\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 2633,
+      "duration_seconds": 0.212822,
+      "id": "constant_replace-6d3e56b7877c-0",
+      "line": 65,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ]
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 2692,
+      "duration_seconds": 0.207635,
+      "id": "negate_condition-48a65da97060-0",
+      "line": 66,
+      "mutated_text": "not (table is None)",
+      "operator": "negate_condition",
+      "original_text": "table is None",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2698,
+      "duration_seconds": 0.213887,
+      "id": "comparison_op-116b78735176-0",
+      "line": 66,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2722,
+      "duration_seconds": 0.215026,
+      "id": "return_value-39a6ba2dff87-1",
+      "line": 67,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{}",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2732,
+      "duration_seconds": 0.21212,
+      "id": "boolean_op-49bb7f5999d2-4",
+      "line": 68,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ]
+    },
+    {
+      "byte_length": 30,
+      "byte_offset": 2732,
+      "duration_seconds": 0.206365,
+      "id": "negate_condition-1358ec526917-0",
+      "line": 68,
+      "mutated_text": "not (not isinstance(table, Mapping))",
+      "operator": "negate_condition",
+      "original_text": "not isinstance(table, Mapping)",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 2856,
+      "duration_seconds": 0.210709,
+      "id": "return_value-51d6d10f1820-0",
+      "line": 70,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "table",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ]
+    },
+    {
+      "byte_length": 61,
+      "byte_offset": 2947,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-594604f6673d-0",
+      "line": 74,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"(relative path, whether the host named it) for one key.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 3058,
+      "duration_seconds": 0.211591,
+      "id": "negate_condition-6804115f678e-0",
+      "line": 76,
+      "mutated_text": "not (raw)",
+      "operator": "negate_condition",
+      "original_text": "raw",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 31,
+      "byte_offset": 3078,
+      "duration_seconds": 0.217997,
+      "id": "return_value-c1ab72cdd2c0-0",
+      "line": 77,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_relative(raw, f\"${env}\"), True",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3105,
+      "duration_seconds": 0.171094,
+      "id": "constant_replace-09a5f8b6ffb2-0",
+      "line": 77,
+      "mutated_text": "False",
+      "operator": "constant_replace",
+      "original_text": "True",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 3151,
+      "duration_seconds": 0.222707,
+      "id": "negate_condition-e9707510e856-0",
+      "line": 79,
+      "mutated_text": "not (key in table)",
+      "operator": "negate_condition",
+      "original_text": "key in table",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3155,
+      "duration_seconds": 0.224441,
+      "id": "comparison_op-cd23cc654614-1",
+      "line": 79,
+      "mutated_text": "not in",
+      "operator": "comparison_op",
+      "original_text": "in",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 35,
+      "byte_offset": 3258,
+      "duration_seconds": 0.2217,
+      "id": "return_value-74abc4f0a01f-0",
+      "line": 81,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_relative(table[key], source), True",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3289,
+      "duration_seconds": 0.210637,
+      "id": "constant_replace-09a5f8b6ffb2-1",
+      "line": 81,
+      "mutated_text": "False",
+      "operator": "constant_replace",
+      "original_text": "True",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 3305,
+      "duration_seconds": 0.223751,
+      "id": "return_value-f98ab210a727-0",
+      "line": 82,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "DEFAULTS[key], False",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 3320,
+      "duration_seconds": 0.232469,
+      "id": "constant_replace-17bf188f5cfa-0",
+      "line": 82,
+      "mutated_text": "True",
+      "operator": "constant_replace",
+      "original_text": "False",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 3328,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-b0eae7fa4e62-0",
+      "line": 85,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@dataclass(frozen=True)\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 78,
+      "byte_offset": 3376,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c97a2356a44e-0",
+      "line": 87,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The host project's conductor data, relative to and joined onto ``root``.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3606,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-9837826db73a-0",
+      "line": 95,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@property\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 43,
+      "byte_offset": 3666,
+      "duration_seconds": 0.224044,
+      "id": "return_value-f116b35a3f83-0",
+      "line": 97,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "self.root / self.policy_relative.as_posix()",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3676,
+      "duration_seconds": 0.215549,
+      "id": "arithmetic_op-75363833dd60-1",
+      "line": 97,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3715,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-9837826db73a-1",
+      "line": 99,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@property\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 45,
+      "byte_offset": 3777,
+      "duration_seconds": 0.215918,
+      "id": "return_value-7d106433a2e0-0",
+      "line": 101,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "self.root / self.registry_relative.as_posix()",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3787,
+      "duration_seconds": 0.258763,
+      "id": "arithmetic_op-75363833dd60-2",
+      "line": 101,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3828,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-9837826db73a-2",
+      "line": 103,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@property\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 60,
+      "byte_offset": 3897,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8770d8196b39-0",
+      "line": 105,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The directory holding manifests, receipts and patches.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 3973,
+      "duration_seconds": 0.218298,
+      "id": "return_value-631e11e6f7f8-0",
+      "line": 106,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "self.registry_relative.parent",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 4008,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-9837826db73a-3",
+      "line": 108,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@property\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 46,
+      "byte_offset": 4071,
+      "duration_seconds": 0.216175,
+      "id": "return_value-71be806d00a5-0",
+      "line": 110,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "self.root / self.campaigns_relative.as_posix()",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4081,
+      "duration_seconds": 0.215629,
+      "id": "arithmetic_op-75363833dd60-3",
+      "line": 110,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 82,
+      "byte_offset": 4177,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-35b48dc0fd1c-0",
+      "line": 114,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Resolve every host path against ``root``. Not cached: hosts differ per call.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 61,
+      "byte_offset": 4486,
+      "duration_seconds": 0.217711,
+      "id": "return_value-6a3fbbd0a760-0",
+      "line": 120,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "ProjectPaths(base, policy, registry, named_policy, named_reg)",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ]
+    },
+    {
+      "byte_length": 84,
+      "byte_offset": 4602,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a4ede9ffdd7e-0",
+      "line": 124,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The nearest ancestor (inclusive) holding ``.git`` -- a dir or a worktree file.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 23,
+      "byte_offset": 4708,
+      "duration_seconds": 0.221715,
+      "id": "zero_iteration_loop-182a0d1a06b7-0",
+      "line": 125,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "(start, *start.parents)",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ]
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 4744,
+      "duration_seconds": 0.216694,
+      "id": "negate_condition-0e9fd919b2f9-0",
+      "line": 126,
+      "mutated_text": "not (candidate == candidate.parent)",
+      "operator": "negate_condition",
+      "original_text": "candidate == candidate.parent",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 4754,
+      "duration_seconds": 0.213398,
+      "id": "comparison_op-96505f43a777-0",
+      "line": 126,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 4787,
+      "duration_seconds": 0.166473,
+      "id": "break_continue-1aa122a468cc-0",
+      "line": 127,
+      "mutated_text": "continue",
+      "operator": "break_continue",
+      "original_text": "break",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory"
+      ]
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 4863,
+      "duration_seconds": 0.224352,
+      "id": "negate_condition-d81a455b3ba1-0",
+      "line": 128,
+      "mutated_text": "not ((candidate / \".git\").exists())",
+      "operator": "negate_condition",
+      "original_text": "(candidate / \".git\").exists()",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4874,
+      "duration_seconds": 0.211378,
+      "id": "arithmetic_op-75363833dd60-4",
+      "line": 128,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 4913,
+      "duration_seconds": 0.212427,
+      "id": "return_value-9a0fd13c0107-0",
+      "line": 129,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "candidate",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 4934,
+      "duration_seconds": 0.162879,
+      "id": "return_value-c2eb5f70ca8f-0",
+      "line": 130,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory"
+      ]
+    },
+    {
+      "byte_length": 80,
+      "byte_offset": 4995,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f4d7fe222165-0",
+      "line": 134,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The host repository root, falling back to ``start`` when there is no repo.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 28,
+      "byte_offset": 5130,
+      "duration_seconds": 0.220603,
+      "id": "return_value-d53398da3367-0",
+      "line": 136,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "enclosing_repo(base) or base",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5151,
+      "duration_seconds": 0.220636,
+      "id": "boolean_op-d5cd278834f0-2",
+      "line": 136,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ]
+    },
+    {
+      "byte_length": 37,
+      "byte_offset": 5230,
+      "duration_seconds": 0.217623,
+      "id": "return_value-c6f474aadf0c-0",
+      "line": 140,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "project_paths(root).registry_relative",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 38,
+      "byte_offset": 5340,
+      "duration_seconds": 0.217405,
+      "id": "return_value-43af37a04e35-0",
+      "line": 144,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "project_paths(root).campaigns_relative",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 51,
+      "byte_offset": 5450,
+      "duration_seconds": 0.218247,
+      "id": "return_value-96e8c11c64aa-0",
+      "line": 148,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "project_paths(root).campaigns_relative / \"receipts\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5489,
+      "duration_seconds": 0.219175,
+      "id": "arithmetic_op-75363833dd60-5",
+      "line": 148,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 5491,
+      "duration_seconds": 0.219939,
+      "id": "constant_replace-5598b308bb82-0",
+      "line": 148,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"receipts\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 33,
+      "byte_offset": 5560,
+      "duration_seconds": 0.213875,
+      "id": "return_value-dab377f01c0b-0",
+      "line": 152,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "project_paths(root).registry_path",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    },
+    {
+      "byte_length": 34,
+      "byte_offset": 5653,
+      "duration_seconds": 0.210032,
+      "id": "return_value-9bd8000daab5-0",
+      "line": 156,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "project_paths(root).campaigns_root",
+      "outcome": "KILLED",
+      "path": "src/conductor/project_paths.py",
+      "tests_run": [
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ]
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.95,
+  "new_survivors": [],
+  "no_coverage": 21,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 57,
+    "NO_COVERAGE": 21,
+    "SURVIVED": 3,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/llm-b0_project_paths_fest_20260912_20260912T211731Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "5111b500ba7035777a4a2c486f51c529eae345f901facbce3518215bf2ba1713",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "fe80b685e955c1b0eee5c16427ecb0478642360441fda763265deffcc71d83a8",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "a39fd174ca08581fc552990b2fa7dabf19be0020f38a7af88405c4266e6cb4b4",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "3e25ed249d3b12666c84b13d8f2fd74eb73ab8903b5203cb38ee280e23d42ced",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "500a038eee783d1072b64524c2181d250df567cdc5e3d5aab4d22c841e90400a"
+  },
+  "runner_sha256": "a39fd174ca08581fc552990b2fa7dabf19be0020f38a7af88405c4266e6cb4b4",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/project_paths.py": "7eb6a77c68b3c1a07929037d24bd46f99fad9407c282da7a6714d682ed07e1cf"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [
+    "break_continue-1aa122a468cc-0",
+    "constant_replace-09a5f8b6ffb2-0",
+    "return_value-c2eb5f70ca8f-0"
+  ],
+  "survivors": [
+    "break_continue-1aa122a468cc-0",
+    "constant_replace-09a5f8b6ffb2-0",
+    "return_value-c2eb5f70ca8f-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_project_paths.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_project_paths.py": "2c4b009d683cb1c2cfde618043e768cabe54e7c38ca1acb51c2d72f377ec5ddd"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 8,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 17
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-75363833dd60-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "arithmetic_op-75363833dd60-1": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root"
+      ],
+      "arithmetic_op-75363833dd60-2": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "arithmetic_op-75363833dd60-3": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "arithmetic_op-75363833dd60-4": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ],
+      "arithmetic_op-75363833dd60-5": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "boolean_op-49bb7f5999d2-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values",
+        "src/conductor/test_project_paths.py::test_relative_refuses_a_non_string"
+      ],
+      "boolean_op-49bb7f5999d2-1": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values"
+      ],
+      "boolean_op-49bb7f5999d2-2": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values"
+      ],
+      "boolean_op-49bb7f5999d2-3": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "boolean_op-49bb7f5999d2-4": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "boolean_op-d5cd278834f0-0": [
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values"
+      ],
+      "boolean_op-d5cd278834f0-1": [
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values"
+      ],
+      "boolean_op-d5cd278834f0-2": [
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ],
+      "comparison_op-116b78735176-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "comparison_op-96505f43a777-0": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ],
+      "comparison_op-cd23cc654614-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values"
+      ],
+      "comparison_op-cd23cc654614-1": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "constant_replace-09a5f8b6ffb2-1": [
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "constant_replace-144f7ea95a66-0": [
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values"
+      ],
+      "constant_replace-17bf188f5cfa-0": [
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "constant_replace-26172b75b6a6-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "constant_replace-40b4627a1540-0": [
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values"
+      ],
+      "constant_replace-5598b308bb82-0": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "constant_replace-6d3e56b7877c-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "constant_replace-9dfa1025beec-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values"
+      ],
+      "constant_replace-e85eae4da7af-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "negate_condition-0e9fd919b2f9-0": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ],
+      "negate_condition-1358ec526917-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "negate_condition-2824711f7192-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values",
+        "src/conductor/test_project_paths.py::test_relative_refuses_a_non_string"
+      ],
+      "negate_condition-48a65da97060-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "negate_condition-6804115f678e-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "negate_condition-82b417ab5a7e-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "negate_condition-a1ba0f292ca2-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values"
+      ],
+      "negate_condition-b008569472aa-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values",
+        "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values"
+      ],
+      "negate_condition-d81a455b3ba1-0": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ],
+      "negate_condition-e9707510e856-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "return_value-16b50685ff02-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values"
+      ],
+      "return_value-39a6ba2dff87-0": [
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "return_value-39a6ba2dff87-1": [
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section"
+      ],
+      "return_value-43af37a04e35-0": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "return_value-51d6d10f1820-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "return_value-631e11e6f7f8-0": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "return_value-6a3fbbd0a760-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "return_value-71be806d00a5-0": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "return_value-74abc4f0a01f-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+      ],
+      "return_value-7d106433a2e0-0": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "return_value-96e8c11c64aa-0": [
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "return_value-9a0fd13c0107-0": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ],
+      "return_value-9bd8000daab5-0": [
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "return_value-c1ab72cdd2c0-0": [
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table"
+      ],
+      "return_value-c6f474aadf0c-0": [
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "return_value-d53398da3367-0": [
+        "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ],
+      "return_value-dab377f01c0b-0": [
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+      ],
+      "return_value-f116b35a3f83-0": [
+        "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root"
+      ],
+      "return_value-f98ab210a727-0": [
+        "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+      ],
+      "zero_iteration_loop-182a0d1a06b7-0": [
+        "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/conductor/project_paths.py"
+        ],
+        "criticality": "high",
+        "id": "llm-b0_project_paths_fest_20260912"
+      }
+    ],
+    "retained_core": [
+      "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+      "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one",
+      "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+      "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+      "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+      "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values",
+      "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+      "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+          "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+          "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "boolean_op-49bb7f5999d2-0",
+          "boolean_op-49bb7f5999d2-1",
+          "boolean_op-49bb7f5999d2-2",
+          "boolean_op-49bb7f5999d2-3",
+          "boolean_op-49bb7f5999d2-4",
+          "comparison_op-116b78735176-0",
+          "comparison_op-cd23cc654614-0",
+          "comparison_op-cd23cc654614-1",
+          "constant_replace-26172b75b6a6-0",
+          "constant_replace-6d3e56b7877c-0",
+          "constant_replace-9dfa1025beec-0",
+          "constant_replace-e85eae4da7af-0",
+          "negate_condition-1358ec526917-0",
+          "negate_condition-2824711f7192-0",
+          "negate_condition-48a65da97060-0",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-82b417ab5a7e-0",
+          "negate_condition-a1ba0f292ca2-0",
+          "negate_condition-b008569472aa-0",
+          "negate_condition-e9707510e856-0",
+          "return_value-16b50685ff02-0",
+          "return_value-51d6d10f1820-0",
+          "return_value-6a3fbbd0a760-0",
+          "return_value-74abc4f0a01f-0",
+          "return_value-f98ab210a727-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_a_blank_environment_variable_does_not_override",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "boolean_op-49bb7f5999d2-0",
+          "boolean_op-49bb7f5999d2-1",
+          "boolean_op-49bb7f5999d2-3",
+          "boolean_op-d5cd278834f0-0",
+          "comparison_op-cd23cc654614-1",
+          "negate_condition-2824711f7192-0",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-82b417ab5a7e-0",
+          "negate_condition-a1ba0f292ca2-0",
+          "negate_condition-b008569472aa-0",
+          "negate_condition-e9707510e856-0",
+          "return_value-39a6ba2dff87-0",
+          "return_value-c1ab72cdd2c0-0",
+          "return_value-f98ab210a727-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "arithmetic_op-75363833dd60-5",
+          "boolean_op-49bb7f5999d2-0",
+          "boolean_op-49bb7f5999d2-1",
+          "boolean_op-49bb7f5999d2-2",
+          "boolean_op-49bb7f5999d2-3",
+          "boolean_op-49bb7f5999d2-4",
+          "comparison_op-116b78735176-0",
+          "comparison_op-cd23cc654614-0",
+          "comparison_op-cd23cc654614-1",
+          "constant_replace-26172b75b6a6-0",
+          "constant_replace-5598b308bb82-0",
+          "constant_replace-6d3e56b7877c-0",
+          "constant_replace-9dfa1025beec-0",
+          "constant_replace-e85eae4da7af-0",
+          "negate_condition-1358ec526917-0",
+          "negate_condition-2824711f7192-0",
+          "negate_condition-48a65da97060-0",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-82b417ab5a7e-0",
+          "negate_condition-a1ba0f292ca2-0",
+          "negate_condition-b008569472aa-0",
+          "negate_condition-e9707510e856-0",
+          "return_value-16b50685ff02-0",
+          "return_value-43af37a04e35-0",
+          "return_value-51d6d10f1820-0",
+          "return_value-631e11e6f7f8-0",
+          "return_value-6a3fbbd0a760-0",
+          "return_value-74abc4f0a01f-0",
+          "return_value-96e8c11c64aa-0",
+          "return_value-f98ab210a727-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "arithmetic_op-75363833dd60-1",
+          "arithmetic_op-75363833dd60-2",
+          "arithmetic_op-75363833dd60-3",
+          "boolean_op-49bb7f5999d2-0",
+          "boolean_op-49bb7f5999d2-1",
+          "boolean_op-49bb7f5999d2-2",
+          "boolean_op-49bb7f5999d2-3",
+          "boolean_op-49bb7f5999d2-4",
+          "comparison_op-116b78735176-0",
+          "comparison_op-cd23cc654614-0",
+          "comparison_op-cd23cc654614-1",
+          "constant_replace-26172b75b6a6-0",
+          "constant_replace-6d3e56b7877c-0",
+          "constant_replace-9dfa1025beec-0",
+          "constant_replace-e85eae4da7af-0",
+          "negate_condition-1358ec526917-0",
+          "negate_condition-2824711f7192-0",
+          "negate_condition-48a65da97060-0",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-82b417ab5a7e-0",
+          "negate_condition-a1ba0f292ca2-0",
+          "negate_condition-b008569472aa-0",
+          "negate_condition-e9707510e856-0",
+          "return_value-16b50685ff02-0",
+          "return_value-51d6d10f1820-0",
+          "return_value-631e11e6f7f8-0",
+          "return_value-6a3fbbd0a760-0",
+          "return_value-71be806d00a5-0",
+          "return_value-74abc4f0a01f-0",
+          "return_value-7d106433a2e0-0",
+          "return_value-f116b35a3f83-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "arithmetic_op-75363833dd60-1",
+          "return_value-f116b35a3f83-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "comparison_op-116b78735176-0",
+          "negate_condition-48a65da97060-0",
+          "return_value-39a6ba2dff87-1"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_conductor_table_is_empty_when_tool_is_not_a_table"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "comparison_op-116b78735176-0",
+          "negate_condition-48a65da97060-0",
+          "return_value-39a6ba2dff87-1"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_conductor_section",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+          "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+          "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "boolean_op-49bb7f5999d2-3",
+          "negate_condition-82b417ab5a7e-0",
+          "return_value-39a6ba2dff87-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_conductor_table_is_empty_without_a_manifest",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+          "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+          "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+          "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+          "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "boolean_op-49bb7f5999d2-3",
+          "boolean_op-49bb7f5999d2-4",
+          "comparison_op-116b78735176-0",
+          "constant_replace-26172b75b6a6-0",
+          "constant_replace-6d3e56b7877c-0",
+          "constant_replace-e85eae4da7af-0",
+          "negate_condition-1358ec526917-0",
+          "negate_condition-48a65da97060-0",
+          "negate_condition-82b417ab5a7e-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_conductor_table_refuses_a_non_table_conductor_key",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+          "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+          "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+          "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "boolean_op-49bb7f5999d2-3",
+          "boolean_op-49bb7f5999d2-4",
+          "comparison_op-116b78735176-0",
+          "constant_replace-26172b75b6a6-0",
+          "constant_replace-6d3e56b7877c-0",
+          "constant_replace-e85eae4da7af-0",
+          "negate_condition-1358ec526917-0",
+          "negate_condition-48a65da97060-0",
+          "negate_condition-82b417ab5a7e-0",
+          "return_value-51d6d10f1820-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_conductor_table_returns_the_declared_keys",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "boolean_op-49bb7f5999d2-0",
+          "boolean_op-49bb7f5999d2-1",
+          "boolean_op-49bb7f5999d2-2",
+          "boolean_op-49bb7f5999d2-3",
+          "boolean_op-49bb7f5999d2-4",
+          "comparison_op-116b78735176-0",
+          "comparison_op-cd23cc654614-0",
+          "comparison_op-cd23cc654614-1",
+          "constant_replace-09a5f8b6ffb2-1",
+          "constant_replace-17bf188f5cfa-0",
+          "constant_replace-26172b75b6a6-0",
+          "constant_replace-6d3e56b7877c-0",
+          "constant_replace-9dfa1025beec-0",
+          "constant_replace-e85eae4da7af-0",
+          "negate_condition-1358ec526917-0",
+          "negate_condition-2824711f7192-0",
+          "negate_condition-48a65da97060-0",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-82b417ab5a7e-0",
+          "negate_condition-a1ba0f292ca2-0",
+          "negate_condition-b008569472aa-0",
+          "negate_condition-e9707510e856-0",
+          "return_value-16b50685ff02-0",
+          "return_value-51d6d10f1820-0",
+          "return_value-6a3fbbd0a760-0",
+          "return_value-74abc4f0a01f-0",
+          "return_value-f98ab210a727-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+          "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+          "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-4",
+          "comparison_op-96505f43a777-0",
+          "negate_condition-0e9fd919b2f9-0",
+          "negate_condition-d81a455b3ba1-0",
+          "return_value-9a0fd13c0107-0",
+          "zero_iteration_loop-182a0d1a06b7-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+          "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+          "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-4",
+          "comparison_op-96505f43a777-0",
+          "negate_condition-0e9fd919b2f9-0",
+          "negate_condition-d81a455b3ba1-0",
+          "return_value-9a0fd13c0107-0",
+          "zero_iteration_loop-182a0d1a06b7-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+          "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+          "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-4",
+          "comparison_op-96505f43a777-0",
+          "negate_condition-0e9fd919b2f9-0",
+          "negate_condition-d81a455b3ba1-0",
+          "return_value-9a0fd13c0107-0",
+          "zero_iteration_loop-182a0d1a06b7-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_enclosing_repo_accepts_a_worktree_dot_git_file",
+          "src/conductor/test_project_paths.py::test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git",
+          "src/conductor/test_project_paths.py::test_enclosing_repo_prefers_the_nearest_of_two_ancestors",
+          "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-4",
+          "negate_condition-d81a455b3ba1-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_enclosing_repo_returns_none_without_a_repo",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-49bb7f5999d2-0",
+          "boolean_op-49bb7f5999d2-1",
+          "boolean_op-49bb7f5999d2-2",
+          "comparison_op-cd23cc654614-0",
+          "constant_replace-9dfa1025beec-0",
+          "negate_condition-2824711f7192-0",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-a1ba0f292ca2-0",
+          "negate_condition-b008569472aa-0",
+          "return_value-16b50685ff02-0",
+          "return_value-6a3fbbd0a760-0",
+          "return_value-c1ab72cdd2c0-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+          "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-4",
+          "boolean_op-d5cd278834f0-2",
+          "return_value-d53398da3367-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_host_root_defaults_to_the_current_directory",
+          "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-4",
+          "boolean_op-d5cd278834f0-2",
+          "return_value-d53398da3367-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_host_root_falls_back_to_the_start_directory",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-4",
+          "boolean_op-d5cd278834f0-2",
+          "comparison_op-96505f43a777-0",
+          "negate_condition-0e9fd919b2f9-0",
+          "negate_condition-d81a455b3ba1-0",
+          "return_value-9a0fd13c0107-0",
+          "return_value-d53398da3367-0",
+          "zero_iteration_loop-182a0d1a06b7-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_host_root_returns_the_repo_root_when_there_is_one",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "arithmetic_op-75363833dd60-2",
+          "arithmetic_op-75363833dd60-3",
+          "arithmetic_op-75363833dd60-5",
+          "boolean_op-49bb7f5999d2-0",
+          "boolean_op-49bb7f5999d2-1",
+          "boolean_op-49bb7f5999d2-2",
+          "boolean_op-49bb7f5999d2-3",
+          "boolean_op-49bb7f5999d2-4",
+          "comparison_op-116b78735176-0",
+          "comparison_op-cd23cc654614-0",
+          "comparison_op-cd23cc654614-1",
+          "constant_replace-26172b75b6a6-0",
+          "constant_replace-5598b308bb82-0",
+          "constant_replace-6d3e56b7877c-0",
+          "constant_replace-9dfa1025beec-0",
+          "constant_replace-e85eae4da7af-0",
+          "negate_condition-1358ec526917-0",
+          "negate_condition-2824711f7192-0",
+          "negate_condition-48a65da97060-0",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-82b417ab5a7e-0",
+          "negate_condition-a1ba0f292ca2-0",
+          "negate_condition-b008569472aa-0",
+          "negate_condition-e9707510e856-0",
+          "return_value-16b50685ff02-0",
+          "return_value-43af37a04e35-0",
+          "return_value-51d6d10f1820-0",
+          "return_value-631e11e6f7f8-0",
+          "return_value-6a3fbbd0a760-0",
+          "return_value-71be806d00a5-0",
+          "return_value-74abc4f0a01f-0",
+          "return_value-7d106433a2e0-0",
+          "return_value-96e8c11c64aa-0",
+          "return_value-9bd8000daab5-0",
+          "return_value-c6f474aadf0c-0",
+          "return_value-dab377f01c0b-0",
+          "return_value-f98ab210a727-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_module_helpers_agree_with_the_dataclass",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "return_value-9bd8000daab5-0",
+          "return_value-c6f474aadf0c-0",
+          "return_value-dab377f01c0b-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "boolean_op-49bb7f5999d2-3",
+          "comparison_op-cd23cc654614-1",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-82b417ab5a7e-0",
+          "negate_condition-e9707510e856-0",
+          "return_value-39a6ba2dff87-0",
+          "return_value-6a3fbbd0a760-0",
+          "return_value-f98ab210a727-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_project_paths_accepts_a_string_root",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "boolean_op-49bb7f5999d2-0",
+          "boolean_op-49bb7f5999d2-1",
+          "boolean_op-49bb7f5999d2-2",
+          "boolean_op-49bb7f5999d2-3",
+          "boolean_op-49bb7f5999d2-4",
+          "comparison_op-116b78735176-0",
+          "comparison_op-cd23cc654614-0",
+          "comparison_op-cd23cc654614-1",
+          "constant_replace-09a5f8b6ffb2-1",
+          "constant_replace-26172b75b6a6-0",
+          "constant_replace-6d3e56b7877c-0",
+          "constant_replace-9dfa1025beec-0",
+          "constant_replace-e85eae4da7af-0",
+          "negate_condition-1358ec526917-0",
+          "negate_condition-2824711f7192-0",
+          "negate_condition-48a65da97060-0",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-82b417ab5a7e-0",
+          "negate_condition-a1ba0f292ca2-0",
+          "negate_condition-b008569472aa-0",
+          "negate_condition-e9707510e856-0",
+          "return_value-16b50685ff02-0",
+          "return_value-51d6d10f1820-0",
+          "return_value-6a3fbbd0a760-0",
+          "return_value-74abc4f0a01f-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-49bb7f5999d2-0",
+          "boolean_op-49bb7f5999d2-1",
+          "boolean_op-49bb7f5999d2-2",
+          "comparison_op-cd23cc654614-0",
+          "constant_replace-144f7ea95a66-0",
+          "constant_replace-9dfa1025beec-0",
+          "negate_condition-2824711f7192-0",
+          "negate_condition-a1ba0f292ca2-0",
+          "negate_condition-b008569472aa-0",
+          "return_value-16b50685ff02-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-144f7ea95a66-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_project_paths.py::test_a_configured_absolute_path_is_refused",
+          "src/conductor/test_project_paths.py::test_a_top_level_registry_leaves_campaigns_at_the_root",
+          "src/conductor/test_project_paths.py::test_absolute_properties_join_onto_the_root",
+          "src/conductor/test_project_paths.py::test_each_key_is_resolved_independently",
+          "src/conductor/test_project_paths.py::test_environment_wins_over_the_pyproject_table",
+          "src/conductor/test_project_paths.py::test_pyproject_table_wins_over_the_default",
+          "src/conductor/test_project_paths.py::test_relative_accepts_root_relative_values"
+        ],
+        "killed_mutants": [
+          "boolean_op-49bb7f5999d2-0",
+          "negate_condition-2824711f7192-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_relative_refuses_a_non_string",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-d5cd278834f0-0",
+          "boolean_op-d5cd278834f0-1",
+          "comparison_op-cd23cc654614-0",
+          "constant_replace-40b4627a1540-0",
+          "negate_condition-b008569472aa-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_relative_refuses_unusable_values",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "boolean_op-d5cd278834f0-1",
+          "constant_replace-40b4627a1540-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_project_paths_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-75363833dd60-0",
+          "boolean_op-49bb7f5999d2-3",
+          "comparison_op-cd23cc654614-1",
+          "constant_replace-17bf188f5cfa-0",
+          "negate_condition-6804115f678e-0",
+          "negate_condition-82b417ab5a7e-0",
+          "negate_condition-e9707510e856-0",
+          "return_value-39a6ba2dff87-0",
+          "return_value-6a3fbbd0a760-0",
+          "return_value-f98ab210a727-0"
+        ],
+        "nodeid": "src/conductor/test_project_paths.py::test_unconfigured_root_falls_back_to_the_monorepo_layout",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      }
+    ]
+  },
+  "unviable": 0
+}
