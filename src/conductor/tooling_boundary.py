@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from conductor._native import tooling_boundary_facts_native
+from conductor.project_paths import package_relative
 
 PROJECT_PACKAGES: tuple[str, ...] = (
     "research",
@@ -224,13 +225,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--root",
         default=".",
-        help="tree root whose conductor/ package is checked (default: cwd)",
+        help="tree root whose conductor package is checked (default: cwd)",
     )
     args = parser.parse_args(argv)
     root = Path(args.root).resolve()
-    package_dir = root / "conductor"
+    # Where the package sits is the reviewed tree's to declare: the monorepo keeps it
+    # at the repo root, this repository under src/. Resolving it against the root
+    # being checked is what lets the boundary contract run on a candidate snapshot of
+    # either layout instead of refusing it as package-less.
+    relative = package_relative(root)
+    package_dir = root / relative.as_posix()
     if not package_dir.is_dir():
-        print(f"tooling-boundary: no conductor/ under {root}", file=sys.stderr)
+        print(f"tooling-boundary: no {relative}/ under {root}", file=sys.stderr)
         return 2
     results = check_all(package_dir)
     total = sum(len(v) for v in results.values())

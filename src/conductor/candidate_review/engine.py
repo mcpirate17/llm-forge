@@ -59,6 +59,7 @@ from conductor.candidate_review.verification import (
     check_test_evidence,
     run_targeted_tests,
 )
+from conductor.project_paths import package_path, package_tree_root
 
 SPECIAL_CHECKS = {
     "performance-evidence",
@@ -180,7 +181,15 @@ def _result_from_dict(payload: dict[str, object]) -> CheckResult:
 
 
 def _package_hash(root: Path) -> tuple[str, dict[str, str]]:
-    package = root / "conductor" / "candidate_review"
+    """The review engine's own sources under ``root``, keyed root-relative.
+
+    Where the package sits is the host's to declare: the monorepo keeps it at the
+    repo root, a src layout two levels down. Reading it back through
+    ``project_paths`` means the candidate snapshot answers for its own layout, so a
+    candidate that moves the package reports a hash difference rather than an
+    absent engine.
+    """
+    package = package_path(root) / "candidate_review"
     if not package.is_dir():
         return "", {}
     files = {
@@ -194,7 +203,7 @@ def _package_hash(root: Path) -> tuple[str, dict[str, str]]:
 def _engine_integrity(ctx: ReviewContext) -> tuple[dict[str, object], CheckResult]:
     started = time.perf_counter()
     candidate_hash, candidate_files = _package_hash(ctx.snapshot)
-    runtime_root = Path(__file__).resolve().parents[2]
+    runtime_root = package_tree_root(Path(__file__).resolve().parents[1])
     runtime_hash, runtime_files = _package_hash(runtime_root)
     findings: list[Finding] = []
     if not candidate_hash:

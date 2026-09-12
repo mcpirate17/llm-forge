@@ -101,6 +101,12 @@ slop-core = { path = "native/slop-core" }
 [tool.conductor]
 candidate_policy = "candidate_policy.toml"
 mutation_registry = "campaigns/registry.json"
+# Where the conductor package itself sits. The monorepo conductor was extracted from
+# keeps it at the repo root, which is the unconfigured default; this repository is a
+# src layout, and the governance checks that read their own package -- engine
+# integrity, the tooling boundary, base-dependency scope -- resolve it through
+# conductor.project_paths rather than spelling "conductor/" out.
+package_root = "src/conductor"
 
 # OS prerequisite for conductor.project_context's additive Linux resolver.
 # Informational package metadata: pip/uv do not install system executables.

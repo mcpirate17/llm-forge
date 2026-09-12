@@ -35,6 +35,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 from conductor.candidate_review.model import CheckResult, Finding, Severity
+from conductor.project_paths import package_relative
 
 if TYPE_CHECKING:  # `checks` imports this module, so the context type is a cycle.
     from conductor.candidate_review.checks import ReviewContext
@@ -57,6 +58,19 @@ MANIFEST = "pyproject.toml"
 # import one; widening the rule to cover them is a packaging decision that has to
 # be made per tree, not a side effect of this check.
 BASE_DEPENDENCY_TREES = ("conductor/", "tooling/")
+
+
+def base_dependency_trees(root: Path) -> tuple[str, ...]:
+    """`BASE_DEPENDENCY_TREES` as the tree at ``root`` spells them.
+
+    The two trees are the conductor package and the hook tooling beside it. Where
+    that pair sits is the host's to declare (the repo root in the monorepo,
+    ``src/`` here); resolving it keeps the stricter rule pointed at the package
+    instead of silently governing nothing under a src layout.
+    """
+
+    package = package_relative(root)
+    return (f"{package}/", f"{(package.parent / 'tooling').as_posix()}/")
 
 # The one shipped module that imports a test tool at runtime and means it.
 # KB-CI-01 grants this explicitly ("Test-only tools (pytest, vulture) may stay in
@@ -275,7 +289,9 @@ def optional_only_imports(
     return tuple(sorted(found))
 
 
-def in_base_dependency_tree(rel_path: str) -> bool:
+def in_base_dependency_tree(
+    rel_path: str, trees: tuple[str, ...] = BASE_DEPENDENCY_TREES
+) -> bool:
     """Whether the stricter base-dependency rule governs this file.
 
     Test infrastructure is excluded wherever it lives: `conftest.py` runs only
@@ -284,7 +300,7 @@ def in_base_dependency_tree(rel_path: str) -> bool:
 
     if PurePosixPath(rel_path).name in TEST_INFRASTRUCTURE:
         return False
-    return rel_path.startswith(BASE_DEPENDENCY_TREES)
+    return rel_path.startswith(trees)
 
 
 def _undeclared_finding(
@@ -361,6 +377,7 @@ def _findings_for_file(
     declared: frozenset[str],
     distributions: Mapping[str, list[str]],
     manifest: str,
+    trees: tuple[str, ...],
 ) -> list[Finding]:
     """Every import finding for one file, both rules, exemptions applied."""
 
@@ -370,7 +387,7 @@ def _findings_for_file(
             source, declared=declared, distributions=distributions
         )
     ]
-    if not in_base_dependency_tree(rel):
+    if not in_base_dependency_tree(rel, trees):
         return findings
     exempt = RUNTIME_TEST_TOOL_EXEMPTIONS.get(rel, frozenset())
     optional = optional_only_imports(
@@ -407,6 +424,7 @@ def check_import_declaration(ctx: "ReviewContext") -> CheckResult:
     from conductor.candidate_review.checks import _result
 
     started = time.perf_counter()
+    trees = base_dependency_trees(ctx.snapshot)
     files = [
         change.path
         for change in ctx.candidate.changes
@@ -457,13 +475,14 @@ def check_import_declaration(ctx: "ReviewContext") -> CheckResult:
                     declared=declared,
                     distributions=distributions,
                     manifest=owner,
+                    trees=trees,
                 )
             )
         except SyntaxError:
             # python-ast owns unparseable sources; reporting it twice buys
             # nothing and splits the fix across two findings.
             continue
-        strict += in_base_dependency_tree(rel)
+        strict += in_base_dependency_tree(rel, trees)
     return _result(
         "import-declaration",
         started,

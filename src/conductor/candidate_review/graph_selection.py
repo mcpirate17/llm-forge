@@ -14,6 +14,7 @@ from typing import Sequence
 
 from conductor.candidate_review.checks import ReviewContext
 from conductor.candidate_review.model import sha256_json
+from conductor.project_paths import package_relative
 
 
 def _graph_database(repo: Path) -> Path:
@@ -241,8 +242,12 @@ def _convention_tests(ctx: ReviewContext, source_paths: Sequence[str]) -> set[st
     modules = [path.removesuffix(".py").replace("/", ".") for path in source_paths]
     surfaces = _reexport_surfaces(ctx, source_paths)
     tests: set[str] = set()
+    # The package's own tests sit beside it, wherever the candidate declares it --
+    # the repo root in the monorepo, src/conductor here. A hardcoded "conductor"
+    # would silently find no test file at all under any other layout, which reads
+    # as "no convention test exists" rather than as a layout mismatch.
     for base in (
-        "conductor",
+        package_relative(ctx.snapshot).as_posix(),
         "research/tests",
         "component_fab/tests",
         "aria_core/tests",
