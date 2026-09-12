@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from conductor import mutation_testing_support as _support
+from conductor.project_paths import enclosing_repo
 from conductor.mutation_scope import (
     CampaignError,
     TestFileScope,
@@ -42,7 +43,16 @@ LEGACY_RECEIPT_PREFIX = "conductor/mutation_campaigns/receipts/"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 CANONICAL_TEST_PATTERNS = _support.CANONICAL_TEST_PATTERNS
 OUTPUT_TAIL_CHARS = 12_000
-REPO_ROOT = Path(__file__).resolve().parents[1]
+_PACKAGE_DIR = Path(__file__).resolve().parent
+# The git root, not the package's parent. Those coincided in the monorepo conductor was
+# extracted from, where `conductor/` sat at the root; under a src layout the parent is
+# `src/`, and every repo-relative path a manifest carries -- `src/conductor/x.py` --
+# then resolves against `src/` and vanishes, so branch scope comes back empty and no
+# campaign can be planned at all. Runner-component hashing is unaffected: it resolves
+# `conductor/...` against the package's parent on purpose, and computes that itself in
+# `_runner_components_sha256`. Falling back to the parent keeps the installed
+# (site-packages, no `.git`) answer exactly what it was.
+REPO_ROOT = enclosing_repo(_PACKAGE_DIR) or _PACKAGE_DIR.parent
 RUNNER_COMPONENT_PATHS = (
     "conductor/mutation_campaign_model.py",
     "conductor/mutation_patch_apply.py",

@@ -1,0 +1,231 @@
+"""Paired tests for conductor.project_paths.
+
+Every branch of the precedence chain (environment, ``[tool.conductor]``, monorepo
+default) and every refusal in ``_relative`` is exercised here, because this module is
+what stops the two host literals from being respelled at three dozen call sites.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path, PurePosixPath
+
+import pytest
+
+from conductor import project_paths as pp
+
+
+def _write(root: Path, body: str) -> None:
+    (root / "pyproject.toml").write_text(body, encoding="utf-8")
+
+
+def test_defaults_are_the_monorepo_literals():
+    assert pp.DEFAULT_CANDIDATE_POLICY == PurePosixPath(
+        "conductor/candidate_policy.toml"
+    )
+    assert pp.DEFAULT_MUTATION_REGISTRY == PurePosixPath(
+        "conductor/mutation_campaigns/registry.json"
+    )
+    assert pp.DEFAULTS[pp.CANDIDATE_POLICY_KEY] == pp.DEFAULT_CANDIDATE_POLICY
+    assert pp.DEFAULTS[pp.MUTATION_REGISTRY_KEY] == pp.DEFAULT_MUTATION_REGISTRY
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("campaigns/registry.json", "campaigns/registry.json"),
+        ("  campaigns/registry.json  ", "campaigns/registry.json"),
+        ("campaigns\\registry.json", "campaigns/registry.json"),
+        ("registry.json", "registry.json"),
+    ],
+)
+def test_relative_accepts_root_relative_values(raw, expected):
+    assert pp._relative(raw, "src") == PurePosixPath(expected)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["/abs/registry.json", "", "   ", "../registry.json", "a/../../b"],
+)
+def test_relative_refuses_unusable_values(raw):
+    with pytest.raises(pp.ProjectPathError):
+        pp._relative(raw, "src")
+
+
+def test_relative_refuses_a_non_string():
+    with pytest.raises(pp.ProjectPathError, match="must be a string, got int"):
+        pp._relative(3, "src")
+
+
+def test_conductor_table_is_empty_without_a_manifest(tmp_path):
+    assert pp.conductor_table(tmp_path) == {}
+
+
+def test_conductor_table_is_empty_without_a_conductor_section(tmp_path):
+    _write(tmp_path, '[project]\nname = "x"\n')
+    assert pp.conductor_table(tmp_path) == {}
+
+
+def test_conductor_table_is_empty_when_tool_is_not_a_table(tmp_path):
+    _write(tmp_path, 'tool = "not-a-table"\n')
+    assert pp.conductor_table(tmp_path) == {}
+
+
+def test_conductor_table_refuses_a_non_table_conductor_key(tmp_path):
+    _write(tmp_path, '[tool]\nconductor = "nope"\n')
+    with pytest.raises(pp.ProjectPathError, match="is not a table"):
+        pp.conductor_table(tmp_path)
+
+
+def test_conductor_table_returns_the_declared_keys(tmp_path):
+    _write(tmp_path, '[tool.conductor]\ncandidate_policy = "policy.toml"\n')
+    assert pp.conductor_table(tmp_path) == {"candidate_policy": "policy.toml"}
+
+
+def test_unconfigured_root_falls_back_to_the_monorepo_layout(tmp_path):
+    paths = pp.project_paths(tmp_path)
+    assert paths.policy_relative == pp.DEFAULT_CANDIDATE_POLICY
+    assert paths.registry_relative == pp.DEFAULT_MUTATION_REGISTRY
+    assert paths.policy_configured is False
+    assert paths.registry_configured is False
+
+
+def test_pyproject_table_wins_over_the_default(tmp_path):
+    _write(
+        tmp_path,
+        "[tool.conductor]\n"
+        'candidate_policy = "candidate_policy.toml"\n'
+        'mutation_registry = "campaigns/registry.json"\n',
+    )
+    paths = pp.project_paths(tmp_path)
+    assert paths.policy_relative == PurePosixPath("candidate_policy.toml")
+    assert paths.registry_relative == PurePosixPath("campaigns/registry.json")
+    assert paths.policy_configured is True
+    assert paths.registry_configured is True
+
+
+def test_environment_wins_over_the_pyproject_table(tmp_path, monkeypatch):
+    _write(
+        tmp_path,
+        "[tool.conductor]\n"
+        'candidate_policy = "from_pyproject.toml"\n'
+        'mutation_registry = "from_pyproject/registry.json"\n',
+    )
+    monkeypatch.setenv(pp.CANDIDATE_POLICY_ENV, "from_env.toml")
+    monkeypatch.setenv(pp.MUTATION_REGISTRY_ENV, "from_env/registry.json")
+    paths = pp.project_paths(tmp_path)
+    assert paths.policy_relative == PurePosixPath("from_env.toml")
+    assert paths.registry_relative == PurePosixPath("from_env/registry.json")
+
+
+def test_a_blank_environment_variable_does_not_override(tmp_path, monkeypatch):
+    _write(tmp_path, '[tool.conductor]\ncandidate_policy = "from_pyproject.toml"\n')
+    monkeypatch.setenv(pp.CANDIDATE_POLICY_ENV, "   ")
+    assert pp.project_paths(tmp_path).policy_relative == PurePosixPath(
+        "from_pyproject.toml"
+    )
+
+
+def test_a_configured_absolute_path_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setenv(pp.MUTATION_REGISTRY_ENV, "/etc/registry.json")
+    with pytest.raises(pp.ProjectPathError, match="repo-root-relative"):
+        pp.project_paths(tmp_path)
+
+
+def test_each_key_is_resolved_independently(tmp_path, monkeypatch):
+    _write(
+        tmp_path, '[tool.conductor]\nmutation_registry = "campaigns/registry.json"\n'
+    )
+    monkeypatch.delenv(pp.CANDIDATE_POLICY_ENV, raising=False)
+    paths = pp.project_paths(tmp_path)
+    assert paths.policy_relative == pp.DEFAULT_CANDIDATE_POLICY
+    assert paths.policy_configured is False
+    assert paths.registry_relative == PurePosixPath("campaigns/registry.json")
+    assert paths.registry_configured is True
+
+
+def test_absolute_properties_join_onto_the_root(tmp_path):
+    _write(
+        tmp_path,
+        "[tool.conductor]\n"
+        'candidate_policy = "candidate_policy.toml"\n'
+        'mutation_registry = "campaigns/registry.json"\n',
+    )
+    paths = pp.project_paths(tmp_path)
+    assert paths.root == tmp_path
+    assert paths.policy_path == tmp_path / "candidate_policy.toml"
+    assert paths.registry_path == tmp_path / "campaigns" / "registry.json"
+    assert paths.campaigns_relative == PurePosixPath("campaigns")
+    assert paths.campaigns_root == tmp_path / "campaigns"
+
+
+def test_project_paths_accepts_a_string_root(tmp_path):
+    assert pp.project_paths(str(tmp_path)).root == tmp_path
+
+
+def test_module_helpers_agree_with_the_dataclass(tmp_path):
+    _write(
+        tmp_path, '[tool.conductor]\nmutation_registry = "campaigns/registry.json"\n'
+    )
+    assert pp.registry_relative(tmp_path) == PurePosixPath("campaigns/registry.json")
+    assert pp.campaigns_relative(tmp_path) == PurePosixPath("campaigns")
+    assert pp.receipts_relative(tmp_path) == PurePosixPath("campaigns/receipts")
+    assert pp.registry_path(tmp_path) == tmp_path / "campaigns" / "registry.json"
+    assert pp.campaigns_root(tmp_path) == tmp_path / "campaigns"
+
+
+def test_a_top_level_registry_leaves_campaigns_at_the_root(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nmutation_registry = "registry.json"\n')
+    assert pp.campaigns_relative(tmp_path) == PurePosixPath(".")
+    assert pp.receipts_relative(tmp_path) == PurePosixPath("receipts")
+
+
+def test_enclosing_repo_finds_the_nearest_ancestor_holding_dot_git(tmp_path):
+    repo = tmp_path / "repo"
+    deep = repo / "a" / "b"
+    deep.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    assert pp.enclosing_repo(deep) == repo
+    assert pp.enclosing_repo(repo) == repo
+
+
+def test_enclosing_repo_accepts_a_worktree_dot_git_file(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".git").write_text("gitdir: /elsewhere\n", encoding="utf-8")
+    assert pp.enclosing_repo(repo) == repo
+
+
+def test_enclosing_repo_returns_none_without_a_repo(tmp_path):
+    deep = tmp_path / "a" / "b"
+    deep.mkdir(parents=True)
+    assert pp.enclosing_repo(deep) is None
+
+
+def test_enclosing_repo_prefers_the_nearest_of_two_ancestors(tmp_path):
+    outer = tmp_path / "outer"
+    inner = outer / "inner"
+    inner.mkdir(parents=True)
+    (outer / ".git").mkdir()
+    (inner / ".git").mkdir()
+    assert pp.enclosing_repo(inner) == inner
+
+
+def test_host_root_falls_back_to_the_start_directory(tmp_path):
+    start = tmp_path / "plain"
+    start.mkdir()
+    assert pp.host_root(start) == start.resolve()
+
+
+def test_host_root_returns_the_repo_root_when_there_is_one(tmp_path):
+    repo = tmp_path / "repo"
+    deep = repo / "a"
+    deep.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    assert pp.host_root(deep) == repo.resolve()
+
+
+def test_host_root_defaults_to_the_current_directory(tmp_path, monkeypatch):
+    plain = tmp_path / "cwd"
+    plain.mkdir()
+    monkeypatch.chdir(plain)
+    assert pp.host_root() == plain.resolve()

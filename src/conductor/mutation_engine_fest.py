@@ -180,8 +180,26 @@ def _coverage_argv(campaign: _core.GeneratedCampaign, interpreter: str) -> list[
     ]
 
 
-def _environment(campaign: _core.GeneratedCampaign) -> dict[str, str]:
-    """The environment fest runs under, with this interpreter's venv on PATH.
+def _import_roots(worktree: Path) -> list[str]:
+    """The snapshot's own import roots, ahead of anything site-packages injects.
+
+    An editable install writes a .pth naming the ORIGINAL checkout, and site
+    processing appends it to sys.path regardless of where the interpreter is run
+    from. Under a flat layout the snapshot still won, because `python -m pytest`
+    puts cwd first and the package sits at the repository root. Under a src
+    layout it does not: `import conductor` resolves through the .pth to the
+    unmutated checkout, every mutant is reported unreached, and the campaign
+    scores nothing while reporting success. PYTHONPATH entries are placed ahead
+    of site-packages, so naming them here is what binds the run to the snapshot.
+    """
+
+    return [str(path) for path in (worktree, worktree / "src") if path.is_dir()]
+
+
+def _environment(
+    campaign: _core.GeneratedCampaign, worktree: Path
+) -> dict[str, str]:
+    """The environment fest runs under, bound to this venv and this snapshot.
 
     fest probes for pytest-cov by spawning a bare `python`, so a runner started
     from a venv that carries pytest-cov still fails when PATH resolves `python`
@@ -191,8 +209,11 @@ def _environment(campaign: _core.GeneratedCampaign) -> dict[str, str]:
     """
 
     bin_dir = str(Path(sys.executable).parent)
+    declared = campaign.environment.get("PYTHONPATH", "").split(os.pathsep)
+    roots = [*_import_roots(worktree), *declared]
     return {
         **campaign.environment,
+        "PYTHONPATH": os.pathsep.join(root for root in roots if root),
         "VIRTUAL_ENV": str(Path(sys.executable).parents[1]),
         "PATH": bin_dir + os.pathsep + os.environ.get("PATH", ""),
     }
@@ -226,7 +247,7 @@ def execute(
     )
     coverage_path = worktree / ".coverage"
     environment = {
-        **_environment(campaign),
+        **_environment(campaign, worktree),
         "COVERAGE_FILE": str(coverage_path),
     }
     baseline_argv = _coverage_argv(campaign, sys.executable)
@@ -277,7 +298,7 @@ def execute(
         campaign,
         receipt,
         worktree=worktree,
-        environment=_environment(campaign),
+        environment=_environment(campaign, worktree),
         interpreter=sys.executable,
     )
 
