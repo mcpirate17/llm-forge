@@ -30,11 +30,11 @@ def _host_dependency_campaign(
     (host / "reports" / "screen").mkdir(parents=True)
     (host / "reports" / "screen" / "receipt.json").write_text("{}", encoding="utf-8")
     (host / "reports" / "screen" / "ignored.json").write_text("[]", encoding="utf-8")
+    campaign_path = (
+        mutation_testing.REPO_ROOT / "src/conductor/testdata/mutation_testing/campaign.json"
+    )
     return dataclasses.replace(
-        mutation_testing.load_campaign(
-            mutation_testing.REPO_ROOT
-            / "conductor/mutation_campaigns/claude_bash_quiet.json"
-        ),
+        mutation_testing.load_campaign(campaign_path),
         host_read_dependencies=relatives,
     )
 
