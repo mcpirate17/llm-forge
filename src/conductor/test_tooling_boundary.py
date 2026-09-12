@@ -18,9 +18,13 @@ from pathlib import Path
 import pytest
 
 from conductor import _project_hooks, tooling_boundary as tb
+from conductor.project_paths import package_path, package_tree_root
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_DIR = REPO_ROOT / "conductor"
+PACKAGE_DIR = Path(__file__).resolve().parents[0]
+# The tree root, per its own configuration -- not a fixed parents[n] walk, which
+# under this repository's src layout names ``src/`` and hides the CLI's own
+# resolution behind an accident that happens to work.
+REPO_ROOT = package_tree_root(PACKAGE_DIR)
 PKG = tb.PROJECT_PACKAGES[0]
 NATIVE = tb.NATIVE_CRATE
 
@@ -67,6 +71,39 @@ def test_cli_reports_clean_on_this_repo(capsys: pytest.CaptureFixture[str]) -> N
     assert tb.main(["--root", str(REPO_ROOT)]) == 0
     out = capsys.readouterr().out
     assert "findings=0" in out and "rule d: clean" in out
+
+
+def test_repo_root_is_the_tree_that_declares_the_package() -> None:
+    """The CLI is handed a tree root, and resolves the package from that tree."""
+    assert package_path(REPO_ROOT).resolve() == PACKAGE_DIR
+    assert (REPO_ROOT / "pyproject.toml").is_file()
+
+
+def test_cli_refuses_a_root_with_no_package_naming_the_configured_path(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\npackage_root = "src/conductor"\n', encoding="utf-8"
+    )
+    assert tb.main(["--root", str(tmp_path)]) == 2
+    assert "no src/conductor/ under" in capsys.readouterr().err
+
+
+def test_cli_finds_a_package_the_tree_declares_under_src(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A src-layout tree is checked, not refused as package-less."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\npackage_root = "src/conductor"\n', encoding="utf-8"
+    )
+    package = tmp_path / "src" / "conductor"
+    package.mkdir(parents=True)
+    seen: list[Path] = []
+    monkeypatch.setattr(
+        tb, "check_all", lambda directory: seen.append(directory) or {"a": []}
+    )
+    assert tb.main(["--root", str(tmp_path)]) == 0
+    assert seen == [package]
 
 
 def test_allowlist_entries_carry_a_reason_and_name_existing_files() -> None:

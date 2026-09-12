@@ -2,8 +2,9 @@
 
 ``conductor`` was extracted from a monorepo that keeps its candidate policy at
 ``conductor/candidate_policy.toml`` and its mutation registry at
-``conductor/mutation_campaigns/registry.json``. Those two literals were spelled out at
-three dozen call sites, which made the package unusable in any tree with another layout.
+``conductor/mutation_campaigns/registry.json``, with the package itself at
+``conductor/``. Those literals were spelled out at three dozen call sites, which made
+the package unusable in any tree with another layout.
 
 This module is the single resolution point, and every answer is repo-root-relative so a
 caller joins it to the root it already holds. Precedence: the environment variables
@@ -25,15 +26,19 @@ from typing import Any
 
 DEFAULT_CANDIDATE_POLICY = PurePosixPath("conductor/candidate_policy.toml")
 DEFAULT_MUTATION_REGISTRY = PurePosixPath("conductor/mutation_campaigns/registry.json")
+DEFAULT_PACKAGE_ROOT = PurePosixPath("conductor")
 
 CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"
 MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
+PACKAGE_ROOT_ENV = "CONDUCTOR_PACKAGE_ROOT"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
 MUTATION_REGISTRY_KEY = "mutation_registry"
+PACKAGE_ROOT_KEY = "package_root"
 DEFAULTS = {
     CANDIDATE_POLICY_KEY: DEFAULT_CANDIDATE_POLICY,
     MUTATION_REGISTRY_KEY: DEFAULT_MUTATION_REGISTRY,
+    PACKAGE_ROOT_KEY: DEFAULT_PACKAGE_ROOT,
 }
 
 
@@ -89,8 +94,10 @@ class ProjectPaths:
     root: Path
     policy_relative: PurePosixPath
     registry_relative: PurePosixPath
+    package_relative: PurePosixPath
     policy_configured: bool
     registry_configured: bool
+    package_configured: bool
 
     @property
     def policy_path(self) -> Path:
@@ -109,6 +116,11 @@ class ProjectPaths:
     def campaigns_root(self) -> Path:
         return self.root / self.campaigns_relative.as_posix()
 
+    @property
+    def package_path(self) -> Path:
+        """The ``conductor`` package directory inside this root."""
+        return self.root / self.package_relative.as_posix()
+
 
 def project_paths(root: Path | str) -> ProjectPaths:
     """Resolve every host path against ``root``. Not cached: hosts differ per call."""
@@ -117,7 +129,10 @@ def project_paths(root: Path | str) -> ProjectPaths:
     registry, named_reg = _configured(
         base, MUTATION_REGISTRY_KEY, MUTATION_REGISTRY_ENV
     )
-    return ProjectPaths(base, policy, registry, named_policy, named_reg)
+    package, named_pkg = _configured(base, PACKAGE_ROOT_KEY, PACKAGE_ROOT_ENV)
+    return ProjectPaths(
+        base, policy, registry, package, named_policy, named_reg, named_pkg
+    )
 
 
 def enclosing_repo(start: Path) -> Path | None:
@@ -146,6 +161,39 @@ def campaigns_relative(root: Path | str) -> PurePosixPath:
 
 def receipts_relative(root: Path | str) -> PurePosixPath:
     return project_paths(root).campaigns_relative / "receipts"
+
+
+def package_relative(root: Path | str) -> PurePosixPath:
+    """Where the ``conductor`` package sits inside ``root`` (``src/conductor``, ...)."""
+    return project_paths(root).package_relative
+
+
+def package_path(root: Path | str) -> Path:
+    return project_paths(root).package_path
+
+
+def package_tree_root(package_dir: Path) -> Path:
+    """The tree root ``package_dir`` sits in, per that root's own configuration.
+
+    The installed package cannot ask itself where it lives: under a src layout its
+    parent is ``src/``, which answers the unconfigured default and would name itself
+    the root. So the enclosing repository is asked first -- it is the root whose
+    ``pyproject.toml`` configured the layout. A package with no repository above it (a
+    wheel in site-packages), or one the repository above it disowns, falls back to the
+    nearest ancestor whose own configuration resolves back onto the same directory;
+    when no ancestor claims it at all, that is a refusal, not a guess.
+    """
+    resolved = Path(package_dir).resolve()
+    repo = enclosing_repo(resolved)
+    candidates = list(resolved.parents)
+    if repo is not None:
+        candidates.insert(0, repo)
+    for candidate in candidates:
+        if project_paths(candidate).package_path.resolve() == resolved:
+            return candidate
+    raise ProjectPathError(
+        f"no tree root above {resolved} resolves its configured package root back to it"
+    )
 
 
 def registry_path(root: Path | str) -> Path:

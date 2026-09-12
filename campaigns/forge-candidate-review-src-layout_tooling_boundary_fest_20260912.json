@@ -1,0 +1,57 @@
+{
+  "campaign_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/tooling_boundary.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/tooling_boundary.py": "b58d481eea2615f0d2fcf3b7867e99fd827c4c9047ea7b9c3c6afbbfee5ce5f9"
+  },
+  "survivor_baseline": [
+    "break_continue-2b87a521ef54-0",
+    "break_continue-2b87a521ef54-1",
+    "constant_replace-0a5cfe523740-0",
+    "constant_replace-155ad58e0725-2",
+    "constant_replace-155ad58e0725-5",
+    "constant_replace-4073f83b37cc-2",
+    "constant_replace-4073f83b37cc-3",
+    "constant_replace-54acbd71acc1-0",
+    "constant_replace-5bc6ab8a9231-0",
+    "constant_replace-8eed33de3f08-0",
+    "constant_replace-8eed33de3f08-2",
+    "constant_replace-8eed33de3f08-3",
+    "constant_replace-b3cbf188ec50-0",
+    "constant_replace-ba3a2420d1b9-0",
+    "constant_replace-ba3a2420d1b9-2",
+    "constant_replace-ba3a2420d1b9-3",
+    "return_value-00436d7e9fba-0",
+    "zero_iteration_loop-0a97a236a403-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-12T21:45:33.518940+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_tooling_boundary.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_tooling_boundary.py": "9d5258c628ee7be6bbae6d294df63006e126ca165704e9f8a6620e53dfab0fb2"
+  },
+  "title": "Generated mutants for src/conductor/tooling_boundary.py, scored on the survivor set"
+}

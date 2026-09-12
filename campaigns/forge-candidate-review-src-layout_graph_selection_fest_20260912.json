@@ -1,0 +1,49 @@
+{
+  "campaign_id": "forge-candidate-review-src-layout_graph_selection_fest_20260912",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/candidate_review/graph_selection.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/candidate_review/graph_selection.py": "4fef11cb7ccd5497964a1224fcd85d1beef16ae46590ad7209951664863ca8fe"
+  },
+  "survivor_baseline": [
+    "boolean_op-1cdf8e94c8c3-3",
+    "boolean_op-1cdf8e94c8c3-6",
+    "break_continue-1d8d042b4038-1",
+    "break_continue-1d8d042b4038-2",
+    "break_continue-1d8d042b4038-3",
+    "break_continue-1d8d042b4038-4",
+    "constant_replace-6f314ef64365-0",
+    "constant_replace-8f37a8e3424f-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-12T21:46:22.111216+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/candidate_review/test_graph_selection.py",
+    "src/conductor/test_graph_selection.py"
+  ],
+  "test_sha256": {
+    "src/conductor/candidate_review/test_graph_selection.py": "32dce2e1d8e95d82a565771278bdbefc73b8496d5d9f0f0fc2643b04c50c499c",
+    "src/conductor/test_graph_selection.py": "37afd883c9dfcc36bedea0521a79d9b96449fff60f6881de269cb1a445f05453"
+  },
+  "title": "Generated mutants for src/conductor/candidate_review/graph_selection.py, scored on the survivor set"
+}

@@ -1,0 +1,3546 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 83,
+    "baseline_repetitions": 2,
+    "killed_mutants": 83,
+    "ranked_tests": 19,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.620212,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                 [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m40 passed\u001b[0m\u001b[32m in 0.36s\u001b[0m\u001b[0m\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-review/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_tooling_boundary.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+  "classification_required": [],
+  "core_sha256": "63f55f69a258923bb85a3458be6a7ccfd9420e2317ebb143cb85964c118c7db1",
+  "engine_result": {
+    "duration_seconds": 26.501027,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "iolations\",\n        \"mutated_text\": \"not (not violations)\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src\",\n        \"src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 277256904\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-u_e_liux/worktree/src/conductor/tooling_boundary.py\",\n        \"line\": 249,\n        \"column\": 12,\n        \"byte_offset\": 8650,\n        \"byte_length\": 17,\n        \"original_text\": \"1 if total else 0\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src\",\n        \"src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 213127262\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-u_e_liux/worktree/src/conductor/tooling_boundary.py\",\n        \"line\": 249,\n        \"column\": 12,\n        \"byte_offset\": 8650,\n        \"byte_length\": 1,\n        \"original_text\": \"1\",\n        \"mutated_text\": \"0\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Survived\",\n      \"tests_run\": [\n        \"src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src\",\n        \"src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 242827223\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-u_e_liux/worktree/src/conductor/tooling_boundary.py\",\n        \"line\": 249,\n        \"column\": 28,\n        \"byte_offset\": 8666,\n        \"byte_length\": 1,\n        \"original_text\": \"0\",\n        \"mutated_text\": \"1\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src\",\n        \"src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 256913238\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-u_e_liux/worktree/src/conductor/tooling_boundary.py\",\n        \"line\": 252,\n        \"column\": 4,\n        \"byte_offset\": 8673,\n        \"byte_length\": 22,\n        \"original_text\": \"__name__ == \\\"__main__\\\"\",\n        \"mutated_text\": \"not (__name__ == \\\"__main__\\\")\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-u_e_liux/worktree/src/conductor/tooling_boundary.py\",\n        \"line\": 252,\n        \"column\": 13,\n        \"byte_offset\": 8682,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-u_e_liux/worktree/src/conductor/tooling_boundary.py\",\n        \"line\": 252,\n        \"column\": 16,\n        \"byte_offset\": 8685,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"__main__\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 26,\n    \"nanos\": 495796784\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 83,
+    "mutants_generated": 130,
+    "mutants_tested": 101,
+    "no_coverage": 29,
+    "survived": 18,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-12T21:44:39.003657+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-review/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/forge-candidate-review-src-layout_tooling_boundary_fest_20260912.json",
+  "manifest_sha256": "4e20c87fd2d65f3b656d27b38b5a32d01fe7da2b6abbae161290a36f8a44fba6",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 1060,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-dd40a6419f6c-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Boundary contract for the extractable tooling (``conductor/`` + agent hooks).\n\nThe tooling is being split into a standalone package. These rules are what \"the\nboundary holds\" means, checked mechanically from the ASTs and the raw hook sources:\n\na. no module under ``conductor/`` (tests included) reaches a project package\n   (``research``, ``component_fab``, ``aria_*``, ``research_runtime_native``) at any\n   scope -- import statements, function-scope imports, ``importlib`` string literals;\nb. no generic hook under ``.claude/hooks`` (``project/`` excluded) or ``.agent_hooks``\n   contains a project path literal;\nc. no non-test conductor module contains a host path literal (``Path.home()`` / env);\nd. ``conductor/_native.py`` is the only module naming the native crate, and every\n   symbol it re-exports exists in the installed crate.\n\nEvery finding names ``file:line``. ``python -m conductor.tooling_boundary`` exits 1 on\nany finding and is wired into the gate as an always-on command check, so a PR that\nreintroduces a coupling fails before review.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 1418,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-fe58ead615d2-0",
+      "line": 35,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"research\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 1434,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5456ba2aa141-0",
+      "line": 36,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"audit\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 1447,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5a9a6446a1c7-0",
+      "line": 37,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"component_fab\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 1468,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a1220a08c534-0",
+      "line": 38,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"aria_designer\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 1489,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-57fd606e4685-0",
+      "line": 39,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"aria_core\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 1506,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-df1d5178824e-0",
+      "line": 40,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"research_runtime_native\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 1550,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-eaa0f48f6074-0",
+      "line": 42,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor_native\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 1583,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5f52fe43dae1-0",
+      "line": 43,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"_native.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 1630,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0d773df4c5e6-0",
+      "line": 44,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"/home/tim\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 1643,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ed30fecab9d0-0",
+      "line": 44,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"/mnt/data\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 1690,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-01a1598e94a7-0",
+      "line": 45,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"research/\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 1703,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0d773df4c5e6-1",
+      "line": 45,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"/home/tim\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 1716,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ed30fecab9d0-1",
+      "line": 45,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"/mnt/data\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 1752,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7ccddd93b6c5-0",
+      "line": 46,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"project\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 21,
+      "byte_offset": 2111,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-94428487b4ae-0",
+      "line": 54,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tooling_boundary.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 2142,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9ed6307fa4e9-0",
+      "line": 55,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"string\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 55,
+      "byte_offset": 2182,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-91e1c6f94892-0",
+      "line": 57,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"the checker must spell the crate whose seam it guards\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 2452,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-9c04a691514f-0",
+      "line": 71,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@dataclass(frozen=True, slots=True)\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 56,
+      "byte_offset": 2610,
+      "duration_seconds": 0.21856,
+      "id": "return_value-f8bcc6c752d1-0",
+      "line": 79,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "f\"{self.path}:{self.line}: [{self.rule}] {self.message}\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ]
+    },
+    {
+      "byte_length": 53,
+      "byte_offset": 2771,
+      "duration_seconds": 0.264993,
+      "id": "return_value-a0b6b3462619-0",
+      "line": 85,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "path.resolve().relative_to(root.resolve()).as_posix()",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 2856,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-848c1a914539-0",
+      "line": 87,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "return path.as_posix()",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 2863,
+      "duration_seconds": 0.0,
+      "id": "return_value-cea4f814092f-0",
+      "line": 87,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "path.as_posix()",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 28,
+      "byte_offset": 2939,
+      "duration_seconds": 0.268343,
+      "id": "negate_condition-585b8816cf08-0",
+      "line": 91,
+      "mutated_text": "not (isinstance(node, ast.Import))",
+      "operator": "negate_condition",
+      "original_text": "isinstance(node, ast.Import)",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 2984,
+      "duration_seconds": 0.228697,
+      "id": "return_value-41b15b70bef6-0",
+      "line": 92,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[alias.name for alias in node.names]",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate"
+      ]
+    },
+    {
+      "byte_length": 68,
+      "byte_offset": 3028,
+      "duration_seconds": 0.274582,
+      "id": "negate_condition-ceff4e23d3b1-0",
+      "line": 93,
+      "mutated_text": "not (isinstance(node, ast.ImportFrom) and node.level == 0 and node.module)",
+      "operator": "negate_condition",
+      "original_text": "isinstance(node, ast.ImportFrom) and node.level == 0 and node.module",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 3061,
+      "duration_seconds": 0.268542,
+      "id": "boolean_op-ed9798773e43-0",
+      "line": 93,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3076,
+      "duration_seconds": 0.281418,
+      "id": "comparison_op-4f8e5998a399-0",
+      "line": 93,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3079,
+      "duration_seconds": 0.332984,
+      "id": "constant_replace-751146ca1113-0",
+      "line": 93,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 3081,
+      "duration_seconds": 0.286245,
+      "id": "boolean_op-ed9798773e43-1",
+      "line": 93,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 3113,
+      "duration_seconds": 0.28273,
+      "id": "return_value-3c7f28efb2cd-0",
+      "line": 94,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[node.module]",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3138,
+      "duration_seconds": 0.268227,
+      "id": "return_value-00436d7e9fba-0",
+      "line": 95,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[]",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 63,
+      "byte_offset": 3192,
+      "duration_seconds": 0.286534,
+      "id": "return_value-474153b8aa50-0",
+      "line": 99,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "ast.parse(path.read_text(encoding=\"utf-8\"), filename=str(path))",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 403,
+      "byte_offset": 3376,
+      "duration_seconds": 0.225471,
+      "id": "return_value-3cdd0d83116f-0",
+      "line": 105,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "json.loads(\n        tooling_boundary_facts_native(\n            str(package_dir),\n            [str(path) for path in hook_dirs],\n            list(PROJECT_PACKAGES),\n            NATIVE_CRATE,\n            NATIVE_SEAM,\n            list(PATH_LITERALS),\n            list(HOOK_LITERALS),\n            HOOK_EXCLUDED_SUBDIR,\n            [(path, kind, value) for path, kind, value, _ in ALLOWLIST],\n        )\n    )",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 3891,
+      "duration_seconds": 0.284406,
+      "id": "constant_replace-91a981e922c3-0",
+      "line": 122,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"project_import\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 27,
+      "byte_offset": 3909,
+      "duration_seconds": 0.293387,
+      "id": "constant_replace-947d1f1ef72a-0",
+      "line": 122,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"imports project module {}\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 3946,
+      "duration_seconds": 0.277136,
+      "id": "constant_replace-1c3ba76f1d96-0",
+      "line": 123,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"project_string\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 39,
+      "byte_offset": 3964,
+      "duration_seconds": 0.284254,
+      "id": "constant_replace-0bde7f297322-0",
+      "line": 123,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"names project module {!r} as a string\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 4013,
+      "duration_seconds": 0.375038,
+      "id": "constant_replace-5235f7d4d769-0",
+      "line": 124,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"hook_literal\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 4029,
+      "duration_seconds": 0.326358,
+      "id": "constant_replace-04bdebc4366b-0",
+      "line": 124,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"hook contains {!r}\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 4059,
+      "duration_seconds": 0.383551,
+      "id": "constant_replace-b9c67044371c-0",
+      "line": 125,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"module_literal\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 4077,
+      "duration_seconds": 0.421664,
+      "id": "constant_replace-0a5cfe523740-0",
+      "line": 125,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"module contains {!r}\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 4109,
+      "duration_seconds": 0.433039,
+      "id": "constant_replace-bc7ede5d5763-0",
+      "line": 126,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"native_import\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 4126,
+      "duration_seconds": 0.429935,
+      "id": "constant_replace-5bc6ab8a9231-0",
+      "line": 126,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"imports {} outside the seam\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 4165,
+      "duration_seconds": 0.445001,
+      "id": "constant_replace-972f680e3228-0",
+      "line": 127,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"native_string\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 27,
+      "byte_offset": 4182,
+      "duration_seconds": 0.417555,
+      "id": "constant_replace-54acbd71acc1-0",
+      "line": 127,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"names {} outside the seam\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4228,
+      "duration_seconds": 0.266989,
+      "id": "return_value-e26a5c9ba722-0",
+      "line": 129,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[\n        Violation(\n            rule,\n            str(fact[\"path\"]),\n            int(fact[\"line\"]),\n            templates[str(fact[\"kind\"])].format(fact[\"value\"]),\n        )\n        for fact in facts\n    ]",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 72,
+      "byte_offset": 4506,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-20f360631397-0",
+      "line": 141,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Rule a: no project package is reachable from any conductor module.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 42,
+      "byte_offset": 4590,
+      "duration_seconds": 0.222178,
+      "id": "return_value-3e7001517f63-0",
+      "line": 142,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_violations(\"a\", _facts(package_dir)[\"a\"])",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 4602,
+      "duration_seconds": 0.223434,
+      "id": "constant_replace-4073f83b37cc-0",
+      "line": 142,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"a\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 4627,
+      "duration_seconds": 0.228556,
+      "id": "constant_replace-4073f83b37cc-1",
+      "line": 142,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"a\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too"
+      ]
+    },
+    {
+      "byte_length": 88,
+      "byte_offset": 4695,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-cfdfd9b13d6f-0",
+      "line": 146,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Hook trees next to the package: launchers, the tooling bodies, the standalone one.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4846,
+      "duration_seconds": 0.22176,
+      "id": "arithmetic_op-b3ac77b1fd38-0",
+      "line": 149,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 4848,
+      "duration_seconds": 0.270999,
+      "id": "constant_replace-95f60c314725-0",
+      "line": 149,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".claude\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4858,
+      "duration_seconds": 0.224525,
+      "id": "arithmetic_op-b3ac77b1fd38-1",
+      "line": 149,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 4860,
+      "duration_seconds": 0.267641,
+      "id": "constant_replace-8599728e09bb-0",
+      "line": 149,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"hooks\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4882,
+      "duration_seconds": 0.222981,
+      "id": "arithmetic_op-b3ac77b1fd38-2",
+      "line": 150,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 4884,
+      "duration_seconds": 0.272935,
+      "id": "constant_replace-4da33740ad91-0",
+      "line": 150,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".agent_hooks\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4913,
+      "duration_seconds": 0.222585,
+      "id": "arithmetic_op-b3ac77b1fd38-3",
+      "line": 151,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 4915,
+      "duration_seconds": 0.222019,
+      "id": "constant_replace-39f0f193bff3-0",
+      "line": 151,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tooling\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4925,
+      "duration_seconds": 0.221976,
+      "id": "arithmetic_op-b3ac77b1fd38-4",
+      "line": 151,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 4927,
+      "duration_seconds": 0.274874,
+      "id": "constant_replace-8599728e09bb-1",
+      "line": 151,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"hooks\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4956,
+      "duration_seconds": 0.220781,
+      "id": "arithmetic_op-b3ac77b1fd38-5",
+      "line": 152,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 4958,
+      "duration_seconds": 0.289825,
+      "id": "constant_replace-8599728e09bb-2",
+      "line": 152,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"hooks\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 37,
+      "byte_offset": 4984,
+      "duration_seconds": 0.233052,
+      "id": "return_value-2abba5bf12b4-0",
+      "line": 154,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[d for d in candidates if d.is_dir()]",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 58,
+      "byte_offset": 5124,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6c02d865a407-0",
+      "line": 160,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Rule b: generic hooks carry no project path literal.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 53,
+      "byte_offset": 5194,
+      "duration_seconds": 0.221876,
+      "id": "return_value-31bb64dee4df-0",
+      "line": 161,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_violations(\"b\", _facts(package_dir, hook_dirs)[\"b\"])",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5206,
+      "duration_seconds": 0.217125,
+      "id": "constant_replace-ba3a2420d1b9-0",
+      "line": 161,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"b\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5242,
+      "duration_seconds": 0.24304,
+      "id": "constant_replace-ba3a2420d1b9-1",
+      "line": 161,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"b\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks[research/]",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ]
+    },
+    {
+      "byte_length": 58,
+      "byte_offset": 5317,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-88606c2b20ac-0",
+      "line": 165,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Rule c: non-test modules carry no host path literal.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 42,
+      "byte_offset": 5387,
+      "duration_seconds": 0.220295,
+      "id": "return_value-97a5790575e0-0",
+      "line": 166,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_violations(\"c\", _facts(package_dir)[\"c\"])",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5399,
+      "duration_seconds": 0.216228,
+      "id": "constant_replace-8eed33de3f08-0",
+      "line": 166,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"c\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5424,
+      "duration_seconds": 0.222881,
+      "id": "constant_replace-8eed33de3f08-1",
+      "line": 166,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"c\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/home/tim]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only[/mnt/data]",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5557,
+      "duration_seconds": 0.29154,
+      "id": "arithmetic_op-b3ac77b1fd38-6",
+      "line": 171,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 5702,
+      "duration_seconds": 0.272031,
+      "id": "zero_iteration_loop-5493d6499996-0",
+      "line": 175,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "_parse(seam).body",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 5774,
+      "duration_seconds": 0.280709,
+      "id": "boolean_op-4e02edb29fa9-0",
+      "line": 177,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 5774,
+      "duration_seconds": 0.274356,
+      "id": "negate_condition-82a0ae7a8798-0",
+      "line": 177,
+      "mutated_text": "not (not modules)",
+      "operator": "negate_condition",
+      "original_text": "not modules",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 5799,
+      "duration_seconds": 0.258748,
+      "id": "break_continue-2b87a521ef54-0",
+      "line": 178,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 55,
+      "byte_offset": 5819,
+      "duration_seconds": 0.287009,
+      "id": "negate_condition-74465fa4886c-0",
+      "line": 179,
+      "mutated_text": "not (modules != [NATIVE_CRATE] and modules != [\"__future__\"])",
+      "operator": "negate_condition",
+      "original_text": "modules != [NATIVE_CRATE] and modules != [\"__future__\"]",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5827,
+      "duration_seconds": 0.272422,
+      "id": "comparison_op-9c8956c116e7-0",
+      "line": 179,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5845,
+      "duration_seconds": 0.287614,
+      "id": "boolean_op-ed9798773e43-2",
+      "line": 179,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5857,
+      "duration_seconds": 0.262781,
+      "id": "comparison_op-9c8956c116e7-1",
+      "line": 179,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 5861,
+      "duration_seconds": 0.267131,
+      "id": "constant_replace-6eedbdd4175b-0",
+      "line": 179,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"__future__\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5949,
+      "duration_seconds": 0.222376,
+      "id": "constant_replace-155ad58e0725-0",
+      "line": 182,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"d\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 6062,
+      "duration_seconds": 0.170262,
+      "id": "break_continue-2b87a521ef54-1",
+      "line": 185,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate"
+      ]
+    },
+    {
+      "byte_length": 64,
+      "byte_offset": 6082,
+      "duration_seconds": 0.267349,
+      "id": "negate_condition-a462ea75a8c0-0",
+      "line": 186,
+      "mutated_text": "not (isinstance(node, ast.ImportFrom) and node.module == NATIVE_CRATE)",
+      "operator": "negate_condition",
+      "original_text": "isinstance(node, ast.ImportFrom) and node.module == NATIVE_CRATE",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 6115,
+      "duration_seconds": 0.287083,
+      "id": "boolean_op-ed9798773e43-3",
+      "line": 186,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6131,
+      "duration_seconds": 0.270819,
+      "id": "comparison_op-4f8e5998a399-1",
+      "line": 186,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 6173,
+      "duration_seconds": 0.272501,
+      "id": "zero_iteration_loop-74c0f7855e6f-0",
+      "line": 187,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "node.names",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 6248,
+      "duration_seconds": 0.266902,
+      "id": "boolean_op-4e02edb29fa9-1",
+      "line": 189,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 30,
+      "byte_offset": 6248,
+      "duration_seconds": 0.267399,
+      "id": "negate_condition-9054a39081e1-0",
+      "line": 189,
+      "mutated_text": "not (not hasattr(crate, alias.name))",
+      "operator": "negate_condition",
+      "original_text": "not hasattr(crate, alias.name)",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 6377,
+      "duration_seconds": 0.236475,
+      "id": "constant_replace-155ad58e0725-1",
+      "line": 192,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"d\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 6596,
+      "duration_seconds": 0.282069,
+      "id": "return_value-fde04792f353-0",
+      "line": 198,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "found",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 79,
+      "byte_offset": 6669,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-1120abcbdad0-0",
+      "line": 202,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Rule d: ``_native.py`` is the only seam and re-exports only real symbols.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 98,
+      "byte_offset": 6760,
+      "duration_seconds": 0.222622,
+      "id": "return_value-77837078c788-0",
+      "line": 203,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_check_live_native_exports(package_dir) + _violations(\n        \"d\", _facts(package_dir)[\"d\"]\n    )",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6800,
+      "duration_seconds": 0.225088,
+      "id": "arithmetic_op-f66df207e609-0",
+      "line": 203,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 6823,
+      "duration_seconds": 0.235028,
+      "id": "constant_replace-155ad58e0725-2",
+      "line": 204,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"d\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 6848,
+      "duration_seconds": 0.241908,
+      "id": "constant_replace-155ad58e0725-3",
+      "line": 204,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"d\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 7027,
+      "duration_seconds": 0.225544,
+      "id": "comparison_op-df2370b15721-0",
+      "line": 211,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 7063,
+      "duration_seconds": 0.220699,
+      "id": "boolean_op-4e02edb29fa9-2",
+      "line": 212,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 7063,
+      "duration_seconds": 0.227988,
+      "id": "negate_condition-d4977ea54ea7-0",
+      "line": 212,
+      "mutated_text": "not (not dirs)",
+      "operator": "negate_condition",
+      "original_text": "not dirs",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts"
+      ]
+    },
+    {
+      "byte_length": 221,
+      "byte_offset": 7199,
+      "duration_seconds": 0.308668,
+      "id": "return_value-3c8df8e9996f-0",
+      "line": 215,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{\n        \"a\": _violations(\"a\", facts[\"a\"]),\n        \"b\": _violations(\"b\", facts[\"b\"]),\n        \"c\": _violations(\"c\", facts[\"c\"]),\n        \"d\": _check_live_native_exports(package_dir) + _violations(\"d\", facts[\"d\"]),\n    }",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7209,
+      "duration_seconds": 0.230093,
+      "id": "constant_replace-4073f83b37cc-2",
+      "line": 216,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"a\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7226,
+      "duration_seconds": 0.228479,
+      "id": "constant_replace-4073f83b37cc-3",
+      "line": 216,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"a\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7237,
+      "duration_seconds": 0.2721,
+      "id": "constant_replace-4073f83b37cc-4",
+      "line": 216,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"a\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7252,
+      "duration_seconds": 0.21279,
+      "id": "constant_replace-ba3a2420d1b9-2",
+      "line": 217,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"b\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7269,
+      "duration_seconds": 0.229163,
+      "id": "constant_replace-ba3a2420d1b9-3",
+      "line": 217,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"b\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7280,
+      "duration_seconds": 0.266588,
+      "id": "constant_replace-ba3a2420d1b9-4",
+      "line": 217,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"b\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7295,
+      "duration_seconds": 0.214836,
+      "id": "constant_replace-8eed33de3f08-2",
+      "line": 218,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"c\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7312,
+      "duration_seconds": 0.218836,
+      "id": "constant_replace-8eed33de3f08-3",
+      "line": 218,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"c\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7323,
+      "duration_seconds": 0.263142,
+      "id": "constant_replace-8eed33de3f08-4",
+      "line": 218,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"c\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7338,
+      "duration_seconds": 0.274525,
+      "id": "constant_replace-155ad58e0725-4",
+      "line": 219,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"d\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7397,
+      "duration_seconds": 0.224945,
+      "id": "constant_replace-155ad58e0725-5",
+      "line": 219,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"d\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7408,
+      "duration_seconds": 0.26833,
+      "id": "constant_replace-155ad58e0725-6",
+      "line": 219,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"d\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 7590,
+      "duration_seconds": 0.241538,
+      "id": "constant_replace-4c48fc46a059-0",
+      "line": 226,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--root\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 8150,
+      "duration_seconds": 0.230488,
+      "id": "arithmetic_op-b3ac77b1fd38-7",
+      "line": 237,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 8179,
+      "duration_seconds": 0.216075,
+      "id": "boolean_op-4e02edb29fa9-3",
+      "line": 238,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 8179,
+      "duration_seconds": 0.221216,
+      "id": "negate_condition-aa939626d84d-0",
+      "line": 238,
+      "mutated_text": "not (not package_dir.is_dir())",
+      "operator": "negate_condition",
+      "original_text": "not package_dir.is_dir()",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 8301,
+      "duration_seconds": 0.215032,
+      "id": "return_value-48de9cb0df21-0",
+      "line": 240,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "2",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 8301,
+      "duration_seconds": 0.21183,
+      "id": "constant_replace-588c155aa582-0",
+      "line": 240,
+      "mutated_text": "3",
+      "operator": "constant_replace",
+      "original_text": "2",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 8479,
+      "duration_seconds": 0.263563,
+      "id": "zero_iteration_loop-985dac6c679d-0",
+      "line": 244,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "results.items()",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 8521,
+      "duration_seconds": 0.216969,
+      "id": "zero_iteration_loop-0a97a236a403-0",
+      "line": 245,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "violations",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 8580,
+      "duration_seconds": 0.270062,
+      "id": "boolean_op-4e02edb29fa9-4",
+      "line": 247,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 8580,
+      "duration_seconds": 0.277257,
+      "id": "negate_condition-b2f594a5a4aa-0",
+      "line": 247,
+      "mutated_text": "not (not violations)",
+      "operator": "negate_condition",
+      "original_text": "not violations",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 8650,
+      "duration_seconds": 0.213127,
+      "id": "return_value-920bc2b9303d-0",
+      "line": 249,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "1 if total else 0",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 8650,
+      "duration_seconds": 0.242827,
+      "id": "constant_replace-b3cbf188ec50-0",
+      "line": 249,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 8666,
+      "duration_seconds": 0.256913,
+      "id": "constant_replace-751146ca1113-1",
+      "line": 249,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 8673,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-e3578e2d6150-0",
+      "line": 252,
+      "mutated_text": "not (__name__ == \"__main__\")",
+      "operator": "negate_condition",
+      "original_text": "__name__ == \"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 8682,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-4f8e5998a399-2",
+      "line": 252,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 8685,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b1f9591d1e61-0",
+      "line": 252,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/tooling_boundary.py",
+      "tests_run": []
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.8217821782178217,
+  "new_survivors": [],
+  "no_coverage": 29,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 83,
+    "NO_COVERAGE": 29,
+    "SURVIVED": 18,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/forge-candidate-review-src-layout_tooling_boundary_fest_20260912_20260912T214438Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "5111b500ba7035777a4a2c486f51c529eae345f901facbce3518215bf2ba1713",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "fe80b685e955c1b0eee5c16427ecb0478642360441fda763265deffcc71d83a8",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "a39fd174ca08581fc552990b2fa7dabf19be0020f38a7af88405c4266e6cb4b4",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "3e25ed249d3b12666c84b13d8f2fd74eb73ab8903b5203cb38ee280e23d42ced",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "500a038eee783d1072b64524c2181d250df567cdc5e3d5aab4d22c841e90400a"
+  },
+  "runner_sha256": "a39fd174ca08581fc552990b2fa7dabf19be0020f38a7af88405c4266e6cb4b4",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/tooling_boundary.py": "b58d481eea2615f0d2fcf3b7867e99fd827c4c9047ea7b9c3c6afbbfee5ce5f9"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "break_continue-2b87a521ef54-0",
+    "break_continue-2b87a521ef54-1",
+    "constant_replace-0a5cfe523740-0",
+    "constant_replace-155ad58e0725-2",
+    "constant_replace-155ad58e0725-5",
+    "constant_replace-4073f83b37cc-2",
+    "constant_replace-4073f83b37cc-3",
+    "constant_replace-54acbd71acc1-0",
+    "constant_replace-5bc6ab8a9231-0",
+    "constant_replace-8eed33de3f08-0",
+    "constant_replace-8eed33de3f08-2",
+    "constant_replace-8eed33de3f08-3",
+    "constant_replace-b3cbf188ec50-0",
+    "constant_replace-ba3a2420d1b9-0",
+    "constant_replace-ba3a2420d1b9-2",
+    "constant_replace-ba3a2420d1b9-3",
+    "return_value-00436d7e9fba-0",
+    "zero_iteration_loop-0a97a236a403-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_tooling_boundary.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_tooling_boundary.py": "9d5258c628ee7be6bbae6d294df63006e126ca165704e9f8a6620e53dfab0fb2"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 9,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 10
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-b3ac77b1fd38-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "arithmetic_op-b3ac77b1fd38-1": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "arithmetic_op-b3ac77b1fd38-2": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "arithmetic_op-b3ac77b1fd38-3": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "arithmetic_op-b3ac77b1fd38-4": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "arithmetic_op-b3ac77b1fd38-5": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "arithmetic_op-b3ac77b1fd38-6": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "arithmetic_op-b3ac77b1fd38-7": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "arithmetic_op-f66df207e609-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "boolean_op-4e02edb29fa9-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "boolean_op-4e02edb29fa9-1": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "boolean_op-4e02edb29fa9-2": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts"
+      ],
+      "boolean_op-4e02edb29fa9-3": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "boolean_op-4e02edb29fa9-4": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "boolean_op-ed9798773e43-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "boolean_op-ed9798773e43-1": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "boolean_op-ed9798773e43-2": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "boolean_op-ed9798773e43-3": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "comparison_op-4f8e5998a399-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ],
+      "comparison_op-4f8e5998a399-1": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "comparison_op-9c8956c116e7-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "comparison_op-9c8956c116e7-1": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "comparison_op-df2370b15721-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts"
+      ],
+      "constant_replace-04bdebc4366b-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks"
+      ],
+      "constant_replace-0bde7f297322-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal"
+      ],
+      "constant_replace-155ad58e0725-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate"
+      ],
+      "constant_replace-155ad58e0725-1": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ],
+      "constant_replace-155ad58e0725-3": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "constant_replace-155ad58e0725-4": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "constant_replace-155ad58e0725-6": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "constant_replace-1c3ba76f1d96-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module"
+      ],
+      "constant_replace-39f0f193bff3-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "constant_replace-4073f83b37cc-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line"
+      ],
+      "constant_replace-4073f83b37cc-1": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too"
+      ],
+      "constant_replace-4073f83b37cc-4": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "constant_replace-4c48fc46a059-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "constant_replace-4da33740ad91-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "constant_replace-5235f7d4d769-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks"
+      ],
+      "constant_replace-588c155aa582-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path"
+      ],
+      "constant_replace-6eedbdd4175b-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "constant_replace-751146ca1113-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ],
+      "constant_replace-751146ca1113-1": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "constant_replace-8599728e09bb-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks"
+      ],
+      "constant_replace-8599728e09bb-1": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "constant_replace-8599728e09bb-2": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "constant_replace-8eed33de3f08-1": [
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal"
+      ],
+      "constant_replace-8eed33de3f08-4": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "constant_replace-91a981e922c3-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too"
+      ],
+      "constant_replace-947d1f1ef72a-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line"
+      ],
+      "constant_replace-95f60c314725-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks"
+      ],
+      "constant_replace-972f680e3228-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam"
+      ],
+      "constant_replace-b9c67044371c-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only"
+      ],
+      "constant_replace-ba3a2420d1b9-1": [
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "constant_replace-ba3a2420d1b9-4": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "constant_replace-bc7ede5d5763-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam"
+      ],
+      "negate_condition-585b8816cf08-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "negate_condition-74465fa4886c-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "negate_condition-82a0ae7a8798-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "negate_condition-9054a39081e1-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "negate_condition-a462ea75a8c0-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "negate_condition-aa939626d84d-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "negate_condition-b2f594a5a4aa-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "negate_condition-ceff4e23d3b1-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "negate_condition-d4977ea54ea7-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts"
+      ],
+      "return_value-2abba5bf12b4-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "return_value-31bb64dee4df-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal"
+      ],
+      "return_value-3c7f28efb2cd-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ],
+      "return_value-3c8df8e9996f-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "return_value-3cdd0d83116f-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "return_value-3e7001517f63-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too"
+      ],
+      "return_value-41b15b70bef6-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate"
+      ],
+      "return_value-474153b8aa50-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "return_value-48de9cb0df21-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path"
+      ],
+      "return_value-77837078c788-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "return_value-920bc2b9303d-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ],
+      "return_value-97a5790575e0-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal"
+      ],
+      "return_value-a0b6b3462619-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ],
+      "return_value-e26a5c9ba722-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only",
+        "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "return_value-f8bcc6c752d1-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ],
+      "return_value-fde04792f353-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols"
+      ],
+      "zero_iteration_loop-5493d6499996-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ],
+      "zero_iteration_loop-74c0f7855e6f-0": [
+        "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export"
+      ],
+      "zero_iteration_loop-985dac6c679d-0": [
+        "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/conductor/tooling_boundary.py"
+        ],
+        "criticality": "high",
+        "id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912"
+      }
+    ],
+    "retained_core": [
+      "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+      "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+      "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+      "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+      "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only",
+      "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+      "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+      "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+      "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-7",
+          "boolean_op-4e02edb29fa9-3",
+          "constant_replace-4c48fc46a059-0",
+          "constant_replace-751146ca1113-1",
+          "negate_condition-aa939626d84d-0",
+          "return_value-920bc2b9303d-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_cli_finds_a_package_the_tree_declares_under_src",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-7",
+          "boolean_op-4e02edb29fa9-3",
+          "constant_replace-4c48fc46a059-0",
+          "constant_replace-588c155aa582-0",
+          "negate_condition-aa939626d84d-0",
+          "return_value-48de9cb0df21-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_cli_refuses_a_root_with_no_package_naming_the_configured_path",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "constant_replace-588c155aa582-0",
+          "return_value-48de9cb0df21-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-0",
+          "arithmetic_op-b3ac77b1fd38-1",
+          "arithmetic_op-b3ac77b1fd38-2",
+          "arithmetic_op-b3ac77b1fd38-3",
+          "arithmetic_op-b3ac77b1fd38-4",
+          "arithmetic_op-b3ac77b1fd38-5",
+          "arithmetic_op-b3ac77b1fd38-6",
+          "arithmetic_op-b3ac77b1fd38-7",
+          "boolean_op-4e02edb29fa9-0",
+          "boolean_op-4e02edb29fa9-1",
+          "boolean_op-4e02edb29fa9-2",
+          "boolean_op-4e02edb29fa9-3",
+          "boolean_op-4e02edb29fa9-4",
+          "boolean_op-ed9798773e43-0",
+          "boolean_op-ed9798773e43-1",
+          "boolean_op-ed9798773e43-2",
+          "boolean_op-ed9798773e43-3",
+          "comparison_op-4f8e5998a399-1",
+          "comparison_op-9c8956c116e7-0",
+          "comparison_op-9c8956c116e7-1",
+          "comparison_op-df2370b15721-0",
+          "constant_replace-155ad58e0725-4",
+          "constant_replace-155ad58e0725-6",
+          "constant_replace-39f0f193bff3-0",
+          "constant_replace-4073f83b37cc-4",
+          "constant_replace-4c48fc46a059-0",
+          "constant_replace-4da33740ad91-0",
+          "constant_replace-6eedbdd4175b-0",
+          "constant_replace-751146ca1113-1",
+          "constant_replace-8599728e09bb-1",
+          "constant_replace-8599728e09bb-2",
+          "constant_replace-8eed33de3f08-4",
+          "constant_replace-ba3a2420d1b9-4",
+          "negate_condition-585b8816cf08-0",
+          "negate_condition-74465fa4886c-0",
+          "negate_condition-82a0ae7a8798-0",
+          "negate_condition-9054a39081e1-0",
+          "negate_condition-a462ea75a8c0-0",
+          "negate_condition-aa939626d84d-0",
+          "negate_condition-b2f594a5a4aa-0",
+          "negate_condition-ceff4e23d3b1-0",
+          "negate_condition-d4977ea54ea7-0",
+          "return_value-2abba5bf12b4-0",
+          "return_value-3c8df8e9996f-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-474153b8aa50-0",
+          "return_value-920bc2b9303d-0",
+          "return_value-e26a5c9ba722-0",
+          "return_value-fde04792f353-0",
+          "zero_iteration_loop-985dac6c679d-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_cli_reports_clean_on_this_repo",
+        "runtime_seconds_median": 0.048,
+        "unique_kills": [
+          "boolean_op-4e02edb29fa9-4",
+          "constant_replace-155ad58e0725-4",
+          "constant_replace-155ad58e0725-6",
+          "constant_replace-4073f83b37cc-4",
+          "constant_replace-8eed33de3f08-4",
+          "constant_replace-ba3a2420d1b9-4",
+          "negate_condition-b2f594a5a4aa-0",
+          "return_value-3c8df8e9996f-0",
+          "zero_iteration_loop-985dac6c679d-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+          "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too"
+        ],
+        "killed_mutants": [
+          "constant_replace-4073f83b37cc-1",
+          "constant_replace-91a981e922c3-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-3e7001517f63-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "constant_replace-0bde7f297322-0",
+          "constant_replace-1c3ba76f1d96-0",
+          "constant_replace-4073f83b37cc-1",
+          "return_value-3cdd0d83116f-0",
+          "return_value-3e7001517f63-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-0bde7f297322-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "constant_replace-4073f83b37cc-0",
+          "constant_replace-4073f83b37cc-1",
+          "constant_replace-91a981e922c3-0",
+          "constant_replace-947d1f1ef72a-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-3e7001517f63-0",
+          "return_value-e26a5c9ba722-0",
+          "return_value-f8bcc6c752d1-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-4073f83b37cc-0",
+          "constant_replace-947d1f1ef72a-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal"
+        ],
+        "killed_mutants": [
+          "constant_replace-1c3ba76f1d96-0",
+          "constant_replace-4073f83b37cc-1",
+          "return_value-3cdd0d83116f-0",
+          "return_value-3e7001517f63-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+          "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+          "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line",
+          "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings",
+          "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+          "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too"
+        ],
+        "killed_mutants": [
+          "constant_replace-4073f83b37cc-1",
+          "return_value-3cdd0d83116f-0",
+          "return_value-3e7001517f63-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_a_no_conductor_module_reaches_a_project_package",
+        "runtime_seconds_median": 0.046,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_tooling_boundary.py::test_rule_a_flags_importlib_string_literal",
+          "src/conductor/test_tooling_boundary.py::test_rule_a_ignores_non_module_strings"
+        ],
+        "killed_mutants": [
+          "constant_replace-1c3ba76f1d96-0",
+          "constant_replace-4073f83b37cc-1",
+          "return_value-3cdd0d83116f-0",
+          "return_value-3e7001517f63-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_a_rejects_host_plugin_string_in_generic_module",
+        "runtime_seconds_median": 0.0005,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_tooling_boundary.py::test_rule_a_flags_function_scope_and_try_except_imports",
+          "src/conductor/test_tooling_boundary.py::test_rule_a_flags_module_scope_import_with_file_and_line"
+        ],
+        "killed_mutants": [
+          "constant_replace-4073f83b37cc-1",
+          "constant_replace-91a981e922c3-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-3e7001517f63-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_a_scans_tests_too",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-0",
+          "arithmetic_op-b3ac77b1fd38-1",
+          "arithmetic_op-b3ac77b1fd38-2",
+          "arithmetic_op-b3ac77b1fd38-3",
+          "arithmetic_op-b3ac77b1fd38-4",
+          "arithmetic_op-b3ac77b1fd38-5",
+          "boolean_op-4e02edb29fa9-2",
+          "comparison_op-df2370b15721-0",
+          "constant_replace-39f0f193bff3-0",
+          "constant_replace-4da33740ad91-0",
+          "constant_replace-8599728e09bb-1",
+          "constant_replace-8599728e09bb-2",
+          "negate_condition-d4977ea54ea7-0",
+          "return_value-2abba5bf12b4-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_b_default_hook_dirs_cover_repo_and_standalone_layouts",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-0",
+          "arithmetic_op-b3ac77b1fd38-1",
+          "arithmetic_op-b3ac77b1fd38-2",
+          "arithmetic_op-b3ac77b1fd38-3",
+          "arithmetic_op-b3ac77b1fd38-4",
+          "arithmetic_op-b3ac77b1fd38-5",
+          "constant_replace-04bdebc4366b-0",
+          "constant_replace-4da33740ad91-0",
+          "constant_replace-5235f7d4d769-0",
+          "constant_replace-8599728e09bb-0",
+          "constant_replace-8599728e09bb-2",
+          "constant_replace-95f60c314725-0",
+          "constant_replace-ba3a2420d1b9-1",
+          "return_value-2abba5bf12b4-0",
+          "return_value-31bb64dee4df-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_b_flags_each_literal_in_generic_hooks",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-04bdebc4366b-0",
+          "constant_replace-5235f7d4d769-0",
+          "constant_replace-8599728e09bb-0",
+          "constant_replace-95f60c314725-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-0",
+          "arithmetic_op-b3ac77b1fd38-1",
+          "arithmetic_op-b3ac77b1fd38-2",
+          "arithmetic_op-b3ac77b1fd38-3",
+          "arithmetic_op-b3ac77b1fd38-4",
+          "arithmetic_op-b3ac77b1fd38-5",
+          "constant_replace-39f0f193bff3-0",
+          "constant_replace-4da33740ad91-0",
+          "constant_replace-8599728e09bb-1",
+          "constant_replace-8599728e09bb-2",
+          "constant_replace-ba3a2420d1b9-1",
+          "return_value-2abba5bf12b4-0",
+          "return_value-31bb64dee4df-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_b_generic_hooks_carry_no_project_literal",
+        "runtime_seconds_median": 0.0465,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "constant_replace-8eed33de3f08-1",
+          "constant_replace-b9c67044371c-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-97a5790575e0-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-b9c67044371c-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_tooling_boundary.py::test_rule_c_flags_host_paths_in_non_test_modules_only"
+        ],
+        "killed_mutants": [
+          "constant_replace-8eed33de3f08-1",
+          "return_value-3cdd0d83116f-0",
+          "return_value-97a5790575e0-0",
+          "return_value-e26a5c9ba722-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_c_non_test_modules_carry_no_host_path_literal",
+        "runtime_seconds_median": 0.046,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-6",
+          "arithmetic_op-f66df207e609-0",
+          "boolean_op-4e02edb29fa9-0",
+          "boolean_op-4e02edb29fa9-1",
+          "boolean_op-ed9798773e43-2",
+          "comparison_op-9c8956c116e7-0",
+          "comparison_op-9c8956c116e7-1",
+          "constant_replace-155ad58e0725-0",
+          "constant_replace-155ad58e0725-3",
+          "negate_condition-585b8816cf08-0",
+          "negate_condition-74465fa4886c-0",
+          "negate_condition-82a0ae7a8798-0",
+          "negate_condition-9054a39081e1-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-41b15b70bef6-0",
+          "return_value-474153b8aa50-0",
+          "return_value-77837078c788-0",
+          "return_value-a0b6b3462619-0",
+          "return_value-e26a5c9ba722-0",
+          "return_value-f8bcc6c752d1-0",
+          "return_value-fde04792f353-0",
+          "zero_iteration_loop-5493d6499996-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_seam_importing_anything_but_the_crate",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-155ad58e0725-0",
+          "return_value-41b15b70bef6-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-6",
+          "arithmetic_op-f66df207e609-0",
+          "boolean_op-4e02edb29fa9-0",
+          "boolean_op-4e02edb29fa9-1",
+          "boolean_op-ed9798773e43-2",
+          "comparison_op-4f8e5998a399-0",
+          "comparison_op-4f8e5998a399-1",
+          "comparison_op-9c8956c116e7-0",
+          "constant_replace-155ad58e0725-1",
+          "constant_replace-155ad58e0725-3",
+          "constant_replace-751146ca1113-0",
+          "negate_condition-585b8816cf08-0",
+          "negate_condition-74465fa4886c-0",
+          "negate_condition-82a0ae7a8798-0",
+          "negate_condition-9054a39081e1-0",
+          "negate_condition-a462ea75a8c0-0",
+          "negate_condition-ceff4e23d3b1-0",
+          "return_value-3c7f28efb2cd-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-474153b8aa50-0",
+          "return_value-77837078c788-0",
+          "return_value-a0b6b3462619-0",
+          "return_value-e26a5c9ba722-0",
+          "return_value-f8bcc6c752d1-0",
+          "return_value-fde04792f353-0",
+          "zero_iteration_loop-5493d6499996-0",
+          "zero_iteration_loop-74c0f7855e6f-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_d_flags_a_symbol_the_crate_does_not_export",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "comparison_op-4f8e5998a399-0",
+          "constant_replace-155ad58e0725-1",
+          "constant_replace-751146ca1113-0",
+          "return_value-3c7f28efb2cd-0",
+          "zero_iteration_loop-74c0f7855e6f-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-6",
+          "arithmetic_op-f66df207e609-0",
+          "boolean_op-4e02edb29fa9-0",
+          "boolean_op-4e02edb29fa9-1",
+          "boolean_op-ed9798773e43-0",
+          "boolean_op-ed9798773e43-1",
+          "boolean_op-ed9798773e43-2",
+          "boolean_op-ed9798773e43-3",
+          "comparison_op-4f8e5998a399-1",
+          "comparison_op-9c8956c116e7-0",
+          "comparison_op-9c8956c116e7-1",
+          "constant_replace-155ad58e0725-3",
+          "constant_replace-6eedbdd4175b-0",
+          "constant_replace-972f680e3228-0",
+          "constant_replace-bc7ede5d5763-0",
+          "negate_condition-585b8816cf08-0",
+          "negate_condition-74465fa4886c-0",
+          "negate_condition-82a0ae7a8798-0",
+          "negate_condition-9054a39081e1-0",
+          "negate_condition-a462ea75a8c0-0",
+          "negate_condition-ceff4e23d3b1-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-474153b8aa50-0",
+          "return_value-77837078c788-0",
+          "return_value-e26a5c9ba722-0",
+          "return_value-fde04792f353-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "constant_replace-972f680e3228-0",
+          "constant_replace-bc7ede5d5763-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-candidate-review-src-layout_tooling_boundary_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_tooling_boundary.py::test_rule_d_flags_the_crate_named_outside_the_seam"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-b3ac77b1fd38-6",
+          "arithmetic_op-f66df207e609-0",
+          "boolean_op-4e02edb29fa9-0",
+          "boolean_op-4e02edb29fa9-1",
+          "boolean_op-ed9798773e43-0",
+          "boolean_op-ed9798773e43-1",
+          "boolean_op-ed9798773e43-2",
+          "boolean_op-ed9798773e43-3",
+          "comparison_op-4f8e5998a399-1",
+          "comparison_op-9c8956c116e7-0",
+          "comparison_op-9c8956c116e7-1",
+          "constant_replace-155ad58e0725-3",
+          "constant_replace-6eedbdd4175b-0",
+          "negate_condition-585b8816cf08-0",
+          "negate_condition-74465fa4886c-0",
+          "negate_condition-82a0ae7a8798-0",
+          "negate_condition-9054a39081e1-0",
+          "negate_condition-a462ea75a8c0-0",
+          "negate_condition-ceff4e23d3b1-0",
+          "return_value-3cdd0d83116f-0",
+          "return_value-474153b8aa50-0",
+          "return_value-77837078c788-0",
+          "return_value-e26a5c9ba722-0",
+          "return_value-fde04792f353-0"
+        ],
+        "nodeid": "src/conductor/test_tooling_boundary.py::test_rule_d_native_seam_is_the_only_seam_and_exports_real_symbols",
+        "runtime_seconds_median": 0.046,
+        "unique_kills": []
+      }
+    ]
+  },
+  "unviable": 0
+}

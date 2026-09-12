@@ -14,6 +14,7 @@ from typing import Sequence
 
 from conductor.candidate_review.checks import ReviewContext
 from conductor.candidate_review.model import sha256_json
+from conductor.project_paths import package_relative
 
 
 def _graph_database(repo: Path) -> Path:
@@ -236,13 +237,36 @@ def _crate_test_files(ctx: ReviewContext, crate: PurePosixPath) -> tuple[str, ..
     return tuple(tests)
 
 
+def _module_names(root: Path, source_paths: Sequence[str]) -> list[str]:
+    """Dotted import names for changed sources, as a test file would spell them.
+
+    A repo-relative path is the import path only when the package sits at the repo
+    root. Under a src layout ``src/conductor/widget.py`` imports as
+    ``conductor.widget``, and dotting the raw path yields ``src.conductor.widget``,
+    which no test file contains -- so every convention match by module name is lost.
+    """
+
+    prefix = package_relative(root).parent.as_posix()
+    names = []
+    for path in source_paths:
+        rel = path
+        if prefix != "." and path.startswith(f"{prefix}/"):
+            rel = path[len(prefix) + 1 :]
+        names.append(rel.removesuffix(".py").replace("/", "."))
+    return names
+
+
 def _convention_tests(ctx: ReviewContext, source_paths: Sequence[str]) -> set[str]:
     names = {f"test_{PurePosixPath(path).stem}.py" for path in source_paths}
-    modules = [path.removesuffix(".py").replace("/", ".") for path in source_paths]
+    modules = _module_names(ctx.snapshot, source_paths)
     surfaces = _reexport_surfaces(ctx, source_paths)
     tests: set[str] = set()
+    # The package's own tests sit beside it, wherever the candidate declares it --
+    # the repo root in the monorepo, src/conductor here. A hardcoded "conductor"
+    # would silently find no test file at all under any other layout, which reads
+    # as "no convention test exists" rather than as a layout mismatch.
     for base in (
-        "conductor",
+        package_relative(ctx.snapshot).as_posix(),
         "research/tests",
         "component_fab/tests",
         "aria_core/tests",
