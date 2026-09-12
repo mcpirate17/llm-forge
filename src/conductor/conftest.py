@@ -209,25 +209,6 @@ HOST_PROJECT_TESTS: dict[str, str] = {
         "the benchmark's subject is the host governance surface -- GOVERNANCE_PATHS "
         "names .github/CODEOWNERS, AGENTS.md, the Makefile and research/notes"
     ),
-    "test_mutation_campaign_generate.py::test_a_generated_rust_manifest_loads_as_a_generated_campaign": (
-        "rust_subjects() rglobs Cargo.toml from the package root; a standalone root "
-        "holds no crates, so there is nothing to plan a campaign against"
-    ),
-    "test_mutation_engine_cargo.py::test_the_campaign_under_test_is_wired_end_to_end": (
-        "the wired campaign pins tooling/native/snapshot-retention, a host crate"
-    ),
-    "test_mutation_engine_mull.py::test_the_campaign_under_test_is_wired_end_to_end": (
-        "the wired campaign pins aria_core/src/cpu/adaptive_routing.cpp, a declared "
-        "project package outside conductor's boundary"
-    ),
-    "test_mutation_testing.py::test_campaign_ranks_every_test_contiguously_and_materializes_six_mutations": (
-        "the fixture campaign nm_f6_phase22_20m_active.json is research/-scoped and "
-        "validates test scopes under research/tests/ -- a boundary violation in its "
-        "own right, and the fixture should become a conductor-scoped campaign"
-    ),
-    "test_mutation_testing.py::test_inspection_reports_ready_with_six_materialized_patches": (
-        "same research/-scoped fixture campaign as the test above"
-    ),
     "test_repo_index.py::test_the_index_resolves_every_import_the_ast_matcher_did": (
         "the thresholds describe the host tree's scale; a standalone install has no "
         "host tree to find and the guard has nothing to say"
