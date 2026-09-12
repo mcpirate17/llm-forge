@@ -1,5 +1,12 @@
 {
-  "campaigns": [],
+  "campaigns": [
+    {
+      "manifest": "campaigns/llm-b0_project_paths_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/llm-b0_mutation_campaign_model_fest_20260912.json"
+    }
+  ],
   "enforcement": "changed_tests",
   "engine_adapters": {
     "c": [
@@ -21,6 +28,23 @@
   "schema_version": 1,
   "test_patterns": [
     "**/test_*.py",
-    "**/*_test.py"
+    "**/*_test.py",
+    "**/*.test.js",
+    "**/*.test.jsx",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.js",
+    "**/*.spec.jsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*Test.java",
+    "**/test_*.c",
+    "**/*_test.c",
+    "**/test_*.cc",
+    "**/*_test.cc",
+    "**/test_*.cpp",
+    "**/*_test.cpp",
+    "**/test_*.cxx",
+    "**/*_test.cxx"
   ]
 }
