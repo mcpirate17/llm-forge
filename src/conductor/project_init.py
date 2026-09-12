@@ -1,19 +1,31 @@
 """``python -m conductor init <project-dir>``: scaffold the platform into a project.
 
+Also reachable as ``python -m conductor.bootstrap <project-dir>`` (``conductor.bootstrap``
+is a thin alias onto this module -- see that file for why).
+
 Writes, idempotently, everything a foreign checkout needs to run the governance and
 efficiency tooling: the dispatcher ``hooks`` block in ``.claude/settings.json``, the
 ``.claude/hooks/dispatch.py`` launcher, the code-review-graph server in ``.mcp.json``,
 a minimal ``conductor/candidate_policy.toml``, the ``conductor/preauthorizations.md``
-skeleton, the mutation-campaign directories and registry, and a ``.gitignore`` block.
+skeleton, the mutation-campaign directories and registry, a ``.gitignore`` block, a
+``.github/workflows/weekly-audit.yml`` running the platform's own audits, and a
+``.claude/hooks/project/env.sh`` stub the host fills in with repo-specific hook
+defaults (``AGENTS.md``, "Hook extension convention").
 
 Merging is by key, never by file: a settings or MCP file keeps every key it already
 has, an event or server that is already wired identically is left alone, and one that
 is wired *differently* is a conflict -- refused with the file and key named unless
 ``--force``. Project-owned files (the policy, the preauthorization ledger, the campaign
-registry) are created once and never rewritten. ``--dry-run`` prints the unified diff
-of every write; ``--check`` exits 1 when a run would write anything or when the hook
-doctor finds a dead hook. A run that writes ends with the doctor and fails loud when
-any declared hook is dead.
+registry, the workflow template, the env.sh stub) are created once and never rewritten.
+``--dry-run`` prints the unified diff of every write; ``--check`` exits 1 when a run
+would write anything or when the hook doctor finds a dead hook. A run that writes ends
+with the doctor and fails loud when any declared hook is dead.
+
+Separately, and never blocking: a host whose ``pyproject.toml`` ``[tool.conductor]``
+table is absent or missing ``candidate_policy`` / ``mutation_registry`` / ``package_root``
+gets a warning, never a write -- those three keys are how ``conductor.project_paths``
+tells an installed-wheel host from an in-tree checkout, and the monorepo-shaped
+defaults it falls back to are wrong for anything else.
 """
 
 from __future__ import annotations
@@ -24,6 +36,7 @@ import json
 import os
 import subprocess
 import sys
+import tomllib
 from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
@@ -62,6 +75,14 @@ GITIGNORE_LINES = (
 )
 DOCTOR_MODULE = "tooling.hooks.dispatch.doctor"
 POLICY_WINDOW_DAYS = 90
+WORKFLOW = ".github/workflows/weekly-audit.yml"
+ENV_STUB = ".claude/hooks/project/env.sh"
+# What conductor.project_paths reads from a host's [tool.conductor] table. Absent
+# entirely or missing any of these three, project_paths falls back to the
+# monorepo-shaped literals (conductor/candidate_policy.toml, .../registry.json,
+# package_root "conductor"), which only an in-tree checkout of this package
+# actually has -- worth a warning for any other host, never worth a refusal.
+CONDUCTOR_STANZA_KEYS = ("candidate_policy", "mutation_registry", "package_root")
 
 Status = Literal["create", "update", "unchanged"]
 
@@ -353,6 +374,80 @@ REGISTRY_TEXT = _dump_json(
     }
 )
 
+WORKFLOW_TEXT = """name: Weekly Audit
+
+# Written by ``conductor init`` / ``conductor.bootstrap``. Platform steps only --
+# every step below runs a module this package ships, installed as an ordinary
+# dependency. Host-specific audits belong in a separate workflow; this file is
+# never rewritten once it exists, so it is also safe to extend in place.
+
+on:
+  schedule:
+    - cron: "15 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - run: uv sync
+      - name: Run guardrail audit (A-G)
+        run: |
+          mkdir -p tasks/audit
+          uv run python -m conductor.guardrail_audit \\
+            --markdown-out tasks/audit/latest_guardrail_report.md \\
+            --json-out tasks/audit/latest_guardrail_report.json
+      - name: Run duplicate-code audit
+        run: uv run python -m conductor.run_duplicate_audit
+      - name: Run cyclomatic complexity audit
+        run: |
+          uv run python -m conductor.radon_complexity report \\
+            > tasks/audit/radon_complexity_report.txt 2>&1 || true
+      - name: Enforce the complexity ratchet
+        run: |
+          # actions/checkout runs bash -e without pipefail; tee would mask the
+          # ratchet's own exit code without this.
+          set -o pipefail
+          uv run python -m conductor.radon_complexity check | tee -a tasks/audit/radon_complexity_report.txt
+      - name: Run dead-test closure audit
+        run: uv run python -m conductor.dead_tests --json-out tasks/audit/dead_tests.json || true
+      - name: Upload audit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-audit
+          path: |
+            tasks/audit/latest_guardrail_report.md
+            tasks/audit/latest_guardrail_report.json
+            tasks/audit/radon_complexity_report.txt
+            tasks/audit/dead_tests.json
+          retention-days: 7
+"""
+
+ENV_STUB_TEXT = """# shellcheck shell=bash
+# Project extension: repo-specific defaults for the generic conductor hooks.
+# Sourced (never executed) by any generic hook that has a configurable path;
+# absent, or with a value left unset below, the generic fallback in
+# tooling.hooks applies. See AGENTS.md, "Hook extension convention".
+# Written once by ``conductor init`` / ``conductor.bootstrap``; never rewritten
+# afterward, so it is safe to fill in.
+
+# Where post-bash-quiet.sh parks the full text of an elided Bash output.
+# export BASH_QUIET_SAVE_DIR="research/tmp/bash_output"
+"""
+
 
 # ── planning and applying ───────────────────────────────────────────────────
 
@@ -388,6 +483,37 @@ def _crg_importable(python: Path) -> bool:
     return probe.returncode == 0
 
 
+def _pyproject_conductor_warnings(project_dir: Path) -> list[str]:
+    """Warn, never write, when ``[tool.conductor]`` is absent or incomplete."""
+    manifest = project_dir / "pyproject.toml"
+    if not manifest.is_file():
+        return [
+            (
+                f"{manifest} does not exist; conductor.project_paths has no "
+                "[tool.conductor] table to read and falls back to the monorepo-shaped "
+                "defaults for candidate_policy, mutation_registry and package_root, "
+                "which is wrong for anything but an in-tree conductor/ checkout"
+            )
+        ]
+    try:
+        payload = tomllib.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        return [f"{manifest} could not be parsed: {exc}"]
+    tool = payload.get("tool")
+    conductor = tool.get("conductor") if isinstance(tool, dict) else None
+    table = conductor if isinstance(conductor, dict) else {}
+    missing = [key for key in CONDUCTOR_STANZA_KEYS if key not in table]
+    if not missing:
+        return []
+    return [
+        (
+            f"{manifest} [tool.conductor] is missing {', '.join(missing)}; "
+            "conductor.project_paths falls back to the monorepo-shaped defaults for "
+            "each missing key until it is set"
+        )
+    ]
+
+
 def plan(config: InitConfig, *, today: date | None = None) -> InitPlan:
     root = config.project_dir
     actions = [
@@ -406,6 +532,8 @@ def plan(config: InitConfig, *, today: date | None = None) -> InitPlan:
         _create_once(root, POLICY, render_policy(today or date.today())),
         _create_once(root, PREAUTH, PREAUTH_TEXT),
         _create_once(root, REGISTRY, REGISTRY_TEXT),
+        _create_once(root, WORKFLOW, WORKFLOW_TEXT),
+        _create_once(root, ENV_STUB, ENV_STUB_TEXT),
         *(_create_once(root, keep, "") for keep in GITKEEPS),
         _action(
             GITIGNORE, _read(root, GITIGNORE), render_gitignore(_read(root, GITIGNORE))
@@ -418,6 +546,7 @@ def plan(config: InitConfig, *, today: date | None = None) -> InitPlan:
             f"{MCP_SERVER} MCP server in {MCP} will not start until it is installed "
             "(pip install 'conductor-tooling[graph]')"
         )
+    warnings.extend(_pyproject_conductor_warnings(root))
     return InitPlan(actions=actions, warnings=warnings)
 
 
