@@ -13,6 +13,11 @@
 UV ?= env -u VIRTUAL_ENV uv
 .SILENT:
 
+# The platform's user-facing commands (governance, slop, complexity, dupes,
+# mutation maintenance, worktree/graph hygiene) live in conductor.mk so a host
+# project can `include` them too. Keep new platform targets there, not here.
+include conductor.mk
+
 PYTEST_TARGET ?= src/conductor
 PYTEST_TIMEOUT ?= 600
 PYTEST_ARGS ?=
