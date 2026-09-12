@@ -7,6 +7,7 @@ import os
 import stat
 import subprocess
 import sys
+import tomllib
 from datetime import date
 from pathlib import Path
 
@@ -350,3 +351,89 @@ def test_init_runs_doctor_and_dispatcher_denies_force_push(tmp_path: Path) -> No
     assert proc.returncode == 0, proc.stderr
     out = json.loads(proc.stdout)
     assert out["hookSpecificOutput"]["permissionDecision"] == "deny", out
+
+
+# ── weekly-audit.yml / env.sh templates ──────────────────────────────────────
+
+
+@pytest.mark.usefixtures("quiet_doctor")
+def test_workflow_and_env_stub_are_written_once(tmp_path: Path) -> None:
+    project = _repo(tmp_path)
+    assert pi.run(_config(project)) == 0
+    workflow = project / pi.WORKFLOW
+    env_stub = project / pi.ENV_STUB
+    assert workflow.read_text() == pi.WORKFLOW_TEXT
+    assert env_stub.read_text() == pi.ENV_STUB_TEXT
+    assert "conductor.guardrail_audit" in workflow.read_text()
+    assert "conductor.radon_complexity" in workflow.read_text()
+    assert "BASH_QUIET_SAVE_DIR" in env_stub.read_text()
+
+    second = pi.plan(_config(project))
+    assert second.changed == []
+
+    for rel in (pi.WORKFLOW, pi.ENV_STUB):
+        _write(project, rel, "owner edit\n")
+    assert pi.run(_config(project, force=True)) == 0
+    for rel in (pi.WORKFLOW, pi.ENV_STUB):
+        assert (project / rel).read_text() == "owner edit\n"
+
+
+# ── [tool.conductor] stanza warning ──────────────────────────────────────────
+
+
+def test_pyproject_warning_when_manifest_absent(tmp_path: Path) -> None:
+    project = _repo(tmp_path)
+    warnings = pi._pyproject_conductor_warnings(project)
+    assert len(warnings) == 1
+    assert "pyproject.toml does not exist" in warnings[0]
+
+
+def test_pyproject_warning_lists_missing_keys(tmp_path: Path) -> None:
+    project = _repo(tmp_path)
+    _write(project, "pyproject.toml", '[tool.conductor]\ncandidate_policy = "x.toml"\n')
+    warnings = pi._pyproject_conductor_warnings(project)
+    assert len(warnings) == 1
+    assert "mutation_registry" in warnings[0]
+    assert "package_root" in warnings[0]
+    assert "candidate_policy" not in warnings[0].split("missing", 1)[1]
+
+
+def test_pyproject_no_warning_when_stanza_is_complete(tmp_path: Path) -> None:
+    project = _repo(tmp_path)
+    _write(
+        project,
+        "pyproject.toml",
+        "[tool.conductor]\n"
+        'candidate_policy = "candidate_policy.toml"\n'
+        'mutation_registry = "campaigns/registry.json"\n'
+        'package_root = "src/conductor"\n',
+    )
+    assert pi._pyproject_conductor_warnings(project) == []
+
+
+def test_pyproject_warning_on_malformed_toml(tmp_path: Path) -> None:
+    project = _repo(tmp_path)
+    _write(project, "pyproject.toml", "[tool.conductor\n")
+    warnings = pi._pyproject_conductor_warnings(project)
+    assert len(warnings) == 1
+    assert "could not be parsed" in warnings[0]
+
+
+@pytest.mark.usefixtures("quiet_doctor")
+def test_pyproject_warning_reaches_the_plan_without_writing_pyproject(
+    tmp_path: Path,
+) -> None:
+    project = _repo(tmp_path)
+    plan_ = pi.plan(_config(project))
+    assert any("pyproject.toml does not exist" in w for w in plan_.warnings)
+    assert not (project / "pyproject.toml").exists()
+
+
+def test_conductor_stanza_keys_round_trip_tomllib() -> None:
+    # Sanity: the constant this module warns about really is what tomllib parses
+    # a [tool.conductor] table into, not a typo that would never match.
+    parsed = tomllib.loads(
+        '[tool.conductor]\ncandidate_policy = "a"\nmutation_registry = "b"\n'
+        'package_root = "c"\n'
+    )
+    assert set(pi.CONDUCTOR_STANZA_KEYS) <= set(parsed["tool"]["conductor"])

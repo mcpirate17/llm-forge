@@ -1,0 +1,38 @@
+{
+  "campaign_id": "llm-b0_bootstrap_fest_20260912",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/bootstrap.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/bootstrap.py": "9879db82b5f8aa36840d3558d9d6df40c67533b08995f12e063f0dd2639901be"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-12T23:39:23.677388+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_bootstrap.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_bootstrap.py": "336ad262f0e86597a704a472730dd9a7083869d0b35ddeb638699cd29d8e7c46"
+  },
+  "title": "Generated mutants for src/conductor/bootstrap.py, scored on the survivor set"
+}
