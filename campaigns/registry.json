@@ -1,9 +1,6 @@
 {
   "campaigns": [
     {
-      "manifest": "campaigns/llm-b0_project_paths_fest_20260912.json"
-    },
-    {
       "manifest": "campaigns/llm-b0_mutation_campaign_model_fest_20260912.json"
     }
   ],
