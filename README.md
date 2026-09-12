@@ -31,6 +31,13 @@ Every host project pins this repo by tag in its own `pyproject.toml`:
 conductor-tooling = { git = "https://github.com/mcpirate17/llm-forge", tag = "v0.1.0" }
 ```
 
+## Documentation
+
+[`docs/`](docs/README.md) has one page per platform law (governance claims, the landing
+gate, risk/approval tiers, mutation evidence, context budget, CI coverage), written for a
+host project adopting this platform. `AGENTS.md` is the working contract for changes to
+this repository itself.
+
 ## History
 
 This repository was split out of the `LLM` monorepo on 2026-09-12 with

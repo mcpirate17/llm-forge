@@ -225,7 +225,7 @@ honest. Neither resembles the 1.0 the hand-authored campaigns publish.
 
 ## Related
 
-- `KB-MUT-02` -- `research/notes/kb_mutation_campaigns.md`, the rules for
-  authoring, running and consuming campaigns at the gate.
+- `KB-MUT-02` -- `docs/KB-MUT-02.md`, the rules for authoring, running and
+  consuming campaigns at the gate.
 - `research/notes/generated_mutation_engine_2026-09-06.md` -- how each of the
   above was measured, including the runs that were wrong first.
