@@ -34,6 +34,9 @@ from conductor.mutation_testing import (
     CampaignError,
     verify_evidence,
 )
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY, host_root
+from conductor.project_paths import registry_path as host_registry_path
+from conductor.project_paths import registry_relative
 
 SKIP_DIRECTORY_NAMES = frozenset(
     {
@@ -57,7 +60,7 @@ SKIP_DIRECTORY_NAMES = frozenset(
     }
 )
 COVERAGE_SCHEMA = "llm.mutation-testing.coverage.v1"
-DEFAULT_REGISTRY = Path("conductor/mutation_campaigns/registry.json")
+DEFAULT_REGISTRY = Path(DEFAULT_MUTATION_REGISTRY)
 
 
 def _native_or_campaign[T](operation: Callable[..., T], *args: object) -> T:
@@ -114,7 +117,7 @@ def discover_test_paths(
 ) -> tuple[str, ...]:
     """Return git-visible test files matching the mutation registry patterns."""
 
-    registry = registry_path or (repo_root / DEFAULT_REGISTRY)
+    registry = registry_path or host_registry_path(repo_root)
     return tuple(
         _native_or_campaign(
             mutation_test_inventory_native,
@@ -135,7 +138,7 @@ def git_changed_test_paths(
 ) -> tuple[str, ...]:
     """Return mutation-eligible tests that differ from HEAD, including untracked."""
 
-    registry = registry_path or (repo_root / DEFAULT_REGISTRY)
+    registry = registry_path or host_registry_path(repo_root)
     return tuple(
         _native_or_campaign(
             mutation_test_inventory_native,
@@ -157,7 +160,7 @@ def coverage_report(
 ) -> dict[str, Any]:
     """Check every discovered test file against current PASS receipts."""
 
-    registry = registry_path or (repo_root / DEFAULT_REGISTRY)
+    registry = registry_path or host_registry_path(repo_root)
     tests = discover_test_paths(
         registry, repo_root=repo_root, include_untracked=include_untracked
     )
@@ -185,7 +188,7 @@ def verify_changed(
 ) -> dict[str, Any]:
     """Require PASS receipts for git-changed and untracked test files."""
 
-    registry = registry_path or (repo_root / DEFAULT_REGISTRY)
+    registry = registry_path or host_registry_path(repo_root)
     tests = git_changed_test_paths(registry, repo_root=repo_root)
     result = verify_evidence(registry, tests, repo_root=repo_root)
     result["schema_version"] = "llm.mutation-testing.changed-evidence.v1"
@@ -226,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
     shared.add_argument(
         "--registry",
         type=Path,
-        default=DEFAULT_REGISTRY,
+        default=Path(registry_relative(host_root())),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser(

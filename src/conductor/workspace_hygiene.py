@@ -43,10 +43,14 @@ from conductor.candidate_review.ownership import (
 )
 from conductor.dead_tests import tracked_files
 from conductor.worktree_lease import is_linked_worktree, lease_state
+from conductor.project_paths import campaigns_relative, host_root, registry_relative
+
 
 ROOT = Path(__file__).resolve().parents[1]
-CAMPAIGN_DIR = "conductor/mutation_campaigns"
-REGISTRY = f"{CAMPAIGN_DIR}/registry.json"
+# ``ROOT`` is the package parent, which is the repo root only in the layout
+# conductor was extracted from; walk to the enclosing repository instead.
+CAMPAIGN_DIR = str(campaigns_relative(host_root(ROOT)))
+REGISTRY = str(registry_relative(host_root(ROOT)))
 
 
 class HygieneError(RuntimeError):

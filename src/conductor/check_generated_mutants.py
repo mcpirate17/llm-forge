@@ -26,7 +26,8 @@ import subprocess
 import sys
 from pathlib import PurePosixPath
 
-CAMPAIGN_ROOT = PurePosixPath("conductor/mutation_campaigns")
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY
+CAMPAIGN_ROOT = DEFAULT_MUTATION_REGISTRY.parent
 
 USAGE = "usage: check_generated_mutants --repo REPO --base COMMIT [PATH ...]"
 

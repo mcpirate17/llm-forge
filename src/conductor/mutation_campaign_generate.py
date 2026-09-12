@@ -39,8 +39,9 @@ from conductor.candidate_review.ownership import (
 )
 from conductor.mutation_campaign_model import REPO_ROOT, _sha256
 from conductor.mutation_scope import CampaignError
+from conductor.project_paths import campaigns_relative, campaigns_root
 
-CAMPAIGN_DIR = "conductor/mutation_campaigns"
+
 ENGINE_SLUG = {"fest": "fest", "cargo-mutants": "cargo", "mull": "mull"}
 
 # Directories that hold no subject of ours: virtualenvs, build trees and vendored
@@ -384,7 +385,7 @@ def existing_subjects(repo_root: Path = REPO_ROOT) -> set[str]:
     """
 
     covered: set[str] = set()
-    for manifest in sorted((repo_root / CAMPAIGN_DIR).glob("*.json")):
+    for manifest in sorted(campaigns_root(repo_root).glob("*.json")):
         try:
             payload = json.loads(manifest.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -663,7 +664,7 @@ def write(
 
     written: list[str] = []
     for manifest in manifests:
-        relative = f"{CAMPAIGN_DIR}/{manifest['campaign_id']}.json"
+        relative = f"{campaigns_relative(repo_root)}/{manifest['campaign_id']}.json"
         destination = repo_root / relative
         if destination.exists() and not force:
             raise CampaignError(
@@ -683,10 +684,10 @@ def _load_generated_cargo_campaign(
 ) -> tuple[Path, dict[str, Any]]:
     """Resolve a campaign name to its path and parsed generated manifest."""
 
-    relative = campaign.removeprefix(f"{CAMPAIGN_DIR}/")
+    relative = campaign.removeprefix(f"{campaigns_relative(repo_root)}/")
     if not relative.endswith(".json"):
         relative = f"{relative}.json"
-    path = repo_root / CAMPAIGN_DIR / relative
+    path = campaigns_root(repo_root) / relative
     try:
         existing = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:

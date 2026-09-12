@@ -64,6 +64,7 @@ from conductor.mutation_campaign_model import (  # noqa: F401
     source_drift,
     symbol_hashes,
 )
+from conductor.project_paths import host_root, registry_relative
 from conductor.mutation_scope import (
     CampaignError,
     _python_test_nodeids,
@@ -773,7 +774,7 @@ def main(argv: list[str] | None = None) -> int:
     verify_parser.add_argument(
         "--registry",
         type=Path,
-        default=Path("conductor/mutation_campaigns/registry.json"),
+        default=Path(registry_relative(host_root())),
     )
     verify_parser.add_argument("paths", nargs="*")
     args = parser.parse_args(argv)

@@ -28,6 +28,7 @@ from typing import (
 
 # Imports nothing from `conductor`, so this stays circular-safe.
 from conductor.mutation_patch_apply import PatchApplyError, apply_patch_text
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY
 
 
 CANONICAL_TEST_PATTERNS = (
@@ -51,7 +52,10 @@ CANONICAL_TEST_PATTERNS = (
     "**/test_*.cxx",
     "**/*_test.cxx",
 )
-ANCHOR_REGISTRY_PATH = "conductor/mutation_campaigns/registry.json"
+# The registry as it stood in the anchor commit. The host may keep its registry
+# elsewhere today (``conductor.project_paths``), so callers pass the anchored
+# spelling in; this default is the one the monorepo anchor was written against.
+ANCHOR_REGISTRY_PATH = str(DEFAULT_MUTATION_REGISTRY)
 
 
 class _CampaignSupport(Protocol):
@@ -126,10 +130,11 @@ def _registered_anchor_manifest_error(
     anchor_commit: str,
     manifest_path: str,
     manifest_sha256: str,
+    registry_path: str = ANCHOR_REGISTRY_PATH,
 ) -> str | None:
     """Require the campaign identity in the anchor's immutable registry and manifest."""
     registry = _git_bytes(
-        anchor_repo, ["cat-file", "blob", f"{anchor_commit}:{ANCHOR_REGISTRY_PATH}"]
+        anchor_repo, ["cat-file", "blob", f"{anchor_commit}:{registry_path}"]
     )
     if registry.returncode != 0:
         return "legacy receipt anchor registry is unavailable"
@@ -166,6 +171,7 @@ def legacy_receipt_anchor_errors(
     receipt_prefix: str,
     manifest_path: str,
     manifest_sha256: str,
+    registry_path: str = ANCHOR_REGISTRY_PATH,
 ) -> list[str]:
     """Accept v2 only as an exact registered receipt and campaign at the anchor."""
     if receipt_path is None or receipt_bytes is None:
@@ -197,6 +203,7 @@ def legacy_receipt_anchor_errors(
         anchor_commit=anchor_commit,
         manifest_path=manifest_path,
         manifest_sha256=manifest_sha256,
+        registry_path=registry_path,
     )
     if manifest_error:
         return [manifest_error]

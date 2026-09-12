@@ -11,9 +11,14 @@ import os
 from pathlib import Path, PurePosixPath
 
 from conductor.candidate_review.policy import PolicyError
+from conductor.project_paths import (
+    DEFAULT_CANDIDATE_POLICY,
+    enclosing_repo,
+    project_paths,
+)
 
 POLICY_ENV = "CONDUCTOR_POLICY"
-DEFAULT_POLICY_RELATIVE = PurePosixPath("conductor/candidate_policy.toml")
+DEFAULT_POLICY_RELATIVE = DEFAULT_CANDIDATE_POLICY
 # The policy shipped next to the package: conductor/candidate_policy.toml.
 PACKAGE_POLICY = Path(__file__).resolve().parents[1] / "candidate_policy.toml"
 
@@ -33,16 +38,6 @@ def _tree_relative(raw: str, source: str) -> PurePosixPath:
     if path.is_absolute() or ".." in path.parts or not path.parts:
         raise PolicyError(f"{source} policy path must be candidate-relative: {raw!r}")
     return path
-
-
-def enclosing_repo(start: Path) -> Path | None:
-    """The nearest ancestor (inclusive) holding ``.git`` -- a dir or a worktree file."""
-    for candidate in (start, *start.parents):
-        if candidate == candidate.parent:
-            break  # the filesystem root is never a repo; do not probe /.git
-        if (candidate / ".git").exists():
-            return candidate
-    return None
 
 
 def resolve_policy_path(
@@ -65,13 +60,27 @@ def resolve_policy_path(
     if tree is not None:
         # One candidate, no search: the tree decides, and ``load_policy`` reports
         # an absent file as loudly as a malformed one.
-        relative = _tree_relative(raw, source) if raw else DEFAULT_POLICY_RELATIVE
+        if raw:
+            relative = _tree_relative(raw, source)
+        else:
+            relative = project_paths(tree).policy_relative
         return tree / relative.as_posix()
     if raw:
         candidates = [Path(raw)]
     else:
         root = enclosing_repo(Path.cwd().resolve())
-        candidates = [] if root is None else [root / DEFAULT_POLICY_RELATIVE.as_posix()]
+        candidates = []
+        if root is not None:
+            hosted = project_paths(root)
+            candidates.append(hosted.policy_path)
+            if hosted.policy_configured:
+                # The host named this file. Falling through to the packaged policy
+                # would review a foreign tree against the wrong rules.
+                if hosted.policy_path.is_file():
+                    return hosted.policy_path
+                raise PolicyError(
+                    f"configured candidate policy is missing: {hosted.policy_path}"
+                )
         candidates.append(PACKAGE_POLICY)
     for candidate in candidates:
         if candidate.is_file():

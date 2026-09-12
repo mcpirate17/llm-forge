@@ -18,6 +18,7 @@ from conductor.candidate_review.checks import (
     _result,
 )
 from conductor.candidate_review import external_invariants
+from conductor.project_paths import registry_path, registry_relative
 from conductor.candidate_review.value_waivers import (
     WAIVED_RULE,
     apply_value_waivers,
@@ -566,7 +567,7 @@ def _has_mutation_evidence(ctx: ReviewContext, tests: set[str]) -> bool:
     a ``parametrize`` decorator — counted for nothing, and satisfying the gate
     meant editing a test whose bytes a campaign pins.
     """
-    registry = ctx.snapshot / "conductor/mutation_campaigns/registry.json"
+    registry = registry_path(ctx.snapshot)
     if not registry.is_file():
         return False
     from conductor.mutation_testing import CampaignError, verify_evidence
@@ -742,7 +743,7 @@ def _manifest_for_campaign(snapshot: Path, campaign_id: object) -> dict[str, obj
 
     if not isinstance(campaign_id, str):
         return {}
-    registry = snapshot / "conductor/mutation_campaigns/registry.json"
+    registry = registry_path(snapshot)
     try:
         rows = json.loads(registry.read_text("utf-8")).get("campaigns", [])
     except (OSError, UnicodeError, json.JSONDecodeError):
@@ -974,14 +975,14 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
     )
     waiver_states = _waiver_states(ctx)
     exempt = [path for path in test_paths if path not in set(receipt_paths)]
-    registry = ctx.snapshot / "conductor/mutation_campaigns/registry.json"
+    registry = registry_path(ctx.snapshot)
     if not registry.is_file():
         finding = Finding(
             check_id="mutation-evidence",
             rule_id="mutation-registry-missing",
             severity=Severity.CRITICAL,
             message=(
-                "candidate snapshot lacks conductor/mutation_campaigns/registry.json; "
+                f"candidate snapshot lacks {registry_relative(ctx.snapshot)}; "
                 "changed tests cannot prove mutation evidence"
             ),
             help=(

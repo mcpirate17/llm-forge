@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY
+
 JSCPD_BASELINE_RELATIVE = Path("conductor/jscpd_duplication_baseline.json")
 PMD_CPD_BASELINE_RELATIVE = Path("conductor/pmd_cpd_duplication_baseline.json")
 AUDIT_ERROR_EXIT_CODE = 2
@@ -20,7 +22,9 @@ JSCPD_INDEX_CONFIG_PATHS = (
     "package.json",
     JSCPD_BASELINE_RELATIVE.as_posix(),
 )
-JSCPD_GENERATED_EVIDENCE_IGNORE = "**/conductor/mutation_campaigns/receipts/**"
+JSCPD_GENERATED_EVIDENCE_IGNORE = (
+    f"**/{DEFAULT_MUTATION_REGISTRY.parent}/receipts/**"
+)
 
 JSCPD_SOURCE_SUFFIXES = frozenset(
     {

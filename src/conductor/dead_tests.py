@@ -46,6 +46,7 @@ from conductor.audit_root import (
     print_audit_provenance,
     resolve_audit_root,
 )
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY
 
 ROOT = Path(__file__).resolve().parents[1]
 TEST_NAME = re.compile(r"^(test_.*|.*_test)\.py$")
@@ -66,7 +67,7 @@ CONFIG_SURFACES = frozenset(
 )
 CONFIG_PREFIXES = (".github/", ".claude/", "conductor/")
 CONFIG_SUFFIXES = (".toml", ".json", ".yml", ".yaml", ".sh", ".md", ".txt")
-CONFIG_EXCLUDED_PREFIXES = ("conductor/mutation_campaigns/",)
+CONFIG_EXCLUDED_PREFIXES = (f"{DEFAULT_MUTATION_REGISTRY.parent}/",)
 NOTES_PREFIX = "research/notes/"
 
 
