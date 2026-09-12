@@ -19,7 +19,14 @@ use crate::mutation_manifest::{
 const RECEIPT_SCHEMA: &str = "llm.mutation-testing.receipt.v3";
 const LEGACY_RECEIPT_SCHEMA: &str = "llm.mutation-testing.receipt.v2";
 const VALUE_SCHEMA: &str = "llm.mutation-testing.test-value.v1";
+/// The registry as it stood in the anchor commit. A host may keep its registry
+/// elsewhere today, so Python names the anchored spelling in the request; this is
+/// the value the monorepo anchor was written against.
 const ANCHOR_REGISTRY_PATH: &str = "conductor/mutation_campaigns/registry.json";
+
+fn default_anchor_registry_path() -> String {
+    ANCHOR_REGISTRY_PATH.to_owned()
+}
 
 fn sha256_file(path: &Path) -> Option<String> {
     fs::read(path)
@@ -34,12 +41,14 @@ pub(crate) struct RunnerState {
     pub(crate) mutation_testing_sha256: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub(crate) struct AnchorConfig {
     pub(crate) repo: String,
     pub(crate) commit: String,
     pub(crate) tree: String,
     pub(crate) receipt_prefix: String,
+    #[serde(default = "default_anchor_registry_path")]
+    pub(crate) registry_path: String,
 }
 
 pub(crate) struct Receipt {
@@ -227,9 +236,7 @@ fn legacy_receipt_anchor_errors(
     receipt: &Receipt,
     repo_root: &Path,
     anchor_repo: &Path,
-    anchor_commit: &str,
-    anchor_tree: &str,
-    receipt_prefix: &str,
+    anchor: &AnchorConfig,
     campaign: &CampaignContract,
 ) -> Vec<String> {
     if receipt.path.as_os_str().is_empty() || !receipt.parsed_bytes_available {
@@ -239,7 +246,7 @@ fn legacy_receipt_anchor_errors(
         Ok(relative) => relative,
         Err(error) => return vec![error],
     };
-    if !relative.starts_with(receipt_prefix) || !relative.ends_with(".json") {
+    if !relative.starts_with(&anchor.receipt_prefix) || !relative.ends_with(".json") {
         return vec!["legacy receipt path is outside the anchored receipt directory".to_owned()];
     }
 
@@ -260,7 +267,7 @@ fn legacy_receipt_anchor_errors(
         &[
             "cat-file".to_owned(),
             "-t".to_owned(),
-            anchor_commit.to_owned(),
+            anchor.commit.clone(),
         ],
     );
     if !successful(&commit_type)
@@ -270,10 +277,13 @@ fn legacy_receipt_anchor_errors(
     }
     let tree = git_bytes(
         anchor_repo,
-        &["rev-parse".to_owned(), format!("{anchor_commit}^{{tree}}")],
+        &[
+            "rev-parse".to_owned(),
+            format!("{}^{{tree}}", anchor.commit),
+        ],
     );
     if !successful(&tree)
-        || String::from_utf8_lossy(&tree.as_ref().expect("checked").stdout).trim() != anchor_tree
+        || String::from_utf8_lossy(&tree.as_ref().expect("checked").stdout).trim() != anchor.tree
     {
         return vec!["legacy receipt anchor tree mismatch".to_owned()];
     }
@@ -283,7 +293,7 @@ fn legacy_receipt_anchor_errors(
         &[
             "cat-file".to_owned(),
             "blob".to_owned(),
-            format!("{anchor_commit}:{ANCHOR_REGISTRY_PATH}"),
+            format!("{}:{}", anchor.commit, anchor.registry_path),
         ],
     );
     if !successful(&registry) {
@@ -309,7 +319,7 @@ fn legacy_receipt_anchor_errors(
         &[
             "cat-file".to_owned(),
             "blob".to_owned(),
-            format!("{anchor_commit}:{}", campaign.manifest),
+            format!("{}:{}", anchor.commit, campaign.manifest),
         ],
     );
     if !successful(&manifest) {
@@ -327,7 +337,7 @@ fn legacy_receipt_anchor_errors(
         anchor_repo,
         &[
             "ls-tree".to_owned(),
-            anchor_commit.to_owned(),
+            anchor.commit.clone(),
             "--".to_owned(),
             relative.clone(),
         ],
@@ -352,7 +362,7 @@ fn legacy_receipt_anchor_errors(
         &[
             "cat-file".to_owned(),
             "blob".to_owned(),
-            format!("{anchor_commit}:{relative}"),
+            format!("{}:{relative}", anchor.commit),
         ],
     );
     if !successful(&blob) || blob.as_ref().expect("checked").stdout != receipt.bytes {
@@ -650,9 +660,7 @@ pub(crate) fn receipt_errors(
             receipt,
             context.repo_root,
             context.anchor_repo,
-            &context.anchor.commit,
-            &context.anchor.tree,
-            &context.anchor.receipt_prefix,
+            context.anchor,
             campaign,
         ));
     } else if schema != Some(RECEIPT_SCHEMA) {
@@ -852,10 +860,10 @@ mod generated_receipt_tests {
     use serde_json::{json, Map, Value};
 
     use super::{
-        campaign_scope_error, exact_parse_error, generated_receipt_errors,
-        legacy_receipt_anchor_errors, lineage_accepts, load_receipts, receipt_errors,
-        runner_errors, scope_error, sha256_file, value_receipt_errors, AnchorConfig, Receipt,
-        RunnerState, ValidationContext,
+        campaign_scope_error, default_anchor_registry_path, exact_parse_error,
+        generated_receipt_errors, legacy_receipt_anchor_errors, lineage_accepts, load_receipts,
+        receipt_errors, runner_errors, scope_error, sha256_file, value_receipt_errors,
+        AnchorConfig, Receipt, RunnerState, ValidationContext,
     };
     use crate::mutation_manifest::{CampaignContract, ValueContract};
 
@@ -972,6 +980,7 @@ mod generated_receipt_tests {
             commit: String::new(),
             tree: String::new(),
             receipt_prefix: String::new(),
+            registry_path: default_anchor_registry_path(),
         };
         let root = repo_root();
         ensure_binding_files(&root);
@@ -1015,6 +1024,7 @@ mod generated_receipt_tests {
             commit: String::new(),
             tree: String::new(),
             receipt_prefix: String::new(),
+            registry_path: default_anchor_registry_path(),
         };
         let root = repo_root();
         let context = ValidationContext {
@@ -1139,6 +1149,16 @@ mod generated_receipt_tests {
         }
     }
 
+    /// The same anchor with one binding varied -- the shape every negative case here
+    /// needs, now that the bindings travel together.
+    fn rebound(anchor: &AnchorConfig, commit: &str, tree: &str) -> AnchorConfig {
+        AnchorConfig {
+            commit: commit.to_owned(),
+            tree: tree.to_owned(),
+            ..anchor.clone()
+        }
+    }
+
     fn legacy_anchor_fixture() -> (PathBuf, Receipt, CampaignContract, AnchorConfig) {
         let root = std::env::temp_dir().join(format!(
             "conductor-native-anchor-{}",
@@ -1206,6 +1226,7 @@ mod generated_receipt_tests {
             commit: rev("HEAD"),
             tree: rev("HEAD^{tree}"),
             receipt_prefix: "research/reports/mutation_testing/".to_owned(),
+            registry_path: default_anchor_registry_path(),
         };
         (root, receipt, campaign, anchor)
     }
@@ -1394,6 +1415,7 @@ mod generated_receipt_tests {
             commit: String::new(),
             tree: String::new(),
             receipt_prefix: String::new(),
+            registry_path: default_anchor_registry_path(),
         };
         let components = json!({"core": "a".repeat(64)});
         let runner = RunnerState {
@@ -1533,23 +1555,14 @@ mod generated_receipt_tests {
     #[test]
     fn legacy_receipt_anchor_requires_the_committed_receipt_and_all_anchor_bindings() {
         let (root, receipt, campaign, anchor) = legacy_anchor_fixture();
-        assert!(legacy_receipt_anchor_errors(
-            &receipt,
-            &root,
-            &root,
-            &anchor.commit,
-            &anchor.tree,
-            &anchor.receipt_prefix,
-            &campaign,
-        )
-        .is_empty());
+        assert!(
+            legacy_receipt_anchor_errors(&receipt, &root, &root, &anchor, &campaign,).is_empty()
+        );
         let bad_tree = legacy_receipt_anchor_errors(
             &receipt,
             &root,
             &root,
-            &anchor.commit,
-            "0",
-            &anchor.receipt_prefix,
+            &rebound(&anchor, &anchor.commit, "0"),
             &campaign,
         );
         assert!(bad_tree.iter().any(|error| error.contains("tree mismatch")));
@@ -1572,9 +1585,7 @@ mod generated_receipt_tests {
                     &receipt,
                     &root,
                     &anchor_root,
-                    commit,
-                    tree,
-                    &anchor.receipt_prefix,
+                    &rebound(&anchor, commit, tree),
                     &campaign
                 ),
                 vec![expected.to_owned()]
@@ -1597,27 +1608,11 @@ mod generated_receipt_tests {
             parsed_bytes_available: true,
         };
         assert_eq!(
-            legacy_receipt_anchor_errors(
-                &outside_directory,
-                &root,
-                &root,
-                &anchor.commit,
-                &anchor.tree,
-                &anchor.receipt_prefix,
-                &campaign
-            ),
+            legacy_receipt_anchor_errors(&outside_directory, &root, &root, &anchor, &campaign),
             vec!["legacy receipt path is outside the anchored receipt directory".to_owned()]
         );
         assert_eq!(
-            legacy_receipt_anchor_errors(
-                &changed_bytes,
-                &root,
-                &root,
-                &anchor.commit,
-                &anchor.tree,
-                &anchor.receipt_prefix,
-                &campaign
-            ),
+            legacy_receipt_anchor_errors(&changed_bytes, &root, &root, &anchor, &campaign),
             vec!["legacy receipt parsed bytes differ from the anchor".to_owned()]
         );
         for args in [
@@ -1649,9 +1644,7 @@ mod generated_receipt_tests {
                 &receipt,
                 &root,
                 &root,
-                &revision("HEAD"),
-                &revision("HEAD^{tree}"),
-                &anchor.receipt_prefix,
+                &rebound(&anchor, &revision("HEAD"), &revision("HEAD^{tree}")),
                 &campaign
             ),
             vec!["legacy receipt is absent or unsafe at the anchor".to_owned()]
@@ -1660,17 +1653,11 @@ mod generated_receipt_tests {
             parsed_bytes_available: false,
             ..receipt
         };
-        assert!(legacy_receipt_anchor_errors(
-            &unavailable,
-            &root,
-            &root,
-            &anchor.commit,
-            &anchor.tree,
-            &anchor.receipt_prefix,
-            &campaign,
-        )
-        .iter()
-        .any(|error| error.contains("path or parsed bytes")));
+        assert!(
+            legacy_receipt_anchor_errors(&unavailable, &root, &root, &anchor, &campaign,)
+                .iter()
+                .any(|error| error.contains("path or parsed bytes"))
+        );
         std::fs::remove_dir_all(root).expect("fixture cleanup");
     }
 
@@ -1688,6 +1675,7 @@ mod generated_receipt_tests {
             commit: String::new(),
             tree: String::new(),
             receipt_prefix: String::new(),
+            registry_path: default_anchor_registry_path(),
         };
         let root = repo_root();
         ensure_binding_files(&root);
@@ -1728,6 +1716,7 @@ mod generated_receipt_tests {
                 commit: String::new(),
                 tree: String::new(),
                 receipt_prefix: String::new(),
+                registry_path: default_anchor_registry_path(),
             };
             let context = ValidationContext {
                 repo_root: &root,
@@ -1773,6 +1762,7 @@ mod generated_receipt_tests {
             commit: String::new(),
             tree: String::new(),
             receipt_prefix: String::new(),
+            registry_path: default_anchor_registry_path(),
         };
         let root = repo_root();
         let context = ValidationContext {

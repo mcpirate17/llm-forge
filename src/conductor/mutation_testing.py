@@ -64,6 +64,7 @@ from conductor.mutation_campaign_model import (  # noqa: F401
     source_drift,
     symbol_hashes,
 )
+from conductor.mutation_testing_support import ANCHOR_REGISTRY_PATH
 from conductor.project_paths import host_root, registry_relative
 from conductor.mutation_scope import (
     CampaignError,
@@ -479,6 +480,7 @@ def _native_anchor_payload(repo_root: Path, anchor_repo: Path | None) -> dict[st
         "commit": LEGACY_RECEIPT_ANCHOR_COMMIT,
         "tree": LEGACY_RECEIPT_ANCHOR_TREE,
         "receipt_prefix": LEGACY_RECEIPT_PREFIX,
+        "registry_path": ANCHOR_REGISTRY_PATH,
     }
 
 
