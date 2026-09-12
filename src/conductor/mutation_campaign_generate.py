@@ -464,6 +464,28 @@ def changed_sources(
     return {p for p in paths if (repo_root / p).exists()}
 
 
+def _admit_extra_tests(
+    paired: list[dict], unpaired: list[dict], extra_tests: Mapping[str, Sequence[str]]
+) -> tuple[list[dict], list[dict]]:
+    """Bind tests that exercise a subject without being named after it.
+
+    Name matching is the cheap proxy and `--extra-test source=test` is the
+    operator's answer for the case it misses: a module defended only by a test
+    named after something else otherwise stays unpaired and gets no campaign.
+    """
+
+    by_source = {str(s["source"]): s for s in paired}
+    still_unpaired = [s for s in unpaired if s["source"] not in extra_tests]
+    for subject in unpaired:
+        if subject["source"] in extra_tests:
+            by_source[str(subject["source"])] = {**subject, "tests": []}
+    for source, tests in extra_tests.items():
+        if source not in by_source:
+            raise CampaignError(f"--extra-test names no python subject: {source}")
+        by_source[source]["tests"] = sorted({*by_source[source]["tests"], *tests})
+    return list(by_source.values()), still_unpaired
+
+
 def _plan_python(
     *,
     repo_root: Path,
@@ -472,10 +494,11 @@ def _plan_python(
     owner: str,
     day: str,
     run_timeout_seconds: int,
+    extra_tests: Mapping[str, Sequence[str]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
     """Manifests, unpaired subjects and already-covered sources for python."""
 
-    paired, unpaired = python_subjects(repo_root)
+    paired, unpaired = _admit_extra_tests(*python_subjects(repo_root), extra_tests)
     if scope is not None:
         # A changed test is in scope as much as a changed source: editing only
         # `test_x.py` is exactly the case the campaign for `x.py` must cover.
@@ -568,6 +591,7 @@ def plan(
     run_timeout_seconds: int = 1800,
     only_sources: Sequence[str] | None = None,
     include_covered: bool = False,
+    extra_tests: Mapping[str, Sequence[str]] | None = None,
 ) -> dict[str, Any]:
     """What `write` would emit, plus the subjects it refuses to emit anything for.
 
@@ -585,6 +609,8 @@ def plan(
 
     if language not in ("python", "rust"):
         raise CampaignError(f"unknown language {language!r}; known: python, rust")
+    if extra_tests and language != "python":
+        raise CampaignError("--extra-test pairs python subjects only")
     day = day or datetime.now(UTC).strftime("%Y%m%d")
     covered = set() if include_covered else existing_subjects(repo_root)
     scope = set(only_sources) if only_sources is not None else None
@@ -599,6 +625,7 @@ def plan(
             owner=owner,
             day=day,
             run_timeout_seconds=run_timeout_seconds,
+            extra_tests=extra_tests or {},
         )
     else:
         manifests, already, untested = _plan_rust(
@@ -931,6 +958,24 @@ def _explicit_scope(paths: Sequence[str], *, repo_root: Path = REPO_ROOT) -> lis
     return sorted(set(scope))
 
 
+def _extra_tests(
+    pairs: Sequence[str], *, repo_root: Path = REPO_ROOT
+) -> dict[str, list[str]]:
+    """Parse `--extra-test SOURCE=TEST` into exact repository-relative pairs."""
+
+    extra: dict[str, list[str]] = {}
+    for raw in pairs:
+        source, sep, test = raw.partition("=")
+        if not sep:
+            raise CampaignError(f"--extra-test wants SOURCE=TEST, got {raw!r}")
+        (source,) = _explicit_scope([source], repo_root=repo_root)
+        (test,) = _explicit_scope([test], repo_root=repo_root)
+        if not _is_test(test, PurePosixPath(test).name):
+            raise CampaignError(f"--extra-test target is not a test file: {test}")
+        extra.setdefault(source, []).append(test)
+    return extra
+
+
 def _cli_parser() -> argparse.ArgumentParser:
     """Build the generated-campaign CLI without coupling parsing to execution."""
 
@@ -944,6 +989,13 @@ def _cli_parser() -> argparse.ArgumentParser:
     shared.add_argument("--jobs", type=int, default=4, help="Rust workers per crate")
     shared.add_argument("--run-timeout", type=int, default=1800)
     shared.add_argument("--only", action="append", default=[])
+    shared.add_argument(
+        "--extra-test",
+        action="append",
+        default=[],
+        metavar="SOURCE=TEST",
+        help="also score SOURCE with TEST when no test is named after SOURCE",
+    )
     shared.add_argument(
         "--include-covered",
         action="store_true",
@@ -1029,6 +1081,7 @@ def _run_plan_or_write(args: argparse.Namespace) -> dict[str, Any]:
         run_timeout_seconds=args.run_timeout,
         only_sources=scope,
         include_covered=args.include_covered,
+        extra_tests=_extra_tests(args.extra_test),
     )
     return {
         **result,

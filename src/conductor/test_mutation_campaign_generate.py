@@ -1075,3 +1075,45 @@ def test_a_narrow_second_campaign_may_be_planned_over_a_covered_source(
         ["conductor/subject.py"]
     ]
     assert narrow["already_covered"] == []
+
+
+def test_an_extra_test_pairs_a_subject_no_test_is_named_after(tmp_path: Path) -> None:
+    """`--extra-test` is the only way a module tested under another name gets a campaign."""
+
+    tree(
+        tmp_path,
+        {
+            "research/tools/overrides.py": "x = 1\n",
+            "research/tools/report.py": "x = 1\n",
+            "research/tests/test_report.py": "def test_x(): pass\n",
+        },
+    )
+    extra = {"research/tools/overrides.py": ["research/tests/test_report.py"]}
+    without = plan("python", repo_root=tmp_path, day="20260912")
+    assert [u["source"] for u in without["unpaired"]] == ["research/tools/overrides.py"]
+    result = plan("python", repo_root=tmp_path, day="20260912", extra_tests=extra)
+    assert result["unpaired"] == []
+    by_source = {m["generator"]["source"][0]: m for m in result["manifests"]}
+    manifest = by_source["research/tools/overrides.py"]
+    assert manifest["test_argv"][5:] == ["research/tests/test_report.py"]
+    assert set(manifest["test_sha256"]) == {"research/tests/test_report.py"}
+    assert by_source["research/tools/report.py"]["test_argv"][5:] == [
+        "research/tests/test_report.py"
+    ]
+    with pytest.raises(CampaignError, match="names no python subject"):
+        plan("python", repo_root=tmp_path, extra_tests={"research/tools/gone.py": []})
+    with pytest.raises(CampaignError, match="python subjects only"):
+        plan("rust", repo_root=tmp_path, extra_tests=extra)
+    parsed = campaign_generate._extra_tests(
+        ["research/tools/overrides.py=research/tests/test_report.py"],
+        repo_root=tmp_path,
+    )
+    assert parsed == extra
+    with pytest.raises(CampaignError, match="not a test file"):
+        campaign_generate._extra_tests(
+            ["research/tools/overrides.py=research/tools/report.py"], repo_root=tmp_path
+        )
+    with pytest.raises(CampaignError, match="SOURCE=TEST"):
+        campaign_generate._extra_tests(
+            ["research/tools/overrides.py"], repo_root=tmp_path
+        )
