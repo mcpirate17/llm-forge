@@ -1,0 +1,40 @@
+{
+  "campaign_id": "forge_fest_adapter_fixture_gate_rollout",
+  "title": "Fixture: gate_rollout, scoped for the fest adapter unit tests",
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "environment": {},
+  "generator": {
+    "source": [
+      "src/conductor/gate_rollout.py"
+    ],
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "seed": 0,
+    "jobs": 1,
+    "mutant_timeout_seconds": 30,
+    "run_timeout_seconds": 900
+  },
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "src/conductor/test_gate_rollout.py"
+  ],
+  "source_sha256": {
+    "src/conductor/gate_rollout.py": "fac6cb6610099c46b9049a846b30b7d508cc9eb31a0c8db5cf895ce85f01f901"
+  },
+  "test_sha256": {
+    "src/conductor/test_gate_rollout.py": "cff720453c1a881ef4e5e248e70cbfb2c866735577366ab440a7ce5ccd2c726a"
+  },
+  "survivor_baseline": [
+    "constant_replace-000000000001-0"
+  ],
+  "survivor_baseline_note": "Placeholder ratchet for adapter unit tests only -- this manifest is not a live campaign and is never handed to the real fest binary in this suite.",
+  "survivor_baseline_recorded": true
+}

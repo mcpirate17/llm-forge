@@ -16,7 +16,10 @@ from conductor.mutation_engine_generated import load_generated_campaign
 from conductor.mutation_scope import CampaignError
 
 WORKTREE = Path("/snap/worktree")
-REPO_ROOT = Path(__file__).resolve().parents[1]
+FEST_FIXTURE_MANIFEST = (
+    Path(__file__).resolve().parent
+    / "testdata/fest/generated_fest_campaign_fixture.json"
+)
 
 
 def mutant(
@@ -176,12 +179,16 @@ def test_coverage_is_measured_over_directories_never_a_single_file() -> None:
 
 
 def test_the_campaign_under_test_is_wired_end_to_end() -> None:
-    """The manifest this adapter was proven on is loadable and pins a real file."""
+    """A self-contained fixture manifest is loadable and pins a real file.
 
-    loaded = load_generated_campaign(
-        REPO_ROOT
-        / "conductor/mutation_campaigns/claude_gate_rollout_fest_20260906.json"
-    )
+    llm-forge carries no live fest campaign of its own yet (the registry this
+    package resolves via ``conductor.project_paths`` is empty), so this
+    manifest exists only to exercise the loader and ``_coverage_targets`` /
+    ``_rows`` contracts, scoped to a real module-and-test pair this repo
+    actually ships: ``src/conductor/gate_rollout.py``.
+    """
+
+    loaded = load_generated_campaign(FEST_FIXTURE_MANIFEST)
     assert loaded.mutation_engine == "fest"
-    assert loaded.source == ("conductor/gate_rollout.py",)
+    assert loaded.source == ("src/conductor/gate_rollout.py",)
     assert loaded.survivor_baseline, "the recorded survivor baseline must not be empty"

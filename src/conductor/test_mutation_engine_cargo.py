@@ -20,8 +20,12 @@ from conductor.mutation_engine_cargo import (
 from conductor.mutation_engine_generated import load_generated_campaign
 from conductor.mutation_scope import CampaignError
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 CRATE = "tooling/native/snapshot-retention"
+CARGO_FIXTURE_MANIFEST = (
+    Path(__file__).resolve().parent
+    / "testdata/cargo/generated_cargo_campaign_fixture.json"
+)
 
 
 def outcome(
@@ -73,12 +77,17 @@ def baseline(summary: str = "Success") -> dict[str, object]:
 
 
 def campaign(tmp_path: Path | None = None):
-    """The committed Rust campaign."""
+    """A self-contained fixture campaign, scoped to a real crate in this repo.
 
-    return load_generated_campaign(
-        REPO_ROOT
-        / "conductor/mutation_campaigns/claude_snapshot_retention_cargo_20260906.json"
-    )
+    llm-forge carries no live cargo-mutants campaign of its own yet (the
+    registry this package resolves via ``conductor.project_paths`` is empty).
+    This manifest exists only to exercise the adapter's own contracts --
+    ``_engine_argv`` and the manifest loader -- so it pins a real file in
+    ``native/conductor-native`` rather than a monorepo crate this repo does
+    not have.
+    """
+
+    return load_generated_campaign(CARGO_FIXTURE_MANIFEST)
 
 
 def test_a_mutant_that_never_compiled_is_not_a_kill() -> None:
@@ -174,7 +183,7 @@ def test_the_invocation_pins_every_bound_from_the_manifest() -> None:
     assert argv[argv.index("--output") + 1] == "/out"
     assert argv[argv.index("--jobs") + 1] == str(subject.jobs)
     assert argv[argv.index("--timeout") + 1] == str(subject.mutant_timeout_seconds)
-    assert argv[argv.index("--package") + 1] == "snapshot-retention"
+    assert argv[argv.index("--package") + 1] == "conductor-native"
     assert argv[argv.index("--manifest-path") + 1].endswith("Cargo.toml")
 
     # Every glob reaches the tool: a dropped one silently narrows the corpus.
@@ -261,7 +270,7 @@ def test_a_crate_without_a_manifest_path_is_refused(tmp_path: Path) -> None:
 
 
 def test_the_campaign_under_test_is_wired_end_to_end() -> None:
-    """The manifest this adapter was proven on is loadable and pins a real file."""
+    """The fixture manifest is loadable and pins a real file in this repo."""
 
     loaded = campaign()
     assert loaded.mutation_engine == "cargo-mutants"
