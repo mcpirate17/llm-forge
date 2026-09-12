@@ -1,0 +1,2518 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 36,
+    "baseline_repetitions": 2,
+    "killed_mutants": 36,
+    "ranked_tests": 10,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.401552,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                                              [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m11 passed\u001b[0m\u001b[32m in 0.13s\u001b[0m\u001b[0m\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-evidence-hash/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_campaign_model.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "llm-b0_mutation_campaign_model_fest_20260912",
+  "classification_required": [],
+  "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "engine_result": {
+    "duration_seconds": 8.796265,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-icz9o7r1/worktree/src/conductor/mutation_campaign_model.py\",\n        \"line\": 462,\n        \"column\": 9,\n        \"byte_offset\": 17296,\n        \"byte_length\": 79,\n        \"original_text\": \"raise CampaignError(\\\"mutation registry must be inside the repository\\\") from exc\",\n        \"mutated_text\": \"pass\",\n        \"mutator_name\": \"exception_swallow\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-icz9o7r1/worktree/src/conductor/mutation_campaign_model.py\",\n        \"line\": 463,\n        \"column\": 12,\n        \"byte_offset\": 17387,\n        \"byte_length\": 312,\n        \"original_text\": \"_require_mapping(\\n        _native_json_call(\\n            \\\"load_mutation_registry_native\\\",\\n            {\\n                \\\"repo_root\\\": str(root),\\n                \\\"registry_path\\\": relative,\\n                \\\"canonical_test_patterns\\\": list(CANONICAL_TEST_PATTERNS),\\n            },\\n        ),\\n        \\\"registry\\\",\\n    )\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-icz9o7r1/worktree/src/conductor/mutation_campaign_model.py\",\n        \"line\": 465,\n        \"column\": 13,\n        \"byte_offset\": 17444,\n        \"byte_length\": 31,\n        \"original_text\": \"\\\"load_mutation_registry_native\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-icz9o7r1/worktree/src/conductor/mutation_campaign_model.py\",\n        \"line\": 467,\n        \"column\": 17,\n        \"byte_offset\": 17507,\n        \"byte_length\": 11,\n        \"original_text\": \"\\\"repo_root\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-icz9o7r1/worktree/src/conductor/mutation_campaign_model.py\",\n        \"line\": 468,\n        \"column\": 17,\n        \"byte_offset\": 17547,\n        \"byte_length\": 15,\n        \"original_text\": \"\\\"registry_path\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-icz9o7r1/worktree/src/conductor/mutation_campaign_model.py\",\n        \"line\": 469,\n        \"column\": 17,\n        \"byte_offset\": 17590,\n        \"byte_length\": 25,\n        \"original_text\": \"\\\"canonical_test_patterns\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-icz9o7r1/worktree/src/conductor/mutation_campaign_model.py\",\n        \"line\": 472,\n        \"column\": 9,\n        \"byte_offset\": 17682,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"registry\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 8,\n    \"nanos\": 791437191\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 36,
+    "mutants_generated": 138,
+    "mutants_tested": 36,
+    "no_coverage": 102,
+    "survived": 0,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-12T22:53:13.466093+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-evidence-hash/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/llm-b0_mutation_campaign_model_fest_20260912.json",
+  "manifest_sha256": "39aef62e9b7e0528dbd1acbe8ad587295648a329d41b75e57a3634a539639d3a",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 661,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7643e72e2b23-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Campaign manifests, runner hashing and drift -- the model half of the runner.\n\n`conductor.mutation_testing` orchestrates campaigns; this module owns what a campaign\nIS: the manifest dataclasses, the hashes that pin it to a tree, and the two drift\nquestions the framework asks before trusting evidence -- has the source moved\n(`source_drift`), and is there still a receipt the gate accepts (`receipt_drift`,\nwhich lives with the receipt validators in `mutation_testing`).\n\nBoth halves are runner components: a change here invalidates receipts exactly as a\nchange to the orchestrator does, which is why this path is named in\n`RUNNER_COMPONENT_PATHS` below.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 33,
+      "byte_offset": 1248,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6883ff8a06df-0",
+      "line": 38,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"llm.mutation-testing.receipt.v3\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 33,
+      "byte_offset": 1306,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-fa773f48b4ea-0",
+      "line": 39,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"llm.mutation-testing.receipt.v2\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 42,
+      "byte_offset": 1371,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-bcf43cd9432f-0",
+      "line": 40,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"61343f575215dd222a74fc2c060d0328692ded5e\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 42,
+      "byte_offset": 1443,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5b6c9302f8d5-0",
+      "line": 41,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"b01877ba62c32445f7649450f9b395dd70de306a\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 40,
+      "byte_offset": 1510,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9a015d66dcbc-0",
+      "line": 42,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_campaigns/receipts/\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 1574,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-25af7c11c318-0",
+      "line": 43,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"^[0-9a-f]{64}$\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 1672,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-bf53222d923c-0",
+      "line": 45,
+      "mutated_text": "12001",
+      "operator": "constant_replace",
+      "original_text": "12_000",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2420,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-707c0a495a35-0",
+      "line": 55,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 38,
+      "byte_offset": 2474,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6c235d52d0a5-0",
+      "line": 57,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_campaign_model.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 35,
+      "byte_offset": 2518,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f4b4bbfd5154-0",
+      "line": 58,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_patch_apply.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 37,
+      "byte_offset": 2559,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8f904636fcdc-0",
+      "line": 59,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_receipt_build.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 2602,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-27f9f51a5d38-0",
+      "line": 60,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_scope.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 31,
+      "byte_offset": 2637,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-d3ee14d5a141-0",
+      "line": 61,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_testing.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 39,
+      "byte_offset": 2674,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-fa3c5d4c725e-0",
+      "line": 62,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_testing_support.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 2719,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-fe19a7d21627-0",
+      "line": 63,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_value.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 2754,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5e2e8d66c147-0",
+      "line": 64,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/snapshot_worktree.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 58,
+      "byte_offset": 2792,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c451ff7fdb64-0",
+      "line": 65,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tooling/native/conductor-native/src/mutation_evidence.rs\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 58,
+      "byte_offset": 2856,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-45dbe154ff6d-0",
+      "line": 66,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tooling/native/conductor-native/src/mutation_manifest.rs\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 57,
+      "byte_offset": 2920,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-be5abc858875-0",
+      "line": 67,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tooling/native/conductor-native/src/mutation_receipt.rs\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 2983,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-812645245ab2-0",
+      "line": 71,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@dataclass(frozen=True, slots=True)\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 71,
+      "byte_offset": 3041,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-d0821141fd0b-0",
+      "line": 73,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"One test selected for a campaign, ordered by contract importance.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 3183,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-812645245ab2-1",
+      "line": 81,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@dataclass(frozen=True, slots=True)\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 69,
+      "byte_offset": 3246,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a6d735d122cf-0",
+      "line": 83,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"A mutation design slot that contains no executable code change.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 3438,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-812645245ab2-2",
+      "line": 92,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@dataclass(frozen=True, slots=True)\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 73,
+      "byte_offset": 3494,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6dea2f021492-0",
+      "line": 94,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"One materialized, first-order mutation represented by a patch file.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 3708,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-812645245ab2-3",
+      "line": 103,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@dataclass(frozen=True, slots=True)\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 3764,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9ffc33fb80b8-0",
+      "line": 105,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Validated mutation campaign loaded from a machine-readable manifest.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 4827,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-68eec4da4de3-0",
+      "line": 130,
+      "mutated_text": "True",
+      "operator": "constant_replace",
+      "original_text": "False",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 4944,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-812645245ab2-4",
+      "line": 135,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@dataclass(frozen=True, slots=True)\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 68,
+      "byte_offset": 5005,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-779317acab7c-0",
+      "line": 137,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Bounded subprocess evidence for a baseline or mutant test run.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 40,
+      "byte_offset": 5242,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-203c493b0454-0",
+      "line": 146,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Return a JSON-safe representation.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 250,
+      "byte_offset": 5299,
+      "duration_seconds": 0.0,
+      "id": "return_value-5b35c63dd4d8-0",
+      "line": 148,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{\n            \"returncode\": self.returncode,\n            \"timed_out\": self.timed_out,\n            \"duration_seconds\": round(self.duration_seconds, 6),\n            \"stdout_tail\": self.stdout_tail,\n            \"stderr_tail\": self.stderr_tail,\n        }",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 5313,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-942d12c174e0-0",
+      "line": 149,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"returncode\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 5356,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-be50b4fbd997-0",
+      "line": 150,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"timed_out\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 5397,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-10be8348542c-0",
+      "line": 151,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"duration_seconds\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5446,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-753118f0448b-0",
+      "line": 151,
+      "mutated_text": "7",
+      "operator": "constant_replace",
+      "original_text": "6",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 5462,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-92a55f7d013b-0",
+      "line": 152,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"stdout_tail\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 5507,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-4f4bf2d61f88-0",
+      "line": 153,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"stderr_tail\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 75,
+      "byte_offset": 5616,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6578ab3ed2fe-0",
+      "line": 158,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Materialize one normalized native row as its stable Python dataclass.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 37,
+      "byte_offset": 5841,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-2a35c13cbd38-0",
+      "line": 164,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "(\"allowed_paths\", \"expected_killers\")",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 5891,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-60fde9386c60-0",
+      "line": 165,
+      "mutated_text": "not (name in values)",
+      "operator": "negate_condition",
+      "original_text": "name in values",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5896,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-6c73adcb6ba6-0",
+      "line": 165,
+      "mutated_text": "not in",
+      "operator": "comparison_op",
+      "original_text": "in",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 5961,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-9bbc3e05ff2a-0",
+      "line": 167,
+      "mutated_text": "not (\"patch_file\" in values)",
+      "operator": "negate_condition",
+      "original_text": "\"patch_file\" in values",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 5961,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e33c23bc15c5-0",
+      "line": 167,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"patch_file\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5974,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-6c73adcb6ba6-1",
+      "line": 167,
+      "mutated_text": "not in",
+      "operator": "comparison_op",
+      "original_text": "in",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 6028,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e33c23bc15c5-1",
+      "line": 168,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"patch_file\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 6054,
+      "duration_seconds": 0.0,
+      "id": "return_value-294a051845b9-0",
+      "line": 169,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "model(**values)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 68,
+      "byte_offset": 6165,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b88df90db081-0",
+      "line": 176,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Call one native mutation primitive and decode its JSON result.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 6475,
+      "duration_seconds": 0.253472,
+      "id": "return_value-ff75b4e26487-0",
+      "line": 185,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "json.loads(encoded)",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 38,
+      "byte_offset": 6586,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-1f960297fb33-0",
+      "line": 187,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(str(exc)) from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 73,
+      "byte_offset": 6686,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-97c30049364a-0",
+      "line": 191,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Extract and validate repository-relative paths from a unified diff.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 51,
+      "byte_offset": 6852,
+      "duration_seconds": 0.0,
+      "id": "return_value-ef545fe28c31-0",
+      "line": 196,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "tuple(mutation_patch_paths_native(str(patch_path)))",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 38,
+      "byte_offset": 6973,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-1f960297fb33-1",
+      "line": 198,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(str(exc)) from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 373,
+      "byte_offset": 7105,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-674dbcd2ea2a-0",
+      "line": 202,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Build one test scope from the native loader's row.\n\n    A generated campaign names its test files in the run command instead of\n    enumerating nodeids, so the loader reports `selection: \"test_argv\"` and no\n    inventory. Reading `inventory` unconditionally is what made every generated\n    manifest unloadable from Python while the native validator accepted it.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 7506,
+      "duration_seconds": 0.271443,
+      "id": "constant_replace-688bbcb8fafa-0",
+      "line": 210,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"selection\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 7519,
+      "duration_seconds": 0.227355,
+      "id": "constant_replace-e8a0bb59f20c-0",
+      "line": 210,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"nodeids\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 7537,
+      "duration_seconds": 0.261492,
+      "id": "negate_condition-d792f32dc10b-0",
+      "line": 211,
+      "mutated_text": "not (selection == \"test_argv\")",
+      "operator": "negate_condition",
+      "original_text": "selection == \"test_argv\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 7547,
+      "duration_seconds": 0.25125,
+      "id": "comparison_op-b64746cba1f5-0",
+      "line": 211,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 7550,
+      "duration_seconds": 0.241079,
+      "id": "constant_replace-6927f1d95b48-0",
+      "line": 211,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"test_argv\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 166,
+      "byte_offset": 7578,
+      "duration_seconds": 0.243473,
+      "id": "return_value-1d581fe00f10-0",
+      "line": 212,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "TestFileScope(\n            path=relative,\n            mode=scope[\"mode\"],\n            inventory=\"\",\n            nodeids=(),\n            selection=selection,\n        )",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 179,
+      "byte_offset": 7756,
+      "duration_seconds": 0.240925,
+      "id": "return_value-b7d75f9b18d5-0",
+      "line": 219,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "TestFileScope(\n        path=relative,\n        mode=scope[\"mode\"],\n        inventory=scope[\"inventory\"],\n        nodeids=tuple(scope[\"nodeids\"]),\n        selection=selection,\n    )",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory"
+      ]
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 8017,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-49ade8098b1c-0",
+      "line": 229,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Load a mutation campaign through the native deterministic validator.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 79,
+      "byte_offset": 8277,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-206e7b95e8c0-0",
+      "line": 236,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(\"campaign manifest must be inside the repository\") from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 76,
+      "byte_offset": 8507,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-9a8750a1c851-0",
+      "line": 240,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(f\"cannot load campaign {manifest_path}: {exc}\") from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 31,
+      "byte_offset": 8624,
+      "duration_seconds": 0.262105,
+      "id": "constant_replace-e139ee6e460f-0",
+      "line": 242,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"load_mutation_campaign_native\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 8666,
+      "duration_seconds": 0.262651,
+      "id": "constant_replace-cb05eab3c8e9-0",
+      "line": 243,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"repo_root\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 8690,
+      "duration_seconds": 0.240012,
+      "id": "constant_replace-0e9db22b2979-0",
+      "line": 243,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"manifest_path\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 8769,
+      "duration_seconds": 0.240898,
+      "id": "constant_replace-87568bc76b7e-0",
+      "line": 245,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"native mutation campaign\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 9298,
+      "duration_seconds": 0.244918,
+      "id": "constant_replace-cba416c874fd-0",
+      "line": 257,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"value_analysis\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 62,
+      "byte_offset": 9612,
+      "duration_seconds": 0.238906,
+      "id": "exception_swallow-2e735de805ae-0",
+      "line": 263,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(f\"invalid value_analysis: {exc}\") from exc",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded"
+      ]
+    },
+    {
+      "byte_length": 100,
+      "byte_offset": 10114,
+      "duration_seconds": 0.244835,
+      "id": "zero_iteration_loop-97cc2649d74b-0",
+      "line": 277,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "(\n        \"test_argv\",\n        \"blocked_process_substrings\",\n        \"host_read_dependencies\",\n    )",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 10308,
+      "duration_seconds": 0.239339,
+      "id": "constant_replace-404d2ebde3dc-0",
+      "line": 283,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"survivor_baseline\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 10345,
+      "duration_seconds": 0.249351,
+      "id": "return_value-262fcc192bd6-0",
+      "line": 284,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "Campaign(**kwargs)",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 43,
+      "byte_offset": 10485,
+      "duration_seconds": 0.233528,
+      "id": "zero_iteration_loop-de4f46bbbaff-0",
+      "line": 290,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "iter(lambda: handle.read(1024 * 1024), b\"\")",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 10515,
+      "duration_seconds": 0.241969,
+      "id": "arithmetic_op-2dba4af8020d-0",
+      "line": 290,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 10574,
+      "duration_seconds": 0.232646,
+      "id": "return_value-f51fa366b55f-0",
+      "line": 292,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "digest.hexdigest()",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ]
+    },
+    {
+      "byte_length": 706,
+      "byte_offset": 10636,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-59ee7ab1d063-0",
+      "line": 296,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Where a bare ``conductor/...`` (or ``tooling/...``) runner-component path\n    resolves from -- the directory the ``conductor`` package sits inside, per this\n    tree's own configuration.\n\n    Every ``RUNNER_COMPONENT_PATHS`` entry, and the receipt-side core/adapter/\n    scope-guard bindings the native validator pins, are spelled root-relative in\n    the monorepo's own layout (``conductor/...``). Under a src layout that literal\n    must join onto ``src/``, not the git root -- ``package_tree_root`` finds the\n    tree whose own configuration resolves the package back to ``_PACKAGE_DIR``,\n    and this is one level above that resolved package, exactly where those\n    literals expect to land.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 30,
+      "byte_offset": 11403,
+      "duration_seconds": 0.227924,
+      "id": "return_value-79d6d8ab96f6-0",
+      "line": 310,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "package_path(tree_root).parent",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_runner_component_root_is_the_repo_root_under_a_flat_layout",
+        "src/conductor/test_mutation_campaign_model.py::test_runner_component_root_resolves_this_repository_to_src"
+      ]
+    },
+    {
+      "byte_length": 71,
+      "byte_offset": 11491,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f61abb3eaebc-0",
+      "line": 314,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Bind every first-party module that can affect mutation execution.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 11655,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-e71403888daa-0",
+      "line": 318,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "RUNNER_COMPONENT_PATHS",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 11699,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-5e2b9118b54f-0",
+      "line": 319,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 11721,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-ded2b48204d2-0",
+      "line": 320,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 39,
+      "byte_offset": 11721,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-4a13787be0c0-0",
+      "line": 320,
+      "mutated_text": "not (not path.is_file() or path.is_symlink())",
+      "operator": "negate_condition",
+      "original_text": "not path.is_file() or path.is_symlink()",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 11740,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-707c0a495a35-1",
+      "line": 320,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 11943,
+      "duration_seconds": 0.0,
+      "id": "return_value-dfa73ce054b7-0",
+      "line": 325,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "components",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 40,
+      "byte_offset": 11978,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b6e2b8c79cfe-0",
+      "line": 328,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_runner_lineage.json\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 322,
+      "byte_offset": 12093,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-893503e5b421-0",
+      "line": 332,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Return whether a runner-component map is explicitly accepted.\n\n    ``package_root`` must be the directory a bare ``conductor/...`` runner-component\n    path resolves from -- ``runner_component_root()``'s return value -- not the git\n    root, so this agrees with ``_runner_components_sha256`` under a src layout.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 370,
+      "byte_offset": 12519,
+      "duration_seconds": 0.230418,
+      "id": "return_value-e9818697f733-0",
+      "line": 342,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "bool(\n            mutation_runner_lineage_accepts_native(\n                json.dumps(\n                    {\n                        \"package_root\": str(package_root.resolve()),\n                        \"recorded\": recorded,\n                    },\n                    ensure_ascii=False,\n                    separators=(\",\", \":\"),\n                )\n            )\n        )",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root",
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_refuses_a_map_the_file_does_not_declare"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 12651,
+      "duration_seconds": 0.248619,
+      "id": "constant_replace-7bd86bf62cf2-0",
+      "line": 346,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"package_root\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root",
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_refuses_a_map_the_file_does_not_declare"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 12720,
+      "duration_seconds": 0.234926,
+      "id": "constant_replace-154790bcba2d-0",
+      "line": 347,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"recorded\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root",
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_refuses_a_map_the_file_does_not_declare"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 12963,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-998185d14dcf-0",
+      "line": 355,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "return False",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 12970,
+      "duration_seconds": 0.0,
+      "id": "return_value-1d46abd54326-0",
+      "line": 355,
+      "mutated_text": "True",
+      "operator": "return_value",
+      "original_text": "False",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 12970,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-68eec4da4de3-1",
+      "line": 355,
+      "mutated_text": "True",
+      "operator": "constant_replace",
+      "original_text": "False",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 608,
+      "byte_offset": 13031,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5e6b638b0c17-0",
+      "line": 359,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"AST hash per top-level symbol, and per method, in a Python file.\n\n    `ast.dump(..., include_attributes=False)` drops line and column numbers, so a\n    comment, a docstring reflow, an import added above, or any edit to a NEIGHBOURING\n    function leaves a symbol's hash untouched. Only a change to that symbol's own\n    syntax tree moves it. That is the whole point: a campaign pins the functions its\n    mutants actually touch, and edits elsewhere in the file stop voiding it.\n\n    Raises rather than returning a partial map: a file that cannot be parsed must not\n    silently produce \"no drift\".\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 13772,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-8e96b1e42848-0",
+      "line": 373,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(f\"cannot inventory symbols in {path}: {exc}\") from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 14181,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-116cac4654d7-0",
+      "line": 382,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "tree.body",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 14203,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-ded2b48204d2-1",
+      "line": 383,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 14203,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-9098be0266cb-0",
+      "line": 383,
+      "mutated_text": "not (not isinstance(node, definition))",
+      "operator": "negate_condition",
+      "original_text": "not isinstance(node, definition)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 14249,
+      "duration_seconds": 0.0,
+      "id": "break_continue-5ff111be09a2-0",
+      "line": 384,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 30,
+      "byte_offset": 14301,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-37d10aefe12a-0",
+      "line": 386,
+      "mutated_text": "not (isinstance(node, ast.ClassDef))",
+      "operator": "negate_condition",
+      "original_text": "isinstance(node, ast.ClassDef)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 14358,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-873c7ced00a5-0",
+      "line": 387,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "node.body",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 58,
+      "byte_offset": 14388,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-28e9e21a9151-0",
+      "line": 388,
+      "mutated_text": "not (isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)))",
+      "operator": "negate_condition",
+      "original_text": "isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 14522,
+      "duration_seconds": 0.0,
+      "id": "return_value-a4a7a8335c0d-0",
+      "line": 390,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "hashes",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 61,
+      "byte_offset": 14609,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-74bd1c432ef9-0",
+      "line": 394,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Return native file drift plus CPython-AST symbol drift.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 14952,
+      "duration_seconds": 0.237346,
+      "id": "negate_condition-39fa0a36f82b-0",
+      "line": 402,
+      "mutated_text": "not (campaign.generated)",
+      "operator": "negate_condition",
+      "original_text": "campaign.generated",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 15237,
+      "duration_seconds": 0.230803,
+      "id": "zero_iteration_loop-d3deb72839d2-0",
+      "line": 407,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "bindings",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 30,
+      "byte_offset": 15295,
+      "duration_seconds": 0.247133,
+      "id": "constant_replace-a19f361c806e-0",
+      "line": 409,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutation_source_drift_native\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 15357,
+      "duration_seconds": 0.250246,
+      "id": "constant_replace-cb05eab3c8e9-1",
+      "line": 411,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"repo_root\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 15407,
+      "duration_seconds": 0.257671,
+      "id": "constant_replace-890f865066f9-0",
+      "line": 412,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"source_sha256\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 15452,
+      "duration_seconds": 0.279029,
+      "id": "constant_replace-7f46fe3dd583-0",
+      "line": 413,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"source_symbols\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 15495,
+      "duration_seconds": 0.252608,
+      "id": "constant_replace-a8c5c473f674-0",
+      "line": 414,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"symbol_hashes\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 15556,
+      "duration_seconds": 0.228714,
+      "id": "boolean_op-ded2b48204d2-2",
+      "line": 417,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 102,
+      "byte_offset": 15556,
+      "duration_seconds": 0.23277,
+      "id": "negate_condition-c0dfce2dcf07-0",
+      "line": 417,
+      "mutated_text": "not (not isinstance(result, list) or not all(\n            isinstance(row, dict) for row in result\n        ))",
+      "operator": "negate_condition",
+      "original_text": "not isinstance(result, list) or not all(\n            isinstance(row, dict) for row in result\n        )",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 15585,
+      "duration_seconds": 0.236636,
+      "id": "boolean_op-707c0a495a35-2",
+      "line": 417,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 15588,
+      "duration_seconds": 0.229541,
+      "id": "boolean_op-ded2b48204d2-3",
+      "line": 417,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad0]",
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects[bad1]",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 15820,
+      "duration_seconds": 0.244921,
+      "id": "return_value-0ff1e2207cfe-0",
+      "line": 424,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "drift",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    {
+      "byte_length": 259,
+      "byte_offset": 15951,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-163b9bfaabe7-0",
+      "line": 430,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Every published receipt, parsed once and indexed by the campaign it reports on.\n\n    A campaign accumulates receipts; superseded ones stay on disk beside the current\n    one, so the question is never \"is THE receipt good\" but \"is ANY receipt good\".\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 16238,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-5e2b9118b54f-1",
+      "line": 436,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 16409,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-ded2b48204d2-4",
+      "line": 440,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 16409,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-4b4d7dd854be-0",
+      "line": 440,
+      "mutated_text": "not (not directory.is_dir())",
+      "operator": "negate_condition",
+      "original_text": "not directory.is_dir()",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 16448,
+      "duration_seconds": 0.0,
+      "id": "return_value-6734950cdf28-0",
+      "line": 441,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "index",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 16470,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-0088568d7ccc-0",
+      "line": 442,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "sorted(directory.glob(\"*.json\"))",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 16831,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-3d35043362e3-0",
+      "line": 448,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "continue",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 16831,
+      "duration_seconds": 0.0,
+      "id": "break_continue-5ff111be09a2-1",
+      "line": 448,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 16851,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-ded2b48204d2-5",
+      "line": 449,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 16851,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-1537d9b21022-0",
+      "line": 449,
+      "mutated_text": "not (not isinstance(payload, Mapping))",
+      "operator": "negate_condition",
+      "original_text": "not isinstance(payload, Mapping)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 16897,
+      "duration_seconds": 0.0,
+      "id": "break_continue-5ff111be09a2-2",
+      "line": 450,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 16940,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a2a4a8eceae1-0",
+      "line": 451,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"campaign_id\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 28,
+      "byte_offset": 16966,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-9ad37b210d7a-0",
+      "line": 452,
+      "mutated_text": "not (isinstance(campaign_id, str))",
+      "operator": "negate_condition",
+      "original_text": "isinstance(campaign_id, str)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 17077,
+      "duration_seconds": 0.0,
+      "id": "return_value-6734950cdf28-1",
+      "line": 454,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "index",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 79,
+      "byte_offset": 17296,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-3bc6f2848a43-0",
+      "line": 462,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(\"mutation registry must be inside the repository\") from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 312,
+      "byte_offset": 17387,
+      "duration_seconds": 0.0,
+      "id": "return_value-e75fe34cc51a-0",
+      "line": 463,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_require_mapping(\n        _native_json_call(\n            \"load_mutation_registry_native\",\n            {\n                \"repo_root\": str(root),\n                \"registry_path\": relative,\n                \"canonical_test_patterns\": list(CANONICAL_TEST_PATTERNS),\n            },\n        ),\n        \"registry\",\n    )",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 31,
+      "byte_offset": 17444,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-277a6a78b8b5-0",
+      "line": 465,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"load_mutation_registry_native\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 17507,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-cb05eab3c8e9-2",
+      "line": 467,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"repo_root\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 17547,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-53c6b29ae19d-0",
+      "line": 468,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"registry_path\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 17590,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-fcd47b2dd4e6-0",
+      "line": 469,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"canonical_test_patterns\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 17682,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-35ecc407b1d2-0",
+      "line": 472,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"registry\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_campaign_model.py",
+      "tests_run": []
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 1.0,
+  "new_survivors": [],
+  "no_coverage": 102,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 36,
+    "NO_COVERAGE": 102,
+    "SURVIVED": 0,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/llm-b0_mutation_campaign_model_fest_20260912_20260912T225313Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "d3f6448839921567e1562d7237abaf62600d958339172afb7a12cab9a63dbe29"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4"
+  },
+  "status": "PASS",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_campaign_model.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_campaign_model.py": "d38dbaa4d085fee99f76dc75a6201f0e1baae1c9cb4951d314b73c0880824bac"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 8,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 2
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-2dba4af8020d-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "boolean_op-707c0a495a35-2": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects"
+      ],
+      "boolean_op-ded2b48204d2-2": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "boolean_op-ded2b48204d2-3": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "comparison_op-b64746cba1f5-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "constant_replace-0e9db22b2979-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "constant_replace-154790bcba2d-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root"
+      ],
+      "constant_replace-404d2ebde3dc-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "constant_replace-688bbcb8fafa-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "constant_replace-6927f1d95b48-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "constant_replace-7bd86bf62cf2-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root"
+      ],
+      "constant_replace-7f46fe3dd583-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "constant_replace-87568bc76b7e-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract"
+      ],
+      "constant_replace-890f865066f9-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "constant_replace-a19f361c806e-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "constant_replace-a8c5c473f674-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "constant_replace-cb05eab3c8e9-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "constant_replace-cb05eab3c8e9-1": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "constant_replace-cba416c874fd-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded"
+      ],
+      "constant_replace-e139ee6e460f-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "constant_replace-e8a0bb59f20c-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory"
+      ],
+      "exception_swallow-2e735de805ae-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded"
+      ],
+      "negate_condition-39fa0a36f82b-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "negate_condition-c0dfce2dcf07-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "negate_condition-d792f32dc10b-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "return_value-0ff1e2207cfe-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "return_value-1d581fe00f10-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "return_value-262fcc192bd6-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "return_value-79d6d8ab96f6-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_runner_component_root_is_the_repo_root_under_a_flat_layout",
+        "src/conductor/test_mutation_campaign_model.py::test_runner_component_root_resolves_this_repository_to_src"
+      ],
+      "return_value-b7d75f9b18d5-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory"
+      ],
+      "return_value-e9818697f733-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root",
+        "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_refuses_a_map_the_file_does_not_declare"
+      ],
+      "return_value-f51fa366b55f-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "return_value-ff75b4e26487-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape"
+      ],
+      "zero_iteration_loop-97cc2649d74b-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "zero_iteration_loop-d3deb72839d2-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ],
+      "zero_iteration_loop-de4f46bbbaff-0": [
+        "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/conductor/mutation_campaign_model.py"
+        ],
+        "criticality": "high",
+        "id": "llm-b0_mutation_campaign_model_fest_20260912"
+      }
+    ],
+    "retained_core": [
+      "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+      "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root",
+      "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory",
+      "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+      "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+      "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape",
+      "src/conductor/test_mutation_campaign_model.py::test_runner_component_root_is_the_repo_root_under_a_flat_layout",
+      "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-2dba4af8020d-0",
+          "boolean_op-707c0a495a35-2",
+          "boolean_op-ded2b48204d2-2",
+          "boolean_op-ded2b48204d2-3",
+          "comparison_op-b64746cba1f5-0",
+          "constant_replace-0e9db22b2979-0",
+          "constant_replace-688bbcb8fafa-0",
+          "constant_replace-6927f1d95b48-0",
+          "constant_replace-cb05eab3c8e9-0",
+          "constant_replace-e139ee6e460f-0",
+          "negate_condition-c0dfce2dcf07-0",
+          "negate_condition-d792f32dc10b-0",
+          "return_value-262fcc192bd6-0",
+          "return_value-f51fa366b55f-0",
+          "return_value-ff75b4e26487-0",
+          "zero_iteration_loop-d3deb72839d2-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects",
+        "runtime_seconds_median": 0.002,
+        "unique_kills": [
+          "boolean_op-707c0a495a35-2"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-2dba4af8020d-0",
+          "boolean_op-ded2b48204d2-2",
+          "boolean_op-ded2b48204d2-3",
+          "comparison_op-b64746cba1f5-0",
+          "constant_replace-0e9db22b2979-0",
+          "constant_replace-688bbcb8fafa-0",
+          "constant_replace-6927f1d95b48-0",
+          "constant_replace-7f46fe3dd583-0",
+          "constant_replace-890f865066f9-0",
+          "constant_replace-a19f361c806e-0",
+          "constant_replace-a8c5c473f674-0",
+          "constant_replace-cb05eab3c8e9-0",
+          "constant_replace-cb05eab3c8e9-1",
+          "constant_replace-e139ee6e460f-0",
+          "negate_condition-39fa0a36f82b-0",
+          "negate_condition-c0dfce2dcf07-0",
+          "negate_condition-d792f32dc10b-0",
+          "return_value-0ff1e2207cfe-0",
+          "return_value-1d581fe00f10-0",
+          "return_value-262fcc192bd6-0",
+          "return_value-f51fa366b55f-0",
+          "return_value-ff75b4e26487-0",
+          "zero_iteration_loop-97cc2649d74b-0",
+          "zero_iteration_loop-d3deb72839d2-0",
+          "zero_iteration_loop-de4f46bbbaff-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "constant_replace-7f46fe3dd583-0",
+          "constant_replace-890f865066f9-0",
+          "constant_replace-a19f361c806e-0",
+          "constant_replace-a8c5c473f674-0",
+          "constant_replace-cb05eab3c8e9-1",
+          "negate_condition-39fa0a36f82b-0",
+          "return_value-0ff1e2207cfe-0",
+          "return_value-1d581fe00f10-0",
+          "zero_iteration_loop-97cc2649d74b-0",
+          "zero_iteration_loop-de4f46bbbaff-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-2dba4af8020d-0",
+          "comparison_op-b64746cba1f5-0",
+          "constant_replace-0e9db22b2979-0",
+          "constant_replace-688bbcb8fafa-0",
+          "constant_replace-6927f1d95b48-0",
+          "constant_replace-cb05eab3c8e9-0",
+          "constant_replace-cba416c874fd-0",
+          "constant_replace-e139ee6e460f-0",
+          "exception_swallow-2e735de805ae-0",
+          "negate_condition-d792f32dc10b-0",
+          "return_value-f51fa366b55f-0",
+          "return_value-ff75b4e26487-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "constant_replace-cba416c874fd-0",
+          "exception_swallow-2e735de805ae-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "comparison_op-b64746cba1f5-0",
+          "constant_replace-e8a0bb59f20c-0",
+          "negate_condition-d792f32dc10b-0",
+          "return_value-b7d75f9b18d5-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-e8a0bb59f20c-0",
+          "return_value-b7d75f9b18d5-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "constant_replace-154790bcba2d-0",
+          "constant_replace-7bd86bf62cf2-0",
+          "return_value-e9818697f733-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-154790bcba2d-0",
+          "constant_replace-7bd86bf62cf2-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root"
+        ],
+        "killed_mutants": [
+          "return_value-e9818697f733-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_lineage_accepts_refuses_a_map_the_file_does_not_declare",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-2dba4af8020d-0",
+          "constant_replace-87568bc76b7e-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-87568bc76b7e-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-2dba4af8020d-0",
+          "comparison_op-b64746cba1f5-0",
+          "constant_replace-0e9db22b2979-0",
+          "constant_replace-404d2ebde3dc-0",
+          "constant_replace-688bbcb8fafa-0",
+          "constant_replace-6927f1d95b48-0",
+          "constant_replace-cb05eab3c8e9-0",
+          "constant_replace-e139ee6e460f-0",
+          "negate_condition-d792f32dc10b-0",
+          "return_value-262fcc192bd6-0",
+          "return_value-f51fa366b55f-0",
+          "return_value-ff75b4e26487-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-404d2ebde3dc-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "return_value-79d6d8ab96f6-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_runner_component_root_is_the_repo_root_under_a_flat_layout",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-b0_mutation_campaign_model_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_mutation_campaign_model.py::test_runner_component_root_is_the_repo_root_under_a_flat_layout"
+        ],
+        "killed_mutants": [
+          "return_value-79d6d8ab96f6-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_campaign_model.py::test_runner_component_root_resolves_this_repository_to_src",
+        "runtime_seconds_median": 0.002,
+        "unique_kills": []
+      }
+    ]
+  },
+  "unviable": 0
+}

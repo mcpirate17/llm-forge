@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from conductor import mutation_testing_support as _support
-from conductor.project_paths import enclosing_repo
+from conductor.project_paths import enclosing_repo, package_path, package_tree_root
 from conductor.mutation_scope import (
     CampaignError,
     TestFileScope,
@@ -48,9 +48,9 @@ _PACKAGE_DIR = Path(__file__).resolve().parent
 # extracted from, where `conductor/` sat at the root; under a src layout the parent is
 # `src/`, and every repo-relative path a manifest carries -- `src/conductor/x.py` --
 # then resolves against `src/` and vanishes, so branch scope comes back empty and no
-# campaign can be planned at all. Runner-component hashing is unaffected: it resolves
-# `conductor/...` against the package's parent on purpose, and computes that itself in
-# `_runner_components_sha256`. Falling back to the parent keeps the installed
+# campaign can be planned at all. Runner-component hashing resolves `conductor/...`
+# against the package's parent on purpose, via `runner_component_root()` below, which
+# is unaffected by this fallback. Falling back to the parent keeps the installed
 # (site-packages, no `.git`) answer exactly what it was.
 REPO_ROOT = enclosing_repo(_PACKAGE_DIR) or _PACKAGE_DIR.parent
 RUNNER_COMPONENT_PATHS = (
@@ -292,10 +292,28 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def runner_component_root() -> Path:
+    """Where a bare ``conductor/...`` (or ``tooling/...``) runner-component path
+    resolves from -- the directory the ``conductor`` package sits inside, per this
+    tree's own configuration.
+
+    Every ``RUNNER_COMPONENT_PATHS`` entry, and the receipt-side core/adapter/
+    scope-guard bindings the native validator pins, are spelled root-relative in
+    the monorepo's own layout (``conductor/...``). Under a src layout that literal
+    must join onto ``src/``, not the git root -- ``package_tree_root`` finds the
+    tree whose own configuration resolves the package back to ``_PACKAGE_DIR``,
+    and this is one level above that resolved package, exactly where those
+    literals expect to land.
+    """
+
+    tree_root = package_tree_root(_PACKAGE_DIR)
+    return package_path(tree_root).parent
+
+
 def _runner_components_sha256() -> dict[str, str]:
     """Bind every first-party module that can affect mutation execution."""
 
-    root = Path(__file__).resolve().parents[1]
+    root = runner_component_root()
     components: dict[str, str] = {}
     for relative in RUNNER_COMPONENT_PATHS:
         path = root / relative
@@ -310,8 +328,13 @@ def _runner_components_sha256() -> dict[str, str]:
 RUNNER_LINEAGE_PATH = "conductor/mutation_runner_lineage.json"
 
 
-def _lineage_accepts(recorded: object, repo_root: Path) -> bool:
-    """Return whether a runner-component map is explicitly accepted."""
+def _lineage_accepts(recorded: object, package_root: Path) -> bool:
+    """Return whether a runner-component map is explicitly accepted.
+
+    ``package_root`` must be the directory a bare ``conductor/...`` runner-component
+    path resolves from -- ``runner_component_root()``'s return value -- not the git
+    root, so this agrees with ``_runner_components_sha256`` under a src layout.
+    """
 
     try:
         from conductor._native import mutation_runner_lineage_accepts_native
@@ -319,7 +342,10 @@ def _lineage_accepts(recorded: object, repo_root: Path) -> bool:
         return bool(
             mutation_runner_lineage_accepts_native(
                 json.dumps(
-                    {"repo_root": str(repo_root.resolve()), "recorded": recorded},
+                    {
+                        "package_root": str(package_root.resolve()),
+                        "recorded": recorded,
+                    },
                     ensure_ascii=False,
                     separators=(",", ":"),
                 )

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -22,6 +23,7 @@ from conductor.mutation_engine_generated import (
     pinned,
     record_survivor_baseline,
     require_executed,
+    resolve_receipt_path,
     score,
 )
 from conductor.mutation_scope import CampaignError
@@ -403,3 +405,47 @@ def test_an_errored_run_never_becomes_a_baseline(tmp_path: Path) -> None:
     assert record_survivor_baseline(campaign, receipt) is False
     assert campaign.survivor_baseline_recorded is False
     assert "survivor_baseline" not in json.loads(path.read_text(encoding="utf-8"))
+
+
+def _campaign(campaign_id: str = "generated_fixture") -> SimpleNamespace:
+    """A duck-typed stand-in: ``resolve_receipt_path`` reads only ``campaign_id``."""
+    return SimpleNamespace(campaign_id=campaign_id)
+
+
+def test_resolve_receipt_path_defaults_to_the_configured_receipt_root(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nmutation_receipt_root = "campaigns/receipts"\n',
+        encoding="utf-8",
+    )
+    output, relative = resolve_receipt_path(_campaign("gen_campaign"), None, tmp_path)
+    assert output.parent == tmp_path / "campaigns" / "receipts"
+    assert (tmp_path / "campaigns" / "receipts").is_dir()
+    assert relative.startswith("campaigns/receipts/gen_campaign_")
+
+
+def test_resolve_receipt_path_falls_back_to_the_monorepo_literal_unconfigured(
+    tmp_path: Path,
+) -> None:
+    output, relative = resolve_receipt_path(_campaign(), None, tmp_path)
+    assert output.parent == tmp_path / "research" / "reports" / "mutation_testing"
+    assert relative.startswith("research/reports/mutation_testing/generated_fixture_")
+
+
+def test_resolve_receipt_path_fails_loud_when_the_directory_cannot_be_created(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nmutation_receipt_root = "blocked"\n', encoding="utf-8"
+    )
+    (tmp_path / "blocked").write_text("not a directory\n", encoding="utf-8")
+    with pytest.raises(CampaignError, match="cannot create mutation receipt directory"):
+        resolve_receipt_path(_campaign(), None, tmp_path)
+
+
+def test_resolve_receipt_path_still_honours_an_explicit_path(tmp_path: Path) -> None:
+    explicit = tmp_path / "somewhere" / "receipt.json"
+    output, relative = resolve_receipt_path(_campaign(), explicit, tmp_path)
+    assert output == explicit.resolve()
+    assert relative == "somewhere/receipt.json"

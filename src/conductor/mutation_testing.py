@@ -61,6 +61,7 @@ from conductor.mutation_campaign_model import (  # noqa: F401
     _runner_components_sha256,
     _sha256,
     load_campaign,
+    runner_component_root,
     source_drift,
     symbol_hashes,
 )
@@ -496,6 +497,7 @@ def _receipt_errors(
         "validate_mutation_receipt_native",
         {
             "repo_root": str(repo_root.resolve()),
+            "package_root": str(runner_component_root()),
             "anchor_repo": str((anchor_repo or repo_root).resolve()),
             "campaign": _native_campaign_contract(campaign, repo_root=repo_root),
             "receipt": dict(receipt),
@@ -603,6 +605,7 @@ def _native_verification_request(
     )
     return {
         "repo_root": str(root),
+        "package_root": str(runner_component_root()),
         "registry_path": registry_relative,
         "canonical_test_patterns": list(CANONICAL_TEST_PATTERNS),
         "receipt_directories": list(directories),

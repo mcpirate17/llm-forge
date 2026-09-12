@@ -906,3 +906,74 @@ def test_empty_patch_corpus_is_clean_and_external_interpreter_is_identified(
     )
     assert verdict is not None
     assert "host's filesystem" in verdict["detail"]
+
+
+def test_audit_reproducibility_resolves_lineage_from_runner_component_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``audit_reproducibility`` must pin evidence acceptance to
+    ``runner_component_root()``, never to ``repo_root`` -- the same distinction
+    that makes a src layout's bare ``conductor/...`` literals resolve correctly.
+
+    The receipt's ``runner_components_sha256`` matches neither the current runner
+    nor a lineage entry recorded at ``repo_root`` -- only one recorded under a
+    *separate* ``package_root`` tree. If the audit ever regresses to consulting
+    ``repo_root`` for lineage (or a hardcoded location) instead of calling
+    ``runner_component_root()``, this receipt reads as uncovered.
+    """
+
+    repo_root = tmp_path / "repo"
+    package_root = tmp_path / "elsewhere" / "src"
+    (repo_root / "receipts").mkdir(parents=True)
+    (package_root / "conductor").mkdir(parents=True)
+
+    recorded = {"conductor/mutation_testing.py": "b" * 64}
+    current = {"conductor/mutation_testing.py": "a" * 64}
+    lineage = {
+        "schema_version": 1,
+        "entries": [{"runner_components_sha256": dict(recorded)}],
+    }
+    (package_root / "conductor" / "mutation_runner_lineage.json").write_text(
+        json.dumps(lineage), encoding="utf-8"
+    )
+    # repo_root deliberately carries no lineage file at all -- if the audit ever
+    # looked there instead, this receipt would be rejected.
+    assert not (repo_root / "conductor" / "mutation_runner_lineage.json").exists()
+
+    (repo_root / "receipts" / "corpus.json").write_text(
+        json.dumps(
+            {
+                "campaign_id": "corpus",
+                "status": "PASS",
+                "runner_components_sha256": dict(recorded),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    campaign = _campaign(repo_root, "corpus", ())
+    registry = {"receipt_directories": ["receipts"]}
+
+    monkeypatch.setattr(
+        mutation_patch_audit, "runner_component_root", lambda: package_root
+    )
+    monkeypatch.setattr(
+        mutation_patch_audit, "_runner_components_sha256", lambda: dict(current)
+    )
+
+    result = mutation_patch_audit.audit_reproducibility(
+        [campaign], registry, repo_root=repo_root
+    )
+    assert result["uncovered_campaigns"] == 0
+    assert result["evidence"] == []
+
+    # Point the audit at repo_root instead -- the same tree, minus the lineage
+    # file -- to prove the prior pass depended on consulting package_root.
+    monkeypatch.setattr(
+        mutation_patch_audit, "runner_component_root", lambda: repo_root
+    )
+    regressed = mutation_patch_audit.audit_reproducibility(
+        [campaign], registry, repo_root=repo_root
+    )
+    assert regressed["uncovered_campaigns"] == 1
+    assert regressed["evidence"][0]["reason"] == "NO_ACCEPTABLE_RECEIPT"

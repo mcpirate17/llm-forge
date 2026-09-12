@@ -17,6 +17,18 @@
     },
     {
       "manifest": "campaigns/llm-b0_mutation_campaign_model_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/forge-evidence-hash_mutation_engine_generated_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/forge-evidence-hash_mutation_patch_audit_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/forge-evidence-hash_mutation_receipt_build_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/forge-evidence-hash_mutation_testing_fest_20260912.json"
     }
   ],
   "enforcement": "changed_tests",

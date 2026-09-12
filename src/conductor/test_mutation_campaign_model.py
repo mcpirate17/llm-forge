@@ -124,3 +124,70 @@ def test_drift_boundary_requires_a_list_of_objects(tmp_path, monkeypatch, bad):
     monkeypatch.setattr(model, "_native_json_call", lambda *args: bad)
     with pytest.raises(model.CampaignError, match="list of objects"):
         model.source_drift(loaded, tmp_path)
+
+
+def test_runner_component_root_resolves_this_repository_to_src():
+    """This checkout is a src layout: the package sits at ``src/conductor``, so a
+    bare ``conductor/...`` runner-component literal must join onto ``src/``, not
+    the git root -- otherwise it hashes the wrong (or a missing) file."""
+    root = model.runner_component_root()
+    assert root == model._PACKAGE_DIR.parent
+    assert (root / "conductor" / "mutation_campaign_model.py").resolve() == (
+        model._PACKAGE_DIR / "mutation_campaign_model.py"
+    ).resolve()
+
+
+def test_runner_component_root_is_the_repo_root_under_a_flat_layout(tmp_path):
+    """The monorepo layout this module was extracted from: package_root
+    unconfigured, package sits directly at the repo root. runner_component_root
+    must then equal that root exactly, so a flat-layout host's runner-component
+    hashes are byte-identical to what they were before package_root existed."""
+    repo = tmp_path / "repo"
+    package = repo / "conductor"
+    package.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    (package / "mutation_campaign_model.py").write_text("# stand-in\n")
+    monkeypatch_dir = model._PACKAGE_DIR
+    try:
+        model._PACKAGE_DIR = package
+        assert model.runner_component_root() == repo.resolve()
+    finally:
+        model._PACKAGE_DIR = monkeypatch_dir
+
+
+def test_lineage_accepts_reads_the_lineage_file_relative_to_package_root(tmp_path):
+    """``_lineage_accepts`` must resolve ``conductor/mutation_runner_lineage.json``
+    from the passed-in ``package_root``, not from the git repository root -- the
+    same distinction ``runner_component_root`` exists to make under a src layout."""
+    package_root = tmp_path / "src"
+    (package_root / "conductor").mkdir(parents=True)
+    recorded = {"conductor/mutation_testing.py": "0" * 64}
+    lineage = {
+        "schema_version": 1,
+        "entries": [
+            {
+                "runner_components_sha256": recorded,
+            }
+        ],
+    }
+    (package_root / "conductor" / "mutation_runner_lineage.json").write_text(
+        json.dumps(lineage)
+    )
+    assert model._lineage_accepts(recorded, package_root) is True
+    # A repo_root sibling with no lineage file at all must not be consulted instead.
+    assert model._lineage_accepts(recorded, tmp_path) is False
+
+
+def test_lineage_accepts_refuses_a_map_the_file_does_not_declare(tmp_path):
+    package_root = tmp_path / "src"
+    (package_root / "conductor").mkdir(parents=True)
+    (package_root / "conductor" / "mutation_runner_lineage.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "entries": [{"runner_components_sha256": {"a": "1" * 64}}],
+            }
+        )
+    )
+    assert model._lineage_accepts({"a": "2" * 64}, package_root) is False
+    assert model._lineage_accepts(None, package_root) is False

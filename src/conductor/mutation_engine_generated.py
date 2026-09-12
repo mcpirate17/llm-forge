@@ -39,6 +39,7 @@ from conductor.mutation_campaign_model import (
     _sha256,
 )
 from conductor.mutation_scope import CampaignError
+from conductor.project_paths import mutation_receipt_root_relative
 from conductor.snapshot_worktree import isolated_snapshot
 
 # Re-exported so an adapter can write its own partial receipt without reaching
@@ -544,13 +545,23 @@ def run_generated_campaign(
 def resolve_receipt_path(
     campaign: GeneratedCampaign, receipt_path: Path | None, repo_root: Path
 ) -> tuple[Path, str]:
+    """Absolute output path and its repo-relative name, refusing anything outside.
+
+    Absent an explicit ``receipt_path`` the default directory is host-configurable
+    (``[tool.conductor].mutation_receipt_root``) and created on demand -- a host
+    with no scratch-output tree of its own must not have to create one by hand.
+    """
+
     if receipt_path is None:
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        output = (
-            repo_root
-            / "research/reports/mutation_testing"
-            / f"{campaign.campaign_id}_{stamp}.json"
-        )
+        directory = repo_root / mutation_receipt_root_relative(repo_root).as_posix()
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise CampaignError(
+                f"cannot create mutation receipt directory {directory}: {exc}"
+            ) from exc
+        output = directory / f"{campaign.campaign_id}_{stamp}.json"
     else:
         output = (
             receipt_path if receipt_path.is_absolute() else repo_root / receipt_path

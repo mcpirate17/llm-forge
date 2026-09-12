@@ -25,6 +25,7 @@ from conductor import mutation_testing_support as _support
 from conductor.mutation_campaign_model import _runner_components_sha256
 from conductor.mutation_scope import CampaignError, _test_scopes_payload
 from conductor.mutation_value import analyze_test_value
+from conductor.project_paths import mutation_receipt_root_relative
 
 
 _BARE_INTERPRETERS = frozenset({"python", "python3"})
@@ -88,11 +89,21 @@ def killer_enforcement(mutants: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 
 def _default_receipt_path(campaign: Campaign, repo_root: Path) -> Path:
-    return (
-        repo_root
-        / "research/reports/mutation_testing"
-        / f"{campaign.campaign_id}_{_utc_stamp()}.json"
-    )
+    """Where a receipt lands absent an explicit ``--receipt``.
+
+    The directory is host-configurable (``[tool.conductor].mutation_receipt_root``)
+    and created on demand -- a host with no scratch-output tree of its own must not
+    have to create one by hand just to run a campaign without an explicit path.
+    """
+
+    directory = repo_root / mutation_receipt_root_relative(repo_root).as_posix()
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise CampaignError(
+            f"cannot create mutation receipt directory {directory}: {exc}"
+        ) from exc
+    return directory / f"{campaign.campaign_id}_{_utc_stamp()}.json"
 
 
 def _open_receipt(
