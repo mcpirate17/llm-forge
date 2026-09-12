@@ -20,9 +20,18 @@
   "source_sha256": {
     "src/conductor/candidate_review/graph_selection.py": "4fef11cb7ccd5497964a1224fcd85d1beef16ae46590ad7209951664863ca8fe"
   },
-  "survivor_baseline": [],
-  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": false,
+  "survivor_baseline": [
+    "boolean_op-1cdf8e94c8c3-3",
+    "boolean_op-1cdf8e94c8c3-6",
+    "break_continue-1d8d042b4038-1",
+    "break_continue-1d8d042b4038-2",
+    "break_continue-1d8d042b4038-3",
+    "break_continue-1d8d042b4038-4",
+    "constant_replace-6f314ef64365-0",
+    "constant_replace-8f37a8e3424f-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-12T21:46:22.111216+00:00",
   "test_argv": [
     "python",
     "-m",
