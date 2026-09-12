@@ -35,10 +35,18 @@ dependencies = [
   "radon>=6.0.1",
   "starlette>=0.45",
   "uvicorn>=0.30",
+  # conductor/candidate_review/vulture_audit.py shells out to the `vulture` binary
+  # and raises VultureAuditError (fail-closed, not a skip) when it is missing from
+  # PATH. That module ships inside src/conductor and is reachable from the
+  # `candidate_review` console script, so vulture is a runtime dependency of the
+  # shipped package, not a CI-only tool -- KB-CI-01's exact shape.
+  "vulture>=2.11",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8.0"]
+# pytest-timeout backs only the `--timeout` flag used to invoke the test suite; no
+# shipped conductor module imports or shells out to it.
+test = ["pytest>=8.0", "pytest-timeout>=2.3"]
 # fest refuses to mutate anything until it has a coverage map, and it collects one
 # by running the campaign's own pytest command under pytest-cov. Kept out of `test`
 # because it is the mutation engine's prerequisite, not the suite's.

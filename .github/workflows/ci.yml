@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - run: uv sync --extra test
+      - run: uv run python -m pytest src/conductor -q -p no:cacheprovider --timeout 600
+
+  rust:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate: [conductor-native, slop-core]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/${{ matrix.crate }}
+      - name: cargo fmt --check
+        working-directory: native/${{ matrix.crate }}
+        run: cargo fmt --check
+      - name: cargo clippy
+        working-directory: native/${{ matrix.crate }}
+        run: cargo clippy --all-targets -- -D warnings
+      - name: cargo test
+        working-directory: native/${{ matrix.crate }}
+        run: cargo test

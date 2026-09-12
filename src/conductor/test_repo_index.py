@@ -123,10 +123,15 @@ def test_a_package_is_named_by_its_directory(index):
 
 def test_the_index_is_not_degenerate(index):
     # A tool that walks the wrong tree returns a clean, meaningless answer, so the
-    # scale of what it found is part of the contract.
-    assert index.file_count > 200
-    assert index.import_key_count > 1000
-    assert index.name_key_count > 10000
+    # scale of what it found is part of the contract. The floor is derived from the
+    # tree actually under test (an independent glob), not a constant pinned to one
+    # particular checkout's size -- a smaller standalone tree is not "degenerate",
+    # an empty or wrong-root walk is.
+    actual_test_files = list(REPO.rglob("test_*.py"))
+    assert index.file_count == len(actual_test_files)
+    assert index.file_count > 0
+    assert index.import_key_count > index.file_count
+    assert index.name_key_count > index.file_count * 10
 
 
 def test_the_gate_asks_the_index_and_gets_the_same_answer(index):
