@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from conductor import project_paths
 from conductor.candidate_review import verification as review_verification
 from conductor.candidate_review.checks import ReviewContext, check_mutation_evidence
 from conductor.candidate_review.model import Candidate, Change, CheckStatus
@@ -32,11 +33,6 @@ PROBE_PATH = "research/tests/test_probe.py"
 DEAD_PATH = "research/tests/test_nm_f6_phase22_chinchilla.py"
 # A dead path that is NOT tombstoned: only the evaluation-time file check can prune it.
 PRUNED_PATH = "research/tests/test_pruned_probe.py"
-CAMPAIGN_MANIFEST_RELPATHS = (
-    "conductor/mutation_campaigns/claude_receipt_scope_20260902.json",
-    "conductor/mutation_campaigns/claude_value_gate_scope_20260903.json",
-    "conductor/mutation_campaigns/claude_value_waivers_20260902.json",
-)
 
 
 def _change(path: str) -> Change:
@@ -358,18 +354,36 @@ def test_grandfather_tombstoned_lane_revival_stays_gated(
     assert effective == {PROBE_PATH: frozenset({"test_probe_legacy"})}
 
 
-def _derive_inventory_sets() -> tuple[set[str], set[str]]:
+def _value_campaign_manifests() -> tuple[tuple[str, dict[str, object]], ...]:
+    """Return (registry path, manifest) for every campaign that ranks tests.
+
+    Category (b): the subject is this repo's own campaign corpus, read from
+    ``campaigns/registry.json`` through ``conductor.project_paths`` exactly as
+    the value gate reads it. Only manifests that rank tests over declared
+    ``test_scopes`` carry a value inventory; generated engine manifests do not.
+    """
+
+    root = project_paths.host_root(Path(__file__))
+    registry = json.loads(project_paths.registry_path(root).read_text(encoding="utf-8"))
+    out: list[tuple[str, dict[str, object]]] = []
+    for row in registry["campaigns"]:
+        manifest = json.loads((root / row["manifest"]).read_text(encoding="utf-8"))
+        if "ranked_tests" in manifest and "test_scopes" in manifest:
+            out.append((row["manifest"], manifest))
+    return tuple(out)
+
+
+def _derive_inventory_sets(
+    manifests: tuple[dict[str, object], ...],
+) -> tuple[set[str], set[str]]:
     """Return (live post-anchor defs, grandfathered nodeids) for scoped files."""
 
-    root = Path(__file__).parent.parent
-    manifests = tuple(
-        json.loads((root / rel_path).read_text(encoding="utf-8"))
-        for rel_path in CAMPAIGN_MANIFEST_RELPATHS
-    )
+    root = project_paths.host_root(Path(__file__))
     inventory = json.loads(
-        (root / review_verification.GRANDFATHER_INVENTORY_RELPATH).read_text(
-            encoding="utf-8"
-        )
+        (
+            Path(__file__).parent.parent
+            / review_verification.GRANDFATHER_INVENTORY_RELPATH
+        ).read_text(encoding="utf-8")
     )
     grandfathered = {
         f"{rel_path}::{label}"
@@ -395,12 +409,18 @@ def _derive_inventory_sets() -> tuple[set[str], set[str]]:
 def test_value_inventory_covers_every_post_anchor_def() -> None:
     """Ranked defs outside the inventory must equal the derived live def set."""
 
-    post_anchor, grandfathered = _derive_inventory_sets()
-    root = Path(__file__).parent.parent
-    manifests = tuple(
-        json.loads((root / rel_path).read_text(encoding="utf-8"))
-        for rel_path in CAMPAIGN_MANIFEST_RELPATHS
-    )
+    registered = _value_campaign_manifests()
+    if not registered:
+        root = project_paths.host_root(Path(__file__))
+        pytest.skip(
+            f"{project_paths.registry_relative(root)} registers no campaign that "
+            "ranks tests over declared test_scopes: the value-evidence corpus this "
+            "test was written against (claude_receipt_scope_20260902, "
+            "claude_value_gate_scope_20260903, claude_value_waivers_20260902) "
+            "belongs to the monorepo and was never carried into llm-forge"
+        )
+    manifests = tuple(manifest for _, manifest in registered)
+    post_anchor, grandfathered = _derive_inventory_sets(manifests)
     ranked = [
         row["nodeid"] for manifest in manifests for row in manifest["ranked_tests"]
     ]
