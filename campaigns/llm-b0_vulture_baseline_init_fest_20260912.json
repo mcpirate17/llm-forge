@@ -21,8 +21,8 @@
     "src/conductor/candidate_review/vulture_baseline_init.py": "ac11bf8bda1e987e25c6d60ff88f291e4f6a99a1917b2096aa41e8ca71a74281"
   },
   "survivor_baseline": [],
-  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": false,
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-12T22:48:10.156941+00:00",
   "test_argv": [
     "python",
     "-m",
