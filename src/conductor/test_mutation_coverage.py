@@ -268,10 +268,12 @@ def test_mutation_testing_cli_inspect_verify_and_refuse(
 ) -> None:
     from conductor import mutation_testing
 
-    campaign = (
-        mutation_testing.REPO_ROOT
-        / "conductor/mutation_campaigns/claude_bash_quiet.json"
-    )
+    # The old monorepo's `conductor/mutation_campaigns/claude_bash_quiet.json`
+    # and `.../registry.json` never carried into this standalone repo (see
+    # KB note on the split). `mutation_testing.main` resolves every campaign
+    # relative to the fixed `REPO_ROOT`, so these two schema-valid fixtures
+    # live under the repo-relative `testdata/` tree rather than `tmp_path`.
+    campaign = mutation_testing.REPO_ROOT / "src/conductor/testdata/coverage/claude_bash_quiet.json"
     assert mutation_testing.main(["inspect", str(campaign)]) == 0
     assert (
         mutation_testing.main(
@@ -280,7 +282,7 @@ def test_mutation_testing_cli_inspect_verify_and_refuse(
                 "--registry",
                 str(
                     mutation_testing.REPO_ROOT
-                    / "conductor/mutation_campaigns/registry.json"
+                    / "src/conductor/testdata/coverage/claude_bash_quiet_registry.json"
                 ),
                 "example/tests/test_unregistered.py",
             ]
@@ -324,8 +326,7 @@ def test_inspect_cli_returns_not_ready(tmp_path: Path) -> None:
 
     payload = json.loads(
         (
-            mutation_testing.REPO_ROOT
-            / "conductor/mutation_campaigns/claude_bash_quiet.json"
+            mutation_testing.REPO_ROOT / "src/conductor/testdata/coverage/claude_bash_quiet.json"
         ).read_text(encoding="utf-8")
     )
     payload["mutations"] = []
