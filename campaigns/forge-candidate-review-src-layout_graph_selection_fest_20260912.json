@@ -1,5 +1,5 @@
 {
-  "campaign_id": "llm-b0_project_paths_fest_20260912",
+  "campaign_id": "forge-candidate-review-src-layout_graph_selection_fest_20260912",
   "environment": {},
   "generator": {
     "exclude": [
@@ -11,33 +11,30 @@
     "run_timeout_seconds": 1800,
     "seed": 0,
     "source": [
-      "src/conductor/project_paths.py"
+      "src/conductor/candidate_review/graph_selection.py"
     ]
   },
   "language": "python",
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/conductor/project_paths.py": "abf5723bdfeed9e3e0ac4b65842bac772337994ad547d39c13d7ba1dc16405b1"
+    "src/conductor/candidate_review/graph_selection.py": "4fef11cb7ccd5497964a1224fcd85d1beef16ae46590ad7209951664863ca8fe"
   },
-  "survivor_baseline": [
-    "break_continue-1aa122a468cc-0",
-    "constant_replace-09a5f8b6ffb2-0",
-    "return_value-c2eb5f70ca8f-0"
-  ],
+  "survivor_baseline": [],
   "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": true,
-  "survivor_baseline_recorded_at": "2026-09-12T21:17:03.457470+00:00",
+  "survivor_baseline_recorded": false,
   "test_argv": [
     "python",
     "-m",
     "pytest",
     "-q",
     "--rootdir=.",
-    "src/conductor/test_project_paths.py"
+    "src/conductor/candidate_review/test_graph_selection.py",
+    "src/conductor/test_graph_selection.py"
   ],
   "test_sha256": {
-    "src/conductor/test_project_paths.py": "1df2aaf59875986ccfcf8c53fda903be132d58a59a06934fe16c1b3fa6f76d30"
+    "src/conductor/candidate_review/test_graph_selection.py": "32dce2e1d8e95d82a565771278bdbefc73b8496d5d9f0f0fc2643b04c50c499c",
+    "src/conductor/test_graph_selection.py": "37afd883c9dfcc36bedea0521a79d9b96449fff60f6881de269cb1a445f05453"
   },
-  "title": "Generated mutants for src/conductor/project_paths.py, scored on the survivor set"
+  "title": "Generated mutants for src/conductor/candidate_review/graph_selection.py, scored on the survivor set"
 }

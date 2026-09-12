@@ -4,6 +4,18 @@
       "manifest": "campaigns/llm-b0_project_paths_fest_20260912.json"
     },
     {
+      "manifest": "campaigns/forge-candidate-review-src-layout_engine_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/forge-candidate-review-src-layout_graph_selection_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/forge-candidate-review-src-layout_import_declaration_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/forge-candidate-review-src-layout_tooling_boundary_fest_20260912.json"
+    },
+    {
       "manifest": "campaigns/llm-b0_mutation_campaign_model_fest_20260912.json"
     }
   ],
