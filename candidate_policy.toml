@@ -751,10 +751,13 @@ profiles = ["fast", "full"]
 classes = ["python"]
 command = [
   "{python}",
-  "conductor/radon_complexity.py",
+  "-m",
+  "conductor.radon_complexity",
   "check",
   "--baseline",
   "conductor/radon_complexity_baseline.json",
+  "--path",
+  ".",
 ]
 version_command = ["radon", "--version"]
 cache = true
@@ -848,14 +851,10 @@ command = [
   "-m",
   "conductor.candidate_review.vulture_audit",
   "--baseline",
-  "conductor/vulture_baseline.json",
+  "src/conductor/vulture_baseline.json",
   "--changed-files-from",
   "{changed_files_file}",
-  "research",
-  "aria_core",
-  "aria_designer",
-  "component_fab",
-  "conductor",
+  "src",
 ]
 version_command = ["vulture", "--version"]
 cache = true
@@ -879,6 +878,32 @@ command = [
   "{changed_files_file}",
 ]
 version_command = ["jscpd", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 600
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.pmd]
+# PMD-CPD's tokenizer catches clones jscpd's line-based scan misses, so it backs
+# its own baseline (baselines.pmd) rather than folding into checks.jscpd. pmd
+# has no packaged distribution -- CI and local dev both install the pinned
+# release zip (see README.md and .github/workflows/ci.yml) rather than a
+# system package.
+kind = "command"
+profiles = ["full"]
+classes = ["python"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.run_duplicate_audit",
+  "--tool",
+  "pmd-python",
+  "--check",
+  "--changed-files-from",
+  "{changed_files_file}",
+]
+version_command = ["pmd", "--version"]
 cache = true
 severity = "high"
 timeout_seconds = 600
@@ -974,22 +999,22 @@ shard_workers = 4
 wall_timeout_seconds = 2400
 
 [baselines.jscpd]
-path = "conductor/jscpd_duplication_baseline.json"
+path = "src/conductor/jscpd_duplication_baseline.json"
 classes = ["python", "source", "config", "native"]
 required_profiles = ["full"]
 
 [baselines.pmd]
-path = "conductor/pmd_cpd_duplication_baseline.json"
+path = "src/conductor/pmd_cpd_duplication_baseline.json"
 classes = ["python"]
 required_profiles = ["full"]
 
 [baselines.complexity]
-path = "conductor/radon_complexity_baseline.json"
+path = "src/conductor/radon_complexity_baseline.json"
 classes = ["python"]
 required_profiles = ["fast", "full"]
 
 [baselines.vulture]
-path = "conductor/vulture_baseline.json"
+path = "src/conductor/vulture_baseline.json"
 classes = ["python"]
 required_profiles = ["full"]
 
@@ -1177,6 +1202,14 @@ expected_version = "4.2.1"
 required_profiles = ["full"]
 provided_by = "npm install --global jscpd@4.2.1"
 rationale = "checks.jscpd"
+
+[tools.pmd]
+executable = "pmd"
+version_command = ["pmd", "--version"]
+expected_version = "7.27.0"
+required_profiles = ["full"]
+provided_by = "download the pinned pmd-dist-7.27.0-bin.zip release and put its bin/ on PATH; see README.md"
+rationale = "checks.pmd"
 
 [tools.git]
 executable = "git"

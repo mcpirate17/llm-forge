@@ -893,8 +893,37 @@ def _pmd_duplicate_entry(
         raise DuplicateAuditError(str(exc)) from exc
 
 
+def _resolve_pmd_executable(cwd: Path, executable: str | None = None) -> str:
+    """Resolve the pmd-cpd binary directly, never through ``npx``.
+
+    ``npx --no-install pmd`` does not fall back to a same-named binary already on
+    ``PATH``: npm's registry carries an unrelated package called ``pmd`` (a Markdown
+    -> PDF converter), and npx resolves the name against that package before it ever
+    looks at the shell's PATH, refusing outright under ``--no-install``. The real
+    PMD CPD ships as a plain shell/batch script (see README for the pinned release),
+    so it is resolved the same way jscpd's binary is: an explicit override, then a
+    project-local ``node_modules/.bin/pmd``, then whatever ``pmd`` PATH resolves to.
+    """
+    if executable:
+        return executable
+    local = cwd / "node_modules" / ".bin" / "pmd"
+    if local.is_file():
+        return str(local.resolve())
+    resolved = shutil.which("pmd")
+    if resolved:
+        return resolved
+    raise DuplicateAuditError(
+        "pmd executable is unavailable; install the repository-pinned analyzer "
+        "(see README.md for the pinned PMD release and how to put it on PATH)"
+    )
+
+
 def _pmd_collect_duplicates(
-    files: list[str], *, relativize_root: Path, cwd: Path = ROOT
+    files: list[str],
+    *,
+    relativize_root: Path,
+    cwd: Path = ROOT,
+    executable: str | None = None,
 ) -> list[dict]:
     """Run PMD CPD with the XML reporter and return normalized clone entries."""
     if not files:
@@ -904,9 +933,7 @@ def _pmd_collect_duplicates(
         file_list.write_text("\n".join(files) + "\n", encoding="utf-8")
         report = Path(tmp) / "cpd-report.xml"
         command = [
-            "npx",
-            "--no-install",
-            "pmd",
+            _resolve_pmd_executable(cwd, executable),
             "cpd",
             "--file-list",
             str(file_list),
@@ -996,13 +1023,16 @@ def run_pmd_python(
             changed_files=changed_files,
         )
 
+    try:
+        executable = _resolve_pmd_executable(root)
+    except DuplicateAuditError as exc:
+        print(f"ERROR: pmd-cpd: {exc}", file=sys.stderr)
+        return AUDIT_ERROR_EXIT_CODE
     audit_dir = root / "tasks" / "audit"
     report = audit_dir / "duplication-pmd-python.txt"
     file_list = python_file_list("duplication-python-files.txt", root=root)
     cmd = [
-        "npx",
-        "--no-install",
-        "pmd",
+        executable,
         "cpd",
         "--file-list",
         str(file_list),

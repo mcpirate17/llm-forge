@@ -58,6 +58,72 @@ needs to find the host's own layout instead of assuming this repo's.
 `conductor.bootstrap` is an alias onto `conductor init` (`conductor/project_init.py`),
 not a separate implementation — see that module for the full contract.
 
+## Documentation
+
+[`docs/`](docs/README.md) has one page per platform law (governance claims, the landing
+gate, risk/approval tiers, mutation evidence, context budget, CI coverage), written for a
+host project adopting this platform. `AGENTS.md` is the working contract for changes to
+this repository itself.
+
+## Baselines
+
+`make candidate-review` (profile `full`) checks staged Python against four
+measurements recorded under `src/conductor/*_baseline.json` and
+`conductor/radon_complexity_baseline.json`: jscpd duplication, PMD-CPD
+duplication, radon complexity, and vulture dead-code findings. These are
+*measurements*, never hand-edited — regenerate them with:
+
+```sh
+make baselines            # all four
+make baseline-jscpd       # needs jscpd on PATH
+make baseline-pmd         # needs pmd on PATH -- see below
+make baseline-complexity
+make baseline-vulture
+```
+
+`jscpd` and `vulture`/`radon` come from `npm install --global jscpd@4.2.1`
+(matching `[tools.jscpd]` in `candidate_policy.toml`) and `uv sync --extra
+test` respectively.
+
+### Installing PMD locally
+
+PMD has no packaged distribution, so this repo pins the release zip instead
+of a system package. Do not `apt install pmd` — install the exact pinned
+version so your baseline matches what CI checks against:
+
+```sh
+mkdir -p .tools
+curl -sSL -o .tools/pmd.zip \
+  https://github.com/pmd/pmd/releases/download/pmd_releases/7.27.0/pmd-dist-7.27.0-bin.zip
+unzip -q .tools/pmd.zip -d .tools/
+rm .tools/pmd.zip
+export PATH="$PWD/.tools/pmd-bin-7.27.0/bin:$PATH"
+pmd --version   # PMD 7.27.0
+```
+
+`.tools/` is gitignored. `[tools.pmd]` in `candidate_policy.toml` pins the
+same `7.27.0` version; CI downloads it the same way (see
+`.github/workflows/ci.yml`) rather than generating the PMD baseline itself --
+baselines are measurements a human regenerates deliberately after a real
+refactor, not something CI writes.
+
+### Staleness
+
+`candidate_policy.toml`'s `baseline_expires` gates all four baselines at
+once: the whole review refuses once that date lapses, so a baseline can't
+silently rot forever unnoticed. Within that window, CI's "duplication,
+complexity and dead-code baselines" step re-runs the same jscpd/PMD-CPD/
+complexity/vulture checks `candidate-review` uses against every PR's changed
+Python files, so drift between the tree and a committed baseline (a new
+duplicate pair, a worse complexity block, a new dead-code finding) fails CI
+red rather than only surfacing when someone happens to run `make
+candidate-review` locally. There is no full-tree hash-based staleness check
+for any of the four baselines today (jscpd/PMD-CPD tolerate baseline entries
+that no longer exist in the tree without complaint, and vulture's
+`generated_from_tree` field is format-checked but never compared against the
+current tree) -- `baseline_expires` plus the CI diff-check above are the
+mechanisms this repo has.
+
 ## History
 
 This repository was split out of the `LLM` monorepo on 2026-09-12 with
