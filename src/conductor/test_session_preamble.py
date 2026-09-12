@@ -58,8 +58,45 @@ def _state() -> dict[object, object]:
     }
 
 
-def test_compact_state_omits_claim_paths() -> None:
-    text = preamble.compact_state(_state())  # type: ignore[arg-type]
+def _write_session_policy(
+    root: Path, preamble_lines: list[str], mandates: list[str]
+) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "pyproject.toml").write_text(
+        "[tool.conductor.session]\n"
+        f"preamble = {json.dumps(preamble_lines)}\n"
+        f"standing_mandates = {json.dumps(mandates)}\n",
+        encoding="utf-8",
+    )
+
+
+# Preamble text this test suite owns outright, so the assertions below exercise
+# session_preamble's "render a host project's opted-in text" mechanism rather than
+# reaching out to whatever a particular host repository's pyproject.toml happens to
+# say. A package install has no opinion on wording (session_policy.EMPTY_SESSION_POLICY
+# is the neutral default); this fixture stands in for a host that has opted in.
+_FIXTURE_PREAMBLE = [
+    "MISSION: Ship correct, minimal, native-speed governance tooling.",
+    "RETRIEVE (do not dump .current_work.md): `python -m conductor.kb_retrieve "
+    'query "<task>" --top-k 5`.',
+    "FLEET: embed http://127.0.0.1:7317/v1 (GPU-guest). Clerk models are "
+    "clerical-only, zero approval authority; never gate work or runs on local output.",
+    "MUTATION: mutate ONLY the files you changed and their tests -- never "
+    "repo-wide. automatic engines only, hand-authored mutants forbidden.",
+    "DELEGATE: searches touching >3 files go to a subagent. Prefer "
+    "ast_context_tool/query_graph over whole-file Read.",
+]
+_FIXTURE_MANDATES: list[str] = []
+
+
+def _fixture_policy_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "fixture-project"
+    _write_session_policy(repo, _FIXTURE_PREAMBLE, _FIXTURE_MANDATES)
+    return repo
+
+
+def test_compact_state_omits_claim_paths(tmp_path: Path) -> None:
+    text = preamble.compact_state(_state(), repo=_fixture_policy_repo(tmp_path))  # type: ignore[arg-type]
     assert "NOVEL_MECHANISMS_ONLY" in text
     assert "MEMORY_RETRIEVE" in text
     assert "heading-a" in text
@@ -83,12 +120,13 @@ def test_compact_state_omits_claim_paths() -> None:
     assert "ast_context_tool/query_graph" in text
 
 
-def test_inject_stays_under_budget() -> None:
+def test_inject_stays_under_budget(tmp_path: Path) -> None:
     huge_summary = "peer " * 2000
     text = preamble.render_text(
         state=_state(),  # type: ignore[arg-type]
         a2a_name="grok",
         a2a_summary=huge_summary,
+        repo=_fixture_policy_repo(tmp_path),
     )
     assert len(text) <= preamble.MAX_INJECT_CHARS
     assert "python -m conductor.kb_retrieve" in text
@@ -111,8 +149,11 @@ def test_a2a_summary_requires_explicit_show_for_full_message() -> None:
     assert "bounded summary" in text
 
 
-def test_hook_payload_shape() -> None:
-    payload = preamble.hook_payload(state=_state())  # type: ignore[arg-type]
+def test_hook_payload_shape(tmp_path: Path) -> None:
+    payload = preamble.hook_payload(
+        state=_state(),  # type: ignore[arg-type]
+        repo=_fixture_policy_repo(tmp_path),
+    )
     out = payload["hookSpecificOutput"]
     assert out["hookEventName"] == "SessionStart"
     assert "MISSION" in out["additionalContext"]
@@ -149,35 +190,29 @@ def test_a2a_context_requires_both_fields_and_budget_truncation_is_exact() -> No
     assert payload["hookSpecificOutput"]["hookEventName"] == "Resume"
 
 
-def _write_session_policy(
-    root: Path, preamble_lines: list[str], mandates: list[str]
-) -> None:
-    import json
-
-    root.mkdir(parents=True, exist_ok=True)
-    (root / "pyproject.toml").write_text(
-        "[tool.conductor.session]\n"
-        f"preamble = {json.dumps(preamble_lines)}\n"
-        f"standing_mandates = {json.dumps(mandates)}\n",
-        encoding="utf-8",
-    )
-
-
-def test_root_policy_is_rendered_before_live_state_summary() -> None:
+def test_root_policy_is_rendered_before_live_state_summary(tmp_path: Path) -> None:
+    """compact_state must splice a host's opted-in preamble ahead of live state,
+    for both an opted-in host (fixture repo) and the package's own neutral
+    default (a repo with no `[tool.conductor.session]` table at all)."""
     from conductor.session_policy import load_session_policy
 
-    policy = load_session_policy(preamble.ROOT)
-    state = {"standing_mandates": list(policy.standing_mandates), "active_claims": []}
-    text = preamble.compact_state(state, include_exposure=False)
-    expected = "\n".join(
-        [
-            *policy.preamble,
-            "MANDATES: "
-            + ", ".join(item.split(":", 1)[0] for item in policy.standing_mandates),
-            "CLAIMS: 0 active. Inspect with `make governance-claims`.",
-        ]
-    )
-    assert text == expected
+    for repo in (_fixture_policy_repo(tmp_path), tmp_path / "no-policy"):
+        (tmp_path / "no-policy").mkdir(exist_ok=True)
+        policy = load_session_policy(repo)
+        state = {
+            "standing_mandates": list(policy.standing_mandates),
+            "active_claims": [],
+        }
+        text = preamble.compact_state(state, include_exposure=False, repo=repo)
+        mandate_ids = [item.split(":", 1)[0] for item in policy.standing_mandates]
+        expected = "\n".join(
+            [
+                *policy.preamble,
+                "MANDATES: " + (", ".join(mandate_ids) if mandate_ids else "none"),
+                "CLAIMS: 0 active. Inspect with `make governance-claims`.",
+            ]
+        )
+        assert text == expected
 
 
 def test_canonical_foreign_state_uses_the_foreign_policy(
