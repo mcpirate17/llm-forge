@@ -192,8 +192,13 @@ def _package_hash(root: Path) -> tuple[str, dict[str, str]]:
     package = package_path(root) / "candidate_review"
     if not package.is_dir():
         return "", {}
+    # Keyed relative to the package, not to the tree root: this hash answers "is
+    # the engine in your tree the engine that is running", and that is a question
+    # about sources. A root-relative key folds the host's layout into the digest,
+    # so a monorepo candidate reviewed by a src-layout runtime reports its engine
+    # as modified when every byte of it is identical.
     files = {
-        path.relative_to(root).as_posix(): sha256_file(path)
+        path.relative_to(package.parent).as_posix(): sha256_file(path)
         for path in sorted(package.glob("*.py"))
         if path.is_file()
     }

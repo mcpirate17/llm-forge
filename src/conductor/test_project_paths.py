@@ -229,3 +229,98 @@ def test_host_root_defaults_to_the_current_directory(tmp_path, monkeypatch):
     plain.mkdir()
     monkeypatch.chdir(plain)
     assert pp.host_root() == plain.resolve()
+
+
+# --- package_root -----------------------------------------------------------
+#
+# The third answer this module owns: where the conductor package itself sits.
+# Unlike the policy and the registry, it has an inverse -- a caller holding the
+# installed package and needing the tree around it -- and that inverse is the part
+# a fixed parents[n] walk gets wrong under a src layout.
+
+
+def test_package_root_defaults_to_the_monorepo_literal():
+    assert pp.DEFAULT_PACKAGE_ROOT == PurePosixPath("conductor")
+    assert pp.DEFAULTS[pp.PACKAGE_ROOT_KEY] == pp.DEFAULT_PACKAGE_ROOT
+
+
+def test_package_root_is_the_default_without_configuration(tmp_path):
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.package_relative == PurePosixPath("conductor")
+    assert resolved.package_configured is False
+    assert resolved.package_path == tmp_path / "conductor"
+
+
+def test_package_root_comes_from_the_conductor_table(tmp_path):
+    _write(tmp_path, '[tool.conductor]\npackage_root = "src/conductor"\n')
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.package_relative == PurePosixPath("src/conductor")
+    assert resolved.package_configured is True
+    assert resolved.package_path == tmp_path / "src/conductor"
+    assert pp.package_relative(tmp_path) == PurePosixPath("src/conductor")
+    assert pp.package_path(tmp_path) == tmp_path / "src/conductor"
+
+
+def test_package_root_environment_overrides_the_table(tmp_path, monkeypatch):
+    _write(tmp_path, '[tool.conductor]\npackage_root = "src/conductor"\n')
+    monkeypatch.setenv(pp.PACKAGE_ROOT_ENV, "lib/conductor")
+    assert pp.package_relative(tmp_path) == PurePosixPath("lib/conductor")
+
+
+def test_package_root_refuses_an_unusable_value(tmp_path):
+    _write(tmp_path, '[tool.conductor]\npackage_root = "/abs/conductor"\n')
+    with pytest.raises(pp.ProjectPathError):
+        pp.package_relative(tmp_path)
+
+
+def test_package_tree_root_finds_a_flat_layout(tmp_path):
+    repo = tmp_path / "repo"
+    package = repo / "conductor"
+    package.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    assert pp.package_tree_root(package) == repo.resolve()
+
+
+def test_package_tree_root_prefers_the_repo_over_the_nearer_ancestor(tmp_path):
+    """``src/`` answers the unconfigured default; the repo is what configured it."""
+    repo = tmp_path / "repo"
+    package = repo / "src" / "conductor"
+    package.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    _write(repo, '[tool.conductor]\npackage_root = "src/conductor"\n')
+    assert pp.package_tree_root(package) == repo.resolve()
+    # The nearer ancestor would have answered, which is exactly the wrong root.
+    assert pp.package_path(repo / "src") == package
+
+
+def test_package_tree_root_falls_back_when_there_is_no_repository(tmp_path):
+    package = tmp_path / "site-packages" / "conductor"
+    package.mkdir(parents=True)
+    assert pp.package_tree_root(package) == (tmp_path / "site-packages").resolve()
+
+
+def test_package_tree_root_falls_back_when_the_repo_names_another_package(tmp_path):
+    """A repo pointing elsewhere is not authoritative for a package it disowns."""
+    repo = tmp_path / "repo"
+    package = repo / "src" / "conductor"
+    package.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    _write(repo, '[tool.conductor]\npackage_root = "elsewhere/conductor"\n')
+    assert pp.package_tree_root(package) == (repo / "src").resolve()
+
+
+def test_package_tree_root_refuses_a_package_no_root_claims(tmp_path):
+    package = tmp_path / "repo" / "src" / "not_conductor"
+    package.mkdir(parents=True)
+    (tmp_path / "repo" / ".git").mkdir()
+    with pytest.raises(pp.ProjectPathError):
+        pp.package_tree_root(package)
+
+
+def test_this_repository_resolves_its_own_package():
+    """The live check: the installed package and the checkout agree on the root."""
+    import conductor.candidate_review.engine as engine
+
+    package = Path(engine.__file__).resolve().parents[1]
+    root = pp.package_tree_root(package)
+    assert pp.package_path(root).resolve() == package

@@ -11,6 +11,7 @@ first-party siblings gets turned off and then catches nothing at all.
 
 from __future__ import annotations
 
+import tomllib
 from dataclasses import replace
 from pathlib import Path
 
@@ -28,6 +29,8 @@ from conductor.candidate_review.import_declaration import (
     canonical_name,
     declared_distributions,
     imported_modules,
+    BASE_DEPENDENCY_TREES,
+    base_dependency_trees,
     in_base_dependency_tree,
     optional_only_imports,
     nearest_manifest,
@@ -458,3 +461,52 @@ def test_an_exemption_that_covers_nothing_is_reported(
     assert [(f.rule_id, f.severity) for f in result.findings] == [
         ("stale-exemption", Severity.MEDIUM)
     ]
+
+
+def test_base_dependency_trees_default_to_the_monorepo_pair(tmp_path: Path) -> None:
+    assert base_dependency_trees(tmp_path) == ("conductor/", "tooling/")
+    assert base_dependency_trees(tmp_path) == BASE_DEPENDENCY_TREES
+
+
+def test_base_dependency_trees_follow_a_declared_src_layout(tmp_path: Path) -> None:
+    """The pair moves together: the package and the hook tooling beside it."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\npackage_root = "src/conductor"\n', encoding="utf-8"
+    )
+    assert base_dependency_trees(tmp_path) == ("src/conductor/", "src/tooling/")
+
+
+def test_the_stricter_rule_governs_the_package_under_a_src_layout(
+    tmp_path: Path,
+) -> None:
+    """The regression this closes: the rule silently governed nothing here."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\npackage_root = "src/conductor"\n', encoding="utf-8"
+    )
+    trees = base_dependency_trees(tmp_path)
+    assert in_base_dependency_tree("src/conductor/radon_complexity.py", trees)
+    assert in_base_dependency_tree("src/tooling/hooks/dispatch/runner.py", trees)
+    assert not in_base_dependency_tree("src/conductor/radon_complexity.py")
+
+
+def test_test_infrastructure_is_excluded_from_any_tree(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\npackage_root = "src/conductor"\n', encoding="utf-8"
+    )
+    trees = base_dependency_trees(tmp_path)
+    assert not in_base_dependency_tree("src/conductor/conftest.py", trees)
+
+
+def test_a_tree_outside_the_pair_is_not_governed(tmp_path: Path) -> None:
+    trees = base_dependency_trees(tmp_path)
+    assert not in_base_dependency_tree("research/model.py", trees)
+    assert not in_base_dependency_tree("native/build.py", trees)
+
+
+def test_an_unparseable_root_manifest_leaves_the_trees_at_their_default(
+    tmp_path: Path,
+) -> None:
+    """The layout read must not out-shout the finding the check already makes."""
+    (tmp_path / "pyproject.toml").write_text("[project\nname =", encoding="utf-8")
+    with pytest.raises(tomllib.TOMLDecodeError):
+        base_dependency_trees(tmp_path)

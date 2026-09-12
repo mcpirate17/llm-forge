@@ -178,9 +178,10 @@ def package_tree_root(package_dir: Path) -> Path:
     The installed package cannot ask itself where it lives: under a src layout its
     parent is ``src/``, which answers the unconfigured default and would name itself
     the root. So the enclosing repository is asked first -- it is the root whose
-    ``pyproject.toml`` configured the layout -- and only a package with no repository
-    above it (a wheel in site-packages) falls back to the nearest ancestor that
-    resolves back onto the same directory.
+    ``pyproject.toml`` configured the layout. A package with no repository above it (a
+    wheel in site-packages), or one the repository above it disowns, falls back to the
+    nearest ancestor whose own configuration resolves back onto the same directory;
+    when no ancestor claims it at all, that is a refusal, not a guess.
     """
     resolved = Path(package_dir).resolve()
     repo = enclosing_repo(resolved)

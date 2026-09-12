@@ -424,7 +424,14 @@ def check_import_declaration(ctx: "ReviewContext") -> CheckResult:
     from conductor.candidate_review.checks import _result
 
     started = time.perf_counter()
-    trees = base_dependency_trees(ctx.snapshot)
+    try:
+        trees = base_dependency_trees(ctx.snapshot)
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        # The root manifest is what declares the layout, and it does not parse.
+        # The loop below reports that file as `unreadable-manifest`; turning the
+        # same fact into an exception here would replace a reviewable finding
+        # with a crashed check, which is the one outcome a review cannot act on.
+        trees = BASE_DEPENDENCY_TREES
     files = [
         change.path
         for change in ctx.candidate.changes
