@@ -13,8 +13,55 @@ jobs:
       - uses: astral-sh/setup-uv@v3
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - run: uv sync --extra test
       - run: uv run python -m pytest src/conductor -q -p no:cacheprovider --timeout 600
+      # candidate-review's "full" profile needs jscpd and pmd on PATH (see
+      # [tools.jscpd]/[tools.pmd] in candidate_policy.toml and README.md's
+      # "Baselines" section). Both are pinned to the exact version the
+      # baselines under src/conductor/*_baseline.json were generated with --
+      # bumping either without regenerating its baseline is exactly the drift
+      # this step exists to catch.
+      - name: Install jscpd (pinned)
+        run: npm install --global jscpd@4.2.1
+      - name: Install pmd (pinned)
+        run: |
+          curl -sSL -o /tmp/pmd.zip \
+            https://github.com/pmd/pmd/releases/download/pmd_releases/7.27.0/pmd-dist-7.27.0-bin.zip
+          unzip -q /tmp/pmd.zip -d /tmp/pmd-dist
+          echo "/tmp/pmd-dist/pmd-bin-7.27.0/bin" >> "$GITHUB_PATH"
+      # Full `make candidate-review --profile full` also needs semgrep,
+      # detect-secrets-hook, bandit, pyright, codespell, shellcheck, biome,
+      # cppcheck and the clang tools, none of which this repo installs
+      # anywhere yet (a pre-existing gap, not introduced here) -- running the
+      # whole governance gate in CI is tracked as separate debt (see PR body)
+      # rather than attempted in this step. This step instead runs exactly
+      # the four checks this PR's baselines back, the same way
+      # candidate-review's [checks.jscpd]/[checks.pmd]/[checks.complexity]/
+      # [checks.vulture] entries do, so a real drift between the tree and a
+      # committed baseline fails CI red instead of only being caught by an
+      # operator remembering to run `make baselines` locally.
+      - name: duplication, complexity and dead-code baselines
+        run: |
+          export PATH="/tmp/pmd-dist/pmd-bin-7.27.0/bin:$PATH"
+          jscpd --version
+          pmd --version
+          git fetch --depth=1 origin "${{ github.event.pull_request.base.sha || 'HEAD~1' }}" || true
+          base="${{ github.event.pull_request.base.sha }}"
+          base="${base:-HEAD~1}"
+          git diff --name-only --diff-filter=ACMR "$base"...HEAD -- '*.py' > /tmp/changed-python-files.txt
+          cat /tmp/changed-python-files.txt
+          uv run python -m conductor.run_duplicate_audit --tool jscpd \
+            --check --changed-files-from /tmp/changed-python-files.txt
+          uv run python -m conductor.run_duplicate_audit --tool pmd-python \
+            --check --changed-files-from /tmp/changed-python-files.txt
+          uv run python -m conductor.radon_complexity check \
+            --baseline conductor/radon_complexity_baseline.json --path .
+          uv run python -m conductor.candidate_review.vulture_audit \
+            --baseline src/conductor/vulture_baseline.json \
+            --changed-files-from /tmp/changed-python-files.txt src
 
   rust:
     runs-on: ubuntu-latest
