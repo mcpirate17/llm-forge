@@ -10,6 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history, not the default shallow depth-1 clone: the
+          # baselines step below needs a real merge base with the PR's base
+          # branch to compute the changed-file diff, and a depth-1 checkout
+          # has no ancestry to compute one from (`git diff base...HEAD` then
+          # fails with "no merge base", exit 128).
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v3
         with:
           python-version: "3.12"
@@ -48,15 +55,32 @@ jobs:
           export PATH="/tmp/pmd-dist/pmd-bin-7.27.0/bin:$PATH"
           jscpd --version
           pmd --version
-          git fetch --depth=1 origin "${{ github.event.pull_request.base.sha || 'HEAD~1' }}" || true
-          base="${{ github.event.pull_request.base.sha }}"
+          # base candidate order: PR base sha, then the pre-push sha (push
+          # events), then HEAD~1 as a last resort for a push with no `before`
+          # (e.g. a repo's very first push on a ref). fetch-depth: 0 above
+          # means the base's ancestry is already in the local object store,
+          # so no extra fetch is needed -- and none is attempted, so a
+          # missing object fails loud here instead of a swallowed `|| true`
+          # silently diffing against stale or wrong data.
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
           base="${base:-HEAD~1}"
-          git diff --name-only --diff-filter=ACMR "$base"...HEAD -- '*.py' > /tmp/changed-python-files.txt
+          if ! merge_base="$(git merge-base "$base" HEAD)"; then
+            echo "::error::no merge base between '$base' and HEAD -- checkout fetch-depth is probably too shallow again" >&2
+            exit 1
+          fi
+          git diff --name-only --diff-filter=ACMR "$merge_base" HEAD -- '*.py' > /tmp/changed-python-files.txt
           cat /tmp/changed-python-files.txt
           uv run python -m conductor.run_duplicate_audit --tool jscpd \
             --check --changed-files-from /tmp/changed-python-files.txt
           uv run python -m conductor.run_duplicate_audit --tool pmd-python \
             --check --changed-files-from /tmp/changed-python-files.txt
+          # --baseline is resolved by conductor.radon_complexity relative to
+          # its own REPO_ROOT (src/, i.e. one level above this module's
+          # package dir) -- "conductor/..." here therefore correctly means
+          # src/conductor/radon_complexity_baseline.json, the same file the
+          # vulture invocation below names explicitly as "src/conductor/...".
+          # Confirmed by running both from the repo root: both resolve the
+          # committed baseline files, not a missing cwd-relative path.
           uv run python -m conductor.radon_complexity check \
             --baseline conductor/radon_complexity_baseline.json --path .
           uv run python -m conductor.candidate_review.vulture_audit \
