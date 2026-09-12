@@ -1,0 +1,1505 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 7,
+    "baseline_repetitions": 2,
+    "killed_mutants": 7,
+    "ranked_tests": 6,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.334136,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                                                   [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m6 passed\u001b[0m\u001b[32m in 0.08s\u001b[0m\u001b[0m\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-evidence-hash/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_receipt_build.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "forge-evidence-hash_mutation_receipt_build_fest_20260912",
+  "classification_required": [],
+  "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "engine_result": {
+    "duration_seconds": 2.170576,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2ar3ymb_/worktree/src/conductor/mutation_receipt_build.py\",\n        \"line\": 202,\n        \"column\": 32,\n        \"byte_offset\": 8122,\n        \"byte_length\": 6,\n        \"original_text\": \"is not\",\n        \"mutated_text\": \"is\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2ar3ymb_/worktree/src/conductor/mutation_receipt_build.py\",\n        \"line\": 211,\n        \"column\": 20,\n        \"byte_offset\": 8480,\n        \"byte_length\": 12,\n        \"original_text\": \"\\\"test_value\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2ar3ymb_/worktree/src/conductor/mutation_receipt_build.py\",\n        \"line\": 211,\n        \"column\": 34,\n        \"byte_offset\": 8494,\n        \"byte_length\": 2,\n        \"original_text\": \"is\",\n        \"mutated_text\": \"is not\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2ar3ymb_/worktree/src/conductor/mutation_receipt_build.py\",\n        \"line\": 212,\n        \"column\": 9,\n        \"byte_offset\": 8510,\n        \"byte_length\": 2,\n        \"original_text\": \"or\",\n        \"mutated_text\": \"and\",\n        \"mutator_name\": \"boolean_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2ar3ymb_/worktree/src/conductor/mutation_receipt_build.py\",\n        \"line\": 212,\n        \"column\": 38,\n        \"byte_offset\": 8539,\n        \"byte_length\": 8,\n        \"original_text\": \"\\\"status\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2ar3ymb_/worktree/src/conductor/mutation_receipt_build.py\",\n        \"line\": 212,\n        \"column\": 48,\n        \"byte_offset\": 8549,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2ar3ymb_/worktree/src/conductor/mutation_receipt_build.py\",\n        \"line\": 212,\n        \"column\": 51,\n        \"byte_offset\": 8552,\n        \"byte_length\": 6,\n        \"original_text\": \"\\\"PASS\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2ar3ymb_/worktree/src/conductor/mutation_receipt_build.py\",\n        \"line\": 213,\n        \"column\": 14,\n        \"byte_offset\": 8572,\n        \"byte_length\": 6,\n        \"original_text\": \"\\\"FAIL\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 2,\n    \"nanos\": 166091553\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 7,
+    "mutants_generated": 90,
+    "mutants_tested": 10,
+    "no_coverage": 80,
+    "survived": 3,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-12T22:50:50.265756+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-evidence-hash/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/forge-evidence-hash_mutation_receipt_build_fest_20260912.json",
+  "manifest_sha256": "f4c9dcd729533f7f6576249eee8c65bb3c8f879873511b8ec10be176e2d11f3d",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 532,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9cbf639a8fed-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Receipt construction and scoring for mutation campaigns.\n\nSplit out of the runner so the orchestration in `mutation_testing` stays about\nrunning things, and because these two ends are what a receipt's integrity rests\non: `_open_receipt` captures every hash binding from the tree as it is before\nanything runs, and `_score_receipt` decides the status those bindings vouch for.\nBoth are declared runner components -- a change in here changes what a receipt\nmeans, so it must invalidate the receipts pinned to the old behaviour.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 1170,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6b2e06fae247-0",
+      "line": 31,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"python\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 1180,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-135f0c8b8429-0",
+      "line": 31,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"python3\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 44,
+      "byte_offset": 1230,
+      "duration_seconds": 0.183099,
+      "id": "return_value-469db6030831-0",
+      "line": 35,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "datetime.now(UTC).strftime(\"%Y%m%dT%H%M%SZ\")",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_creates_a_directory_that_does_not_exist_yet",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 1257,
+      "duration_seconds": 0.196518,
+      "id": "constant_replace-46d690311a2e-0",
+      "line": 35,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"%Y%m%dT%H%M%SZ\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_creates_a_directory_that_does_not_exist_yet",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ]
+    },
+    {
+      "byte_length": 403,
+      "byte_offset": 1337,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-4156b7a65495-0",
+      "line": 39,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Resolve a bare ``python`` argv[0] to the runner's own interpreter.\n\n    A bare name resolves through the invoking shell's PATH, so the same manifest\n    ran under whichever venv the agent happened to have active (torch 2.12.1 in\n    the project ``.venv`` vs 2.13.0 in ``~/venvs/llm``), and the receipt could not\n    tell. Evidence must bind the interpreter the runner itself was started with.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 109,
+      "byte_offset": 1752,
+      "duration_seconds": 0.0,
+      "id": "return_value-d23d7431448d-0",
+      "line": 46,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_support.pin_interpreter(\n        argv, bare_interpreters=_BARE_INTERPRETERS, executable=sys.executable\n    )",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 1920,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9f764a988d1b-0",
+      "line": 52,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Best-effort torch version of ``interpreter`` for receipt provenance.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 35,
+      "byte_offset": 2007,
+      "duration_seconds": 0.0,
+      "id": "return_value-11cd03673f83-0",
+      "line": 54,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_support.torch_version(interpreter)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 627,
+      "byte_offset": 2129,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c70e6fa5f7dd-0",
+      "line": 58,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Fold per-mutant verdicts into the campaign's contract-binding verdict.\n\n    Three outcomes, and the middle one is the point. `ENFORCED` means every kill\n    was traced to a test the mutant's contract named. `UNAVAILABLE` means the\n    harness produces no per-test evidence at all -- a property of the batch that\n    the campaign cannot fix, so it is reported and not punished. `REFUSED` means\n    the campaign's own claims did not hold: a kill landed on the wrong test, or\n    a batch that *can* attribute did not attribute this one, which is how a\n    mutant that breaks the build or the collection reads as a kill.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 125,
+      "byte_offset": 2812,
+      "duration_seconds": 0.0,
+      "id": "return_value-d7fb1d12f228-0",
+      "line": 70,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[\n            row[\"id\"]\n            for row in mutants\n            if row[\"killer_attribution\"][\"status\"] == status\n        ]",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 2963,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e6037a5b6b27-0",
+      "line": 76,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"MISATTRIBUTED\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 3003,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f92c702221d7-0",
+      "line": 77,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"UNAVAILABLE\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 3046,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-4e5a931808c8-0",
+      "line": 78,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"UNATTRIBUTED\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 283,
+      "byte_offset": 3073,
+      "duration_seconds": 0.0,
+      "id": "return_value-92c560092379-0",
+      "line": 79,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{\n        \"status\": \"REFUSED\"\n        if misattributed or unattributed_runs\n        else \"UNAVAILABLE\"\n        if unattributed\n        else \"ENFORCED\",\n        \"misattributed\": misattributed,\n        \"unattributed\": unattributed,\n        \"unattributed_runs\": unattributed_runs,\n    }",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 3083,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-94fe08fb116a-0",
+      "line": 80,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"status\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 3093,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e3749ec08afc-0",
+      "line": 80,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"REFUSED\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 3162,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f92c702221d7-1",
+      "line": 82,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"UNAVAILABLE\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3213,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-60e2875b8cd4-0",
+      "line": 84,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"ENFORCED\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 3233,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-12ccf7bf938a-0",
+      "line": 85,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"misattributed\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 3273,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c37c67eaca0a-0",
+      "line": 86,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"unattributed\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 3311,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-4d278a0a50df-0",
+      "line": 87,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"unattributed_runs\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 315,
+      "byte_offset": 3435,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-123b9f326e72-0",
+      "line": 92,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Where a receipt lands absent an explicit ``--receipt``.\n\n    The directory is host-configurable (``[tool.conductor].mutation_receipt_root``)\n    and created on demand -- a host with no scratch-output tree of its own must not\n    have to create one by hand just to run a campaign without an explicit path.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3778,
+      "duration_seconds": 0.219236,
+      "id": "arithmetic_op-4706c5ae9fde-0",
+      "line": 99,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_creates_a_directory_that_does_not_exist_yet",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_fails_loud_when_the_directory_cannot_be_created",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ]
+    },
+    {
+      "byte_length": 114,
+      "byte_offset": 3930,
+      "duration_seconds": 0.218258,
+      "id": "exception_swallow-99bf90c63473-0",
+      "line": 103,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(\n            f\"cannot create mutation receipt directory {directory}: {exc}\"\n        ) from exc",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_fails_loud_when_the_directory_cannot_be_created"
+      ]
+    },
+    {
+      "byte_length": 57,
+      "byte_offset": 4056,
+      "duration_seconds": 0.250271,
+      "id": "return_value-ae60288623f1-0",
+      "line": 106,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "directory / f\"{campaign.campaign_id}_{_utc_stamp()}.json\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_creates_a_directory_that_does_not_exist_yet",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4066,
+      "duration_seconds": 0.234138,
+      "id": "arithmetic_op-4706c5ae9fde-1",
+      "line": 106,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_creates_a_directory_that_does_not_exist_yet",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ]
+    },
+    {
+      "byte_length": 335,
+      "byte_offset": 4230,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-1986d5a23c45-0",
+      "line": 112,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The receipt as it stands before anything has run.\n\n    Written in the RUNNING state so a crash leaves a receipt that names what was\n    attempted; the hash bindings (manifest, runner components, sources, symbols)\n    are all captured here, from the tree as it is now, so nothing later in the\n    run can quietly rebind them.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4674,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-edf6bea445d7-0",
+      "line": 121,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1231,
+      "byte_offset": 4688,
+      "duration_seconds": 0.0,
+      "id": "return_value-2e0b8e0d5f1d-0",
+      "line": 122,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{\n        \"schema_version\": RECEIPT_SCHEMA,\n        \"campaign_id\": campaign.campaign_id,\n        \"manifest\": campaign.manifest_path.relative_to(repo_root).as_posix(),\n        \"manifest_sha256\": campaign.manifest_sha256,\n        \"runner_sha256\": runner_components[\"conductor/mutation_testing.py\"],\n        \"runner_components_sha256\": runner_components,\n        \"language\": campaign.language,\n        \"mutation_engine\": campaign.mutation_engine,\n        \"generated_at\": datetime.now(UTC).isoformat(),\n        \"status\": \"RUNNING\",\n        \"source_sha256\": dict(campaign.source_sha256),\n        \"source_symbols\": {k: dict(v) for k, v in campaign.source_symbols.items()},\n        \"test_scopes\": _test_scopes_payload(campaign),\n        \"test_argv\": list(campaign.test_argv),\n        \"interpreter\": interpreter,\n        \"torch_version\": _torch_version(interpreter),\n        \"expected_campaign_mutations\": campaign.expected_mutations,\n        \"selected_mutations\": [mutation.mutation_id for mutation in selected],\n        \"complete_campaign\": len(selected) == campaign.expected_mutations,\n        \"baseline\": None,\n        \"mutants\": [],\n        \"mutation_score\": None,\n        \"test_value\": None,\n        \"killer_enforcement\": None,\n    }",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 4698,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9bb38f88e40e-0",
+      "line": 123,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"schema_version\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 4740,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5da6270c801a-0",
+      "line": 124,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"campaign_id\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 4785,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ad46697ef975-0",
+      "line": 125,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"manifest\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 4863,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-23e4ce5dc9eb-0",
+      "line": 126,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"manifest_sha256\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 4916,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8448cbf4f822-0",
+      "line": 127,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"runner_sha256\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 31,
+      "byte_offset": 4951,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-381d922cd42c-0",
+      "line": 127,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"conductor/mutation_testing.py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 4993,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-435d4de47263-0",
+      "line": 128,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"runner_components_sha256\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 5048,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7c32989a910a-0",
+      "line": 129,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"language\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 5087,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ab9e8e1794de-0",
+      "line": 130,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutation_engine\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 5140,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c6ad0c31074f-0",
+      "line": 131,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"generated_at\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 5195,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-94fe08fb116a-1",
+      "line": 132,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"status\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 5205,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0dee61d09013-0",
+      "line": 132,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"RUNNING\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 5224,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-264fcc5d2da3-0",
+      "line": 133,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"source_sha256\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 5279,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f1255c748c07-0",
+      "line": 134,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"source_symbols\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 5363,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0f6b60e4c594-0",
+      "line": 135,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"test_scopes\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 5418,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-077f55907842-0",
+      "line": 136,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"test_argv\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 5465,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0a29384cc56a-0",
+      "line": 137,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"interpreter\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 5501,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-d70bfdc26327-0",
+      "line": 138,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"torch_version\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 5555,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6d3248758805-0",
+      "line": 139,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"expected_campaign_mutations\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 5623,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f7aa9b7f4e31-0",
+      "line": 140,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"selected_mutations\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 5702,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0fe72fdaf7a4-0",
+      "line": 141,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"complete_campaign\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 5777,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-65993544eecd-0",
+      "line": 142,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"baseline\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 5803,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0a40050b4dde-0",
+      "line": 143,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutants\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 5826,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-2260443d7635-0",
+      "line": 144,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutation_score\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 5858,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8c1cbbc146ae-0",
+      "line": 145,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"test_value\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 5886,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b0a60e34e2be-0",
+      "line": 146,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"killer_enforcement\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 81,
+      "byte_offset": 6043,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0c13586f033a-0",
+      "line": 153,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Absolute output path and its repo-relative name, refusing anything outside.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 6133,
+      "duration_seconds": 0.213549,
+      "id": "negate_condition-b91079a5ce65-0",
+      "line": 155,
+      "mutated_text": "not (receipt_path is None)",
+      "operator": "negate_condition",
+      "original_text": "receipt_path is None",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_still_honours_an_explicit_path",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6146,
+      "duration_seconds": 0.232637,
+      "id": "comparison_op-3282a4154607-0",
+      "line": 155,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_still_honours_an_explicit_path",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6324,
+      "duration_seconds": 0.19362,
+      "id": "arithmetic_op-4706c5ae9fde-2",
+      "line": 159,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_still_honours_an_explicit_path"
+      ]
+    },
+    {
+      "byte_length": 68,
+      "byte_offset": 6417,
+      "duration_seconds": 0.224288,
+      "id": "return_value-5057c84adc67-0",
+      "line": 163,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "output_path, output_path.relative_to(repo_root.resolve()).as_posix()",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": [
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_still_honours_an_explicit_path",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ]
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 6524,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-91f9b2792523-0",
+      "line": 165,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(\"receipt path must be inside the repository\") from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 385,
+      "byte_offset": 6827,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6667594b35d9-0",
+      "line": 175,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Turn completed mutant rows into a score and a final status, in place.\n\n    PASS demands that every selected mutant was killed, so a timeout is never\n    scored as a kill: a mutant the tests merely outran was not detected. A\n    REFUSED killer enforcement or a failed value analysis overrides a numeric\n    PASS, because a perfect score attributed to nothing is not evidence.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 7474,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-b2eef79e4ad3-0",
+      "line": 186,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 7524,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-4706c5ae9fde-3",
+      "line": 187,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 7732,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-94c2e5cd6ff0-0",
+      "line": 191,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"survivors\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 7809,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0a40050b4dde-1",
+      "line": 192,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutants\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 7853,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6de20705b2df-0",
+      "line": 194,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"PASS\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 7878,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-a852a8bcb118-0",
+      "line": 195,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7895,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-26e2fee9f7ca-0",
+      "line": 195,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 7899,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-6eee4360c9c6-0",
+      "line": 195,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 7912,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-26e2fee9f7ca-1",
+      "line": 195,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 7916,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-6eee4360c9c6-1",
+      "line": 195,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 7943,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-22e74ba582c7-0",
+      "line": 196,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"FAIL\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 7983,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e33f3faa1daf-0",
+      "line": 198,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"ERROR\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 52,
+      "byte_offset": 8004,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-37fd72c3672e-0",
+      "line": 200,
+      "mutated_text": "not (receipt[\"killer_enforcement\"][\"status\"] == \"REFUSED\")",
+      "operator": "negate_condition",
+      "original_text": "receipt[\"killer_enforcement\"][\"status\"] == \"REFUSED\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 8012,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b0a60e34e2be-1",
+      "line": 200,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"killer_enforcement\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 8034,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-94fe08fb116a-2",
+      "line": 200,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"status\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 8044,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-a852a8bcb118-1",
+      "line": 200,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 8047,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e3749ec08afc-1",
+      "line": 200,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"REFUSED\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 8084,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-22e74ba582c7-1",
+      "line": 201,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"FAIL\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 35,
+      "byte_offset": 8098,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-2f8a9157cd78-0",
+      "line": 202,
+      "mutated_text": "not (campaign.value_analysis is not None)",
+      "operator": "negate_condition",
+      "original_text": "campaign.value_analysis is not None",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 8122,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-094327512d97-0",
+      "line": 202,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 8480,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8c1cbbc146ae-1",
+      "line": 211,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"test_value\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 8494,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-3282a4154607-1",
+      "line": 211,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 8510,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-58c1ff3c9dfa-0",
+      "line": 212,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 8539,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-94fe08fb116a-3",
+      "line": 212,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"status\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 8549,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-a852a8bcb118-2",
+      "line": 212,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 8552,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6de20705b2df-1",
+      "line": 212,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"PASS\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 8572,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-22e74ba582c7-2",
+      "line": 213,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"FAIL\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_receipt_build.py",
+      "tests_run": []
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.7,
+  "new_survivors": [],
+  "no_coverage": 80,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 7,
+    "NO_COVERAGE": 80,
+    "SURVIVED": 3,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/forge-evidence-hash_mutation_receipt_build_fest_20260912_20260912T225050Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "d3f6448839921567e1562d7237abaf62600d958339172afb7a12cab9a63dbe29"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "arithmetic_op-4706c5ae9fde-2",
+    "constant_replace-46d690311a2e-0",
+    "return_value-469db6030831-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_receipt_build.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_receipt_build.py": "6bf0484e8c3cc336b2f2fe52389d7d89ef057d3f666d85e4e4f315153b150ae9"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 2,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 4
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-4706c5ae9fde-0": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_creates_a_directory_that_does_not_exist_yet",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_fails_loud_when_the_directory_cannot_be_created",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ],
+      "arithmetic_op-4706c5ae9fde-1": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_creates_a_directory_that_does_not_exist_yet",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ],
+      "comparison_op-3282a4154607-0": [
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_still_honours_an_explicit_path",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ],
+      "exception_swallow-99bf90c63473-0": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_fails_loud_when_the_directory_cannot_be_created"
+      ],
+      "negate_condition-b91079a5ce65-0": [
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_still_honours_an_explicit_path",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ],
+      "return_value-5057c84adc67-0": [
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_still_honours_an_explicit_path",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ],
+      "return_value-ae60288623f1-0": [
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+        "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+        "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/conductor/mutation_receipt_build.py"
+        ],
+        "criticality": "high",
+        "id": "forge-evidence-hash_mutation_receipt_build_fest_20260912"
+      }
+    ],
+    "retained_core": [
+      "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given",
+      "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_fails_loud_when_the_directory_cannot_be_created"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-evidence-hash_mutation_receipt_build_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+          "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+          "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-4706c5ae9fde-0",
+          "arithmetic_op-4706c5ae9fde-1"
+        ],
+        "nodeid": "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_creates_a_directory_that_does_not_exist_yet",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-evidence-hash_mutation_receipt_build_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-4706c5ae9fde-0",
+          "exception_swallow-99bf90c63473-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_fails_loud_when_the_directory_cannot_be_created",
+        "runtime_seconds_median": 0.0005,
+        "unique_kills": [
+          "exception_swallow-99bf90c63473-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-evidence-hash_mutation_receipt_build_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+          "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-4706c5ae9fde-0",
+          "arithmetic_op-4706c5ae9fde-1",
+          "return_value-ae60288623f1-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_falls_back_to_the_monorepo_literal_unconfigured",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-evidence-hash_mutation_receipt_build_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-4706c5ae9fde-0",
+          "arithmetic_op-4706c5ae9fde-1",
+          "return_value-ae60288623f1-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_receipt_build.py::test_default_receipt_path_honours_the_configured_mutation_receipt_root",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-evidence-hash_mutation_receipt_build_fest_20260912",
+        "dominated_by": [
+          "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given"
+        ],
+        "killed_mutants": [
+          "comparison_op-3282a4154607-0",
+          "negate_condition-b91079a5ce65-0",
+          "return_value-5057c84adc67-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_still_honours_an_explicit_path",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-evidence-hash_mutation_receipt_build_fest_20260912",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-4706c5ae9fde-0",
+          "arithmetic_op-4706c5ae9fde-1",
+          "comparison_op-3282a4154607-0",
+          "negate_condition-b91079a5ce65-0",
+          "return_value-5057c84adc67-0",
+          "return_value-ae60288623f1-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_receipt_build.py::test_resolve_receipt_path_uses_the_default_when_none_is_given",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      }
+    ]
+  },
+  "unviable": 0
+}

@@ -107,6 +107,11 @@ mutation_registry = "campaigns/registry.json"
 # integrity, the tooling boundary, base-dependency scope -- resolve it through
 # conductor.project_paths rather than spelling "conductor/" out.
 package_root = "src/conductor"
+# Where a receipt lands when a campaign is run without an explicit `--receipt`. The
+# unconfigured default is the monorepo's own scratch tree (`research/reports/...`),
+# which this repository does not have; point it at the registered receipts
+# directory instead so an ad hoc run has somewhere real to write.
+mutation_receipt_root = "campaigns/receipts"
 
 # OS prerequisite for conductor.project_context's additive Linux resolver.
 # Informational package metadata: pip/uv do not install system executables.
