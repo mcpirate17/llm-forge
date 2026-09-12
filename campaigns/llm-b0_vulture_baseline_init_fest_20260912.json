@@ -1,0 +1,38 @@
+{
+  "campaign_id": "llm-b0_vulture_baseline_init_fest_20260912",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/candidate_review/vulture_baseline_init.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/candidate_review/vulture_baseline_init.py": "ac11bf8bda1e987e25c6d60ff88f291e4f6a99a1917b2096aa41e8ca71a74281"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/candidate_review/test_vulture_baseline_init.py"
+  ],
+  "test_sha256": {
+    "src/conductor/candidate_review/test_vulture_baseline_init.py": "6ba14a4a6e85a892871ce078154d99e40d15281fa873bca024fceb6f97675d97"
+  },
+  "title": "Generated mutants for src/conductor/candidate_review/vulture_baseline_init.py, scored on the survivor set"
+}
