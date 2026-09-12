@@ -1,0 +1,125 @@
+{
+	"_comment": "Baseline of known duplicate-code pairs, keyed by a content hash of the duplicated fragment (not line numbers). The staged gate only fails on pairs NOT in this file. Regenerate with `python conductor/run_duplicate_audit.py --tool <name> --save-baseline` after a deliberate refactor changes the known clone set; never hand-edit to hide a new duplicate.",
+	"count": 17,
+	"entries": {
+		"src/conductor/candidate_review/test_value_waivers.py::src/conductor/candidate_review/test_value_waivers.py::6d3511ed99345493": {
+			"files": [
+				"src/conductor/candidate_review/test_value_waivers.py",
+				"src/conductor/candidate_review/test_value_waivers.py"
+			],
+			"lines": 8
+		},
+		"src/conductor/reuse/test_detector_scan_native.py::src/conductor/reuse/test_detector_scan_native.py::91199693c0fc7574": {
+			"files": [
+				"src/conductor/reuse/test_detector_scan_native.py",
+				"src/conductor/reuse/test_detector_scan_native.py"
+			],
+			"lines": 17
+		},
+		"src/conductor/reuse/test_detector_scan_native.py::src/conductor/reuse/test_detector_scan_native.py::ec210e1cc002a4e4": {
+			"files": [
+				"src/conductor/reuse/test_detector_scan_native.py",
+				"src/conductor/reuse/test_detector_scan_native.py"
+			],
+			"lines": 25
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::5035985a679901ad": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review.py"
+			],
+			"lines": 17
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::77f07f01cf8a39fa": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review.py"
+			],
+			"lines": 18
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::8b30935bcceddfaf": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review.py"
+			],
+			"lines": 10
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::a754fc508384fd1c": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review.py"
+			],
+			"lines": 26
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::aa365cb2e9ef3fb7": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review.py"
+			],
+			"lines": 22
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::b92fa6d68aee7f9c": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review.py"
+			],
+			"lines": 20
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::bb674ffda7196a52": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review.py"
+			],
+			"lines": 15
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::bd17cde68db46c4d": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review.py"
+			],
+			"lines": 25
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::d3f1eedfd3bc259d": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review.py"
+			],
+			"lines": 16
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review_cli_policy.py::5e82b7f0640e8aa3": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review_cli_policy.py"
+			],
+			"lines": 10
+		},
+		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review_hardening.py::cc9fb699c3271b96": {
+			"files": [
+				"src/conductor/test_candidate_review.py",
+				"src/conductor/test_candidate_review_hardening.py"
+			],
+			"lines": 20
+		},
+		"src/conductor/test_check_protected_deletes.py::src/conductor/test_workspace_runtime_matrix.py::c0259ac9db65413a": {
+			"files": [
+				"src/conductor/test_check_protected_deletes.py",
+				"src/conductor/test_workspace_runtime_matrix.py"
+			],
+			"lines": 10
+		},
+		"src/conductor/test_commit_snapshot.py::src/conductor/test_gate.py::c863aff90c23116e": {
+			"files": [
+				"src/conductor/test_commit_snapshot.py",
+				"src/conductor/test_gate.py"
+			],
+			"lines": 17
+		},
+		"src/conductor/workspace_runtime_matrix.py::src/conductor/workspace_runtime_matrix.py::c454641ff00ba86e": {
+			"files": [
+				"src/conductor/workspace_runtime_matrix.py",
+				"src/conductor/workspace_runtime_matrix.py"
+			],
+			"lines": 14
+		}
+	}
+}

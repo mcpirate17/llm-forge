@@ -11,6 +11,15 @@ __pycache__/
 native/*/target/
 target/
 
+# Node (jscpd only; no runtime JS dependencies)
+node_modules/
+
+# Baseline analyzer binaries, downloaded on demand (see README)
+.tools/
+
+# Scratch file lists the duplicate/complexity analyzers write while running
+tasks/audit/
+
 # Runtime state written by the tooling itself, never committed
 src/conductor/active_state.json
 src/conductor/avo_runtime_state.json
