@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Rust
+native/*/target/
+target/
+
+# Runtime state written by the tooling itself, never committed
+src/conductor/active_state.json
+src/conductor/avo_runtime_state.json
