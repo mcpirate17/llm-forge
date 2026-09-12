@@ -1,16 +1,89 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from conductor import worktree_reap
+
+GIT_ENV = {
+    **os.environ,
+    "GIT_AUTHOR_NAME": "Reap Test",
+    "GIT_AUTHOR_EMAIL": "reap@example.invalid",
+    "GIT_COMMITTER_NAME": "Reap Test",
+    "GIT_COMMITTER_EMAIL": "reap@example.invalid",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_SYSTEM": "/dev/null",
+}
+
+
+def _git(cwd: Path, *args: str) -> str:
+    done = subprocess.run(
+        ["git", *args], cwd=cwd, env=GIT_ENV, capture_output=True, text=True, check=True
+    )
+    return done.stdout
 
 
 def _porcelain(
     path: Path, head: str = "a" * 40, branch: str = "refs/heads/topic"
 ) -> str:
     return f"worktree {path}\nHEAD {head}\nbranch {branch}\n\n"
+
+
+def _age(path: Path, hours: float) -> None:
+    """Backdate every file in ``path`` so the idle probe sees an untouched tree."""
+    when = datetime.now(UTC).timestamp() - hours * 3600
+    for root, _dirs, files in os.walk(path):
+        for name in files:
+            target = Path(root) / name
+            if target.is_symlink():
+                continue
+            os.utime(target, (when, when))
+
+
+@pytest.fixture
+def repo(tmp_path: Path) -> Path:
+    """A primary checkout wired to a real ``origin`` with one commit on master."""
+    origin = tmp_path / "origin.git"
+    _git(tmp_path, "init", "--bare", "-b", "master", str(origin))
+    primary = tmp_path / "primary"
+    _git(tmp_path, "clone", str(origin), str(primary))
+    (primary / "seed.txt").write_text("seed\n")
+    _git(primary, "add", "seed.txt")
+    _git(primary, "commit", "-m", "seed")
+    _git(primary, "push", "origin", "master")
+    return primary
+
+
+def _worktree(repo: Path, name: str, branch: str) -> Path:
+    path = repo.parent / name
+    _git(repo, "worktree", "add", "-b", branch, str(path), "origin/master")
+    return path
+
+
+def _proc(tmp_path: Path, pid: str = "4242", cwd: Path | None = None) -> Path:
+    root = tmp_path / f"proc-{pid}"
+    (root / pid).mkdir(parents=True, exist_ok=True)
+    if cwd is not None:
+        os.symlink(cwd, root / pid / "cwd")
+    return root
+
+
+def _decide(repo: Path, **kwargs):
+    kwargs.setdefault("proc_root", _proc(repo.parent / "empty-proc"))
+    kwargs.setdefault("current", repo)
+    return worktree_reap.decide(repo, **kwargs)
+
+
+def _state(decisions, path: Path) -> worktree_reap.Decision:
+    for decision in decisions:
+        if decision.worktree.path.resolve() == path.resolve():
+            return decision
+    raise AssertionError(f"{path} missing from decisions")
 
 
 def test_parse_worktrees_preserves_safety_markers(tmp_path):
@@ -57,1024 +130,337 @@ def test_parse_worktrees_keeps_empty_head_and_boolean_marker_lines(tmp_path):
     assert rows[0].prunable
 
 
-def test_active_process_cwd_is_a_block(monkeypatch, tmp_path):
-    target = tmp_path / "tree"
-    target.mkdir()
-    proc = tmp_path / "proc" / "42"
-    proc.mkdir(parents=True)
-    following_proc = tmp_path / "proc" / "43"
-    following_proc.mkdir()
-    final_proc = tmp_path / "proc" / "44"
-    final_proc.mkdir()
-    monkeypatch.setattr(
-        worktree_reap.os,
-        "readlink",
-        lambda link: str(target / "nested") if link == proc / "cwd" else "",
+def test_unreadable_processes_are_counted_not_treated_as_active(monkeypatch, tmp_path):
+    """The bug that made the reaper a permanent no-op: EACCES must not block."""
+    root = _proc(tmp_path, "7", cwd=tmp_path)
+    real = os.readlink
+
+    def denied(path, *args, **kwargs):
+        if str(path).endswith("/7/cwd"):
+            raise PermissionError(13, "Permission denied")
+        return real(path, *args, **kwargs)
+
+    monkeypatch.setattr(worktree_reap.os, "readlink", denied)
+    found, unreadable = worktree_reap.active_process_cwds(tmp_path, root)
+    assert found == []
+    assert unreadable == 1
+
+
+def test_live_process_cwd_is_still_reported(tmp_path):
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    found, unreadable = worktree_reap.active_process_cwds(
+        tree, _proc(tmp_path, "9", tree)
     )
-    assert worktree_reap.active_process_cwds(target, tmp_path / "proc") == [
-        f"pid 42: {target / 'nested'}"
-    ]
-    for error in (PermissionError("denied"), RuntimeError("unreadable")):
-        first_pid = next(proc.parent.iterdir()).name
-
-        def fail_first_readlink(link):
-            if link.parent.name == first_pid:
-                raise error
-            return str(target / link.parent.name)
-
-        monkeypatch.setattr(worktree_reap.os, "readlink", fail_first_readlink)
-        expected = sorted(
-            [
-                f"pid {entry.name}: {target / entry.name}"
-                for entry in proc.parent.iterdir()
-                if entry.name != first_pid
-            ]
-            + [f"unknown process state for pid {first_pid}: {error}"]
-        )
-        assert worktree_reap.active_process_cwds(target, tmp_path / "proc") == expected
-
-    first_pid = next(proc.parent.iterdir()).name
-
-    def vanished_first_readlink(link):
-        if link.parent.name == first_pid:
-            raise FileNotFoundError("exited")
-        return str(target / link.parent.name)
-
-    monkeypatch.setattr(worktree_reap.os, "readlink", vanished_first_readlink)
-    expected = sorted(
-        [
-            f"pid {entry.name}: {target / entry.name}"
-            for entry in proc.parent.iterdir()
-            if entry.name != first_pid
-        ]
-    )
-    assert worktree_reap.active_process_cwds(target, tmp_path / "proc") == expected
+    assert found == [f"pid 9: {tree}"]
+    assert unreadable == 0
 
 
-def test_status_of_a_non_git_directory_is_unknown_and_blocks(tmp_path):
-    clean, reasons = worktree_reap._status(tmp_path)
-    assert not clean
-    assert reasons[0].startswith("unknown git status: fatal: not a git repository")
+def test_unlistable_proc_root_is_fatal(tmp_path):
+    found, unreadable = worktree_reap.active_process_cwds(tmp_path, tmp_path / "absent")
+    assert found and found[0].startswith("unknown process state: cannot inspect")
+    assert unreadable == 0
 
 
-def test_status_requests_porcelain_and_all_untracked_files(monkeypatch, tmp_path):
-    calls = []
-
-    def fake_run(*args, **kwargs):
-        calls.append((args, kwargs))
-        return type("Done", (), {"returncode": 0, "stderr": "", "stdout": ""})()
-
-    monkeypatch.setattr(worktree_reap.subprocess, "run", fake_run)
-    assert worktree_reap._status(tmp_path) == (True, [])
-    assert calls == [
-        (
-            (
-                [
-                    "git",
-                    "-C",
-                    str(tmp_path),
-                    "status",
-                    "--porcelain",
-                    "--untracked-files=all",
-                ],
-            ),
-            {"capture_output": True, "text": True, "check": False},
-        )
-    ]
+def test_primary_checkout_is_never_eligible(repo):
+    decisions = _decide(repo)
+    primary = _state(decisions, repo)
+    assert primary.state == worktree_reap.PRIMARY
+    assert not primary.eligible
 
 
-def test_expired_lease_does_not_block_but_live_lease_does(tmp_path):
-    path = tmp_path / "tree"
-    path.mkdir()
-    expiry = datetime.now(UTC) + timedelta(hours=1)
-    (path / ".worktree-lease.json").write_text(
-        '{"schema":"worktree-lease.v1","owner":"a","purpose":"b","expires_at":"'
-        + expiry.isoformat()
-        + '"}'
-    )
-    assert "active lease" in (
-        worktree_reap._lease_reason(path, datetime.now(UTC)) or ""
-    )
-    assert worktree_reap._lease_reason(path, expiry + timedelta(seconds=1)) is None
-
-
-def test_lease_with_naive_expiry_is_interpreted_as_utc(tmp_path):
-    path = tmp_path / "tree"
-    path.mkdir()
-    (path / ".worktree-lease.json").write_text(
-        '{"schema":"worktree-lease.v1","owner":"a","purpose":"b",'
-        '"expires_at":"2099-01-01T00:00:00"}'
-    )
-    assert worktree_reap._lease_reason(path, datetime(2098, 1, 1, tzinfo=UTC))
-
-
-def test_decide_refuses_dirty_locked_and_unproven(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    linked = tmp_path / "linked"
-    primary.mkdir()
-    linked.mkdir()
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            worktree_reap.Worktree(linked, "b" * 40, locked=True),
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda path: path == linked
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "_status",
-        lambda path: (True, ["?? saved.txt"]) if path == linked else (True, []),
-    )
+def test_live_process_inside_a_worktree_blocks_removal(repo, tmp_path):
+    tree = _worktree(repo, "busy", "topic/busy")
+    _age(tree, 48)
     decisions = worktree_reap.decide(
-        tmp_path, current=tmp_path / "elsewhere", proc_root=tmp_path / "no-proc"
+        repo, proc_root=_proc(tmp_path, "31337", tree), current=repo
     )
-    assert not decisions[0].eligible
-    assert "primary worktree" in decisions[0].reasons
-    assert not decisions[1].eligible
-    assert any("dirty worktree" in reason for reason in decisions[1].reasons)
-    assert "locked worktree" in decisions[1].reasons
+    decision = _state(decisions, tree)
+    assert decision.state == worktree_reap.ACTIVE
+    assert not decision.eligible
 
 
-def _decide_refuses_current_linked_tree_even_when_clean(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    linked = tmp_path / "linked"
-    primary.mkdir()
-    linked.mkdir()
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            worktree_reap.Worktree(linked, "b" * 40),
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda path: path == linked
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    proc_root = tmp_path / "proc"
-    proc_root.mkdir()
-    decisions = worktree_reap.decide(tmp_path, current=linked, proc_root=proc_root)
-    assert not decisions[1].eligible
-    assert decisions[1].reasons == ["current directory"]
-
-
-def test_decide_refuses_current_nested_directory(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    linked = tmp_path / "linked"
-    primary.mkdir()
-    linked.mkdir()
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            worktree_reap.Worktree(linked, "b" * 40),
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda path: path == linked
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    nested = linked / "nested"
-    nested.mkdir()
-    proc_root = tmp_path / "proc"
-    proc_root.mkdir()
-    decisions = worktree_reap.decide(tmp_path, current=nested, proc_root=proc_root)
-    assert decisions[1].reasons == ["current directory"]
-
-
-def test_decide_refuses_unlinked_non_primary_tree(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    linked = tmp_path / "linked"
-    primary.mkdir()
-    linked.mkdir()
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            worktree_reap.Worktree(linked, "b" * 40),
-        ],
-    )
-    monkeypatch.setattr(worktree_reap, "is_linked_worktree", lambda _: False)
+def test_a_process_cwd_deeper_inside_the_tree_also_blocks(repo, tmp_path):
+    tree = _worktree(repo, "deep", "topic/deep")
+    inner = tree / "research" / "reports"
+    inner.mkdir(parents=True)
+    _age(tree, 48)
     decisions = worktree_reap.decide(
-        tmp_path, current=tmp_path / "elsewhere", proc_root=tmp_path / "proc"
+        repo, proc_root=_proc(tmp_path, "31338", inner), current=repo
     )
-    assert "primary worktree" in decisions[1].reasons
+    assert _state(decisions, tree).state == worktree_reap.ACTIVE
 
 
-def test_decide_refuses_prunable_registration(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    linked = tmp_path / "linked"
-    primary.mkdir()
-    linked.mkdir()
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            worktree_reap.Worktree(linked, "b" * 40, prunable=True),
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda path: path == linked
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    assert (
-        "missing/prunable registration"
-        in worktree_reap.decide(
-            tmp_path, current=tmp_path / "elsewhere", proc_root=tmp_path / "proc"
-        )[1].reasons
-    )
+def test_locked_worktree_is_kept(repo):
+    tree = _worktree(repo, "locked", "topic/locked")
+    _git(repo, "worktree", "lock", str(tree))
+    _age(tree, 48)
+    decision = _state(_decide(repo), tree)
+    assert decision.state == worktree_reap.LOCKED
+    assert not decision.eligible
 
 
-def test_decide_default_clock_is_used_for_active_lease(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    linked = tmp_path / "linked"
-    primary.mkdir()
-    linked.mkdir()
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            worktree_reap.Worktree(linked, "b" * 40),
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda path: path == linked
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    monkeypatch.setattr(
-        worktree_reap,
-        "_lease_reason",
-        lambda path, now: (
-            "active lease" if path == linked and now is not None else None
-        ),
-    )
-    assert (
-        "active lease"
-        in worktree_reap.decide(
-            tmp_path, current=tmp_path / "elsewhere", proc_root=tmp_path / "proc"
-        )[1].reasons
-    )
-
-
-def test_decide_accepts_only_clean_ancestry_proof(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    linked = tmp_path / "linked"
-    primary.mkdir()
-    linked.mkdir()
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            worktree_reap.Worktree(linked, "b" * 40, branch="topic"),
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda path: path == linked
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    calls = []
-    monkeypatch.setattr(
-        worktree_reap,
-        "_run",
-        lambda repo, *args: (
-            calls.append(args) or type("Done", (), {"returncode": 0, "stderr": ""})()
-        ),
-    )
-    proc_root = tmp_path / "proc"
-    proc_root.mkdir()
+def test_current_directory_is_kept(repo):
+    tree = _worktree(repo, "here", "topic/here")
+    _age(tree, 48)
     decisions = worktree_reap.decide(
-        tmp_path, current=tmp_path / "elsewhere", proc_root=proc_root
+        repo, proc_root=_proc(repo.parent / "empty"), current=tree
     )
-    assert decisions[1].eligible
-    assert decisions[1].reasons == ["ancestry proven in origin/master"]
-    assert calls == [("merge-base", "--is-ancestor", "b" * 40, "origin/master")]
-    monkeypatch.setattr(
-        worktree_reap, "active_process_cwds", lambda *_: ["pid 9: process"]
-    )
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: "active lease")
-    guarded = worktree_reap.decide(
-        tmp_path, current=tmp_path / "elsewhere", proc_root=proc_root
-    )[1]
-    assert not guarded.eligible
-    assert guarded.reasons == ["pid 9: process", "active lease"]
+    assert _state(decisions, tree).state == worktree_reap.CURRENT
 
 
-def test_merged_pr_mode_selects_only_exact_branch_and_head(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    exact = tmp_path / "exact"
-    other = tmp_path / "other"
-    primary.mkdir()
-    exact.mkdir()
-    other.mkdir()
-    exact_row = worktree_reap.Worktree(exact, "b" * 40, branch="topic")
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            exact_row,
-            worktree_reap.Worktree(other, "c" * 40, branch="other"),
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda path: path != primary
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    monkeypatch.setattr(
-        worktree_reap, "_merged_pr_proof", lambda *_: ("topic", "b" * 40)
-    )
-    proc_root = tmp_path / "proc"
-    proc_root.mkdir()
-    decisions = worktree_reap.decide(
-        tmp_path, merged_pr=401, current=tmp_path / "elsewhere", proc_root=proc_root
-    )
-    assert decisions[1].eligible
-    assert decisions[1].reasons == ["merged PR #401 exact branch/HEAD proven"]
-    assert not decisions[2].eligible
-    assert "does not match merged PR #401" in decisions[2].reasons[0]
-
-
-def _merged_pr_proof_fails_closed_on_unknown_gh(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        worktree_reap.subprocess,
-        "run",
-        lambda *args, **kwargs: type(
-            "Done", (), {"returncode": 1, "stderr": "not logged in", "stdout": ""}
-        )(),
-    )
-    try:
-        worktree_reap._merged_pr_proof(tmp_path, 401)
-    except worktree_reap.ReapError as exc:
-        assert "proof unavailable" in str(exc)
-    else:
-        raise AssertionError("unknown gh state was accepted")
-
-
-def test_merged_pr_proof_uses_exact_gh_query_and_returns_head(monkeypatch, tmp_path):
-    calls = []
-
-    def fake_run(*args, **kwargs):
-        calls.append((args, kwargs))
-        return type(
-            "Done",
-            (),
+def test_live_lease_keeps_an_idle_worktree(repo):
+    tree = _worktree(repo, "leased", "topic/leased")
+    (tree / ".worktree-lease.json").write_text(
+        json.dumps(
             {
-                "returncode": 0,
-                "stderr": "",
-                "stdout": '{"state":"MERGED","mergedAt":"2026-09-10T00:00:00Z",'
-                '"headRefName":"topic","headRefOid":"b"}',
-            },
-        )()
-
-    monkeypatch.setattr(worktree_reap.subprocess, "run", fake_run)
-    assert worktree_reap._merged_pr_proof(tmp_path, 401) == ("topic", "b")
-    assert calls[0][0][0] == [
-        "gh",
-        "pr",
-        "view",
-        "401",
-        "--json",
-        "state,mergedAt,headRefName,headRefOid",
-    ]
-    assert calls[0][1]["cwd"] == tmp_path
+                "schema": "worktree-lease.v1",
+                "owner": "llm-b0",
+                "purpose": "still running",
+                "branch": "topic/leased",
+                "worktree": str(tree),
+                "opened_at": datetime.now(UTC).isoformat(),
+                "expires_at": (datetime.now(UTC) + timedelta(hours=4)).isoformat(),
+            }
+        )
+    )
+    _age(tree, 48)
+    decision = _state(_decide(repo), tree)
+    assert decision.state == worktree_reap.LEASED
+    assert not decision.eligible
 
 
-def test_merged_pr_proof_rejects_each_incomplete_merge_record(monkeypatch, tmp_path):
-    records = [
-        ([], "not proven MERGED"),
-        ({"state": "OPEN", "mergedAt": "2026-09-10T00:00:00Z"}, "not proven MERGED"),
-        ({"state": "MERGED"}, "not proven MERGED"),
-        (
+def test_expired_lease_makes_a_dirty_unlanded_worktree_eligible(repo):
+    """Dirty and unproven no longer protect a tree: the archive does."""
+    tree = _worktree(repo, "expired", "topic/expired")
+    (tree / "work.txt").write_text("uncommitted\n")
+    _git(tree, "add", "work.txt")
+    _git(tree, "commit", "-m", "unlanded work")
+    (tree / "scratch.txt").write_text("dirty\n")
+    (tree / ".worktree-lease.json").write_text(
+        json.dumps(
             {
-                "state": "MERGED",
-                "mergedAt": "2026-09-10T00:00:00Z",
-                "headRefName": "",
-                "headRefOid": "b",
-            },
-            "incomplete exact-head proof",
-        ),
-        (
-            {
-                "state": "MERGED",
-                "mergedAt": "2026-09-10T00:00:00Z",
-                "headRefName": "topic",
-            },
-            "incomplete exact-head proof",
-        ),
-        (
-            {
-                "state": "MERGED",
-                "mergedAt": "2026-09-10T00:00:00Z",
-                "headRefName": "topic",
-                "headRefOid": "",
-            },
-            "incomplete exact-head proof",
-        ),
+                "schema": "worktree-lease.v1",
+                "owner": "llm-b0",
+                "purpose": "done",
+                "branch": "topic/expired",
+                "worktree": str(tree),
+                "opened_at": (datetime.now(UTC) - timedelta(hours=9)).isoformat(),
+                "expires_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat(),
+            }
+        )
+    )
+    decision = _state(_decide(repo), tree)
+    assert decision.eligible
+    assert decision.state == worktree_reap.REMOVE
+    assert any("expired" in reason for reason in decision.reasons)
+
+
+def test_idle_worktree_with_unlanded_commits_is_eligible(repo):
+    tree = _worktree(repo, "idle", "topic/idle")
+    (tree / "work.txt").write_text("unlanded\n")
+    _git(tree, "add", "work.txt")
+    _git(tree, "commit", "-m", "unlanded work")
+    _age(tree, 48)
+    decision = _state(_decide(repo, idle_hours=6.0), tree)
+    assert decision.eligible
+    assert any(reason.startswith("idle:") for reason in decision.reasons)
+
+
+def test_busy_unlanded_worktree_without_a_lease_is_held(repo):
+    tree = _worktree(repo, "busy-unlanded", "topic/busy-unlanded")
+    (tree / "work.txt").write_text("fresh\n")
+    _git(tree, "add", "work.txt")
+    _git(tree, "commit", "-m", "unlanded work")
+    decision = _state(_decide(repo, idle_hours=6.0), tree)
+    assert not decision.eligible
+    assert decision.state == worktree_reap.HELD
+    assert decision.reasons == ["run is not over"]
+
+
+def test_merged_head_is_eligible_even_while_busy(repo):
+    tree = _worktree(repo, "merged", "topic/merged")
+    (tree / "fresh.txt").write_text("modified just now\n")
+    decision = _state(_decide(repo, idle_hours=6.0), tree)
+    assert decision.eligible
+    assert any("contained in origin/master" in reason for reason in decision.reasons)
+
+
+def test_stale_registration_is_eligible_without_a_directory(repo):
+    tree = _worktree(repo, "gone", "topic/gone")
+    subprocess.run(["rm", "-rf", str(tree)], check=True)
+    decision = _state(_decide(repo), tree)
+    assert decision.eligible
+    assert decision.reasons == ["stale registration: worktree directory is absent"]
+
+
+def test_remote_branch_gone_needs_a_tracking_ref(repo):
+    tree = _worktree(repo, "never-pushed", "topic/never-pushed")
+    assert not worktree_reap._remote_branch_gone(repo, "topic/never-pushed")
+    _git(tree, "push", "-u", "origin", "topic/never-pushed")
+    assert not worktree_reap._remote_branch_gone(repo, "topic/never-pushed")
+    _git(repo, "push", "origin", "--delete", "topic/never-pushed")
+    assert worktree_reap._remote_branch_gone(repo, "topic/never-pushed")
+
+
+def test_idle_probe_failure_is_not_read_as_idle(tmp_path):
+    assert worktree_reap.recent_change(tmp_path / "absent", 6.0) is not None
+
+
+def test_idle_probe_ignores_the_hardlinked_venv(repo):
+    tree = _worktree(repo, "venv-tree", "topic/venv-tree")
+    _age(tree, 48)
+    venv = tree / ".venv" / "bin"
+    venv.mkdir(parents=True)
+    (venv / "python").write_text("fresh\n")
+    assert worktree_reap.recent_change(tree, 6.0) is None
+
+
+def test_archive_preserves_patches_diff_status_and_moves_artifacts(repo, tmp_path):
+    tree = _worktree(repo, "archive-me", "topic/archive-me")
+    (tree / "landed.txt").write_text("committed\n")
+    _git(tree, "add", "landed.txt")
+    _git(tree, "commit", "-m", "unlanded commit")
+    (tree / "landed.txt").write_text("committed then edited\n")
+    (tree / "untracked.txt").write_text("untracked\n")
+    reports = tree / "research" / "reports"
+    reports.mkdir(parents=True)
+    (reports / "run.json").write_text("{}\n")
+    (tree / "model.pt").write_bytes(b"weights")
+    row = _state(_decide(repo), tree).worktree
+    record = worktree_reap.archive_worktree(
+        repo,
+        row,
+        integration_ref="origin/master",
+        archive_root=tmp_path / "archive",
+        checkpoint_root=tmp_path / "ckpt",
+    )
+    dest = Path(str(record["archive"]))
+    assert list(dest.glob("0001-*.patch"))
+    assert "committed then edited" in (dest / "worktree.diff").read_text()
+    assert "untracked.txt" in (dest / "status.txt").read_text()
+    moved = [Path(p) for p in record["moved_artifacts"]]  # type: ignore[union-attr]
+    assert {p.name for p in moved} == {"run.json", "model.pt"}
+    assert all(p.exists() for p in moved)
+    assert not (tree / "model.pt").exists()
+    assert not (reports / "run.json").exists()
+
+
+def test_apply_force_removes_a_dirty_tree_and_deletes_the_branch(repo, tmp_path):
+    tree = _worktree(repo, "reap-me", "topic/reap-me")
+    (tree / "dirty.txt").write_text("uncommitted\n")
+    _age(tree, 48)
+    decisions = _decide(repo, idle_hours=6.0)
+    removed = worktree_reap.apply(
+        repo,
+        decisions,
+        archive_root=tmp_path / "archive",
+        checkpoint_root=tmp_path / "ckpt",
+        delete_remote=False,
+        current=repo,
+        proc_root=_proc(repo.parent / "empty-proc"),
+    )
+    assert [record["worktree"] for record in removed] == [str(tree)]
+    assert not tree.exists()
+    assert "topic/reap-me" not in _git(repo, "branch", "--list", "topic/reap-me")
+    assert "reap-me" not in _git(repo, "worktree", "list")
+
+
+def test_apply_refuses_a_tree_that_became_active_after_the_decision(repo, tmp_path):
+    tree = _worktree(repo, "raced", "topic/raced")
+    _age(tree, 48)
+    decisions = _decide(repo, idle_hours=6.0)
+    assert _state(decisions, tree).eligible
+    with pytest.raises(worktree_reap.ReapError, match="refusing"):
+        worktree_reap.apply(
+            repo,
+            decisions,
+            archive_root=tmp_path / "archive",
+            checkpoint_root=tmp_path / "ckpt",
+            delete_remote=False,
+            current=repo,
+            proc_root=_proc(tmp_path, "999", tree),
+        )
+    assert tree.exists()
+
+
+def test_apply_never_touches_an_ineligible_tree(repo, tmp_path):
+    tree = _worktree(repo, "kept", "topic/kept")
+    (tree / "fresh.txt").write_text("fresh\n")
+    _git(tree, "add", "fresh.txt")
+    _git(tree, "commit", "-m", "unlanded")
+    decisions = _decide(repo, idle_hours=6.0)
+    assert not _state(decisions, tree).eligible
+    removed = worktree_reap.apply(
+        repo,
+        decisions,
+        archive_root=tmp_path / "archive",
+        checkpoint_root=tmp_path / "ckpt",
+        delete_remote=False,
+        current=repo,
+        proc_root=_proc(repo.parent / "empty-proc"),
+    )
+    assert removed == []
+    assert tree.exists()
+
+
+def test_second_apply_is_refused_while_one_holds_the_lock(repo, tmp_path, capsys):
+    handle = worktree_reap._hold_lock(repo)
+    assert handle is not None
+    roots = [
+        "--archive-root",
+        str(tmp_path / "archive"),
+        "--checkpoint-root",
+        str(tmp_path / "ckpt"),
     ]
-
-    for record, expected in records:
-        monkeypatch.setattr(
-            worktree_reap.subprocess,
-            "run",
-            lambda *args, payload=record, **kwargs: type(
-                "Done",
-                (),
-                {
-                    "returncode": 0,
-                    "stderr": "",
-                    "stdout": json.dumps(payload),
-                },
-            )(),
-        )
-        try:
-            worktree_reap._merged_pr_proof(tmp_path, 401)
-        except worktree_reap.ReapError as exc:
-            assert expected in str(exc)
-        else:
-            raise AssertionError(f"accepted incomplete merged PR record: {record!r}")
-    _merged_pr_proof_fails_closed_on_unknown_gh(monkeypatch, tmp_path)
-
-
-def test_apply_merged_pr_rechecks_exact_proof_without_ancestry(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(path, "b" * 40, branch="topic"),
-        True,
-        ["merged PR #401 exact branch/HEAD proven"],
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [worktree_reap.Worktree(primary, "a" * 40), decision.worktree],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda candidate: candidate == path
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    monkeypatch.setattr(worktree_reap, "active_process_cwds", lambda *_: [])
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: None)
-    monkeypatch.setattr(
-        worktree_reap, "_merged_pr_proof", lambda *_: ("topic", "b" * 40)
-    )
-    calls = []
-    monkeypatch.setattr(
-        worktree_reap,
-        "_run",
-        lambda repo, *args: (
-            calls.append(args) or type("Done", (), {"returncode": 0, "stderr": ""})()
-        ),
-    )
-    assert worktree_reap.apply(tmp_path, [decision], merged_pr=401) == [str(path)]
-    assert not any(args[:1] == ("merge-base",) for args in calls)
-
-
-def test_apply_is_the_only_mutating_path(monkeypatch, tmp_path):
-    path = tmp_path / "linked"
-    (tmp_path / "primary").mkdir()
-    path.mkdir()
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(path, "b" * 40, branch="topic"),
-        True,
-        ["ancestry proven in origin/master"],
-    )
-    calls: list[tuple[str, ...]] = []
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(tmp_path / "primary", "a" * 40),
-            decision.worktree,
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda candidate: candidate == path
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    monkeypatch.setattr(worktree_reap, "active_process_cwds", lambda *_: [])
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: None)
-    monkeypatch.setattr(
-        worktree_reap,
-        "_run",
-        lambda repo, *args: (
-            calls.append(args) or type("Done", (), {"returncode": 0, "stderr": ""})()
-        ),
-    )
-    assert worktree_reap.apply(tmp_path, [decision], delete_branches=True) == [
-        str(path)
-    ]
-    assert calls == [
-        ("merge-base", "--is-ancestor", "b" * 40, "origin/master"),
-        ("worktree", "remove", str(path)),
-        ("branch", "-d", "topic"),
-    ]
-
-
-def _apply_skips_ineligible_decisions(monkeypatch, tmp_path):
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(tmp_path / "linked"), False, ["dirty worktree"]
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "_run",
-        lambda *_: (_ for _ in ()).throw(AssertionError("must not mutate")),
-    )
-    assert worktree_reap.apply(tmp_path, [decision]) == []
-
-
-def test_apply_continues_after_ineligible_decision(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    decisions = [
-        worktree_reap.Decision(
-            worktree_reap.Worktree(tmp_path / "blocked"), False, ["dirty worktree"]
-        ),
-        worktree_reap.Decision(
-            worktree_reap.Worktree(path, "b" * 40, branch="topic"),
-            True,
-            ["ancestry proven in origin/master"],
-        ),
-    ]
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [worktree_reap.Worktree(primary, "a" * 40), decisions[1].worktree],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda candidate: candidate == path
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    monkeypatch.setattr(worktree_reap, "active_process_cwds", lambda *_: [])
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: None)
-    monkeypatch.setattr(
-        worktree_reap,
-        "_run",
-        lambda repo, *args: type("Done", (), {"returncode": 0, "stderr": ""})(),
-    )
-    assert worktree_reap.apply(tmp_path, decisions) == [str(path)]
-    for index, helper in enumerate(
-        (
-            _apply_skips_ineligible_decisions,
-            _apply_rechecks_current_process_and_lease_guards,
-            _apply_rechecks_primary_lock_and_unknown_status,
-        )
-    ):
-        merged = tmp_path / f"merged-{index}"
-        merged.mkdir()
-        helper(monkeypatch, merged)
-
-
-def test_apply_does_not_delete_branch_without_explicit_flag(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(path, "b" * 40, branch="topic"),
-        True,
-        ["ancestry proven in origin/master"],
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [worktree_reap.Worktree(primary, "a" * 40), decision.worktree],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda candidate: candidate == path
-    )
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    monkeypatch.setattr(worktree_reap, "active_process_cwds", lambda *_: [])
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: None)
-    calls = []
-    monkeypatch.setattr(
-        worktree_reap,
-        "_run",
-        lambda repo, *args: (
-            calls.append(args) or type("Done", (), {"returncode": 0, "stderr": ""})()
-        ),
-    )
-    assert worktree_reap.apply(tmp_path, [decision], delete_branches=False) == [
-        str(path)
-    ]
-    assert not any(args[:2] == ("branch", "-d") for args in calls)
-    for index, helper in enumerate(
-        (
-            _apply_rechecks_linked_identity_before_removal,
-            _apply_rechecks_ancestry_proof_before_removal,
-        )
-    ):
-        merged = tmp_path / f"merged-{index}"
-        merged.mkdir()
-        helper(monkeypatch, merged)
-
-
-def test_main_rejects_branch_deletion_without_apply(tmp_path, capsys):
     try:
-        worktree_reap.main(["--repo", str(tmp_path), "--delete-branches"])
-    except SystemExit as exc:
-        assert exc.code == 2
-        assert "--delete-branches requires --apply" in capsys.readouterr().err
-    else:
-        raise AssertionError("branch deletion flag bypassed --apply requirement")
+        assert worktree_reap.main(["--repo", str(repo), "--apply", *roots]) == 0
+    finally:
+        handle.close()
+    assert "another reap is running" in capsys.readouterr().err
 
 
-def test_apply_rechecks_head_before_removal(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(path, "b" * 40, branch="topic"),
-        True,
-        ["ancestry proven in origin/master"],
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            worktree_reap.Worktree(path, "c" * 40, branch="topic"),
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda candidate: candidate == path
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "_run",
-        lambda *_: type("Done", (), {"returncode": 0, "stderr": ""})(),
-    )
-    try:
-        worktree_reap.apply(tmp_path, [decision])
-    except worktree_reap.ReapError as exc:
-        assert "HEAD/branch changed" in str(exc)
-    else:
-        raise AssertionError("apply trusted a stale HEAD")
+def test_apply_refuses_to_run_with_nowhere_to_archive(repo, monkeypatch, capsys):
+    """The data volume's path is the machine's, not this module's -- so it must be given."""
+    monkeypatch.delenv(worktree_reap.ARCHIVE_ROOT_ENV, raising=False)
+    monkeypatch.delenv(worktree_reap.CHECKPOINT_ROOT_ENV, raising=False)
+    assert worktree_reap.main(["--repo", str(repo), "--apply"]) == 2
+    assert "needs somewhere to archive to" in capsys.readouterr().err
 
 
-def _apply_rechecks_primary_lock_and_unknown_status(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(path, "b" * 40, branch="topic"),
-        True,
-        ["ancestry proven in origin/master"],
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [
-            worktree_reap.Worktree(primary, "a" * 40),
-            worktree_reap.Worktree(path, "b" * 40, branch="topic", locked=True),
-        ],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "is_linked_worktree", lambda candidate: candidate == path
-    )
-    try:
-        worktree_reap.apply(tmp_path, [decision])
-    except worktree_reap.ReapError as exc:
-        assert "locked/prunable/missing" in str(exc)
-    else:
-        raise AssertionError("apply ignored a newly locked worktree")
-
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [worktree_reap.Worktree(primary, "a" * 40), decision.worktree],
-    )
-    monkeypatch.setattr(
-        worktree_reap, "_status", lambda _: (False, ["unknown git status"])
-    )
-    monkeypatch.setattr(worktree_reap, "active_process_cwds", lambda *_: [])
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: None)
-    try:
-        worktree_reap.apply(tmp_path, [decision])
-    except worktree_reap.ReapError as exc:
-        assert "dirty/unknown" in str(exc)
-    else:
-        raise AssertionError("apply ignored unknown git status")
+def test_apply_roots_come_from_the_environment(repo, tmp_path, monkeypatch):
+    monkeypatch.setenv(worktree_reap.ARCHIVE_ROOT_ENV, str(tmp_path / "archive"))
+    monkeypatch.setenv(worktree_reap.CHECKPOINT_ROOT_ENV, str(tmp_path / "ckpt"))
+    tree = _worktree(repo, "env-roots", "topic/env-roots")
+    (tree / "work.txt").write_text("unlanded\n")
+    _git(tree, "add", "work.txt")
+    _git(tree, "commit", "-m", "unlanded work")
+    _age(tree, 48)
+    assert worktree_reap.main(["--repo", str(repo), "--apply"]) == 0
+    assert not tree.exists()
+    assert list((tmp_path / "archive" / "topic-env-roots").glob("0001-*.patch"))
 
 
-def _apply_rechecks_linked_identity_before_removal(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(path, "b" * 40, branch="topic"),
-        True,
-        ["ancestry proven in origin/master"],
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [worktree_reap.Worktree(primary, "a" * 40), decision.worktree],
-    )
-    monkeypatch.setattr(worktree_reap, "is_linked_worktree", lambda _: False)
-    try:
-        worktree_reap.apply(tmp_path, [decision])
-    except worktree_reap.ReapError as exc:
-        assert "primary/non-linked" in str(exc)
-    else:
-        raise AssertionError("apply removed a no-longer-linked worktree")
+def test_main_is_preview_by_default_and_reports_state(repo, capsys):
+    tree = _worktree(repo, "preview", "topic/preview")
+    assert worktree_reap.main(["--repo", str(repo), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["dry_run"] is True
+    assert payload["removed"] == []
+    states = {row["worktree"]: row["state"] for row in payload["decisions"]}
+    assert states[str(repo)] == worktree_reap.PRIMARY
+    assert str(tree) in states
 
 
-def _apply_rechecks_current_process_and_lease_guards(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(path, "b" * 40, branch="topic"),
-        True,
-        ["ancestry proven in origin/master"],
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [worktree_reap.Worktree(primary, "a" * 40), decision.worktree],
-    )
-    monkeypatch.setattr(worktree_reap, "is_linked_worktree", lambda _: True)
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    monkeypatch.setattr(
-        worktree_reap, "active_process_cwds", lambda *_: ["pid 7: process"]
-    )
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: None)
-    try:
-        worktree_reap.apply(tmp_path, [decision])
-    except worktree_reap.ReapError as exc:
-        assert "active-process" in str(exc)
-    else:
-        raise AssertionError("apply ignored a newly active process")
-
-    monkeypatch.setattr(worktree_reap, "active_process_cwds", lambda *_: [])
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: "active lease")
-    try:
-        worktree_reap.apply(tmp_path, [decision])
-    except worktree_reap.ReapError as exc:
-        assert "active lease" in str(exc)
-    else:
-        raise AssertionError("apply ignored a newly active lease")
+def test_main_text_output_names_the_state_and_the_dry_run(repo, capsys):
+    _worktree(repo, "text", "topic/text")
+    assert worktree_reap.main(["--repo", str(repo)]) == 0
+    out = capsys.readouterr().out
+    assert "PRIMARY" in out
+    assert "pass --apply" in out
 
 
-def _apply_rechecks_ancestry_proof_before_removal(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(path, "b" * 40, branch="topic"),
-        True,
-        ["ancestry proven in origin/master"],
-    )
-    monkeypatch.setattr(
-        worktree_reap,
-        "inventory",
-        lambda _: [worktree_reap.Worktree(primary, "a" * 40), decision.worktree],
-    )
-    monkeypatch.setattr(worktree_reap, "is_linked_worktree", lambda _: True)
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    monkeypatch.setattr(worktree_reap, "active_process_cwds", lambda *_: [])
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: None)
-    monkeypatch.setattr(
-        worktree_reap,
-        "_run",
-        lambda *_: type("Done", (), {"returncode": 1, "stderr": "not ancestor"})(),
-    )
-    try:
-        worktree_reap.apply(tmp_path, [decision])
-    except worktree_reap.ReapError as exc:
-        assert "unproven worktree" in str(exc)
-    else:
-        raise AssertionError("apply ignored failed ancestry proof")
-
-
-def _recheck_rejects_nonlinked_before_downstream_guards(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    row = worktree_reap.Worktree(path, "b" * 40)
-    monkeypatch.setattr(worktree_reap, "is_linked_worktree", lambda _: False)
-    monkeypatch.setattr(
-        worktree_reap,
-        "_status",
-        lambda _: (_ for _ in ()).throw(AssertionError("status reached")),
-    )
-    try:
-        worktree_reap._recheck_tree_state(
-            tmp_path, row, [worktree_reap.Worktree(primary), row], current=tmp_path
-        )
-    except worktree_reap.ReapError as exc:
-        assert "primary/non-linked" in str(exc)
-    else:
-        raise AssertionError("non-linked worktree was not rejected")
-
-
-def test_recheck_rejects_lock_prune_or_missing_before_status(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    monkeypatch.setattr(worktree_reap, "is_linked_worktree", lambda _: True)
-    monkeypatch.setattr(
-        worktree_reap,
-        "_status",
-        lambda _: (_ for _ in ()).throw(AssertionError("status reached")),
-    )
-    primary_row = worktree_reap.Worktree(primary, "a" * 40)
-    try:
-        worktree_reap._recheck_tree_state(
-            tmp_path, primary_row, [primary_row], current=tmp_path / "elsewhere"
-        )
-    except worktree_reap.ReapError as exc:
-        assert "primary/non-linked" in str(exc)
-    else:
-        raise AssertionError("primary worktree was not rejected")
-    for row in (
-        worktree_reap.Worktree(path, "b" * 40, locked=True),
-        worktree_reap.Worktree(path, "b" * 40, prunable=True),
-        worktree_reap.Worktree(tmp_path / "gone", "b" * 40),
-    ):
-        try:
-            worktree_reap._recheck_tree_state(
-                tmp_path,
-                row,
-                [worktree_reap.Worktree(primary), row],
-                current=tmp_path / "elsewhere",
-            )
-        except worktree_reap.ReapError as exc:
-            assert "locked/prunable/missing" in str(exc)
-        else:
-            raise AssertionError("unsafe worktree marker was not rejected")
-    merged = tmp_path / "merged"
-    merged.mkdir()
-    _recheck_rejects_nonlinked_before_downstream_guards(monkeypatch, merged)
-
-
-def test_recheck_rejects_unknown_or_dirty_before_process_probe(monkeypatch, tmp_path):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    primary.mkdir()
-    path.mkdir()
-    row = worktree_reap.Worktree(path, "b" * 40)
-    monkeypatch.setattr(worktree_reap, "is_linked_worktree", lambda _: True)
-    monkeypatch.setattr(
-        worktree_reap,
-        "active_process_cwds",
-        lambda *_: (_ for _ in ()).throw(AssertionError("process reached")),
-    )
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: None)
-    for status in (
-        (False, ["unknown"]),
-        (True, ["?? dirty"]),
-    ):
-        monkeypatch.setattr(worktree_reap, "_status", lambda _: status)
-        try:
-            worktree_reap._recheck_tree_state(
-                tmp_path,
-                row,
-                [worktree_reap.Worktree(primary), row],
-                current=tmp_path / "elsewhere",
-            )
-        except worktree_reap.ReapError as exc:
-            assert "dirty/unknown" in str(exc)
-        else:
-            raise AssertionError("unsafe status was not rejected")
-
-
-def test_recheck_rejects_current_equal_or_nested_before_process_probe(
-    monkeypatch, tmp_path
-):
-    primary = tmp_path / "primary"
-    path = tmp_path / "linked"
-    nested = path / "nested"
-    primary.mkdir()
-    path.mkdir()
-    nested.mkdir()
-    row = worktree_reap.Worktree(path, "b" * 40)
-    monkeypatch.setattr(worktree_reap, "is_linked_worktree", lambda _: True)
-    monkeypatch.setattr(worktree_reap, "_status", lambda _: (True, []))
-    monkeypatch.setattr(
-        worktree_reap,
-        "active_process_cwds",
-        lambda *_: (_ for _ in ()).throw(AssertionError("process reached")),
-    )
-    monkeypatch.setattr(worktree_reap, "_lease_reason", lambda *_: None)
-    for current in (path, nested):
-        try:
-            worktree_reap._recheck_tree_state(
-                tmp_path, row, [worktree_reap.Worktree(primary), row], current=current
-            )
-        except worktree_reap.ReapError as exc:
-            assert "current worktree" in str(exc)
-        else:
-            raise AssertionError("current worktree was not rejected")
-    monkeypatch.setattr(worktree_reap, "active_process_cwds", lambda *_: [])
-    merged = tmp_path / "merged"
-    merged.mkdir()
-    _decide_refuses_current_linked_tree_even_when_clean(monkeypatch, merged)
-
-
-def test_inventory_surfaces_git_failure(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        worktree_reap,
-        "_run",
-        lambda *_: type("Done", (), {"returncode": 1, "stderr": "broken"})(),
-    )
-    try:
-        worktree_reap.inventory(tmp_path)
-    except worktree_reap.ReapError as exc:
-        assert "git worktree list --porcelain failed: broken" in str(exc)
-    else:
-        raise AssertionError("inventory accepted a failed git command")
-
-
-def test_main_defaults_to_report_only_and_json(monkeypatch, tmp_path, capsys):
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(tmp_path / "linked", branch="topic"),
-        True,
-        ["ancestry proven in origin/master"],
-    )
-    monkeypatch.setattr(worktree_reap, "decide", lambda *args, **kwargs: [decision])
-    monkeypatch.setattr(
-        worktree_reap,
-        "apply",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("dry-run mutated")
-        ),
-    )
-    assert worktree_reap.main(["--repo", str(tmp_path), "--json"]) == 0
-    output = capsys.readouterr().out
-    assert '"dry_run": true' in output
-    assert '"decisions"' in output
-    assert '"removed": []' in output
-    _main_apply_reports_removed(monkeypatch, tmp_path, capsys)
-
-
-def _main_apply_reports_removed(monkeypatch, tmp_path, capsys):
-    decision = worktree_reap.Decision(
-        worktree_reap.Worktree(tmp_path / "linked", branch="topic"),
-        True,
-        ["ancestry proven in origin/master"],
-    )
-    monkeypatch.setattr(worktree_reap, "decide", lambda *args, **kwargs: [decision])
-    monkeypatch.setattr(
-        worktree_reap, "apply", lambda *args, **kwargs: [str(decision.worktree.path)]
-    )
-    assert worktree_reap.main(["--repo", str(tmp_path), "--apply", "--json"]) == 0
-    assert '"dry_run": false' in capsys.readouterr().out
-
-
-def test_main_text_bounds_reasons_but_json_preserves_them(
-    monkeypatch, tmp_path, capsys
-):
-    for count in (0, 5, 6, 8):
-        reasons = [f"reason-{index}" for index in range(count)]
-        decision = worktree_reap.Decision(
-            worktree_reap.Worktree(tmp_path / "linked", branch="topic"),
-            False,
-            reasons,
-        )
-        monkeypatch.setattr(worktree_reap, "decide", lambda *args, **kwargs: [decision])
-        assert worktree_reap.main(["--repo", str(tmp_path)]) == 0
-        output = capsys.readouterr().out
-        expected = "; ".join(reasons[:5])
-        if count > 5:
-            expected += f"; {count - 5} more reasons (use --json)"
-        assert (
-            output.splitlines()[0]
-            == f"KEEP {tmp_path / 'linked'} [topic] -- {expected}"
-        )
-        assert output.splitlines()[1:] == [
-            "dry-run only; pass --apply to remove eligible worktrees"
-        ]
-        assert decision.reasons == reasons
-        assert worktree_reap.main(["--repo", str(tmp_path), "--json"]) == 0
-        import json
-
-        payload = json.loads(capsys.readouterr().out)
-        assert payload["decisions"][0]["reasons"] == reasons
-        decision.eligible = True
-        monkeypatch.setattr(worktree_reap, "apply", lambda *args, **kwargs: [])
-        assert worktree_reap.main(["--repo", str(tmp_path), "--apply"]) == 0
-        assert capsys.readouterr().out.splitlines() == [
-            f"REMOVE {tmp_path / 'linked'} [topic] -- {expected}"
-        ]
+def test_slug_is_filesystem_safe(tmp_path):
+    row = worktree_reap.Worktree(tmp_path, "a" * 40, "llm-b0/trident2-sdsm-r9")
+    assert worktree_reap.slug_for(row) == "llm-b0-trident2-sdsm-r9"
+    assert worktree_reap.slug_for(worktree_reap.Worktree(tmp_path / "plain")) == "plain"

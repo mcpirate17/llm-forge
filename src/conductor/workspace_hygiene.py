@@ -35,7 +35,7 @@ from pathlib import Path
 
 from conductor import _native
 
-from conductor import branch_policy
+from conductor import branch_policy, worktree_reap
 from conductor.candidate_review.ownership import (
     OwnershipClaim,
     load_claims,
@@ -680,10 +680,35 @@ def stale_feature_branches(
     return rows, gh_available
 
 
+def reap_preview(repo: Path = ROOT) -> list[dict[str, str]]:
+    """Name the worktrees the next ``make worktree-reap REAP_ARGS=--apply`` takes.
+
+    This report used to say only that finished worktrees existed, which is why
+    63 GB of them could stand while every check stayed green: nobody could tell
+    from here what removal would actually do. These rows are the reaper's own
+    decision, so the line and the enforcement cannot drift apart.
+    """
+    try:
+        decisions = worktree_reap.decide(repo)
+    except worktree_reap.ReapError as exc:
+        return [
+            {"worktree": str(repo), "branch": "", "reason": f"reap unavailable: {exc}"}
+        ]
+    return [
+        {
+            "worktree": str(decision.worktree.path),
+            "branch": decision.worktree.branch,
+            "reason": "; ".join(decision.reasons[:3]),
+        }
+        for decision in decisions
+        if decision.eligible
+    ]
+
+
 def exposure_report(
     repo: Path = ROOT, live_ref: str | None = None
 ) -> dict[str, object]:
-    """The three EXPOSED checks in one payload, for the session-preamble hook and CLI."""
+    """The four EXPOSED checks in one payload, for the session-preamble hook and CLI."""
     ref = live_ref or _git_in(repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
     branches, gh_available = stale_feature_branches(ref, repo)
     return {
@@ -691,6 +716,7 @@ def exposure_report(
         "gh_available": gh_available,
         "local_only_commit_exposure": local_only_commit_exposure(repo),
         "stale_dirty_files": stale_dirty_files(repo=repo),
+        "reap_preview": reap_preview(repo),
     }
 
 
@@ -716,6 +742,12 @@ def render_exposure(report: dict[str, object]) -> str:
         lines.append(
             f"  {row['age_hours']:>6}h  claim={row['claim_id']}  {row['path']}"
         )
+    reapable = report.get("reap_preview", [])
+    lines.append(
+        f"EXPOSED WORKTREES -- next reap archives then removes ({len(reapable)})"  # type: ignore[arg-type]
+    )
+    for row in reapable:  # type: ignore[assignment]
+        lines.append(f"  {row['worktree']}  [{row['branch']}]  {row['reason']}")
     return "\n".join(lines)
 
 
@@ -912,6 +944,7 @@ def render(report: Report) -> str:
                 "gh_available": report.gh_available,
                 "local_only_commit_exposure": report.local_only_commit_exposure,
                 "stale_dirty_files": report.stale_dirty_files,
+                "reap_preview": reap_preview(),
             }
         )
     )
