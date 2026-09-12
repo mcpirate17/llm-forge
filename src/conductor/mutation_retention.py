@@ -38,9 +38,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from conductor.project_paths import (
+    DEFAULT_MUTATION_REGISTRY,
+    campaigns_relative,
+    receipts_relative,
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
-RECEIPT_DIRECTORY = "conductor/mutation_campaigns/receipts"
-CAMPAIGN_DIRECTORY = "conductor/mutation_campaigns"
+
+# The default layout, for callers that name a directory without holding a root; every
+# function below resolves against the root it is given instead.
+CAMPAIGN_DIRECTORY = str(DEFAULT_MUTATION_REGISTRY.parent)
+RECEIPT_DIRECTORY = f"{CAMPAIGN_DIRECTORY}/receipts"
+
 
 
 class RetentionError(Exception):
@@ -91,9 +101,10 @@ def _campaign_ids_with_a_manifest(repo_root: Path) -> set[str]:
     merely looks absent is exactly the campaign whose receipts must not go.
     """
 
-    directory = repo_root / CAMPAIGN_DIRECTORY
+    relative = campaigns_relative(repo_root)
+    directory = repo_root / relative.as_posix()
     if not directory.is_dir():
-        raise RetentionError(f"no campaign directory at {CAMPAIGN_DIRECTORY}")
+        raise RetentionError(f"no campaign directory at {relative}")
 
     ids: set[str] = set()
     for path in sorted(directory.glob("*.json")):
@@ -216,9 +227,10 @@ def plan(repo_root: Path = REPO_ROOT, *, protect: Sequence[str] = ()) -> Plan:
 
     live = _campaign_ids_with_a_manifest(repo_root)
 
-    directory = repo_root / RECEIPT_DIRECTORY
+    relative = receipts_relative(repo_root)
+    directory = repo_root / relative.as_posix()
     if not directory.is_dir():
-        raise RetentionError(f"no receipt directory at {RECEIPT_DIRECTORY}")
+        raise RetentionError(f"no receipt directory at {relative}")
 
     receipts, unreadable = _load_receipts(directory)
     cited = cited_receipts(repo_root) | audited_receipts(receipts, repo_root)

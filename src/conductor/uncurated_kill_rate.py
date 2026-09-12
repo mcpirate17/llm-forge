@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
 
+from conductor.project_paths import campaigns_root
+
 PY = sys.executable  # the campaign runs under whatever interpreter invoked us
 
 
@@ -407,7 +409,7 @@ def resolve_campaigns(root: Path, requested: list[str]) -> list[tuple[str, Path]
     before the first mutant, not after the sixth campaign.
     """
 
-    campaign_dir = root / "conductor/mutation_campaigns"
+    campaign_dir = campaigns_root(root)
     resolved: list[tuple[str, Path]] = []
     unresolved: list[str] = []
     by_id: dict[str, Path] | None = None

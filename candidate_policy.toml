@@ -1,0 +1,1203 @@
+# llm-forge candidate policy.
+#
+# Derived from the monorepo conductor was extracted from: the generic checks, tool
+# declarations and thresholds, with every host-specific exception, mutation waiver,
+# value waiver and provenance entry dropped -- those excused code that does not exist
+# here, and an inert exception reads as live coverage. [classes], [risk] and [paths]
+# name this repository's layout (src/conductor, native/, campaigns/).
+#
+# pyproject.toml's [tool.conductor] points at this file; see conductor.project_paths.
+
+schema_version = 1
+block_at = "high"
+max_workers = 4
+cache_ttl_days = 14
+claim_max_age_hours = 24
+max_file_bytes = 1000000
+max_binary_bytes = 5000000
+coverage_threshold = 40.0
+high_risk_coverage_threshold = 65.0
+baseline_expires = 2026-09-15
+[classes]
+governance = [
+  "src/conductor/**",
+  "src/tooling/hooks/**",
+  ".claude/**",
+  ".github/workflows/**",
+  ".pre-commit-config.yaml",
+  "Makefile",
+]
+workflow = [".github/workflows/**", ".pre-commit-config.yaml"]
+# `novel` is what arms [checks.research-integrity]. llm-forge has no research tree of
+# its own yet, but the check ships here and its tests pin these directory names, so the
+# class is declared rather than dropped -- a glob that matches nothing costs nothing.
+novel = ["component_fab/**", "research/**"]
+
+[risk]
+high = [
+  "src/conductor/**",
+  "src/tooling/hooks/**",
+  ".claude/**",
+  ".github/workflows/**",
+  ".pre-commit-config.yaml",
+  "native/**",
+]
+
+[paths]
+# This repository's own entries first; the trailing globs name directories llm-forge
+# does not have, kept because the shipped checks' tests pin them (a glob that matches
+# nothing costs nothing, and dropping them would silently retire the check).
+protected_deletes = [
+  "campaigns/receipts/**",
+  "research/runtime_events/**",
+  "research/perf_artifacts/**",
+  "research/db_backups/**",
+  "research/data/**",
+  "**/*champion*.json",
+  "**/*promotion*.jsonl",
+]
+hot = [
+  "native/**",
+  "component_fab/harness/**",
+  "research/synthesis/**",
+  "**/kernels/**",
+  "**/training*.py",
+  "**/trainer*.py",
+]
+generated = [
+  "**/generated/**",
+  "**/*.generated.*",
+  "research/reports/**",
+  "tasks/audit/**",
+]
+
+[checks.candidate-integrity]
+kind = "builtin"
+profiles = ["fast", "full"]
+classes = []
+always = true
+cache = false
+run_on_deletions = true
+severity = "critical"
+timeout_seconds = 30
+memory_mb = 512
+max_output_chars = 12000
+
+[checks.ownership]
+kind = "builtin"
+profiles = ["fast", "full"]
+classes = []
+always = true
+cache = false
+run_on_deletions = true
+severity = "high"
+timeout_seconds = 30
+memory_mb = 512
+max_output_chars = 12000
+
+[checks.secret-scan]
+kind = "builtin"
+profiles = ["fast", "full"]
+classes = []
+always = true
+cache = true
+severity = "critical"
+timeout_seconds = 60
+memory_mb = 1024
+max_output_chars = 12000
+
+[checks.config-parse]
+kind = "builtin"
+# attribution = "diff": this check judges the candidate's changed files, so a
+# finding naming an unchanged path (or no path) is pre-existing tree debt. It is
+# reported and counted, but does not block. A candidate that cannot pass by doing
+# its own work well gets bypassed rather than obeyed -- see conductor/gate_rollout.md.
+attribution = "diff"
+profiles = ["fast", "full"]
+classes = ["config", "notebook", "workflow"]
+cache = true
+severity = "critical"
+timeout_seconds = 60
+memory_mb = 1024
+max_output_chars = 12000
+
+[checks.equivalence-probe]
+kind = "builtin"
+profiles = ["full"]
+classes = ["python"]
+cache = true
+severity = "low"
+timeout_seconds = 600
+
+[checks.python-ast]
+kind = "builtin"
+# attribution = "diff": this check judges the candidate's changed files, so a
+# finding naming an unchanged path (or no path) is pre-existing tree debt. It is
+# reported and counted, but does not block. A candidate that cannot pass by doing
+# its own work well gets bypassed rather than obeyed -- see conductor/gate_rollout.md.
+attribution = "diff"
+profiles = ["fast", "full"]
+classes = ["python"]
+cache = true
+severity = "high"
+timeout_seconds = 90
+memory_mb = 2048
+max_output_chars = 12000
+
+[checks.native-source]
+kind = "builtin"
+# attribution = "diff": this check judges the candidate's changed files, so a
+# finding naming an unchanged path (or no path) is pre-existing tree debt. It is
+# reported and counted, but does not block. A candidate that cannot pass by doing
+# its own work well gets bypassed rather than obeyed -- see conductor/gate_rollout.md.
+attribution = "diff"
+profiles = ["fast", "full"]
+classes = ["native"]
+cache = true
+severity = "critical"
+timeout_seconds = 60
+memory_mb = 1024
+max_output_chars = 12000
+
+[checks.crate-version]
+kind = "builtin"
+# attribution = "candidate": every finding names a manifest of a crate this
+# candidate edited, so there is no pre-existing-debt shape to inherit.
+profiles = ["fast", "full"]
+classes = ["native"]
+cache = false
+severity = "critical"
+timeout_seconds = 30
+memory_mb = 512
+max_output_chars = 8000
+
+[checks.dependency-integrity]
+kind = "builtin"
+profiles = ["fast", "full"]
+classes = ["dependency"]
+cache = true
+run_on_deletions = true
+severity = "critical"
+timeout_seconds = 60
+memory_mb = 1024
+max_output_chars = 12000
+
+[checks.import-declaration]
+kind = "builtin"
+# attribution = "diff": the rule judges the imports of the files this candidate
+# changed. A finding on an unchanged path is pre-existing tree debt -- recorded,
+# but not a wall in front of unrelated work.
+attribution = "diff"
+profiles = ["fast", "full"]
+classes = ["python"]
+cache = true
+severity = "critical"
+timeout_seconds = 90
+memory_mb = 1024
+max_output_chars = 12000
+
+[checks.duplicate-function-bodies]
+kind = "builtin"
+# attribution = "diff": this check judges the candidate's changed files, so a
+# finding naming an unchanged path (or no path) is pre-existing tree debt. It is
+# reported and counted, but does not block. A candidate that cannot pass by doing
+# its own work well gets bypassed rather than obeyed -- see conductor/gate_rollout.md.
+attribution = "diff"
+profiles = ["fast", "full"]
+classes = ["python"]
+cache = true
+severity = "high"
+timeout_seconds = 180
+memory_mb = 4096
+max_output_chars = 12000
+
+[checks.structure-audit]
+kind = "builtin"
+profiles = ["fast", "full"]
+classes = ["python"]
+cache = true
+severity = "high"
+timeout_seconds = 180
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.tooling-boundary]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python"]
+# The tooling boundary contract (conductor/tooling_boundary.py): no import edge from
+# conductor/ to a host package at any scope, no host path literal in conductor/ or the
+# generic hooks, and conductor/_native.py the only native seam. Always on because a
+# coupling can enter through any file class; runs against the snapshot, not the tree.
+always = true
+command = [
+  "{python}",
+  "-m",
+  "conductor.tooling_boundary",
+  "--root",
+  "{snapshot}",
+]
+version_command = ["{python}", "--version"]
+cache = false
+severity = "high"
+timeout_seconds = 120
+memory_mb = 2048
+max_output_chars = 20000
+
+[checks.forbid-repo-root-junk]
+kind = "command"
+profiles = ["fast", "full"]
+# Repo root is config only (CLAUDE.md). Rejects *PLAN*.md, *HANDOFF*.md, *.log,
+# metrics.jsonl and unused.* directly at the root, and explicitly allows the
+# user-blessed *DO_NOT_DELETE* files. No class filter: the junk it rejects is
+# markdown and log output, which belong to no source class. Deletions are exempt
+# -- removing a junk file is the fix, not a violation.
+command = ["{python}", "-m", "conductor.check_root_junk", "{files}"]
+version_command = ["{python}", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 60
+memory_mb = 512
+max_output_chars = 4000
+
+[checks.forbid-json-in-notes]
+kind = "command"
+profiles = ["fast", "full"]
+# research/notes/ is the knowledge tree; bulk data is not knowledge. Rejects
+# .json/.jsonl/.csv directly inside it -- research/data/ for persistent inputs,
+# research/reports/ or tasks/audit/ for tool output. Subdirectories are exempt
+# by design: they are curated collections, not loose data drops.
+command = ["{python}", "-m", "conductor.check_json_in_notes", "{files}"]
+version_command = ["{python}", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 60
+memory_mb = 512
+max_output_chars = 4000
+
+
+[checks.require-generated-mutants]
+kind = "command"
+profiles = ["fast", "full"]
+# New mutation campaigns must be generated, never hand-written. An agent that
+# picks its own mutants scores the damage it chose: 482 of 483 hand-authored
+# campaigns publish exactly 1.0 while a mechanical sweep of the same code kills
+# 60.6% (conductor/mutation_engine_generated.py). Rejects a campaign MANIFEST
+# whose mutation_engine is not one the runner can execute AND which did not
+# exist at {base}. The admitted set is read from GENERATED_ENGINES, so it cannot
+# drift from the adapters. The legacy hand-written campaigns already in the tree
+# are archival provenance, never an executable fallback: the driver that used to
+# re-pin them was deleted on 2026-09-08, so when a source edit rots one the cure
+# is to RETIRE it -- drop the registry row, the manifest, its patches and its
+# receipts -- and re-record the corpus baseline. Deleting one is never an
+# offence. CRITICAL because a hand-authored campaign is the student grading its
+# own test; there is no severity at which it is acceptable.
+command = [
+  "{python}",
+  "-m",
+  "conductor.check_generated_mutants",
+  "--repo",
+  "{repo}",
+  "--base",
+  "{base}",
+  "{files}",
+]
+version_command = ["{python}", "--version"]
+cache = true
+severity = "critical"
+timeout_seconds = 60
+memory_mb = 512
+max_output_chars = 4000
+
+[checks.ruff-check]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python", "notebook"]
+command = ["ruff", "check", "--no-cache", "{files}"]
+version_command = ["ruff", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 120
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.ruff-format]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python", "notebook"]
+command = ["ruff", "format", "--check", "--no-cache", "{files}"]
+version_command = ["ruff", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 120
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.ruff-lifecycle]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python", "notebook"]
+# Measured 0 findings over the tracked modules, so this blocks from the day it lands and
+# every finding is a regression. The B*/RUF006 half is now redundant -- ruff.toml selects
+# all eight, and CI runs `ruff check .` over the whole tree rather than a rule set of its
+# own -- and the ASYNC half has been promoted there too. Kept because this runs per
+# candidate file with its own severity and timeout, which the tree-wide job does not;
+# it is a duplicate check, not a second rule set, so the two cannot disagree.
+command = [
+  "ruff",
+  "check",
+  "--no-cache",
+  "--select",
+  "B003,B006,B012,B019,B024,B027,B039,RUF006,ASYNC100,ASYNC110,ASYNC210,ASYNC212,ASYNC220,ASYNC221,ASYNC222,ASYNC230,ASYNC240,ASYNC251",
+  "{files}",
+]
+version_command = ["ruff", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 120
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.ruff-lifecycle-advisory]
+kind = "command"
+profiles = ["full"]
+classes = ["python", "notebook"]
+# Same families, the two rules with a measured pre-existing population (RUF012 mutable
+# class default: 51, SIM115 unclosed file: 7). Advisory until that debt is paid down,
+# then fold them into [checks.ruff-lifecycle].
+command = [
+  "ruff",
+  "check",
+  "--no-cache",
+  "--select",
+  "SIM115,RUF012",
+  "{files}",
+]
+version_command = ["ruff", "--version"]
+cache = true
+severity = "medium"
+timeout_seconds = 120
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.pyright]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python"]
+command = ["pyright", "--level", "error", "{files}"]
+version_command = ["pyright", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 300
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.bandit]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python"]
+exclude_classes = ["test"]
+command = [
+  "bandit",
+  "-q",
+  "--severity-level",
+  "medium",
+  "--confidence-level",
+  "medium",
+  "--skip",
+  # B614 (torch.load without weights_only): the W7 lane instruments load their own
+  # sha256-pinned state bundles; skipped 2026-08-27 for the linear-integration landing,
+  # revisit with weights_only=True migration (tracked post-landing debt).
+  "B608,B614",
+  "{files}",
+]
+version_command = ["bandit", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 180
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.semgrep]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python", "web", "workflow"]
+exclude_classes = ["test", "native"]
+command = [
+  "semgrep",
+  "scan",
+  "--no-git-ignore",
+  "--jobs",
+  "1",
+  "--max-memory",
+  "2048",
+  "--config",
+  ".semgrep.yml",
+  "--error",
+  "{files}",
+]
+version_command = ["semgrep", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 300
+memory_mb = 4096
+max_output_chars = 30000
+
+[checks.semgrep-advisory]
+kind = "command"
+profiles = ["full"]
+classes = ["python"]
+exclude_classes = ["native"]
+# Concurrency and unbounded-state heuristics with real signal but a measured pre-existing
+# population (81 over 2998 modules), so MEDIUM and never blocking. A command check emits
+# ONE blob finding at the check's own severity, which is why these need their own ruleset
+# and their own check rather than a severity field inside .semgrep.yml.
+command = [
+  "semgrep",
+  "scan",
+  "--no-git-ignore",
+  "--jobs",
+  "1",
+  "--max-memory",
+  "2048",
+  "--config",
+  ".semgrep-advisory.yml",
+  "--error",
+  "{files}",
+]
+version_command = ["semgrep", "--version"]
+cache = true
+severity = "medium"
+timeout_seconds = 300
+memory_mb = 4096
+max_output_chars = 30000
+
+[checks.detect-secrets]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python", "source", "config", "workflow", "notebook"]
+command = ["detect-secrets-hook", "--baseline", ".secrets.baseline", "{files}"]
+version_command = ["detect-secrets-hook", "--version"]
+cache = true
+severity = "critical"
+timeout_seconds = 180
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.codespell]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["docs", "python", "source"]
+command = [
+  "codespell",
+  "--ignore-words-list",
+  "ans,mor,nd,pres,astroid,unparseable,regraded,fpr,nam,probelm,fro,interfer,retuned,covert,nce,disjointness,re-declare,non-useful,notin",
+  "{files}",
+]
+version_command = ["codespell", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 120
+memory_mb = 2048
+max_output_chars = 20000
+
+[checks.shellcheck]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["shell"]
+command = ["shellcheck", "{files}"]
+version_command = ["shellcheck", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 120
+memory_mb = 2048
+max_output_chars = 20000
+
+[checks.taplo]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["toml"]
+command = ["taplo", "fmt", "--check", "{files}"]
+version_command = ["taplo", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 120
+memory_mb = 2048
+max_output_chars = 20000
+
+[checks.biome]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["web"]
+exclude_classes = ["python", "native"]
+command = ["biome", "check", "--files-ignore-unknown=true", "{files}"]
+version_command = ["biome", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 180
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.uv-lock]
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python_dependency"]
+command = ["uv", "lock", "--check"]
+version_command = ["uv", "--version"]
+cache = true
+severity = "critical"
+timeout_seconds = 180
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.pip-audit]
+kind = "command"
+profiles = ["full"]
+classes = ["python_dependency"]
+command = ["pip-audit", "--progress-spinner", "off"]
+version_command = ["pip-audit", "--version"]
+cache = true
+severity = "critical"
+timeout_seconds = 600
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.npm-audit]
+kind = "command"
+profiles = ["full"]
+classes = ["node_dependency"]
+command = ["npm", "audit", "--package-lock-only", "--audit-level=high"]
+version_command = ["npm", "--version"]
+cache = true
+severity = "critical"
+timeout_seconds = 600
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.cargo-audit]
+kind = "command"
+profiles = ["full"]
+classes = ["rust_dependency"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.cargo_audit_files",
+  "{files}",
+]
+version_command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.cargo_audit_files",
+  "--version",
+]
+cache = true
+severity = "critical"
+timeout_seconds = 600
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.cppcheck]
+kind = "command"
+profiles = ["full"]
+classes = ["native"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.cppcheck_files",
+  "{files}",
+]
+version_command = ["cppcheck", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 600
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.cargo-fmt]
+# CI formats every crate on every native change; the gate formats the crates the
+# candidate touched, with the same command. The crate roster is
+# tooling/native/crates.toml, which the CI job reads too, so a crate cannot be
+# formatted in one place and not the other.
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["rust", "rust_dependency"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.cargo_lint_files",
+  "--mode",
+  "fmt",
+  "{files}",
+]
+version_command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.cargo_lint_files",
+  "--mode",
+  "fmt",
+  "--version",
+]
+cache = true
+severity = "high"
+timeout_seconds = 300
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.cargo-clippy]
+# `full` only: clippy has to compile, so unlike cargo-fmt it is minutes, not
+# seconds. A crate whose build.rs needs an artifact that is not in the checkout
+# (aria-scheduler's C archive) is skipped with the build command on stderr
+# rather than failed -- CI builds it before linting, so nothing is lost there.
+kind = "command"
+profiles = ["full"]
+classes = ["rust", "rust_dependency"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.cargo_lint_files",
+  "--mode",
+  "clippy",
+  "{files}",
+]
+version_command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.cargo_lint_files",
+  "--mode",
+  "clippy",
+  "--version",
+]
+cache = true
+severity = "high"
+timeout_seconds = 900
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.clang-format]
+# The 125 host C/C++ files match no base clang-format style -- measured, see
+# .clang-format -- so this is line-scoped: {base} lets the wrapper ask git which
+# lines the candidate wrote and pass them as --lines. The tree converges file by
+# file as people edit it, instead of in one unreviewed sweep.
+#
+# .cu/.cuh are excluded by class: clang parses CUDA only with a toolkit and
+# --cuda-gpu-arch, which is not a formatter's business.
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["cfamily_host"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.clang_files",
+  "--mode",
+  "format",
+  "--base",
+  "{base}",
+  "{files}",
+]
+version_command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.clang_files",
+  "--mode",
+  "format",
+  "--version",
+]
+cache = true
+severity = "high"
+timeout_seconds = 300
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.clang-tidy]
+# Line-scoped the same way, via -line-filter. No CMake build in this tree emits
+# a compile_commands.json yet, so today every file is skipped with that reason
+# on stderr -- a linter that reports missing headers as errors is noise, and
+# guessing include paths is how you get it. Configure any build with
+# -DCMAKE_EXPORT_COMPILE_COMMANDS=ON and this starts reporting with no edit here.
+kind = "command"
+profiles = ["full"]
+classes = ["cfamily_host"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.clang_files",
+  "--mode",
+  "tidy",
+  "--base",
+  "{base}",
+  "{files}",
+]
+version_command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.clang_files",
+  "--mode",
+  "tidy",
+  "--version",
+]
+cache = true
+severity = "high"
+timeout_seconds = 900
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.complexity]
+# The ratchet runs in BOTH profiles: pre-commit uses --profile fast, so a new or
+# worsened D-F block is refused at the commit, not discovered a branch later.
+# A full four-tree radon scan costs ~4s, so scoping it to changed files would buy
+# nothing and would blind the check to a grandfathered block that regressed.
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python"]
+command = [
+  "{python}",
+  "conductor/radon_complexity.py",
+  "check",
+  "--baseline",
+  "conductor/radon_complexity_baseline.json",
+]
+version_command = ["radon", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 120
+memory_mb = 2048
+max_output_chars = 30000
+
+[checks.style-scan]
+# The three concerns with no detector anywhere: "no effort-signaling code" (no
+# Python linter reads comments -- ruff discards them before it starts), dead
+# scaffolding (ruff's dead-code rules stop at unused *names*, so a stub body, an
+# unreachable statement and a constant condition all pass), and a name for
+# something outside this repository written into the call that uses it -- a
+# host, a port, an id -- which no linter has an opinion about at all.
+#
+# The rules are tree-sitter over the whole file, in Rust; this entry is the
+# argv. Line-scoped like clang-format, and for the same reason: the rules find
+# 129 pre-existing findings across the 3303 tracked Python files, and reporting
+# those would red-gate a candidate for lines it never touched. {base} lets the
+# wrapper ask git which lines this candidate wrote and drop the rest, so the
+# tree converges as people edit it.
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["python"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.style_scan",
+  "--base",
+  "{base}",
+  "{files}",
+]
+version_command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.style_scan",
+  "--version",
+]
+cache = true
+severity = "high"
+timeout_seconds = 300
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.rust-style-scan]
+# "Fail loud" in the language the compute is written in. `.unwrap()` does not
+# hide an error, it discards the reason and aborts: the backtrace names
+# core::option rather than the call that was wrong. `todo!()` and
+# `unimplemented!()` are scaffolding that type-checks, so nothing else in the
+# toolchain notices them. clippy has lints for both, but they are `full`-only
+# here because clippy compiles -- this is tree-sitter, 0.2 s over all 127
+# tracked Rust files, so it fires ahead of the commit.
+#
+# Test scope is read from `#[cfg(test)]` and `#[test]` rather than from the
+# path: of the 332 `.unwrap()` calls in non-test-path files, 294 are inside an
+# inline test module and only 38 are production. `.expect("why")` is allowed --
+# it fails as loudly and carries the reason, which is all the rule asks for.
+# Line-scoped like style-scan, so those 38 land on whoever next edits them.
+kind = "command"
+profiles = ["fast", "full"]
+classes = ["rust"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.style_scan",
+  "--language",
+  "rust",
+  "--base",
+  "{base}",
+  "{files}",
+]
+version_command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.style_scan",
+  "--version",
+]
+cache = true
+severity = "high"
+timeout_seconds = 300
+memory_mb = 4096
+max_output_chars = 20000
+
+[checks.vulture]
+kind = "command"
+profiles = ["full"]
+classes = ["python"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.candidate_review.vulture_audit",
+  "--baseline",
+  "conductor/vulture_baseline.json",
+  "--changed-files-from",
+  "{changed_files_file}",
+  "research",
+  "aria_core",
+  "aria_designer",
+  "component_fab",
+  "conductor",
+]
+version_command = ["vulture", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 600
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.jscpd]
+kind = "command"
+profiles = ["full"]
+classes = ["python", "source", "config", "native"]
+command = [
+  "{python}",
+  "-m",
+  "conductor.run_duplicate_audit",
+  "--tool",
+  "jscpd",
+  "--check",
+  "--changed-files-from",
+  "{changed_files_file}",
+]
+version_command = ["jscpd", "--version"]
+cache = true
+severity = "high"
+timeout_seconds = 600
+memory_mb = 8192
+max_output_chars = 30000
+
+[checks.test-evidence]
+kind = "builtin"
+profiles = ["fast", "full"]
+classes = ["python", "native"]
+cache = false
+severity = "high"
+timeout_seconds = 60
+memory_mb = 2048
+max_output_chars = 12000
+
+[checks.mutation-evidence]
+kind = "builtin"
+profiles = ["fast", "full"]
+classes = ["test"]
+cache = false
+severity = "critical"
+timeout_seconds = 120
+memory_mb = 2048
+max_output_chars = 30000
+
+[checks.performance-evidence]
+kind = "builtin"
+profiles = ["fast", "full"]
+classes = ["source", "native"]
+cache = false
+severity = "high"
+timeout_seconds = 60
+memory_mb = 2048
+max_output_chars = 12000
+
+[checks.research-integrity]
+kind = "builtin"
+profiles = ["fast", "full"]
+classes = ["novel"]
+cache = false
+severity = "critical"
+timeout_seconds = 60
+memory_mb = 2048
+max_output_chars = 12000
+
+[checks.targeted-tests]
+kind = "builtin"
+profiles = ["fast"]
+classes = ["python", "native"]
+cache = false
+severity = "high"
+timeout_seconds = 900
+memory_mb = 65536
+max_output_chars = 100000
+
+[checks.targeted-tests-full]
+kind = "builtin"
+profiles = ["full"]
+classes = ["python", "native"]
+cache = false
+severity = "high"
+timeout_seconds = 1200
+memory_mb = 32768
+max_output_chars = 50000
+# A large integration candidate selects tests from every changed file: PR #38
+# changed 2359 files and selected 451 of the repo's 1029 test files, a ~5.5h
+# sweep that a single 1200s-CPU process cannot finish -- it was SIGKILLed at 6%.
+# Sharding runs each chunk as its own subprocess, so prlimit applies the budget
+# per shard. 451 files -> 23 shards at ~72% of budget each. Selections at or
+# below shard_max_files run as one process on the unsharded path, unchanged.
+#
+# 20 -> 10 on 2026-08-29: ~72% of budget was an AVERAGE, and the shards are not
+# uniform. On PR #40, shard13 drew four component_fab tests, test_pipeline_-
+# integration and three nm_f6 phase-22 files into one chunk and hit TimeoutExpired
+# at the full 1200s. Halving the chunk is the conservative correction: the
+# per-shard CPU budget is UNCHANGED and no test is skipped, so the gate still
+# bites exactly as hard -- only the work per subprocess drops. If a shard times
+# out again, halve again rather than raising timeout_seconds; a slow shard is a
+# packing problem, and raising the budget is the one change that would let a
+# genuinely hanging test through.
+shard_max_files = 10
+shard_workers = 4
+# Wall budget, separate from the 1200s CPU budget above. MEASURED 2026-08-29: shard5
+# held test_algebraic_properties, whose test_tropical_calibration_pure_order_statistics_
+# flag alone costs 136s of a 153s file on a 32-core box; the shard's other nine files
+# total 86s CPU. On a 4-vCPU runner each of the 4 concurrent shards gets ~1 core, so
+# that shard needs roughly 600-800s of wall and blew the 1200s ceiling once coverage
+# and runner slowness were added. It was never looping -- prlimit --cpu never fired.
+# Raising THIS does not relax hang detection: timeout_seconds still caps CPU at 1200s,
+# so a runaway test is still killed on exactly the old budget. The job's 180m cap is
+# the backstop for a test that sleeps without burning CPU.
+wall_timeout_seconds = 2400
+
+[baselines.jscpd]
+path = "conductor/jscpd_duplication_baseline.json"
+classes = ["python", "source", "config", "native"]
+required_profiles = ["full"]
+
+[baselines.pmd]
+path = "conductor/pmd_cpd_duplication_baseline.json"
+classes = ["python"]
+required_profiles = ["full"]
+
+[baselines.complexity]
+path = "conductor/radon_complexity_baseline.json"
+classes = ["python"]
+required_profiles = ["fast", "full"]
+
+[baselines.vulture]
+path = "conductor/vulture_baseline.json"
+classes = ["python"]
+required_profiles = ["full"]
+
+# ---------------------------------------------------------------------------
+# Declared external tool set, 2026-08-29.
+#
+# `make gate` probes every entry here BEFORE it starts work and refuses to run when
+# one is absent. This exists because "green locally" meant nothing during the
+# 2026-08-26/29 landing: the local box had tools the runner lacked and vice versa,
+# and each mismatch surfaced one CI cycle at a time.
+#
+# `command_runner` already fails closed on a missing analyzer for policy `command`
+# checks -- but only after the review has materialized a snapshot and run every cheap
+# check, and `prlimit` was exempt even from that, silently returning an unbounded
+# command and dropping the CPU and address-space budget entirely. That is why
+# `prlimit`, `git` and `uv` are declared here even though no `[checks.*]` names them.
+#
+# `expected_version` is CI's pin (see .github/workflows/governance-ci.yml). A local
+# version that differs is REPORTED, not refused: version skew is worth knowing, a
+# missing tool is what actually breaks the run.
+# ---------------------------------------------------------------------------
+
+[tools.ruff]
+executable = "ruff"
+version_command = ["ruff", "--version"]
+expected_version = "0.15.20"
+required_profiles = ["fast", "full"]
+provided_by = "uv pip install ruff==0.15.20"
+rationale = "checks.ruff-check and checks.ruff-format"
+
+[tools.pyright]
+executable = "pyright"
+version_command = ["pyright", "--version"]
+expected_version = "1.1.409"
+required_profiles = ["fast", "full"]
+provided_by = "uv pip install pyright==1.1.409"
+rationale = "checks.pyright"
+
+[tools.bandit]
+executable = "bandit"
+version_command = ["bandit", "--version"]
+expected_version = "1.9.4"
+required_profiles = ["fast", "full"]
+provided_by = "uv pip install bandit==1.9.4"
+rationale = "checks.bandit"
+
+[tools.semgrep]
+executable = "semgrep"
+version_command = ["semgrep", "--version"]
+expected_version = "1.175.0"
+required_profiles = ["fast", "full"]
+provided_by = "uv pip install semgrep==1.175.0"
+rationale = "checks.semgrep"
+
+[tools.detect-secrets]
+executable = "detect-secrets-hook"
+version_command = ["detect-secrets-hook", "--version"]
+expected_version = "1.5.0"
+required_profiles = ["fast", "full"]
+provided_by = "uv sync --group dev (detect-secrets>=1.5.0)"
+rationale = "checks.detect-secrets; severity critical, and it is NOT in the CI pip pin list -- it arrives only via the dev group, so a --no-dev sync silently loses it"
+
+[tools.codespell]
+executable = "codespell"
+version_command = ["codespell", "--version"]
+expected_version = "2.4.2"
+required_profiles = ["fast", "full"]
+provided_by = "uv pip install codespell==2.4.2"
+rationale = "checks.codespell"
+
+[tools.shellcheck]
+executable = "shellcheck"
+version_command = ["shellcheck", "--version"]
+expected_version = ""
+required_profiles = ["fast", "full"]
+provided_by = "apt-get install shellcheck"
+rationale = "checks.shellcheck; CI takes the distro version, so no pin to compare against"
+
+[tools.taplo]
+executable = "taplo"
+version_command = ["taplo", "--version"]
+expected_version = "0.10.0"
+required_profiles = ["fast", "full"]
+provided_by = "cargo install taplo-cli --version 0.10.0 --locked"
+rationale = "checks.taplo"
+
+[tools.biome]
+executable = "biome"
+version_command = ["biome", "--version"]
+expected_version = "2.4.15"
+required_profiles = ["fast", "full"]
+provided_by = "npm install --global @biomejs/biome@2.4.15"
+rationale = "checks.biome"
+
+[tools.uv]
+executable = "uv"
+version_command = ["uv", "--version"]
+expected_version = "0.10.9"
+required_profiles = ["fast", "full"]
+provided_by = "python -m pip install uv==0.10.9"
+rationale = "checks.uv-lock, and every Makefile governance target shells uv run --frozen"
+
+[tools.pip-audit]
+executable = "pip-audit"
+version_command = ["pip-audit", "--version"]
+expected_version = "2.10.0"
+required_profiles = ["full"]
+provided_by = "uv pip install pip-audit==2.10.0"
+rationale = "checks.pip-audit"
+
+[tools.npm]
+executable = "npm"
+version_command = ["npm", "--version"]
+expected_version = ""
+required_profiles = ["full"]
+provided_by = "actions/setup-node@v4 with node 22"
+rationale = "checks.npm-audit; CI takes whatever node 22 ships"
+
+[tools.cargo]
+executable = "cargo"
+version_command = ["cargo", "--version"]
+expected_version = ""
+required_profiles = ["fast", "full"]
+provided_by = "rust toolchain on the runner image"
+rationale = "checks.cargo-audit and checks.cargo-clippy (full), checks.cargo-fmt (fast and full)"
+
+[tools.cppcheck]
+executable = "cppcheck"
+version_command = ["cppcheck", "--version"]
+expected_version = ""
+required_profiles = ["full"]
+provided_by = "apt-get install cppcheck"
+rationale = "checks.cppcheck; distro version, no pin"
+
+[tools.rustfmt]
+executable = "rustfmt"
+version_command = ["rustfmt", "--version"]
+expected_version = ""
+required_profiles = ["fast", "full"]
+provided_by = "rustup component add rustfmt"
+rationale = "checks.cargo-fmt; the pinned CI toolchain installs it as a component, so no version to compare against here"
+
+[tools.clang-format]
+executable = "clang-format"
+version_command = ["clang-format", "--version"]
+expected_version = "23.1.0"
+required_profiles = ["fast", "full"]
+provided_by = "uv sync --group dev (clang-format>=20.1.0)"
+rationale = "checks.clang-format; a PyPI-packaged LLVM binary rather than the distro's, so uv.lock pins the version every lane formats with"
+
+[tools.clang-tidy]
+executable = "clang-tidy"
+version_command = ["clang-tidy", "--version"]
+# Unpinned, and not by choice: clang-tidy leads its --version output with
+# "LLVM (http://llvm.org/):" and prints the number on the next line, while the
+# preflight compares against the first line only. Pinning 22.1.8 here refuses
+# every gate run. uv.lock is the pin that actually binds -- clang-tidy is a
+# dev-group dependency, so `uv sync` gives every lane the same build. Debt:
+# teach probe_tool to match the whole version output, then pin here too.
+expected_version = ""
+required_profiles = ["full"]
+provided_by = "uv sync --group dev (clang-tidy>=20.1.0)"
+rationale = "checks.clang-tidy; same PyPI provenance as clang-format, shipped as a separate distribution so the two versions differ"
+
+[tools.radon]
+executable = "radon"
+version_command = ["radon", "--version"]
+expected_version = "6.0.1"
+required_profiles = ["fast", "full"]
+provided_by = "declared in pyproject.toml (radon>=6.0.1)"
+rationale = "checks.complexity"
+
+[tools.vulture]
+executable = "vulture"
+version_command = ["vulture", "--version"]
+expected_version = "2.16"
+required_profiles = ["full"]
+provided_by = "uv pip install vulture==2.16"
+rationale = "checks.vulture"
+
+[tools.jscpd]
+executable = "jscpd"
+version_command = ["jscpd", "--version"]
+expected_version = "4.2.1"
+required_profiles = ["full"]
+provided_by = "npm install --global jscpd@4.2.1"
+rationale = "checks.jscpd"
+
+[tools.git]
+executable = "git"
+version_command = ["git", "--version"]
+expected_version = ""
+required_profiles = ["fast", "full"]
+provided_by = "the runner image and every developer box"
+rationale = "candidate resolution, tree materialization and the export are all git operations; declared so a PATH-less environment refuses rather than crashing mid-review"
+
+[tools.prlimit]
+executable = "prlimit"
+version_command = ["prlimit", "--version"]
+expected_version = ""
+required_profiles = ["fast", "full"]
+provided_by = "util-linux"
+rationale = "command_runner._limited_command SILENTLY returns an unbounded command when prlimit is absent, dropping the CPU and address-space budget for every analyzer and every test shard. Declaring it makes that a refusal instead of an invisible downgrade"
+
+[tools.code-review-graph]
+executable = "code-review-graph"
+version_command = ["code-review-graph", "--version"]
+expected_version = "2.3.8"
+required_profiles = ["fast", "full"]
+provided_by = "uv pip install code-review-graph==2.3.8"
+rationale = "checks.test-evidence fails closed with 'graph database is missing' unless the graph has been built; CI runs code-review-graph build before the review"

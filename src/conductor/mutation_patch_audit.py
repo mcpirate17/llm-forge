@@ -62,6 +62,7 @@ import subprocess
 from typing import Any
 
 from conductor.mutation_patch_apply import PatchApplyError, check_patch_text
+from conductor.project_paths import campaigns_relative, host_root, registry_relative
 from conductor.mutation_scope import CampaignError, _safe_relative_path
 from conductor.mutation_testing import (
     REPO_ROOT,
@@ -377,7 +378,9 @@ def audit_reproducibility(
     }
 
 
-DEFAULT_BASELINE = Path("conductor/mutation_campaigns/reproducibility_baseline.json")
+DEFAULT_BASELINE = Path(
+    campaigns_relative(host_root()) / "reproducibility_baseline.json"
+)
 BASELINE_KEYS = (
     "stale_mutations",
     "unloadable_manifests",
@@ -635,7 +638,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--registry",
         type=Path,
-        default=Path("conductor/mutation_campaigns/registry.json"),
+        default=Path(registry_relative(host_root())),
     )
     parser.add_argument(
         "--max-workers",

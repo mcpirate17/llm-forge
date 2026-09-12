@@ -11,6 +11,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY
+
 SOURCE_SUFFIXES = {
     ".c",
     ".cc",
@@ -34,7 +36,7 @@ SOURCE_SUFFIXES = {
     ".yml",
 }
 EXCLUDED_PREFIXES = (
-    "conductor/mutation_campaigns/receipts/",
+    f"{DEFAULT_MUTATION_REGISTRY.parent}/receipts/",
     "research/reports/",
     "research/notes/",
     "tasks/",

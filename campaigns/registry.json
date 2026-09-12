@@ -1,0 +1,26 @@
+{
+  "campaigns": [],
+  "enforcement": "changed_tests",
+  "engine_adapters": {
+    "c": [
+      "mull"
+    ],
+    "cpp": [
+      "mull"
+    ],
+    "python": [
+      "fest"
+    ],
+    "rust": [
+      "cargo-mutants"
+    ]
+  },
+  "receipt_directories": [
+    "campaigns/receipts"
+  ],
+  "schema_version": 1,
+  "test_patterns": [
+    "**/test_*.py",
+    "**/*_test.py"
+  ]
+}

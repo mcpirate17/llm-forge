@@ -47,6 +47,11 @@ from pathlib import Path
 
 from conductor.candidate_review.policy import PolicyError, ToolPolicy, load_policy
 from conductor.candidate_review.policy_path import resolve_policy_path
+from conductor.project_paths import (
+    DEFAULT_MUTATION_REGISTRY,
+    registry_path,
+    registry_relative,
+)
 
 DEFAULT_BASE = "origin/w7-trident-program"
 # Exit codes are part of the contract: hooks and CI branch on them.
@@ -568,7 +573,12 @@ def clean_clone_closure(repo: Path, export_root: Path) -> PhaseResult:
 # ---------------------------------------------------------------------------
 
 
-MUTATION_REGISTRY = Path("conductor/mutation_campaigns/registry.json")
+# The default layout; `mutation_corpus_audit` resolves against the export root it is
+# handed, which is what decides a candidate's verdict.
+MUTATION_REGISTRY = Path(DEFAULT_MUTATION_REGISTRY)
+
+
+
 
 
 def mutation_corpus_audit(export_root: Path) -> PhaseResult:
@@ -597,10 +607,10 @@ def mutation_corpus_audit(export_root: Path) -> PhaseResult:
     except ImportError as exc:
         raise GateRefusal(f"mutation corpus audit is unavailable: {exc}") from exc
 
-    registry = export_root / MUTATION_REGISTRY
+    registry = registry_path(export_root)
     if not registry.is_file():
         raise GateRefusal(
-            f"candidate tree has no mutation registry at {MUTATION_REGISTRY}"
+            f"candidate tree has no mutation registry at {registry_relative(export_root)}"
         )
 
     try:

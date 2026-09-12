@@ -75,6 +75,15 @@ slop-core = { path = "native/slop-core" }
 # build outright -- the two mechanisms cannot coexist, and package data is the one that
 # also fixes the checkout. 110 KB total.
 
+# Where this repository keeps its conductor data. conductor.project_paths reads these
+# two keys (env overrides: $CONDUCTOR_CANDIDATE_POLICY, $CONDUCTOR_MUTATION_REGISTRY)
+# and every call site resolves through it. Omitting them yields the monorepo layout
+# conductor was extracted from -- conductor/candidate_policy.toml and
+# conductor/mutation_campaigns/registry.json -- so that host needs no entry here.
+[tool.conductor]
+candidate_policy = "candidate_policy.toml"
+mutation_registry = "campaigns/registry.json"
+
 # OS prerequisite for conductor.project_context's additive Linux resolver.
 # Informational package metadata: pip/uv do not install system executables.
 # The resolver fails closed if this fixed executable or its required options
