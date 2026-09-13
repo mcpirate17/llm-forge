@@ -1,0 +1,18 @@
+{
+  "clean-main": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "clean-master-config": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "combined-exposure": "EXPOSED: 1 local-only commit(s), 1 stale dirty file(s), 1 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "dirty-fresh": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "dirty-future-mtime": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "dirty-tracked-stale": "EXPOSED: 0 local-only commit(s), 1 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "dirty-untracked-stale": "EXPOSED: 0 local-only commit(s), 1 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "master-local-symref": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "master-ls-remote-only": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "no-remote-trunk": "EXPOSED: 1 local-only commit(s), 0 stale dirty file(s), unknown finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "unpushed-one": "EXPOSED: 1 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "unpushed-two": "EXPOSED: 2 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "worktree-contained": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 1 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "worktree-dirty": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "worktree-merged-pruned": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 1 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene",
+  "worktree-uncontained": "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s), 0 finished worktree(s) to remove, branches skipped (needs gh). python -m conductor.workspace_hygiene"
+}

@@ -29,6 +29,15 @@
 //! `FORGE_NATIVE_HOOKS=""` (set to the empty string) is a documented escape
 //! hatch back to the pre-port, all-Python behaviour; unset means "use the
 //! native default", not "opt out" -- see `native_hook_names_from_env`.
+//!
+//! `SessionStart` gets the same partial-splice treatment as `PostToolUse`:
+//! `workspace_exposure_session` (the EXPOSED one-liner,
+//! `crate::workspace_hygiene`) is the only ported name, and there is
+//! deliberately no fully-native fast path for the event --
+//! `crg_refresh_report_session`, the legacy `session_start`/`session_handoff`
+//! shell bodies and `native_freshness` all still run in Python for every
+//! session start, so Python always starts and only this one body is skipped
+//! when forge has answered it.
 
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -46,6 +55,7 @@ use crate::identity;
 use crate::instant;
 use crate::merge::{self, HookOutcome};
 use crate::tool_quiet::{self, QuietConfig};
+use crate::workspace_hygiene;
 use crate::write_targets;
 
 /// A hook body ported to native Rust.
@@ -353,6 +363,33 @@ impl NativeHandler for PostToolQuiet {
     }
 }
 
+/// `workspace_exposure_session`: the SessionStart EXPOSED summary line
+/// (`adapters.workspace_exposure`, exactly `workspace_hygiene.exposure_line`).
+/// The repo it reports on is the session's checkout
+/// (`interpreter::project_root`), which is what the Python adapter's
+/// `ctx.root` resolves to for the same call.
+pub struct WorkspaceExposureSession;
+
+impl NativeHandler for WorkspaceExposureSession {
+    fn name(&self) -> &'static str {
+        "workspace_exposure_session"
+    }
+
+    fn event(&self) -> &'static str {
+        "SessionStart"
+    }
+
+    fn run(&self, _payload: &Value) -> Result<Value> {
+        let root = crate::interpreter::project_root();
+        Ok(json!({
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": workspace_hygiene::exposure_line(&root),
+            }
+        }))
+    }
+}
+
 /// Handlers ported so far.
 pub fn registry() -> Vec<Box<dyn NativeHandler>> {
     vec![
@@ -363,6 +400,7 @@ pub fn registry() -> Vec<Box<dyn NativeHandler>> {
         Box::new(CurrentWorkGuardBash),
         Box::new(PostBashQuiet),
         Box::new(PostToolQuiet),
+        Box::new(WorkspaceExposureSession),
     ]
 }
 
@@ -437,6 +475,36 @@ pub const BASH_PRETOOLUSE_HOOK_NAMES: [&str; 4] = [
     "current_work_guard_bash",
 ];
 
+/// The exact hook name, in the Python registry's own order, that a
+/// `SessionStart` call matches and this crate serves: the EXPOSED summary
+/// line. The event's other names (`crg_refresh_report_session`,
+/// `session_start`, `session_handoff`, `native_freshness`) are not ported;
+/// Python still runs them for every session start.
+pub const SESSIONSTART_HOOK_NAMES: [&str; 1] = ["workspace_exposure_session"];
+
+/// The `SessionStart` twin of `native_answers_for_post_tool_use`: the
+/// opted-in subset of `SESSIONSTART_HOOK_NAMES`, each hook's own unmerged
+/// answer. There is no "fully native" fast path for this event (see module
+/// docs); this only lets the Python dispatcher skip the one body this crate
+/// already answered. Unlike the tool events the answer needs no payload --
+/// the line depends on the checkout, not on the hook input.
+pub fn native_answers_for_session_start(native_hooks: &HashSet<String>) -> HashMap<String, Value> {
+    let mut answers = HashMap::new();
+    let handlers = registry();
+    for name in SESSIONSTART_HOOK_NAMES {
+        if !native_hooks.contains(name) {
+            continue;
+        }
+        let Some(handler) = find_handler(&handlers, name, "SessionStart") else {
+            continue;
+        };
+        if let Ok(value) = handler.run(&Value::Null) {
+            answers.insert(name.to_string(), value);
+        }
+    }
+    answers
+}
+
 /// True once every name in `BASH_PRETOOLUSE_HOOK_NAMES` is opted in: forge has
 /// full native coverage for a Bash `PreToolUse` call and `dispatch::run_hook`
 /// can answer it without starting Python at all.
@@ -448,11 +516,11 @@ pub fn bash_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
 
 /// The hooks forge serves natively when the caller expresses no preference at
 /// all (`FORGE_NATIVE_HOOKS` unset) -- the native path is the *default* as of
-/// this PR, not an opt-in. The four `BASH_PRETOOLUSE_HOOK_NAMES` and the two
-/// `POST_TOOL_USE_HOOK_NAMES` are the names Python's registry actually
-/// recognizes; `"bash_write_targets"` gates forge's own additive telemetry
-/// handler and is a no-op name on the Python side (there is no such
-/// `HookSpec`).
+/// this PR, not an opt-in. The four `BASH_PRETOOLUSE_HOOK_NAMES`, the two
+/// `POST_TOOL_USE_HOOK_NAMES` and `workspace_exposure_session` are the names
+/// Python's registry actually recognizes; `"bash_write_targets"` gates
+/// forge's own additive telemetry handler and is a no-op name on the Python
+/// side (there is no such `HookSpec`).
 fn default_native_hook_names() -> HashSet<String> {
     let mut names: HashSet<String> = BASH_PRETOOLUSE_HOOK_NAMES
         .iter()
@@ -460,6 +528,7 @@ fn default_native_hook_names() -> HashSet<String> {
         .collect();
     names.insert("bash_write_targets".to_string());
     names.extend(POST_TOOL_USE_HOOK_NAMES.iter().map(|s| s.to_string()));
+    names.extend(SESSIONSTART_HOOK_NAMES.iter().map(|s| s.to_string()));
     names
 }
 
@@ -643,8 +712,9 @@ mod tests {
     #[test]
     fn registry_covers_every_bash_pretooluse_hook_plus_write_targets() {
         // 5 Bash PreToolUse handlers (4 real HookSpec names plus
-        // bash_write_targets) + PostBashQuiet + PostToolQuiet.
-        assert_eq!(registry().len(), 7);
+        // bash_write_targets) + PostBashQuiet + PostToolQuiet
+        // + WorkspaceExposureSession.
+        assert_eq!(registry().len(), 8);
         assert!(bash_pretooluse_fully_native(&all_four()));
         let mut missing_one = all_four();
         missing_one.remove("current_work_guard_bash");
@@ -675,8 +745,82 @@ mod tests {
         for name in BASH_PRETOOLUSE_HOOK_NAMES {
             assert!(names.contains(name), "{name} missing from the default set");
         }
+        for name in POST_TOOL_USE_HOOK_NAMES {
+            assert!(names.contains(name), "{name} missing from the default set");
+        }
+        for name in SESSIONSTART_HOOK_NAMES {
+            assert!(names.contains(name), "{name} missing from the default set");
+        }
         assert!(names.contains("bash_write_targets"));
         assert!(bash_pretooluse_fully_native(&names));
+    }
+
+    #[test]
+    fn session_start_answers_carry_the_exposure_line_once_opted_in() {
+        use std::process::Command;
+
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // A scratch git repo so the line is a real count, not the degrade
+        // text; CLAUDE_PROJECT_DIR is what the handler reports on.
+        let dir = std::env::temp_dir().join(format!(
+            "forge-handlers-session-start-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        Command::new("git")
+            .args(["init", "--quiet", "-b", "trunk"])
+            .current_dir(&dir)
+            .output()
+            .expect("git init");
+        Command::new("git")
+            .args(["config", "user.email", "forge@example.invalid"])
+            .current_dir(&dir)
+            .output()
+            .expect("git config");
+        Command::new("git")
+            .args(["config", "user.name", "forge"])
+            .current_dir(&dir)
+            .output()
+            .expect("git config");
+        std::fs::write(dir.join("seed.txt"), b"seed\n").unwrap();
+        Command::new("git")
+            .args(["add", "seed.txt"])
+            .current_dir(&dir)
+            .output()
+            .expect("git add");
+        Command::new("git")
+            .args(["commit", "--quiet", "-m", "seed"])
+            .current_dir(&dir)
+            .output()
+            .expect("git commit");
+        std::env::set_var("CLAUDE_PROJECT_DIR", &dir);
+
+        let empty = HashSet::new();
+        assert!(native_answers_for_session_start(&empty).is_empty());
+        let mut opted_in = HashSet::new();
+        opted_in.insert("workspace_exposure_session".to_string());
+        let answers = native_answers_for_session_start(&opted_in);
+
+        std::env::remove_var("CLAUDE_PROJECT_DIR");
+        std::fs::remove_dir_all(&dir).ok();
+        let out = answers.get("workspace_exposure_session").expect("answered");
+        assert_eq!(
+            out["hookSpecificOutput"]["hookEventName"],
+            json!("SessionStart")
+        );
+        let line = out["hookSpecificOutput"]["additionalContext"]
+            .as_str()
+            .expect("the EXPOSED line");
+        // trunk + no remote + no conductor table: one local-only commit and
+        // no integration line to judge worktrees against, so "unknown".
+        assert!(
+            line.starts_with(
+                "EXPOSED: 1 local-only commit(s), 0 stale dirty file(s), unknown finished worktree(s)"
+            ),
+            "{line}"
+        );
     }
 
     #[test]
@@ -813,6 +957,16 @@ mod tests {
     #[test]
     fn crg_refresh_report_pre_handler_is_silent_with_no_marker_file() {
         let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // `CrgRefreshReportPre.run` reads the store through `store_dir`, which
+        // prefers the process-global `CRG_DATA_DIR` -- a var THIS module's lock
+        // does not cover. `crg_refresh`'s own tests mutate it under their own
+        // lock, and two different mutexes guarding the same env var provide no
+        // mutual exclusion at all (its `pub(crate)` exists for exactly this),
+        // so take both: this module's for `CLAUDE_PROJECT_DIR`, theirs for
+        // `CRG_DATA_DIR`.
+        let _crg_guard = crate::crg_refresh::tests::ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir =
