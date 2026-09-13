@@ -222,6 +222,32 @@ fn classify<'a>(policy: &'a Policy, input: &AgentInput) -> (&'a ClassRule, &'sta
     }
 }
 
+/// The inherit-class deny message (class tier is `deny`, no `justify:` in
+/// the description). A pub fn rather than a const because `format!` takes
+/// only literal format strings -- this fn is the single source of the
+/// template, and `tests/routing_docs_sync.rs` renders it against the exact
+/// example quoted in `docs/routing.md`.
+pub fn inherit_deny_reason(class_name: &str, class_reason: &str, justify_marker: &str) -> String {
+    format!(
+        "class {class_name} ({class_reason}); policy tier is deny. To pass: prefix the description with '{justify_marker} <reason>'."
+    )
+}
+
+/// The above-tier deny message (a requested model ranking above the class's
+/// tier, no `justify:` in the description). Same single-source deal as
+/// `inherit_deny_reason`.
+pub fn above_tier_deny_reason(
+    class_name: &str,
+    class_reason: &str,
+    requested: &str,
+    class_tier: &str,
+    justify_marker: &str,
+) -> String {
+    format!(
+        "class {class_name} ({class_reason}); requested model {requested} exceeds policy tier {class_tier}. To pass: add model: \"{class_tier}\" or prefix the description with '{justify_marker} <reason>'."
+    )
+}
+
 /// The pure routing decision: classify, then compare the requested model (if
 /// any) against the class's tier, applying the `justify:` escape uniformly
 /// to both the inherit class's outright deny and a real class's
@@ -249,10 +275,7 @@ pub fn route(policy: &Policy, input: &AgentInput) -> Decision {
                 model: None,
                 cap_tokens: class.cap_tokens,
                 decision: Verdict::Deny,
-                reason: format!(
-                    "class {} ({class_reason}); policy tier is deny. To pass: prefix the description with '{} <reason>'.",
-                    class.name, policy.justify_marker
-                ),
+                reason: inherit_deny_reason(&class.name, class_reason, &policy.justify_marker),
                 policy_version: policy.policy_version.clone(),
             }
         };
@@ -318,9 +341,12 @@ pub fn route(policy: &Policy, input: &AgentInput) -> Decision {
             model: None,
             cap_tokens: class.cap_tokens,
             decision: Verdict::Deny,
-            reason: format!(
-                "class {} ({class_reason}); requested model {requested} exceeds policy tier {}. To pass: add model: \"{}\" or prefix the description with '{} <reason>'.",
-                class.name, class.tier, class.tier, policy.justify_marker
+            reason: above_tier_deny_reason(
+                &class.name,
+                class_reason,
+                requested,
+                &class.tier,
+                &policy.justify_marker,
             ),
             policy_version: policy.policy_version.clone(),
         }
@@ -537,9 +563,11 @@ mod tests {
 
     /// `FORGE_MODE` is a per-process env var read fresh by `resolve_mode`
     /// on every call; any test that sets it must serialize against every
-    /// other test in this module touching it, or a parallel `cargo test`
-    /// run races (codebase convention -- see `handlers::tests::ENV_LOCK`).
-    pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// other test touching it, or a parallel `cargo test` run races. The
+    /// lock is the crate-wide `ledger::test_env::ENV_LOCK` (cap_enforce's
+    /// and ledger::agent_upsert's tests set `FORGE_MODE` too; two mutexes
+    /// guarding one env var exclude nothing).
+    use crate::ledger::test_env::ENV_LOCK;
 
     fn policy() -> Policy {
         Policy::embedded().expect("embedded policy parses")

@@ -315,6 +315,25 @@ fn find_task_dispatch_hint(
     None
 }
 
+/// The over-cap deny message. A pub fn rather than a const because
+/// `format!` takes only literal format strings -- this fn is the single
+/// source of the template, and `tests/routing_docs_sync.rs` renders it
+/// against the exact example quoted in `docs/routing.md`.
+pub fn over_cap_reason(cap_tokens: u64, class: &str, billed_total: u64) -> String {
+    format!(
+        "over the {cap_tokens} token cap for class {class} ({billed_total} billed): stop, write your final report now; the parent will re-dispatch what is left"
+    )
+}
+
+/// The once-per-agent 80%-of-cap warning message; same single-source deal
+/// as `over_cap_reason`.
+pub fn near_cap_warning(cap_tokens: u64, class: &str, billed_total: u64) -> String {
+    format!(
+        "at {:.0}% of the {cap_tokens} token cap for class {class} ({billed_total} billed): consider wrapping up soon",
+        WARN_FRACTION * 100.0
+    )
+}
+
 /// The actual over/under-cap decision, given the now-current `billed_total`.
 /// Mutates and re-persists `state.warned` when the 80% warning fires for the
 /// first time -- a second call past 80% (but still under cap) is then a
@@ -324,10 +343,7 @@ fn find_task_dispatch_hint(
 /// 80% warning below, one flag apiece.
 fn verdict_for(state: &mut LiveState, state_path: &Path, class: &str, cap_tokens: u64) -> CapCheck {
     if state.billed_total > cap_tokens {
-        let reason = format!(
-            "over the {cap_tokens} token cap for class {class} ({} billed): stop, write your final report now; the parent will re-dispatch what is left",
-            state.billed_total
-        );
+        let reason = over_cap_reason(cap_tokens, class, state.billed_total);
         if route::resolve_mode() == "warn" {
             if state.deny_warned {
                 return CapCheck::NoOp;
@@ -352,11 +368,7 @@ fn verdict_for(state: &mut LiveState, state_path: &Path, class: &str, cap_tokens
                 state_path.display()
             );
         }
-        return CapCheck::Warn(format!(
-            "at {:.0}% of the {cap_tokens} token cap for class {class} ({} billed): consider wrapping up soon",
-            WARN_FRACTION * 100.0,
-            state.billed_total
-        ));
+        return CapCheck::Warn(near_cap_warning(cap_tokens, class, state.billed_total));
     }
     CapCheck::NoOp
 }
@@ -371,9 +383,13 @@ mod tests {
     /// every test in this module that sets either one holds this lock for
     /// its duration so a concurrently-running test can never observe a
     /// spurious `NoOp` (from `FORGE_CAP_DISABLE`) or a spurious warn-mode
-    /// verdict (from `FORGE_MODE`) it did not itself set. Same convention as
-    /// `handlers::tests::ENV_LOCK` and friends.
-    pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// verdict (from `FORGE_MODE`) it did not itself set. The lock is the
+    /// crate-wide `ledger::test_env::ENV_LOCK`, not a second mutex declared
+    /// here: route's and ledger::agent_upsert's tests set `FORGE_MODE` too,
+    /// and two different mutexes guarding the same env var provide no
+    /// mutual exclusion at all (the convention `post_tool`'s tests
+    /// document).
+    use crate::ledger::test_env::ENV_LOCK;
 
     struct ScratchDir(PathBuf);
     impl ScratchDir {

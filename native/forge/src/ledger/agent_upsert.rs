@@ -319,10 +319,12 @@ mod tests {
     #[test]
     fn the_row_carries_decision_mode_and_applied() {
         // `resolve_mode` reads `FORGE_MODE` fresh, same as `route::
-        // resolve_mode`; serialize against the same convention used
-        // elsewhere in this crate (e.g. `cap_enforce::tests::ENV_LOCK`).
-        static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        // resolve_mode`; serialize against the crate-wide lock (route's and
+        // cap_enforce's tests set it too -- a mutex declared here would
+        // exclude nothing, see `ledger::test_env`).
+        let _guard = crate::ledger::test_env::ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let scratch = ScratchDir::new("modeapplied");
         let transcript_path = scratch.path().join("agent-modefield.jsonl");

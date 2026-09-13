@@ -31,17 +31,16 @@ default posture is to require a reason.
 
 ### Deny messages
 
-Deny reasons name the class, the policy's tier for that class, and the exact
-edit that clears it:
+Deny reasons name the class, why it matched, the policy's tier for that
+class, and the exact edit that clears it. The exact strings, kept in sync
+with `route.rs` by `tests/routing_docs_sync.rs`:
 
 ```
-class general (tier sonnet, policy 2026-09-13.1): requested model 'opus' is
-above tier; add model: "sonnet" or prefix the description with justify: <reason>
+class general (subagent_type matches the class); requested model opus exceeds policy tier sonnet. To pass: add model: "sonnet" or prefix the description with 'justify: <reason>'.
 ```
 
 ```
-class inherit (tier deny, policy 2026-09-13.1): denied by default; prefix the
-description with justify: <reason> to proceed
+class inherit (subagent_type matches the inherit class); policy tier is deny. To pass: prefix the description with 'justify: <reason>'.
 ```
 
 ## `forge route`

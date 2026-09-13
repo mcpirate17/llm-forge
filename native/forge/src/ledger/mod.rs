@@ -32,6 +32,21 @@ pub fn resolve_ledger_root(out: Option<PathBuf>) -> PathBuf {
     out.or_else(|| std::env::var("LEDGER_ROOT").ok().map(PathBuf::from))
         .unwrap_or_else(|| PathBuf::from(DEFAULT_LEDGER_ROOT))
 }
+
+/// The crate-wide mutex serializing tests that mutate process-wide env
+/// vars (`FORGE_MODE` today). Lives here -- not in `route` or
+/// `cap_enforce` -- because the ledger tree is the only module set
+/// compiled into every test binary whose tests touch `FORGE_MODE`: the
+/// unit-test binary, the ledger-only integration tests (tests/ledger_*.rs,
+/// which compile agent_upsert's tests), and tests/routing_docs_sync.rs
+/// (which compiles route, cap_enforce and this tree together). Two
+/// different mutexes guarding one env var provide no mutual exclusion at
+/// all (the convention `post_tool`'s tests document).
+#[cfg(test)]
+pub(crate) mod test_env {
+    pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+}
+
 use clap::{Args, ValueEnum};
 
 use schema::InputKind;
