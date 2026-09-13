@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from conductor.bytecode_isolation import isolated_python_env
+from conductor.bytecode_isolation import (
+    cache_paths_for,
+    evict_mutated_caches,
+    isolated_python_env,
+    scratch_root_for,
+)
 
 _ISOLATION_VARS = ("PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX")
 
@@ -23,11 +28,11 @@ def _plain_env() -> dict[str, str]:
     }
 
 
-def _child(env: Mapping[str, str], cwd: Path) -> str:
-    """Import `m` in a child interpreter and report what `m.f()` returned."""
+def _child(env: Mapping[str, str], cwd: Path, code: str = "import m; print(m.f())") -> str:
+    """Run `code` in a child interpreter and report its stdout."""
 
     completed = subprocess.run(
-        [sys.executable, "-c", "import m; print(m.f())"],
+        [sys.executable, "-c", code],
         cwd=cwd,
         env=dict(env),
         capture_output=True,
@@ -36,6 +41,18 @@ def _child(env: Mapping[str, str], cwd: Path) -> str:
         check=True,
     )
     return completed.stdout.strip()
+
+
+def _pinned_mtime_write(source: Path, text: str, before: os.stat_result) -> None:
+    """Rewrite `source` the way an engine applies a mutant: keep time and size.
+
+    Keeping the file's original atime/mtime (nanosecond resolution pinned back
+    onto the new file) and matching the old byte count is exactly the rewrite
+    CPython's whole-second mtime + size cache validation cannot see.
+    """
+
+    source.write_text(text, encoding="utf-8")
+    os.utime(source, ns=(before.st_atime_ns, before.st_mtime_ns))
 
 
 def test_a_same_second_edit_runs_stale_code_until_the_env_is_isolated(
@@ -72,16 +89,21 @@ def test_a_same_second_edit_runs_stale_code_until_the_env_is_isolated(
     assert _child(isolated, tmp_path) == "2"
 
 
-def test_the_env_carries_base_plus_both_exports(tmp_path: Path) -> None:
-    """`base` survives whole, and an isolation variable in `base` is overridden."""
+def test_the_env_carries_base_plus_the_run_private_prefix(tmp_path: Path) -> None:
+    """`base` survives whole, and the no-write kill-switch is dropped from it.
 
-    base = {"KEEP": "yes", "PYTHONDONTWRITEBYTECODE": "0"}
+    Caching unmutated modules is the point of the scheme, so an inherited
+    `PYTHONDONTWRITEBYTECODE` in `base` must not survive into the child: the
+    run would quietly go back to recompiling every module of every child.
+    """
+
+    base = {"KEEP": "yes", "PYTHONDONTWRITEBYTECODE": "1"}
     env = isolated_python_env(base, tmp_path / "scratch")
 
     assert env["KEEP"] == "yes"
-    assert env["PYTHONDONTWRITEBYTECODE"] == "1"
+    assert "PYTHONDONTWRITEBYTECODE" not in env
     assert env["PYTHONPYCACHEPREFIX"] == str(tmp_path / "scratch" / "pycache")
-    assert base["PYTHONDONTWRITEBYTECODE"] == "0", "base must not be mutated"
+    assert base["PYTHONDONTWRITEBYTECODE"] == "1", "base must not be mutated"
 
 
 def test_each_scratch_names_its_own_prefix(tmp_path: Path) -> None:
@@ -105,3 +127,95 @@ def test_an_unusable_scratch_fails_loud(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="is not usable"):
         isolated_python_env({}, blocker / "pycache")
+
+
+def test_a_second_mutant_of_the_same_file_never_reads_the_firsts_bytecode(
+    tmp_path: Path,
+) -> None:
+    """Two same-size rewrites inside one mtime second, one run-private prefix.
+
+    The first child compiles the unmutated file into the prefix. The engine
+    then applies a mutant -- same size, mtime pinned to the same second -- and
+    launches the next child through `isolated_python_env` with that file named
+    as mutated. Without the per-launch eviction, CPython's (mtime, size)
+    validation accepts the first child's cache and the second mutant is graded
+    against the first one's bytes; the eviction is what makes this print 3.
+    """
+
+    source = tmp_path / "m.py"
+    source.write_text("def f(): return 1\n", encoding="utf-8")
+    before = source.stat()
+    plain = _plain_env()
+    scratch = tmp_path / "scratch"
+
+    first = isolated_python_env(plain, scratch, mutated_paths=[source])
+    assert _child(first, tmp_path) == "1"
+
+    _pinned_mtime_write(source, "def f(): return 3\n", before)
+    second = isolated_python_env(plain, scratch, mutated_paths=[source])
+    assert _child(second, tmp_path) == "3"
+
+
+def test_an_unmutated_module_is_served_from_the_prefix_on_the_second_child(
+    tmp_path: Path,
+) -> None:
+    """Everything but the mutated file compiles once per run, not per child.
+
+    Two children run against the same scratch with `m` named as mutated both
+    times; `n` is never mutated. After the first child, `n`'s `.pyc` in the
+    prefix is valid for every later child of the run: the file count after the
+    second child equals the count after the first (nothing new was compiled),
+    and `n`'s cache entry is the very same inode with the very same mtime --
+    served from the prefix, not rewritten into it.
+    """
+
+    (tmp_path / "n.py").write_text("def g(): return 7\n", encoding="utf-8")
+    source = tmp_path / "m.py"
+    source.write_text("def f(): return 1\n", encoding="utf-8")
+    before = source.stat()
+    plain = _plain_env()
+    scratch = tmp_path / "scratch"
+    code = "import m, n; print(m.f(), n.g())"
+
+    first = isolated_python_env(plain, scratch, mutated_paths=[source])
+    assert _child(first, tmp_path, code) == "1 7"
+    n_cache = cache_paths_for(tmp_path / "n.py", scratch / "pycache")[0]
+    assert n_cache.is_file(), "the first child must have cached n in the prefix"
+    n_stat = n_cache.stat()
+    count = len(list((scratch / "pycache").rglob("*.pyc")))
+
+    _pinned_mtime_write(source, "def f(): return 4\n", before)
+    second = isolated_python_env(plain, scratch, mutated_paths=[source])
+    assert _child(second, tmp_path, code) == "4 7"
+
+    assert len(list((scratch / "pycache").rglob("*.pyc"))) == count
+    again = n_cache.stat()
+    assert (again.st_ino, again.st_mtime_ns) == (n_stat.st_ino, n_stat.st_mtime_ns)
+
+
+def test_eviction_refuses_to_leave_the_runs_own_scratch(tmp_path: Path) -> None:
+    """A cache path that escapes the run's prefix fails loud instead of unlinking.
+
+    The eviction deletes files to buy immunity, so a computed path that does
+    not live under the run's own prefix is refused before anything is removed.
+    A symlink planted in the mirrored source directory makes the computed path
+    resolve outside the prefix -- the one way the mapping can be led astray.
+    """
+
+    source = tmp_path / "proj" / "m.py"
+    source.parent.mkdir()
+    source.write_text("x = 1\n", encoding="utf-8")
+    run = tmp_path / "run"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    victim = cache_paths_for(source, scratch_root_for(run) / "pycache")[0]
+    mirrored = victim.parent.parent
+    mirrored.parent.mkdir(parents=True)
+    mirrored.symlink_to(outside)
+    victim.parent.mkdir()
+    victim.write_bytes(b"stale")
+
+    with pytest.raises(RuntimeError, match="not under the run's cache prefix"):
+        evict_mutated_caches([source], scratch_root_for(run))
+    assert victim.is_file(), "a refused eviction must not delete anything"
