@@ -139,18 +139,40 @@ tracked directory; only that copy is committed.
 
 Every child command an engine spawns — the baseline suite, the engine binary
 (and the per-mutant test commands it spawns in turn), attribution's re-applied
-mutants — and the gate's two pytest collect probes run with
-`PYTHONDONTWRITEBYTECODE=1` and a fresh `PYTHONPYCACHEPREFIX` scratch, wired
-once in `mutation_engine_generated.run` (the choke point all engine children
-flow through) and `gate.preflight_pytest_config`. CPython validates a
+mutants — and the gate's two pytest collect probes run against a
+`PYTHONPYCACHEPREFIX` scratch that is private to the run, wired once in
+`mutation_engine_generated.run` (the choke point all engine children flow
+through) and `gate.preflight_pytest_config`. CPython validates a
 `__pycache__` entry by source mtime and size, so a same-size rewrite within
 one mtime second leaves a stale `.pyc` that later interpreters keep
 executing — and applying a mutant *is* a same-size same-second rewrite, which
 let a campaign grade the unmutated bytecode and report a survivor no source
 diff explained (PR #49's spurious `arithmetic_op`). With a prefix set,
 CPython stops reading beside-source caches entirely, so a stale one cannot be
-read even where it already exists; the price is one compile per module per
-run, reported as wall time in the campaign receipts.
+read even where it already exists.
+
+Only the mutated file can be stale — every other module is byte-identical
+across the mutants of one run — so PR #52 caches instead of refusing to write:
+`PYTHONDONTWRITEBYTECODE` is gone (PR #51's version set it, making every
+child recompile every module and costing the retention campaign 2.6x wall
+time), unmutated modules compile once into the run's prefix and are served
+from it after, and each mutated source's cached `.pyc` — plain, `.opt-1` and
+`.opt-2`, the paths `importlib.util.cache_from_source` maps — is evicted
+before every child launch that must not trust it (`isolated_python_env`).
+fest's subprocess backend builds each mutant's pytest command itself, so no
+launcher sits between the rewrite and the import; the adapter loads a pytest
+plugin (`conductor.mutation_pycache_evict`, via `PYTEST_ADDOPTS`) that repeats
+the eviction inside every child before collection imports anything, and
+attribution evicts around every re-applied mutant. Measured on
+`conductor-67_mutation_retention_fest_20260913` (`MUTATION_BASE=ff91c95`,
+outcomes and survivor set identical in every run):
+
+| | wall clock (median of 3) | KILLED/SURVIVED/NO_COVERAGE |
+|---|---|---|
+| pre-#51, no isolation (single run) | 51.1 s | 90/8/19 |
+| #51, refuse to write (single run) | 131.8 s | 90/8/19 |
+| #51 as merged (3 runs) | 127.67 s | 90/8/19 |
+| #52, cache + evict (3 runs) | **51.12 s** | 90/8/19 |
 
 ### Orphaned runs
 
