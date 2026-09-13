@@ -132,6 +132,13 @@ agent tokens. Stop porting; finish Phase 3, then install.
    root, the embedded routing policy, and a live hook roundtrip that
    writes nothing. One line per check, exit 1 names the broken piece.
    DONE PR #61 (`docs/install.md`, "Verify the install").
+2d. (GLM) memory_index sidecar: query built a 406 MB JSONL parse into
+   every call (measured 4.3 s on the real index); a binary f32 matrix +
+   row-offset sidecar beside the JSONL (mmap, rank all rows, seek only
+   the winners; identical top-10 on five real queries, scores within
+   1e-4) makes warm query 0.74 s end to end -- the JSON parse is gone,
+   the remaining time is process start + the embed call. DONE PR #63
+   (4.28 s -> 0.74 s median; `docs/ledger.md`, "Index layout").
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
