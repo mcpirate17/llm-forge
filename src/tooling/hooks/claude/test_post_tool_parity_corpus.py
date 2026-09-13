@@ -117,19 +117,115 @@ def _install_stub_tool(bin_dir: Path) -> None:
     stub.chmod(stub.stat().st_mode | 0o111)
 
 
+def _run_report_post(tmp: Path, label: str, seed: dict) -> dict:
+    import crg_gate as crg_gate_mod
+    import crg_graph_refresh as crg_refresh_mod
+
+    store = tmp / f"{label}-store"
+    store.mkdir()
+    if seed.get("refresh_failed"):
+        (store / "refresh.failed").write_text(seed["refresh_failed"])
+    os.environ["CRG_DATA_DIR"] = str(store)
+    importlib.reload(crg_gate_mod)
+    importlib.reload(crg_refresh_mod)
+    output = crg_refresh_mod.failure_output("PostToolUse")
+    failed_after = (
+        (store / "refresh.failed").read_text()
+        if (store / "refresh.failed").exists()
+        else None
+    )
+    return {"output": output, "failed_after": failed_after}
+
+
+def _run_graph_bash(tmp: Path, label: str, payload: dict, seed: dict, base_path: str) -> dict:
+    import crg_gate as crg_gate_mod
+    import crg_graph_refresh as crg_refresh_mod
+
+    from tooling.hooks.dispatch.adapters import GIT_TREE_REWRITE
+
+    repo = _make_repo(tmp, label)
+    bin_dir = tmp / f"{label}-bin"
+    if seed.get("stub_tool"):
+        _install_stub_tool(bin_dir)
+    else:
+        bin_dir.mkdir(parents=True, exist_ok=True)
+    store = tmp / f"{label}-crgdata"
+    store.mkdir()
+    # The scratch bin dir alone decides whether code-review-graph is
+    # installed, exactly as the generator pinned it.
+    os.environ["PATH"] = str(bin_dir)
+    os.environ["CRG_GATE_REPO_ROOT"] = str(repo)
+    os.environ["CRG_DATA_DIR"] = str(store)
+    importlib.reload(crg_gate_mod)
+    importlib.reload(crg_refresh_mod)
+    # The sleeper stands in for the real worker so the spawn is
+    # observable and inert; identical to the generator's patch. The
+    # positional parameters mirror `worker_command(body, root)` -- the
+    # call site passes both, the stand-in uses neither.
+    crg_refresh_mod.worker_command = lambda _body, _root: list(_SLEEPER)
+    tool_input = payload.get("tool_input")
+    command = (
+        str(tool_input.get("command") or "") if isinstance(tool_input, dict) else ""
+    )
+    if not command or GIT_TREE_REWRITE.search(command) is None:
+        output = {"hookSpecificOutput": {"hookEventName": "PostToolUse"}}
+    else:
+        output = crg_refresh_mod.full_update_output()
+    os.environ["PATH"] = base_path
+    pending_path = store / "refresh.pending"
+    pending = pending_path.read_text() if pending_path.exists() else None
+    return {"output": output, "pending": pending}
+
+
+def _run_read_budget(tmp: Path, label: str, payload: dict, seed: dict) -> dict:
+    import crg_gate as crg_gate_mod
+    import read_budget
+
+    gate = tmp / f"{label}-gate"
+    gate.mkdir()
+    if seed.get("ledger") is not None:
+        key = _ledger_key(payload["session_id"])
+        (gate / f"{key}.read-tokens").write_text(seed["ledger"] + "\n")
+    os.environ["CRG_GATE_STATE_DIR"] = str(gate)
+    importlib.reload(crg_gate_mod)
+    state_dir = crg_gate_mod._state_dir()
+    output = read_budget.hook_output(payload, state_dir)
+    ledger_after = None
+    if payload.get("session_id"):
+        path = state_dir / f"{_ledger_key(payload['session_id'])}.read-tokens"
+        ledger_after = path.read_text() if path.exists() else None
+    return {"output": output, "ledger_after": ledger_after}
+
+
+def _run_telemetry_path(case: dict) -> dict:
+    # `adapters._telemetry_path` verbatim: the env override, else the
+    # module's own DEFAULT_PATH (derived from the module file's location
+    # -- the inherited `<checkout>/src/research` quirk).
+    path = Path(
+        os.environ.get("CONTEXT_TELEMETRY_PATH", str(telemetry.DEFAULT_PATH))
+    )
+    if case.get("env", {}).get("CONTEXT_TELEMETRY_PATH"):
+        return {"path": str(path)}
+    try:
+        suffix = str(path.relative_to(_REPO))
+    except ValueError:
+        # A conductor already imported from elsewhere (site-packages)
+        # pins DEFAULT_PATH under its own root; the inherited suffix
+        # shape -- src/research/tmp/context_telemetry/events.jsonl -- is
+        # what both twins freeze, and the Rust one asserts it under its
+        # own scratch root via strip_prefix.
+        suffix = str(Path(*path.parts[-5:]))
+    return {"path_suffix": suffix}
+
+
 def _run_case(tmp: Path, case: dict, base_path: str):
     """Rebuild one case's state and compute its live verdict, field by field.
 
     Mirrors the fixture generator's own per-kind branches exactly (same
     reloads, same env, same monkeypatch) so whatever semantics produced the
-    frozen values hold here too.
+    frozen values hold here too. The per-kind bodies live in their own
+    helpers -- the complexity ratchet caps this dispatcher well below grade D.
     """
-    import crg_gate as crg_gate_mod
-    import crg_graph_refresh as crg_refresh_mod
-    import read_budget
-
-    from tooling.hooks.dispatch.adapters import GIT_TREE_REWRITE
-
     kind = case["kind"]
     payload = case["payload"]
     seed = case.get("seed", {})
@@ -139,103 +235,21 @@ def _run_case(tmp: Path, case: dict, base_path: str):
         os.environ[key] = value
 
     if kind == "report_post":
-        store = tmp / f"{label}-store"
-        store.mkdir()
-        if seed.get("refresh_failed"):
-            (store / "refresh.failed").write_text(seed["refresh_failed"])
-        os.environ["CRG_DATA_DIR"] = str(store)
-        importlib.reload(crg_gate_mod)
-        importlib.reload(crg_refresh_mod)
-        output = crg_refresh_mod.failure_output("PostToolUse")
-        failed_after = (
-            (store / "refresh.failed").read_text()
-            if (store / "refresh.failed").exists()
-            else None
-        )
-        return {"output": output, "failed_after": failed_after}
-
+        return _run_report_post(tmp, label, seed)
     if kind == "graph_bash":
-        repo = _make_repo(tmp, label)
-        bin_dir = tmp / f"{label}-bin"
-        if seed.get("stub_tool"):
-            _install_stub_tool(bin_dir)
-        else:
-            bin_dir.mkdir(parents=True, exist_ok=True)
-        store = tmp / f"{label}-crgdata"
-        store.mkdir()
-        # The scratch bin dir alone decides whether code-review-graph is
-        # installed, exactly as the generator pinned it.
-        os.environ["PATH"] = str(bin_dir)
-        os.environ["CRG_GATE_REPO_ROOT"] = str(repo)
-        os.environ["CRG_DATA_DIR"] = str(store)
-        importlib.reload(crg_gate_mod)
-        importlib.reload(crg_refresh_mod)
-        # The sleeper stands in for the real worker so the spawn is
-        # observable and inert; identical to the generator's patch. The
-        # positional parameters mirror `worker_command(body, root)` -- the
-        # call site passes both, the stand-in uses neither.
-        crg_refresh_mod.worker_command = lambda _body, _root: list(_SLEEPER)
-        tool_input = payload.get("tool_input")
-        command = (
-            str(tool_input.get("command") or "")
-            if isinstance(tool_input, dict)
-            else ""
-        )
-        if not command or GIT_TREE_REWRITE.search(command) is None:
-            output = {"hookSpecificOutput": {"hookEventName": "PostToolUse"}}
-        else:
-            output = crg_refresh_mod.full_update_output()
-        os.environ["PATH"] = base_path
-        pending_path = store / "refresh.pending"
-        pending = pending_path.read_text() if pending_path.exists() else None
-        return {"output": output, "pending": pending}
-
+        return _run_graph_bash(tmp, label, payload, seed, base_path)
     if kind == "read_budget":
-        gate = tmp / f"{label}-gate"
-        gate.mkdir()
-        if seed.get("ledger") is not None:
-            key = _ledger_key(payload["session_id"])
-            (gate / f"{key}.read-tokens").write_text(seed["ledger"] + "\n")
-        os.environ["CRG_GATE_STATE_DIR"] = str(gate)
-        importlib.reload(crg_gate_mod)
-        state_dir = crg_gate_mod._state_dir()
-        output = read_budget.hook_output(payload, state_dir)
-        ledger_after = None
-        if payload.get("session_id"):
-            path = state_dir / f"{_ledger_key(payload['session_id'])}.read-tokens"
-            ledger_after = path.read_text() if path.exists() else None
-        return {"output": output, "ledger_after": ledger_after}
-
+        return _run_read_budget(tmp, label, payload, seed)
     if kind == "telemetry_record":
         return {"line": _pinned_event(payload)}
-
     if kind == "telemetry_hook_context":
         return {
             "line": _pinned_hook_context(
                 seed["hook"], seed["hook_json"], payload["session_id"]
             )
         }
-
     if kind == "telemetry_path":
-        # `adapters._telemetry_path` verbatim: the env override, else the
-        # module's own DEFAULT_PATH (derived from the module file's location
-        # -- the inherited `<checkout>/src/research` quirk).
-        path = Path(
-            os.environ.get("CONTEXT_TELEMETRY_PATH", str(telemetry.DEFAULT_PATH))
-        )
-        if case.get("env", {}).get("CONTEXT_TELEMETRY_PATH"):
-            return {"path": str(path)}
-        try:
-            suffix = str(path.relative_to(_REPO))
-        except ValueError:
-            # A conductor already imported from elsewhere (site-packages)
-            # pins DEFAULT_PATH under its own root; the inherited suffix
-            # shape -- src/research/tmp/context_telemetry/events.jsonl -- is
-            # what both twins freeze, and the Rust one asserts it under its
-            # own scratch root via strip_prefix.
-            suffix = str(Path(*path.parts[-5:]))
-        return {"path_suffix": suffix}
-
+        return _run_telemetry_path(case)
     raise ValueError(f"unknown kind in corpus case {label!r}: {kind!r}")
 
 
