@@ -8,6 +8,9 @@
 //! Same `#[path]`-inclusion pattern as the other ledger integration tests:
 //! this binary crate has no lib target.
 
+#[path = "../src/json_canon.rs"]
+#[allow(dead_code)]
+mod json_canon;
 #[path = "../src/ledger/mod.rs"]
 #[allow(dead_code)]
 mod ledger;

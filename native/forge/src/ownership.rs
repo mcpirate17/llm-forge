@@ -284,12 +284,11 @@ const REQUIRED_CLAIM_FIELDS: &[&str] = &[
 ];
 
 /// Python's `sha256_json`: `sha256(json.dumps(value, sort_keys=True,
-/// separators=(",",":"), ensure_ascii=False))`. `serde_json::to_string` on a
-/// `Value` already sorts object keys (no `preserve_order` feature) and emits
-/// compact, non-ASCII-preserving output, so it matches byte-for-byte.
-fn sha256_json(value: &Value) -> String {
-    let canonical = serde_json::to_string(value).expect("Value always serializes");
-    let digest = Sha256::digest(canonical.as_bytes());
+/// separators=(",",":"), ensure_ascii=False))` -- the digest runs over
+/// `json_canon::canonical_json`'s bytes, so it stays independent of
+/// serde_json's `preserve_order` feature (see `json_canon.rs`).
+pub(crate) fn sha256_json(value: &Value) -> String {
+    let digest = Sha256::digest(crate::json_canon::canonical_json(value).as_bytes());
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
@@ -497,6 +496,25 @@ mod tests {
         assert!(paths_overlap("src/a", "src"));
         assert!(paths_overlap("src", "src/a"));
         assert!(!paths_overlap("src2", "src"));
+    }
+
+    /// The claim-id digest must not depend on map insertion order: the crate
+    /// enables serde_json's `preserve_order` (the hooks installer preserves
+    /// the host settings file's own key order), and before the explicit sort
+    /// that feature silently changed every claim id and broke the parity
+    /// corpus. The hashed bytes are Python's `json.dumps(sort_keys=True,
+    /// separators=(",",":"))` form, byte for byte.
+    #[test]
+    fn sha256_json_sorts_keys_independently_of_map_order() {
+        let sorted = serde_json::json!({"a": "1", "b": ["2", "3"], "c": {"d": "4", "e": "5"}});
+        let mut shuffled = serde_json::Map::new();
+        shuffled.insert("c".into(), serde_json::json!({"e": "5", "d": "4"}));
+        shuffled.insert("b".into(), serde_json::json!(["2", "3"]));
+        shuffled.insert("a".into(), serde_json::json!("1"));
+        assert_eq!(sha256_json(&sorted), sha256_json(&Value::Object(shuffled)));
+        let expected = Sha256::digest(br#"{"a":"1","b":["2","3"],"c":{"d":"4","e":"5"}}"#);
+        let expected: String = expected.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(sha256_json(&sorted), expected);
     }
 
     #[test]

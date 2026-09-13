@@ -178,7 +178,7 @@ fn parse_hook_command(command: &str) -> Option<ParsedHook> {
         .find_map(|t| t.strip_prefix("FORGE_MODE="))
         .unwrap_or("enforce")
         .to_string();
-    let standalone = env.iter().any(|t| *t == "FORGE_HOOK_STANDALONE=1");
+    let standalone = env.contains(&"FORGE_HOOK_STANDALONE=1");
     Some(ParsedHook {
         event: tokens[i + 1].to_string(),
         mode,

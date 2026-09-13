@@ -23,6 +23,7 @@ mod hooks_install;
 mod identity;
 mod instant;
 mod interpreter;
+mod json_canon;
 mod ledger;
 mod local_ai_policy;
 mod merge;
