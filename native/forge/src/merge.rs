@@ -415,10 +415,7 @@ mod tests {
     /// there), and SubagentStop/Stop drop even a voting hook's wrapper.
     #[test]
     fn non_schema_events_fold_to_top_level_fields_only() {
-        let quiet = merge(
-            "SessionEnd",
-            &[outcome("telemetry", json!({}), false)],
-        );
+        let quiet = merge("SessionEnd", &[outcome("telemetry", json!({}), false)]);
         assert_eq!(quiet, json!({}));
 
         let errored = HookOutcome {
@@ -429,7 +426,10 @@ mod tests {
         };
         let merged = merge("SessionEnd", &[errored]);
         assert!(merged.get("hookSpecificOutput").is_none());
-        assert!(merged["systemMessage"].as_str().unwrap().contains("rollup failed"));
+        assert!(merged["systemMessage"]
+            .as_str()
+            .unwrap()
+            .contains("rollup failed"));
 
         for event in ["SubagentStop", "Stop"] {
             let voting = outcome(

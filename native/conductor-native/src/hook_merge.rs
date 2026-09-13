@@ -270,7 +270,10 @@ mod tests {
         )
         .expect("result must be JSON");
         assert!(errored.get("hookSpecificOutput").is_none());
-        assert!(errored["systemMessage"].as_str().unwrap().contains("rollup failed"));
+        assert!(errored["systemMessage"]
+            .as_str()
+            .unwrap()
+            .contains("rollup failed"));
 
         for event in ["SubagentStop", "Stop"] {
             let result: Value = serde_json::from_str(
@@ -281,7 +284,11 @@ mod tests {
                 .expect("merge should succeed"),
             )
             .expect("result must be JSON");
-            assert_eq!(result, serde_json::json!({}), "{event} has no schema for it");
+            assert_eq!(
+                result,
+                serde_json::json!({}),
+                "{event} has no schema for it"
+            );
         }
 
         for event in ["PreToolUse", "PostToolUse", "SessionStart"] {
