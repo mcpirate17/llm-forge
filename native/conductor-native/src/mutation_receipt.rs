@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use crate::mutation_manifest::{
     lexical_absolute, python_repr, safe_relative, CampaignContract, ValueContract,
 };
+use crate::receipt_slim::expand_receipt;
 
 const RECEIPT_SCHEMA: &str = "llm.mutation-testing.receipt.v3";
 const LEGACY_RECEIPT_SCHEMA: &str = "llm.mutation-testing.receipt.v2";
@@ -653,18 +654,68 @@ fn generated_receipt_errors(
     errors
 }
 
-pub(crate) fn receipt_errors(
+/// The reviewed rule's mutant cross-check: the receipt's result rows are the
+/// manifest's chosen mutations, in order, each killed with its recorded patch
+/// digest.
+fn reviewed_mutant_errors(
+    payload: &Map<String, Value>,
+    campaign: &CampaignContract,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    let expected_ids: Vec<Value> = campaign
+        .mutations
+        .iter()
+        .map(|mutation| Value::String(mutation.id.clone()))
+        .collect();
+    if payload.get("selected_mutations").and_then(Value::as_array) != Some(&expected_ids) {
+        errors.push("selected mutation ids mismatch".to_owned());
+    }
+    match payload.get("mutants").and_then(Value::as_array) {
+        None => errors.push("mutants must be a list".to_owned()),
+        Some(rows) => {
+            let mut ordered_ids = Vec::new();
+            let mut actual: HashMap<String, &Map<String, Value>> = HashMap::new();
+            for row in rows.iter().filter_map(Value::as_object) {
+                if let Some(id) = row.get("id").and_then(Value::as_str) {
+                    if !actual.contains_key(id) {
+                        ordered_ids.push(Value::String(id.to_owned()));
+                    }
+                    actual.insert(id.to_owned(), row);
+                }
+            }
+            if ordered_ids != expected_ids {
+                errors.push("mutant result ids mismatch".to_owned());
+            }
+            for mutation in &campaign.mutations {
+                let row = actual.get(&mutation.id);
+                if row
+                    .and_then(|row| row.get("outcome"))
+                    .and_then(Value::as_str)
+                    != Some("KILLED")
+                {
+                    errors.push(format!("mutant {} was not killed", mutation.id));
+                }
+                if row
+                    .and_then(|row| row.get("patch_sha256"))
+                    .and_then(Value::as_str)
+                    != Some(mutation.patch_sha256.as_str())
+                {
+                    errors.push(format!("mutant {} patch hash mismatch", mutation.id));
+                }
+            }
+        }
+    }
+    errors
+}
+
+/// The reviewed-campaign rule (hand-authored mutations): every summary field
+/// agrees with the manifest and every named mutation is killed.
+fn reviewed_receipt_errors(
     receipt: &Receipt,
+    payload: &Map<String, Value>,
     campaign: &CampaignContract,
     context: &ValidationContext<'_>,
 ) -> Vec<String> {
-    let payload = receipt
-        .value
-        .as_object()
-        .expect("receipt loader requires object");
-    if campaign.generated {
-        return generated_receipt_errors(payload, campaign, context);
-    }
     let mut errors = Vec::new();
     let schema = payload.get("schema_version").and_then(Value::as_str);
     let anchored_legacy = schema == Some(LEGACY_RECEIPT_SCHEMA);
@@ -714,49 +765,7 @@ pub(crate) fn receipt_errors(
     if payload.get("complete_campaign") != Some(&Value::Bool(true)) {
         errors.push("partial campaign receipt".to_owned());
     }
-    let expected_ids: Vec<Value> = campaign
-        .mutations
-        .iter()
-        .map(|mutation| Value::String(mutation.id.clone()))
-        .collect();
-    if payload.get("selected_mutations").and_then(Value::as_array) != Some(&expected_ids) {
-        errors.push("selected mutation ids mismatch".to_owned());
-    }
-    match payload.get("mutants").and_then(Value::as_array) {
-        None => errors.push("mutants must be a list".to_owned()),
-        Some(rows) => {
-            let mut ordered_ids = Vec::new();
-            let mut actual: HashMap<String, &Map<String, Value>> = HashMap::new();
-            for row in rows.iter().filter_map(Value::as_object) {
-                if let Some(id) = row.get("id").and_then(Value::as_str) {
-                    if !actual.contains_key(id) {
-                        ordered_ids.push(Value::String(id.to_owned()));
-                    }
-                    actual.insert(id.to_owned(), row);
-                }
-            }
-            if ordered_ids != expected_ids {
-                errors.push("mutant result ids mismatch".to_owned());
-            }
-            for mutation in &campaign.mutations {
-                let row = actual.get(&mutation.id);
-                if row
-                    .and_then(|row| row.get("outcome"))
-                    .and_then(Value::as_str)
-                    != Some("KILLED")
-                {
-                    errors.push(format!("mutant {} was not killed", mutation.id));
-                }
-                if row
-                    .and_then(|row| row.get("patch_sha256"))
-                    .and_then(Value::as_str)
-                    != Some(mutation.patch_sha256.as_str())
-                {
-                    errors.push(format!("mutant {} patch hash mismatch", mutation.id));
-                }
-            }
-        }
-    }
+    errors.extend(reviewed_mutant_errors(payload, campaign));
     if payload.get("mutation_score").and_then(Value::as_f64) != Some(1.0) {
         errors.push("mutation score is not 1.0".to_owned());
     }
@@ -767,6 +776,33 @@ pub(crate) fn receipt_errors(
         errors.push("current source hashes drifted".to_owned());
     }
     errors
+}
+
+pub(crate) fn receipt_errors(
+    receipt: &Receipt,
+    campaign: &CampaignContract,
+    context: &ValidationContext<'_>,
+) -> Vec<String> {
+    // A slim receipt (PR #41) keeps the summary block plain but moves the bulky
+    // lists -- `mutants`, `test_value` -- under one `detail` value, and the rules
+    // below read those keys. Expand first: a plain receipt has no `detail` key
+    // and expands to itself, so pre-slim receipts validate unchanged. An
+    // expansion failure is itself the rejection, never a reason to judge the
+    // summary alone: a `superseded` pointer names the receipt that replaced this
+    // one, a corrupt blob names its own decode error, and a slim receipt read
+    // without its detail would look like a plain one that mysteriously lost its
+    // lists.
+    let expanded = match expand_receipt(&receipt.value) {
+        Ok(value) => value,
+        Err(error) => return vec![error],
+    };
+    let payload = expanded
+        .as_object()
+        .expect("receipt loader requires object");
+    if campaign.generated {
+        return generated_receipt_errors(payload, campaign, context);
+    }
+    reviewed_receipt_errors(receipt, payload, campaign, context)
 }
 
 fn scope_error(campaign: &CampaignContract, test_path: &str) -> Option<String> {

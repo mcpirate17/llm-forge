@@ -50,6 +50,22 @@ receipt the audit reads afterwards is exactly the one whose detail survived.
 `--no-audit-keep-set` falls back to newest-passing-status, right only when no
 receipt was lineage-rejected.
 
+### Slim receipts and the evidence gate
+
+The native evidence gate (`verify-evidence` behind `verify_mutation_evidence_native`
+and `validate_mutation_receipt_native`) validates a receipt through
+`receipt_errors`, which expands a slim receipt before any rule reads it — so the
+`mutants` and `test_value` lists folded under `detail` are restored for the
+ratchet cross-checks, a plain pre-slim receipt (no `detail` key) validates
+unchanged, a `superseded` pointer is rejected with `receipt superseded by
+<newer file>` and can never rank as evidence no matter what its summary says,
+and a blob that does not decode is rejected with its own decode error rather
+than judged on the summary alone. Between slice L landing the format and this
+seam being added, every tracked receipt was slim and the gate rejected them all
+with `mutants must be a non-empty list` — a real engine PASS unreadable as
+evidence; no CI job runs `verify-evidence` yet, which is why the gap went
+unnoticed (tracked as debt).
+
 ### Ratchet iterations
 
 `make mutation-engine-run` writes its receipt under
