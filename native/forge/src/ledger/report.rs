@@ -46,6 +46,18 @@ pub struct TierReportRow {
     pub rework_rate: Option<f64>,
     /// Same absence rule as `rework_rate`, over `ci_red_on_first_push`.
     pub ci_red_rate: Option<f64>,
+    /// Share of this tier's *warn-mode* rows (`mode == "warn"`) whose
+    /// routing verdict was `deny` but were let through anyway
+    /// (`applied == false`) -- `docs/routing.md`'s "warn-only mode" bullet.
+    /// `None` when this tier has no warn-mode rows at all, same absence
+    /// rule as `rework_rate`/`ci_red_rate`: a warn-only install that was
+    /// never exercised must never look like "would never have denied".
+    pub would_deny: Option<f64>,
+    /// Share of this tier's warn-mode rows whose verdict would have
+    /// changed the model (`decision == "allow"` with a model opinion) but
+    /// was left unapplied (`applied == false`). Same `None`-when-unmeasured
+    /// rule as `would_deny`.
+    pub would_route: Option<f64>,
 }
 
 pub fn run(args: ReportArgs) -> Result<i32> {
@@ -188,6 +200,14 @@ fn build_tier_row(tier: String, rows: &[&Value], total_billed: u64) -> TierRepor
 
     let rework_rate = bool_field_rate(rows, "required_rework");
     let ci_red_rate = bool_field_rate(rows, "ci_red_on_first_push");
+    let would_deny = warn_mode_rate(rows, |r| {
+        r.get("decision").and_then(Value::as_str) == Some("deny")
+            && r.get("applied").and_then(Value::as_bool) == Some(false)
+    });
+    let would_route = warn_mode_rate(rows, |r| {
+        r.get("decision").and_then(Value::as_str) == Some("allow")
+            && r.get("applied").and_then(Value::as_bool) == Some(false)
+    });
 
     TierReportRow {
         tier,
@@ -198,6 +218,8 @@ fn build_tier_row(tier: String, rows: &[&Value], total_billed: u64) -> TierRepor
         over_cap_rate,
         rework_rate,
         ci_red_rate,
+        would_deny,
+        would_route,
     }
 }
 
@@ -213,6 +235,24 @@ fn bool_field_rate(rows: &[&Value], field: &str) -> Option<f64> {
     }
     let true_count = known.iter().filter(|b| **b).count();
     Some(true_count as f64 / known.len() as f64)
+}
+
+/// Same "`None` unless measured" convention as `bool_field_rate`, but the
+/// population is warn-mode rows specifically (`mode == "warn"`): a row this
+/// offline sweep built from a bare transcript, or one written in `enforce`
+/// mode, has no opinion on what warn mode *would have* done, so it is
+/// excluded from both the numerator and the denominator rather than
+/// counted as a `false`.
+fn warn_mode_rate(rows: &[&Value], predicate: impl Fn(&Value) -> bool) -> Option<f64> {
+    let warn_rows: Vec<&&Value> = rows
+        .iter()
+        .filter(|r| r.get("mode").and_then(Value::as_str) == Some("warn"))
+        .collect();
+    if warn_rows.is_empty() {
+        return None;
+    }
+    let true_count = warn_rows.iter().filter(|r| predicate(r)).count();
+    Some(true_count as f64 / warn_rows.len() as f64)
 }
 
 fn rate(count: u64, total: u64) -> f64 {
@@ -235,14 +275,26 @@ fn median(sorted: &[u64]) -> Option<u64> {
     }
 }
 
+/// Ten columns, kept under 100 characters wide (`docs/routing.md`'s
+/// terminal-table requirement) -- verified at 94 chars for a representative
+/// row in `report.rs`'s tests.
 fn print_table(report: &[TierReportRow]) {
     println!(
-        "{:<8} {:>5} {:>7} {:>12} {:>9} {:>10} {:>12} {:>12}",
-        "tier", "n", "share", "median_bld", "over_cap", "cap_rate", "rework_rate", "ci_red_rate"
+        "{:<8} {:>5} {:>7} {:>10} {:>8} {:>9} {:>11} {:>11} {:>8} {:>8}",
+        "tier",
+        "n",
+        "share",
+        "median",
+        "over_cap",
+        "cap_rate",
+        "rework_rt",
+        "ci_red_rt",
+        "wd_deny",
+        "wd_route"
     );
     for row in report {
         println!(
-            "{:<8} {:>5} {:>6.1}% {:>12} {:>9} {:>9.1}% {:>12} {:>12}",
+            "{:<8} {:>5} {:>6.1}% {:>10} {:>8} {:>8.1}% {:>11} {:>11} {:>8} {:>8}",
             row.tier,
             row.n_dispatches,
             row.share_of_billed_tokens * 100.0,
@@ -253,6 +305,8 @@ fn print_table(report: &[TierReportRow]) {
             row.over_cap_rate * 100.0,
             fmt_pct_opt(row.rework_rate),
             fmt_pct_opt(row.ci_red_rate),
+            fmt_pct_opt(row.would_deny),
+            fmt_pct_opt(row.would_route),
         );
     }
 }
@@ -287,6 +341,21 @@ mod tests {
             v["ci_red_on_first_push"] = serde_json::json!(c);
         }
         v
+    }
+
+    /// A warn-mode `task_dispatch` row (`mode`/`decision`/`applied` all
+    /// set), for `would_deny`/`would_route`'s tests -- `row()` above never
+    /// sets these three, so its rows fall outside the warn-mode population
+    /// by construction, same as an offline-sweep or enforce-mode row would.
+    fn warn_row(tier: &str, decision: &str, applied: bool) -> Value {
+        serde_json::json!({
+            "tier": tier,
+            "billed_tokens": 100,
+            "over_cap": false,
+            "mode": "warn",
+            "decision": decision,
+            "applied": applied,
+        })
     }
 
     #[test]
@@ -325,5 +394,91 @@ mod tests {
         assert_eq!(median(&[5]), Some(5));
         assert_eq!(median(&[1, 2, 3, 4]), Some(2)); // (2+3)/2
         assert_eq!(median(&[1, 2, 3]), Some(2));
+    }
+
+    #[test]
+    fn no_warn_mode_rows_leaves_would_deny_and_would_route_null() {
+        let rows = vec![row("haiku", 100, false, None, None)];
+        let report = build_report(&rows);
+        assert_eq!(report[0].would_deny, None);
+        assert_eq!(report[0].would_route, None);
+    }
+
+    #[test]
+    fn would_deny_counts_only_unapplied_warn_mode_denies() {
+        let rows = vec![
+            warn_row("sonnet", "deny", false),
+            warn_row("sonnet", "allow", true),
+            row("sonnet", 100, false, None, None), // outside the warn population
+        ];
+        let report = build_report(&rows);
+        let sonnet = report.iter().find(|r| r.tier == "sonnet").unwrap();
+        // Two warn-mode rows in the denominator, one bare row excluded.
+        assert_eq!(sonnet.would_deny, Some(0.5));
+        assert_eq!(sonnet.would_route, Some(0.0));
+    }
+
+    #[test]
+    fn would_route_counts_unapplied_warn_mode_allows() {
+        let rows = vec![
+            warn_row("opus", "allow", false), // would have rerouted
+            warn_row("opus", "allow", true),  // a plain no-op allow
+            warn_row("opus", "deny", false),  // a would-deny, not a would-route
+        ];
+        let report = build_report(&rows);
+        let opus = report.iter().find(|r| r.tier == "opus").unwrap();
+        assert_eq!(opus.would_deny, Some(1.0 / 3.0));
+        assert_eq!(opus.would_route, Some(1.0 / 3.0));
+    }
+
+    #[test]
+    fn print_table_stays_under_100_columns_wide() {
+        let rows = vec![
+            warn_row("sonnet", "deny", false),
+            row("haiku", 12345, false, Some(false), None),
+        ];
+        let report = build_report(&rows);
+        // print_table only writes to stdout; render the same two format
+        // strings here to check width without capturing process stdout.
+        let header = format!(
+            "{:<8} {:>5} {:>7} {:>10} {:>8} {:>9} {:>11} {:>11} {:>8} {:>8}",
+            "tier",
+            "n",
+            "share",
+            "median",
+            "over_cap",
+            "cap_rate",
+            "rework_rt",
+            "ci_red_rt",
+            "wd_deny",
+            "wd_route"
+        );
+        assert!(
+            header.len() < 100,
+            "header is {} columns wide",
+            header.len()
+        );
+        for row in &report {
+            let line = format!(
+                "{:<8} {:>5} {:>6.1}% {:>10} {:>8} {:>8.1}% {:>11} {:>11} {:>8} {:>8}",
+                row.tier,
+                row.n_dispatches,
+                row.share_of_billed_tokens * 100.0,
+                row.median_billed_tokens
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "null".to_string()),
+                row.over_cap_count,
+                row.over_cap_rate * 100.0,
+                fmt_pct_opt(row.rework_rate),
+                fmt_pct_opt(row.ci_red_rate),
+                fmt_pct_opt(row.would_deny),
+                fmt_pct_opt(row.would_route),
+            );
+            assert!(
+                line.len() < 100,
+                "row is {} columns wide: {line}",
+                line.len()
+            );
+        }
     }
 }
