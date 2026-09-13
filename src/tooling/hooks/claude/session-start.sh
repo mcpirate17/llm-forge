@@ -80,4 +80,4 @@ export A2A_SUMMARY="${A2A_SUMMARY:-}"
 # passes the JSON through untouched, so hook cost shows up in the telemetry.
 "$PYTHON" -m conductor.session_preamble hook --a2a-name "$A2A_ID" \
   | python3 "$HOOK_DIR/_append_context.py" \
-  | "$PYTHON" -m conductor.context_telemetry hook-context --hook session-start
+  | "$PYTHON" -m conductor.context_telemetry hook-context --hook session-start --category instructions

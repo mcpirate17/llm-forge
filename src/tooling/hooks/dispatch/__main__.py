@@ -18,6 +18,41 @@ from tooling.hooks.dispatch import runner
 from tooling.hooks.dispatch.registry import EVENTS, settings_block
 
 
+def _session_id(raw: bytes) -> str:
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        return ""
+    session_id = payload.get("session_id") if isinstance(payload, dict) else None
+    return session_id if isinstance(session_id, str) else ""
+
+
+def _record_hook_timings(
+    event: str, outcomes: list[runner.HookOutcome], session_id: str
+) -> None:
+    """Route each hook's dispatch duration through the same ledger as the byte
+    counts (the ``_telemetry()`` wrapper convention in ``adapters.py``): never
+    let a telemetry failure break hook dispatch itself."""
+    from conductor import context_telemetry
+
+    path = context_telemetry.DEFAULT_PATH
+    for outcome in outcomes:
+        status = outcome.error or ("json" if outcome.output else "quiet")
+        try:
+            context_telemetry.record(
+                context_telemetry.hook_timing_event(
+                    event,
+                    outcome.name,
+                    outcome.elapsed_ms,
+                    status,
+                    session_id=session_id,
+                ),
+                path,
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            print(f"context telemetry unavailable: {exc}", file=sys.stderr)
+
+
 def _root(explicit: Path | None) -> Path:
     if explicit is not None:
         return explicit.resolve()
@@ -46,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"[dispatch] {outcome.name:<24} {outcome.elapsed_ms:7.1f} ms  {status}",
                 file=sys.stderr,
             )
+    _record_hook_timings(args.event, outcomes, _session_id(raw))
     real_stdout.write(json.dumps(result))
     real_stdout.write("\n")
     real_stdout.flush()

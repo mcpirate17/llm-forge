@@ -1,0 +1,92 @@
+{
+  "campaign_id": "forge-telemetry_context_telemetry_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/context_telemetry.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/context_telemetry.py": "176bbacaa186d6de62240474a981efab0e6a1c597204819e49f331bf6c876a9c"
+  },
+  "survivor_baseline": [
+    "arithmetic_op-42a447cece9a-1",
+    "arithmetic_op-a556e174d5b4-2",
+    "arithmetic_op-a556e174d5b4-4",
+    "augmented_assign-09d5e413e665-2",
+    "augmented_assign-09d5e413e665-3",
+    "augmented_assign-09d5e413e665-4",
+    "augmented_assign-09d5e413e665-5",
+    "boolean_op-447136a9970c-0",
+    "boolean_op-61f3f9af9cde-0",
+    "boolean_op-61f3f9af9cde-1",
+    "break_continue-83fd5a54270a-4",
+    "comparison_op-5ce6f68cfa56-1",
+    "constant_replace-097b639d9c43-0",
+    "constant_replace-0a38a24d17f4-0",
+    "constant_replace-0ff3842f7d8a-0",
+    "constant_replace-2f638c654978-0",
+    "constant_replace-2f638c654978-3",
+    "constant_replace-2f638c654978-5",
+    "constant_replace-355f4d3c3011-0",
+    "constant_replace-3eda1f9e0d13-1",
+    "constant_replace-56209fe0c461-0",
+    "constant_replace-607d88a0e3eb-1",
+    "constant_replace-60b99950fc09-6",
+    "constant_replace-60b99950fc09-8",
+    "constant_replace-7755ea61a6e0-0",
+    "constant_replace-9d345bfc7014-0",
+    "constant_replace-9d345bfc7014-2",
+    "constant_replace-a2b7a46e9877-0",
+    "constant_replace-af6c1b4d025e-0",
+    "constant_replace-c1766445b04f-0",
+    "constant_replace-c1766445b04f-1",
+    "constant_replace-c1766445b04f-4",
+    "constant_replace-c1766445b04f-5",
+    "constant_replace-c1766445b04f-6",
+    "constant_replace-c1766445b04f-7",
+    "constant_replace-c1766445b04f-8",
+    "constant_replace-e5fd262f7980-0",
+    "constant_replace-e9536529d861-0",
+    "constant_replace-edbd4cf2f99c-0",
+    "constant_replace-edbd4cf2f99c-1",
+    "constant_replace-f5c9ce1bfa1f-0",
+    "constant_replace-f5c9ce1bfa1f-1",
+    "constant_replace-f710a53eaca6-1",
+    "exception_swallow-1b3c981424ff-0",
+    "negate_condition-3f7918ff9883-0",
+    "negate_condition-56718bd0522f-0",
+    "negate_condition-b7e369f1a4dd-0",
+    "negate_condition-c09d4b877ad0-0",
+    "negate_condition-c7ad7d0d11f1-0",
+    "return_value-0a22348323ca-0",
+    "return_value-0b085466e225-0",
+    "return_value-0f0d2bfde460-0",
+    "return_value-88cff1f0367f-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:27:27.424244+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_context_telemetry.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_context_telemetry.py": "cdb4474a1062e4bfcdbb6a7a0a5e175ab6295f8f003d442da55701ea4a6948b7"
+  },
+  "title": "Generated mutants for src/conductor/context_telemetry.py, scored on the survivor set"
+}

@@ -1,0 +1,788 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 10,
+    "baseline_repetitions": 2,
+    "killed_mutants": 10,
+    "ranked_tests": 3,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.317491,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                                                      [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m3 passed\u001b[0m\u001b[32m in 0.05s\u001b[0m\u001b[0m\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-telemetry/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test___main__.py",
+    "--cov=src/tooling/hooks/dispatch",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "forge-telemetry_dispatch_main_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "engine_result": {
+    "duration_seconds": 2.388621,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": " \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-xww_rifr/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 79,\n        \"column\": 40,\n        \"byte_offset\": 2810,\n        \"byte_length\": 6,\n        \"original_text\": \"\\\"json\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-xww_rifr/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 79,\n        \"column\": 70,\n        \"byte_offset\": 2840,\n        \"byte_length\": 7,\n        \"original_text\": \"\\\"quiet\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-xww_rifr/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 86,\n        \"column\": 23,\n        \"byte_offset\": 3133,\n        \"byte_length\": 4,\n        \"original_text\": \"\\\"\\\\n\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-xww_rifr/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 88,\n        \"column\": 12,\n        \"byte_offset\": 3174,\n        \"byte_length\": 1,\n        \"original_text\": \"0\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-xww_rifr/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 88,\n        \"column\": 12,\n        \"byte_offset\": 3174,\n        \"byte_length\": 1,\n        \"original_text\": \"0\",\n        \"mutated_text\": \"1\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-xww_rifr/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 91,\n        \"column\": 4,\n        \"byte_offset\": 3181,\n        \"byte_length\": 22,\n        \"original_text\": \"__name__ == \\\"__main__\\\"\",\n        \"mutated_text\": \"not (__name__ == \\\"__main__\\\")\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-xww_rifr/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 91,\n        \"column\": 13,\n        \"byte_offset\": 3190,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-xww_rifr/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 91,\n        \"column\": 16,\n        \"byte_offset\": 3193,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"__main__\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 2,\n    \"nanos\": 384157133\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 10,
+    "mutants_generated": 40,
+    "mutants_tested": 11,
+    "no_coverage": 29,
+    "survived": 1,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T00:28:06.437219+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-telemetry/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/forge-telemetry_dispatch_main_fest_20260913.json",
+  "manifest_sha256": "f84f59e53c8de5e7313de5ad1cb11b22bbdc81861e969256e26ecf46c94b872b",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 392,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-bc22d9f9f958-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"``python -m tooling.hooks.dispatch <Event>``: run one hook event end to end.\n\nReads the hook payload on stdin, dispatches every registered hook for the\nevent, prints the merged JSON and exits 0. ``HOOK_DISPATCH_TRACE=1`` prints a\nper-hook timing line to stderr. ``python -m tooling.hooks.dispatch settings``\nprints the ``.claude/settings.json`` hooks block that wires every event here.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 726,
+      "duration_seconds": 0.223672,
+      "id": "exception_swallow-187a9cd5f876-0",
+      "line": 25,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "return \"\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 733,
+      "duration_seconds": 0.222344,
+      "id": "return_value-98271bbce06a-0",
+      "line": 25,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "\"\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 733,
+      "duration_seconds": 0.214284,
+      "id": "constant_replace-3261283b3ba7-0",
+      "line": 25,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 765,
+      "duration_seconds": 0.21854,
+      "id": "constant_replace-371113d096ba-0",
+      "line": 26,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"session_id\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ]
+    },
+    {
+      "byte_length": 49,
+      "byte_offset": 829,
+      "duration_seconds": 0.250392,
+      "id": "return_value-bb1731a8b7df-0",
+      "line": 27,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "session_id if isinstance(session_id, str) else \"\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 876,
+      "duration_seconds": 0.214345,
+      "id": "constant_replace-3261283b3ba7-1",
+      "line": 27,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ]
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 990,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5ea0d947fef6-0",
+      "line": 33,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Route each hook's dispatch duration through the same ledger as the byte\n    counts (the ``_telemetry()`` wrapper convention in ``adapters.py``): never\n    let a telemetry failure break hook dispatch itself.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 1309,
+      "duration_seconds": 0.214474,
+      "id": "zero_iteration_loop-844c5f4408ac-0",
+      "line": 39,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "outcomes",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_survives_a_telemetry_failure",
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_writes_one_event_per_outcome"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 1350,
+      "duration_seconds": 0.208312,
+      "id": "boolean_op-2d7e713b9e78-0",
+      "line": 40,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_survives_a_telemetry_failure",
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_writes_one_event_per_outcome"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 1354,
+      "duration_seconds": 0.213764,
+      "id": "constant_replace-52f480598cc6-0",
+      "line": 40,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"json\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_survives_a_telemetry_failure",
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_writes_one_event_per_outcome"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 1384,
+      "duration_seconds": 0.189822,
+      "id": "constant_replace-a7a6249a05cb-0",
+      "line": 40,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"quiet\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_survives_a_telemetry_failure",
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_writes_one_event_per_outcome"
+      ]
+    },
+    {
+      "byte_length": 63,
+      "byte_offset": 1792,
+      "duration_seconds": 0.213923,
+      "id": "exception_swallow-02d20ca6d017-0",
+      "line": 53,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "print(f\"context telemetry unavailable: {exc}\", file=sys.stderr)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_survives_a_telemetry_failure"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 1907,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-3650738422b4-0",
+      "line": 57,
+      "mutated_text": "not (explicit is not None)",
+      "operator": "negate_condition",
+      "original_text": "explicit is not None",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 1916,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-3b04f081e3b9-0",
+      "line": 57,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 1944,
+      "duration_seconds": 0.0,
+      "id": "return_value-1a86b60bc599-0",
+      "line": 58,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "explicit.resolve()",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 37,
+      "byte_offset": 1978,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-0c196dd4208d-0",
+      "line": 59,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "(\"PROJECT_DIR\", \"CLAUDE_PROJECT_DIR\")",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 2076,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-d3869ecce09b-0",
+      "line": 61,
+      "mutated_text": "not (value)",
+      "operator": "negate_condition",
+      "original_text": "value",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 21,
+      "byte_offset": 2102,
+      "duration_seconds": 0.0,
+      "id": "return_value-5ebba311a771-0",
+      "line": 62,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "Path(value).resolve()",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 35,
+      "byte_offset": 2135,
+      "duration_seconds": 0.0,
+      "id": "return_value-21031ce5caf0-0",
+      "line": 63,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "Path(__file__).resolve().parents[3]",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2168,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8d2095203ab0-0",
+      "line": 63,
+      "mutated_text": "4",
+      "operator": "constant_replace",
+      "original_text": "3",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 2303,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-57d76036a395-0",
+      "line": 68,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"event\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 2367,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-417ed7f20852-0",
+      "line": 69,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--project-dir\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 2451,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-1f0ff30d5164-0",
+      "line": 71,
+      "mutated_text": "not (args.event == \"settings\")",
+      "operator": "negate_condition",
+      "original_text": "args.event == \"settings\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2462,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-486c8e4a9557-0",
+      "line": 71,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 2465,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f5b9c07d13e8-0",
+      "line": 71,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"settings\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2546,
+      "duration_seconds": 0.0,
+      "id": "return_value-8732d7e6d51b-0",
+      "line": 73,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2546,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e9776c29f0ff-0",
+      "line": 73,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 37,
+      "byte_offset": 2699,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-340f7d8bad87-0",
+      "line": 77,
+      "mutated_text": "not (os.environ.get(\"HOOK_DISPATCH_TRACE\"))",
+      "operator": "negate_condition",
+      "original_text": "os.environ.get(\"HOOK_DISPATCH_TRACE\")",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 21,
+      "byte_offset": 2714,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6e3cc21248d8-0",
+      "line": 77,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"HOOK_DISPATCH_TRACE\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 2761,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-844c5f4408ac-1",
+      "line": 78,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "outcomes",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2806,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-2d7e713b9e78-1",
+      "line": 79,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 2810,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-52f480598cc6-1",
+      "line": 79,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"json\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 2840,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a7a6249a05cb-1",
+      "line": 79,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"quiet\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3133,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-20dae532d0e4-0",
+      "line": 86,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\\n\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3174,
+      "duration_seconds": 0.0,
+      "id": "return_value-8732d7e6d51b-1",
+      "line": 88,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3174,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e9776c29f0ff-1",
+      "line": 88,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 3181,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-ba2a08275624-0",
+      "line": 91,
+      "mutated_text": "not (__name__ == \"__main__\")",
+      "operator": "negate_condition",
+      "original_text": "__name__ == \"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3190,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-486c8e4a9557-1",
+      "line": 91,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3193,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-bab00a2c00fc-0",
+      "line": 91,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/__main__.py",
+      "tests_run": []
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.9090909090909091,
+  "new_survivors": [],
+  "no_coverage": 29,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 10,
+    "NO_COVERAGE": 29,
+    "SURVIVED": 1,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/forge-telemetry_dispatch_main_fest_20260913_20260913T002806Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "d3f6448839921567e1562d7237abaf62600d958339172afb7a12cab9a63dbe29"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/__main__.py": "e6e203e49847742a6a4f7c09c068912daf0e7e2a955c9ae97059c6608bdb16a1"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "constant_replace-a7a6249a05cb-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test___main__.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test___main__.py": "ccd5bae85bc255cc8802bf5a957de00e2859bc9f871acc34b2718a179aec5757"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 3,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 0
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "boolean_op-2d7e713b9e78-0": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_writes_one_event_per_outcome"
+      ],
+      "constant_replace-3261283b3ba7-0": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ],
+      "constant_replace-3261283b3ba7-1": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ],
+      "constant_replace-371113d096ba-0": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ],
+      "constant_replace-52f480598cc6-0": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_writes_one_event_per_outcome"
+      ],
+      "exception_swallow-02d20ca6d017-0": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_survives_a_telemetry_failure"
+      ],
+      "exception_swallow-187a9cd5f876-0": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ],
+      "return_value-98271bbce06a-0": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ],
+      "return_value-bb1731a8b7df-0": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json"
+      ],
+      "zero_iteration_loop-844c5f4408ac-0": [
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_survives_a_telemetry_failure",
+        "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_writes_one_event_per_outcome"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/tooling/hooks/dispatch/__main__.py"
+        ],
+        "criticality": "high",
+        "id": "forge-telemetry_dispatch_main_fest_20260913"
+      }
+    ],
+    "retained_core": [
+      "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json",
+      "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_writes_one_event_per_outcome",
+      "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_survives_a_telemetry_failure"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-telemetry_dispatch_main_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "exception_swallow-02d20ca6d017-0",
+          "zero_iteration_loop-844c5f4408ac-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_survives_a_telemetry_failure",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "exception_swallow-02d20ca6d017-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-telemetry_dispatch_main_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-2d7e713b9e78-0",
+          "constant_replace-52f480598cc6-0",
+          "zero_iteration_loop-844c5f4408ac-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test___main__.py::test_record_hook_timings_writes_one_event_per_outcome",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "boolean_op-2d7e713b9e78-0",
+          "constant_replace-52f480598cc6-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-telemetry_dispatch_main_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "constant_replace-3261283b3ba7-0",
+          "constant_replace-3261283b3ba7-1",
+          "constant_replace-371113d096ba-0",
+          "exception_swallow-187a9cd5f876-0",
+          "return_value-98271bbce06a-0",
+          "return_value-bb1731a8b7df-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test___main__.py::test_session_id_reads_the_payload_and_tolerates_bad_json",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-3261283b3ba7-0",
+          "constant_replace-3261283b3ba7-1",
+          "constant_replace-371113d096ba-0",
+          "exception_swallow-187a9cd5f876-0",
+          "return_value-98271bbce06a-0",
+          "return_value-bb1731a8b7df-0"
+        ]
+      }
+    ]
+  },
+  "unviable": 0
+}
