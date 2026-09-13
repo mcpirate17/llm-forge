@@ -12,7 +12,7 @@
 #[allow(dead_code)]
 mod ledger;
 
-use ledger::agent_upsert::{run as agent_upsert_run, AgentUpsertArgs};
+use ledger::agent_upsert::{run as agent_upsert_run, AgentRouteResolution, AgentUpsertArgs};
 use ledger::rollup::{run, today_utc_date, RollupArgs};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -398,7 +398,11 @@ fn live_upsert_then_full_sweep_yields_one_row_per_agent() {
             subagent_type: Some("general-purpose".to_string()),
             out: Some(root.clone()),
         },
-        |_| ledger::agent::DEFAULT_CAP,
+        |_| AgentRouteResolution {
+            cap_tokens: ledger::agent::DEFAULT_CAP,
+            decision: "allow".to_string(),
+            would_assign_model: false,
+        },
     )
     .expect("live SubagentStop upsert succeeds");
 
