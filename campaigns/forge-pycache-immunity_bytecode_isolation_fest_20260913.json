@@ -1,5 +1,5 @@
 {
-  "campaign_id": "forge-evidence-hash_mutation_engine_generated_fest_20260912",
+  "campaign_id": "forge-pycache-immunity_bytecode_isolation_fest_20260913",
   "environment": {},
   "generator": {
     "exclude": [
@@ -10,32 +10,28 @@
     "run_timeout_seconds": 1800,
     "seed": 0,
     "source": [
-      "src/conductor/mutation_engine_generated.py"
+      "src/conductor/bytecode_isolation.py"
     ]
   },
   "language": "python",
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/conductor/mutation_engine_generated.py": "ea45fccd07714449833e9fa408e32741b79d510d0ac5f6de8566263b394e9311"
+    "src/conductor/bytecode_isolation.py": "84baddfbea153a805441ea5028ba8452e2121b29b12810121f205dde8f9cd1bf"
   },
-  "survivor_baseline": [
-    "arithmetic_op-e0a44816bc5d-4",
-    "constant_replace-1f340b9f9e9c-0"
-  ],
+  "survivor_baseline": [],
   "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": true,
-  "survivor_baseline_recorded_at": "2026-09-12T22:47:42.874165+00:00",
+  "survivor_baseline_recorded": false,
   "test_argv": [
     "python",
     "-m",
     "pytest",
     "-q",
     "--rootdir=.",
-    "src/conductor/test_mutation_engine_generated.py"
+    "src/conductor/test_bytecode_isolation.py"
   ],
   "test_sha256": {
-    "src/conductor/test_mutation_engine_generated.py": "1536b407918ac51dfd8968dcdb96522455c026e96f6f82784bfd0b95e72ae231"
+    "src/conductor/test_bytecode_isolation.py": "e4c4311cd98eed83a7cb7754baf5df9e95d26e6d46d32743a35466d27add1cc3"
   },
-  "title": "Generated mutants for src/conductor/mutation_engine_generated.py, scored on the survivor set"
+  "title": "Generated mutants for src/conductor/bytecode_isolation.py, scored on the survivor set"
 }
