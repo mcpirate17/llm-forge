@@ -330,6 +330,27 @@
         "tooling/native/conductor-native/src/mutation_receipt.rs": "b75962e0c67452fec0dbdd6792f024dd88fef7d4238786f4de40edb96cad2bb9"
       },
       "verified_by": "Proven by re-running the one campaign whose source pins changed, not merely asserted: conductor-67_mutation_testing_support_fest_20260913 ran to PASS at the new runner (395 mutants: 90 KILLED, 0 SURVIVED, 305 NO_COVERAGE, 0 ERROR; was 306 mutants: 26 KILLED, 0 SURVIVED, 280 NO_COVERAGE) with attribution completing cleanly under the new spawn path. Per-mutant comparison of the 302 mutant ids shared by both receipts: 293 outcomes identical, 9 changed NO_COVERAGE -> KILLED (the new tests exercise constructs the old covering sets never reached), zero outcomes worsened, and every previously-killed mutant stayed killed. The 93 mutant ids new to this source: 57 KILLED, 36 NO_COVERAGE, 0 SURVIVED. Full conductor suite at the new runner: 2174 passed, 5 skipped, 0 failed."
+    },
+    {
+      "covers_diff": "tooling/native/conductor-native/src/mutation_receipt.rs (mirrored byte-identical at native/conductor-native/src/mutation_receipt.rs): receipt_errors now expands a slim receipt through receipt_slim::expand_receipt before any rule reads it, restoring the mutants/test_value lists PR #41 moved under `detail` (a plain receipt has no detail key and expands to itself; a superseded pointer or corrupt blob is returned as the rejection itself, never judged on the summary alone). The reviewed-campaign half of the old 115-line function moved verbatim into reviewed_receipt_errors/reviewed_mutant_errors -- no rule, error message or comparison changed. Native version 0.1.40 -> 0.1.41.",
+      "id": "slim-receipt-evidence-expansion-20260913",
+      "justification": "Read-side only. The change alters how the validator reads receipts, never how the engine produces them or what any receipt field means: the engine, the receipt writers and the compaction pass are untouched, and every receipt in this tree was written by the runner this map pins (the slim writers landed in #41 without touching these components). A receipt that validated before still validates -- plain receipts expand to themselves -- and the slim ones this entry keeps acceptable failed under the old reader only because it could not open their detail block at all ('mutants must be a non-empty list' against a real engine PASS).",
+      "owner": "glm",
+      "recorded_at": "2026-09-13",
+      "runner_components_sha256": {
+        "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+        "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+        "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+        "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+        "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+        "conductor/mutation_testing_support.py": "01e9af0bde00c8d659432eb0d115fba2ae5a80bc139f7c46b12a7bd375342189",
+        "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+        "conductor/snapshot_worktree.py": "fbaf4781cb73027fb336508b3fc8ec082497ced9edb6a3344e09fb40f58f37ad",
+        "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+        "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+        "tooling/native/conductor-native/src/mutation_receipt.rs": "b75962e0c67452fec0dbdd6792f024dd88fef7d4238786f4de40edb96cad2bb9"
+      },
+      "verified_by": "Proven by the gate the change exists for, on the extension rebuilt from this source: python -m conductor.mutation_testing verify-evidence src/conductor/test_mutation_testing_support.py moved from FAIL at 1039cb1 ('...130731Z.json: mutants must be a non-empty list') to status PASS naming that same receipt as evidence; before this entry was appended the same command failed 'runner component hash map mismatch', so the entry is load-bearing, not decoration. cargo test in conductor-native: 135 passed, 0 failed, including four new gate tests (slim inline, slim zstd blob, plain pre-slim unchanged, superseded rejected naming its replacement, corrupt blob failing loud with exactly its decode error)."
     }
   ],
   "schema_version": 1

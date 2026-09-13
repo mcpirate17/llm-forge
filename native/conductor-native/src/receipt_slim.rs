@@ -538,3 +538,224 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+
+#[cfg(test)]
+mod evidence_gate_tests {
+    //! The evidence gate meets slim receipts on disk. These tests drive the real
+    //! validation rule (`receipt_errors`, not just the decoder above) through
+    //! every shape the gate can find in a receipt directory: inline detail, one
+    //! zstd blob, a plain pre-slim receipt, a superseded pointer and a corrupt
+    //! blob. The gate expands before it judges, so an expansion failure is the
+    //! rejection itself -- one error, loud, never a fall-back to the summary.
+
+    use std::path::{Path, PathBuf};
+
+    use base64::Engine;
+    use serde_json::{json, Value};
+
+    use super::{slim_receipt, supersede_detail, DETAIL_KEY};
+    use crate::mutation_manifest::CampaignContract;
+    use crate::mutation_receipt::{
+        receipt_errors, AnchorConfig, Receipt, RunnerState, ValidationContext,
+    };
+
+    const MANIFEST: &str = "conductor/mutation_campaigns/subject_fest_20260906.json";
+
+    fn repo_root() -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "conductor-native-slim-gate-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ))
+    }
+
+    fn sha256_hex(bytes: &[u8]) -> String {
+        use sha2::{Digest, Sha256};
+        format!("{:x}", Sha256::digest(bytes))
+    }
+
+    /// The three files the generated rule hashes on disk, with known content;
+    /// returns the digest every binding in the receipt must carry.
+    fn ensure_binding_files(root: &Path) -> String {
+        std::fs::create_dir_all(root.join("conductor")).expect("binding directory");
+        for relative in [
+            "conductor/mutation_engine_generated.py",
+            "conductor/mutation_engine_fest.py",
+            "conductor/mutation_run_scope.py",
+        ] {
+            std::fs::write(root.join(relative), b"fixture binding\n").expect("binding file");
+        }
+        sha256_hex(b"fixture binding\n")
+    }
+
+    fn campaign() -> CampaignContract {
+        serde_json::from_value(json!({
+            "campaign_id": "subject_fest_20260906",
+            "title": "Subject under fest",
+            "language": "python",
+            "mutation_engine": "fest",
+            "expected_mutations": 0,
+            "manifest": MANIFEST,
+            "manifest_sha256": "a".repeat(64),
+            "source_sha256": {"conductor/subject.py": "b".repeat(64)},
+            "source_symbols": {},
+            "test_scopes": {},
+            "ranked_tests": [],
+            "ranked_test_paths": ["conductor/test_subject.py"],
+            "planned_mutations": [],
+            "mutations": [],
+            "test_argv": ["python", "-m", "pytest", "-q", "conductor/test_subject.py"],
+            "timeout_seconds": 900,
+            "blocked_process_substrings": [],
+            "poll_seconds": 0,
+            "environment": {},
+            "host_read_dependencies": [],
+            "value_analysis_payload": null,
+            "value_analysis": null,
+            "source_drifted": false,
+            "generated": true,
+            "survivor_baseline": [],
+            "test_sha256": {"conductor/test_subject.py": "c".repeat(64)}
+        }))
+        .expect("campaign contract")
+    }
+
+    /// A generated PASS receipt agreeing with the campaign on every pin.
+    fn full_receipt(binding: &str, mutants: Value, outcome_counts: Value) -> Value {
+        let campaign = campaign();
+        json!({
+            "schema_version": "llm.mutation-testing.receipt.v3",
+            "mutants_are_generated": true,
+            "status": "PASS",
+            "campaign_id": campaign.campaign_id,
+            "manifest": MANIFEST,
+            "manifest_sha256": campaign.manifest_sha256,
+            "source_sha256": campaign.source_sha256,
+            "test_sha256": campaign.test_sha256,
+            "core_sha256": binding,
+            "adapter_sha256": binding,
+            "scope_guard_sha256": binding,
+            "survivors": [],
+            "baseline": {"returncode": 0, "timed_out": false},
+            "mutants": mutants,
+            "outcome_counts": outcome_counts,
+            "mutation_score": 1.0
+        })
+    }
+
+    fn killed_rows(count: usize) -> Value {
+        Value::Array(
+            (0..count)
+                .map(|n| json!({"id": format!("m{n}"), "outcome": "KILLED"}))
+                .collect(),
+        )
+    }
+
+    fn outcome_counts(killed: u64) -> Value {
+        json!({"KILLED": killed, "NO_COVERAGE": 0, "UNVIABLE": 0,
+               "ERROR": 0, "SURVIVED": 0, "TIMED_OUT": 0})
+    }
+
+    /// Validate a receipt value through the gate's own seam, exactly as
+    /// `verify_mutation_evidence_native` and `validate_mutation_receipt_native`
+    /// do; no runner components on disk isolates these tests to the shapes.
+    fn gate_errors(root: &Path, value: Value) -> Vec<String> {
+        let runner = RunnerState {
+            components: None,
+            error: None,
+            mutation_testing_sha256: None,
+        };
+        let anchor = AnchorConfig {
+            repo: String::new(),
+            commit: String::new(),
+            tree: String::new(),
+            receipt_prefix: String::new(),
+            registry_path: "conductor/mutation_campaigns/registry.json".to_owned(),
+        };
+        let context = ValidationContext {
+            repo_root: root,
+            package_root: root,
+            anchor_repo: Path::new("/nonexistent"),
+            runner: &runner,
+            anchor: &anchor,
+        };
+        let receipt = Receipt {
+            path: PathBuf::new(),
+            relative: String::new(),
+            name: "slim.json".to_owned(),
+            value,
+            bytes: Vec::new(),
+            parsed_bytes_available: false,
+        };
+        receipt_errors(&receipt, &campaign(), &context)
+    }
+
+    #[test]
+    fn the_gate_validates_a_slim_pass_receipt_inline_and_compressed() {
+        let root = repo_root();
+        let binding = ensure_binding_files(&root);
+        // Inline: a small campaign's detail stays plain JSON under `detail`.
+        let small = slim_receipt(&full_receipt(&binding, killed_rows(1), outcome_counts(1)));
+        assert_eq!(small[DETAIL_KEY]["encoding"], "json");
+        assert!(small.get("mutants").is_none());
+        assert!(gate_errors(&root, small).is_empty());
+        // Compressed: 60 mutants cross the inline cut, so the detail is one
+        // zstd+base64 blob -- the shape every large tracked receipt has had
+        // since the tree was compacted.
+        let big = slim_receipt(&full_receipt(&binding, killed_rows(60), outcome_counts(60)));
+        assert_eq!(big[DETAIL_KEY]["encoding"], "zstd+base64");
+        assert!(gate_errors(&root, big).is_empty());
+    }
+
+    #[test]
+    fn the_gate_validates_a_plain_receipt_unchanged() {
+        let root = repo_root();
+        let binding = ensure_binding_files(&root);
+        let plain = full_receipt(&binding, killed_rows(1), outcome_counts(1));
+        assert!(plain.get(DETAIL_KEY).is_none());
+        assert!(gate_errors(&root, plain).is_empty());
+    }
+
+    #[test]
+    fn a_superseded_receipt_is_rejected_naming_the_replacement() {
+        let root = repo_root();
+        let binding = ensure_binding_files(&root);
+        let newer = "subject_fest_20260906_20260913T140000Z.json";
+        let mut superseded =
+            slim_receipt(&full_receipt(&binding, killed_rows(60), outcome_counts(60)));
+        superseded[DETAIL_KEY] = supersede_detail(newer);
+        // The summary block still says PASS; the pointer is the only honest
+        // verdict, and exactly it -- never a PASS, never a noise of follow-on
+        // errors from judging the summary without its detail.
+        assert_eq!(
+            gate_errors(&root, superseded),
+            vec![format!("receipt superseded by {newer}")]
+        );
+    }
+
+    #[test]
+    fn a_corrupt_detail_blob_fails_loud_with_its_decode_error() {
+        let root = repo_root();
+        let binding = ensure_binding_files(&root);
+        let basis = || slim_receipt(&full_receipt(&binding, killed_rows(60), outcome_counts(60)));
+        // Not base64 at all.
+        let mut broken = basis();
+        broken[DETAIL_KEY]["blob"] = json!("%%% not base64 %%%");
+        let found = gate_errors(&root, broken);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("detail blob is not valid base64"),
+            "{found:?}"
+        );
+        // Valid base64 that is not a zstd frame.
+        let mut garbage = basis();
+        garbage[DETAIL_KEY]["blob"] =
+            json!(base64::engine::general_purpose::STANDARD.encode(b"not a zstd frame"));
+        let found = gate_errors(&root, garbage);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("detail blob does not decompress"),
+            "{found:?}"
+        );
+    }
+}
