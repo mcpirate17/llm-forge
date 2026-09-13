@@ -35,6 +35,7 @@
     "constant_replace-b38a1b2780a1-1",
     "return_value-fa30b476fa6b-0"
   ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
   "survivor_baseline_recorded": true,
   "survivor_baseline_recorded_at": "2026-09-13T01:26:19.306581+00:00",
   "test_argv": [

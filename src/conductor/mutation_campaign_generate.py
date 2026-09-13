@@ -75,12 +75,41 @@ def _is_test(relative: str, name: str) -> bool:
     return name.startswith("test_") or name == "conftest.py" or "/tests/" in relative
 
 
+def _mirrored_tests(source: str, candidates: Sequence[str]) -> list[str]:
+    """Candidates in a test tree that mirrors the source's own package.
+
+    A module ``a/b/c.py`` pairs with ``a/b/test_c.py`` beside it, and with any
+    ``<prefix>/tests/<tail>/test_c.py`` cut from its own path -- the layouts
+    this tree uses, where tests sit either beside the module or under a
+    ``tests/`` directory of one of its ancestors. A same-basename test in an
+    unrelated package mirrors nothing: `conductor/__main__.py` and
+    `tooling/hooks/dispatch/__main__.py` each own exactly their own
+    ``test___main__.py``, and basename-only pairing once crossed them.
+    """
+    directories = PurePosixPath(source).parts[:-1]
+
+    def _mirrors(candidate: str) -> bool:
+        parts = PurePosixPath(candidate).parts[:-1]
+        if parts == directories:
+            return True  # beside the module it tests
+        return any(
+            parts == directories[:prefix] + ("tests",) + directories[tail:]
+            for prefix in range(len(directories) + 1)
+            for tail in range(prefix, len(directories) + 1)
+        )
+
+    return sorted(candidate for candidate in candidates if _mirrors(candidate))
+
+
 def python_subjects(repo_root: Path = REPO_ROOT) -> tuple[list[dict], list[dict]]:
     """Split every Python module into (has a test named for it, does not).
 
-    Two layouts coexist here: `conductor/` keeps `test_x.py` beside `x.py`, while
-    `research/tools/` and `component_fab/` keep theirs under a `tests/` directory.
-    Matching on the file name rather than the directory covers both.
+    Pairing is package-relative first: a module pairs with the ``test_<name>.py``
+    beside it or under its own ``tests/`` mirror, and only a sole same-basename
+    candidate with no mirror still pairs by name alone. Two same-basename
+    candidates with no mirror are refused naming both -- guessing there pairs
+    some other package's tests with the module and every mutant comes back
+    unreached.
 
     Name matching is a proxy, not proof: a module with no `test_<name>.py` may
     still be exercised through one that has one. It is the cheap half of the
@@ -102,10 +131,22 @@ def python_subjects(repo_root: Path = REPO_ROOT) -> tuple[list[dict], list[dict]
     unpaired: list[dict] = []
     for path in sources:
         relative = path.relative_to(repo_root).as_posix()
-        matches = tests.get(f"test_{path.name}")
+        matches = tests.get(f"test_{path.name}", [])
         record = {"source": relative, "lines": _line_count(path)}
-        if matches:
-            paired.append({**record, "tests": matches})
+        mirrored = _mirrored_tests(relative, matches)
+        if mirrored:
+            paired.append({**record, "tests": mirrored})
+        elif len(matches) == 1:
+            # One same-basename test in no mirrored tree is still the test this
+            # module has -- a legacy layout that predates the mirror rule.
+            paired.append({**record, "tests": list(matches)})
+        elif matches:
+            raise CampaignError(
+                f"{relative} has no test in its own package, and several "
+                f"unrelated files share the name test_{path.name}: "
+                f"{sorted(matches)}. Put the test beside the module (or under "
+                "its tests/ mirror) so the pairing can say which one counts."
+            )
         else:
             unpaired.append(record)
     return paired, unpaired
@@ -697,6 +738,17 @@ def _load_generated_cargo_campaign(
     return path, existing
 
 
+def _recorded_test_list(existing: Mapping[str, Any], path: Path) -> list[str]:
+    """The test list a generated campaign already recorded, in engine order."""
+    recorded = existing.get("test_sha256")
+    if not isinstance(recorded, dict) or not recorded:
+        raise CampaignError(
+            f"{path} has no recorded test list to carry forward; regenerate it "
+            "with plan/write and let the engine record a fresh baseline"
+        )
+    return sorted(str(test) for test in recorded)
+
+
 def refresh_python_campaign(campaign: str, *, repo_root: Path = REPO_ROOT) -> str:
     """Regenerate one generated Python campaign while retaining its engine baseline."""
 
@@ -712,14 +764,19 @@ def refresh_python_campaign(campaign: str, *, repo_root: Path = REPO_ROOT) -> st
     ):
         raise CampaignError(f"{path} must declare exactly one Python source to refresh")
     source = sources[0]
-    subject = next(
-        (item for item in python_subjects(repo_root)[0] if item["source"] == source),
-        None,
-    )
+    paired, unpaired = python_subjects(repo_root)
+    subject = next((item for item in paired if item["source"] == source), None)
     if subject is None:
-        raise CampaignError(
-            f"generated Python source {source!r} no longer has a named test"
-        )
+        orphan = next((item for item in unpaired if item["source"] == source), None)
+        if orphan is None:
+            raise CampaignError(
+                f"generated Python source {source!r} no longer exists in the tree"
+            )
+        # A campaign admitted with --extra-test names tests no file-name rule
+        # can re-derive; its recorded list is the authority, carried forward
+        # unchanged. Refusing here used to leave `write --force` as the only
+        # path, which resets the survivor baseline the engine is holding.
+        subject = {**orphan, "tests": _recorded_test_list(existing, path)}
     refreshed = fest_manifest(
         subject,
         campaign_id=str(existing.get("campaign_id") or path.stem),

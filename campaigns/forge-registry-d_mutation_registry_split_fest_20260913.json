@@ -1,0 +1,40 @@
+{
+  "campaign_id": "forge-registry-d_mutation_registry_split_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/mutation_registry_split.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/mutation_registry_split.py": "2b0efd2a245c9cf7e61d4f41a430ba8c1446f7bb2b366779de07eb6aecac3760"
+  },
+  "survivor_baseline": [
+    "constant_replace-4aa6a5b7e62f-1"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T03:25:23.240812+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_registry_split.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_registry_split.py": "ff14cd2be8f9a4e1a670e2033cf109af837515d8c246ed7fe2379d672f7d1f6e"
+  },
+  "title": "Generated mutants for src/conductor/mutation_registry_split.py, scored on the survivor set"
+}

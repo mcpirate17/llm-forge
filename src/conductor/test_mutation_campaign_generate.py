@@ -310,6 +310,61 @@ def test_both_test_layouts_in_this_repo_are_paired(tmp_path: Path) -> None:
     ]
 
 
+def test_same_basename_tests_in_two_packages_pair_with_their_own_modules(
+    tmp_path: Path,
+) -> None:
+    """Basename-only pairing once crossed packages and every mutant went unreached."""
+
+    tree(
+        tmp_path,
+        {
+            "src/alpha/__main__.py": "x = 1\n",
+            "src/alpha/test___main__.py": "def test_a(): pass\n",
+            "src/beta/__main__.py": "x = 2\n",
+            "src/beta/test___main__.py": "def test_b(): pass\n",
+        },
+    )
+    paired, unpaired = python_subjects(tmp_path)
+    by_source = {subject["source"]: subject["tests"] for subject in paired}
+    assert by_source["src/alpha/__main__.py"] == ["src/alpha/test___main__.py"]
+    assert by_source["src/beta/__main__.py"] == ["src/beta/test___main__.py"]
+    assert unpaired == []
+
+
+def test_an_unmirrored_basename_collision_refuses_naming_both_candidates(
+    tmp_path: Path,
+) -> None:
+    """Two unrelated same-basename tests with no mirror is a refusal, not a guess."""
+
+    tree(
+        tmp_path,
+        {
+            "pkg/subject.py": "x = 1\n",
+            "elsewhere/test_subject.py": "def test_x(): pass\n",
+            "further/test_subject.py": "def test_y(): pass\n",
+        },
+    )
+    with pytest.raises(CampaignError) as exc:
+        python_subjects(tmp_path)
+    assert "elsewhere/test_subject.py" in str(exc.value)
+    assert "further/test_subject.py" in str(exc.value)
+
+
+def test_a_sole_unmirrored_same_basename_test_still_pairs(tmp_path: Path) -> None:
+    """The legacy layout -- one test elsewhere -- keeps its pairing."""
+
+    tree(
+        tmp_path,
+        {
+            "pkg/candidate_review/policy.py": "x = 1\n",
+            "pkg/test_policy.py": "def test_x(): pass\n",
+        },
+    )
+    paired, _unpaired = python_subjects(tmp_path)
+    by_source = {subject["source"]: subject["tests"] for subject in paired}
+    assert by_source["pkg/candidate_review/policy.py"] == ["pkg/test_policy.py"]
+
+
 def test_a_subject_a_committed_campaign_already_covers_is_skipped(
     tmp_path: Path,
 ) -> None:
@@ -948,7 +1003,60 @@ def test_refresh_rebinds_a_fest_campaign_without_erasing_its_baseline(
 
     refreshed["generator"]["source"] = ["conductor/absent.py"]
     path.write_text(json.dumps(refreshed), encoding="utf-8")
-    with pytest.raises(CampaignError, match="no longer has a named test"):
+    with pytest.raises(CampaignError, match="no longer exists in the tree"):
+        refresh_python_campaign(payload["campaign_id"], repo_root=tmp_path)
+
+
+def test_refresh_carries_an_extra_test_campaign_forward_without_erasing_its_baseline(
+    tmp_path: Path,
+) -> None:
+    """An extra-test admission refreshes like any other; `--force` is not needed.
+
+    Refusing these campaigns left `write --include-covered --force` as the only
+    path, and force resets the survivor baseline the engine is holding.
+    """
+
+    tree(
+        tmp_path,
+        {
+            "conductor/_bash_quiet.py": "LIMIT = 8000\n",
+            "conductor/test_bash_quiet.py": "def test_limit(): assert True\n",
+        },
+    )
+    manifest = plan(
+        "python",
+        repo_root=tmp_path,
+        day="20260910",
+        extra_tests={"conductor/_bash_quiet.py": ["conductor/test_bash_quiet.py"]},
+    )["manifests"][0]
+    path = tmp_path / write([manifest], repo_root=tmp_path)[0]
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["survivor_baseline"] = ["engine-recorded-survivor"]
+    payload["survivor_baseline_recorded"] = True
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    (tmp_path / "conductor/_bash_quiet.py").write_text("LIMIT = 4000\n", encoding="utf-8")
+
+    assert refresh_python_campaign(payload["campaign_id"], repo_root=tmp_path) == (
+        path.relative_to(tmp_path).as_posix()
+    )
+    refreshed = json.loads(path.read_text(encoding="utf-8"))
+    assert refreshed["survivor_baseline"] == ["engine-recorded-survivor"]
+    assert refreshed["survivor_baseline_recorded"] is True
+    assert refreshed["test_argv"] == [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--rootdir=.",
+        "conductor/test_bash_quiet.py",
+    ]
+    assert list(refreshed["test_sha256"]) == ["conductor/test_bash_quiet.py"]
+    assert refreshed["source_sha256"] != payload["source_sha256"]
+
+    # A manifest that recorded no test list cannot invent one to carry forward.
+    payload["test_sha256"] = {}
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(CampaignError, match="no recorded test list"):
         refresh_python_campaign(payload["campaign_id"], repo_root=tmp_path)
 
 

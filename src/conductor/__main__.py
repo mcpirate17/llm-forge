@@ -11,6 +11,7 @@ from collections.abc import Callable, Sequence
 SUBCOMMANDS: dict[str, str] = {
     "init": "conductor.project_init",
     "bootstrap": "conductor.bootstrap",
+    "doctor": "conductor.doctor",
 }
 
 

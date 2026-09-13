@@ -1,0 +1,76 @@
+{
+  "campaign_id": "forge-harness-doctor_doctor_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/doctor.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/doctor.py": "29219e6bf5c81ba394d6e792635231bba31a3270dc7b791fa0dce4a6db80a2a2"
+  },
+  "survivor_baseline": [
+    "augmented_assign-ded260767379-0",
+    "augmented_assign-ded260767379-2",
+    "boolean_op-588eac64c6a2-2",
+    "break_continue-b46e12e9f333-0",
+    "break_continue-b46e12e9f333-2",
+    "comparison_op-4bc4b0e8a5e4-7",
+    "comparison_op-64f280cdc8c6-0",
+    "constant_replace-048c6743f67b-0",
+    "constant_replace-05a615771181-6",
+    "constant_replace-18d4ce766f6d-1",
+    "constant_replace-18d4ce766f6d-2",
+    "constant_replace-18d4ce766f6d-3",
+    "constant_replace-1aca145edc7b-0",
+    "constant_replace-32aadbc4dee9-0",
+    "constant_replace-39c687f1252f-0",
+    "constant_replace-39c687f1252f-2",
+    "constant_replace-5eb04eef0f56-0",
+    "constant_replace-72b7857335d6-0",
+    "constant_replace-79997a9437dd-2",
+    "constant_replace-79997a9437dd-5",
+    "constant_replace-87d7d0e3fc52-1",
+    "constant_replace-985e0e85c8e6-0",
+    "constant_replace-aeb4bc4cf7bb-0",
+    "constant_replace-af6fbcdb64e8-0",
+    "constant_replace-d0cf54e87c3c-0",
+    "constant_replace-d0cf54e87c3c-1",
+    "constant_replace-d0cf54e87c3c-4",
+    "constant_replace-d1e46696bae9-1",
+    "constant_replace-daef6dee9b9d-0",
+    "constant_replace-f9eb4509d796-0",
+    "constant_replace-fd00713f61b4-1",
+    "constant_replace-fe45814571c6-0",
+    "negate_condition-6388896009c3-0",
+    "negate_condition-93c15b55e676-0",
+    "negate_condition-d96607892a78-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T02:43:07.133258+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_doctor.py",
+    "src/tooling/hooks/dispatch/test_doctor.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_doctor.py": "79ccc252668438082fc3a7daafa77721d3ae1fb09222b87325c85f117d835960",
+    "src/tooling/hooks/dispatch/test_doctor.py": "ea42358a58f08508cb2e9a13a80e7b4b3c96a4695332ac5a945e61a6a7e85760"
+  },
+  "title": "Generated mutants for src/conductor/doctor.py, scored on the survivor set"
+}

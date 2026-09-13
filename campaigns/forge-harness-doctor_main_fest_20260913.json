@@ -1,0 +1,43 @@
+{
+  "campaign_id": "forge-harness-doctor_main_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/__main__.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/__main__.py": "d1ce6e9500eaba622dcf047702307868d70e24a06832fb4dae477586fd9a2483"
+  },
+  "survivor_baseline": [
+    "constant_replace-1ac10786f789-0",
+    "constant_replace-59cf04f4326b-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T02:44:09.305620+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test___main__.py",
+    "src/tooling/hooks/dispatch/test___main__.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test___main__.py": "91850f126e3542019299dc50aaeb55d6077562b999fabbe7827f1fe9b907580f",
+    "src/tooling/hooks/dispatch/test___main__.py": "ccd5bae85bc255cc8802bf5a957de00e2859bc9f871acc34b2718a179aec5757"
+  },
+  "title": "Generated mutants for src/conductor/__main__.py, scored on the survivor set"
+}
