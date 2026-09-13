@@ -478,10 +478,9 @@ pub fn cheap_exposure_counts(repo: &Path) -> Result<(usize, usize, Option<usize>
     std::thread::scope(|scope| {
         let local = scope.spawn(|| local_only_commit_count(repo));
         let stale = scope.spawn(|| stale_dirty_file_count(repo, DEFAULT_STALE_HOURS));
-        let landed = scope
-            .spawn(|| {
-                default_integration_ref(repo, false).and_then(|live| landed_worktrees(&live, repo))
-            });
+        let landed = scope.spawn(|| {
+            default_integration_ref(repo, false).and_then(|live| landed_worktrees(&live, repo))
+        });
 
         // Error precedence matches Python's sequential order: a local-only
         // failure surfaces before a stale-files failure, and a landed failure
@@ -684,7 +683,10 @@ mod tests {
         );
         // No manifest (default "main") and no local/pushed "main": only the
         // bound symref can answer, and it must arrive as the short form.
-        assert_eq!(default_integration_ref(&repo, true).unwrap(), "origin/master");
+        assert_eq!(
+            default_integration_ref(&repo, true).unwrap(),
+            "origin/master"
+        );
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
 
@@ -749,7 +751,12 @@ mod tests {
         .unwrap();
         git(
             &repo,
-            &["remote", "add", "origin", "/nonexistent/ambiguous-origin.git"],
+            &[
+                "remote",
+                "add",
+                "origin",
+                "/nonexistent/ambiguous-origin.git",
+            ],
         );
         let head = git_out(&repo, &["rev-parse", "HEAD"]).unwrap();
         for branch in ["master", "main"] {
