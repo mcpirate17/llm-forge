@@ -291,6 +291,13 @@ def test_receipts_are_indexed_by_their_declared_id_not_their_filename(
     assert sorted(index) == ["corpus", "elsewhere"]
     assert len(index["corpus"]) == 2
     assert {row["status"] for row in index["corpus"]} == {"PASS", "FAIL"}
+    # A missing directory ahead of a present one must not end the walk --
+    # `continue` mutated to `break` would load nothing and read as
+    # "no evidence for anyone", which is the silent version of a lie.
+    assert (
+        mutation_patch_audit._receipts_by_campaign(tmp_path, ["absent", "receipts"])
+        == index
+    )
 
 
 def test_a_receipt_is_evidence_only_when_a_known_runner_produced_it(

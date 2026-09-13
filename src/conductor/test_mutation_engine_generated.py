@@ -552,6 +552,19 @@ def test_a_baseline_that_died_for_want_of_python_says_so(
             note_baseline(campaign, receipt, result(tail), ["cargo", "test"], output)
         assert receipt["status"] == "BASELINE_FAILED"
 
+    # A tail carrying EVERY marker at once is the one input that tells `in`
+    # from `not in`: any partial tail leaves some marker absent, so an
+    # inverted membership test still finds a "missing" marker and returns
+    # the hint anyway. All three present, and only the honest test fires.
+    with pytest.raises(CampaignError, match="could not drive Python"):
+        note_baseline(
+            campaign,
+            receipt,
+            result("python3: not found: ModuleNotFoundError: No module named 'x'"),
+            ["cargo", "test"],
+            output,
+        )
+
     # Any other failure stays a plain refusal -- the hint must not smudge a
     # genuine red suite into an interpreter problem.
     with pytest.raises(CampaignError, match="^unmutated baseline failed"):

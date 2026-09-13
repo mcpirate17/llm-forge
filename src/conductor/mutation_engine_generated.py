@@ -393,7 +393,12 @@ _INTERPRETER_FAILURE_MARKERS = (
 
 
 def _missing_interpreter_hint(baseline: CommandResult) -> str | None:
-    """Why this baseline may have died for want of a Python interpreter."""
+    """Why this baseline may have died for want of a Python interpreter.
+
+    Falls off the end with None rather than saying `return None`: fest's
+    rewrite of the None constant is a no-op, so an explicit None is an
+    unkillable mutant that would redden the ratchet forever.
+    """
 
     recorded = baseline.as_dict()
     tails = " ".join(
@@ -407,7 +412,7 @@ def _missing_interpreter_hint(baseline: CommandResult) -> str | None:
                 "this automatically; [tool.conductor].snapshot_python "
                 "overrides which interpreter)"
             )
-    return None
+
 
 
 def note_baseline(

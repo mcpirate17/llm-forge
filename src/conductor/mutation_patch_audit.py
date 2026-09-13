@@ -240,6 +240,10 @@ def _receipt_rejection(
     symbol-by-symbol are exempt -- their whole-file digest is expected to move,
     because edits outside the pinned functions do not drift the campaign, and
     the symbol pins say so precisely.
+
+    Falls off the end with None rather than saying `return None`: fest's
+    rewrite of the None constant is a no-op, so an explicit None is an
+    unkillable mutant that would redden the ratchet forever.
     """
 
     status = receipt.get("status")
@@ -258,7 +262,6 @@ def _receipt_rejection(
     )
     if stale_sources:
         return f"source hashes differ from this tree: {stale_sources}"
-    return None
 
 
 def _evidence_verdict(
