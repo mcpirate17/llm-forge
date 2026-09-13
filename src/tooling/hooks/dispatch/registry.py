@@ -13,6 +13,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Final
 
 EVENTS: Final[tuple[str, ...]] = (
@@ -372,8 +373,30 @@ def resolve_legacy(command: str) -> HookSpec | None:
 
 
 def resolve_dispatcher(command: str) -> str | None:
-    """The event a dispatcher settings.json command names."""
+    """The event a dispatcher settings.json command names.
+
+    Two shapes count: the exact launcher command (``dispatcher_command``),
+    and ``<forge-binary> hook <Event>`` -- what ``project_init`` wires when
+    a forge binary exists. Any binary path whose file name is ``forge``
+    (project-local, ``cargo``-installed, absolute) and an optional leading
+    ``env VAR=value`` prefix (the standalone installer writes one) are both
+    accepted: forge answers natively what it can and forwards the rest to
+    this dispatcher, so it is the same wiring, not a rogue command.
+    """
     for event in EVENTS:
         if command == dispatcher_command(event):
             return event
+    tokens = command.split()
+    if tokens and tokens[0] == "env":
+        tokens = tokens[1:]
+        while tokens and "=" in tokens[0]:
+            tokens = tokens[1:]
+    if (
+        len(tokens) == 3
+        and tokens[1] == "hook"
+        and PurePath(tokens[0]).name == "forge"
+    ):
+        for event in EVENTS:
+            if tokens[2] == event:
+                return event
     return None

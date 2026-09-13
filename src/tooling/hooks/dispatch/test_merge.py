@@ -185,10 +185,43 @@ def test_updated_tool_output_last_writer_wins_and_conflict_is_loud():
 
 def test_event_name_is_always_the_dispatched_event():
     result = merge(
-        "SessionEnd",
+        "SessionStart",
         [_out("a", {"hookSpecificOutput": {"hookEventName": "PreToolUse"}})],
     )
-    assert result["hookSpecificOutput"]["hookEventName"] == "SessionEnd"
+    assert result["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+
+
+def test_schema_events_keep_hook_event_name_exactly():
+    for event in ("PreToolUse", "PostToolUse", "SessionStart"):
+        result = merge(event, [_out("a", None)])
+        assert result == {"hookSpecificOutput": {"hookEventName": event}}
+
+
+def test_session_end_never_carries_hook_specific_output():
+    # Claude Code's schema has no hookSpecificOutput for SessionEnd: 2.1.268
+    # logged a validation error on every session end until this rule. A
+    # quiet session end folds to {}.
+    result = merge(
+        "SessionEnd",
+        [
+            _out("a", None),
+            _out("b", {"hookSpecificOutput": {"hookEventName": "SessionEnd"}}),
+        ],
+    )
+    assert result == {}
+
+
+def test_subagent_stop_and_stop_never_carry_hook_specific_output():
+    # Those events' schema has no permissionDecision either, so even a voting
+    # hook folds to {} -- nothing valid to say.
+    for event in ("SubagentStop", "Stop"):
+        assert merge(event, [_out("a", _pre("deny", "no"))]) == {}
+
+
+def test_session_end_error_still_surfaces_in_system_message():
+    result = merge("SessionEnd", [_out("a", None, error="boom")])
+    assert "hookSpecificOutput" not in result
+    assert "HOOK ERROR [a]: boom" in result["systemMessage"]
 
 
 def test_non_dict_output_is_ignored_without_crashing():

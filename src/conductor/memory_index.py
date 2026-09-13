@@ -24,10 +24,14 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
 from conductor._native import (
+    memory_index_build_sidecar_native,
     memory_index_chunk_text_native,
     memory_index_metadata_native,
     memory_index_query_file_native,
+    memory_index_query_sidecar_native,
     memory_index_score_rows_native,
+    memory_index_sidecar_header_native,
+    memory_index_sidecar_is_fresh_native,
 )
 from conductor.atomic_json import write_lines_atomic
 from conductor.kb_retrieve import (
@@ -47,6 +51,10 @@ CATALOG_SCHEMA_VERSION: Final[int] = 1
 SCHEMA_VERSION: Final[int] = 3
 MAX_CHUNK_CHARS: Final[int] = 1500
 HEADING_PREFIXES: Final[tuple[str, ...]] = ("# ", "## ", "### ", "#### ")
+# Mirrors MAX_HIT_TEXT_CHARS in native/conductor-native/src/memory_index.rs:
+# hit texts are truncated to this many characters on every path.
+MAX_HIT_TEXT_CHARS: Final[int] = 500
+SIDECAR_SUFFIX: Final[str] = ".sidecar"
 
 
 @dataclass(frozen=True)
@@ -587,14 +595,43 @@ def _native_hits(
     ]
 
 
-def query_index_file(
+def _embed_query_vector(
+    query: str,
+    *,
+    embedder: Callable[[str], list[float]],
+    fingerprint: str,
+    dimension: int,
+) -> list[float]:
+    """Embed the query against the index's fingerprint and refuse a dimension
+    mismatch -- shared by the scan and sidecar paths so they cannot drift."""
+
+    if embedder is embed_text:
+        return embed_text(
+            QUERY_INSTRUCT + query.strip(),
+            purpose="query",
+            required_fingerprint=fingerprint,
+        )
+    qvec = embedder(QUERY_INSTRUCT + query.strip())
+    if len(qvec) != dimension:
+        raise RetrieveError(
+            f"query dimension {len(qvec)} != index dimension {dimension}"
+        )
+    return qvec
+
+
+def _query_index_file_scan(
     query: str,
     path: Path = INDEX_PATH,
     *,
     top_k: int = 8,
     embedder: Callable[[str], list[float]] = embed_text,
 ) -> list[dict[str, Any]]:
-    """Query a validated JSONL index without materializing vectors in Python."""
+    """The pre-sidecar full scan: parse and score every JSONL row natively.
+
+    Kept callable for the parity test against the sidecar path (and as the
+    reference implementation the sidecar must reproduce); every real query
+    goes through :func:`query_index_file` below.
+    """
 
     if not query.strip():
         raise RetrieveError("query is empty")
@@ -604,18 +641,9 @@ def query_index_file(
         fingerprint, dimension, _count = memory_index_metadata_native(str(path))
     except ValueError as exc:
         raise RetrieveError(str(exc)) from exc
-    if embedder is embed_text:
-        qvec = embed_text(
-            QUERY_INSTRUCT + query.strip(),
-            purpose="query",
-            required_fingerprint=fingerprint,
-        )
-    else:
-        qvec = embedder(QUERY_INSTRUCT + query.strip())
-    if len(qvec) != dimension:
-        raise RetrieveError(
-            f"query dimension {len(qvec)} != index dimension {dimension}"
-        )
+    qvec = _embed_query_vector(
+        query, embedder=embedder, fingerprint=fingerprint, dimension=dimension
+    )
     try:
         native_hits = memory_index_query_file_native(
             str(path), qvec, top_k, fingerprint
@@ -623,6 +651,110 @@ def query_index_file(
     except ValueError as exc:
         raise RetrieveError(str(exc)) from exc
     return _native_hits(native_hits)
+
+
+def _sidecar_path(index_path: Path) -> Path:
+    return index_path.with_name(index_path.name + SIDECAR_SUFFIX)
+
+
+def _rebuild_sidecar(index_path: Path, sidecar_path: Path) -> None:
+    """Build the sidecar once; a build failure is loud, never a silent scan."""
+
+    try:
+        rows = memory_index_build_sidecar_native(
+            str(index_path), str(sidecar_path)
+        )
+    except ValueError as exc:
+        raise RetrieveError(
+            f"cannot build the memory index sidecar for {index_path}: {exc}"
+        ) from exc
+    print(f"memory_index: building sidecar ({rows} rows)", file=sys.stderr)
+
+
+def _seek_hit_rows(
+    index_path: Path, scored: list[tuple[float, int]]
+) -> list[dict[str, Any]]:
+    """Decode only the ranked rows: seek each offset, read one line."""
+
+    hits: list[dict[str, Any]] = []
+    with index_path.open("rb") as handle:
+        for score, offset in scored:
+            handle.seek(offset)
+            line = handle.readline()
+            row = _decode_index_row(line.decode("utf-8"))
+            for field in ("source", "path", "title", "text"):
+                if not isinstance(row.get(field), str):
+                    raise RetrieveError(
+                        f"memory index row {row.get('path')!r} "
+                        f"field {field!r} must be a string"
+                    )
+            hits.append(
+                {
+                    "score": score,
+                    "source": row["source"],
+                    "path": row["path"],
+                    "title": row["title"],
+                    "text": row["text"][:MAX_HIT_TEXT_CHARS],
+                }
+            )
+    return hits
+
+
+def _rank_and_seek(
+    sidecar: Path,
+    index_path: Path,
+    qvec: list[float],
+    candidates: int,
+) -> list[dict[str, Any]]:
+    try:
+        scored = memory_index_query_sidecar_native(
+            str(sidecar), qvec, candidates
+        )
+    except ValueError as exc:
+        raise RetrieveError(str(exc)) from exc
+    return _seek_hit_rows(index_path, scored)
+
+
+def query_index_file(
+    query: str,
+    path: Path = INDEX_PATH,
+    *,
+    top_k: int = 8,
+    embedder: Callable[[str], list[float]] = embed_text,
+) -> list[dict[str, Any]]:
+    """Query a validated JSONL index via its binary embedding sidecar.
+
+    Every row is ranked from an mmap of the sidecar's f32 matrix and the
+    JSONL is seeked only for the winning rows' payloads (``docs/ledger.md``
+    "Index layout"); a missing or stale sidecar is rebuilt first, one stderr
+    line per build. The full-parse path this replaces lives on as
+    ``_query_index_file_scan``, the parity reference.
+    """
+
+    if not query.strip():
+        raise RetrieveError("query is empty")
+    if top_k < 1:
+        raise RetrieveError("top_k must be >= 1")
+    sidecar = _sidecar_path(path)
+    if not memory_index_sidecar_is_fresh_native(str(path), str(sidecar)):
+        _rebuild_sidecar(path, sidecar)
+    try:
+        fingerprint, dimension, rows = memory_index_sidecar_header_native(
+            str(sidecar)
+        )
+    except ValueError as exc:
+        raise RetrieveError(str(exc)) from exc
+    qvec = _embed_query_vector(
+        query, embedder=embedder, fingerprint=fingerprint, dimension=dimension
+    )
+    candidates = max(top_k * 8, 64)
+    hits = _rank_and_seek(sidecar, path, qvec, candidates)
+    if len(hits) < top_k and candidates < rows:
+        # Nothing filters the ranked rows today; if a scope filter returns to
+        # this seam, one widening pass keeps small top_k honest, then return
+        # what there is.
+        hits = _rank_and_seek(sidecar, path, qvec, min(candidates * 4, rows))
+    return hits[:top_k]
 
 
 @contextmanager

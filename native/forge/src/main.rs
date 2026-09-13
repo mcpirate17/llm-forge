@@ -42,6 +42,7 @@ mod session_preamble;
 mod session_policy;
 mod subagent_stop;
 mod subagent_transcript;
+mod takeover;
 mod telemetry;
 mod tool_quiet;
 mod workspace_hygiene;

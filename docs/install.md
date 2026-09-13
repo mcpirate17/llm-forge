@@ -64,6 +64,43 @@ flags were), prints what it removed, and deliberately leaves the backup in
 place — rollback is either `uninstall` or restoring
 `.claude/settings.pre-forge.bak.json` by hand.
 
+## Take over from the Python dispatcher
+
+A host that runs llm-forge's Python tooling alongside forge (i.e. installed
+without `--standalone`, or hand-wired with both) pays for `dispatch.py
+<Event>` (~40-50 ms, interpreter start included) *and* forge (~1-3 ms) on
+every hook event, even for events forge already answers on its own.
+`--takeover` removes that duplication for events where nothing is lost:
+
+```
+forge hooks install --host <project-root> --mode warn --takeover
+```
+
+`--takeover` implies `--standalone`. For each event, `forge hooks
+install` asks `native/forge/src/takeover.rs::coverage(event, tool_matcher)`
+whether every Python hook that event's host matcher would run has a native
+twin:
+
+- **Full** (`PostToolUse` today — see the coverage table below): the
+  host's Python dispatcher entry (`.../dispatch.py <Event>` or
+  `python -m tooling.hooks.dispatch <Event>`) is removed and recorded
+  **verbatim** in `.claude/settings.forge-takeover.json` (created once;
+  re-running `--takeover` merges into it and never blind-overwrites an
+  entry it already recorded), and a forge entry for that event is ensured.
+- **Partial** (`PreToolUse`, `SessionStart`, `SessionEnd` today): the
+  Python entry is left completely untouched and reported as `kept python:
+  <event> (missing: …)` — naming the Python hook names that have no
+  native twin yet, or, for `PreToolUse`+`Bash`, naming why: forge's
+  standalone entrypoint never invokes the Bash guard logic at all (see
+  the coverage table's note below).
+
+`--dry-run` prints what would change without writing anything.
+`forge hooks status` gains a `python: present|taken-over|n/a` column so a
+re-run (or a different operator) can see at a glance which events still
+run Python. `forge hooks uninstall` restores every recorded Python entry
+verbatim and deletes `.claude/settings.forge-takeover.json` — the same
+rollback command works whether or not `--takeover` was ever used.
+
 ## Verify the install
 
 ```
@@ -95,3 +132,11 @@ PASS hook-roundtrip: exit 0, stdout empty, 1 ms
 "detail"}], "ok"}` object. Exit 1 means: fix whatever the one `FAIL` line
 names — that line is the broken piece, not a suggestion to re-run install
 blind (`forge hooks status` remains the narrower settings-only check).
+
+## Known host issues fixed
+
+SessionEnd/SubagentStop/Stop no longer emit `hookSpecificOutput` (Claude
+Code 2.1.268 rejected it); the hook doctor no longer calls a compiled
+`forge` binary "dead" for lacking a shebang; a mutation receipt's filename
+now always carries the receipt's own `generated_at`, not a second clock
+read.
