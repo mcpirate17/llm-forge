@@ -6,7 +6,6 @@
       "**/test_*.py",
       "**/conftest.py"
     ],
-    "mutant_timeout_seconds": 30,
     "operators": [],
     "run_timeout_seconds": 1800,
     "seed": 0,
@@ -18,7 +17,7 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/conductor/snapshot_worktree.py": "c7b93a242cbc3d4dbd0a9410401b4a1c79f1024abbd877d3c0ae7370c259085b"
+    "src/conductor/snapshot_worktree.py": "fbaf4781cb73027fb336508b3fc8ec082497ced9edb6a3344e09fb40f58f37ad"
   },
   "survivor_baseline": [
     "constant_replace-6049030ad2fa-0",
@@ -28,6 +27,7 @@
     "constant_replace-f02fa060c4b7-0",
     "constant_replace-fbd3ad0c7efb-0"
   ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
   "survivor_baseline_recorded": true,
   "survivor_baseline_recorded_at": "2026-09-13T01:51:03.702972+00:00",
   "test_argv": [
@@ -39,7 +39,7 @@
     "src/conductor/test_snapshot_worktree.py"
   ],
   "test_sha256": {
-    "src/conductor/test_snapshot_worktree.py": "f01c1ae41c032238fe5ed70affc729dd2f1cd417375e9627b6903dc934810b47"
+    "src/conductor/test_snapshot_worktree.py": "d62aa4e35c45c53fc7a216869dd7075481e1b370baae5bcc38d5b7ff771adb74"
   },
   "title": "Generated mutants for src/conductor/snapshot_worktree.py, scored on the survivor set"
 }

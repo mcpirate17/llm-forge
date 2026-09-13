@@ -1,0 +1,72 @@
+{
+  "campaign_id": "forge-audit-stale-evidence_gate_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/gate.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/gate.py": "ca8fb5978cc140c1a8b655b005f400a3217b981cb5cade609301a31c0ea12b68"
+  },
+  "survivor_baseline": [
+    "boolean_op-4df6c0016597-3",
+    "boolean_op-d91994b5514e-3",
+    "break_continue-ac48a7448969-1",
+    "break_continue-ac48a7448969-2",
+    "constant_replace-00d12f84c21c-1",
+    "constant_replace-0e7eff279d55-0",
+    "constant_replace-14df621766de-0",
+    "constant_replace-1540ed067553-0",
+    "constant_replace-31d04a820829-0",
+    "constant_replace-47720beabca0-0",
+    "constant_replace-47720beabca0-1",
+    "constant_replace-62417994bc92-1",
+    "constant_replace-8b3bb9b8c1ca-0",
+    "constant_replace-97d5dcaeb6cb-0",
+    "constant_replace-9837f2ee8794-0",
+    "constant_replace-98588cf04da7-0",
+    "constant_replace-bb320a212e25-0",
+    "constant_replace-c0e2bcc0161f-0",
+    "constant_replace-c5df00dce804-5",
+    "constant_replace-c7567a692cea-0",
+    "constant_replace-f106a17924d3-1",
+    "constant_replace-f107c92f0caa-0",
+    "negate_condition-7cdc09880152-0",
+    "return_value-082a1b6a4332-0",
+    "unary_op-7a66a9dc6ba5-0",
+    "unary_op-7a66a9dc6ba5-2",
+    "unary_op-8b6f0261105f-0",
+    "unary_op-8b6f0261105f-2",
+    "unary_op-999a617b625f-0",
+    "unary_op-999a617b625f-2",
+    "zero_iteration_loop-15fdd84c3928-0",
+    "zero_iteration_loop-5565c3815896-0",
+    "zero_iteration_loop-6394f9be3767-1"
+  ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T05:13:41.570488+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_gate.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_gate.py": "749b247962b975e36e035afeef6d34ebb2289d7c4a67285adf70802b5f180cae"
+  },
+  "title": "Generated mutants for src/conductor/gate.py, scored on the survivor set"
+}
