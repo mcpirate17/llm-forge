@@ -4,7 +4,9 @@
 //! retaining block text past this boundary.
 
 pub mod reader;
+pub mod rollup;
 pub mod schema;
+pub mod writer;
 
 use std::path::{Path, PathBuf};
 
