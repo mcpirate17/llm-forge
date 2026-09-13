@@ -64,6 +64,15 @@
       "manifest": "campaigns/forge-integration-branch_workspace_hygiene_fest_20260913.json"
     },
     {
+      "manifest": "campaigns/forge-rust-bash-guard_forge_cargo_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-rust-bash-guard_registry_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-rust-bash-guard_runner_fest_20260913.json"
+    },
+    {
       "manifest": "campaigns/conductor-67_bash_quiet_fest_20260913.json"
     },
     {

@@ -1,0 +1,617 @@
+[
+  {
+    "command": "git push --force origin master",
+    "blocked": true,
+    "reason": "BLOCKED: git push --force. Use --force-with-lease if you must, or ask the user.",
+    "write_targets": []
+  },
+  {
+    "command": "git push -f origin master",
+    "blocked": true,
+    "reason": "BLOCKED: git push --force. Use --force-with-lease if you must, or ask the user.",
+    "write_targets": []
+  },
+  {
+    "command": "git push --force-with-lease origin master",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "git push origin master",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "git reset --hard HEAD~1",
+    "blocked": true,
+    "reason": "BLOCKED: git reset --hard destroys uncommitted work. Stash or commit first.",
+    "write_targets": []
+  },
+  {
+    "command": "cd /tmp && git reset --hard",
+    "blocked": true,
+    "reason": "BLOCKED: git reset --hard destroys uncommitted work. Stash or commit first.",
+    "write_targets": []
+  },
+  {
+    "command": "git reset --soft HEAD~1",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "git clean -fd",
+    "blocked": true,
+    "reason": "BLOCKED: git clean deletes untracked files permanently. Be specific about what to remove.",
+    "write_targets": []
+  },
+  {
+    "command": "git clean -fdx",
+    "blocked": true,
+    "reason": "BLOCKED: git clean deletes untracked files permanently. Be specific about what to remove.",
+    "write_targets": []
+  },
+  {
+    "command": "git clean --force",
+    "blocked": true,
+    "reason": "BLOCKED: git clean deletes untracked files permanently. Be specific about what to remove.",
+    "write_targets": []
+  },
+  {
+    "command": "git clean --dry-run",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "rm -rf /",
+    "blocked": true,
+    "reason": "BLOCKED: Dangerous recursive delete target.",
+    "write_targets": []
+  },
+  {
+    "command": "rm -rf /home/tim/stuff",
+    "blocked": true,
+    "reason": "BLOCKED: Dangerous recursive delete target.",
+    "write_targets": []
+  },
+  {
+    "command": "rm -rf ~/important",
+    "blocked": true,
+    "reason": "BLOCKED: Dangerous recursive delete target.",
+    "write_targets": [
+      "~/important"
+    ]
+  },
+  {
+    "command": "rm -r ../sibling",
+    "blocked": true,
+    "reason": "BLOCKED: Dangerous recursive delete target.",
+    "write_targets": []
+  },
+  {
+    "command": "rm -rf ./build",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "build"
+    ]
+  },
+  {
+    "command": "rm -rf research/tmp/scratch",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "research/tmp/scratch"
+    ]
+  },
+  {
+    "command": "rm -f /tmp/single_file.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "pip install numpy",
+    "blocked": true,
+    "reason": "BLOCKED: Use 'uv pip install' instead of raw pip.",
+    "write_targets": []
+  },
+  {
+    "command": "python -m pip install numpy",
+    "blocked": true,
+    "reason": "BLOCKED: Use 'uv pip install' instead of raw pip.",
+    "write_targets": []
+  },
+  {
+    "command": "python3 -m pip install numpy",
+    "blocked": true,
+    "reason": "BLOCKED: Use 'uv pip install' instead of raw pip.",
+    "write_targets": []
+  },
+  {
+    "command": "uv pip install numpy",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "python3 -m research.tools.rotate_current_work --apply",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "bash -c \"git push --force\"",
+    "blocked": true,
+    "reason": "BLOCKED: git push --force. Use --force-with-lease if you must, or ask the user.",
+    "write_targets": []
+  },
+  {
+    "command": "sh -c 'git reset --hard'",
+    "blocked": true,
+    "reason": "BLOCKED: git reset --hard destroys uncommitted work. Stash or commit first.",
+    "write_targets": []
+  },
+  {
+    "command": "bash -c \"ls -la\"",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "ls; git reset --hard",
+    "blocked": true,
+    "reason": "BLOCKED: git reset --hard destroys uncommitted work. Stash or commit first.",
+    "write_targets": []
+  },
+  {
+    "command": "true && rm -rf /etc",
+    "blocked": true,
+    "reason": "BLOCKED: Dangerous recursive delete target.",
+    "write_targets": []
+  },
+  {
+    "command": "echo a || git push --force origin x",
+    "blocked": true,
+    "reason": "BLOCKED: git push --force. Use --force-with-lease if you must, or ask the user.",
+    "write_targets": []
+  },
+  {
+    "command": "ls -la && echo done",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "echo '{\"tool_input\":{\"command\":\"git push --force origin master\"}}' | ./hook.sh",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "echo \"git reset --hard is blocked\"",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "grep -rn \"git clean -fd\" docs/",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "git push --force origin master \"oops",
+    "blocked": true,
+    "reason": "BLOCKED (git push --force): command could not be parsed, matched conservatively.",
+    "write_targets": []
+  },
+  {
+    "command": "git reset --hard \"oops",
+    "blocked": true,
+    "reason": "BLOCKED (git reset --hard): command could not be parsed, matched conservatively.",
+    "write_targets": []
+  },
+  {
+    "command": "echo \"hello",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "cat file.txt | tee output.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "output.txt"
+    ]
+  },
+  {
+    "command": "echo hi | tee -a log.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "log.txt"
+    ]
+  },
+  {
+    "command": "(cd /tmp && rm -rf scratch)",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "scratch",
+      ")"
+    ]
+  },
+  {
+    "command": "(git push --force origin main)",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "cat <<EOF > notes.txt\nhello\nEOF",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "notes.txt"
+    ]
+  },
+  {
+    "command": "cat <<'EOF' | python3\nprint('hi')\nEOF",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "true && echo ok",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "false || echo fallback",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "echo a; echo b; git reset --hard",
+    "blocked": true,
+    "reason": "BLOCKED: git reset --hard destroys uncommitted work. Stash or commit first.",
+    "write_targets": []
+  },
+  {
+    "command": "echo 'git push --force' > /tmp/log.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "grep \"rm -rf /\" README.md",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "tee -a build.log <<< 'line'",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "build.log",
+      "<<<",
+      "line"
+    ]
+  },
+  {
+    "command": "sed -i 's/a/b/' config.toml",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "config.toml"
+    ]
+  },
+  {
+    "command": "sed -i.bak 's/a/b/' config.toml",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "config.toml"
+    ]
+  },
+  {
+    "command": "sed -n '1,5p' config.toml",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "dd if=/dev/zero of=disk.img bs=1M count=1",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "disk.img"
+    ]
+  },
+  {
+    "command": "git apply patch.diff",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "patch.diff"
+    ]
+  },
+  {
+    "command": "git checkout -- file.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "file.txt"
+    ]
+  },
+  {
+    "command": "git restore file.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "file.txt"
+    ]
+  },
+  {
+    "command": "git stash pop",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "pop"
+    ]
+  },
+  {
+    "command": "git status",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "git diff HEAD~1",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "git log --oneline",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "python -c \"open('out.txt','w').write('x')\"",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "out.txt"
+    ]
+  },
+  {
+    "command": "python3 -c \"import os; os.remove('tmp.txt')\"",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "tmp.txt"
+    ]
+  },
+  {
+    "command": "uv run python script.py",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "uv run pytest tests/",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "uv pip install -e .",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "cp a.txt b.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "b.txt"
+    ]
+  },
+  {
+    "command": "cp -r src/ dest/",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "dest"
+    ]
+  },
+  {
+    "command": "mv old.txt new.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "new.txt"
+    ]
+  },
+  {
+    "command": "install -m 644 file.txt /usr/local/bin/",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "ln -s target.txt link.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "link.txt"
+    ]
+  },
+  {
+    "command": "rsync -av src/ dest/",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "dest"
+    ]
+  },
+  {
+    "command": "touch newfile.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "newfile.txt"
+    ]
+  },
+  {
+    "command": "truncate -s 0 bigfile.log",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "bigfile.log"
+    ]
+  },
+  {
+    "command": "shred -u secret.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "secret.txt"
+    ]
+  },
+  {
+    "command": "for f in a.txt b.txt c.txt; do rm \"$f\"; done",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "a.txt",
+      "b.txt",
+      "c.txt"
+    ]
+  },
+  {
+    "command": "for f in x.log y.log; do cp \"$f\" backup/; done",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "backup"
+    ]
+  },
+  {
+    "command": "cd src && cat file.txt > out.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "src/out.txt"
+    ]
+  },
+  {
+    "command": "cd /tmp && echo done > note.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "echo test 2>&1 | tee combined.log",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "combined.log"
+    ]
+  },
+  {
+    "command": "cat a.txt >> combined.log",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "combined.log"
+    ]
+  },
+  {
+    "command": "bash -c 'cd /tmp && rm -rf scratch'",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "scratch"
+    ]
+  },
+  {
+    "command": "sh -c 'echo ok > /tmp/x.txt'",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "python3 -m pip install --upgrade pip",
+    "blocked": true,
+    "reason": "BLOCKED: Use 'uv pip install' instead of raw pip.",
+    "write_targets": []
+  },
+  {
+    "command": "pip3 install requests",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "npm install",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "cargo build --release",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "git push origin --force-with-lease=refs/heads/main",
+    "blocked": true,
+    "reason": "BLOCKED: git push --force. Use --force-with-lease if you must, or ask the user.",
+    "write_targets": []
+  },
+  {
+    "command": "rm --recursive --force /var/tmp/x",
+    "blocked": true,
+    "reason": "BLOCKED: Dangerous recursive delete target.",
+    "write_targets": []
+  },
+  {
+    "command": "rm -Rf /opt/data",
+    "blocked": true,
+    "reason": "BLOCKED: Dangerous recursive delete target.",
+    "write_targets": []
+  },
+  {
+    "command": "cat file1 file2 > merged.txt",
+    "blocked": false,
+    "reason": null,
+    "write_targets": [
+      "merged.txt"
+    ]
+  },
+  {
+    "command": "echo hello > /dev/null",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  },
+  {
+    "command": "printf 'x' > /dev/stdout",
+    "blocked": false,
+    "reason": null,
+    "write_targets": []
+  }
+]
