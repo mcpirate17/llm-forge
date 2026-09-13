@@ -20,9 +20,12 @@
   "source_sha256": {
     "src/conductor/mutation_engine_cargo.py": "03966cfed5ce6c4a0cd67a9b8ba27ccef6553bca207ca6e432bde77b835858d8"
   },
-  "survivor_baseline": [],
-  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": false,
+  "survivor_baseline": [
+    "constant_replace-0e293c139379-0",
+    "return_value-48576ec16349-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:44:20.486698+00:00",
   "test_argv": [
     "python",
     "-m",
