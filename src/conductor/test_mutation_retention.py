@@ -532,3 +532,43 @@ def test_an_audit_that_cannot_read_the_runner_refuses_the_sweep(
     with pytest.raises(RetentionError, match="corpus audit did not run"):
         mutation_retention.plan(repo)
     assert ghost.exists()
+
+
+def test_compacted_receipts_are_judged_by_their_summary_alone(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The retention sweep is a summary-only reader; slim detail changes nothing.
+
+    After slice L's compaction an old PASS receipt carries a `superseded_by`
+    pointer where its per-mutant block was, and the newest keeps a zstd blob.
+    The sweep decides on campaign id, status and timestamp -- so the old one is
+    still swept and the newest still survives, pointer or not.
+    """
+
+    from conductor.mutation_receipt_slim import slim_receipt
+
+    _campaign(repo, "alpha")
+    old_payload = {
+        "campaign_id": "alpha",
+        "status": "PASS",
+        "generated_at": "2026-09-01T00:00:00+00:00",
+        "mutants": [{"id": f"m{i}", "outcome": "KILLED"} for i in range(80)],
+    }
+    new_payload = dict(old_payload, generated_at="2026-09-05T00:00:00+00:00")
+    old = _write_json(
+        repo / mutation_retention.RECEIPT_DIRECTORY / "alpha_old.json",
+        {
+            **slim_receipt(old_payload),
+            "detail": {"encoding": "superseded", "superseded_by": "alpha_new.json"},
+        },
+    )
+    new = _write_json(
+        repo / mutation_retention.RECEIPT_DIRECTORY / "alpha_new.json",
+        slim_receipt(new_payload),
+    )
+    _no_citations(monkeypatch)
+
+    plan = mutation_retention.plan(repo)
+
+    assert set(plan.delete) == {old}
+    assert plan.keep[new] == "newest PASS for alpha"

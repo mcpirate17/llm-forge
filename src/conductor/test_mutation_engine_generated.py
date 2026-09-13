@@ -572,3 +572,40 @@ def test_a_baseline_that_died_for_want_of_python_says_so(
             campaign, receipt, result("test result: FAILED. 3 passed; 2 failed"),
             ["cargo", "test"], output,
         )
+
+
+def test_the_disk_copy_is_slim_while_the_returned_receipt_stays_full(
+    tmp_path: Path,
+) -> None:
+    """Slice L: every receipt the engine leaves on disk is slim.
+
+    The in-memory dict keeps its full rows (attribution and the CLI summary
+    read them before the write ever happens); the file on disk folds the
+    detail under one key -- inline under 50 mutants, one zstd+base64 blob
+    above -- with the summary byte-identical.
+    """
+
+    import conductor.mutation_engine_generated as runner
+    from conductor.mutation_receipt_slim import expand_receipt
+
+    receipt = {
+        "campaign_id": "gen_slim",
+        "status": "RATCHET_HELD",
+        "generated_at": "2026-09-13T00:00:00+00:00",
+        "mutants": [{"id": f"m{i}", "outcome": "KILLED"} for i in range(80)],
+    }
+    out = tmp_path / "receipt.json"
+    runner.write_receipt(out, receipt)
+    text = out.read_text(encoding="utf-8")
+    disk = json.loads(text)
+    assert "mutants" not in disk
+    assert disk["detail"]["encoding"] == "zstd+base64"
+    assert disk["campaign_id"] == receipt["campaign_id"]
+    assert expand_receipt(disk) == receipt
+    assert text == json.dumps(disk, indent=2, sort_keys=True) + "\n"
+
+    small = dict(receipt, mutants=receipt["mutants"][:5])
+    runner.write_receipt(out, small)
+    disk = json.loads(out.read_text(encoding="utf-8"))
+    assert disk["detail"]["encoding"] == "json"
+    assert expand_receipt(disk) == small

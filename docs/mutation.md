@@ -1,86 +1,60 @@
-# Mutation platform: registering, refreshing and snapshotting campaigns
+# Mutation testing in llm-forge
 
-Engine contracts, ratchet semantics and the acceptance rule live in
-`src/conductor/MUTATION_ENGINES.md`; the knowledge card for hand-authored
-baselines is `docs/KB-MUT-02.md`. This page documents the platform behaviors
-around them: how a campaign is registered, how one refreshes, and what the
-disposable snapshot carries. All of it is automatic — agents run the
-generator, the engine and the doctor; nothing here is hand-edited.
+How campaigns are generated, run and audited. The commands live in
+`conductor.mutation_campaign_generate` (write/refresh), `conductor.mutation_engine_generated`
+(run), `conductor.mutation_patch_audit` (corpus audit) and `conductor.mutation_retention`
+(sweep); `make mutation-*` wraps the common flows.
 
-## Registering a campaign: one file per row in `registry.d/`
+## Receipt format
 
-A campaign is registered by writing one file:
+A mutation receipt is one JSON file with two blocks (slice L):
 
-```
-campaigns/registry.d/<campaign-id>.json
-```
+- **Summary** — plain JSON at the top level, byte-identical to what the
+  pre-slice-L receipts carried: `campaign_id`, `status`, `generated_at`,
+  score and killed/survived/timed-out counts, `source_sha256`,
+  `runner_components_sha256`, engine, base commit. Every reader that only
+  wants to know *how a campaign went* keys off these and never decodes
+  anything.
+- **Detail** — the per-mutant rows (`mutants`) and the value analysis
+  (`test_value`) folded under one `detail` key, in one of three shapes:
 
-containing exactly one row:
+  | `detail.encoding` | When | Shape |
+  |---|---|---|
+  | `json` | fewer than 50 mutants and under 32 KiB serialized | the detail keys inline |
+  | `zstd+base64` | everything else | one `blob`, zstd-compressed base64 of the detail object's JSON |
+  | `superseded` | an older receipt of a campaign that has a newer one | `{"superseded_by": "<newer file>"}` |
 
-```json
-{
-  "manifest": "campaigns/<campaign-id>.json"
-}
-```
+One decoder owns the format: `conductor.mutation_receipt_slim.expand_receipt`
+(behind it, `receipt_expand_detail_native` in conductor-native). Readers that
+need detail rows call `expand_receipt_field(receipt, "test_value")` and
+decompress only when the field actually lives under the block; a summary-only
+reader pays nothing. `forge receipt show <path>` prints a receipt expanded for
+humans. Legacy receipts (no `detail` key) pass through every seam unchanged.
 
-`campaigns/registry.json` still exists but only as the envelope the loader
-requires — `schema_version`, `enforcement`, the canonical `test_patterns`,
-`receipt_directories` — with an empty `campaigns` array. Nothing appends to
-that array again: it was the one file every lane wrote to, and every pair of
-concurrent PRs conflicted on it (PRs #13, #16, #20 and #22 each needed a
-merge-in for that alone). One file per row means two lanes registering in
-parallel never touch the same file; the only conflict left is two branches
-registering the *same* campaign id, which is exactly the case that should
-conflict.
+The engine writes slim receipts at every disk copy (the RUNNING stub, ERROR
+receipts, and the final write); the in-memory dict stays full, so attribution
+and the CLI summary are unaffected. Files are written in the canonical
+receipt shape (`json.dumps(..., indent=2, sort_keys=True) + "\n"`, atomic
+replace) regardless of encoding.
 
-The reader (the native registry loader) merges the array and every fragment,
-deduplicates by manifest path and yields the list **sorted by campaign id**,
-so a given tree always resolves in the same order regardless of filesystem.
+### Compaction
 
-### Splitting a legacy array
+`conductor mutation_receipt_compact <dir>` is one pass over a receipt
+directory: every kept receipt is slimmed, and every other receipt of a
+campaign has its detail replaced by a `superseded_by` pointer. Which receipt
+is kept is the audit's decision, not the clock's — the CLI runs
+`mutation_patch_audit`'s own acceptance predicate first (a newer receipt can
+be rejected because its runner components match neither this runner nor any
+lineage entry) and hands the per-campaign keep-set to the native pass, so the
+receipt the audit reads afterwards is exactly the one whose detail survived.
+`--no-audit-keep-set` falls back to newest-passing-status, right only when no
+receipt was lineage-rejected.
 
-`python -m conductor.mutation_registry_split` is the one-shot migration that
-moves every row of a shared array into `registry.d/` fragments and empties
-the array. It is idempotent — an already-split registry changes no byte —
-and it refuses loudly *before writing anything* when two rows share a
-campaign id, a row has no `manifest` string, or an existing fragment already
-registers a different manifest. Half a split registry is worse than none.
+### Ratchet iterations
 
-## Refreshing a campaign admitted with extra tests
-
-`python -m conductor.mutation_campaign_generate refresh <campaign>` is the
-automatic path after a source or test change. A campaign whose source has no
-test named after it (`test_<module>.py`) — one admitted with
-`--extra-test SOURCE=TEST`, like `_bash_quiet.py` — refreshes like any
-other: the recorded test list is carried forward unchanged and the
-engine-recorded survivor baseline is never touched. `write --force` remains
-the wrong answer for these (it resets the ratchet; that is how `bash_quiet`
-once went 8 → 13 survivors); refresh refuses only when the declared source
-no longer exists in the tree.
-
-## What the disposable snapshot carries
-
-Engine runs execute inside a snapshot of the working tree. Every file under
-a `tests/`, `fixtures/` or `test_*` path is included **regardless of
-suffix** — fixture trees keep `.db` payloads, `.txt` corpora and extension
-less symlinks, and dropping them by suffix once sent green campaigns home as
-`BASELINE_FAILED`. Everywhere else the source-suffix allowlist governs.
-
-A host whose data files live outside those paths can extend the allowlist
-once in `pyproject.toml`:
-
-```toml
-[tool.conductor]
-snapshot_extra_suffixes = [".db", ".dat"]
-```
-
-## How a module pairs with its tests
-
-The generator pairs a module with the `test_<name>.py` **beside it**, or
-under a `tests/` directory that mirrors the module's own package path. A
-sole same-basename test in no mirrored tree still pairs (the legacy layout
-some older packages keep). Two same-basename candidates with no mirror are a
-loud refusal naming both — guessing there once paired
-`conductor/__main__.py` with tooling's `test___main__.py` from another
-package, and every mutant came back unreached. A module with no candidate at
-all is reported unpaired; that list is where to look before deleting code.
+`make mutation-engine-run` writes its receipt under
+`campaigns/receipts/.iterations/` (gitignored): a ratchet loop that commits
+every iteration was growing the tracked tree by ~350 KB per run, and every
+clone and CI checkout paid for it. When a loop settles,
+`make mutation-receipt-promote` copies the newest iteration receipt into the
+tracked directory; only that copy is committed.

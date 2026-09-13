@@ -1,0 +1,49 @@
+{
+  "campaign_id": "forge-receipt-slimming_verification_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/candidate_review/verification.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/candidate_review/verification.py": "388b2c976a3b18404d5e415b89a5da710dda25376068f5be153b1192942860fa"
+  },
+  "survivor_baseline": [
+    "boolean_op-6690aba1ed00-16",
+    "boolean_op-6690aba1ed00-18",
+    "boolean_op-f970fef4437c-22",
+    "boolean_op-f970fef4437c-25",
+    "boolean_op-f970fef4437c-26",
+    "constant_replace-5ff79d946e54-1",
+    "constant_replace-7b2d05debc91-0",
+    "constant_replace-af7f9ad21821-0",
+    "negate_condition-7c8747d7e62d-0",
+    "zero_iteration_loop-28be5914e8bc-0",
+    "zero_iteration_loop-358f1bc8c686-1"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T11:10:35.086763+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/candidate_review/test_verification.py"
+  ],
+  "test_sha256": {
+    "src/conductor/candidate_review/test_verification.py": "8cb2e8b6acbadf3c047605036c926de6f5d07cf03854a8437e0a513ef39bff2d"
+  },
+  "title": "Generated mutants for src/conductor/candidate_review/verification.py, scored on the survivor set"
+}

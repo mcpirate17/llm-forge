@@ -104,3 +104,47 @@ def test_invalid_or_waived_rows_do_not_hide_later_actionable_debt() -> None:
         ("malformed-mutation-receipt", None),
         ("missing-mutation-receipt", "active.py"),
     ]
+
+
+def test_new_test_value_findings_read_slim_receipts(tmp_path: Path) -> None:
+    """The verification check decodes a slim receipt's `test_value` lazily.
+
+    The receipt on disk carries its detail under the `detail` block after
+    slice L's compaction; a new test definition must still find its value
+    classification through it, exactly as it did from a legacy receipt.
+    """
+
+    import json
+    from types import SimpleNamespace
+
+    from conductor.candidate_review.verification import _new_test_value_findings
+    from conductor.mutation_receipt_slim import slim_receipt
+
+    receipt = slim_receipt(
+        {
+            "campaign_id": "c-slim",
+            "status": "PASS",
+            "generated_at": "2026-09-13T00:00:00+00:00",
+            "mutants": [{"id": f"m{i}", "outcome": "KILLED"} for i in range(80)],
+            "test_value": {
+                "schema_version": "llm.mutation-testing.test-value.v1",
+                "status": "PASS",
+                "tests": [
+                    {"nodeid": "t.py::test_new", "classification": "CORE"},
+                ],
+            },
+        }
+    )
+    assert "test_value" not in receipt  # it moved under detail
+    (tmp_path / "receipt.json").write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    payload = {
+        "evidence": [{"path": "t.py", "receipt": "receipt.json", "campaign_id": "c-slim"}]
+    }
+    ctx = SimpleNamespace(snapshot=tmp_path)
+    nodeids = {"t.py": ["t.py::test_new"]}
+
+    findings = _new_test_value_findings(ctx, payload, nodeids)
+
+    assert findings == [], "a classified test in a slim receipt is admitted"

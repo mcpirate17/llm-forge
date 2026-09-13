@@ -74,6 +74,7 @@ from typing import Any
 
 from conductor.changed_files_cli import add_changed_files_arguments, resolve_changed_files
 from conductor.mutation_patch_apply import PatchApplyError, check_patch_text
+from conductor.mutation_receipt_slim import expand_receipt_field, receipt_files
 from conductor.project_paths import campaigns_relative, host_root, registry_relative
 from conductor.mutation_scope import CampaignError, _safe_relative_path
 from conductor.mutation_testing import (
@@ -177,13 +178,7 @@ def _receipts_by_campaign(
         )
         if not root.is_dir():
             continue
-        for path in sorted(root.glob("*.json")):
-            try:
-                payload = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue
-            if not isinstance(payload, dict):
-                continue
+        for _path, payload in receipt_files(root):
             campaign_id = payload.get("campaign_id")
             if isinstance(campaign_id, str):
                 index.setdefault(campaign_id, []).append(payload)
@@ -347,7 +342,13 @@ def _value_verdicts(
     inert: list[dict[str, str]] = []
     for campaign in campaigns:
         receipt = _acceptable_receipt(campaign, receipts, current, package_root, tree)
-        value = receipt.get("test_value") if isinstance(receipt, Mapping) else None
+        # Slim receipts carry `test_value` under the detail block; the field
+        # reader decompresses it only when it is actually there.
+        value = (
+            expand_receipt_field(receipt, "test_value")
+            if isinstance(receipt, Mapping)
+            else None
+        )
         if value is None:
             if campaign.value_analysis is None and not campaign.generated:
                 unmeasured.append(

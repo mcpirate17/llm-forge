@@ -47,6 +47,21 @@ from conductor.snapshot_worktree import isolated_snapshot, snapshot_python
 # into a private alias of a module it does not import.
 atomic_json = _support.atomic_json
 
+
+def write_receipt(path: Path, receipt: Mapping[str, Any]) -> None:
+    """Write a receipt slim: summary plain, detail under one key.
+
+    Every disk copy the engine leaves behind -- the RUNNING stub, the ERROR
+    receipts, the final one -- goes through the same native codec, so a
+    campaign with hundreds of mutants costs one small blob on disk instead of
+    ~350 KB of per-mutant JSON. The in-memory dict stays full: attribution and
+    the CLI summary read it before this is ever called.
+    """
+
+    from conductor.mutation_receipt_slim import write_slim_receipt
+
+    write_slim_receipt(Path(path), receipt)
+
 # engine name -> the module that adapts it. Imported lazily: each adapter
 # imports this module, so naming them at import time would be circular.
 ADAPTER_MODULES = {
@@ -435,7 +450,7 @@ def note_baseline(
     receipt["baseline"] = baseline.as_dict()
     if baseline.timed_out or baseline.returncode != 0:
         receipt["status"] = "BASELINE_FAILED"
-        atomic_json(output_path, receipt)
+        write_receipt(output_path, receipt)
         hint = _missing_interpreter_hint(baseline)
         detail = f"unmutated baseline failed; receipt={output_path}"
         raise CampaignError(f"{detail}; {hint}" if hint else detail)
@@ -655,7 +670,7 @@ def run_generated_campaign(
     receipt = open_receipt(campaign, repo_root, Path(engine.__file__))
     receipt["memory_cap_bytes"] = cap_memory()
     output_path, relative = resolve_receipt_path(campaign, receipt_path, repo_root)
-    _support.atomic_json(output_path, receipt)
+    write_receipt(output_path, receipt)
     try:
         with isolated_snapshot(repo_root) as snapshot:
             engine.execute(
@@ -668,18 +683,18 @@ def run_generated_campaign(
     except CampaignError:
         if receipt["status"] == "RUNNING":
             receipt["status"] = "ERROR"
-            _support.atomic_json(output_path, receipt)
+            write_receipt(output_path, receipt)
         raise
     except Exception as exc:
         receipt["status"] = "ERROR"
         receipt["error"] = f"{type(exc).__name__}: {exc}"
-        _support.atomic_json(output_path, receipt)
+        write_receipt(output_path, receipt)
         raise CampaignError(f"generated campaign crashed: {exc}") from exc
 
     score(campaign, receipt)
     record_survivor_baseline(campaign, receipt)
     receipt["receipt_path"] = relative
-    _support.atomic_json(output_path, receipt)
+    write_receipt(output_path, receipt)
     return receipt
 
 

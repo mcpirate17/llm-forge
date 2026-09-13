@@ -21,6 +21,10 @@
   ],
   "campaign_id": "conductor-67_registry_fest_20260913",
   "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "detail": {
+    "encoding": "superseded",
+    "superseded_by": "conductor-67_registry_fest_20260913_20260913T101800Z.json"
+  },
   "generated_at": "2026-09-13T00:30:06.048917+00:00",
   "interpreter": "/mnt/data/llm/scratch/forge-glm-campaigns/.venv/bin/python3",
   "killer_enforcement": null,
@@ -28,7 +32,6 @@
   "manifest": "campaigns/conductor-67_registry_fest_20260913.json",
   "manifest_sha256": "c005aa32cde4d385bbd7d3c9d89c12201f14644d0b5118608de5f895283bf0a6",
   "memory_cap_bytes": 8589934592,
-  "mutants": [],
   "mutants_are_generated": true,
   "mutation_engine": "fest",
   "mutation_score": null,
@@ -68,6 +71,5 @@
   ],
   "test_sha256": {
     "src/tooling/hooks/dispatch/test_registry.py": "fedb68f1a5faa6e94f7ac2e21a7ef822fe733a548ffda377d7438cc6d6cf5359"
-  },
-  "test_value": null
+  }
 }

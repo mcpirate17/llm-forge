@@ -28,6 +28,7 @@ mod mutation_value;
 mod native_reuse;
 mod project_context;
 mod receipt_auth;
+pub mod receipt_slim;
 mod tooling_boundary;
 
 use pyo3::prelude::*;
@@ -56,6 +57,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     native_reuse::register(module)?;
     project_context::register(module)?;
     receipt_auth::register(module)?;
+    receipt_slim::register(module)?;
     tooling_boundary::register(module)?;
     Ok(())
 }

@@ -23,3 +23,6 @@ tasks/audit/
 # Runtime state written by the tooling itself, never committed
 src/conductor/active_state.json
 src/conductor/avo_runtime_state.json
+
+# Ratchet-loop iteration receipts (slice L): only promoted finals are tracked
+campaigns/receipts/.iterations/
