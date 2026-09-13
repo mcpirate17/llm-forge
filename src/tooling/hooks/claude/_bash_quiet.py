@@ -64,17 +64,24 @@ TAIL_LINES: Final[int] = 30
 TEXT_FIELDS: Final[tuple[str, ...]] = ("stdout", "stderr", "output")
 
 
+def _now_stamp() -> str:
+    """``%Y%m%dT%H%M%S`` embedded in a spill filename -- a real, non-deterministic
+    wall-clock read in production, monkeypatched to a fixed literal by any test
+    (Python or the frozen-corpus Rust parity test) that needs a reproducible
+    spill filename.
+    """
+    return time.strftime("%Y%m%dT%H%M%S")
+
+
 def _save(data: bytes) -> Path:
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     digest = hashlib.sha256(data).hexdigest()[:10]
-    path = SAVE_DIR / f"{time.strftime('%Y%m%dT%H%M%S')}-{digest}.txt"
+    path = SAVE_DIR / f"{_now_stamp()}-{digest}.txt"
     path.write_bytes(data)
     return path
 
 
-def split_head_tail(
-    data: bytes, limit_bytes: int
-) -> tuple[bytes, bytes, int, int]:
+def split_head_tail(data: bytes, limit_bytes: int) -> tuple[bytes, bytes, int, int]:
     """Head and tail halves of the bounding split, with what they elide.
 
     Line-count split first (``HEAD_LINES`` + ``TAIL_LINES``); a response of

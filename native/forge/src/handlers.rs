@@ -32,8 +32,9 @@
 
 use std::collections::{HashMap, HashSet};
 use std::env;
+use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde_json::{json, Value};
 
 use crate::bash_guard;
@@ -42,7 +43,9 @@ use crate::crg_gate;
 use crate::crg_refresh;
 use crate::current_work_guard;
 use crate::identity;
+use crate::instant;
 use crate::merge::{self, HookOutcome};
+use crate::tool_quiet::{self, QuietConfig};
 use crate::write_targets;
 
 /// A hook body ported to native Rust.
@@ -230,6 +233,126 @@ impl NativeHandler for CurrentWorkGuardBash {
     }
 }
 
+/// Resolves the four env vars `_bash_quiet.py`/`post_tool_quiet.py` read at
+/// module scope, so `PostBashQuiet`/`PostToolQuiet` can build a
+/// `tool_quiet::QuietConfig` without duplicating the resolution logic.
+fn quiet_save_dir(repo_root: &Path) -> PathBuf {
+    let configured = env::var("BASH_QUIET_SAVE_DIR").unwrap_or_default();
+    let trimmed = configured.trim();
+    if trimmed.is_empty() {
+        return std::env::temp_dir().join("agent-bash-output");
+    }
+    let path = PathBuf::from(trimmed);
+    if path.is_absolute() {
+        path
+    } else {
+        repo_root.join(path)
+    }
+}
+
+fn quiet_output_field() -> String {
+    env::var("BASH_QUIET_OUTPUT_FIELD").unwrap_or_else(|_| "updatedToolOutput".to_string())
+}
+
+/// `int(os.environ.get("BASH_QUIET_LIMIT_BYTES", "8000"))` -- an unparseable
+/// value fails loud, matching Python's `int(...)` `ValueError` rather than
+/// silently falling back to the default.
+fn bash_quiet_limit() -> Result<usize> {
+    match env::var("BASH_QUIET_LIMIT_BYTES") {
+        Err(_) => Ok(tool_quiet::BASH_QUIET_LIMIT_DEFAULT),
+        Ok(raw) => raw
+            .parse()
+            .with_context(|| format!("BASH_QUIET_LIMIT_BYTES is not an integer: {raw:?}")),
+    }
+}
+
+/// `_cap()`: `int(os.environ.get("TOOL_OUTPUT_QUIET_BYTES", "16000"))`, plus
+/// the `<= 0` disables-bounding reading `post_tool_quiet.bound_response`
+/// applies itself. Returns `(cap, disabled)`; `cap` is `0` when disabled.
+fn tool_output_quiet_cap() -> Result<(usize, bool)> {
+    let raw = match env::var("TOOL_OUTPUT_QUIET_BYTES") {
+        Err(_) => return Ok((tool_quiet::TOOL_OUTPUT_QUIET_DEFAULT, false)),
+        Ok(raw) => raw,
+    };
+    let parsed: i64 = raw
+        .parse()
+        .with_context(|| format!("TOOL_OUTPUT_QUIET_BYTES is not an integer: {raw:?}"))?;
+    if parsed <= 0 {
+        Ok((0, true))
+    } else {
+        Ok((parsed as usize, false))
+    }
+}
+
+/// `post_bash_quiet`: bounds a Bash tool response's `stdout`/`stderr`/`output`
+/// fields over `BASH_QUIET_LIMIT_BYTES` (default 8000 bytes), matching
+/// `_bash_quiet.hook_output`.
+pub struct PostBashQuiet;
+
+impl NativeHandler for PostBashQuiet {
+    fn name(&self) -> &'static str {
+        "post_bash_quiet"
+    }
+
+    fn event(&self) -> &'static str {
+        "PostToolUse"
+    }
+
+    fn run(&self, payload: &Value) -> Result<Value> {
+        let root = crate::interpreter::project_root();
+        let save_dir = quiet_save_dir(&root);
+        let output_field = quiet_output_field();
+        let limit = bash_quiet_limit()?;
+        let now_stamp = instant::format_compact_utc(instant::now());
+        let cfg = QuietConfig {
+            save_dir: &save_dir,
+            repo_root: &root,
+            now_stamp: &now_stamp,
+            output_field: &output_field,
+        };
+        Ok(tool_quiet::rewrite_envelope_bash(payload, limit, &cfg))
+    }
+}
+
+/// `post_tool_quiet`: bounds a Read/Grep/MCP tool response over
+/// `TOOL_OUTPUT_QUIET_BYTES` (default 16000 bytes; `<= 0` disables), matching
+/// `post_tool_quiet.hook_output`. An unrecognized response shape still
+/// passes through unbounded, warning on stderr exactly as the Python body
+/// does (`post_tool_quiet._warn_unrecognized`).
+pub struct PostToolQuiet;
+
+impl NativeHandler for PostToolQuiet {
+    fn name(&self) -> &'static str {
+        "post_tool_quiet"
+    }
+
+    fn event(&self) -> &'static str {
+        "PostToolUse"
+    }
+
+    fn run(&self, payload: &Value) -> Result<Value> {
+        let root = crate::interpreter::project_root();
+        let save_dir = quiet_save_dir(&root);
+        let output_field = quiet_output_field();
+        let (cap, disabled) = tool_output_quiet_cap()?;
+        let now_stamp = instant::format_compact_utc(instant::now());
+        let cfg = QuietConfig {
+            save_dir: &save_dir,
+            repo_root: &root,
+            now_stamp: &now_stamp,
+            output_field: &output_field,
+        };
+        let (value, warned) = tool_quiet::rewrite_envelope_tool(payload, cap, disabled, &cfg);
+        if let Some(kind) = warned {
+            eprintln!(
+                "post-tool-quiet: unrecognized tool_response shape ({kind}); \
+                 passing through unbounded"
+            );
+        }
+        Ok(value)
+    }
+}
+
 /// Handlers ported so far.
 pub fn registry() -> Vec<Box<dyn NativeHandler>> {
     vec![
@@ -238,7 +361,66 @@ pub fn registry() -> Vec<Box<dyn NativeHandler>> {
         Box::new(CrgRefreshReportPre),
         Box::new(CrgGateVerifyBash),
         Box::new(CurrentWorkGuardBash),
+        Box::new(PostBashQuiet),
+        Box::new(PostToolQuiet),
     ]
+}
+
+/// The exact hook names, in the Python registry's own order
+/// (`src/tooling/hooks/dispatch/registry.py`), that a `PostToolUse` call
+/// matches for the two output-bounding hooks: `post_bash_quiet` (matcher
+/// `Bash`) and `post_tool_quiet` (matcher `Read|Grep|mcp__.*`) -- mutually
+/// exclusive on `tool_name`, so at most one of them ever contributes an
+/// answer for a given call. Other `PostToolUse` hooks
+/// (`crg_refresh_report_post`, `crg_graph_refresh`, `post_edit`,
+/// `read_budget`, `obsidian_post_edit`, `post_bash_graph`,
+/// `context_telemetry`) are not ported: Python still starts for every
+/// `PostToolUse` event to run those, but never runs `post_bash_quiet` or
+/// `post_tool_quiet`'s own body when this crate already answered it.
+pub const POST_TOOL_USE_HOOK_NAMES: [&str; 2] = ["post_bash_quiet", "post_tool_quiet"];
+
+/// Whether `name`'s own Python `HookSpec.matcher` would fire for `tool_name`
+/// -- `post_bash_quiet` and `post_tool_quiet`'s matchers specifically, since
+/// `native_answers_for_post_tool_use` must not compute (or claim to answer)
+/// a hook that Python's own `select()` would never have run for this call.
+fn post_tool_use_matches(name: &str, tool_name: &str) -> bool {
+    match name {
+        "post_bash_quiet" => tool_name == "Bash",
+        "post_tool_quiet" => {
+            tool_name == "Read" || tool_name == "Grep" || tool_name.starts_with("mcp__")
+        }
+        _ => false,
+    }
+}
+
+/// Computes each opted-in, matcher-eligible native `PostToolUse` hook's own
+/// answer, keyed by its Python-recognized name -- the `PostToolUse` twin of
+/// `native_answers_for_bash`. There is no "fully native" fast path here
+/// (unlike Bash `PreToolUse`): `crg_refresh_report_post` and
+/// `context_telemetry` match every `PostToolUse` call and are not ported, so
+/// Python always still runs for the event; this only lets it skip the two
+/// hook bodies this crate already answered.
+pub fn native_answers_for_post_tool_use(
+    payload: &Value,
+    native_hooks: &HashSet<String>,
+) -> HashMap<String, Value> {
+    let mut answers = HashMap::new();
+    let Some(tool_name) = payload.get("tool_name").and_then(Value::as_str) else {
+        return answers;
+    };
+    let handlers = registry();
+    for name in POST_TOOL_USE_HOOK_NAMES {
+        if !native_hooks.contains(name) || !post_tool_use_matches(name, tool_name) {
+            continue;
+        }
+        let Some(handler) = find_handler(&handlers, name, "PostToolUse") else {
+            continue;
+        };
+        if let Ok(value) = handler.run(payload) {
+            answers.insert(name.to_string(), value);
+        }
+    }
+    answers
 }
 
 /// The exact hook names, in the Python registry's own order
@@ -266,16 +448,18 @@ pub fn bash_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
 
 /// The hooks forge serves natively when the caller expresses no preference at
 /// all (`FORGE_NATIVE_HOOKS` unset) -- the native path is the *default* as of
-/// this PR, not an opt-in. The four `BASH_PRETOOLUSE_HOOK_NAMES` are the names
-/// Python's registry actually recognizes; `"bash_write_targets"` gates
-/// forge's own additive telemetry handler and is a no-op name on the Python
-/// side (there is no such `HookSpec`).
+/// this PR, not an opt-in. The four `BASH_PRETOOLUSE_HOOK_NAMES` and the two
+/// `POST_TOOL_USE_HOOK_NAMES` are the names Python's registry actually
+/// recognizes; `"bash_write_targets"` gates forge's own additive telemetry
+/// handler and is a no-op name on the Python side (there is no such
+/// `HookSpec`).
 fn default_native_hook_names() -> HashSet<String> {
     let mut names: HashSet<String> = BASH_PRETOOLUSE_HOOK_NAMES
         .iter()
         .map(|s| s.to_string())
         .collect();
     names.insert("bash_write_targets".to_string());
+    names.extend(POST_TOOL_USE_HOOK_NAMES.iter().map(|s| s.to_string()));
     names
 }
 
@@ -330,10 +514,11 @@ fn fold_additional_context(answer: &mut Value, extra: &Value) {
 fn find_handler<'a>(
     handlers: &'a [Box<dyn NativeHandler>],
     name: &str,
+    event: &str,
 ) -> Option<&'a dyn NativeHandler> {
     handlers
         .iter()
-        .find(|h| h.name() == name && h.event() == "PreToolUse")
+        .find(|h| h.name() == name && h.event() == event)
         .map(Box::as_ref)
 }
 
@@ -347,10 +532,11 @@ fn pre_bash_answer(
     payload: &Value,
     native_hooks: &HashSet<String>,
 ) -> Result<Value> {
-    let pre_bash = find_handler(handlers, "pre_bash").expect("pre_bash always registered");
+    let pre_bash =
+        find_handler(handlers, "pre_bash", "PreToolUse").expect("pre_bash always registered");
     let mut answer = pre_bash.run(payload)?;
     if native_hooks.contains("bash_write_targets") {
-        if let Some(write_targets) = find_handler(handlers, "bash_write_targets") {
+        if let Some(write_targets) = find_handler(handlers, "bash_write_targets", "PreToolUse") {
             if let Ok(extra) = write_targets.run(payload) {
                 fold_additional_context(&mut answer, &extra);
             }
@@ -382,7 +568,7 @@ pub fn native_answers_for_bash(
         let computed = if name == "pre_bash" {
             pre_bash_answer(&handlers, payload, native_hooks)
         } else {
-            find_handler(&handlers, name)
+            find_handler(&handlers, name, "PreToolUse")
                 .expect("every BASH_PRETOOLUSE_HOOK_NAMES entry is registered")
                 .run(payload)
         };
@@ -410,7 +596,7 @@ pub fn run_bash_pretooluse_fully_native(payload: &Value, native_hooks: &HashSet<
             let computed = if *name == "pre_bash" {
                 pre_bash_answer(&handlers, payload, native_hooks)
             } else {
-                find_handler(&handlers, name)
+                find_handler(&handlers, name, "PreToolUse")
                     .expect("every BASH_PRETOOLUSE_HOOK_NAMES entry is registered")
                     .run(payload)
             };
@@ -456,7 +642,9 @@ mod tests {
 
     #[test]
     fn registry_covers_every_bash_pretooluse_hook_plus_write_targets() {
-        assert_eq!(registry().len(), 5);
+        // 5 Bash PreToolUse handlers (4 real HookSpec names plus
+        // bash_write_targets) + PostBashQuiet + PostToolQuiet.
+        assert_eq!(registry().len(), 7);
         assert!(bash_pretooluse_fully_native(&all_four()));
         let mut missing_one = all_four();
         missing_one.remove("current_work_guard_bash");

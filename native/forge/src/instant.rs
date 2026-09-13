@@ -160,6 +160,27 @@ pub fn format_hm(instant: f64) -> String {
     format!("{h:02}:{min:02}")
 }
 
+/// `%Y%m%dT%H%M%S`, UTC: the compact stamp `tool_quiet::save` embeds in a
+/// spill filename. Python's `time.strftime` (no explicit time tuple) renders
+/// this in the process's local timezone rather than UTC; that divergence
+/// never matters in production since the two implementations are never both
+/// live for the same call (`forge` supersedes the Python hook body entirely
+/// once native), only a test that pins the very same stamp string on both
+/// sides needs the two to agree, and it does that by injecting one literal
+/// value rather than by comparing each implementation's own clock.
+///
+/// This crate has no lib target, so `handlers.rs`'s own use of this function
+/// is invisible to a `tests/*.rs` binary that pulls in `instant.rs` via
+/// `#[path]` without also including `handlers.rs` -- `#[allow(dead_code)]`
+/// matches `crg_gate::unused_constants_reference` and
+/// `write_targets::unused_from_some_test_binaries`'s established use of the
+/// same pattern in this crate.
+#[allow(dead_code)]
+pub fn format_compact_utc(instant: f64) -> String {
+    let (y, mo, d, h, min, s, _frac) = civil_hms(instant);
+    format!("{y:04}{mo:02}{d:02}T{h:02}{min:02}{s:02}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

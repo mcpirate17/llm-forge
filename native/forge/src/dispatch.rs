@@ -35,22 +35,38 @@
 //! empty set, `native_answers_for_bash` then always returns an empty map,
 //! `bash_pretooluse_fully_native` is false, and this module forwards that
 //! same empty override to the Python child.
+//!
+//! `PostToolUse` gets the same partial-splice treatment as a partially-native
+//! Bash `PreToolUse` call, and only that: `handlers::native_answers_for_post_tool_use`
+//! computes `post_bash_quiet`/`post_tool_quiet`'s own answer (whichever one
+//! the call's `tool_name` matches), spliced back in via the same
+//! `FORGE_NATIVE_HOOKS`/`FORGE_NATIVE_ANSWERS` env pair. There is no fully
+//! native fast path for this event: `crg_refresh_report_post` and
+//! `context_telemetry` (both matcher `.*`) are not ported and match every
+//! `PostToolUse` call, so Python always still starts for the event.
 
 use crate::{handlers, interpreter, telemetry};
 use anyhow::{Context, Result};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::time::Instant;
 
 /// Runs one hook event and returns the exit code to propagate to the caller.
 pub fn run_hook(event: &str) -> Result<u8> {
-    if event != "PreToolUse" {
-        // No native handlers exist for any other event yet: read nothing,
-        // change nothing, delegate exactly as before this PR.
-        return delegate(event, None, &no_native_env());
+    match event {
+        "PreToolUse" => run_pre_tool_use(event),
+        "PostToolUse" => run_post_tool_use(event),
+        _ => {
+            // No native handlers exist for any other event yet: read nothing,
+            // change nothing, delegate exactly as before this PR.
+            delegate(event, None, &no_native_env())
+        }
     }
+}
 
+fn run_pre_tool_use(event: &str) -> Result<u8> {
     let mut input = String::new();
     std::io::stdin()
         .read_to_string(&mut input)
@@ -87,19 +103,48 @@ pub fn run_hook(event: &str) -> Result<u8> {
         .map(|payload| handlers::native_answers_for_bash(payload, &native_hooks))
         .unwrap_or_default();
 
-    let extra_env = if native_answers.is_empty() {
-        no_native_env()
-    } else {
-        let names: Vec<&str> = native_answers.keys().map(String::as_str).collect();
-        let answers = serde_json::to_string(&native_answers)
-            .context("failed to serialize native hook answers")?;
-        vec![
-            ("FORGE_NATIVE_HOOKS".to_string(), names.join(",")),
-            ("FORGE_NATIVE_ANSWERS".to_string(), answers),
-        ]
-    };
-
+    let extra_env = env_for_answers(&native_answers)?;
     delegate(event, Some(input.as_bytes()), &extra_env)
+}
+
+/// `PostToolUse`: always starts Python (see module docs for why no fully
+/// native fast path exists here), but splices in `post_bash_quiet`'s or
+/// `post_tool_quiet`'s own precomputed answer -- whichever one the call's
+/// `tool_name` matches -- exactly like a partially-native Bash `PreToolUse`
+/// call.
+fn run_post_tool_use(event: &str) -> Result<u8> {
+    let mut input = String::new();
+    std::io::stdin()
+        .read_to_string(&mut input)
+        .context("failed to read hook payload from stdin")?;
+
+    let native_hooks = handlers::native_hook_names_from_env();
+    let parsed: Option<Value> = serde_json::from_str(&input).ok();
+
+    let native_answers = parsed
+        .as_ref()
+        .map(|payload| handlers::native_answers_for_post_tool_use(payload, &native_hooks))
+        .unwrap_or_default();
+
+    let extra_env = env_for_answers(&native_answers)?;
+    delegate(event, Some(input.as_bytes()), &extra_env)
+}
+
+/// Builds the `FORGE_NATIVE_HOOKS`/`FORGE_NATIVE_ANSWERS` env pair to forward
+/// to the Python child: the explicit empty override when nothing was
+/// answered natively this call, otherwise the answered names and their
+/// serialized verdicts.
+fn env_for_answers(native_answers: &HashMap<String, Value>) -> Result<Vec<(String, String)>> {
+    if native_answers.is_empty() {
+        return Ok(no_native_env());
+    }
+    let names: Vec<&str> = native_answers.keys().map(String::as_str).collect();
+    let answers = serde_json::to_string(&native_answers)
+        .context("failed to serialize native hook answers")?;
+    Ok(vec![
+        ("FORGE_NATIVE_HOOKS".to_string(), names.join(",")),
+        ("FORGE_NATIVE_ANSWERS".to_string(), answers),
+    ])
 }
 
 /// The explicit "forge answered nothing natively this call" env override --
