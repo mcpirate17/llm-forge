@@ -28,7 +28,7 @@ const SETTINGS_REL: &str = ".claude/settings.json";
 /// only PreToolUse and SubagentStop (`dispatch.rs::run_hook_standalone`);
 /// a full install uses all five and delegates the non-native events to the
 /// host's Python dispatcher (`dispatch.rs::delegate`).
-const EVENTS: [&str; 5] = [
+pub(crate) const EVENTS: [&str; 5] = [
     "PreToolUse",
     "PostToolUse",
     "SessionStart",
@@ -60,20 +60,20 @@ pub enum HooksCommand {
 pub struct InstallArgs {
     /// The host project root (the dir containing `.claude/`).
     #[arg(long)]
-    host: PathBuf,
+    pub(crate) host: PathBuf,
     /// `FORGE_MODE` for the installed commands (warn first, enforce ~2026-09-20).
     #[arg(long, default_value = "warn")]
-    mode: String,
+    pub(crate) mode: String,
     /// Only PreToolUse + SubagentStop, `FORGE_HOOK_STANDALONE=1`: no Python
     /// dispatcher, no native Bash-guard branches (`docs/routing.md`).
     #[arg(long)]
-    standalone: bool,
+    pub(crate) standalone: bool,
     /// The forge binary the hooks call; defaults to this running binary.
     #[arg(long)]
-    binary: Option<PathBuf>,
+    pub(crate) binary: Option<PathBuf>,
     /// Print the unified diff and write nothing.
     #[arg(long)]
-    dry_run: bool,
+    pub(crate) dry_run: bool,
 }
 
 #[derive(Args)]
@@ -150,11 +150,11 @@ fn forge_entry(event: &str, command: &str) -> Value {
 /// install/uninstall recognise. `None` for anything that is not a forge
 /// hook command (no `hook` token, binary not named forge, junk before the
 /// binary that is not `VAR=value`).
-struct ParsedHook {
-    event: String,
-    mode: String,
-    standalone: bool,
-    binary: String,
+pub(crate) struct ParsedHook {
+    pub(crate) event: String,
+    pub(crate) mode: String,
+    pub(crate) standalone: bool,
+    pub(crate) binary: String,
 }
 
 fn parse_hook_command(command: &str) -> Option<ParsedHook> {
@@ -189,7 +189,7 @@ fn parse_hook_command(command: &str) -> Option<ParsedHook> {
 
 /// Every forge hook command in one entry, parsed. An entry with no forge
 /// command yields an empty vec and is never touched.
-fn entry_parsed_hooks(entry: &Value) -> Vec<ParsedHook> {
+pub(crate) fn entry_parsed_hooks(entry: &Value) -> Vec<ParsedHook> {
     entry
         .get("hooks")
         .and_then(Value::as_array)
@@ -204,7 +204,7 @@ fn entry_parsed_hooks(entry: &Value) -> Vec<ParsedHook> {
 
 // ── settings load / save ─────────────────────────────────────────────────
 
-fn settings_path(host: &Path) -> PathBuf {
+pub(crate) fn settings_path(host: &Path) -> PathBuf {
     host.join(SETTINGS_REL)
 }
 
@@ -214,7 +214,7 @@ fn backup_path(host: &Path) -> PathBuf {
 
 /// `(raw text, parsed)`; `(None, {})` when the file does not exist yet.
 /// Unparsable JSON is an error, never a silent reset to `{}`.
-fn load_settings(host: &Path) -> Result<(Option<String>, Value)> {
+pub(crate) fn load_settings(host: &Path) -> Result<(Option<String>, Value)> {
     let path = settings_path(host);
     let Some(text) = std::fs::read_to_string(&path).ok() else {
         return Ok((None, json!({})));
@@ -270,7 +270,7 @@ fn write_atomic(path: &Path, text: &str) -> Result<()> {
 
 // ── install ──────────────────────────────────────────────────────────────
 
-fn install(args: &InstallArgs) -> Result<u8> {
+pub(crate) fn install(args: &InstallArgs) -> Result<u8> {
     let mode = args.mode.as_str();
     if mode != "warn" && mode != "enforce" {
         bail!("--mode must be warn or enforce, got {mode:?}");
@@ -522,7 +522,7 @@ fn installed_binary_version(binary: &str) -> String {
 /// `forge --version` prints `<name> <version line>`; accept either the
 /// prefixed form (a real forge) or the bare line, so the comparison is on
 /// the version content, not clap's output format.
-fn versions_match(installed_output: &str) -> bool {
+pub(crate) fn versions_match(installed_output: &str) -> bool {
     installed_output.strip_prefix("forge ") == Some(VERSION_LINE)
         || installed_output == VERSION_LINE
 }
