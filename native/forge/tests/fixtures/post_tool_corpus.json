@@ -330,5 +330,316 @@
   "kind": "telemetry_path",
   "payload": {},
   "seed": {}
+ },
+ {
+  "id": "pe-py-clean",
+  "kind": "post_edit",
+  "seed": {
+   "file": "notes.py",
+   "content": "def small():\n    return 1\n"
+  },
+  "payload": {
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  }
+ },
+ {
+  "id": "pe-py-god-function",
+  "kind": "post_edit",
+  "seed": {
+   "file": "giant.py",
+   "content": "def giant():\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\n    pass\ndef after():\n    pass\n"
+  },
+  "payload": {
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  }
+ },
+ {
+  "id": "pe-py-silent-fallback",
+  "kind": "post_edit",
+  "seed": {
+   "file": "falls.py",
+   "content": "try:\n    x = 1\nexcept ValueError:\n    pass\n"
+  },
+  "payload": {
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  }
+ },
+ {
+  "id": "pe-py-commented-and-bare",
+  "kind": "post_edit",
+  "seed": {
+   "file": "dusty.py",
+   "content": "# def old()\n# import sys\n# return 3\ntry:\n    y = 2\nexcept:\n    raise\n"
+  },
+  "payload": {
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  }
+ },
+ {
+  "id": "pe-rs-god-file",
+  "kind": "post_edit",
+  "seed": {
+   "file": "big.rs",
+   "content": "// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n// line\n"
+  },
+  "payload": {
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  }
+ },
+ {
+  "id": "pe-md-god-file",
+  "kind": "post_edit",
+  "seed": {
+   "file": "big.md",
+   "content": "line\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\nline\n"
+  },
+  "payload": {
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  }
+ },
+ {
+  "id": "pe-toml-file",
+  "kind": "post_edit",
+  "seed": {
+   "file": "conf.toml",
+   "content": "[a]\nb = 1\n"
+  },
+  "payload": {
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  }
+ },
+ {
+  "id": "pe-unknown-suffix",
+  "kind": "post_edit",
+  "seed": {
+   "file": "data.weird",
+   "content": "just text\n"
+  },
+  "payload": {
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  }
+ },
+ {
+  "id": "pe-file-missing",
+  "kind": "post_edit",
+  "seed": {
+   "file": "ghost.py",
+   "content": null
+  },
+  "payload": {
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  }
+ },
+ {
+  "id": "pe-no-path",
+  "kind": "post_edit",
+  "seed": {},
+  "payload": {
+   "tool_name": "Edit",
+   "tool_input": {
+    "old_string": "x"
+   }
+  }
+ },
+ {
+  "id": "ge-py-queued",
+  "kind": "graph_edit",
+  "payload": {
+   "session_id": "s-ge",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "a.py"
+   }
+  },
+  "seed": {
+   "files": {
+    "a.py": "x = 1\n"
+   },
+   "stub_tool": true
+  }
+ },
+ {
+  "id": "ge-md-skipped",
+  "kind": "graph_edit",
+  "payload": {
+   "session_id": "s-ge",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "notes.md"
+   }
+  },
+  "seed": {
+   "files": {
+    "notes.md": "text\n"
+   },
+   "stub_tool": true
+  }
+ },
+ {
+  "id": "ge-missing-file",
+  "kind": "graph_edit",
+  "payload": {
+   "session_id": "s-ge",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "ghost.py"
+   }
+  },
+  "seed": {
+   "files": {},
+   "stub_tool": true
+  }
+ },
+ {
+  "id": "ge-outside-repo",
+  "kind": "graph_edit",
+  "payload": {
+   "session_id": "s-ge",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<OUTSIDE>"
+   }
+  },
+  "seed": {
+   "files": {},
+   "stub_tool": true
+  }
+ },
+ {
+  "id": "ge-no-tool",
+  "kind": "graph_edit",
+  "payload": {
+   "session_id": "s-ge",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "a.py"
+   }
+  },
+  "seed": {
+   "files": {
+    "a.py": "x = 1\n"
+   },
+   "stub_tool": false
+  }
+ },
+ {
+  "id": "oe-plain-edit",
+  "kind": "obsidian_edit",
+  "payload": {
+   "session_id": "pt-obs-plain",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  },
+  "seed": {
+   "where": "repo",
+   "file": "code.py",
+   "content": "x = 1\n"
+  },
+  "env": {
+   "OBSIDIAN_VAULT_ROOT": "<VAULT>",
+   "CLAUDE_MEMORY_ROOT": "<MEM>"
+  }
+ },
+ {
+  "id": "oe-memory-file",
+  "kind": "obsidian_edit",
+  "payload": {
+   "session_id": "pt-obs-mem",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  },
+  "seed": {
+   "where": "mem",
+   "file": "tips.md",
+   "content": "---\nname: Tips\ndescription: small tips\ntype: feedback\n---\n\nUse it.\n"
+  },
+  "env": {
+   "OBSIDIAN_VAULT_ROOT": "<VAULT>",
+   "CLAUDE_MEMORY_ROOT": "<MEM>"
+  }
+ },
+ {
+  "id": "oe-memory-index",
+  "kind": "obsidian_edit",
+  "payload": {
+   "session_id": "pt-obs-idx",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  },
+  "seed": {
+   "where": "mem",
+   "file": "MEMORY.md",
+   "content": "# Index\n"
+  },
+  "env": {
+   "OBSIDIAN_VAULT_ROOT": "<VAULT>",
+   "CLAUDE_MEMORY_ROOT": "<MEM>"
+  }
+ },
+ {
+  "id": "oe-vault-unset",
+  "kind": "obsidian_edit",
+  "payload": {
+   "session_id": "pt-obs-unset",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "<FILE>"
+   }
+  },
+  "seed": {
+   "where": "mem-default",
+   "file": "note.md",
+   "content": "---\nname: Note\ntype: project\n---\n\nBody.\n"
+  },
+  "env": {
+   "HOME": "<HOME>"
+  }
+ },
+ {
+  "id": "oe-no-path",
+  "kind": "obsidian_edit",
+  "payload": {
+   "session_id": "pt-obs-nopath",
+   "tool_name": "Edit",
+   "tool_input": {}
+  },
+  "seed": {},
+  "env": {
+   "OBSIDIAN_VAULT_ROOT": "<VAULT>",
+   "CLAUDE_MEMORY_ROOT": "<MEM>"
+  }
  }
 ]

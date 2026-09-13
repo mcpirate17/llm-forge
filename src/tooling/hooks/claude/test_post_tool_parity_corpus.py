@@ -1,12 +1,15 @@
-"""Differential parity twin (Python side) for the Rust port of the four
-PostToolUse hooks behind the zero-interpreter-start slice:
+"""Differential parity twin (Python side) for the Rust port of the
+PostToolUse hooks behind the two zero-interpreter-start slices:
 ``crg_graph_refresh.failure_output`` (``crg_refresh_report_post``),
 ``crg_graph_refresh.full_update_output`` behind the git-tree-rewrite check
-(``post_bash_graph``), ``read_budget.hook_output``, and
-``conductor.context_telemetry``'s two record builders.
+(``post_bash_graph``), ``read_budget.hook_output``,
+``conductor.context_telemetry``'s two record builders, and the edit family
+(``_post_edit_audit.hook_output`` for ``post_edit``,
+``crg_graph_refresh.hook_output`` for ``crg_graph_refresh``, and
+``obsidian_sync.cmd_post_edit`` for ``obsidian_post_edit``).
 
 ``native/forge/tests/post_tool_zero_start_parity.rs`` and this file load the
-SAME two fixtures -- ``post_tool_corpus.json`` (24 case descriptors: a
+SAME two fixtures -- ``post_tool_corpus.json`` (44 case descriptors: a
 ``kind`` discriminator, the raw hook payload, optional env overrides and seed
 state) and ``post_tool_expected.json`` (frozen verdicts, captured once from
 these very Python modules) -- and each independently rebuilds the state a
@@ -28,14 +31,25 @@ Determinism notes, mirrored from the fixture generator:
   spawned "worker" is monkeypatched to ``/bin/sleep 30`` -- the same inert
   stand-in the generator used, so the spawn really happens without running
   any refresh.
+* The ``post_edit`` cases keep the same scratch-bin trick for the
+  formatters (stub ``ruff``/``rustfmt``), so no real formatter ever runs or
+  rewrites a file under test.
+* The ``obsidian_edit`` cases pin ``HOME``/vault/memory roots to scratch
+  dirs, and the frozen verdicts normalize every scratch prefix (including
+  the dashed *slug* form of the repo path the default memory root embeds)
+  plus the accumulator timestamp and the mirror note's date line.
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib
+import importlib.util
+import io
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -44,15 +58,20 @@ _HERE = Path(__file__).resolve().parent
 _REPO = _HERE.parent.parent.parent.parent
 _SRC = _REPO / "src"
 _AGENT = _SRC / "tooling" / "hooks" / "agent"
+_CLAUDE = _SRC / "tooling" / "hooks" / "claude"
 sys.path.insert(0, str(_SRC))
 sys.path.insert(0, str(_AGENT))
+sys.path.insert(0, str(_CLAUDE))
 
 import conductor.context_telemetry as telemetry  # noqa: E402
 
 _FIXTURES = _REPO / "native" / "forge" / "tests" / "fixtures"
 _STAMP = "2026-09-13T00:00:00.000+00:00"
 _PID = 3831796
+_DATE_STAMP = "2026-09-13"
 _SLEEPER = ["/bin/sleep", "30"]
+_ACCUM_DIR = Path("/tmp/claude-session-journal")
+_OBS_LOADS = 0
 
 _MANAGED_ENV_VARS = (
     "CRG_GATE_REPO_ROOT",
@@ -63,6 +82,10 @@ _MANAGED_ENV_VARS = (
     "CONTEXT_TELEMETRY_PATH",
     "CLAUDE_PROJECT_DIR",
     "CONDUCTOR_SNAPSHOT_PYTHON",
+    "PROJECT_DIR",
+    "OBSIDIAN_VAULT_ROOT",
+    "CLAUDE_MEMORY_ROOT",
+    "HOME",
 )
 
 
@@ -79,9 +102,9 @@ def test_fixture_files_exist_and_are_shared_with_the_rust_test() -> None:
     corpus = _load_json("post_tool_corpus.json")
     expected = _load_json("post_tool_expected.json")
     assert len(corpus) == len(expected)
-    assert len(corpus) >= 20, (
-        f"expected 4 report + 4 graph + 5 budget + 9 telemetry + 2 path = 24, "
-        f"got {len(corpus)}"
+    assert len(corpus) >= 40, (
+        f"expected 24 first-slice cases (4 report + 4 graph + 5 budget + "
+        f"9 telemetry + 2 path) plus >= 15 edit-family cases, got {len(corpus)}"
     )
 
 
@@ -115,6 +138,187 @@ def _install_stub_tool(bin_dir: Path) -> None:
     stub = bin_dir / "code-review-graph"
     stub.write_text("#!/bin/sh\nexit 0\n")
     stub.chmod(stub.stat().st_mode | 0o111)
+
+
+def _install_stub_formatters(bin_dir: Path) -> None:
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    for tool in ("ruff", "rustfmt"):
+        stub = bin_dir / tool
+        stub.write_text("#!/bin/sh\nexit 0\n")
+        stub.chmod(stub.stat().st_mode | 0o111)
+
+
+def _substitute(value, replacements: dict[str, str]):
+    """Fill the corpus's ``<PLACEHOLDER>`` tokens with this run's paths."""
+    if isinstance(value, str):
+        for old, new in replacements.items():
+            value = value.replace(old, new)
+        return value
+    if isinstance(value, dict):
+        return {key: _substitute(item, replacements) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_substitute(item, replacements) for item in value]
+    return value
+
+
+def _normalize_strings(obj, mapping: dict[str, str]):
+    """Replace every scratch-root prefix in every string, recursively."""
+    if isinstance(obj, str):
+        for old, new in mapping.items():
+            obj = obj.replace(old, new)
+        return obj
+    if isinstance(obj, dict):
+        return {key: _normalize_strings(value, mapping) for key, value in obj.items()}
+    if isinstance(obj, list):
+        return [_normalize_strings(value, mapping) for value in obj]
+    return obj
+
+
+def _normalize_accum(text: str, mapping: dict[str, str]) -> str:
+    ts, kind, fp = text.rstrip("\n").split("\t", 2)
+    return "\t".join([_STAMP, kind, _normalize_strings(fp, mapping)])
+
+
+def _normalize_mirror(note: str, mapping: dict[str, str]) -> str:
+    dated = re.sub(r"^date: .*$", f"date: {_DATE_STAMP}", note, count=1, flags=re.M)
+    return _normalize_strings(dated, mapping)
+
+
+def _run_post_edit(tmp: Path, label: str, payload: dict, seed: dict, base_path: str) -> dict:
+    import _post_edit_audit
+
+    file_dir = tmp / f"{label}-file"
+    file_dir.mkdir()
+    path = file_dir / seed.get("file", "ghost.py")
+    if seed.get("content") is not None:
+        path.write_text(seed["content"])
+    bin_dir = tmp / f"{label}-bin"
+    _install_stub_formatters(bin_dir)
+    payload_run = _substitute(payload, {"<FILE>": str(path)})
+    # The scratch bin dir alone holds the formatters (stubs on every
+    # machine), exactly as the generator pinned it.
+    os.environ["PATH"] = str(bin_dir)
+    output = _post_edit_audit.hook_output(payload_run)
+    os.environ["PATH"] = base_path
+    return {"output": _normalize_strings(output, {str(file_dir): "<F>"})}
+
+
+def _run_graph_edit(tmp: Path, label: str, payload: dict, seed: dict, base_path: str) -> dict:
+    import crg_gate as crg_gate_mod
+    import crg_graph_refresh as crg_refresh_mod
+
+    repo = _make_repo(tmp, label)
+    for rel, content in seed.get("files", {}).items():
+        (repo / rel).write_text(content)
+    outside = tmp / f"{label}-outside"
+    outside.mkdir()
+    (outside / "x.py").write_text("y = 2\n")
+    bin_dir = tmp / f"{label}-bin"
+    if seed.get("stub_tool"):
+        _install_stub_tool(bin_dir)
+    else:
+        bin_dir.mkdir(parents=True, exist_ok=True)
+    store = tmp / f"{label}-crgdata"
+    store.mkdir()
+    payload_run = _substitute(payload, {"<OUTSIDE>": str(outside / "x.py")})
+    os.environ["PATH"] = str(bin_dir)
+    os.environ["CRG_GATE_REPO_ROOT"] = str(repo)
+    os.environ["CRG_DATA_DIR"] = str(store)
+    importlib.reload(crg_gate_mod)
+    importlib.reload(crg_refresh_mod)
+    # The sleeper stands in for the real worker (positional parameters mirror
+    # `worker_command(body, root)`), so the spawn happens without a refresh.
+    crg_refresh_mod.worker_command = lambda _body, _root: list(_SLEEPER)
+    output = crg_refresh_mod.hook_output(payload_run)
+    os.environ["PATH"] = base_path
+    pending = None
+    if (store / "refresh.pending").exists():
+        pending = (store / "refresh.pending").read_text()
+    return {"output": output, "pending": pending}
+
+
+def _run_obsidian_edit(tmp: Path, case: dict) -> dict:
+    label = case["id"]
+    payload = case["payload"]
+    seed = case.get("seed", {})
+    repo = tmp / f"{label}-repo"
+    repo.mkdir()
+    vault = tmp / f"{label}-vault"
+    mem = tmp / f"{label}-mem"
+    home = tmp / f"{label}-home"
+    for directory in (vault, mem, home):
+        directory.mkdir()
+    base_by_where = {
+        "repo": repo,
+        "mem": mem,
+        "mem-default": home
+        / ".claude"
+        / "projects"
+        / (str(repo).replace("/", "-").replace("_", "-").replace(".", "-"))
+        / "memory",
+    }
+    base = base_by_where[seed.get("where", "repo")]
+    payload_run = payload
+    if seed.get("file"):
+        base.mkdir(parents=True, exist_ok=True)
+        path = base / seed["file"]
+        if seed.get("content") is not None:
+            path.write_text(seed["content"])
+        payload_run = _substitute(payload, {"<FILE>": str(path)})
+    replacements = {
+        "<VAULT>": str(vault),
+        "<MEM>": str(mem),
+        "<HOME>": str(home),
+    }
+    resolved_env = {k: replacements[v] for k, v in case.get("env", {}).items()}
+    resolved_env.setdefault("CLAUDE_PROJECT_DIR", str(repo))
+    for key, value in resolved_env.items():
+        os.environ[key] = value
+    # A fresh module per case: the module-level roots re-read the env.
+    global _OBS_LOADS
+    _OBS_LOADS += 1
+    spec = importlib.util.spec_from_file_location(
+        f"obsidian_sync_twin_{_OBS_LOADS}", _CLAUDE / "obsidian_sync.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    accum_path = _ACCUM_DIR / f"{payload['session_id']}.tsv"
+    accum_path.unlink(missing_ok=True)
+    buffer = io.StringIO()
+    old_stdin = sys.stdin
+    sys.stdin = io.StringIO(json.dumps(payload_run))
+    try:
+        with contextlib.redirect_stdout(buffer):
+            module.cmd_post_edit()
+    finally:
+        sys.stdin = old_stdin
+    text = buffer.getvalue().strip()
+    output = json.loads(text) if text else None
+    mapping = {
+        str(home): "<H>",
+        str(vault): "<V>",
+        str(mem): "<M>",
+        str(repo): "<R>",
+        str(repo).replace("/", "-").replace("_", "-").replace(".", "-"): "<RS>",
+    }
+    accum = None
+    if accum_path.exists():
+        accum = _normalize_accum(accum_path.read_text(), mapping)
+        accum_path.unlink()
+    mirror_path = None
+    mirror = None
+    notes_dir = module.VAULT_ROOT / "memory"
+    if notes_dir.is_dir():
+        notes = sorted(notes_dir.glob("*.md"))
+        if notes:
+            mirror_path = notes[0].relative_to(module.VAULT_ROOT).as_posix()
+            mirror = _normalize_mirror(notes[0].read_text(), mapping)
+    return {
+        "output": output,
+        "accum": accum,
+        "mirror_path": mirror_path,
+        "mirror": mirror,
+    }
 
 
 def _run_report_post(tmp: Path, label: str, seed: dict) -> dict:
@@ -231,6 +435,9 @@ def _run_case(tmp: Path, case: dict, base_path: str):
     seed = case.get("seed", {})
     label = case["id"]
     _reset_env()
+    if kind == "obsidian_edit":
+        # Its env values are placeholders the helper itself resolves.
+        return _run_obsidian_edit(tmp, case)
     for key, value in case.get("env", {}).items():
         os.environ[key] = value
 
@@ -250,6 +457,10 @@ def _run_case(tmp: Path, case: dict, base_path: str):
         }
     if kind == "telemetry_path":
         return _run_telemetry_path(case)
+    if kind == "post_edit":
+        return _run_post_edit(tmp, label, payload, seed, base_path)
+    if kind == "graph_edit":
+        return _run_graph_edit(tmp, label, payload, seed, base_path)
     raise ValueError(f"unknown kind in corpus case {label!r}: {kind!r}")
 
 
@@ -257,6 +468,7 @@ def test_python_hooks_match_the_frozen_corpus(tmp_path: Path) -> None:
     corpus = _load_json("post_tool_corpus.json")
     expected = _load_json("post_tool_expected.json")
     base_path = os.environ["PATH"]
+    base_home = os.environ.get("HOME")
     tmp = Path(tempfile.mkdtemp(prefix="pt-twin-", dir=tmp_path))
     failures: list[str] = []
     try:
@@ -284,6 +496,8 @@ def test_python_hooks_match_the_frozen_corpus(tmp_path: Path) -> None:
     finally:
         _reset_env()
         os.environ["PATH"] = base_path
+        if base_home is not None:
+            os.environ["HOME"] = base_home
     assert not failures, (
         f"{len(failures)} parity mismatches:\n" + "\n".join(failures)
     )

@@ -141,5 +141,170 @@
  },
  "pt-tele-path-default": {
   "path_suffix": "src/research/tmp/context_telemetry/events.jsonl"
+ },
+ "pe-py-clean": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  }
+ },
+ "pe-py-god-function": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "POST-EDIT AUDIT: giant() is 121 lines at line 1. Break it up."
+   }
+  }
+ },
+ "pe-py-silent-fallback": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "POST-EDIT AUDIT: Silent fallback at line 3: except block only contains pass. Log or re-raise."
+   }
+  }
+ },
+ "pe-py-commented-and-bare": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "POST-EDIT AUDIT: 3 lines of commented-out code. Delete them. | 1 bare except clause(s). Catch specific exceptions."
+   }
+  }
+ },
+ "pe-rs-god-file": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "POST-EDIT AUDIT: <F>/big.rs: 1251 lines. Split this file."
+   }
+  }
+ },
+ "pe-md-god-file": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  }
+ },
+ "pe-toml-file": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  }
+ },
+ "pe-unknown-suffix": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  }
+ },
+ "pe-file-missing": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  }
+ },
+ "pe-no-path": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  }
+ },
+ "ge-py-queued": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "pending": "a.py\n"
+ },
+ "ge-md-skipped": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "pending": null
+ },
+ "ge-missing-file": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "pending": null
+ },
+ "ge-outside-repo": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "pending": null
+ },
+ "ge-no-tool": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "WARNING: code-review-graph is not installed; graph NOT refreshed for a.py"
+   }
+  },
+  "pending": null
+ },
+ "oe-plain-edit": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "accum": "2026-09-13T00:00:00.000+00:00\tedit\t<R>/code.py",
+  "mirror_path": null,
+  "mirror": null
+ },
+ "oe-memory-file": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "accum": "2026-09-13T00:00:00.000+00:00\tmemory\t<M>/tips.md",
+  "mirror_path": "memory/tips.md",
+  "mirror": "---\ndate: 2026-09-13\nsource: claude-code-memory\ntype: feedback\ncanonical: \"<M>/tips.md\"\ntags: [project/llm, source/claude-code, memory/feedback]\n---\n\n# Tips\n\n> **Canonical** (auto-memory): `<M>/tips.md`\n> Thin mirror — the repo memory file is the source of truth.\n\n**small tips**\n\nUse it.\n"
+ },
+ "oe-memory-index": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "accum": "2026-09-13T00:00:00.000+00:00\tmemory-index\t<M>/MEMORY.md",
+  "mirror_path": null,
+  "mirror": null
+ },
+ "oe-vault-unset": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "accum": "2026-09-13T00:00:00.000+00:00\tmemory\t<H>/.claude/projects/<RS>/memory/note.md",
+  "mirror_path": "memory/note.md",
+  "mirror": "---\ndate: 2026-09-13\nsource: claude-code-memory\ntype: project\ncanonical: \"<H>/.claude/projects/<RS>/memory/note.md\"\ntags: [project/llm, source/claude-code, memory/project]\n---\n\n# Note\n\n> **Canonical** (auto-memory): `<H>/.claude/projects/<RS>/memory/note.md`\n> Thin mirror — the repo memory file is the source of truth.\n\nBody.\n"
+ },
+ "oe-no-path": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "accum": null,
+  "mirror_path": null,
+  "mirror": null
  }
 }

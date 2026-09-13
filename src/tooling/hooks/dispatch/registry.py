@@ -318,9 +318,11 @@ def natively_served() -> frozenset[str]:
     `post_tool_quiet`) as of #31, ``workspace_exposure_session`` (the
     SessionStart EXPOSED line, ``workspace_hygiene.exposure_line``, served
     by `native/forge/src/workspace_hygiene.rs`) as of the workspace-hygiene
-    port, and the four remaining non-editing `PostToolUse` names
-    (`crg_refresh_report_post`, `read_budget`, `post_bash_graph`,
-    `context_telemetry`) as of the zero-interpreter-start port -- so served
+    port, and every remaining `PostToolUse` name (the non-editing four
+    `crg_refresh_report_post`, `read_budget`, `post_bash_graph`,
+    `context_telemetry`, then the edit family `crg_graph_refresh`,
+    `post_edit`, `obsidian_post_edit`) as of the zero-interpreter-start
+    port -- so served
     names always come with a matching entry in
     `native_answers()`: `select()` dropping a served spec never drops a
     contribution, it is spliced back in by `runner.dispatch` instead. See
