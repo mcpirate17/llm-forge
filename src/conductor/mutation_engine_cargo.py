@@ -278,12 +278,7 @@ def execute(
     receipt["engine_version"] = report.get("cargo_mutants_version")
     package_root = str(campaign.options.get("package_root", ""))
     receipt["mutants"] = _rows(report, package_root)
-    tested = sum(
-        1
-        for row in receipt["mutants"]
-        if row["outcome"] in (_core.KILLED, _core.SURVIVED)
-    )
-    _core.require_executed(len(receipt["mutants"]), tested, campaign.source)
+    _core.require_scored_rows(campaign, receipt)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -414,6 +414,21 @@ def require_executed(generated: int, tested: int, source: Sequence[str]) -> None
         )
 
 
+def require_scored_rows(campaign: GeneratedCampaign, receipt: dict[str, Any]) -> None:
+    """`require_executed`, counted from receipt rows instead of engine totals.
+
+    cargo-mutants and mull report per-mutant rows rather than summary counters,
+    so both adapters count the outcomes that score straight off the receipt.
+    The two copies had grown into a duplication-gate clone pair, which is the
+    signal that the sequence belongs here.
+    """
+
+    tested = sum(
+        1 for row in receipt["mutants"] if row["outcome"] in (KILLED, SURVIVED)
+    )
+    require_executed(len(receipt["mutants"]), tested, campaign.source)
+
+
 def open_receipt(
     campaign: GeneratedCampaign, repo_root: Path, adapter_path: Path
 ) -> dict[str, Any]:
