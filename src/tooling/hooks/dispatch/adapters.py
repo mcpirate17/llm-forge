@@ -265,6 +265,26 @@ def obsidian_session_end(ctx: Any) -> None:
 # ── SessionStart ────────────────────────────────────────────────────────
 
 
+def workspace_exposure(ctx: Any) -> dict[str, Any]:
+    """The EXPOSED summary line, as its own hook so forge can serve it natively.
+
+    Used to be spliced into ``session_preamble.compact_state`` (deep inside the
+    legacy ``session_start`` shell body), where no amount of native serving
+    could reach it without porting the whole preamble. As its own registry
+    entry its Python adapter is exactly ``workspace_hygiene.exposure_line``
+    -- byte-identical text to what the preamble used to embed -- and the Rust
+    twin (``native/forge/src/workspace_hygiene.rs``) answers the same name.
+    """
+    workspace_hygiene = _conductor(ctx, "conductor.workspace_hygiene")
+    line = workspace_hygiene.exposure_line(ctx.root)
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": line,
+        }
+    }
+
+
 def native_freshness_report(ctx: Any) -> dict[str, Any] | None:
     """Do the interpreters this session depends on carry the natives this tree builds?
 

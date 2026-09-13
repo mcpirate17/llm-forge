@@ -225,6 +225,25 @@ mod tests {
     }
 
     #[test]
+    fn impossible_field_values_are_rejected() {
+        // Each input violates exactly one field constraint; `parse` must
+        // reject every one of them, which is also what pins the validation
+        // chain together as independent checks (any `&&` in that chain would
+        // let the single-violation inputs through).
+        for raw in [
+            "2026-09-12T24:00:00Z",
+            "2026-09-12T00:60:00Z",
+            "2026-09-12T00:00:60Z",
+            "2026-00-12T00:00:00Z",
+            "2026-13-12T00:00:00Z",
+            "2026-09-00T00:00:00Z",
+            "2026-09-32T00:00:00Z",
+        ] {
+            assert_eq!(parse(raw), None, "must reject {raw}");
+        }
+    }
+
+    #[test]
     fn duration_arithmetic_round_trips_through_formatting() {
         let created = parse("2026-09-12T00:00:00+00:00").unwrap();
         let two_hours_later = created + 2.0 * 3600.0;

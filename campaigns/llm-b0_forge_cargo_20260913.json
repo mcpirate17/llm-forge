@@ -16,19 +16,23 @@
       "src/dispatch.rs",
       "src/handlers.rs",
       "src/instant.rs",
+      "src/interpreter.rs",
       "src/main.rs",
-      "src/tool_quiet.rs"
+      "src/tool_quiet.rs",
+      "src/workspace_hygiene.rs"
     ]
   },
   "language": "rust",
   "mutation_engine": "cargo-mutants",
   "schema_version": 1,
   "source_sha256": {
-    "native/forge/src/dispatch.rs": "758415f64ed1776caad4c96b1d4be986850e3ad8e8c25f57db9983c7a1e3cfba",
-    "native/forge/src/handlers.rs": "b131e2a7a812fe5364fc1f8f35de0103894f8b2240c714c6e726c1b6e6bf3015",
-    "native/forge/src/instant.rs": "a87223b5f0a762e1e790cb48bec72a932ed6ca3a2032bc24b2c43117fdc6492d",
-    "native/forge/src/main.rs": "d472d32f0aec4481cc6a9959fd0e97be283fdb39dc6ed1f2664e983573c657d7",
-    "native/forge/src/tool_quiet.rs": "299777e8fa1d82261c0cd0f31aa688f04ef2231102e6a13bedaae4d8d77da7d8"
+    "native/forge/src/dispatch.rs": "91d29f960d079534b3c1e64ca1d9e56dc13ce9fbb1837d71635f29613a7a217f",
+    "native/forge/src/handlers.rs": "d595d07585b096f19c143f5c5fda8a02c85a93f9ffa483cfd0c5411647997fcd",
+    "native/forge/src/instant.rs": "eee8d3efc2e59dd3af60f37697360252ea94bff8aefee67fb04147675d78bb8a",
+    "native/forge/src/interpreter.rs": "3cb69794d15bae35650e8aac7c6ea296589d7ff3544d8ad5837711c289dbe85e",
+    "native/forge/src/main.rs": "052bfdeef1edfb404a552898ebe55573b8edd2d1d9e31e9e4e7edfaa88f5db2d",
+    "native/forge/src/tool_quiet.rs": "299777e8fa1d82261c0cd0f31aa688f04ef2231102e6a13bedaae4d8d77da7d8",
+    "native/forge/src/workspace_hygiene.rs": "a5426f3ef2332cc85179d0cd7f3c6d6b11dec075acf7d264d3d8f0860c6325b4"
   },
   "survivor_baseline": [
     "BinaryOperator-0761e2591eed-2",
@@ -114,6 +118,7 @@
     "UnaryOperator-f8854c4d3180-0",
     "UnaryOperator-f8854c4d3180-1"
   ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
   "survivor_baseline_recorded": true,
   "survivor_baseline_recorded_at": "2026-09-13T05:55:57.838138+00:00",
   "test_argv": [
@@ -125,27 +130,13 @@
     "forge"
   ],
   "test_sha256": {
-    "native/forge/src/bash_guard.rs": "c8893e81fd61f3721df8dd6129a764383a3a404b42356bda4ff96203dd6bf73d",
-    "native/forge/src/bash_impact.rs": "fc461f5bee186d125ad23a881c70be2e3291a489323b8107dfcc2a19ff1c9297",
-    "native/forge/src/civil.rs": "9acac46ea18abc73fbb6cd5173e82d421be97337e0a904b0aa50b9bda91a258c",
-    "native/forge/src/crg_gate.rs": "14ff650d6922a00108af6dfeb62168d55b17b21fe72c9cad7fea3a2764738fd5",
-    "native/forge/src/crg_refresh.rs": "411778a8dcb360f56b022f6259ec3470d939ffd569a86958415dd44cf3652522",
-    "native/forge/src/current_work_guard.rs": "a2c933eceed20848b652d2ad27cae891bd13487b3417a09d25d176aa7f23488f",
-    "native/forge/src/handlers.rs": "b131e2a7a812fe5364fc1f8f35de0103894f8b2240c714c6e726c1b6e6bf3015",
-    "native/forge/src/identity.rs": "301b2072244de09a1efe70dea5c2b8f66d70524883f1261f2cd74b0f16b0956e",
-    "native/forge/src/instant.rs": "a87223b5f0a762e1e790cb48bec72a932ed6ca3a2032bc24b2c43117fdc6492d",
-    "native/forge/src/interpreter.rs": "8ff087abdb19392728949fa20db60259386c90b8980d601a25d1f9b8042b108c",
-    "native/forge/src/local_ai_policy.rs": "9c419ff8f8c1261959e3ec3188ae7c6310e04e436d011a942e748bc28d4dbc6d",
-    "native/forge/src/merge.rs": "84d583a0a3af836ffec4546deb6c3264fff360476ebe9885a75db22c2e07bb0a",
-    "native/forge/src/ownership.rs": "1c2c17f141192b30877e97eca3febc8564d987af30c1f40359e9c600b3e5649a",
-    "native/forge/src/telemetry.rs": "6dae7a78bbe3f89fbcfa26445841eed4c88224609fee519af74a150478575216",
+    "native/forge/src/dispatch.rs": "91d29f960d079534b3c1e64ca1d9e56dc13ce9fbb1837d71635f29613a7a217f",
+    "native/forge/src/handlers.rs": "d595d07585b096f19c143f5c5fda8a02c85a93f9ffa483cfd0c5411647997fcd",
+    "native/forge/src/instant.rs": "eee8d3efc2e59dd3af60f37697360252ea94bff8aefee67fb04147675d78bb8a",
+    "native/forge/src/interpreter.rs": "3cb69794d15bae35650e8aac7c6ea296589d7ff3544d8ad5837711c289dbe85e",
+    "native/forge/src/main.rs": "052bfdeef1edfb404a552898ebe55573b8edd2d1d9e31e9e4e7edfaa88f5db2d",
     "native/forge/src/tool_quiet.rs": "299777e8fa1d82261c0cd0f31aa688f04ef2231102e6a13bedaae4d8d77da7d8",
-    "native/forge/src/write_targets.rs": "81b4c50b4f1dee51824d970813cb09defa713f7dbd8fdc76cae537d033a17633",
-    "native/forge/tests/bash_impact_parity.rs": "04bd5dfc9fc9eb143ef110e78a40d17fc4073b57f0ab85322a85ef38ab9cb64c",
-    "native/forge/tests/bash_pretooluse_hooks_parity.rs": "06b1228f5cb9472a5d3c2b136b0a73c291107fce899154c4e8d3458b1d402f46",
-    "native/forge/tests/guard_parity.rs": "6c87cb87e95ef6b75fdcad46ca4cfdc32ee78681585f43be04a454496e00fc8c",
-    "native/forge/tests/hook_delegation.rs": "6654fe5af18f4da0ed2946f9a9759a00d4af94db321e85018b91c5ddddb3f5a8",
-    "native/forge/tests/tool_quiet_parity.rs": "aebacef5ce6089af8b04c7f5f10907a41543b8920fcd02fb6fd4fefc8ac018ae"
+    "native/forge/src/workspace_hygiene.rs": "a5426f3ef2332cc85179d0cd7f3c6d6b11dec075acf7d264d3d8f0860c6325b4"
   },
   "title": "Generated mutants for the forge crate, scored on the survivor set"
 }

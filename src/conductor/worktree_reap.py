@@ -56,6 +56,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from conductor.project_paths import host_root, integration_refs
 from conductor.worktree_lease import LeaseError, is_linked_worktree, read_lease
 
 DEFAULT_IDLE_HOURS = 6.0
@@ -373,16 +374,55 @@ def triggers(
     return found
 
 
+def default_integration_ref(repo: Path) -> str:
+    """The line containment is judged against -- resolved, never a literal.
+
+    ``[tool.conductor].integration_branch`` (``CONDUCTOR_INTEGRATION_BRANCH``
+    overrides) names the line, and ``origin/<branch>`` is preferred over the
+    local branch so a checkout behind its remote cannot make landed work read
+    unlanded. When the configured name verifies nowhere, the remote's own HEAD
+    symref answers -- bound locally as ``refs/remotes/origin/HEAD`` when a
+    clone set it, else advertised by the remote itself via ``ls-remote
+    --symref`` -- so a repo whose line is ``master`` and whose only naming of
+    it is the remote still resolves ``origin/master``. This replaced a hardcoded
+    ``origin/master`` default that ignored all of the above: on a ``main``-line
+    repo the containment trigger silently never fired and finished worktrees
+    read as "run is not over".
+    """
+    candidates = integration_refs(host_root(repo))
+    for ref in candidates:
+        if _run(repo, "rev-parse", "--verify", "--quiet", ref).returncode == 0:
+            return ref
+    bound = _run(repo, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
+    if bound.returncode == 0:
+        remote_line = bound.stdout.strip().removeprefix("refs/remotes/")
+        if remote_line:
+            return remote_line
+    advertised = _run(repo, "ls-remote", "--symref", "origin", "HEAD")
+    if advertised.returncode == 0:
+        for line in advertised.stdout.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == "ref:" and parts[1].startswith(
+                "refs/heads/"
+            ):
+                return f"origin/{parts[1].removeprefix('refs/heads/')}"
+    raise ReapError(
+        f"{repo}: no integration line to judge containment against "
+        f"(tried {', '.join(candidates)}; origin HEAD symref unavailable)"
+    )
+
+
 def decide(
     repo: Path,
     *,
-    integration_ref: str = "origin/master",
+    integration_ref: str | None = None,
     idle_hours: float = DEFAULT_IDLE_HOURS,
     current: Path | None = None,
     now: datetime | None = None,
     proc_root: Path = Path("/proc"),
 ) -> list[Decision]:
     """Produce removal decisions without mutating Git or the filesystem."""
+    line = integration_ref or default_integration_ref(repo)
     rows = inventory(repo)
     if not rows:
         raise ReapError("git reported no worktrees")
@@ -404,7 +444,7 @@ def decide(
         fired = triggers(
             repo,
             row,
-            integration_ref=integration_ref,
+            integration_ref=line,
             idle_hours=idle_hours,
             moment=moment,
             proc_root=proc_root,
@@ -575,7 +615,7 @@ def apply(
     repo: Path,
     decisions: list[Decision],
     *,
-    integration_ref: str = "origin/master",
+    integration_ref: str | None = None,
     idle_hours: float = DEFAULT_IDLE_HOURS,
     archive_root: Path,
     checkpoint_root: Path,
@@ -585,6 +625,7 @@ def apply(
     proc_root: Path = Path("/proc"),
 ) -> list[dict[str, object]]:
     """Archive, then force-remove, every eligible worktree."""
+    line = integration_ref or default_integration_ref(repo)
     here = (current or Path.cwd()).resolve()
     removed: list[dict[str, object]] = []
     for decision in decisions:
@@ -593,7 +634,7 @@ def apply(
         row = _recheck(
             repo,
             decision,
-            integration_ref=integration_ref,
+            integration_ref=line,
             idle_hours=idle_hours,
             current=here,
             proc_root=proc_root,
@@ -603,7 +644,7 @@ def apply(
             record["archived"] = archive_worktree(
                 repo,
                 row,
-                integration_ref=integration_ref,
+                integration_ref=line,
                 archive_root=archive_root,
                 checkpoint_root=checkpoint_root,
             )
@@ -652,7 +693,12 @@ def _root_from_env(name: str) -> Path | None:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="conductor.worktree_reap")
     parser.add_argument("--repo", type=Path, default=Path.cwd())
-    parser.add_argument("--integration-ref", default="origin/master")
+    parser.add_argument(
+        "--integration-ref",
+        default=None,
+        help="integration line to judge containment against "
+        "(default: [tool.conductor].integration_branch, else the remote HEAD)",
+    )
     parser.add_argument("--idle-hours", type=float, default=DEFAULT_IDLE_HOURS)
     parser.add_argument(
         "--archive-root", type=Path, default=_root_from_env(ARCHIVE_ROOT_ENV)

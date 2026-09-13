@@ -10,25 +10,11 @@ import pytest
 
 from conductor import session_preamble as preamble
 
-
-@pytest.fixture(autouse=True)
-def _isolated_exposure(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep the EXPOSED line out of live shared state.
-
-    `compact_state` gained an exposure summary that calls
-    `workspace_hygiene.cheap_exposure_counts`, which reads the repository's SHARED
-    `.git/governance/ownership-claims.json`. That is correct in production and wrong
-    in a test: no tmp_path fixture can isolate it, and the path guard rightly refuses
-    it (governance reset deliverable 5).
-
-    Stubbed rather than disabled via `include_exposure=False`, so the CLI paths still
-    exercise the line's presence and its contribution to the MAX_INJECT_CHARS budget.
-    """
-    monkeypatch.setattr(
-        preamble,
-        "_exposure_line",
-        lambda _repo: "EXPOSED: 0 local-only commit(s), 0 stale dirty file(s).",
-    )
+# The EXPOSED summary line no longer renders inside compact_state: it moved to
+# its own SessionStart registry hook (workspace_exposure_session ->
+# workspace_hygiene.exposure_line), which also removed the autouse stub this
+# suite needed to keep that line out of the shared governance store. Its own
+# behaviour is pinned in test_workspace_hygiene.py.
 
 
 def _install_active_state_stub(
@@ -203,7 +189,7 @@ def test_root_policy_is_rendered_before_live_state_summary(tmp_path: Path) -> No
             "standing_mandates": list(policy.standing_mandates),
             "active_claims": [],
         }
-        text = preamble.compact_state(state, include_exposure=False, repo=repo)
+        text = preamble.compact_state(state, repo=repo)
         mandate_ids = [item.split(":", 1)[0] for item in policy.standing_mandates]
         expected = "\n".join(
             [
