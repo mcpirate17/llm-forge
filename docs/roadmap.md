@@ -40,9 +40,9 @@ Conclusion: cost = resident context × turns. Speed = process starts × tool cal
 1. `forge` binary crate lands (0.2).
 2. Port `_bash_guard.py` + `bash_write_targets.py`. DONE PR #20 d2a3b2c: 49 ms -> 1.05 ms, opt-in via FORGE_NATIVE_HOOKS until step 3.
 3. Port `_bash_impact.py`. DONE PR #22 78344f0; no wall-clock win yet, three Python hooks still force one interpreter start.
-4. Port `crg_gate.py` reusing `branch_policy.rs` claim/path logic. IN PROGRESS forge/rust-bash-remaining (with step 5 and the two other Bash hooks).
-5. `forge hook PreToolUse` runs 2–4 natively; shells to Python only for unported hooks.
-6. Same for PostToolUse (`post_bash_graph`, `post_bash_quiet`, telemetry).
+4. Port `crg_gate.py` reusing `branch_policy.rs` claim/path logic. DONE PR #28 5672ff6 (all Bash PreToolUse hooks native, 44 ms -> 1 ms).
+5. `forge hook PreToolUse` runs 2–4 natively; shells to Python only for unported hooks. DONE PR #28 5672ff6.
+6. Same for PostToolUse (`post_bash_graph`, `post_bash_quiet`, telemetry). IN PROGRESS.
 7. Fix and port `workspace_hygiene`'s claim read (today: hardcoded `origin/master`, `ROOT` resolving into `src/`, and a second interpreter re-exec that dominates its 0.7 s).
 8. Extend `mutation_manifest.rs` to own `mutation_campaign_generate plan`.
 9. Last: `candidate_review` checks/engine/verification.
@@ -68,6 +68,7 @@ Claude agents (≤150K each): anything Rust, anything that needs a design decisi
 - PR #25 ff1d7d8: `refresh` accepts campaigns admitted with extra tests (no more `--force` ratchet resets); `snapshot_worktree` keeps every tracked file under `tests/`, `fixtures/` and `test_*` paths plus `[tool.conductor].snapshot_extra_suffixes`; the generator pairs tests by package-relative path, not basename.
 - PR #26 3e536f7: `campaigns/registry.d/<campaign-id>.json`, one file per row; `registry.json` is an empty read-only envelope; `conductor.mutation_registry_split` is the one-shot migration. Concurrent PRs no longer conflict on the registry.
 - Slice G: a timed-out mutant is a measurement, not an engine error — TIMED_OUT counts beside `no_coverage`/`unviable` and never blocks the ratchet; the per-mutant bound is 3x the baseline suite's wall time (floor 60 s) unless the manifest pins one, and the resolved value lands in the receipt.
+- Slice H: a registered receipt whose `source_sha256` disagrees with the audited tree is a blocking stale-evidence finding (PR #28 passed on one), and a changed file inside measured territory that no campaign pins is reported uncovered; snapshots export the host interpreter as `CONDUCTOR_SNAPSHOT_PYTHON` so Rust campaigns whose tests drive Python pass baseline in a sandbox.
 - Open: re-runs of campaigns that mutate other lanes' files need `--base` pinned to the pre-lane commit.
 
 
@@ -90,3 +91,5 @@ Claude agents (≤150K each): anything Rust, anything that needs a design decisi
 | #25 | ff1d7d8 | fix(mutation): refresh accepts extra-test campaigns; snapshots keep fixture trees |
 | #26 | 3e536f7 | refactor(mutation): one registry file per campaign, no more registry.json conflicts |
 | #27 | 83504e7 | docs: roadmap, registry.d layout, doctor --harness |
+| #28 | 5672ff6 | feat(forge): all Bash PreToolUse hooks native (steps 4-5) |
+| #29 | 47624e6 | fix(mutation): timed-out mutants are a status, not an engine error |

@@ -330,3 +330,37 @@ def test_the_committed_campaign_does_not_pin_a_shared_target_dir() -> None:
     subject = campaign()
     assert subject.jobs > 1
     assert "CARGO_TARGET_DIR" not in subject.environment
+
+
+def test_the_run_environment_exports_the_snapshot_interpreter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Gap 6: a crate's tests may drive Python, and the snapshot has no venv.
+
+    The export is ranked AFTER the campaign's own environment so a manifest
+    cannot ship a broken interpreter pin past the host's, and around it the
+    campaign's variables, PATH and the no-color pin all survive.
+    """
+
+    import os
+    import sys
+
+    from conductor.mutation_engine_cargo import _environment
+
+    subject = campaign()
+    subject.environment = {
+        "RUST_LOG": "debug",
+        "CONDUCTOR_SNAPSHOT_PYTHON": "/stale/pin/from/the/manifest",
+    }
+    environment = _environment(subject)
+
+    assert environment["CONDUCTOR_SNAPSHOT_PYTHON"] == sys.executable
+    assert environment["RUST_LOG"] == "debug"
+    assert environment["PATH"] == os.environ.get("PATH", "")
+    assert environment["CARGO_TERM_COLOR"] == "never"
+
+    # The empty-string default is part of the contract, not decoration: with
+    # no PATH at all the environment still resolves (empty), and anything a
+    # mutant substitutes shows up here and only here.
+    monkeypatch.delenv("PATH", raising=False)
+    assert _environment(subject)["PATH"] == ""

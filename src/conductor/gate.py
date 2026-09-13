@@ -581,7 +581,9 @@ MUTATION_REGISTRY = Path(DEFAULT_MUTATION_REGISTRY)
 
 
 
-def mutation_corpus_audit(export_root: Path) -> PhaseResult:
+def mutation_corpus_audit(
+    export_root: Path, changed_files: frozenset[str] | None = None
+) -> PhaseResult:
     """Every registered mutant must still apply to the candidate tree.
 
     CI runs `make mutation-patch-audit` as a step of its own, so without this
@@ -595,6 +597,12 @@ def mutation_corpus_audit(export_root: Path) -> PhaseResult:
     reads campaigns, patches and receipts from disk. A shared checkout always
     carries other lanes' uncommitted campaigns, and billing those to this lane
     would make the phase red for reasons the author cannot fix.
+
+    ``changed_files`` is the candidate's own diff, so the audit's per-PR
+    dimension -- changed files inside measured territory that no campaign pins
+    -- asks about exactly this PR (PR #28 shipped ten such files and passed).
+    Repo-relative paths are identical in the repo and the export, which is why
+    a set computed against the one is valid inside the other.
     """
 
     try:
@@ -614,7 +622,9 @@ def mutation_corpus_audit(export_root: Path) -> PhaseResult:
         )
 
     try:
-        result = audit_corpus(registry, repo_root=export_root, summary=True)
+        result = audit_corpus(
+            registry, repo_root=export_root, summary=True, changed_files=changed_files
+        )
     except CampaignError as exc:
         raise GateRefusal(f"mutation corpus audit did not run: {exc}") from exc
 
@@ -724,7 +734,16 @@ def run_gate(
         base_oid = resolve_base_commit(repo, base_ref, target_ref)
         phases.append(waiver_activation(policy.mutation_waivers, base_oid))
         phases.append(clean_clone_closure(repo, export_root))
-        phases.append(mutation_corpus_audit(export_root))
+        # ACMR, not just M: a file the PR adds or renames into measured
+        # territory is exactly as unmeasured as one it edits, and a deletion
+        # needs no campaign to vouch for bytes that no longer exist.
+        changed = frozenset(
+            _git(
+                ["diff", "--name-only", "--diff-filter=ACMR", base_oid, target_ref],
+                repo=repo,
+            ).splitlines()
+        )
+        phases.append(mutation_corpus_audit(export_root, changed_files=changed))
         if not skip_review:
             review_phase, _payload = run_review(
                 repo,

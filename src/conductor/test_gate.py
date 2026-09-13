@@ -47,19 +47,20 @@ def _fake_executable(
 
 
 def _git(repo: Path, *args: str) -> str:
-    completed = subprocess.run(
+    """One git invocation inside `repo`; a nonzero exit fails the test."""
+    return subprocess.run(
         ["git", *args], cwd=repo, capture_output=True, text=True, check=True
-    )
-    return completed.stdout.strip()
+    ).stdout.strip()
 
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
+    """A one-commit repository, so a gate run has a real HEAD to diff against."""
     root = tmp_path / "repo"
     root.mkdir()
     _git(root, "init", "--quiet", "-b", "main")
-    _git(root, "config", "user.email", "test@example.invalid")
-    _git(root, "config", "user.name", "test")
+    for key, value in (("user.email", "test@example.invalid"), ("user.name", "test")):
+        _git(root, "config", key, value)
     (root / "tracked.py").write_text("VALUE = 1\n", encoding="utf-8")
     _git(root, "add", "tracked.py")
     _git(root, "commit", "--quiet", "-m", "first")
@@ -381,10 +382,11 @@ def export_with_registry(tmp_path: Path) -> Path:
 
 
 def _stub_audit(monkeypatch, result: dict[str, object], seen: dict[str, object]):
-    def fake(registry, *, repo_root, summary=False, **kwargs):
+    def fake(registry, *, repo_root, summary=False, changed_files=None, **kwargs):
         seen["registry"] = registry
         seen["repo_root"] = repo_root
         seen["summary"] = summary
+        seen["changed_files"] = changed_files
         return result
 
     monkeypatch.setattr("conductor.mutation_patch_audit.audit_corpus", fake)
@@ -412,6 +414,24 @@ def test_corpus_audit_reads_the_export_not_the_working_tree(
     gate.mutation_corpus_audit(export_with_registry)
     assert seen["repo_root"] == export_with_registry
     assert seen["registry"] == export_with_registry / gate.MUTATION_REGISTRY
+
+
+def test_corpus_audit_forwards_the_candidate_diff(
+    export_with_registry: Path, monkeypatch
+) -> None:
+    """The per-PR dimension must judge THIS candidate's changed files, or it is
+    guessing -- PR #28 shipped ten unpinned files through a green audit."""
+
+    seen: dict[str, object] = {}
+    _stub_audit(monkeypatch, _corpus_result(), seen)
+    gate.mutation_corpus_audit(
+        export_with_registry, changed_files=frozenset({"src/one.py", "src/two.py"})
+    )
+    assert seen["changed_files"] == frozenset({"src/one.py", "src/two.py"})
+
+    # Whole-tree legacy mode stays available: no diff handed over, no dimension.
+    gate.mutation_corpus_audit(export_with_registry)
+    assert seen["changed_files"] is None
 
 
 def test_corpus_audit_fails_on_a_newly_rotted_mutant(

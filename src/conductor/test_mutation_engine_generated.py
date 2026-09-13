@@ -513,3 +513,62 @@ def test_resolve_receipt_path_still_honours_an_explicit_path(tmp_path: Path) -> 
     output, relative = resolve_receipt_path(_campaign(), explicit, tmp_path)
     assert output == explicit.resolve()
     assert relative == "somewhere/receipt.json"
+
+
+def test_a_baseline_that_died_for_want_of_python_says_so(
+    tmp_path: Path,
+) -> None:
+    """Gap 6's other half: the failure that reads as a mystery must not be one.
+
+    `unmutated baseline failed` alone sent lanes hunting a broken test while
+    the same suite passed on the host -- the snapshot simply had no interpreter
+    that could import conductor. The tails say which it was; the refusal now
+    repeats them as a reason.
+    """
+
+    from conductor.mutation_campaign_model import CommandResult
+
+    from conductor.mutation_engine_generated import note_baseline
+
+    campaign = load_generated_campaign(manifest(tmp_path))
+    receipt: dict = {}
+    output = tmp_path / "receipt.json"
+
+    def result(stderr: str) -> CommandResult:
+        return CommandResult(
+            returncode=1,
+            timed_out=False,
+            duration_seconds=1.0,
+            stdout_tail="",
+            stderr_tail=stderr,
+        )
+
+    for tail in (
+        "python3: not found",
+        "ModuleNotFoundError: No module named 'conductor'",
+        "ImportError: No module named 'x'",
+    ):
+        with pytest.raises(CampaignError, match="could not drive Python"):
+            note_baseline(campaign, receipt, result(tail), ["cargo", "test"], output)
+        assert receipt["status"] == "BASELINE_FAILED"
+
+    # A tail carrying EVERY marker at once is the one input that tells `in`
+    # from `not in`: any partial tail leaves some marker absent, so an
+    # inverted membership test still finds a "missing" marker and returns
+    # the hint anyway. All three present, and only the honest test fires.
+    with pytest.raises(CampaignError, match="could not drive Python"):
+        note_baseline(
+            campaign,
+            receipt,
+            result("python3: not found: ModuleNotFoundError: No module named 'x'"),
+            ["cargo", "test"],
+            output,
+        )
+
+    # Any other failure stays a plain refusal -- the hint must not smudge a
+    # genuine red suite into an interpreter problem.
+    with pytest.raises(CampaignError, match="^unmutated baseline failed"):
+        note_baseline(
+            campaign, receipt, result("test result: FAILED. 3 passed; 2 failed"),
+            ["cargo", "test"], output,
+        )
