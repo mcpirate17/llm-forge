@@ -152,7 +152,11 @@ def _refuses_to_delete(path: Path) -> str | None:
         return f"{resolved}/pycache does not exist; not a run scratch"
     if not (resolved / _RUN_MARKER).exists():
         return f"{resolved}/{_RUN_MARKER} is absent; not a run scratch"
-    return None
+    # No bare trailing `return None` in this module: fest's return_value
+    # operator rewrites one into a byte-identical no-op mutant that no test
+    # can ever kill (verified on this campaign), so a fall-through -- which
+    # returns the same None with nothing left to mutate -- is the only form
+    # the ratchet can hold.
 
 
 def _repo_root() -> Path | None:
@@ -162,7 +166,6 @@ def _repo_root() -> Path | None:
     for candidate in (current, *current.parents):
         if (candidate / ".git").exists():
             return candidate
-    return None
 
 
 # At pytest startup: plugin import happens before conftest and test modules,
