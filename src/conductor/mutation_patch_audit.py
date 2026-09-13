@@ -259,6 +259,40 @@ def _receipt_rejection(
         return f"source hashes differ from this tree: {stale_sources}"
 
 
+class ReceiptJudge:
+    """The public seam over `_receipt_rejection`: everything it needs, built once.
+
+    The predicate grew two arguments in PR #28's follow-up (`tree`, `campaign`)
+    and every caller inside this module was updated -- but `mutation_retention`
+    called the three-argument form straight through the private name and crashed
+    with a TypeError, because nothing outside the module had a way to ask for a
+    verdict without assembling five arguments itself. This class is that way:
+    build one judge from the repo root, ask it about any number of receipts.
+    Shares one `_TreeHasher` (and its cache) across every question asked.
+
+    `_evidence_verdict` and `_acceptable_receipt` keep calling the private
+    function directly: they already hold all five arguments mid-audit, and
+    routing them through an object would be churn without a seam.
+    """
+
+    def __init__(self, repo_root: Path) -> None:
+        self.current: Mapping[str, str] = _runner_components_sha256()
+        self.package_root: Path = runner_component_root()
+        self.tree: _TreeHasher = _TreeHasher(repo_root)
+
+    def rejection(self, receipt: Mapping[str, Any], campaign: Campaign) -> str | None:
+        """Why `receipt` is not usable evidence for `campaign`, or ``None``.
+
+        The one-line forward is the point: the signature lives here, in
+        public, so a caller that drifts from it fails loudly at its own call
+        site instead of silently mis-binding the private function.
+        """
+
+        return _receipt_rejection(
+            receipt, self.current, self.package_root, self.tree, campaign
+        )
+
+
 def _evidence_verdict(
     campaign: Campaign,
     receipts: Mapping[str, list[Mapping[str, Any]]],
