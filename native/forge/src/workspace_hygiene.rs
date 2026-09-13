@@ -151,13 +151,18 @@ pub fn default_integration_ref(repo: &Path) -> Result<String> {
         repo,
         &["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"],
     ) {
+        // Python: `stdout.strip().removeprefix("refs/remotes/")` kept only
+        // when truthy -- an empty target falls through to the advertisement.
+        // Written empty-first (no `!`) so the guard cannot be quietly deleted
+        // by a single-token mutation.
         let line = bound
             .trim()
             .strip_prefix("refs/remotes/")
-            .unwrap_or(bound.trim())
-            .to_string();
-        if !line.is_empty() {
-            return Ok(line);
+            .unwrap_or(bound.trim());
+        if line.is_empty() {
+            // fall through to the remote's own advertisement
+        } else {
+            return Ok(line.to_string());
         }
     }
     if let Some(advertised) = git_quiet(repo, &["ls-remote", "--symref", "origin", "HEAD"]) {
@@ -679,7 +684,13 @@ mod tests {
         std::fs::write(wt.join("feat.txt"), b"feat\n").unwrap();
         git(&wt, &["add", "feat.txt"]);
         git(&wt, &["commit", "--quiet", "-m", "feat"]);
+        // Half-configured upstream: the merge ref is named but the remote is
+        // configured to the empty string (a `git config branch.feat.remote ""`
+        // artifact), which must read as "never pushed", not "pushed and
+        // pruned" -- the emptiness check is what keeps it from proceeding to
+        // the doomed refs/remotes//feat probe.
         git(&repo, &["config", "branch.feat.merge", "refs/heads/feat"]);
+        git(&repo, &["config", "branch.feat.remote", ""]);
         assert_eq!(landed_worktrees("origin/main", &repo).unwrap(), 0);
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
