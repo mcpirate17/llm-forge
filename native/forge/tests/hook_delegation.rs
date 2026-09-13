@@ -619,26 +619,15 @@ fn an_empty_snapshot_export_still_lets_the_project_venv_win() {
 }
 
 /// `FORGE_HOOK_STANDALONE=1` (`docs/routing.md`'s "Warn-only mode and
-/// standalone install" section): a `PreToolUse` `Bash` payload -- no
-/// `agent_id`, so the live cap check is a fast-path `NoOp`, and `tool_name`
-/// isn't `Agent`, so routing has nothing to say either -- must produce
-/// empty stdout and exit 0, never forge's own native Bash-guard verdict
-/// (contrast `default_native_coverage_answers_bash_pretooluse_without_
-/// starting_python` above, which is the same payload *without* the flag and
-/// gets a real `deny` verdict back).
-///
-/// This also proves no Python child is spawned, but only by construction,
-/// not by a dynamic sentinel: `dispatch::run_pre_tool_use_standalone`'s
-/// only branches are the live cap check, the `Agent` routing branch, and a
-/// bare `Ok(0)` fallthrough -- none of the three calls `interpreter::
-/// resolve_python` or spawns a `Command` on this payload's path. A wrapper
-/// `.venv/bin/python` that flips a marker file would exercise exactly the
-/// same static fact this comment already states from reading the source,
-/// since standalone's `PreToolUse` arm has no code path that reaches
-/// `delegate()` at all -- so it is not built here; this is the documented
-/// limitation the brief allows in place of a dynamic "no spawn" proof.
+/// standalone install" section): a `PreToolUse` `Bash` payload now runs the
+/// same fully-native guard path the non-standalone default does --
+/// `dispatch::run_pre_tool_use_standalone` special-cases `tool_name ==
+/// "Bash"` before falling through to the bare `Ok(0)` allow, so a denying
+/// command is denied under standalone too, with no Python dispatcher ever
+/// started (proven by construction: the stub dispatcher's distinctive
+/// `"echoed"` shape never appears in stdout).
 #[test]
-fn standalone_mode_silences_a_bash_payload_it_has_no_opinion_on() {
+fn standalone_mode_denies_a_bash_payload_via_the_native_guard() {
     let project = tempdir();
     stub_project(project.path());
     let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}"#;
@@ -663,11 +652,56 @@ fn standalone_mode_silences_a_bash_payload_it_has_no_opinion_on() {
         .expect("write stdin");
     let out = child.wait_with_output().expect("wait for forge");
 
-    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(out.status.code(), Some(0), "a deny verdict still exits 0");
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("json stdout from forge's own guard");
     assert!(
-        out.stdout.is_empty(),
-        "standalone must print nothing for a payload it has no opinion on: {:?}",
-        String::from_utf8_lossy(&out.stdout)
+        stdout.get("echoed").is_none(),
+        "the stub dispatcher must never have run: {stdout}"
+    );
+    assert_eq!(
+        stdout["hookSpecificOutput"]["permissionDecision"], "deny",
+        "standalone must deny exactly like the non-standalone native path: {stdout}"
+    );
+}
+
+/// The other half of the same contract: a benign `Bash` payload under
+/// standalone must not be denied -- it gets whatever the fully-native path
+/// prints for an allow (`hookSpecificOutput.permissionDecision == "allow"`),
+/// matching `handlers::run_bash_pretooluse_fully_native`'s own
+/// `fully_native_merges_all_four_outcomes_in_registry_order` unit test.
+#[test]
+fn standalone_mode_allows_a_benign_bash_payload_via_the_native_guard() {
+    let project = tempdir();
+    stub_project(project.path());
+    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"echo hi"}}"#;
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
+    cmd.arg("hook")
+        .arg("PreToolUse")
+        .env("CLAUDE_PROJECT_DIR", project.path())
+        .env("FORGE_HOOK_STANDALONE", "1")
+        .env_remove("CONTEXT_TELEMETRY_PATH")
+        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
+        .env_remove("FORGE_NATIVE_HOOKS")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd.spawn().expect("spawn forge");
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(payload.as_bytes())
+        .expect("write stdin");
+    let out = child.wait_with_output().expect("wait for forge");
+
+    assert_eq!(out.status.code(), Some(0));
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("json stdout from forge's own guard");
+    assert_eq!(
+        stdout["hookSpecificOutput"]["permissionDecision"], "allow",
+        "a benign command must not be denied: {stdout}"
     );
 }
 
