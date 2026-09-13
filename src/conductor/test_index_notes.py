@@ -30,12 +30,8 @@ def repo_trees(tmp_path):
     return notes_dir, tasks_dir
 
 
-def test_source_roots_includes_repo_and_vault_when_vault_present(monkeypatch, tmp_path, repo_trees):
-    notes_dir, tasks_dir = repo_trees
-    vault_root = tmp_path / "vault"
-    vault_research = vault_root / "research"
-    _write(vault_research / "gamma.md", "# Gamma\n\nvault-only note\n")
-
+def _patch_sources(monkeypatch, tmp_path, notes_dir, tasks_dir, *, vault_root):
+    """Point every module constant `_source_roots()` reads at temp trees."""
     monkeypatch.setattr(index_notes, "VAULT_ROOT", str(vault_root))
     monkeypatch.setattr(
         index_notes,
@@ -49,33 +45,27 @@ def test_source_roots_includes_repo_and_vault_when_vault_present(monkeypatch, tm
     monkeypatch.setattr(index_notes, "TASKS_SOURCE", ("tasks", str(tasks_dir)))
     monkeypatch.setattr(index_notes, "_fallback_notes_source", lambda: ("notes", str(notes_dir)))
 
+
+def test_source_roots_includes_repo_and_vault_when_vault_present(monkeypatch, tmp_path, repo_trees):
+    notes_dir, tasks_dir = repo_trees
+    vault_root = tmp_path / "vault"
+    _write(vault_root / "research" / "gamma.md", "# Gamma\n\nvault-only note\n")
+    _patch_sources(monkeypatch, tmp_path, notes_dir, tasks_dir, vault_root=vault_root)
+
     roots = index_notes._source_roots()
     sources = {name for name, _ in roots}
 
     assert "notes" in sources
     assert "tasks" in sources
     assert "vault_research" in sources
-    assert (str(notes_dir) in {r for _, r in roots})
+    assert str(notes_dir) in {r for _, r in roots}
 
 
 def test_rebuild_indexes_both_repo_notes_and_vault(monkeypatch, tmp_path, repo_trees):
     notes_dir, tasks_dir = repo_trees
     vault_root = tmp_path / "vault"
-    vault_research = vault_root / "research"
-    _write(vault_research / "gamma.md", "# Gamma\n\nvault-only note\n")
-
-    monkeypatch.setattr(index_notes, "VAULT_ROOT", str(vault_root))
-    monkeypatch.setattr(
-        index_notes,
-        "VAULT_SOURCES",
-        (
-            ("vault_research", str(vault_research)),
-            ("vault_dashboards", str(vault_root / "dashboards")),
-            ("vault_runbooks", str(vault_root / "runbooks")),
-        ),
-    )
-    monkeypatch.setattr(index_notes, "TASKS_SOURCE", ("tasks", str(tasks_dir)))
-    monkeypatch.setattr(index_notes, "_fallback_notes_source", lambda: ("notes", str(notes_dir)))
+    _write(vault_root / "research" / "gamma.md", "# Gamma\n\nvault-only note\n")
+    _patch_sources(monkeypatch, tmp_path, notes_dir, tasks_dir, vault_root=vault_root)
     monkeypatch.setattr(index_notes, "REPO", str(tmp_path / "repo"))
 
     conn = sqlite3.connect(":memory:")
@@ -98,19 +88,7 @@ def test_rebuild_indexes_both_repo_notes_and_vault(monkeypatch, tmp_path, repo_t
 def test_source_roots_repo_only_when_no_vault(monkeypatch, tmp_path, repo_trees):
     notes_dir, tasks_dir = repo_trees
     missing_vault = tmp_path / "no-such-vault"
-
-    monkeypatch.setattr(index_notes, "VAULT_ROOT", str(missing_vault))
-    monkeypatch.setattr(
-        index_notes,
-        "VAULT_SOURCES",
-        (
-            ("vault_research", str(missing_vault / "research")),
-            ("vault_dashboards", str(missing_vault / "dashboards")),
-            ("vault_runbooks", str(missing_vault / "runbooks")),
-        ),
-    )
-    monkeypatch.setattr(index_notes, "TASKS_SOURCE", ("tasks", str(tasks_dir)))
-    monkeypatch.setattr(index_notes, "_fallback_notes_source", lambda: ("notes", str(notes_dir)))
+    _patch_sources(monkeypatch, tmp_path, notes_dir, tasks_dir, vault_root=missing_vault)
 
     roots = index_notes._source_roots()
     sources = {name for name, _ in roots}
