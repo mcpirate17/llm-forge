@@ -1,5 +1,5 @@
 {
-  "campaign_id": "conductor-67_mutation_attribution_fest_20260913",
+  "campaign_id": "llm-b0_mutation_pycache_evict_fest_20260913",
   "environment": {},
   "generator": {
     "exclude": [
@@ -10,29 +10,28 @@
     "run_timeout_seconds": 1800,
     "seed": 0,
     "source": [
-      "src/conductor/mutation_attribution.py"
+      "src/conductor/mutation_pycache_evict.py"
     ]
   },
   "language": "python",
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/conductor/mutation_attribution.py": "ad461e9b4f37a2402a9c9c56ea56a3237c917d506f72f3c85af092060742ba85"
+    "src/conductor/mutation_pycache_evict.py": "4e948a2af1a66567cc44fef670bc728e2a4fb6da9d8f82cf4ba5cf0c8a9b93b4"
   },
   "survivor_baseline": [],
   "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": true,
-  "survivor_baseline_recorded_at": "2026-09-13T00:32:59.951317+00:00",
+  "survivor_baseline_recorded": false,
   "test_argv": [
     "python",
     "-m",
     "pytest",
     "-q",
     "--rootdir=.",
-    "src/conductor/test_mutation_attribution.py"
+    "src/conductor/test_mutation_pycache_evict.py"
   ],
   "test_sha256": {
-    "src/conductor/test_mutation_attribution.py": "b47aa72c9984cd90b9f696ca94ff7eb2ad3c650086f53d84b640bb6dc72c4f52"
+    "src/conductor/test_mutation_pycache_evict.py": "4e8694833a2486339e4d553941788f0fe3c00bda5cd84bea8e0ac9d74cfc6ef5"
   },
-  "title": "Generated mutants for src/conductor/mutation_attribution.py, scored on the survivor set"
+  "title": "Generated mutants for src/conductor/mutation_pycache_evict.py, scored on the survivor set"
 }
