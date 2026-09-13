@@ -167,3 +167,115 @@ later PR (`docs/roadmap.md` step 2b).
 warnings`, `cargo test` (673 tests, 0 failed) all pass. Median of 10 release
 `forge hook PreToolUse` runs with an `Agent` payload on stdin: 1.364 ms
 (budget: under 5 ms).
+
+## Enforcement (`docs/roadmap.md` Phase 3 step 3, items 1-2)
+
+Step 2 above only decides a dispatch's tier at the moment it starts. Step 3
+watches the dispatch while it runs and finalizes its ledger row once it
+stops.
+
+### Which branch of live cap enforcement shipped, and why
+
+Verdict B (above) settled this: a `PreToolUse` fired for a tool call made
+*inside* a running subagent carries the **parent's own** `session_id`/
+`transcript_path`, never a distinct path for the subagent itself, plus a
+populated `agent_id`. There is no harness-provided "this subagent's
+transcript" field to read directly. `native/forge/src/cap_enforce.rs`
+therefore ships the **derived-path branch**: for any `PreToolUse` whose
+payload carries a non-empty `agent_id`, it derives
+`<dirname(transcript_path)>/<session_id>/subagents/agent-<agent_id>.jsonl`
+itself (`subagent_transcript::derive`) and reads *that* file incrementally.
+A payload with no `agent_id` (the overwhelming majority of calls -- anything
+outside a subagent) is a fast-path no-op: one field lookup, no filesystem
+access at all. Measured in-process median over 10 runs each
+(`cap_enforce::timing_probe`, `cargo test --release --bin forge
+cap_enforce::timing_probe -- --ignored --nocapture`): fast path **0.03 us**,
+derived path (50-line transcript, cold state) **42.92 us** -- both trivial
+next to the ~1.4 ms whole-hook budget measured above.
+
+State lives at `<ledger_root>/live/<agent_id>.json`: a byte offset already
+folded into the running total, plus the running `billed_total`
+(input+output+cache_creation, cache reads excluded, same basis as
+`agent_rollup`) and a `warned` flag so the 80% warning fires at most once.
+The whole check (state load, incremental read, route lookup, state save) is
+bounded to 200 ms wall clock; on overrun the partial read is still
+persisted but the call is allowed, with one stderr line -- a slow disk must
+never manufacture a denial.
+
+Class and cap resolution prefers the matching `task_dispatch` row for that
+`agent_id` (written by the dispatching `Agent` `PreToolUse` call) when one
+exists on disk; absent that, it falls back to `forge route` on the
+payload's own `agent_type` field, same policy table as step 2.
+
+### Exact deny/warn messages
+
+At 80% of the class cap, once per agent, the call is allowed with an
+`additionalContext` warning:
+
+```
+at 80% of the 150000 token cap for class general (120000 billed): consider wrapping up soon
+```
+
+Over the cap, the call is denied outright:
+
+```
+over the 150000 token cap for class general (162345 billed): stop, write your final report now; the parent will re-dispatch what is left
+```
+
+Both interpolate the resolved `cap_tokens`, `class`, and the state's current
+`billed_total` -- never a hardcoded number.
+
+### `SubagentStop`: finalizing the row
+
+`native/forge/src/subagent_stop.rs` wires a new `SubagentStop` match arm in
+`dispatch.rs::run_hook`. On every `SubagentStop`, best-effort (every failure
+is one stderr line, never a propagated error -- this hook owns no verdict
+and must never block the harness):
+
+1. Reads the payload's `agent_id`, `agent_type`, and derives the subagent's
+   own transcript path exactly as the live-enforcement branch above does.
+2. Runs `forge ledger rollup-agent <transcript> --agent-id <id>
+   [--subagent-type <type>]` as a child bounded to 2 s, over that one
+   transcript path only -- never the whole session tree `SessionEnd`'s
+   rollup walks. `FORGE_LEDGER_DISABLE=1` skips this entirely.
+3. `rollup-agent` upserts the matching `task_dispatch` row keyed by a
+   synthetic `agent-<agent_id>` id, with final `billed_tokens`, `tier`, and
+   `over_cap = billed_tokens > cap_tokens` (cap resolved the same way as
+   step 2, via `forge route` on `subagent_type`/`description`). A second
+   `SubagentStop` for the same agent rewrites the same row rather than
+   appending a duplicate.
+4. Deletes `<ledger_root>/live/<agent_id>.json` -- the agent has stopped, so
+   there is nothing left for the next `PreToolUse` to enforce a cap against.
+5. Delegates to the Python dispatcher exactly as before -- `SubagentStop`
+   owns no verdict of its own, same posture as `SessionEnd`.
+
+**Known debt** (also in `docs/ledger.md`): `rollup-agent` has no access to
+the parent transcript, so it never learns the real `tool_use_id` a later
+full `forge ledger rollup --repo` sweep will key that same dispatch's row
+under. It is a *separate* row from the one a subsequent full sweep writes
+for the same dispatch until something reconciles the two keys.
+
+### Installing the hook
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [{"type": "command", "command": "<path-to>/forge hook PreToolUse"}]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [{"type": "command", "command": "<path-to>/forge hook SubagentStop"}]
+      }
+    ]
+  }
+}
+```
+
+`FORGE_LEDGER_DISABLE=1` skips the `SubagentStop` rollup entirely (the
+escape hatch for a broken ledger root); it does not affect the live
+`PreToolUse` cap check itself, which has no disable flag of its own today
+(tracked as debt below).
