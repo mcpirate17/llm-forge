@@ -78,11 +78,6 @@ handoff = "conductor.handoff:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/conductor", "src/tooling"]
 
-[tool.pytest.ini_options]
-markers = [
-    "slow: takes longer than a fast unit test (still runs in CI, not filtered).",
-]
-
 [tool.uv.sources]
 conductor-native = { path = "native/conductor-native" }
 slop-core = { path = "native/slop-core" }

@@ -99,7 +99,6 @@ def _assert_no_site_leak(
     )
 
 
-@pytest.mark.slow
 def test_installed_layout_resolves_host_not_site(
     installed_site: Path, fake_host: Path
 ) -> None:
