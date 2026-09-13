@@ -241,6 +241,11 @@ def post_bash_quiet(ctx: Any) -> dict[str, Any]:
     return _body(ctx, "tooling/hooks/claude/_bash_quiet.py").hook_output(ctx.payload)
 
 
+def post_tool_quiet(ctx: Any) -> dict[str, Any]:
+    _source_project_env(ctx)
+    return _body(ctx, "tooling/hooks/claude/post_tool_quiet.py").hook_output(ctx.payload)
+
+
 def context_telemetry(ctx: Any) -> None:
     telemetry = _conductor(ctx, "conductor.context_telemetry")
     path = _telemetry_path(telemetry)

@@ -189,3 +189,13 @@ def test_shell_entry_point_round_trips_json() -> None:
         ["bash", str(HOOK)], input="not json", capture_output=True, text=True
     )
     assert proc.returncode == 0 and "updatedToolOutput" not in proc.stdout
+
+
+def test_bound_response_gates_on_bytes_not_characters() -> None:
+    # The declared bound is LIMIT_BYTES of output. 5000 two-byte characters are
+    # 10000 bytes -- over the 8000-byte cap on the byte count, under it on the
+    # character count, which is the gate that used to decide.
+    response = {"stdout": "ü" * 5000}
+    updated = bq.bound_response(response)
+    assert updated is not None
+    assert "[elided" in updated["stdout"]
