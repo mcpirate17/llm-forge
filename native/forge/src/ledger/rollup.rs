@@ -181,6 +181,14 @@ pub struct SessionRollupRow {
     /// from it would carry the same superset rather than under-attributing
     /// either.
     pub harness_session_ids: Vec<String>,
+    /// `TranscriptSummary::commit_subject_digests` carried through the same
+    /// way as `harness_session_ids`: a transcript file already is one
+    /// session, so the file-wide digest set the reader computed is this
+    /// session's set. A subagent row (`agent-<id>`) keeps its OWN list -- a
+    /// subagent that typed a commit is joinable on its own digest, which
+    /// `agent.rs`'s join then also credits to its parent. The
+    /// `commit_subject` join key (`subject.rs`).
+    pub commit_subject_digests: Vec<String>,
     /// Distinct `TurnSummary::model` values seen on this session's turns,
     /// sorted (design step 4, `agent_rollup`'s tier inference input).
     pub models: Vec<String>,
@@ -313,9 +321,19 @@ pub fn run(args: RollupArgs) -> Result<i32> {
             }
         }
         let ambiguous = joins.iter().filter(|j| j.ambiguous).count();
+        let by_method = |method: &str| joins.iter().filter(|j| j.join_method == method).count();
+        eprintln!(
+            "forge ledger rollup: joined {}/{} landed commits: session_url={} commit_subject={} time_window={} unjoined={}",
+            joins.len() - by_method("unjoined"),
+            joins.len(),
+            by_method("session_url"),
+            by_method("commit_subject"),
+            by_method("time_window"),
+            by_method("unjoined"),
+        );
         if ambiguous > 0 {
             eprintln!(
-                "forge ledger rollup: {ambiguous} landed commit(s) matched more than one session on the time-window fallback (agent_rollup.join_method=\"time_window\"; every candidate was credited)"
+                "forge ledger rollup: {ambiguous} landed commit(s) matched more than one session on a fallback join (commit_subject or time_window; every candidate was credited)"
             );
         }
         for row in agent_rows {
@@ -684,6 +702,7 @@ fn session_rollup_row(
         resend_bytes,
         resend_events,
         harness_session_ids: summary.harness_session_ids.to_vec(),
+        commit_subject_digests: summary.commit_subject_digests.to_vec(),
         models,
     }
 }

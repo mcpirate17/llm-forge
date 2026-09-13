@@ -12,6 +12,7 @@ pub mod reader;
 pub mod rollup;
 pub mod schema;
 pub mod session_ids;
+pub mod subject;
 pub mod writer;
 
 use std::path::{Path, PathBuf};

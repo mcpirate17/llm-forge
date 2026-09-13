@@ -224,7 +224,7 @@ dependencies = [
 
 [[package]]
 name = "conductor-native"
-version = "0.1.40"
+version = "0.1.42"
 dependencies = [
  "base64",
  "pyo3",

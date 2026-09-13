@@ -77,6 +77,13 @@ pub struct LandedCommitRow {
     /// once, one per squashed sub-commit).
     pub agent_names: Vec<String>,
     pub harness_session_ids: Vec<String>,
+    /// The subject's digest under the SAME normalization and hash the
+    /// reader side uses (`subject.rs`): the squash suffix `(#N)` is
+    /// stripped before hashing, so a `gh pr create --title` digest meets
+    /// its landed subject here. Empty string when the normalized subject is
+    /// shorter than `subject::MIN_SUBJECT_CHARS` -- refused on both sides,
+    /// never matched.
+    pub subject_digest: String,
     pub files_changed: u64,
     pub insertions: u64,
     pub deletions: u64,
@@ -186,6 +193,7 @@ fn parse_commit_chunk(chunk: &str) -> LandedCommitRow {
         pr_number: pr_number_from_subject(subject),
         agent_names: agent_names_from_body(body),
         harness_session_ids: harness_session_ids.into_iter().collect(),
+        subject_digest: super::subject::subject_digest(subject),
         files_changed,
         insertions,
         deletions,
@@ -319,6 +327,31 @@ mod tests {
         assert_eq!(
             ids.into_iter().collect::<Vec<_>>(),
             vec!["session_abc123".to_string()]
+        );
+    }
+
+    #[test]
+    fn the_subject_digest_strips_the_squash_suffix() {
+        // The landed subject carries ` (#N)`; the session that typed it ran
+        // `gh pr create --title "<title>"` with no suffix. The strip is
+        // what makes the two digests meet.
+        let rows = parse_log(FIXTURE_LOG);
+        assert_eq!(
+            rows[0].subject_digest,
+            super::super::subject::subject_digest(
+                "feat(forge): ledger rollup writes turn, session and hook tables with compaction and resend detection"
+            )
+        );
+        assert_eq!(
+            rows[1].subject_digest,
+            super::super::subject::subject_digest(
+                "feat(forge): workspace_hygiene reads the configured integration branch, runs native at SessionStart"
+            )
+        );
+        // No suffix on this one: the digest hashes the subject verbatim.
+        assert_eq!(
+            rows[2].subject_digest,
+            super::super::subject::subject_digest("chore: direct push, no PR")
         );
     }
 }
