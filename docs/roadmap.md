@@ -45,7 +45,7 @@ Conclusion: cost = resident context × turns. Speed = process starts × tool cal
 6. Same for PostToolUse (`post_bash_graph`, `post_bash_quiet`, telemetry). DONE PR #31 25cd503 (`post_bash_quiet`/`post_tool_quiet` native via the splice); the matcher-`.*` remainder is step 9 below.
 7. Fix and port `workspace_hygiene`'s claim read (today: hardcoded `origin/master`, `ROOT` resolving into `src/`, and a second interpreter re-exec that dominates its 0.7 s). DONE PR #32.
 8. Extend `mutation_manifest.rs` to own `mutation_campaign_generate plan`. DONE PR #33 a5f3a62 (forge mutation plan 1.1 ms median, zero interpreter starts).
-9. PostToolUse fully native for every non-edit tool (`crg_refresh_report_post`, `read_budget`, `post_bash_graph`, `context_telemetry`; Read/Bash `ls`/Grep/MCP answered with zero interpreter starts). IN PROGRESS #36.
+9. PostToolUse fully native for every non-edit tool (`crg_refresh_report_post`, `read_budget`, `post_bash_graph`, `context_telemetry`; Read/Bash `ls`/Grep/MCP answered with zero interpreter starts). DONE PR #36 (those four; Bash `ls` 1.05 ms, Read 0.86 ms, zero interpreter starts). PR #40 finishes it: the edit family (`crg_graph_refresh`, `post_edit`, `obsidian_post_edit` post-edit path) ported too, so all nine registry PostToolUse names are native and Edit/Write/NotebookEdit answer with zero interpreter starts -- Edit hook overhead 0.83 ms excluding the external formatter (was ~41 ms through the Python dispatcher; formatters 4-5 ms each measured separately), zero python execve on the hook path (the detached refresh worker Python spawns stays, by design, off the hook path).
 10. Last: `candidate_review` checks/engine/verification.
 Exit criterion: per-tool-call fixed cost < 5 ms, measured by 0.1.
 

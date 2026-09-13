@@ -1,9 +1,12 @@
 //! Native port of `crg_graph_refresh`'s PostToolUse surface:
 //! `failure_output` (via `crg_refresh_state.take_notices`) for
-//! `crg_refresh_report_post`, and `_queue([FULL_UPDATE])` /
+//! `crg_refresh_report_post`, `_queue([FULL_UPDATE])` /
 //! `full_update_output` for `post_bash_graph` -- queue a whole-tree refresh
 //! by appending to the graph store's `refresh.pending` marker and spawning
-//! one detached worker when none is running, then return at once.
+//! one detached worker when none is running, then return at once -- and
+//! `hook_output` (`edit_hook_output`) for the `crg_graph_refresh` hook
+//! itself: PostToolUse on Edit/Write/NotebookEdit queues the edited
+//! graph-suffix files the same way and never waits.
 //!
 //! The worker itself stays Python (`crg_graph_refresh.py --worker`): it owns
 //! the debounce/coalesce loop, the bounded refresh child and the embedding
@@ -193,22 +196,193 @@ pub fn body_path(root: &Path, relative: &str) -> PathBuf {
     root.join("src").join(relative)
 }
 
-/// `_queue([FULL_UPDATE])`: the warning when `code-review-graph` is not
-/// installed, else the queue append (empty string = no warning).
+/// `_queue([FULL_UPDATE])`: the whole-tree queue append (empty string = no
+/// warning).
 pub fn queue_full_update(repo_root: &Path) -> std::io::Result<String> {
+    queue_paths(repo_root, &[FULL_UPDATE.to_string()])
+}
+
+/// `crg_gate.REPO_ROOT`'s ladder: `CRG_GATE_REPO_ROOT` (tests), then
+/// `PROJECT_DIR` (the exec launcher), then the session checkout. Python's
+/// fourth rung is the module file's own location; forge has no module file,
+/// so the dispatcher's checkout (`interpreter::project_root()`) is the
+/// authority -- the same root every other native hook resolves against.
+/// Canonicalized like Python's outer `.resolve()`, so `strip_prefix` against
+/// a canonicalized target agrees.
+pub fn gate_repo_root() -> PathBuf {
+    let raw = ["CRG_GATE_REPO_ROOT", "PROJECT_DIR"]
+        .iter()
+        .find_map(|name| std::env::var(name).ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(crate::interpreter::project_root);
+    std::fs::canonicalize(&raw).unwrap_or(raw)
+}
+
+/// `crg_graph_refresh.GRAPH_SUFFIXES`: the suffixes whose edits touch the
+/// graph (prose and config files do not).
+pub const GRAPH_SUFFIXES: &[&str] = &[
+    ".py", ".rs", ".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".sh", ".bash",
+];
+
+/// `crg_gate._target_paths`: the write targets a payload names -- the five
+/// path keys of `tool_input`, plus every `*** Add/Update/Delete File:` header
+/// inside a patch-shaped string field.
+fn target_paths(payload: &Value) -> Vec<String> {
+    let mut paths = Vec::new();
+    let empty = serde_json::Map::new();
+    let tool_input = payload
+        .get("tool_input")
+        .or_else(|| payload.get("toolInput"))
+        .and_then(Value::as_object)
+        .unwrap_or(&empty);
+    for key in [
+        "file_path",
+        "filePath",
+        "path",
+        "notebook_path",
+        "target_file",
+    ] {
+        if let Some(value) = tool_input.get(key).and_then(Value::as_str) {
+            if !value.is_empty() {
+                paths.push(value.to_string());
+            }
+        }
+    }
+    static PATCH_FILE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let pattern = PATCH_FILE.get_or_init(|| {
+        // `(?m)`: Python compiles this with re.MULTILINE, so every line of a
+        // multi-line patch is a candidate, not just the whole-string head.
+        regex::Regex::new(r"(?m)^\*\*\* (?:Add|Update|Delete) File: (.+)$")
+            .expect("constant pattern compiles")
+    });
+    for source in [
+        tool_input.get("patch"),
+        tool_input.get("input"),
+        tool_input.get("command"),
+        payload.get("patch"),
+        payload.get("input"),
+        payload.get("command"),
+    ] {
+        let Some(text) = source.and_then(Value::as_str) else {
+            continue;
+        };
+        for capture in pattern.captures_iter(text) {
+            paths.push(capture[1].trim().to_string());
+        }
+    }
+    paths
+}
+
+/// Python's non-strict `Path.resolve()` for the shapes a hook target takes:
+/// an existing path canonicalizes; a missing leaf resolves against its
+/// canonical parent; only when even the parent is missing does the path stay
+/// lexical (normalized `.`/`..` components, never above the root).
+fn resolve_like_python(path: &Path) -> PathBuf {
+    if let Ok(canonical) = std::fs::canonicalize(path) {
+        return canonical;
+    }
+    if let Some(parent) = path.parent() {
+        if let Ok(canonical_parent) = std::fs::canonicalize(parent) {
+            return match path.file_name() {
+                Some(name) => canonical_parent.join(name),
+                None => canonical_parent,
+            };
+        }
+    }
+    let mut normalized = PathBuf::from("/");
+    for component in path.components() {
+        use std::path::Component;
+        match component {
+            Component::RootDir | Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::Normal(part) => normalized.push(part),
+            Component::Prefix(_) => {}
+        }
+    }
+    normalized
+}
+
+/// `crg_gate._classify_targets`'s local half (`_repo_relative_targets`):
+/// the targets that land inside this checkout, as checkout-relative posix
+/// paths. Sibling-worktree and outside-checkout targets are dropped -- the
+/// graph only refreshes what this checkout owns.
+fn repo_relative_targets(payload: &Value, repo_root: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    for raw in target_paths(payload) {
+        let target = PathBuf::from(&raw);
+        let resolved = if target.is_absolute() {
+            resolve_like_python(&target)
+        } else {
+            resolve_like_python(&repo_root.join(target))
+        };
+        if let Ok(relative) = resolved.strip_prefix(repo_root) {
+            out.push(relative.to_string_lossy().into_owned());
+        }
+    }
+    out
+}
+
+/// `crg_graph_refresh._graph_files`: the queued subset of the payload's
+/// targets -- a known graph suffix that exists as a file under the checkout.
+pub fn graph_files(payload: &Value, repo_root: &Path) -> Vec<String> {
+    repo_relative_targets(payload, repo_root)
+        .into_iter()
+        .filter(|target| {
+            let suffix = Path::new(target)
+                .extension()
+                .map(|ext| format!(".{}", ext.to_string_lossy()));
+            suffix.is_some_and(|suffix| GRAPH_SUFFIXES.contains(&suffix.as_str()))
+                && repo_root.join(target).is_file()
+        })
+        .collect()
+}
+
+/// `_queue(paths)`: the warning when `code-review-graph` is not installed,
+/// else the queue append + detached worker spawn (empty string = no warning).
+fn queue_paths(repo_root: &Path, paths: &[String]) -> std::io::Result<String> {
     if which_code_review_graph().is_none() {
         return Ok(format!(
             "WARNING: code-review-graph is not installed; graph NOT refreshed for {}",
-            FULL_UPDATE
+            paths.join(", ")
         ));
     }
+    let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
     request(
         &ensure_store(repo_root),
-        &[FULL_UPDATE],
+        &refs,
         &worker_command(repo_root),
         repo_root,
     )?;
     Ok(String::new())
+}
+
+/// `crg_graph_refresh.hook_output`: the dispatcher's PostToolUse
+/// Edit/Write/NotebookEdit answer -- queue the graph-relevant targets and
+/// never wait. Quiet on success (the queue owns the refresh); the
+/// not-installed warning is the only context it ever adds.
+pub fn edit_hook_output(payload: &Value, repo_root: &Path) -> std::io::Result<Value> {
+    let files = graph_files(payload, repo_root);
+    if files.is_empty() {
+        return Ok(json!({
+            "hookSpecificOutput": {"hookEventName": "PostToolUse"}
+        }));
+    }
+    let warning = queue_paths(repo_root, &files)?;
+    if warning.is_empty() {
+        return Ok(json!({
+            "hookSpecificOutput": {"hookEventName": "PostToolUse"}
+        }));
+    }
+    Ok(json!({
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": warning,
+        }
+    }))
 }
 
 /// `crg_graph_refresh.full_update_output`: the PostToolUse answer after a git
@@ -571,5 +745,95 @@ pub(crate) mod tests {
         );
         // Nothing was queued while the tool is absent.
         assert!(!tmp.path().join(".code-review-graph").exists());
+    }
+
+    #[test]
+    fn gate_repo_root_and_resolve_follow_the_python_ladder() {
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let tmp = ScratchDir::new("gate-root");
+        let root = tmp.path().canonicalize().unwrap();
+        std::env::set_var("CRG_GATE_REPO_ROOT", tmp.path());
+        // Canonicalized like Python's outer `.resolve()`, so `strip_prefix`
+        // against a canonicalized target agrees.
+        assert_eq!(gate_repo_root(), root);
+        std::env::remove_var("CRG_GATE_REPO_ROOT");
+        // `resolve_like_python`: an existing path canonicalizes; a missing
+        // leaf joins its canonical parent; a fully missing path stays lexical
+        // (normalized, never above the root).
+        assert_eq!(resolve_like_python(&root), root);
+        assert_eq!(
+            resolve_like_python(&root.join("ghost.py")),
+            root.join("ghost.py")
+        );
+        assert_eq!(
+            resolve_like_python(Path::new("/nonexistent-xyz-123/../../../x.py")),
+            PathBuf::from("/x.py")
+        );
+    }
+
+    #[test]
+    fn graph_files_keeps_existing_graph_suffix_targets() {
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let tmp = ScratchDir::new("graph-files");
+        let root = tmp.path().canonicalize().unwrap();
+        fs::write(root.join("a.py"), "x = 1\n").unwrap();
+        fs::write(root.join("b.md"), "prose\n").unwrap();
+        fs::write(root.join("sub.rs"), "fn f() {}\n").unwrap();
+        assert_eq!(
+            graph_files(&json!({"tool_input": {"file_path": "a.py"}}), &root),
+            vec!["a.py".to_string()]
+        );
+        // Prose suffixes and missing files are dropped even when named.
+        assert!(graph_files(&json!({"tool_input": {"file_path": "b.md"}}), &root).is_empty());
+        assert!(graph_files(&json!({"tool_input": {"file_path": "ghost.py"}}), &root).is_empty());
+        // An absolute path inside the checkout is repo-relative first.
+        assert_eq!(
+            graph_files(
+                &json!({"tool_input": {"file_path": root.join("sub.rs").display().to_string()}}),
+                &root
+            ),
+            vec!["sub.rs".to_string()]
+        );
+        // A patch-shaped command names its targets too, and a path outside
+        // the checkout is never this checkout's to refresh.
+        assert_eq!(
+            graph_files(
+                &json!({"tool_input": {"command": "*** Add File: a.py\n+new\n*** Update File: /elsewhere/x.py"}}),
+                &root
+            ),
+            vec!["a.py".to_string()]
+        );
+    }
+
+    #[test]
+    fn edit_hook_output_is_quiet_or_warns_like_the_python_body() {
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let tmp = ScratchDir::new("edit-hook");
+        let root = tmp.path().canonicalize().unwrap();
+        fs::write(root.join("a.py"), "x = 1\n").unwrap();
+        // No graph-relevant target named: quiet, and nothing queued.
+        let quiet = json!({"hookSpecificOutput": {"hookEventName": "PostToolUse"}});
+        assert_eq!(
+            edit_hook_output(&json!({"tool_input": {"file_path": "b.md"}}), &root).unwrap(),
+            quiet
+        );
+        // Tool absent: the not-installed warning is the only context the
+        // edit path ever adds, and nothing is queued behind it.
+        let empty_bin = tmp.path().join("bin");
+        fs::create_dir_all(&empty_bin).unwrap();
+        std::env::set_var("PATH", empty_bin.display().to_string());
+        let out = edit_hook_output(&json!({"tool_input": {"file_path": "a.py"}}), &root).unwrap();
+        std::env::remove_var("PATH");
+        assert_eq!(
+            out["hookSpecificOutput"]["additionalContext"],
+            json!("WARNING: code-review-graph is not installed; graph NOT refreshed for a.py")
+        );
+        assert!(!root.join(".code-review-graph").exists());
     }
 }

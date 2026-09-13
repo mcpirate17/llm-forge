@@ -31,13 +31,12 @@
 //! native default", not "opt out" -- see `native_hook_names_from_env`.
 //!
 //! `PostToolUse` lives in `crate::post_tool` (same registry, same
-//! env-var contract): the six non-editing names splice partially like the
-//! Bash set above, and for a `tool_name` outside Edit/Write/NotebookEdit they
-//! are also *every* hook Python's registry matches for the call, so
-//! `post_tool_use_fully_native` turns true and `dispatch::run_hook` answers
-//! the whole event without starting Python. Edit-family tools keep
-//! `crg_graph_refresh`/`post_edit`/`obsidian_post_edit` in Python and always
-//! delegate.
+//! env-var contract): the nine ported names splice partially like the Bash
+//! set above, and together they are *every* hook Python's registry matches
+//! for any `PostToolUse` call (the edit family included --
+//! `crg_graph_refresh`/`post_edit`/`obsidian_post_edit` are ported too), so
+//! `post_tool_use_fully_native` turns true for every tool and
+//! `dispatch::run_hook` answers the whole event without starting Python.
 //!
 //! `SessionStart` gets only the partial-splice treatment:
 //! `workspace_exposure_session` (the EXPOSED one-liner,
@@ -66,7 +65,8 @@ use crate::current_work_guard;
 use crate::identity;
 use crate::merge::{self, HookOutcome};
 use crate::post_tool::{
-    ContextTelemetry, CrgRefreshReportPost, PostBashGraph, PostBashQuiet, PostToolQuiet, ReadBudget,
+    ContextTelemetry, CrgGraphRefresh, CrgRefreshReportPost, ObsidianPostEdit, PostBashGraph,
+    PostBashQuiet, PostEdit, PostToolQuiet, ReadBudget,
 };
 use crate::workspace_hygiene;
 use crate::write_targets;
@@ -294,7 +294,10 @@ pub fn registry() -> Vec<Box<dyn NativeHandler>> {
         Box::new(PostBashQuiet),
         Box::new(PostToolQuiet),
         Box::new(CrgRefreshReportPost),
+        Box::new(CrgGraphRefresh),
+        Box::new(PostEdit),
         Box::new(ReadBudget),
+        Box::new(ObsidianPostEdit),
         Box::new(PostBashGraph),
         Box::new(ContextTelemetry),
         Box::new(WorkspaceExposureSession),
@@ -554,7 +557,7 @@ pub(crate) mod tests {
         // 5 Bash PreToolUse handlers (4 real HookSpec names plus
         // bash_write_targets) + the 6 PostToolUse names + the SessionStart
         // exposure line.
-        assert_eq!(registry().len(), 12);
+        assert_eq!(registry().len(), 15);
         assert!(bash_pretooluse_fully_native(&all_four()));
         let mut missing_one = all_four();
         missing_one.remove("current_work_guard_bash");

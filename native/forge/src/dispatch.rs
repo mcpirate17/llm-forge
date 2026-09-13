@@ -40,17 +40,17 @@
 //!
 //! * **Fully native** (not Edit/Write/NotebookEdit, and
 //!   `handlers::post_tool_use_fully_native` true for the opted-in set): the
-//!   six ported names are every hook the Python registry matches for the
-//!   call, `handlers::run_post_tooluse_fully_native` produces the merged
-//!   answer, and no interpreter starts -- the exit criterion this whole
-//!   splice exists for (a Read or a plain `Bash ls` answered in the forge
-//!   process alone).
-//! * **Edit-family tools or partial opt-in**: the Python child runs and gets
+//!   nine ported names are every hook the Python registry matches for any
+//!   call (the edit family included since `crg_graph_refresh`, `post_edit`
+//!   and `obsidian_post_edit` were ported), `handlers::run_post_tooluse_
+//!   fully_native` produces the merged answer, and no interpreter starts --
+//!   the exit criterion this whole splice exists for (a Read, a plain
+//!   `Bash ls` or an Edit answered in the forge process alone).
+//! * **Partial opt-in** (some matching name not opted in, or the
+//!   `FORGE_NATIVE_HOOKS=""` escape hatch): the Python child runs and gets
 //!   the opted-in, matcher-eligible names' precomputed answers spliced back
 //!   in via `FORGE_NATIVE_HOOKS`/`FORGE_NATIVE_ANSWERS`, exactly like a
-//!   partially-native Bash `PreToolUse` call. Edit/Write/NotebookEdit always
-//!   land here: `crg_graph_refresh`, `post_edit` and `obsidian_post_edit`
-//!   still run in Python.
+//!   partially-native Bash `PreToolUse` call.
 //!
 //! `SessionStart` likewise: `handlers::native_answers_for_session_start`
 //! answers `workspace_exposure_session` (the EXPOSED summary line) and

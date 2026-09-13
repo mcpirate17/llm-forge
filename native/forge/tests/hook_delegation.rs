@@ -303,18 +303,48 @@ fn default_native_coverage_answers_post_tooluse_without_starting_python() {
         .is_none());
 }
 
-/// Edit-family tools keep `crg_graph_refresh`/`post_edit`/
-/// `obsidian_post_edit` in Python, so the event always delegates -- with the
-/// two matcher-`.*` ported names (`crg_refresh_report_post`,
-/// `context_telemetry`) spliced in via the env pair, exactly like a
-/// partially-native Bash `PreToolUse` call.
+/// An Edit call's every registry-matched hook (`crg_refresh_report_post`,
+/// `crg_graph_refresh`, `post_edit`, `obsidian_post_edit`,
+/// `context_telemetry`) is native by default now, so the stub dispatcher
+/// must never run -- the edit-family twin of the Read test above. The
+/// obsidian body appends its accumulator line for the session id, so the
+/// payload uses a dedicated id and the line is cleaned up after.
 #[test]
-fn an_edit_tool_post_tooluse_delegates_with_the_wildcard_names_spliced_in() {
+fn an_edit_tool_post_tooluse_is_fully_native_by_default() {
+    let project = tempdir();
+    stub_project(project.path());
+    let payload = r#"{"session_id":"s-edit-native","tool_name":"Edit","tool_input":{"file_path":"a.py","old_string":"x","new_string":"y"},"tool_response":{"filePath":"a.py"}}"#;
+
+    let out = run_forge_with_native_hooks(project.path(), "PostToolUse", payload, None);
+
+    assert_eq!(out.status.code(), Some(0));
+    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
+    assert!(
+        stdout.get("ok").is_none(),
+        "the stub dispatcher must never have run: {stdout}"
+    );
+    assert_eq!(stdout["hookSpecificOutput"]["hookEventName"], "PostToolUse");
+    let _ = std::fs::remove_file("/tmp/claude-session-journal/s-edit-native.tsv");
+}
+
+/// With a partial opt-in, an Edit call delegates the names not opted in and
+/// gets the opted-in, matcher-eligible ones' precomputed answers spliced
+/// back in via the env pair, exactly like a partially-native Bash
+/// `PreToolUse` call -- here the two matcher-`.*` names
+/// (`crg_refresh_report_post`, `context_telemetry`), with the three
+/// edit-family names left to Python.
+#[test]
+fn an_edit_tool_post_tooluse_splices_the_wildcard_names_on_partial_opt_in() {
     let project = tempdir();
     stub_project(project.path());
     let payload = r#"{"session_id":"s-2","tool_name":"Edit","tool_input":{"file_path":"a.py","old_string":"x","new_string":"y"},"tool_response":{"filePath":"a.py"}}"#;
 
-    let out = run_forge_with_native_hooks(project.path(), "PostToolUse", payload, None);
+    let out = run_forge_with_native_hooks(
+        project.path(),
+        "PostToolUse",
+        payload,
+        Some("crg_refresh_report_post,context_telemetry"),
+    );
 
     assert_eq!(out.status.code(), Some(0));
     let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");

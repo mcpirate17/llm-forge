@@ -17,7 +17,7 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/tooling/hooks/dispatch/registry.py": "70c81d418aa06993c7da99519480e3acdee8f33146b8c0e7b2d16647cb06a3d9"
+    "src/tooling/hooks/dispatch/registry.py": "78e26736c81635682c565d0a9755366881473f4cfbd83706154ad88db14678ea"
   },
   "survivor_baseline": [
     "constant_replace-c47a780b3463-0",
