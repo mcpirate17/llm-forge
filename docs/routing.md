@@ -366,7 +366,7 @@ nothing about the live call.
 
 **Live cap enforcement** (`cap_enforce.rs`): an over-cap verdict that would
 have denied the call instead allows it, once per agent, with
-`additionalContext: "forge warn-only: <original deny reason>"` (a new
+`additionalContext: "forge warn-only: would deny -- over the <cap> token cap for class <class> (<billed> billed); continuing, this dispatch is recorded as over_cap"` (the enforce-mode text tells the agent to stop and write its report; warn mode must not, or the notice enforces by suggestion -- observed 2026-09-13 on the first live install: a sonnet agent read the warn-only notice and abandoned uncommitted work) (a new
 `deny_warned` flag on `LiveState`, persisted next to the existing `warned`
 flag, silences every call after the first). The 80%-of-cap warning and the
 `over_cap` fact recorded on the `SubagentStop` row are unchanged and

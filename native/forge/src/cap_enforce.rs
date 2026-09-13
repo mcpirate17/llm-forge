@@ -355,7 +355,10 @@ fn verdict_for(state: &mut LiveState, state_path: &Path, class: &str, cap_tokens
                     state_path.display()
                 );
             }
-            return CapCheck::Warn(format!("forge warn-only: {reason}"));
+            return CapCheck::Warn(format!(
+                "forge warn-only: would deny -- over the {cap_tokens} token cap for class {class} ({} billed); continuing, this dispatch is recorded as over_cap",
+                state.billed_total
+            ));
         }
         return CapCheck::Deny(reason);
     }
@@ -572,7 +575,12 @@ mod tests {
                     context.starts_with("forge warn-only: "),
                     "warn-mode over-cap context must be prefixed for the caller: {context}"
                 );
+                assert!(context.contains("would deny -- over the"));
                 assert!(context.contains("token cap for class"));
+                assert!(
+                    !context.contains("stop, write your final report"),
+                    "warn mode must not carry the enforce-mode stop instruction: {context}"
+                );
             }
             other => panic!("call 1 over cap in warn mode must warn once, got {other:?}"),
         }
