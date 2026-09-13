@@ -63,3 +63,35 @@ the entries install recognises (all five events, whatever the install
 flags were), prints what it removed, and deliberately leaves the backup in
 place — rollback is either `uninstall` or restoring
 `.claude/settings.pre-forge.bak.json` by hand.
+
+## Verify the install
+
+```
+forge doctor --host <project-root> [--json]
+```
+
+One line per check, `PASS|FAIL|SKIP <check>: <detail>`, six checks:
+`settings` (forge's entries in the host's `.claude/settings.json`),
+`binary` (each installed entry's binary exists, is executable, and its
+`forge --version` rev matches the running one), `python` (the interpreter
+forge would delegate to imports `conductor` and `tooling.hooks.dispatch`
+from the host; SKIP on a `--standalone` install, which never delegates),
+`ledger` (the ledger root is writable — a probe file is created and
+deleted under `live/`), `policy` (the embedded `routing_policy.toml`
+parses, with its class count), and `hook-roundtrip` (this binary re-run
+exactly as the standalone install wires it, a synthetic `Bash` payload on
+stdin; the probe writes nothing). Sample:
+
+```
+PASS settings: 2 entries over [PreToolUse, SubagentStop], mode=warn, standalone=true
+PASS binary: 1 binary checked, versions match 0.1.0 (git 890e5e5)
+SKIP python: every installed entry is standalone; forge never delegates to Python
+PASS ledger: /mnt/data/llm/ledger is writable (probe under live/ created and deleted)
+PASS policy: embedded routing_policy.toml parses: policy_version 2026-09-13.1, 4 classes
+PASS hook-roundtrip: exit 0, stdout empty, 1 ms
+```
+
+`--json` prints the same as one `{"checks": [{"name", "status",
+"detail"}], "ok"}` object. Exit 1 means: fix whatever the one `FAIL` line
+names — that line is the broken piece, not a suggestion to re-run install
+blind (`forge hooks status` remains the narrower settings-only check).
