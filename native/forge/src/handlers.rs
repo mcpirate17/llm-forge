@@ -30,7 +30,16 @@
 //! hatch back to the pre-port, all-Python behaviour; unset means "use the
 //! native default", not "opt out" -- see `native_hook_names_from_env`.
 //!
-//! `SessionStart` gets the same partial-splice treatment as `PostToolUse`:
+//! `PostToolUse` lives in `crate::post_tool` (same registry, same
+//! env-var contract): the six non-editing names splice partially like the
+//! Bash set above, and for a `tool_name` outside Edit/Write/NotebookEdit they
+//! are also *every* hook Python's registry matches for the call, so
+//! `post_tool_use_fully_native` turns true and `dispatch::run_hook` answers
+//! the whole event without starting Python. Edit-family tools keep
+//! `crg_graph_refresh`/`post_edit`/`obsidian_post_edit` in Python and always
+//! delegate.
+//!
+//! `SessionStart` gets only the partial-splice treatment:
 //! `workspace_exposure_session` (the EXPOSED one-liner,
 //! `crate::workspace_hygiene`) is the only ported name, and there is
 //! deliberately no fully-native fast path for the event --
@@ -39,12 +48,15 @@
 //! session start, so Python always starts and only this one body is skipped
 //! when forge has answered it.
 
+use anyhow::Result;
+use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
-use serde_json::{json, Value};
+pub use crate::post_tool::{
+    native_answers_for_post_tool_use, post_tool_use_fully_native, run_post_tooluse_fully_native,
+    POST_TOOL_USE_HOOK_NAMES,
+};
 
 use crate::bash_guard;
 use crate::bash_impact;
@@ -52,9 +64,10 @@ use crate::crg_gate;
 use crate::crg_refresh;
 use crate::current_work_guard;
 use crate::identity;
-use crate::instant;
 use crate::merge::{self, HookOutcome};
-use crate::tool_quiet::{self, QuietConfig};
+use crate::post_tool::{
+    ContextTelemetry, CrgRefreshReportPost, PostBashGraph, PostBashQuiet, PostToolQuiet, ReadBudget,
+};
 use crate::workspace_hygiene;
 use crate::write_targets;
 
@@ -75,7 +88,7 @@ pub trait NativeHandler {
     fn run(&self, payload: &Value) -> Result<Value>;
 }
 
-fn command_from_payload(payload: &Value) -> Option<&str> {
+pub(crate) fn command_from_payload(payload: &Value) -> Option<&str> {
     payload.get("tool_input")?.get("command")?.as_str()
 }
 
@@ -243,126 +256,6 @@ impl NativeHandler for CurrentWorkGuardBash {
     }
 }
 
-/// Resolves the four env vars `_bash_quiet.py`/`post_tool_quiet.py` read at
-/// module scope, so `PostBashQuiet`/`PostToolQuiet` can build a
-/// `tool_quiet::QuietConfig` without duplicating the resolution logic.
-fn quiet_save_dir(repo_root: &Path) -> PathBuf {
-    let configured = env::var("BASH_QUIET_SAVE_DIR").unwrap_or_default();
-    let trimmed = configured.trim();
-    if trimmed.is_empty() {
-        return std::env::temp_dir().join("agent-bash-output");
-    }
-    let path = PathBuf::from(trimmed);
-    if path.is_absolute() {
-        path
-    } else {
-        repo_root.join(path)
-    }
-}
-
-fn quiet_output_field() -> String {
-    env::var("BASH_QUIET_OUTPUT_FIELD").unwrap_or_else(|_| "updatedToolOutput".to_string())
-}
-
-/// `int(os.environ.get("BASH_QUIET_LIMIT_BYTES", "8000"))` -- an unparseable
-/// value fails loud, matching Python's `int(...)` `ValueError` rather than
-/// silently falling back to the default.
-fn bash_quiet_limit() -> Result<usize> {
-    match env::var("BASH_QUIET_LIMIT_BYTES") {
-        Err(_) => Ok(tool_quiet::BASH_QUIET_LIMIT_DEFAULT),
-        Ok(raw) => raw
-            .parse()
-            .with_context(|| format!("BASH_QUIET_LIMIT_BYTES is not an integer: {raw:?}")),
-    }
-}
-
-/// `_cap()`: `int(os.environ.get("TOOL_OUTPUT_QUIET_BYTES", "16000"))`, plus
-/// the `<= 0` disables-bounding reading `post_tool_quiet.bound_response`
-/// applies itself. Returns `(cap, disabled)`; `cap` is `0` when disabled.
-fn tool_output_quiet_cap() -> Result<(usize, bool)> {
-    let raw = match env::var("TOOL_OUTPUT_QUIET_BYTES") {
-        Err(_) => return Ok((tool_quiet::TOOL_OUTPUT_QUIET_DEFAULT, false)),
-        Ok(raw) => raw,
-    };
-    let parsed: i64 = raw
-        .parse()
-        .with_context(|| format!("TOOL_OUTPUT_QUIET_BYTES is not an integer: {raw:?}"))?;
-    if parsed <= 0 {
-        Ok((0, true))
-    } else {
-        Ok((parsed as usize, false))
-    }
-}
-
-/// `post_bash_quiet`: bounds a Bash tool response's `stdout`/`stderr`/`output`
-/// fields over `BASH_QUIET_LIMIT_BYTES` (default 8000 bytes), matching
-/// `_bash_quiet.hook_output`.
-pub struct PostBashQuiet;
-
-impl NativeHandler for PostBashQuiet {
-    fn name(&self) -> &'static str {
-        "post_bash_quiet"
-    }
-
-    fn event(&self) -> &'static str {
-        "PostToolUse"
-    }
-
-    fn run(&self, payload: &Value) -> Result<Value> {
-        let root = crate::interpreter::project_root();
-        let save_dir = quiet_save_dir(&root);
-        let output_field = quiet_output_field();
-        let limit = bash_quiet_limit()?;
-        let now_stamp = instant::format_compact_utc(instant::now());
-        let cfg = QuietConfig {
-            save_dir: &save_dir,
-            repo_root: &root,
-            now_stamp: &now_stamp,
-            output_field: &output_field,
-        };
-        Ok(tool_quiet::rewrite_envelope_bash(payload, limit, &cfg))
-    }
-}
-
-/// `post_tool_quiet`: bounds a Read/Grep/MCP tool response over
-/// `TOOL_OUTPUT_QUIET_BYTES` (default 16000 bytes; `<= 0` disables), matching
-/// `post_tool_quiet.hook_output`. An unrecognized response shape still
-/// passes through unbounded, warning on stderr exactly as the Python body
-/// does (`post_tool_quiet._warn_unrecognized`).
-pub struct PostToolQuiet;
-
-impl NativeHandler for PostToolQuiet {
-    fn name(&self) -> &'static str {
-        "post_tool_quiet"
-    }
-
-    fn event(&self) -> &'static str {
-        "PostToolUse"
-    }
-
-    fn run(&self, payload: &Value) -> Result<Value> {
-        let root = crate::interpreter::project_root();
-        let save_dir = quiet_save_dir(&root);
-        let output_field = quiet_output_field();
-        let (cap, disabled) = tool_output_quiet_cap()?;
-        let now_stamp = instant::format_compact_utc(instant::now());
-        let cfg = QuietConfig {
-            save_dir: &save_dir,
-            repo_root: &root,
-            now_stamp: &now_stamp,
-            output_field: &output_field,
-        };
-        let (value, warned) = tool_quiet::rewrite_envelope_tool(payload, cap, disabled, &cfg);
-        if let Some(kind) = warned {
-            eprintln!(
-                "post-tool-quiet: unrecognized tool_response shape ({kind}); \
-                 passing through unbounded"
-            );
-        }
-        Ok(value)
-    }
-}
-
 /// `workspace_exposure_session`: the SessionStart EXPOSED summary line
 /// (`adapters.workspace_exposure`, exactly `workspace_hygiene.exposure_line`).
 /// The repo it reports on is the session's checkout
@@ -400,65 +293,12 @@ pub fn registry() -> Vec<Box<dyn NativeHandler>> {
         Box::new(CurrentWorkGuardBash),
         Box::new(PostBashQuiet),
         Box::new(PostToolQuiet),
+        Box::new(CrgRefreshReportPost),
+        Box::new(ReadBudget),
+        Box::new(PostBashGraph),
+        Box::new(ContextTelemetry),
         Box::new(WorkspaceExposureSession),
     ]
-}
-
-/// The exact hook names, in the Python registry's own order
-/// (`src/tooling/hooks/dispatch/registry.py`), that a `PostToolUse` call
-/// matches for the two output-bounding hooks: `post_bash_quiet` (matcher
-/// `Bash`) and `post_tool_quiet` (matcher `Read|Grep|mcp__.*`) -- mutually
-/// exclusive on `tool_name`, so at most one of them ever contributes an
-/// answer for a given call. Other `PostToolUse` hooks
-/// (`crg_refresh_report_post`, `crg_graph_refresh`, `post_edit`,
-/// `read_budget`, `obsidian_post_edit`, `post_bash_graph`,
-/// `context_telemetry`) are not ported: Python still starts for every
-/// `PostToolUse` event to run those, but never runs `post_bash_quiet` or
-/// `post_tool_quiet`'s own body when this crate already answered it.
-pub const POST_TOOL_USE_HOOK_NAMES: [&str; 2] = ["post_bash_quiet", "post_tool_quiet"];
-
-/// Whether `name`'s own Python `HookSpec.matcher` would fire for `tool_name`
-/// -- `post_bash_quiet` and `post_tool_quiet`'s matchers specifically, since
-/// `native_answers_for_post_tool_use` must not compute (or claim to answer)
-/// a hook that Python's own `select()` would never have run for this call.
-fn post_tool_use_matches(name: &str, tool_name: &str) -> bool {
-    match name {
-        "post_bash_quiet" => tool_name == "Bash",
-        "post_tool_quiet" => {
-            tool_name == "Read" || tool_name == "Grep" || tool_name.starts_with("mcp__")
-        }
-        _ => false,
-    }
-}
-
-/// Computes each opted-in, matcher-eligible native `PostToolUse` hook's own
-/// answer, keyed by its Python-recognized name -- the `PostToolUse` twin of
-/// `native_answers_for_bash`. There is no "fully native" fast path here
-/// (unlike Bash `PreToolUse`): `crg_refresh_report_post` and
-/// `context_telemetry` match every `PostToolUse` call and are not ported, so
-/// Python always still runs for the event; this only lets it skip the two
-/// hook bodies this crate already answered.
-pub fn native_answers_for_post_tool_use(
-    payload: &Value,
-    native_hooks: &HashSet<String>,
-) -> HashMap<String, Value> {
-    let mut answers = HashMap::new();
-    let Some(tool_name) = payload.get("tool_name").and_then(Value::as_str) else {
-        return answers;
-    };
-    let handlers = registry();
-    for name in POST_TOOL_USE_HOOK_NAMES {
-        if !native_hooks.contains(name) || !post_tool_use_matches(name, tool_name) {
-            continue;
-        }
-        let Some(handler) = find_handler(&handlers, name, "PostToolUse") else {
-            continue;
-        };
-        if let Ok(value) = handler.run(payload) {
-            answers.insert(name.to_string(), value);
-        }
-    }
-    answers
 }
 
 /// The exact hook names, in the Python registry's own order
@@ -516,7 +356,7 @@ pub fn bash_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
 
 /// The hooks forge serves natively when the caller expresses no preference at
 /// all (`FORGE_NATIVE_HOOKS` unset) -- the native path is the *default* as of
-/// this PR, not an opt-in. The four `BASH_PRETOOLUSE_HOOK_NAMES`, the two
+/// this PR, not an opt-in. The four `BASH_PRETOOLUSE_HOOK_NAMES`, the six
 /// `POST_TOOL_USE_HOOK_NAMES` and `workspace_exposure_session` are the names
 /// Python's registry actually recognizes; `"bash_write_targets"` gates
 /// forge's own additive telemetry handler and is a no-op name on the Python
@@ -580,7 +420,7 @@ fn fold_additional_context(answer: &mut Value, extra: &Value) {
     }
 }
 
-fn find_handler<'a>(
+pub(crate) fn find_handler<'a>(
     handlers: &'a [Box<dyn NativeHandler>],
     name: &str,
     event: &str,
@@ -712,9 +552,9 @@ pub(crate) mod tests {
     #[test]
     fn registry_covers_every_bash_pretooluse_hook_plus_write_targets() {
         // 5 Bash PreToolUse handlers (4 real HookSpec names plus
-        // bash_write_targets) + PostBashQuiet + PostToolQuiet
-        // + WorkspaceExposureSession.
-        assert_eq!(registry().len(), 8);
+        // bash_write_targets) + the 6 PostToolUse names + the SessionStart
+        // exposure line.
+        assert_eq!(registry().len(), 12);
         assert!(bash_pretooluse_fully_native(&all_four()));
         let mut missing_one = all_four();
         missing_one.remove("current_work_guard_bash");
@@ -1052,41 +892,5 @@ pub(crate) mod tests {
             out["hookSpecificOutput"]["permissionDecision"],
             json!("deny")
         );
-    }
-
-    #[test]
-    fn post_tool_matchers_mirror_the_registry_matchers() {
-        // `post_bash_quiet` is Bash-only; `post_tool_quiet` is the
-        // Read/Grep/mcp__ triple; anything else claims no match, so a native
-        // answer is never promised for a hook Python's own `select()` would
-        // not have run.
-        assert!(post_tool_use_matches("post_bash_quiet", "Bash"));
-        assert!(!post_tool_use_matches("post_bash_quiet", "Read"));
-        assert!(post_tool_use_matches("post_tool_quiet", "Read"));
-        assert!(post_tool_use_matches("post_tool_quiet", "Grep"));
-        assert!(post_tool_use_matches(
-            "post_tool_quiet",
-            "mcp__code_review_graph__x"
-        ));
-        assert!(!post_tool_use_matches("post_tool_quiet", "Bash"));
-        assert!(!post_tool_use_matches("post_tool_quiet", "Edit"));
-        assert!(!post_tool_use_matches("context_telemetry", "Read"));
-    }
-
-    #[test]
-    fn post_tool_answers_cover_only_the_opted_in_matcher_eligible_hooks() {
-        let payload = serde_json::json!({"tool_name": "Bash"});
-        let mut hooks = HashSet::new();
-        hooks.insert("post_bash_quiet".to_string());
-        let answers = native_answers_for_post_tool_use(&payload, &hooks);
-        assert!(
-            answers.contains_key("post_bash_quiet"),
-            "the opted-in, matcher-eligible hook must be answered: {answers:?}"
-        );
-        // `post_tool_quiet` opted in but its matcher excludes Bash: no answer
-        // may be claimed for a hook Python would not have run.
-        hooks.insert("post_tool_quiet".to_string());
-        let answers = native_answers_for_post_tool_use(&payload, &hooks);
-        assert!(!answers.contains_key("post_tool_quiet"));
     }
 }

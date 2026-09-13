@@ -98,12 +98,13 @@ fn run_forge(
 /// value from the test runner's own shell can leak in.
 fn run_forge_with_native_hooks(
     project: &Path,
+    event: &str,
     stdin: &str,
     native_hooks: Option<&str>,
 ) -> std::process::Output {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
     cmd.arg("hook")
-        .arg("PreToolUse")
+        .arg(event)
         .env("CLAUDE_PROJECT_DIR", project)
         .env_remove("CONTEXT_TELEMETRY_PATH")
         .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
@@ -143,7 +144,7 @@ fn default_native_coverage_answers_bash_pretooluse_without_starting_python() {
     stub_project(project.path());
     let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}"#;
 
-    let out = run_forge_with_native_hooks(project.path(), payload, None);
+    let out = run_forge_with_native_hooks(project.path(), "PreToolUse", payload, None);
 
     assert_eq!(out.status.code(), Some(0), "a deny verdict still exits 0");
     let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
@@ -172,6 +173,7 @@ fn partial_native_coverage_still_starts_python_for_the_remaining_hook() {
 
     let out = run_forge_with_native_hooks(
         project.path(),
+        "PreToolUse",
         payload,
         Some("crg_refresh_report_pre,crg_gate_verify_bash,pre_bash"),
     );
@@ -217,7 +219,7 @@ fn empty_native_hooks_is_the_escape_hatch_back_to_all_python() {
     stub_project(project.path());
     let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}"#;
 
-    let out = run_forge_with_native_hooks(project.path(), payload, Some(""));
+    let out = run_forge_with_native_hooks(project.path(), "PreToolUse", payload, Some(""));
 
     assert_eq!(out.status.code(), Some(0));
     let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
@@ -235,7 +237,7 @@ fn a_stale_env_native_hooks_value_never_leaks_past_a_non_bash_payload() {
     // believe `pre_bash` was served when no answer exists for it.
     let payload = r#"{"tool_name":"Write","tool_input":{"file_path":"x","content":"y"}}"#;
 
-    let out = run_forge_with_native_hooks(project.path(), payload, Some("pre_bash"));
+    let out = run_forge_with_native_hooks(project.path(), "PreToolUse", payload, Some("pre_bash"));
 
     assert_eq!(out.status.code(), Some(0));
     let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
@@ -253,7 +255,7 @@ fn forwards_stdin_to_the_dispatcher_and_its_allow_exit_code() {
     // stdin/exit-code forwarding contract, not nativity, and the default
     // native coverage would otherwise answer `echo hi` itself and never
     // start the stub dispatcher this test inspects.
-    let out = run_forge_with_native_hooks(project.path(), payload, Some(""));
+    let out = run_forge_with_native_hooks(project.path(), "PreToolUse", payload, Some(""));
 
     assert_eq!(out.status.code(), Some(0));
     let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
@@ -265,10 +267,72 @@ fn forwards_stderr_output_unchanged() {
     let project = tempdir();
     stub_project(project.path());
 
-    let out = run_forge(project.path(), "PostToolUse", "{}", None);
+    // The escape hatch keeps this test about the generic stderr-forwarding
+    // contract: with defaults, a PostToolUse payload without a `tool_name`
+    // is fully native now (both matcher-`.*` names ported) and never starts
+    // the stub dispatcher at all.
+    let out = run_forge_with_native_hooks(project.path(), "PostToolUse", "{}", Some(""));
 
     assert_eq!(out.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&out.stderr).contains("soft warning on stderr"));
+}
+
+/// The PostToolUse twin of
+/// `default_native_coverage_answers_bash_pretooluse_without_starting_python`:
+/// a Read call's every registry-matched hook is native by default, so the
+/// stub dispatcher must never run -- proven by its `"ok"` stdout shape never
+/// appearing.
+#[test]
+fn default_native_coverage_answers_post_tooluse_without_starting_python() {
+    let project = tempdir();
+    stub_project(project.path());
+    let payload = r#"{"session_id":"s-1","tool_name":"Read","tool_input":{"file_path":"a.py"},"tool_response":{"type":"text","text":"one line"}}"#;
+
+    let out = run_forge_with_native_hooks(project.path(), "PostToolUse", payload, None);
+
+    assert_eq!(out.status.code(), Some(0));
+    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
+    assert!(
+        stdout.get("ok").is_none(),
+        "the stub dispatcher must never have run: {stdout}"
+    );
+    assert_eq!(stdout["hookSpecificOutput"]["hookEventName"], "PostToolUse");
+    // A short response crosses no budget step and bounds nothing: bare.
+    assert!(stdout["hookSpecificOutput"]
+        .get("additionalContext")
+        .is_none());
+}
+
+/// Edit-family tools keep `crg_graph_refresh`/`post_edit`/
+/// `obsidian_post_edit` in Python, so the event always delegates -- with the
+/// two matcher-`.*` ported names (`crg_refresh_report_post`,
+/// `context_telemetry`) spliced in via the env pair, exactly like a
+/// partially-native Bash `PreToolUse` call.
+#[test]
+fn an_edit_tool_post_tooluse_delegates_with_the_wildcard_names_spliced_in() {
+    let project = tempdir();
+    stub_project(project.path());
+    let payload = r#"{"session_id":"s-2","tool_name":"Edit","tool_input":{"file_path":"a.py","old_string":"x","new_string":"y"},"tool_response":{"filePath":"a.py"}}"#;
+
+    let out = run_forge_with_native_hooks(project.path(), "PostToolUse", payload, None);
+
+    assert_eq!(out.status.code(), Some(0));
+    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
+    assert_eq!(
+        stdout["ok"],
+        serde_json::json!(true),
+        "the stub ran: {stdout}"
+    );
+    let served: std::collections::HashSet<&str> = stdout["forge_native_hooks"]
+        .as_str()
+        .expect("forge_native_hooks is a string")
+        .split(',')
+        .collect();
+    assert_eq!(
+        served,
+        std::collections::HashSet::from(["crg_refresh_report_post", "context_telemetry"]),
+        "exactly the matcher-.* names were answered natively"
+    );
 }
 
 #[test]

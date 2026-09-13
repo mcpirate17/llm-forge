@@ -11,6 +11,7 @@
 mod bash_guard;
 mod bash_impact;
 mod civil;
+mod context_telemetry;
 mod crg_gate;
 mod crg_refresh;
 mod current_work_guard;
@@ -24,6 +25,8 @@ mod local_ai_policy;
 mod merge;
 mod mutation_plan;
 mod ownership;
+mod post_tool;
+mod read_budget;
 mod telemetry;
 mod tool_quiet;
 mod workspace_hygiene;

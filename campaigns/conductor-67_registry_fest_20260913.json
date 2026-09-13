@@ -6,7 +6,6 @@
       "**/test_*.py",
       "**/conftest.py"
     ],
-    "mutant_timeout_seconds": 30,
     "operators": [],
     "run_timeout_seconds": 1800,
     "seed": 0,
@@ -18,7 +17,7 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/tooling/hooks/dispatch/registry.py": "f2977bd67468274868a412b0ffd462a352339f4b3d3553fb3c018fd08aa1542f"
+    "src/tooling/hooks/dispatch/registry.py": "70c81d418aa06993c7da99519480e3acdee8f33146b8c0e7b2d16647cb06a3d9"
   },
   "survivor_baseline": [
     "constant_replace-c47a780b3463-0",
@@ -36,7 +35,7 @@
     "src/tooling/hooks/dispatch/test_registry.py"
   ],
   "test_sha256": {
-    "src/tooling/hooks/dispatch/test_registry.py": "0694a92e0f21fd70e610c3620e8f1d8e0a262c4b929ced0f171142933aab1eea"
+    "src/tooling/hooks/dispatch/test_registry.py": "0d58b98caf3e5ce7935589a0ac5ce35aedd978e86ac3247cbaeac77ef5b01604"
   },
   "title": "Generated mutants for src/tooling/hooks/dispatch/registry.py, scored on the survivor set"
 }

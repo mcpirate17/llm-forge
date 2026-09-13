@@ -42,6 +42,11 @@ mod current_work_guard;
 mod identity;
 #[path = "../src/instant.rs"]
 mod instant;
+// `crg_refresh`'s queueing half (spawned by this PR's PostToolUse port)
+// resolves the worker interpreter through `crate::interpreter`; the module
+// is self-contained, so closing this binary's include set is just this line.
+#[path = "../src/interpreter.rs"]
+mod interpreter;
 #[path = "../src/local_ai_policy.rs"]
 mod local_ai_policy;
 #[path = "../src/ownership.rs"]

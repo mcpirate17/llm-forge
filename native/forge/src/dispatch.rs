@@ -36,14 +36,21 @@
 //! `bash_pretooluse_fully_native` is false, and this module forwards that
 //! same empty override to the Python child.
 //!
-//! `PostToolUse` gets the same partial-splice treatment as a partially-native
-//! Bash `PreToolUse` call, and only that: `handlers::native_answers_for_post_tool_use`
-//! computes `post_bash_quiet`/`post_tool_quiet`'s own answer (whichever one
-//! the call's `tool_name` matches), spliced back in via the same
-//! `FORGE_NATIVE_HOOKS`/`FORGE_NATIVE_ANSWERS` env pair. There is no fully
-//! native fast path for this event: `crg_refresh_report_post` and
-//! `context_telemetry` (both matcher `.*`) are not ported and match every
-//! `PostToolUse` call, so Python always still starts for the event.
+//! `PostToolUse` has both cases, on `tool_name`:
+//!
+//! * **Fully native** (not Edit/Write/NotebookEdit, and
+//!   `handlers::post_tool_use_fully_native` true for the opted-in set): the
+//!   six ported names are every hook the Python registry matches for the
+//!   call, `handlers::run_post_tooluse_fully_native` produces the merged
+//!   answer, and no interpreter starts -- the exit criterion this whole
+//!   splice exists for (a Read or a plain `Bash ls` answered in the forge
+//!   process alone).
+//! * **Edit-family tools or partial opt-in**: the Python child runs and gets
+//!   the opted-in, matcher-eligible names' precomputed answers spliced back
+//!   in via `FORGE_NATIVE_HOOKS`/`FORGE_NATIVE_ANSWERS`, exactly like a
+//!   partially-native Bash `PreToolUse` call. Edit/Write/NotebookEdit always
+//!   land here: `crg_graph_refresh`, `post_edit` and `obsidian_post_edit`
+//!   still run in Python.
 //!
 //! `SessionStart` likewise: `handlers::native_answers_for_session_start`
 //! answers `workspace_exposure_session` (the EXPOSED summary line) and
@@ -118,11 +125,10 @@ fn run_pre_tool_use(event: &str) -> Result<u8> {
     delegate(event, Some(input.as_bytes()), &extra_env)
 }
 
-/// `PostToolUse`: always starts Python (see module docs for why no fully
-/// native fast path exists here), but splices in `post_bash_quiet`'s or
-/// `post_tool_quiet`'s own precomputed answer -- whichever one the call's
-/// `tool_name` matches -- exactly like a partially-native Bash `PreToolUse`
-/// call.
+/// `PostToolUse`: fully native whenever the call's `tool_name` keeps every
+/// registry-matched hook inside `POST_TOOL_USE_HOOK_NAMES` (see module docs),
+/// else the Python child runs with the opted-in names' precomputed answers
+/// spliced back in, exactly like a partially-native Bash `PreToolUse` call.
 fn run_post_tool_use(event: &str) -> Result<u8> {
     let mut input = String::new();
     std::io::stdin()
@@ -131,6 +137,30 @@ fn run_post_tool_use(event: &str) -> Result<u8> {
 
     let native_hooks = handlers::native_hook_names_from_env();
     let parsed: Option<Value> = serde_json::from_str(&input).ok();
+    let tool_name = parsed
+        .as_ref()
+        .and_then(|payload| payload.get("tool_name"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+
+    if handlers::post_tool_use_fully_native(tool_name, &native_hooks) {
+        let payload = parsed
+            .as_ref()
+            .expect("a tool_name implies a parsed payload");
+        let start = Instant::now();
+        let answer = handlers::run_post_tooluse_fully_native(payload);
+        let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+        telemetry::record_native(event, elapsed_ms);
+
+        let mut stdout = std::io::stdout();
+        stdout
+            .write_all(answer.to_string().as_bytes())
+            .context("failed to write the native hook answer to stdout")?;
+        stdout
+            .write_all(b"\n")
+            .context("failed to write the native hook answer to stdout")?;
+        return Ok(0);
+    }
 
     let native_answers = parsed
         .as_ref()
