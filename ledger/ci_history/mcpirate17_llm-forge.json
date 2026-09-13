@@ -1,5 +1,5 @@
 {
-  "fetched_utc": "2026-09-13T20:11:16Z",
+  "fetched_utc": "2026-09-13T20:44:10Z",
   "prs": {
     "1": {
       "branch": "forge/project-paths",
@@ -2140,6 +2140,341 @@
       ],
       "first_push_ci": "unknown",
       "first_push_sha": "f6dcbc8de78ca5b6367991f985aeec62e0a980e5"
+    },
+    "54": {
+      "branch": "forge/routing-gate",
+      "commits": [
+        {
+          "sha": "9b2fd8901a350822ae510b4eabc5b2741f55958a",
+          "subject": "fix(ledger): key task_dispatch upserts by agent_id, not tool_use_id",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "d49103a60d84eb6c0e5e4a822972d4517bee6a87",
+          "subject": "fix(routing): add FORGE_CAP_DISABLE, the live cap check's own escape \u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "8cb47621ebd66a4d0b92879e735b9e189729fd51",
+          "subject": "feat(gate): add cap_breach_rate and cheap_tier_rework_rate to cost audit",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "00d727d74b437e6aba1d2ebfab6bd9b8c4fba287",
+          "subject": "feat(gate): record a 5-metric cost_budget_baseline",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "3b499758a619ddee53e247687646d4bebba975e8",
+          "subject": "docs(gate): cost_budget_audit docstring and tests cover five metrics",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "41ae4b034b7a8a10725100c50061edf2ed1d3b2b",
+          "subject": "docs(gate): document the five-metric ratchet and the Phase 3 exit table",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "eb9ebdafc3aa8e74d94784c5a29decfe8a2b5fe1",
+          "subject": "test(mutation): generate the cost_budget_audit campaign for the five-\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "482bf1ccbc186d9f62539269a52cfc4dac112d7d",
+          "subject": "test(mutation): register the cost_budget_audit campaign, RATCHET_HELD\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "46b7515ad9c2599f6f8e8b4cff967ba663c81e8d",
+          "subject": "test(gate): rename an unused stub kwarg to satisfy vulture on the new\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "35c25f43db6f161342c825a0e569f097be7d2ac6",
+          "subject": "test(mutation): drop the stale receipt, test_sha256 no longer matches",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "6cb986bc8332d57ae66cc9c48b3725fed0d84b53",
+          "subject": "test(mutation): regenerate the cost_budget_audit campaign for the cur\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "885390f7978b7a5389fed9b33132e9df90a341a8",
+          "subject": "test(mutation): RATCHET_HELD receipt for the regenerated cost_budget_\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "9b2fd8901a350822ae510b4eabc5b2741f55958a"
+    },
+    "55": {
+      "branch": "forge/ci-history-fetch",
+      "commits": [
+        {
+          "sha": "9c36d91d00eec431a6dee29a08425d0b7b74d78b",
+          "subject": "fix(mutation): bound the eviction plugin's fail-closed deletion",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "1086964c9598652a19e45acb1d72794b739cb8bb",
+          "subject": "feat(ledger): ci_history fetcher so the outcome join has data",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "a86a3eb5394e9406a6acf65ce5da458b3f8fa569",
+          "subject": "build(ledger): make ci-history and let ledger-rollup refresh it",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "50a39c7c85784216ad952c7a42d5f24d9e9f96f9",
+          "subject": "test(ledger): ci_history fetcher contracts, recorded gh JSON, no network",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "437b8841e7127c0a7eeae7575167d6a9a029e5e9",
+          "subject": "chore(ledger): the first real ci_history cache",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "5d346b397442a0fd314e6b52090cb7166f2df26f",
+          "subject": "fix(ledger): name an explicit gh --limit so the cache holds every mer\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "f93fca0d5705f4ffcfc06dadac6f41037fb16b98",
+          "subject": "chore(ledger): ci_history cache covers all 53 merged PRs",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "0adc7adb713f65fb5df96000be5453d975b9314b",
+          "subject": "docs(ledger): the ci_history fetcher is built -- synopsis, incrementa\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "241ef70d19fa1e5be970227e5da59250578cb7bc",
+          "subject": "chore(mutation): campaign for ci_history_fetch (fest, automatic engin\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "ff210cc4dd9f4b7fce52cb013894558406cd72a7",
+          "subject": "chore(mutation): receipt for ci_history_fetch campaign, RATCHET_HELD \u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "fc96ec5ace0d5f0776adafbb0204157928ae4acc",
+          "subject": "chore(mutation): ci_history_fetch campaign records its survivor baseline",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "021a71e717b7094a22cc497e428a4edb9ccf3e30",
+          "subject": "chore(mutation): refresh the pycache_evict campaign pin to the slice'\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "f79b2ae5aee411496269dce05ebabc21e3f2b202",
+          "subject": "test(mutation): the fail-closed deletion refuses cwd itself",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "9d212ececc0fba6c3ebfae763a866c0638eb0ed0",
+          "subject": "fix(mutation): no bare trailing return None -- fest turns one into an\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "69aaab881cd4ae70d1d8ee36cbc3f037a4c8106d",
+          "subject": "chore(mutation): refresh the pycache_evict pin after the no-op fix",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "1228583e0ec4952c9cd758e5597a9a002aed3fed",
+          "subject": "chore(mutation): pycache_evict receipt re-recorded at the slice tip, \u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "fe9d45a5d27ca17f02cd1c0e5624ecd8d67db0cf",
+          "subject": "chore(mutation): refresh the bytecode_isolation pin (marker write cha\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "8f56cb2f7cb8b974f75d84cb5d92f51207e08b37",
+          "subject": "chore(mutation): bytecode_isolation receipt re-recorded at the slice \u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "1d842c611a7b07f7e283a7c8346724a16f648ef8",
+          "subject": "fix(mutation): the run marker is touched, not written -- empty by con\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "708fd5c9862612490327ab737e7fdc191732c1d4",
+          "subject": "chore(mutation): refresh the bytecode_isolation pin after the touch()\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "bd1e47a2a75af8035c89f94e833c4042b428b16e",
+          "subject": "chore(mutation): bytecode_isolation receipt, zero survivors at the sl\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "5d342fd460a92c440659df8f685dd74291e456d7",
+          "subject": "chore(mutation): compact receipts -- one detail per campaign, older o\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "68fcf12a962e8f16684e4e03da6e7f88bc470749",
+          "subject": "chore(merge): merge origin/main (#54) into forge/ci-history-fetch",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "9c36d91d00eec431a6dee29a08425d0b7b74d78b"
+    },
+    "56": {
+      "branch": "forge/warn-mode",
+      "commits": [
+        {
+          "sha": "cf2446e9cfed407e89357463da1739ff06709cd6",
+          "subject": "feat(hook): FORGE_HOOK_STANDALONE and FORGE_MODE=warn for routing and\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "ab81f62616c317ba9c0f01157efb7c5e9428c353",
+          "subject": "feat(ledger): decouple task_dispatch decision/mode/applied from over_cap",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "c8f5c69b47e9bbbf46582cd9e81509ba551a5a0e",
+          "subject": "feat(ledger): would_deny/would_route per-tier columns in forge ledger\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "943d5fb5e0273db4934918460dd4343686b25d98",
+          "subject": "docs(routing,ledger): document warn-only mode, standalone install, an\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "e049f1ce9296495762c79d2c489f2d65de7392ce",
+          "subject": "fix(ledger): update the rebased live-upsert-then-sweep test for Agent\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "6aa876ddc31f356976756ad55f2a5c5f1e2f1acf",
+          "subject": "docs(roadmap): mark Phase 3 step 2b's warn-only install ready, PR #56",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "c8a803f649da10f70f6e746a705918d8c3ab0081",
+          "subject": "chore(merge): merge origin/main (#55) into forge/warn-mode",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "cf2446e9cfed407e89357463da1739ff06709cd6"
     },
     "6": {
       "branch": "forge/test-layout",

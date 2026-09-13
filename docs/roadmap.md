@@ -84,7 +84,7 @@ Cheap tier for Explore/clerical dispatches by default, measured before it is enf
 2. Routing policy: which tier a dispatch gets by default, from the measured per-tier dispatch costs (`ledger/routing_policy.toml`, `forge route`). The dispatch-seam probe found `PreToolUse`'s `updatedInput.model` *does* take (it must carry the whole `tool_input`, not a patch — `docs/routing.md`), and that a hook fired for a call inside a subagent sees the parent's own `session_id`/`transcript_path` plus a populated `agent_id`, never a distinct subagent transcript path. DONE PR #50.
 2b. Install `forge hook PreToolUse` (matcher `Agent`) in the LLM monorepo's own `.claude/settings.json` — `tooling.hooks.dispatch` (Python) is LLM's live hook path today and does not invoke `forge` at all. Warn-only install ready, PR #56 (`FORGE_HOOK_STANDALONE=1`/`FORGE_MODE=warn`, `docs/routing.md`'s "Warn-only mode and standalone install" section, `cargo install --git ... --locked forge`) — the actual LLM monorepo settings.json wiring is still TODO.
 3. The hook that applies it at the dispatch seam: `SubagentStop` finalizes each dispatch's `task_dispatch` row (`forge ledger rollup-agent`, idempotent by `agent_id`); live `PreToolUse` enforcement derives the subagent's own transcript from verdict B's identity fields and denies once billed tokens exceed the class cap (fast path for calls outside a subagent adds ~0.03 us, derived path ~43 us); `forge ledger report` prints per-tier n/share/median/over_cap/rework/ci_red; the outcome join (`ledger/outcome.rs`) fills `landed`/`required_rework`/`ci_red_on_first_push` from a cached `ci_history` file (`docs/ledger.md`). DONE PR #52 (`docs/routing.md`'s enforcement section, `docs/ledger.md`'s outcome-join section) plus PR #55: the `ci_history` fetcher (`conductor.ci_history_fetch`, `make ci-history`) that populates the cache the join reads, incremental by `fetched_utc`, with the first real cache (all 53 merged PRs) committed as data.
-4. A gate metric that ratchets routing cost. (Claude) DONE PR #54 (`native/forge/src/ledger/audit.rs` gains `cap_breach_rate` and `cheap_tier_rework_rate` alongside the design-step-5 three, `docs/ledger.md`/`docs/routing.md` updated; `cost_budget_audit.py` needed no code change, only docstrings, since its metric map is already generic). `cheap_tier_rework_rate`'s baseline is recorded `null` -- reads as `NO_BASELINE`, never a false regression -- until the step 3 `ci_history` fetcher exists. GLM part (this item's docs/routing.md synopsis sync and `conductor.mk` route-report target) is separate and not done here.
+4. A gate metric that ratchets routing cost. (Claude) DONE PR #54 (`native/forge/src/ledger/audit.rs` gains `cap_breach_rate` and `cheap_tier_rework_rate` alongside the design-step-5 three, `docs/ledger.md`/`docs/routing.md` updated; `cost_budget_audit.py` needed no code change, only docstrings, since its metric map is already generic). `cheap_tier_rework_rate`'s baseline is recorded `null` -- reads as `NO_BASELINE`, never a false regression -- until the step 3 `ci_history` fetcher exists. GLM part DONE PR #58 (the `docs/routing.md`-vs-policy sync test and the `conductor.mk` `route-report` target).
 
 ### Phase 3 exit table (fills in as evidence lands)
 
@@ -99,10 +99,70 @@ Cheap tier for Explore/clerical dispatches by default, measured before it is enf
 | sonnet | 54.5% | TODO (step 2b + 1 week) | 78.6% | TODO | null | TODO | null | TODO |
 | unknown | 6.3% | TODO (step 2b + 1 week) | 66.7% | TODO | null | TODO | null | TODO |
 
-## Phase 4: bet B2, correct incremental verification (Claude)
+## Phase 4: stable install into LLM, then LLM cleanup
+
+Direction call 2026-09-13 (after Tim's autonomy grant), from measurement:
+llm-forge CI on main is python 225 s (pytest over 45K test lines),
+mutation-evidence ~100-130 s, each Rust job 20-50 s -- hooks, ledger and
+routing are already Rust (hook 1.4 ms). The remaining Python (116 modules,
+42K LOC; 25 reached from LLM, ~78 unreached) is subprocess-bound
+orchestration whose port saves little CPU and costs a cottage industry of
+agent tokens. Stop porting; finish Phase 3, then install.
+
+1. (Claude) The uv git dependency PR in LLM: `conductor-tooling @
+   git+https://github.com/mcpirate17/llm-forge@<tag>`, `forge` via
+   `cargo install --git`, LLM's in-repo `conductor/` copy and its
+   `tooling/native` duplicates deleted, their campaigns retired. Drafted
+   and install-tested 2026-09-13 (uv resolves the path-sourced native
+   crates, builds and imports in 35 s) but awaiting Tim's explicit go --
+   he turned the PR off on 09-13 morning. Reconciling the ~36 diverged
+   conductor files first needs no forge PR (33 forge-ahead, 3 both, 0
+   cosmetic).
+2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
+   settings.json wiring, `FORGE_MODE=warn`), then one week of
+   `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
+   columns.
+3. (GLM) Move what still lives in LLM but belongs here, hooks first:
+   `tooling/hooks/{dispatch,claude,agent}` (7.9K LOC, the Python half of
+   the hook path `forge hook` delegates to -- forge's hooks are not
+   self-contained without it), the 14 generic `.claude/hooks` scripts,
+   the 3 generic `.claude/skills`, `sweep.md`. Later: the 16
+   project-agnostic kb_*.md governance cards and the Makefile targets
+   conductor.mk lacks.
+4. (GLM, scope with Tim) LLM cleanup: stale dirty files, untracked
+   receipts; the ~78 unreached conductor modules are drop candidates
+   only after a usage-ledger week (static import grep misses importlib
+   adapters -- mutation_engine_fest/cargo/mull are live).
+
+## Phase 5 (deferred): Rust porting method
+
+If porting ever resumes, the method decided 2026-09-13 (the usage ledger
+decides order, never a cottage industry):
+
+1. Usage ledger first: a forge ledger table `cli_invocation` (module, wall
+   ms, exit, caller) written by a 3-line shim in `conductor/__main__` and
+   the make targets; port order = calls x wall time; never port a module
+   the ledger has not seen in 30 days (drop it instead).
+2. CLI passthrough, not pyo3: each ported module becomes `forge <module>`
+   plus a 10-line Python shim (`os.execvp("forge", ...)`) so `python -m
+   conductor.X` keeps working; pyo3 stays only for the 14 in-process call
+   sites. Kills the maturin/wheel/version-bump churn (41 native-churn
+   commits in forge history).
+3. Golden fixtures replace mutation receipts for ports: record the Python
+   CLI's stdout/JSON/exit on 5-10 fixtures once (GLM); Rust must match
+   byte-for-byte in `cargo test`; policy exception -- ported modules need
+   no Python receipt.
+4. One brief template per port (module, fixtures path, shim, docs line,
+   deletion of the Python body) so agents stop re-learning the tree; GLM
+   records fixtures and writes shim/docs, sonnet writes the Rust, one PR
+   per module, no stacked PRs.
+5. Stop rule: the ledger's remaining Python wall time under 5% of gate
+   time ends the phase.
+
+## Phase 6: bet B2, correct incremental verification (Claude)
 Transitive closure index (Rust) over imports and fixtures, per-test timing DB, flake ledger from the 1,494 receipts, content-addressed check cache keyed per file not per tree. Bound or de-scope the equivalence probe. Exit: gate time proportional to the diff, not the repo.
 
-## Phase 5: bet B3, sandbox runner (Claude, after Tim's design nod)
+## Phase 7: bet B3, sandbox runner (Claude, after Tim's design nod)
 Landlock/seccomp runner with write scope bound to the session's claims; replaces command-string heuristics as the safety floor.
 
 ## Do not build
