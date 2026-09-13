@@ -1,0 +1,38 @@
+{
+  "campaign_id": "forge-notes-root_memory_index_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/memory_index.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/memory_index.py": "ff9f5ef3f6c7e4a9e4210afaf1ebbd8239e7acb99914a6f3b174d5043d32d62f"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_memory_index.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_memory_index.py": "e14aec9f29c52364183b10195113fc560f3ffd51ae9e40f04ba9f983c5a03017"
+  },
+  "title": "Generated mutants for src/conductor/memory_index.py, scored on the survivor set"
+}

@@ -1,0 +1,57 @@
+{
+  "campaign_id": "forge-notes-root_dead_tests_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/dead_tests.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/dead_tests.py": "9ef4e9459622b424be2e061e3884a01e33e95d1a8bff70799ff862ed25196985"
+  },
+  "survivor_baseline": [
+    "boolean_op-538209d55aca-0",
+    "boolean_op-64bbaa807a08-0",
+    "boolean_op-64bbaa807a08-1",
+    "break_continue-ab3f05c6b357-0",
+    "constant_replace-10c7246aeacf-0",
+    "constant_replace-73cef07428a4-0",
+    "constant_replace-af29ae49b1c7-0",
+    "negate_condition-79702e75357b-0",
+    "negate_condition-939c172f23e7-0",
+    "return_value-4f280718e6c4-0",
+    "zero_iteration_loop-093257e3ce90-0",
+    "zero_iteration_loop-157ac872d064-0",
+    "zero_iteration_loop-1b47d654be3d-0",
+    "zero_iteration_loop-2aeff809d047-0",
+    "zero_iteration_loop-44be2b00bca0-0",
+    "zero_iteration_loop-53b52794dca1-0",
+    "zero_iteration_loop-edeca860ecef-0",
+    "zero_iteration_loop-f765c4458388-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T01:45:16.029646+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_dead_tests.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_dead_tests.py": "2a5a2ea519c425c6170c92d9192c30bf0bb76505dc6495c25df377620da75a00"
+  },
+  "title": "Generated mutants for src/conductor/dead_tests.py, scored on the survivor set"
+}
