@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -88,14 +89,17 @@ class Plan:
         return sum(path.stat().st_size for path in self.delete if path.exists())
 
 
-def _campaign_ids_with_a_manifest(repo_root: Path) -> set[str]:
-    """Campaign ids that still have a manifest on disk.
+def _manifests_by_campaign_id(repo_root: Path) -> dict[str, Path]:
+    """Campaign id -> manifest path, for every campaign with a manifest on disk.
 
     `registry.json` is deliberately not consulted. The evidence gate never reads
     it -- it resolves a campaign through its manifest -- and the two disagree
     badly: on 2026-09-07 the tree carried 488 manifests against 457 registry
     entries, and the gate cited receipts for 29 of the 31 campaigns the registry
     omits. Sweeping on registry membership therefore deleted live evidence.
+
+    Two manifests may declare the same id; the later filename wins, and the
+    duplicate is a lane problem the walk does not paper over either way.
 
     A manifest that cannot be read refuses the whole sweep: a campaign that
     merely looks absent is exactly the campaign whose receipts must not go.
@@ -106,7 +110,7 @@ def _campaign_ids_with_a_manifest(repo_root: Path) -> set[str]:
     if not directory.is_dir():
         raise RetentionError(f"no campaign directory at {relative}")
 
-    ids: set[str] = set()
+    manifests: dict[str, Path] = {}
     for path in sorted(directory.glob("*.json")):
         if path.name == "registry.json":
             continue
@@ -118,8 +122,8 @@ def _campaign_ids_with_a_manifest(repo_root: Path) -> set[str]:
             payload.get("campaign_id") if isinstance(payload, Mapping) else None
         )
         if isinstance(campaign_id, str):
-            ids.add(campaign_id)
-    return ids
+            manifests[campaign_id] = path
+    return manifests
 
 
 def _load_receipts(directory: Path) -> tuple[list[Receipt], list[Path]]:
@@ -190,7 +194,17 @@ def audited_receipts(receipts: Sequence[Receipt], repo_root: Path) -> set[Path]:
     map, and it reports on campaigns, not on tracked test files, so it vouches
     for campaigns the coverage inventory never reaches. The audit's own predicate
     is used rather than a restatement of it -- a copy would drift, and the whole
-    point is to keep what that consumer reads.
+    point is to keep what that consumer reads. It is reached through the public
+    `ReceiptJudge` seam, never by assembling the predicate's arguments here --
+    assembling them is how this module crashed for a week after the predicate
+    grew `tree` and `campaign`.
+
+    Each receipt's `campaign_id` is resolved to its `Campaign` by loading the
+    manifest the same way the evidence gate does (`load_campaign`), never
+    through `registry.json` (see `_manifests_by_campaign_id`). A receipt whose
+    campaign has no manifest is not audited -- it is already not live, and the
+    plan's own rule condemns it. A manifest that exists but will not load
+    refuses the sweep, exactly as an unreadable one does.
 
     Its selection is reproduced exactly, including the tie-break: `max` over a
     filename-sorted list returns the *first* row holding the highest
@@ -198,19 +212,31 @@ def audited_receipts(receipts: Sequence[Receipt], repo_root: Path) -> set[Path]:
     reads the one whose filename sorts first, and that is the one kept.
     """
 
-    from conductor.mutation_patch_audit import (
-        _receipt_rejection,
-        _runner_components_sha256,
-    )
+    from conductor.mutation_campaign_model import Campaign, load_campaign
+    from conductor.mutation_patch_audit import ReceiptJudge
 
     try:
-        current = _runner_components_sha256()
+        judge = ReceiptJudge(repo_root)
     except Exception as exc:  # same rule as the gate: no authority, no sweep
         raise RetentionError(f"corpus audit did not run: {exc}") from exc
 
+    manifests = _manifests_by_campaign_id(repo_root)
+    campaigns: dict[str, Campaign] = {}
     best: dict[str, Receipt] = {}
     for receipt in sorted(receipts, key=lambda item: item.path.name):
-        if _receipt_rejection(receipt.payload, current, repo_root) is not None:
+        manifest = manifests.get(receipt.campaign_id)
+        if manifest is None:
+            continue
+        if receipt.campaign_id not in campaigns:
+            try:
+                campaigns[receipt.campaign_id] = load_campaign(
+                    manifest, repo_root=repo_root
+                )
+            except Exception as exc:
+                raise RetentionError(
+                    f"manifest {manifest.name} cannot be loaded: {exc}"
+                ) from exc
+        if judge.rejection(receipt.payload, campaigns[receipt.campaign_id]) is not None:
             continue
         held = best.get(receipt.campaign_id)
         if held is None or receipt.generated_at > held.generated_at:
@@ -225,7 +251,7 @@ def plan(repo_root: Path = REPO_ROOT, *, protect: Sequence[str] = ()) -> Plan:
     case where a lane has a run in flight the tree does not yet describe.
     """
 
-    live = _campaign_ids_with_a_manifest(repo_root)
+    live = set(_manifests_by_campaign_id(repo_root))
 
     relative = receipts_relative(repo_root)
     directory = repo_root / relative.as_posix()
@@ -301,6 +327,9 @@ def _report(plan_: Plan) -> dict[str, Any]:
         "schema_version": "llm.mutation-testing.receipt-retention.v1",
         "kept": len(plan_.keep),
         "deleted": len(plan_.delete),
+        "protected": sum(
+            1 for reason in plan_.keep.values() if reason == "explicitly protected"
+        ),
         "unreadable": [str(path) for path in plan_.unreadable],
         "freed_bytes": plan_.freed_bytes,
     }
@@ -323,7 +352,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     args = parser.parse_args(argv)
 
-    plan_ = plan(args.repo_root, protect=args.protect)
+    try:
+        plan_ = plan(args.repo_root, protect=args.protect)
+    except RetentionError as exc:
+        # 0 = the sweep ran (its plan is the report, deletions and all); 2 = it
+        # could not decide (unreadable manifest, a gate that would not run), so
+        # nothing was touched. The split is what lets CI run the report as a
+        # step that fails on a crash and still tolerates an accumulating
+        # uncitable list. Any other exit is an unhandled defect.
+        print(f"mutation-retention: {exc}", file=sys.stderr)
+        return 2
     report = _report(plan_)
     if args.apply:
         report["removed"] = apply(plan_)

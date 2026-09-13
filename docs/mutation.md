@@ -108,6 +108,24 @@ have caught the #41–#46 gap on day one. Locally, `make mutation-evidence
 MUTATION_BASE=<ref>` drives the changed-test check against any ref
 (`origin/main` by default).
 
+Third, the retention report: `make mutation-retention` (the same step CI's
+`mutation-evidence` job runs, in dry-run) prints what a sweep would keep,
+delete, and leave to protection, and exits:
+
+- **0** — the sweep ran; the plan on stdout *is* the report, a non-empty
+  `deleted` count included. Receipts are supposed to accumulate between
+  sweeps, so an uncitable list is a plan, not a failure;
+- **2** — the sweep could not decide (an unreadable or unloadable manifest,
+  a gate that would not run) and touched nothing; the reason goes to stderr
+  and the job fails;
+- anything else is an unhandled defect — a crash like the TypeError that
+  kept `make mutation-retention` dead for a week fails the step it always
+  should have.
+
+`MUTATION_RETENTION_APPLY=1 make mutation-retention` performs the deletion
+locally; `MUTATION_RETENTION_ARGS="--protect FILENAME"` shelters a receipt a
+lane has in flight.
+
 ### Ratchet iterations
 
 `make mutation-engine-run` writes its receipt under

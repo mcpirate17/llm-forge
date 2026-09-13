@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import inspect
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from conductor import mutation_retention
+from conductor.mutation_campaign_model import Campaign
 from conductor.mutation_retention import RetentionError
 
 
@@ -15,17 +20,53 @@ def _write_json(path: Path, payload: object) -> Path:
     return path
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+_SUBJECT = "src/conductor/retained_subject.py"
+_SUBJECT_TEST = "src/conductor/test_retained_subject.py"
+
+
 def _campaign(root: Path, campaign_id: str, *, filename: str | None = None) -> Path:
-    """Put a campaign on disk the way the gate finds one: a manifest.
+    """Put a campaign on disk the way the gate finds one: a loadable manifest.
 
     `filename` decouples the manifest's name from its `campaign_id`, which is what
-    the gate keys on -- the two agree by convention, not by rule.
+    the gate keys on -- the two agree by convention, not by rule. The manifest is
+    a real generated campaign over a synthetic source file, because the corpus
+    audit resolves every receipt's campaign through `load_campaign` before it
+    will vouch for the receipt: a manifest that will not load refuses the sweep.
     """
 
+    source = root / _SUBJECT
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    test = root / _SUBJECT_TEST
+    test.write_text(
+        "def test_retained_subject() -> None:\n    assert True\n", encoding="utf-8"
+    )
     stem = filename or campaign_id
     return _write_json(
         root / f"{mutation_retention.CAMPAIGN_DIRECTORY}/{stem}.json",
-        {"campaign_id": campaign_id},
+        {
+            "campaign_id": campaign_id,
+            "title": campaign_id,
+            "language": "python",
+            "mutation_engine": "fest",
+            "schema_version": 1,
+            "generator": {
+                "source": [_SUBJECT],
+                "exclude": ["**/test_*.py"],
+                "operators": [],
+                "seed": 0,
+                "run_timeout_seconds": 60,
+            },
+            "source_sha256": {_SUBJECT: _sha256(source)},
+            "test_sha256": {_SUBJECT_TEST: _sha256(test)},
+            "survivor_baseline": [],
+            "test_argv": ["python", "-m", "pytest", _SUBJECT_TEST],
+            "environment": {},
+        },
     )
 
 
@@ -76,26 +117,37 @@ def _no_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+def _audit_rejection_double(accepted: set[str]) -> Any:
+    """A stand-in for `ReceiptJudge.rejection` with the production signature.
+
+    Built through a factory (the accepted names vary per test) but carrying the
+    seam's exact parameter list -- the old double replaced the private
+    `_receipt_rejection` with a three-argument lambda, so the tests kept passing
+    for a week while production crashed on the five-argument truth.
+    """
+
+    def _rejection(
+        self, receipt: Mapping[str, Any], campaign: Campaign
+    ) -> str | None:
+        return None if receipt.get("name") in accepted else "rejected by the test"
+
+    return _rejection
+
+
 def _audit_accepts(monkeypatch: pytest.MonkeyPatch, *names: str) -> None:
     """Let the real `audited_receipts` run, with the audit's verdict under control.
 
-    Its predicate is patched, not restated: the point of the function is that it
-    asks `mutation_patch_audit` rather than reimplementing it, so the test drives
-    the same seam production code uses.
+    The public seam's `rejection` method is patched, not the private predicate:
+    the point of the function is that it asks `mutation_patch_audit` rather than
+    reimplementing it, so the test drives the same seam production code uses.
     """
 
     from conductor import mutation_patch_audit
 
-    accepted = set(names)
     monkeypatch.setattr(
-        mutation_patch_audit, "_runner_components_sha256", lambda: {"runner": "sha"}
-    )
-    monkeypatch.setattr(
-        mutation_patch_audit,
-        "_receipt_rejection",
-        lambda receipt, current, repo_root: (
-            None if receipt.get("name") in accepted else "rejected by the test"
-        ),
+        mutation_patch_audit.ReceiptJudge,
+        "rejection",
+        _audit_rejection_double(set(names)),
     )
 
 
@@ -392,6 +444,22 @@ def test_cli_reports_without_applying_and_applies_when_told(
     assert not old.exists()
 
 
+def test_the_cli_reports_an_undecidable_corpus_as_exit_two(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """0 = the sweep ran (its plan is the report, deletions and all); 2 = it
+    could not decide, touched nothing, and said why on stderr -- the split CI's
+    report step depends on to fail a crash without failing an uncitable list."""
+
+    _campaign(repo, "alpha")
+    old = _receipt(repo, "alpha_old", "alpha", "PASS", "2026-09-01T00:00:00+00:00")
+    (repo / "conductor/mutation_campaigns/alpha.json").write_text("{", encoding="utf-8")
+
+    assert mutation_retention.main(["--repo-root", str(repo)]) == 2
+    assert "alpha.json is unreadable" in capsys.readouterr().err
+    assert old.exists()
+
+
 def test_cited_receipts_reads_the_receipt_field_of_every_evidence_row(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -532,6 +600,132 @@ def test_an_audit_that_cannot_read_the_runner_refuses_the_sweep(
     with pytest.raises(RetentionError, match="corpus audit did not run"):
         mutation_retention.plan(repo)
     assert ghost.exists()
+
+
+def test_the_audit_double_carries_the_production_seams_signature() -> None:
+    """The generic guard against the next arity drift.
+
+    Whatever a test double replaces must accept exactly what the production
+    callable accepts. When the predicate grew `tree` and `campaign`, the double
+    kept a three-argument lambda and the suite stayed green for a week while
+    `make mutation-retention` crashed; comparing signatures up front turns that
+    drift into a test failure the moment it happens.
+    """
+
+    from conductor import mutation_patch_audit
+
+    assert inspect.signature(_audit_rejection_double(set())) == inspect.signature(
+        mutation_patch_audit.ReceiptJudge.rejection
+    )
+
+
+def test_audited_receipts_runs_end_to_end_without_patching_the_predicate(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole path -- judge, manifest load, real predicate -- on one repo.
+
+    Only the runner component map is pinned (`{"runner": "sha"}`); everything
+    else is production: the manifest loads through `load_campaign`, the tree
+    hasher reads the synthetic repo's real bytes, and the predicate accepts the
+    receipt whose pins match while refusing the sibling whose pinned source
+    bytes drifted.
+    """
+
+    from conductor import mutation_patch_audit
+
+    _campaign(repo, "alpha")
+    monkeypatch.setattr(
+        mutation_patch_audit, "_runner_components_sha256", lambda: {"runner": "sha"}
+    )
+    vouching = {
+        "campaign_id": "alpha",
+        "status": "PASS",
+        "generated_at": "2026-09-05T00:00:00+00:00",
+        "name": "alpha_good",
+        "runner_components_sha256": {"runner": "sha"},
+    }
+    good = _write_json(
+        repo / mutation_retention.RECEIPT_DIRECTORY / "alpha_good.json", vouching
+    )
+    drifted = _write_json(
+        repo / mutation_retention.RECEIPT_DIRECTORY / "alpha_drift.json",
+        vouching
+        | {
+            "name": "alpha_drift",
+            "source_sha256": {_SUBJECT: "0" * 64},
+        },
+    )
+
+    receipts, _unreadable = mutation_retention._load_receipts(
+        repo / mutation_retention.RECEIPT_DIRECTORY
+    )
+    read = mutation_retention.audited_receipts(receipts, repo)
+
+    assert read == {good.resolve()}
+    assert drifted.resolve() not in read
+
+
+def test_an_orphan_campaign_does_not_stop_the_audit_later_receipts_still_are(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A receipt whose campaign has no manifest is skipped, not terminal.
+
+    The orphan sorts first by filename, so a loop that stopped at it instead
+    of stepping over it would never audit the good receipt behind it.
+    """
+
+    _campaign(repo, "alpha")
+    _receipt(repo, "aaa_ghost", "ghost", "PASS", "2026-09-01T00:00:00+00:00")
+    good = _receipt(repo, "alpha_good", "alpha", "PASS", "2026-09-02T00:00:00+00:00")
+    _audit_accepts(monkeypatch, "alpha_good")
+
+    receipts, _unreadable = mutation_retention._load_receipts(
+        repo / mutation_retention.RECEIPT_DIRECTORY
+    )
+    read = mutation_retention.audited_receipts(receipts, repo)
+
+    assert read == {good.resolve()}
+
+
+def test_the_report_counts_what_protection_saved(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The `protected` count is the receipts the flag actually sheltered."""
+
+    _campaign(repo, "alpha")
+    old = _receipt(repo, "alpha_old", "alpha", "PASS", "2026-09-01T00:00:00+00:00")
+    _receipt(repo, "alpha_new", "alpha", "PASS", "2026-09-05T00:00:00+00:00")
+    _no_citations(monkeypatch)
+
+    assert mutation_retention.main(["--repo-root", str(repo), "--protect", old.name]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["protected"] == 1
+    assert report["deleted"] == 0
+
+
+def test_a_no_pass_campaign_is_stepped_over_not_terminal(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`continue` past a broken campaign, never `break` out of the plan.
+
+    The broken campaign's receipts sort first, so a loop that stopped at the
+    first campaign with no PASS would never reach the healthy one behind it.
+    """
+
+    broken = _receipt(
+        repo, "aaa_broken_a", "aaa_broken", "FAIL", "2026-09-01T00:00:00+00:00"
+    )
+    _campaign(repo, "aaa_broken")
+    _campaign(repo, "alpha")
+    old = _receipt(repo, "alpha_old", "alpha", "PASS", "2026-09-01T00:00:00+00:00")
+    new = _receipt(repo, "alpha_new", "alpha", "PASS", "2026-09-05T00:00:00+00:00")
+    _no_citations(monkeypatch)
+
+    plan_ = mutation_retention.plan(repo)
+
+    assert set(plan_.delete) == {old}
+    assert plan_.keep[new] == "newest PASS for alpha"
+    assert plan_.keep[broken] == "campaign aaa_broken has no PASS receipt to supersede"
 
 
 def test_compacted_receipts_are_judged_by_their_summary_alone(
