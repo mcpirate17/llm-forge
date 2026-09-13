@@ -18,20 +18,25 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/tooling/hooks/claude/_bash_quiet.py": "4b1acc8743ed96203ebc9e27d05c570230c02086bff37c2728f205607d2caa66"
+    "src/tooling/hooks/claude/_bash_quiet.py": "d1e31e989f364dde2dc95c354aedfa1f2ff5a139a8484f1c29bdadb4549c4c87"
   },
   "survivor_baseline": [
     "arithmetic_op-8a8afb54e882-0",
     "arithmetic_op-8a8afb54e882-1",
+    "arithmetic_op-8a8afb54e882-2",
+    "arithmetic_op-8a8afb54e882-3",
     "arithmetic_op-be07a942a8e6-0",
     "constant_replace-7b27c484c12d-0",
+    "constant_replace-7b27c484c12d-1",
+    "constant_replace-8754d5be37dc-0",
+    "constant_replace-8754d5be37dc-1",
     "constant_replace-8ffb2bd1ff95-0",
     "constant_replace-b38a1b2780a1-0",
     "constant_replace-b38a1b2780a1-1",
     "return_value-fa30b476fa6b-0"
   ],
   "survivor_baseline_recorded": true,
-  "survivor_baseline_recorded_at": "2026-09-13T00:29:08.586876+00:00",
+  "survivor_baseline_recorded_at": "2026-09-13T01:12:58.644063+00:00",
   "test_argv": [
     "python",
     "-m",
@@ -41,7 +46,7 @@
     "src/tooling/hooks/claude/test_bash_quiet.py"
   ],
   "test_sha256": {
-    "src/tooling/hooks/claude/test_bash_quiet.py": "44b24bd54d69b99039d3813efce50495642228c15b4c953aedd724d980e18fe0"
+    "src/tooling/hooks/claude/test_bash_quiet.py": "f933c165dcd96a93821b2a581ce407804d577a323f241aab478e261701bfd4ef"
   },
   "title": "Generated mutants for src/tooling/hooks/claude/_bash_quiet.py, scored on the survivor set"
 }

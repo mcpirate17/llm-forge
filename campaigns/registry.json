@@ -116,6 +116,9 @@
     },
     {
       "manifest": "campaigns/forge-telemetry_dispatch_main_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_post_tool_quiet_fest_20260913.json"
     }
   ],
   "enforcement": "changed_tests",
