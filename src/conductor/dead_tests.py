@@ -40,15 +40,14 @@ from conductor._native import (
     DeadTestsResolverNative,
     dead_tests_closure_native,
 )
-
 from conductor.audit_root import (
     AuditRootError,
     print_audit_provenance,
     resolve_audit_root,
 )
-from conductor.project_paths import DEFAULT_MUTATION_REGISTRY, notes_relative
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY, host_root, notes_relative
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = host_root()
 TEST_NAME = re.compile(r"^(test_.*|.*_test)\.py$")
 DOTTED = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$")
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

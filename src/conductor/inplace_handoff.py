@@ -344,7 +344,9 @@ def activate_handoff(
 # additionalContext. The loop is: stage -> /clear (or compaction, restart) ->
 # the next turn opens with the bounded projection instead of the old context.
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+
+ROOT: Final[Path] = host_root()
 IDENTITY_ENV: Final[str] = "A2A_AGENT_NAME"
 DEFAULT_IDENTITY: Final[str] = "claude"
 _IDENTITY_RE: Final[re.Pattern[str]] = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")

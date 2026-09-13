@@ -66,6 +66,42 @@ head + elision marker + tail — Grep and MCP results spill to the same director
 path, while Read output is never spilled (the file is on disk) and the marker names the
 byte where it was cut plus the `Read(offset=..., limit=...)` call that reaches the rest.
 
+## Installing into a host project
+
+`conductor-tooling` is meant to be installed as a dependency of a host project's own
+venv, not run from an in-tree checkout:
+
+```toml
+[tool.uv.sources]
+conductor-tooling = { git = "https://github.com/mcpirate17/llm-forge", tag = "v0.1.0" }
+```
+
+```sh
+uv add "conductor-tooling @ git+https://github.com/mcpirate17/llm-forge"
+```
+
+Every CLI (`conductor.active_state`, `conductor.session_preamble`, `conductor.gate`,
+...) resolves the *host* repository root from the working directory or environment --
+never from where the package itself is installed (`__file__` inside `site-packages` is
+not the host tree, and every module that once derived a "repo root" that way has been
+fixed). Precedence, highest first:
+
+1. `CONDUCTOR_HOST_ROOT`, when set: an absolute, existing path, and it wins over
+   everything else, including an explicit `--repo-root` flag -- useful for pinning
+   every subprocess a supervising process launches to one host without threading a
+   flag through each one.
+2. An explicit `--repo-root` (or equivalent flag) the CLI accepts.
+3. The nearest `.git` ancestor of the current working directory, falling back to the
+   cwd itself.
+
+A host also configures its own layout in `pyproject.toml`'s `[tool.conductor]` table
+(`candidate_policy`, `mutation_registry`, `package_root`, `mutation_receipt_root`,
+`integration_branch`, `notes_root`) so `conductor.project_paths` stops assuming this
+repo's own monorepo-shaped defaults. Hook commands installed by `conductor.bootstrap`
+invoke the CLI the same way a human would (`python -m conductor.<module> ...`, or the
+installed console script), from the host's working directory -- there is nothing extra
+to configure for path resolution beyond the two items above.
+
 ## Documentation
 
 [`docs/`](docs/README.md) has one page per platform law (governance claims, the landing

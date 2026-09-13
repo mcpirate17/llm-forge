@@ -1,0 +1,49 @@
+{
+  "campaign_id": "forge-host-root_radon_complexity_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/radon_complexity.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/radon_complexity.py": "530422ac9a7e0a10ef09ad96f33b5036759c3cb6eb7d835eebad8418551febb0"
+  },
+  "survivor_baseline": [
+    "constant_replace-613d1b2bdf53-0",
+    "constant_replace-6896e73f8b66-0",
+    "constant_replace-76e08f8138dc-0",
+    "constant_replace-88601ba264af-0",
+    "constant_replace-8c969e8d5fb4-0",
+    "constant_replace-a1670c4693b0-0",
+    "constant_replace-a5a751555fd6-0",
+    "constant_replace-a973af1b448f-0",
+    "return_value-aaeeb180ed55-0",
+    "return_value-de2b1860f470-0",
+    "zero_iteration_loop-a04926502fed-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T21:17:23.569351+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_radon_complexity.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_radon_complexity.py": "760d1d73ea04b31bf9575b1a47dd05080015805d447a372873cd38400c10ad05"
+  },
+  "title": "Generated mutants for src/conductor/radon_complexity.py, scored on the survivor set"
+}

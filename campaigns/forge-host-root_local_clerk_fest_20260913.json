@@ -1,0 +1,37 @@
+{
+  "campaign_id": "forge-host-root_local_clerk_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/local_clerk.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/local_clerk.py": "22e4f6fff9c08e315f1a1ce98ce25b09526093873e684df02d5f46b6209539e0"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_local_clerk.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_local_clerk.py": "e5056c76cb354a49f3b241b73ab42816214f88dee5bd68167235381b6b731076"
+  },
+  "title": "Generated mutants for src/conductor/local_clerk.py, scored on the survivor set"
+}

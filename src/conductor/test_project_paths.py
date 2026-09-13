@@ -231,6 +231,42 @@ def test_host_root_defaults_to_the_current_directory(tmp_path, monkeypatch):
     assert pp.host_root() == plain.resolve()
 
 
+def test_host_root_env_wins_over_an_explicit_start(tmp_path, monkeypatch):
+    pinned = tmp_path / "pinned"
+    pinned.mkdir()
+    other = tmp_path / "other"
+    other.mkdir()
+    monkeypatch.setenv("CONDUCTOR_HOST_ROOT", str(pinned))
+    assert pp.host_root(other) == pinned.resolve()
+
+
+def test_host_root_env_must_be_absolute(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CONDUCTOR_HOST_ROOT", "relative/path")
+    with pytest.raises(pp.ProjectPathError, match="relative/path"):
+        pp.host_root()
+
+
+def test_host_root_env_must_exist(tmp_path, monkeypatch):
+    missing = tmp_path / "does-not-exist"
+    monkeypatch.setenv("CONDUCTOR_HOST_ROOT", str(missing))
+    with pytest.raises(pp.ProjectPathError, match=str(missing)):
+        pp.host_root()
+
+
+def test_host_root_explicit_start_wins_over_cwd_walk(tmp_path, monkeypatch):
+    cwd_repo = tmp_path / "cwd_repo"
+    cwd_repo.mkdir()
+    (cwd_repo / ".git").mkdir()
+    monkeypatch.chdir(cwd_repo)
+
+    other_repo = tmp_path / "other_repo"
+    other_repo.mkdir()
+    (other_repo / ".git").mkdir()
+
+    assert pp.host_root(other_repo) == other_repo.resolve()
+
+
 # --- package_root -----------------------------------------------------------
 #
 # The third answer this module owns: where the conductor package itself sits.

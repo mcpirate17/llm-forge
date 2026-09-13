@@ -1,0 +1,37 @@
+{
+  "campaign_id": "forge-host-root_crg_workspace_tools_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/crg_workspace_tools.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/crg_workspace_tools.py": "e7f20df877e0a5bde67c195160c3f44eb27365451e01c0de2c1d0c60f84b2a81"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_crg_workspace_tools.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_crg_workspace_tools.py": "b4f129f13f8ee0fd4a625d07869353257eefa2c4f80446c0ffce9069b5f3b0ec"
+  },
+  "title": "Generated mutants for src/conductor/crg_workspace_tools.py, scored on the survivor set"
+}

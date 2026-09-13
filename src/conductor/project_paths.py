@@ -253,7 +253,28 @@ def enclosing_repo(start: Path) -> Path | None:
 
 
 def host_root(start: Path | None = None) -> Path:
-    """The host repository root, falling back to ``start`` when there is no repo."""
+    """The host repository root -- never a path derived from ``__file__``.
+
+    Precedence, highest first:
+
+    1. ``CONDUCTOR_HOST_ROOT`` env var, when set: must be an absolute path
+       that exists, else raises naming the offending value. Wins over
+       everything, including an explicit ``start``, so a supervising
+       process can pin every subprocess to one host without touching CLI
+       flags.
+    2. ``start`` -- the caller's explicit ``--repo-root``, for the CLIs
+       that accept one.
+    3. The nearest ``.git`` ancestor of the current working directory,
+       else the cwd itself.
+    """
+    env_value = os.environ.get("CONDUCTOR_HOST_ROOT")
+    if env_value:
+        candidate = Path(env_value)
+        if not candidate.is_absolute() or not candidate.exists():
+            raise ProjectPathError(
+                f"CONDUCTOR_HOST_ROOT={env_value!r} must be an absolute, existing path"
+            )
+        return candidate.resolve()
     base = (start or Path.cwd()).resolve()
     return enclosing_repo(base) or base
 

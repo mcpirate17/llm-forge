@@ -1,0 +1,37 @@
+{
+  "campaign_id": "forge-host-root_embedding_contract_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/embedding_contract.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/embedding_contract.py": "03d179a3a668d9c994128da4ee5677068ca11065225a47792c54c373a849dbcc"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_embedding_contract.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_embedding_contract.py": "bf662983c02a19bb8cf70f6d6866613b55b7681168c32fd1cb5574c241f2349a"
+  },
+  "title": "Generated mutants for src/conductor/embedding_contract.py, scored on the survivor set"
+}

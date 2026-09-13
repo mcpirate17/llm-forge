@@ -10,18 +10,20 @@ existing byte counts, and both feed ``summarize``.
 
 from __future__ import annotations
 
-from collections import Counter
-from datetime import UTC, datetime, timedelta
 import hashlib
 import json
 import os
 import re
 import sys
 import tempfile
+from collections import Counter
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Final
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+
+ROOT: Final[Path] = host_root()
 # The default sink lives under the ledger root (``LEDGER_ROOT`` env var,
 # else /mnt/data/llm/ledger), never inside the checkout: the old
 # ``<ROOT>/src/research/tmp/...`` default was an inherited defect from the

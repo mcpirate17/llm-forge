@@ -16,8 +16,9 @@ from conductor.crg_response_shim import (
     prune_tools,
 )
 from conductor.crg_workspace_tools import register_workspace_tools, search_enrichers
+from conductor.project_paths import host_root
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = host_root()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,7 +31,8 @@ def main(argv: list[str] | None = None) -> int:
         install_node_text(root)
     except CrgBridgeError as exc:
         parser.error(str(exc))
-    from code_review_graph.main import main as crg_main, mcp
+    from code_review_graph.main import main as crg_main
+    from code_review_graph.main import mcp
 
     # CRG_SHIM_DISABLE=1 is the harness A/B baseline (research/tools/codex_noshim.sh).
     if os.environ.get("CRG_SHIM_DISABLE", "").strip() != "1":

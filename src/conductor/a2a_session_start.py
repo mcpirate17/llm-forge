@@ -36,8 +36,9 @@ from conductor.agent_a2a import (
     fetch_card,
     load_registry,
 )
+from conductor.project_paths import host_root
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+ROOT: Final[Path] = host_root()
 IDENTITY_ENV: Final[str] = "A2A_AGENT_NAME"
 DEFAULT_MAX_MESSAGES: Final[int] = 8
 DEFAULT_PREVIEW_CHARS: Final[int] = 140

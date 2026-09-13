@@ -154,6 +154,8 @@ def check_hook_noops(
 def _preamble_env() -> dict[str, str]:
     """Import the package that supplied this runtime check from a foreign cwd."""
     environment = os.environ.copy()
+    # Package's own location, not the host root: the subprocess needs this dir on
+    # PYTHONPATH to import `conductor` at all.
     package_root = str(Path(__file__).resolve().parents[1])
     inherited = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = (

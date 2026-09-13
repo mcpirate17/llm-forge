@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Final, Iterable
 
+from conductor import workspace_launcher_smokes as _launcher_smokes
+from conductor import workspace_runtime_support as _runtime_support
 from conductor.active_state import save_active_state
 from conductor.audit_root import (
     AuditRootError,
@@ -27,13 +29,12 @@ from conductor.audit_root import (
 )
 from conductor.candidate_review.model import write_json_atomic
 from conductor.candidate_review.ownership import load_claims
-from conductor.local_ai_policy import CLERK_SYSTEM_PROMPT
 from conductor.http_transport import open_http
-from conductor import workspace_launcher_smokes as _launcher_smokes
-from conductor import workspace_runtime_support as _runtime_support
+from conductor.local_ai_policy import CLERK_SYSTEM_PROMPT
+from conductor.project_paths import host_root
 from conductor.workspace_runtime_types import CellReceipt, LauncherSpec, ReceiptStatus
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+ROOT: Final[Path] = host_root()
 # Relative to --root (see main()), not to Path(__file__) -- a caller in a
 # different worktree must not write receipts into some other checkout.
 DEFAULT_OUTPUT: Final[Path] = Path("research/reports/workspace_reliability_20260823")

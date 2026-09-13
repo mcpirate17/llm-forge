@@ -37,9 +37,10 @@ from conductor.candidate_review.ownership import (
     paths_overlap,
 )
 from conductor.context_envelope import dedupe_fragments, fit_text
+from conductor.project_paths import host_root
 from conductor.session_preamble import MAX_HEADINGS, load_state
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+ROOT: Final[Path] = host_root()
 MAX_MSGS: Final[int] = DEFAULT_MAX_MESSAGES
 PREVIEW_CHARS: Final[int] = DEFAULT_PREVIEW_CHARS
 MAX_INBOX_CHARS: Final[int] = DEFAULT_MAX_CHARS

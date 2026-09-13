@@ -26,10 +26,11 @@ from conductor.graph_context import (
     get_file_context,
 )
 from conductor.graph_test_select import graph_database_path
+from conductor.project_paths import host_root
 from conductor.session_brief import brief as session_brief
 from conductor.session_brief import snippet as _snippet
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+ROOT: Final[Path] = host_root()
 # Skeletons of big files exceeded the 8 KB context bound on 56 % of calls (telemetry
 # baseline 2026-09-01); cap and say how to narrow instead of shipping the whole thing.
 AST_CONTEXT_MAX_BYTES: Final[int] = int(

@@ -18,8 +18,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Final, Mapping
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
-ROUTES_PATH: Final[Path] = ROOT / "conductor" / "embedding_routes.toml"
+# Ships inside the package next to this module -- not host data, never resolved
+# through host_root().
+ROUTES_PATH: Final[Path] = Path(__file__).resolve().parent / "embedding_routes.toml"
 CONTRACT_VERSION: Final[int] = 1
 QUALITY_SCHEMA_VERSION: Final[int] = 1
 QUALITY_RECEIPT_ENV: Final[str] = "WORKSPACE_EMBED_QUALITY_RECEIPT"

@@ -205,6 +205,8 @@ def ensure_service(timeout: float = STARTUP_TIMEOUT_SECONDS) -> bool:
             ensure_ollama_service(timeout=timeout)
         subprocess.Popen(  # noqa: S603 - current interpreter and fixed module argv
             [sys.executable, "-m", "conductor.cpu_embed", "serve"],
+            # Package's own parent, not the host root: puts this dir on the child's
+            # sys.path so `-m conductor.cpu_embed` resolves even off PYTHONPATH.
             cwd=Path(__file__).resolve().parents[1],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,

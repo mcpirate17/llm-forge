@@ -1,0 +1,37 @@
+{
+  "campaign_id": "forge-host-root_hook_installer_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/hook_installer.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/hook_installer.py": "ffbf012f9d16670e3d3bf5af04d02ff0579531a96eefd78b18bc96ff453215b9"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_hook_installer.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_hook_installer.py": "72eccece7ed8c97d753bc2e0976aaf927ffede7acce049e27709f430ef5f32bd"
+  },
+  "title": "Generated mutants for src/conductor/hook_installer.py, scored on the survivor set"
+}

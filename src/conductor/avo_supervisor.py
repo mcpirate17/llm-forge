@@ -18,7 +18,9 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Final
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+
+ROOT: Final[Path] = host_root()
 AVO_STATE_PATH: Final[Path] = ROOT / "conductor" / "avo_runtime_state.json"
 
 DEFAULT_STRATEGY_PIVOTS: Final[tuple[str, ...]] = (

@@ -15,7 +15,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Final
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+
+ROOT: Final[Path] = host_root()
 CURRENT_WORK_PATH: Final[Path] = ROOT / ".current_work.md"
 MAX_TITLE_CHARS: Final[int] = 120
 MAX_BODY_LINES: Final[int] = 12

@@ -23,6 +23,7 @@ from conductor._native import (
     a2a_retention_manifests_native,
 )
 from conductor.agent_a2a import DEFAULT_STATE_DIR, A2aError
+from conductor.project_paths import host_root
 
 DEFAULT_GRACE: Final = timedelta(hours=48)
 MIN_GRACE: Final = timedelta(hours=1)
@@ -34,7 +35,8 @@ MAX_EVIDENCE_TOTAL_BYTES: Final = 32 << 20
 MAX_EVIDENCE_NODES: Final = 500_000
 POLICY_VERSION: Final = 2
 TOMBSTONE_BODY: Final = "[compacted: resolved A2A content retained by digest]"
-DEFAULT_EVIDENCE_ROOT: Final = Path(__file__).resolve().parents[1]
+# Evidence lives in the host tree (``research/reports/``), not beside this package.
+DEFAULT_EVIDENCE_ROOT: Final = host_root()
 EVIDENCE_PATTERNS: Final = (
     "research/reports/**/*gate*.json",
     "research/reports/**/*receipt*.json",

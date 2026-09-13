@@ -104,15 +104,11 @@ jobs:
             --check --changed-files-from /tmp/changed-python-files.txt
           uv run python -m conductor.run_duplicate_audit --tool pmd-python \
             --check --changed-files-from /tmp/changed-python-files.txt
-          # --baseline is resolved by conductor.radon_complexity relative to
-          # its own REPO_ROOT (src/, i.e. one level above this module's
-          # package dir) -- "conductor/..." here therefore correctly means
-          # src/conductor/radon_complexity_baseline.json, the same file the
-          # vulture invocation below names explicitly as "src/conductor/...".
-          # Confirmed by running both from the repo root: both resolve the
-          # committed baseline files, not a missing cwd-relative path.
+          # REPO_ROOT is the true host root (conductor.project_paths.host_root()),
+          # not this module's package parent, so both the baseline and the scan
+          # path are spelled src-relative like the vulture invocation below.
           uv run python -m conductor.radon_complexity check \
-            --baseline conductor/radon_complexity_baseline.json --path .
+            --baseline src/conductor/radon_complexity_baseline.json --path src
           uv run python -m conductor.candidate_review.vulture_audit \
             --baseline src/conductor/vulture_baseline.json \
             --changed-files-from /tmp/changed-python-files.txt src
