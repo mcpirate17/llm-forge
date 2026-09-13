@@ -8,6 +8,9 @@
 //! binary crate has no lib target, so `extern crate forge` is not an
 //! option here either.
 
+#[path = "../src/json_canon.rs"]
+#[allow(dead_code)]
+mod json_canon;
 #[path = "../src/ledger/mod.rs"]
 #[allow(dead_code)]
 mod ledger;

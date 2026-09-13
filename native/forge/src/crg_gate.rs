@@ -401,10 +401,11 @@ pub(crate) mod tests {
                 "owner": owner, "paths": paths, "justification": "because",
                 "created_at": created, "expires_at": expires,
             });
-            let canonical = serde_json::to_string(&fields).unwrap();
-            use sha2::{Digest, Sha256};
-            let digest = Sha256::digest(canonical.as_bytes());
-            let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+            // The id must come from the same canonicalization the loader
+            // verifies against (`ownership::sha256_json`, sorted keys) --
+            // `to_string` here would emit insertion order now that the crate
+            // enables serde_json's `preserve_order`.
+            let hex = crate::ownership::sha256_json(&fields);
             let claim = json!({
                 "claim_id": format!("claim-{}", &hex[..20]),
                 "owner": owner, "paths": paths, "justification": "because",

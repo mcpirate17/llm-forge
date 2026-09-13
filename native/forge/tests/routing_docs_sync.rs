@@ -32,6 +32,9 @@ mod merge;
 #[allow(dead_code)]
 mod subagent_transcript;
 
+#[path = "../src/json_canon.rs"]
+#[allow(dead_code)]
+mod json_canon;
 #[path = "../src/ledger/mod.rs"]
 #[allow(dead_code)]
 mod ledger;

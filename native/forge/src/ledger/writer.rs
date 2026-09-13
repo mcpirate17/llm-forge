@@ -70,7 +70,10 @@ pub fn write_day_file(
         out.push('\n');
     }
     for row in new_rows {
-        out.push_str(&serde_json::to_string(row)?);
+        // Canonical (sorted-key) bytes: this line format is frozen by the
+        // hand-computed fixtures in `tests/ledger_rollup.rs` and must not
+        // depend on serde_json's `preserve_order` feature (`json_canon.rs`).
+        out.push_str(&crate::json_canon::canonical_json(row));
         out.push('\n');
     }
 

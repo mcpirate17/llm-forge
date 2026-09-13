@@ -42,6 +42,9 @@ mod current_work_guard;
 mod identity;
 #[path = "../src/instant.rs"]
 mod instant;
+#[path = "../src/json_canon.rs"]
+#[allow(dead_code)]
+mod json_canon;
 // `crg_refresh`'s queueing half (spawned by this PR's PostToolUse port)
 // resolves the worker interpreter through `crate::interpreter`; the module
 // is self-contained, so closing this binary's include set is just this line.

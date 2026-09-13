@@ -19,9 +19,11 @@ mod crg_refresh;
 mod current_work_guard;
 mod dispatch;
 mod handlers;
+mod hooks_install;
 mod identity;
 mod instant;
 mod interpreter;
+mod json_canon;
 mod ledger;
 mod local_ai_policy;
 mod merge;
@@ -47,7 +49,9 @@ use std::process::ExitCode;
 #[derive(Parser)]
 #[command(
     name = "forge",
-    version,
+    // The git rev (stamped by build.rs, `unknown` outside a checkout) is
+    // what `forge hooks status` compares an installed hook's binary by.
+    version = concat!(env!("CARGO_PKG_VERSION"), " (git ", env!("FORGE_GIT_REV"), ")"),
     about = "Native launcher for llm-forge's Claude Code hook path"
 )]
 struct Cli {
@@ -81,6 +85,12 @@ enum Command {
     /// Routing-policy decision for one `Agent` dispatch (`docs/roadmap.md`
     /// Phase 3 step 2).
     Route(route::RouteArgs),
+    /// Install/uninstall/inspect forge's entries in a host's Claude Code
+    /// settings (`docs/roadmap.md` Phase 4).
+    Hooks {
+        #[command(subcommand)]
+        action: hooks_install::HooksCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -201,6 +211,13 @@ fn main() -> ExitCode {
             Err(err) => {
                 eprintln!("forge route: {err:#}");
                 ExitCode::from(2)
+            }
+        },
+        Command::Hooks { action } => match hooks_install::run(action) {
+            Ok(code) => ExitCode::from(code),
+            Err(err) => {
+                eprintln!("forge hooks: {err:#}");
+                ExitCode::from(1)
             }
         },
         Command::Ledger { action } => match action {
