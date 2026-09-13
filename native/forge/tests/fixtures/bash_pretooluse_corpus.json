@@ -1,0 +1,694 @@
+[
+  {
+    "id": "gate-readonly",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "git status",
+    "graph_used_session": null,
+    "claims": [],
+    "detach_head": false
+  },
+  {
+    "id": "gate-empty-cmd",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "",
+    "graph_used_session": null,
+    "claims": [],
+    "detach_head": false
+  },
+  {
+    "id": "gate-no-graph-use",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "echo hi > out.txt",
+    "graph_used_session": null,
+    "claims": [],
+    "detach_head": false
+  },
+  {
+    "id": "gate-no-claims",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "echo hi > out.txt",
+    "graph_used_session": "s1",
+    "claims": [],
+    "detach_head": false
+  },
+  {
+    "id": "gate-exact-claim-allows",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "echo hi > out.txt",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "out.txt"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-prefix-claim-allows",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "echo hi > docs/out.txt",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "docs"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-claim-disjoint",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "echo hi > out.txt",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "other"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-claim-other-owner",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "echo hi > out.txt",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "someone-else",
+        "paths": [
+          "out.txt"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-claim-expired",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "echo hi > out.txt",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "out.txt"
+        ],
+        "created_at": "2019-12-31T00:00:00+00:00",
+        "expires_at": "2020-01-01T00:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-partial-claim",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "for f in a.txt b.txt; do rm \"$f\"; done",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "a.txt"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-both-claimed",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "for f in a.txt b.txt; do rm \"$f\"; done",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "a.txt"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      },
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "b.txt"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-sed-claimed",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "sed -i 's/a/b/' config.toml",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "config.toml"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-sed-unclaimed",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "sed -i 's/a/b/' config.toml",
+    "graph_used_session": "s1",
+    "claims": [],
+    "detach_head": false
+  },
+  {
+    "id": "gate-tee-claimed",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "echo hi | tee -a log.txt",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "log.txt"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-opaque",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "python -c \"open(sys.argv[1],'w').write('x')\"",
+    "graph_used_session": "s1",
+    "claims": [],
+    "detach_head": false
+  },
+  {
+    "id": "gate-python-literal-claimed",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "python -c \"open('out.txt','w').write('x')\"",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "out.txt"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-empty-owner",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "",
+    "command": "echo hi > out.txt",
+    "graph_used_session": "s1",
+    "claims": [],
+    "detach_head": true
+  },
+  {
+    "id": "gate-wrong-session",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s2",
+    "owner": "llm-b0",
+    "command": "echo hi > out.txt",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "out.txt"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-git-apply-claimed",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "git apply patch.diff",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "patch.diff"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-git-apply-unclaimed",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "git apply patch.diff",
+    "graph_used_session": "s1",
+    "claims": [],
+    "detach_head": false
+  },
+  {
+    "id": "gate-dd-claimed",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "dd if=/dev/zero of=disk.img bs=1M",
+    "graph_used_session": "s1",
+    "claims": [
+      {
+        "owner": "llm-b0",
+        "paths": [
+          "disk.img"
+        ],
+        "created_at": "2099-01-01T00:00:00+00:00",
+        "expires_at": "2099-01-01T01:00:00+00:00"
+      }
+    ],
+    "detach_head": false
+  },
+  {
+    "id": "gate-append-unclaimed",
+    "hook": "crg_gate_verify_bash",
+    "session_id": "s1",
+    "owner": "llm-b0",
+    "command": "cat a.txt >> combined.log",
+    "graph_used_session": "s1",
+    "claims": [],
+    "detach_head": false
+  },
+  {
+    "id": "refresh-no-marker",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": null
+  },
+  {
+    "id": "refresh-empty-marker",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": ""
+  },
+  {
+    "id": "refresh-one-failure",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[\"a.py\"],\"error\":\"boom\"}"
+  },
+  {
+    "id": "refresh-one-warning",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"warning\",\"paths\":[\"b.py\"],\"text\":\"slow\"}"
+  },
+  {
+    "id": "refresh-failure-then-warning",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[\"a.py\"],\"error\":\"boom\"}\n{\"kind\":\"warning\",\"paths\":[\"b.py\"],\"text\":\"slow\"}\n"
+  },
+  {
+    "id": "refresh-two-failures",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[\"a.py\"],\"error\":\"boom\"}\n{\"kind\":\"failure\",\"paths\":[\"c.py\",\"d.py\"],\"error\":\"bang\"}\n"
+  },
+  {
+    "id": "refresh-malformed-line-falls-back-to-failure",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "not json at all\n"
+  },
+  {
+    "id": "refresh-failure-real-writer-shape",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"at\":1700000000.0,\"kind\":\"failure\",\"paths\":[\"z.py\"],\"text\":\"RuntimeError: boom\"}"
+  },
+  {
+    "id": "refresh-default-kind-is-failure",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"paths\":[\"a.py\"],\"error\":\"boom\"}"
+  },
+  {
+    "id": "refresh-text-field-preferred-over-error",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[\"a.py\"],\"text\":\"t\",\"error\":\"e\"}"
+  },
+  {
+    "id": "refresh-two-warnings",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"warning\",\"paths\":[\"a.py\"],\"text\":\"slow a\"}\n{\"kind\":\"warning\",\"paths\":[\"b.py\"],\"text\":\"slow b\"}\n"
+  },
+  {
+    "id": "refresh-failure-empty-paths",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[],\"error\":\"boom\"}"
+  },
+  {
+    "id": "refresh-combined-multiple-failures-and-warnings",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[\"a.py\"],\"error\":\"boom\"}\n{\"kind\":\"warning\",\"paths\":[\"b.py\"],\"text\":\"slow\"}\n{\"kind\":\"failure\",\"paths\":[\"c.py\"],\"error\":\"bang\"}\n"
+  },
+  {
+    "id": "refresh-warning-empty-paths",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"warning\",\"paths\":[],\"text\":\"slow\"}"
+  },
+  {
+    "id": "refresh-failure-with-multiple-paths",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[\"a.py\",\"b.py\"],\"error\":\"boom\"}"
+  },
+  {
+    "id": "refresh-warning-then-failure",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"warning\",\"paths\":[\"a.py\"],\"text\":\"slow\"}\n{\"kind\":\"failure\",\"paths\":[\"b.py\"],\"text\":\"boom\"}\n"
+  },
+  {
+    "id": "refresh-single-failure-with-long-text",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[\"deep/nested/module.py\"],\"text\":\"TimeoutError: refresh exceeded 30s while walking the dependency graph\"}"
+  },
+  {
+    "id": "refresh-many-failures-preserves-order",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[\"a.py\"],\"text\":\"first\"}\n{\"kind\":\"failure\",\"paths\":[\"b.py\"],\"text\":\"second\"}\n{\"kind\":\"failure\",\"paths\":[\"c.py\"],\"text\":\"third\"}\n"
+  },
+  {
+    "id": "refresh-warning-then-two-failures",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"warning\",\"paths\":[\"w.py\"],\"text\":\"slow\"}\n{\"kind\":\"failure\",\"paths\":[\"a.py\"],\"text\":\"boom\"}\n{\"kind\":\"failure\",\"paths\":[\"b.py\"],\"text\":\"bang\"}\n"
+  },
+  {
+    "id": "refresh-failure-and-warning-shared-path",
+    "hook": "crg_refresh_report_pre",
+    "marker_lines": "{\"kind\":\"failure\",\"paths\":[\"shared.py\"],\"text\":\"boom\"}\n{\"kind\":\"warning\",\"paths\":[\"shared.py\"],\"text\":\"slow\"}\n"
+  },
+  {
+    "id": "guard-edit-current-work-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "/repo/.current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-write-current-work-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": ".current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-read-current-work-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "notes/.current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-notebookedit-current-work-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "tool_name": "NotebookEdit",
+      "tool_input": {
+        "path": ".current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-edit-other-file-allowed",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "src/main.py"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-bash-cat-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat .current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-bash-head-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "head -n5 .current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-bash-echo-mention-allowed",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo see .current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-bash-grep-pattern-after-target-allowed",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep foo .current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-bash-grep-pattern-before-target-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep -f .current_work.md foo.txt"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-bash-unrelated-command-allowed",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls -la"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-bash-sed-current-work-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "sed -n 1p .current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-bash-mv-current-work-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "mv .current_work.md backup.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-shell-tool-alias-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "tool_name": "shell",
+      "tool_input": {
+        "command": "cat .current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-grok-protocol-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "toolName": "Bash",
+      "toolInput": {
+        "command": "cat .current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-grok-protocol-allowed",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "toolName": "Bash",
+      "toolInput": {
+        "command": "echo hi"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-mutation-hint-advisory-on-new-test-file",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "src/foo_test.py"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-no-advisory-on-non-test-new-file",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "src/foo.py"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-local-ai-runtime-off-shell-echo-allowed",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo hi"
+      }
+    },
+    "local_ai_runtime": "0"
+  },
+  {
+    "id": "guard-local-ai-runtime-on-plain-command-allowed",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "session_id": "s1",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls -la"
+      }
+    },
+    "local_ai_runtime": "1"
+  },
+  {
+    "id": "guard-run-shell-command-alias-current-work-denied",
+    "hook": "current_work_guard_bash",
+    "payload": {
+      "tool_name": "run_shell_command",
+      "tool_input": {
+        "command": "tail .current_work.md"
+      }
+    },
+    "local_ai_runtime": null
+  },
+  {
+    "id": "guard-empty-payload-allowed",
+    "hook": "current_work_guard_bash",
+    "payload": {},
+    "local_ai_runtime": null
+  }
+]
