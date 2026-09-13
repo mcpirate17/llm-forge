@@ -168,8 +168,14 @@ agent tokens. Stop porting; finish Phase 3, then install.
    removes) the host's `PreToolUse` `.*` Python entry down to
    `Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*` --
    the tools still needing Python -- and `uninstall` restores it to
-   `.*` in place. Measured on a synthetic Bash deny payload, 20+ runs,
-   median/mean wall time:
+   `.*` in place. `crg_refresh_report_pre`'s own matcher is `.*`, so
+   Python ran it for every tool before narrowing; closed the resulting
+   gap by having standalone `PreToolUse` run it alone
+   (`handlers::run_generic_pretooluse_fully_native`) for any `tool_name`
+   that is neither `Bash` nor `Agent`, so a staged background-refresh
+   failure still reports for Grep/Glob/WebFetch/TodoWrite/Task/etc.
+   Measured on a synthetic Bash deny payload, 20+ runs, median/mean wall
+   time:
 
    | Path | ms |
    |---|---|

@@ -99,7 +99,12 @@ twin:
   exactly those still-missing tools, its original `.*` shape recorded
   verbatim (same mechanism as a Full removal) so `uninstall` restores it,
   and forge's own `PreToolUse` entry keeps matcher `.*` since it still has
-  to see every Bash call. This prints `narrowed python: PreToolUse .* ->
+  to see every Bash call *and* `crg_refresh_report_pre`, whose own matcher
+  is `.*`: `handlers::run_generic_pretooluse_fully_native` runs it, alone,
+  for every `tool_name` that is neither `Bash` nor `Agent` (Grep, Glob,
+  WebFetch, TodoWrite, Task, ...), so a staged background-refresh-failure
+  report still surfaces for those calls even though the narrowed Python
+  entry no longer sees them. This prints `narrowed python: PreToolUse .* ->
   <matcher>`; a second run is a no-op (`already narrowed`).
 
 Coverage today:
@@ -107,7 +112,7 @@ Coverage today:
 | Event | Matcher | Coverage | Notes |
 |---|---|---|---|
 | `PreToolUse` | `Bash` | Full | native guard: `crg_refresh_report_pre`, `crg_gate_verify_bash`, `pre_bash`, `current_work_guard_bash` |
-| `PreToolUse` | `.*` (catch-all) | Partial, narrowed | Python keeps `Read\|Edit\|Write\|NotebookEdit\|mcp__code[-_]review[-_]graph__.*` |
+| `PreToolUse` | `.*` (catch-all) | Partial, narrowed | native runs `crg_refresh_report_pre` for every tool (`handlers::run_generic_pretooluse_fully_native`); Python keeps only `Read\|Edit\|Write\|NotebookEdit\|mcp__code[-_]review[-_]graph__.*` |
 | `PostToolUse` | `.*` | Full | Python entry removed |
 | `SessionStart` | *(none)* | Partial | Python entry kept as-is |
 | `SessionEnd` | *(none)* | Partial | Python entry kept as-is |

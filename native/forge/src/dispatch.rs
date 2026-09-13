@@ -124,8 +124,13 @@ fn run_hook_standalone(event: &str) -> Result<u8> {
 /// an `Agent` call gets forge's routing verdict alone (`route::
 /// hook_outcome_for_agent`, run through `merge::merge` on its own so a
 /// malformed embedded policy still fails closed the same way the merged,
-/// non-standalone path does); anything else has nothing native to say under
-/// standalone and prints nothing.
+/// non-standalone path does); every other parsed `tool_name` (Grep, Glob,
+/// WebFetch, TodoWrite, Task, ...) still gets `crg_refresh_report_pre`
+/// alone (`handlers::run_generic_pretooluse_fully_native`) -- that hook's
+/// own matcher is `.*`, so Python ran it for every tool before `--takeover`
+/// narrowed the host's Python `PreToolUse` entry down to a five-tool
+/// residual, and without this branch a staged refresh-failure report would
+/// go silently unreported for everything outside that residual plus Bash.
 fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
     let start = Instant::now();
     let mut input = String::new();
@@ -172,6 +177,18 @@ fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
             "PreToolUse",
             &[crate::route::hook_outcome_for_agent(payload)],
         );
+        telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+        let mut stdout = std::io::stdout();
+        stdout
+            .write_all(answer.to_string().as_bytes())
+            .context("failed to write the standalone hook verdict to stdout")?;
+        stdout
+            .write_all(b"\n")
+            .context("failed to write the standalone hook verdict to stdout")?;
+        return Ok(0);
+    }
+    if let Some(payload) = parsed.as_ref() {
+        let answer = handlers::run_generic_pretooluse_fully_native(payload);
         telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
         let mut stdout = std::io::stdout();
         stdout

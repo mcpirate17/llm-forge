@@ -746,3 +746,86 @@ fn standalone_mode_still_answers_an_agent_payload_with_routing() {
         "the stub dispatcher must never have run: {stdout}"
     );
 }
+
+/// Every `tool_name` that is neither `Bash` nor `Agent` (Grep here) still
+/// gets `crg_refresh_report_pre` alone under standalone: `--takeover`
+/// narrows the host's Python `PreToolUse` entry away from `.*`, so without
+/// this branch a staged refresh-failure marker would go unreported for
+/// exactly the tools the narrowed entry no longer covers. Runs the same
+/// payload twice against one project: first with a staged marker (must
+/// report and consume it), then again with the marker already gone (must
+/// answer a bare, hook-only allow) -- `take_notices` deletes the marker file
+/// it reads, so the second call naturally covers the "nothing staged" case.
+#[test]
+fn standalone_mode_reports_a_staged_refresh_failure_for_any_other_tool() {
+    let project = tempdir();
+    stub_project(project.path());
+    let store = project.path().join(".code-review-graph");
+    fs::create_dir_all(&store).expect("create crg store dir");
+    fs::write(
+        store.join("refresh.failed"),
+        "{\"kind\":\"failure\",\"text\":\"embedding server unreachable\"}\n",
+    )
+    .expect("stage a refresh-failure marker");
+    let payload = r#"{"tool_name":"Grep","tool_input":{"pattern":"TODO"}}"#;
+
+    let run = || {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
+        cmd.arg("hook")
+            .arg("PreToolUse")
+            .env("CLAUDE_PROJECT_DIR", project.path())
+            .env("FORGE_HOOK_STANDALONE", "1")
+            .env_remove("FORGE_MODE")
+            .env_remove("CONTEXT_TELEMETRY_PATH")
+            .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
+            .env_remove("FORGE_NATIVE_HOOKS")
+            .env_remove("CRG_DATA_DIR")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut child = cmd.spawn().expect("spawn forge");
+        child
+            .stdin
+            .take()
+            .expect("piped stdin")
+            .write_all(payload.as_bytes())
+            .expect("write stdin");
+        child.wait_with_output().expect("wait for forge")
+    };
+
+    let with_marker = run();
+    assert_eq!(with_marker.status.code(), Some(0));
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&with_marker.stdout).expect("json stdout from the report");
+    assert!(
+        stdout.get("echoed").is_none(),
+        "the stub dispatcher must never have run: {stdout}"
+    );
+    let context = stdout["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .expect("a staged failure surfaces as additionalContext");
+    assert!(
+        context.contains("background graph refresh FAILED")
+            && context.contains("embedding server unreachable"),
+        "unexpected report: {stdout}"
+    );
+    assert!(
+        !store.join("refresh.failed").exists(),
+        "the marker must be consumed once reported"
+    );
+
+    let without_marker = run();
+    assert_eq!(without_marker.status.code(), Some(0));
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&without_marker.stdout).expect("json stdout from the bare allow");
+    assert!(
+        stdout.get("echoed").is_none(),
+        "the stub dispatcher must never have run: {stdout}"
+    );
+    assert!(
+        stdout["hookSpecificOutput"]
+            .get("additionalContext")
+            .is_none(),
+        "nothing staged means nothing to report: {stdout}"
+    );
+}
