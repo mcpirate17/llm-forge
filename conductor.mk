@@ -43,7 +43,7 @@ CONDUCTOR_GATE_FINDINGS_DIR ?= $(CONDUCTOR_REPORTS_DIR)/gate_findings
 	complexity-report complexity-check complexity-refresh-baseline \
 	dupes dupes-jscpd dupes-jscpd-check dupes-pmd dupes-pmd-check dupes-pylint \
 	dupes-nicad dupes-deep dupes-deep-check \
-	mutation-retention mutation-patch-audit mutation-patch-audit-record \
+	mutation-retention mutation-patch-audit mutation-patch-audit-record mutation-reap \
 	ledger-rollup ledger-report cost-budget-audit cost-budget-record \
 	graph-seed-worktree worktree-reap workspace-hygiene branch-policy \
 	branch-policy-audit checkout-sync crg-probe crg-sync crg-check \
@@ -222,6 +222,7 @@ dupes-deep-check:  ## Run duplicate detectors as a failing gate
 MUTATION_RETENTION_APPLY ?=
 MUTATION_RETENTION_ARGS ?=
 MUTATION_AUDIT_ARGS ?=
+MUTATION_REAP_APPLY ?=
 
 mutation-retention:  ## Report (or with MUTATION_RETENTION_APPLY=1, delete) uncitable receipts
 	$(PYTHON) -m conductor.mutation_retention --repo-root "$(CONDUCTOR_HOST_ROOT)" \
@@ -237,6 +238,10 @@ mutation-patch-audit-record:  ## Re-record the reproducibility baseline after re
 	$(PYTHON) -m conductor.mutation_patch_audit \
 		--registry "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_MUTATION_REGISTRY)" \
 		--summary --write-baseline
+
+mutation-reap:  ## List engine runs orphaned by a dead engine (MUTATION_REAP_APPLY=1 kills them)
+	$(PYTHON) -m conductor.mutation_testing_support reap \
+		--repo-root "$(CONDUCTOR_HOST_ROOT)" $(if $(MUTATION_REAP_APPLY),--apply,)
 
 # ── Cost ledger budget ratchet (docs/design/cost_ledger.md section 4) ───
 # Shells to `forge ledger audit` (native/forge/src/ledger/audit.rs); the Python
