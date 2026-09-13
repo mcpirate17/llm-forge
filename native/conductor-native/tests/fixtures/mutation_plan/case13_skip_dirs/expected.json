@@ -1,0 +1,46 @@
+{
+  "already_covered": [],
+  "language": "python",
+  "manifests": [
+    {
+      "campaign_id": "llm-b0_j_fest_20260913",
+      "environment": {},
+      "generator": {
+        "exclude": [
+          "**/test_*.py",
+          "**/conftest.py"
+        ],
+        "operators": [],
+        "run_timeout_seconds": 1800,
+        "seed": 0,
+        "source": [
+          "pkg/j.py"
+        ]
+      },
+      "language": "python",
+      "mutation_engine": "fest",
+      "schema_version": 1,
+      "source_sha256": {
+        "pkg/j.py": "5b76d0962c09ab4ee309fac65fad3568c97abdec983b405146ae3e86a235e352"
+      },
+      "survivor_baseline": [],
+      "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+      "survivor_baseline_recorded": false,
+      "test_argv": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--rootdir=.",
+        "pkg/test_j.py"
+      ],
+      "test_sha256": {
+        "pkg/test_j.py": "17596343eef4aa93e67fa63c8cd060e63e36c4525be899a5d0dd2e8067c6e366"
+      },
+      "title": "Generated mutants for pkg/j.py, scored on the survivor set"
+    }
+  ],
+  "unpaired": [],
+  "unpaired_lines": 0,
+  "untested": []
+}

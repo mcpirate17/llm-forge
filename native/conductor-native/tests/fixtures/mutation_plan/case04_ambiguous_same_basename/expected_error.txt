@@ -1,0 +1,1 @@
+pkg/d.py has no test in its own package, and several unrelated files share the name test_d.py: ['other1/test_d.py', 'other2/test_d.py']. Put the test beside the module (or under its tests/ mirror) so the pairing can say which one counts.

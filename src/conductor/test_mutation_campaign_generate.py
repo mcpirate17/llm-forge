@@ -457,7 +457,9 @@ def test_write_refuses_to_replace_a_recorded_baseline(tmp_path: Path) -> None:
     )
 
 
-def test_a_generated_rust_manifest_loads_as_a_generated_campaign(tmp_path: Path) -> None:
+def test_a_generated_rust_manifest_loads_as_a_generated_campaign(
+    tmp_path: Path,
+) -> None:
     """The generator's output must satisfy the runner's own model, not resemble it."""
 
     result = plan("rust", day="20260907", repo_root=host_root(Path(__file__)))
@@ -963,8 +965,12 @@ def test_rust_plan_reports_an_untested_scoped_crate_without_hiding_its_identity(
 def test_rust_plan_uses_zero_lines_only_for_partial_subject_metadata(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """A defensive untested finding must not invent a line count when metadata is partial."""
+    """A defensive untested finding must not invent a line count when metadata is partial.
 
+    Forces `CONDUCTOR_PLAN_IMPL=python`: the monkeypatches below only reach it.
+    """
+
+    monkeypatch.setenv("CONDUCTOR_PLAN_IMPL", "python")
     subject = {
         "package": "partial",
         "root": "partial",
@@ -1064,7 +1070,9 @@ def test_refresh_carries_an_extra_test_campaign_forward_without_erasing_its_base
     payload["survivor_baseline"] = ["engine-recorded-survivor"]
     payload["survivor_baseline_recorded"] = True
     path.write_text(json.dumps(payload), encoding="utf-8")
-    (tmp_path / "conductor/_bash_quiet.py").write_text("LIMIT = 4000\n", encoding="utf-8")
+    (tmp_path / "conductor/_bash_quiet.py").write_text(
+        "LIMIT = 4000\n", encoding="utf-8"
+    )
 
     assert refresh_python_campaign(payload["campaign_id"], repo_root=tmp_path) == (
         path.relative_to(tmp_path).as_posix()

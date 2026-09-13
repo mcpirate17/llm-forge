@@ -1,0 +1,13 @@
+{
+  "campaigns_root": "conductor/mutation_campaigns",
+  "day": "20260913",
+  "extra_tests": {},
+  "include_covered": false,
+  "jobs": 4,
+  "language": "rust",
+  "only_sources": [
+    "crate_d/src/lib.rs"
+  ],
+  "owner": "llm-b0",
+  "run_timeout_seconds": 1800
+}

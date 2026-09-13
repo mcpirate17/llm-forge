@@ -1,0 +1,15 @@
+{
+  "campaigns_root": "conductor/mutation_campaigns",
+  "day": "20260913",
+  "extra_tests": {
+    "pkg/f.py": [
+      "pkg/test_other.py"
+    ]
+  },
+  "include_covered": false,
+  "jobs": 4,
+  "language": "python",
+  "only_sources": null,
+  "owner": "llm-b0",
+  "run_timeout_seconds": 1800
+}
