@@ -67,6 +67,10 @@ fn run_forge(
     cmd.arg("hook")
         .arg(event)
         .env("CLAUDE_PROJECT_DIR", project)
+        // The stub venv below is the interpreter this test is about; a snapshot
+        // export leaking in from the mutation engine's environment would rank
+        // above it and run the host's python instead of the stub.
+        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -102,6 +106,7 @@ fn run_forge_with_native_hooks(
         .arg("PreToolUse")
         .env("CLAUDE_PROJECT_DIR", project)
         .env_remove("CONTEXT_TELEMETRY_PATH")
+        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
