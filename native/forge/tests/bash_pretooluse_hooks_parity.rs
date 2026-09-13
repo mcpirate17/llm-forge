@@ -874,6 +874,22 @@ fn bash_pretooluse_native_hooks_match_python_over_a_wide_corpus() {
         guard_case(&mut pending, "guard-empty-payload-allowed", json!({}));
     }
 
+    // Every case above that needed `CRG_GATE_STATE_DIR`/`CRG_DATA_DIR` ran its
+    // Rust side inline while building `pending`, against a `ScratchDir` this
+    // function still owns; nothing past this point reads those vars again.
+    // Left set, they point at directories `ScratchDir::Drop` removes at the
+    // end of this scope -- and, worse, they leak past this function's locks
+    // to whichever `crg_gate::tests::*`/`crg_refresh::tests::*` test runs
+    // next once `_gate_guard`/`_refresh_guard` release, making it read the
+    // wrong (or a since-deleted) store directory instead of its own. That
+    // observed, intermittently: `crg_refresh::tests::*` panicking on a
+    // `Value::Null` it didn't expect because `CRG_DATA_DIR` was still
+    // pointing at this function's last `refresh_case`'s scratch dir.
+    std::env::remove_var("CRG_GATE_STATE_DIR");
+    std::env::remove_var("CRG_DATA_DIR");
+    std::env::remove_var("GOVERNANCE_OWNER");
+    std::env::remove_var("LOCAL_AI_RUNTIME");
+
     assert!(
         pending.len() >= 64,
         "expected at least 20 cases per hook (60+ total; 22 gate + 20 refresh \
