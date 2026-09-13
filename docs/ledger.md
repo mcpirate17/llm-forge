@@ -168,32 +168,58 @@ rather than silently downgrading. Docs and reports quote the bound as
 
 ### First real run (this PR, offline debt path)
 
-45 turns, 5 sessions (seed 20260913, 10/session; one session holds only 5
-usage-bearing turns), billed input 10,772–164,794, **0 API calls** --
+Inputs are the five top-level design-table session files, one per session
+(a resume file and a subagent transcript are different populations from
+the sessions the design table measured). Exact commands, so the fixture
+reproduces byte-for-byte:
+
+```
+forge ledger calibrate sample \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/206702fb-97d8-444b-97c3-5d12c6eeb6a8.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/3c0c3659-9c0a-43c6-8826-cbba537595f1.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/5e93df87-d437-4c17-adaa-75357a1dc0c5.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/65f84759-e8ac-47fa-a82c-d67624da005d.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/c38ffd05-637b-4717-bf6d-2bf44203793a.jsonl \
+  --per-session 10 --seed 20260913 > /tmp/calibration_sample.jsonl
+
+uv run python -m conductor.ledger_calibrate /tmp/calibration_sample.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/206702fb-97d8-444b-97c3-5d12c6eeb6a8.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/3c0c3659-9c0a-43c6-8826-cbba537595f1.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/5e93df87-d437-4c17-adaa-75357a1dc0c5.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/65f84759-e8ac-47fa-a82c-d67624da005d.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/c38ffd05-637b-4717-bf6d-2bf44203793a.jsonl \
+  --offline \
+  --out native/forge/tests/fixtures/ledger/calibration.json \
+  --cache /tmp/.ledger-calibrate-cache.json
+```
+
+45 turns, 5 sessions (10/session; `c38ffd05` holds only 5 usage-bearing
+turns), billed input 38,701–164,794, **0 API calls** --
 `ANTHROPIC_API_KEY` is not set on this machine, so `per_block_type` ships
 `null` and the bound is recorded as debt, not guessed.
 
 | session | cpt median | p10 | p90 |
 |---|---|---|---|
 | `206702fb…` | 0.871 | 0.416 | 0.957 |
-| `3c0c3659…` | 0.939 | 0.363 | 1.052 |
+| `3c0c3659…` | 0.776 | 0.402 | 1.101 |
 | `5e93df87…` | 0.954 | 0.651 | 1.064 |
-| `65f84759…` | 1.633 | 0.532 | 1.670 |
+| `65f84759…` | 0.663 | 0.320 | 0.900 |
 | `c38ffd05…` | 0.008 | 0.001 | 0.212 |
-| **overall** | **0.939** | **0.212** | **1.642** |
+| **overall** | **0.772** | **0.212** | **1.059** |
 
 Read the numbers knowing what the window holds: transcripts do not carry
 the system prompt, tool definitions, or attachment records
-(`hook_success` outputs, skill listings, file pastes -- 250 of 655 window
-lines in one sampled session), yet all of it is billed as input. The
-measured ratio therefore calibrates *transcript-chars per billed input
-token* including that overhead -- which is exactly the constant the
-rollup's `cpt4` resend heuristic wants, and why the overall median is
-0.94 rather than the naive ~4. `c38ffd05`'s 0.008 is the same effect at
-the extreme: 8 message lines (11.7K content chars) against 69K billed
-cache-read tokens of non-transcript overhead. These are honest
-calibration findings, not sampler bugs; the per-block-type bound, once
-measured with a key, rests on the same window definition.
+(`hook_success` outputs, skill listings, file pastes -- 298 of 730 window
+lines in one sampled `3c0c3659` window, 0.28 of 1.02 MB), yet all of it
+is billed as input. The measured ratio therefore calibrates
+*transcript-chars per billed input token* including that overhead --
+which is exactly the constant the rollup's `cpt4` resend heuristic wants,
+and why the overall median is 0.77 rather than the naive ~4.
+`c38ffd05`'s 0.008 is the same effect at the extreme: 8 message lines
+(11.7K content chars) against 69K billed cache-read tokens of
+non-transcript overhead. These are honest calibration findings, not
+sampler bugs; the per-block-type bound, once measured with a key, rests
+on the same window definition.
 
 ### Frozen fixtures this step moved
 
