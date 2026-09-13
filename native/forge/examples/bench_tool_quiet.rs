@@ -14,7 +14,6 @@
 mod tool_quiet;
 
 use serde_json::json;
-use std::path::PathBuf;
 use std::time::Instant;
 use tool_quiet::QuietConfig;
 
@@ -76,8 +75,8 @@ fn run(label: &str, payload: &serde_json::Value, save_dir: &std::path::Path) {
 }
 
 fn main() {
-    let scratch = PathBuf::from(std::env::temp_dir())
-        .join(format!("forge-tool-quiet-bench-{}", std::process::id()));
+    let scratch =
+        std::env::temp_dir().join(format!("forge-tool-quiet-bench-{}", std::process::id()));
     std::fs::create_dir_all(&scratch).unwrap();
     run("bash_1mb_stdout (after, native)", &bash_case(), &scratch);
     run("read_1mb_content (after, native)", &read_case(), &scratch);
