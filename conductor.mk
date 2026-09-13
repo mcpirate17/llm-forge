@@ -47,7 +47,7 @@ CONDUCTOR_GATE_FINDINGS_DIR ?= $(CONDUCTOR_REPORTS_DIR)/gate_findings
 	graph-seed-worktree worktree-reap workspace-hygiene branch-policy \
 	branch-policy-audit checkout-sync crg-probe crg-sync crg-check \
 	dead-tests test-graph codex-journal notebooklm-bundle notebooklm-research-bundle \
-	test-conductor-native test-slop-core
+	test-conductor-native test-slop-core test-forge forge-build
 
 # ── Governance: candidate review, claims, sessions ──────────────────────
 # All of these wrap conductor.candidate_review.cli / conductor.session_close,
@@ -320,3 +320,15 @@ test-conductor-native:  ## cargo test the conductor-native crate
 
 test-slop-core:  ## cargo test the slop-core crate
 	cd "$(CONDUCTOR_HOST_ROOT)/native/slop-core" && cargo test
+
+test-forge:  ## cargo test the forge crate (native hook launcher, step 1 of the Rust hook port)
+	cd "$(CONDUCTOR_HOST_ROOT)/native/forge" && cargo test
+
+# Installs to .tools/bin/forge, where project_init.resolve_forge_binary looks for
+# it: the next `conductor init`/`conductor.bootstrap` run then wires
+# .claude/settings.json hooks to `forge hook <Event>` instead of the Python
+# launcher script. No hook logic is native yet (step 1 of the port) -- forge just
+# delegates whole to the same Python dispatcher, so this is safe to build early.
+forge-build:  ## Build forge and install it to .tools/bin
+	cd "$(CONDUCTOR_HOST_ROOT)/native/forge" && \
+		cargo install --path . --root "$(CONDUCTOR_HOST_ROOT)/.tools" --force
