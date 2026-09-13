@@ -175,6 +175,39 @@ def _branched_repo(tmp_path: Path) -> tuple[Path, str, str]:
     return repo, integration, head
 
 
+def _unrelated_history_root(repo: Path) -> str:
+    """Commit an orphan root unrelated to ``lane``'s history, then check ``lane`` back out.
+
+    Shared setup for the two "a base off another history is refused" tests below:
+    one drives it through an index candidate, the other through a commit candidate,
+    but both need the same disconnected commit to pass as ``base_ref``.
+    """
+    _git(repo, "checkout", "-q", "--orphan", "unrelated")
+    (repo / "c.txt").write_text("elsewhere\n", encoding="utf-8")
+    _git(repo, "add", "c.txt")
+    _git(repo, "commit", "-qm", "unrelated root")
+    unrelated = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "lane")
+    return unrelated
+
+
+def _assert_base_off_another_history_refused(candidate: object, unrelated: str) -> None:
+    """Common assertions: the unrelated base binds nothing, so every waiver is inert."""
+
+    assert candidate.base_commit_oid == unrelated
+    assert candidate.integration_base_oid is None
+    assert "is not an ancestor of" in candidate.integration_base_detail
+    assert candidate.waiver_base is None
+    _still_critical(
+        apply_value_waivers(
+            [_finding()],
+            (_waiver(integration_base=unrelated),),
+            base=candidate.waiver_base,
+            today=TODAY,
+        )
+    )
+
+
 def test_an_index_candidate_binds_waivers_to_the_integration_base(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -203,25 +236,9 @@ def test_an_integration_base_that_is_not_an_ancestor_is_refused(
     """A base off this history binds nothing: no waiver base, so every waiver is inert."""
 
     repo, _integration, _head = _branched_repo(tmp_path)
-    _git(repo, "checkout", "-q", "--orphan", "unrelated")
-    (repo / "c.txt").write_text("elsewhere\n", encoding="utf-8")
-    _git(repo, "add", "c.txt")
-    _git(repo, "commit", "-qm", "unrelated root")
-    unrelated = _git(repo, "rev-parse", "HEAD")
-    _git(repo, "checkout", "-q", "lane")
+    unrelated = _unrelated_history_root(repo)
     candidate = resolve_candidate(repo, kind="index", base_ref=unrelated)
-    assert candidate.base_commit_oid == unrelated
-    assert candidate.integration_base_oid is None
-    assert "is not an ancestor of" in candidate.integration_base_detail
-    assert candidate.waiver_base is None
-    _still_critical(
-        apply_value_waivers(
-            [_finding()],
-            (_waiver(integration_base=unrelated),),
-            base=candidate.waiver_base,
-            today=TODAY,
-        )
-    )
+    _assert_base_off_another_history_refused(candidate, unrelated)
 
 
 def _gate_context_with_receipt(
@@ -366,27 +383,11 @@ def test_a_commit_candidate_refuses_a_base_off_another_history(tmp_path: Path) -
     """`--base-ref` on a commit candidate cannot smuggle in an unrelated waiver base."""
 
     repo, _integration, _head = _branched_repo(tmp_path)
-    _git(repo, "checkout", "-q", "--orphan", "unrelated")
-    (repo / "c.txt").write_text("elsewhere\n", encoding="utf-8")
-    _git(repo, "add", "c.txt")
-    _git(repo, "commit", "-qm", "unrelated root")
-    unrelated = _git(repo, "rev-parse", "HEAD")
-    _git(repo, "checkout", "-q", "lane")
+    unrelated = _unrelated_history_root(repo)
     candidate = resolve_candidate(
         repo, kind="commit", target_ref="lane", base_ref=unrelated
     )
-    assert candidate.base_commit_oid == unrelated
-    assert candidate.integration_base_oid is None
-    assert "is not an ancestor of" in candidate.integration_base_detail
-    assert candidate.waiver_base is None
-    _still_critical(
-        apply_value_waivers(
-            [_finding()],
-            (_waiver(integration_base=unrelated),),
-            base=candidate.waiver_base,
-            today=TODAY,
-        )
-    )
+    _assert_base_off_another_history_refused(candidate, unrelated)
 
 
 def _report_receipt(findings: list[dict[str, object]]) -> ReviewReceipt:

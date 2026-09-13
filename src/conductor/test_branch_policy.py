@@ -70,6 +70,24 @@ def _rev_parse(repo: Path, ref: str) -> str:
     return _git(repo, "rev-parse", ref).strip()
 
 
+def _bind_topic_a_then_return_to_master(repo: Path) -> str:
+    """Bind ``claude/topic-a-20260829`` to claim ``c1`` and check ``master`` back out.
+
+    Shared setup for the two "second branch on the same claim" tests below: one
+    expects the second branch refused while the first is still live, the other
+    expects it allowed once the first is gone. Both start from the identical bound
+    branch and returned-to-master state; only what happens to the first branch next
+    differs.
+    """
+    base = _commit(repo, "a.txt")
+    _checkout_new(repo, "claude/topic-a-20260829", start=base)
+    bp.bind_branch(
+        repo, branch="claude/topic-a-20260829", claim_id="c1", owner="claude"
+    )
+    _git(repo, "checkout", "--quiet", "master")
+    return base
+
+
 def _write_binding_row(repo: Path, *, branch: str, claim_id: str, owner: str) -> None:
     """Append a binding row straight to the store, bypassing bind_branch's own guard.
 
@@ -386,12 +404,7 @@ class TestBindingStore:
         assert len(bp.load_bindings(repo)) == 1
 
     def test_second_live_branch_same_claim_is_refused(self, repo: Path) -> None:
-        base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-a-20260829", start=base)
-        bp.bind_branch(
-            repo, branch="claude/topic-a-20260829", claim_id="c1", owner="claude"
-        )
-        _git(repo, "checkout", "--quiet", "master")
+        base = _bind_topic_a_then_return_to_master(repo)
         _checkout_new(repo, "claude/topic-b-20260829", start=base)
         with pytest.raises(bp.BranchPolicyError, match="already bound to live branch"):
             bp.bind_branch(
@@ -401,12 +414,7 @@ class TestBindingStore:
     def test_second_branch_allowed_once_first_is_no_longer_live(
         self, repo: Path
     ) -> None:
-        base = _commit(repo, "a.txt")
-        _checkout_new(repo, "claude/topic-a-20260829", start=base)
-        bp.bind_branch(
-            repo, branch="claude/topic-a-20260829", claim_id="c1", owner="claude"
-        )
-        _git(repo, "checkout", "--quiet", "master")
+        base = _bind_topic_a_then_return_to_master(repo)
         _git(repo, "branch", "-D", "claude/topic-a-20260829")
         _checkout_new(repo, "claude/topic-b-20260829", start=base)
         binding = bp.bind_branch(
