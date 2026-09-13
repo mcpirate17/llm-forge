@@ -26,24 +26,24 @@
 //! `PreToolUse` `Partial` at the `".*"` matcher even though the `Bash` and
 //! `Agent` cases it is built from would each look `Full` in isolation.
 //!
-//! Second, and more subtle: `--takeover` always implies `--standalone`
-//! (`FORGE_HOOK_STANDALONE=1`), and the standalone path is a *different*
-//! function -- `dispatch::run_pre_tool_use_standalone` -- whose own doc
-//! comment says plainly that "anything else -- Bash included -- has nothing
-//! native to say under standalone and prints nothing." Measured directly
-//! (item 3(b) of the takeover slice): piping a `Bash` `rm -rf /home/x` or
-//! `git push --force origin main` payload through
-//! `FORGE_MODE=warn FORGE_HOOK_STANDALONE=1 forge hook PreToolUse` produces
-//! **no deny at all** -- the same payload only denies under the
-//! non-standalone `forge hook PreToolUse`. So even a hypothetical host
-//! entry with the literal matcher `"Bash"` is not safe to take over: the
-//! guard denials `BASH_PRETOOLUSE_HOOK_NAMES` promises are not live in the
-//! one mode `--takeover` will ever run forge in. `"Bash"` is therefore
-//! `Partial` here too, naming its own native names as missing -- not
-//! because they lack a Rust implementation, but because the standalone
-//! entrypoint never calls it. `"Agent"` is unaffected:
-//! `run_pre_tool_use_standalone` does special-case `tool_name == "Agent"`
-//! and its routing verdict is confirmed live under standalone.
+//! Second, and no longer a surprise as of the standalone Bash guard slice:
+//! `--takeover` always implies `--standalone` (`FORGE_HOOK_STANDALONE=1`),
+//! and the standalone path is a *different* function --
+//! `dispatch::run_pre_tool_use_standalone` -- which used to have nothing to
+//! say for Bash at all. It now special-cases `tool_name == "Bash"` the same
+//! way the non-standalone fully-native branch does
+//! (`handlers::run_bash_pretooluse_fully_native`), so a literal `"Bash"`
+//! matcher is `Full` here: the guard denials `BASH_PRETOOLUSE_HOOK_NAMES`
+//! promises are live in the one mode `--takeover` ever runs forge in.
+//! `".*"` (the real host shape) is still `Partial`, though narrower than
+//! before -- `Read`, `Edit|Write|NotebookEdit` and the graph-tool matcher
+//! still have no native twin and still need Python; `residual_python_matcher`
+//! below gives the alternation of just those matchers so `--takeover` can
+//! narrow the Python entry's own matcher down to them instead of leaving it
+//! at `".*"` (which would re-run Python on every Bash call for nothing).
+//! `"Agent"` is unaffected: `run_pre_tool_use_standalone` already
+//! special-cased `tool_name == "Agent"` before this slice and its routing
+//! verdict was already confirmed live under standalone.
 
 use crate::handlers::{
     AGENT_PRETOOLUSE_HOOK_NAMES, BASH_PRETOOLUSE_HOOK_NAMES, POST_TOOL_USE_HOOK_NAMES,
@@ -99,12 +99,12 @@ const SESSIONEND_MISSING: [&str; 1] = ["obsidian_session_end"];
 pub fn coverage(event: &str, tool_matcher: &str) -> Coverage {
     match event {
         "PreToolUse" => match tool_matcher {
-            // Not Full: `run_pre_tool_use_standalone` -- the only path
-            // `--takeover` (implies `--standalone`) ever runs -- never
-            // calls the Bash guard logic; see the module doc comment and
-            // item 3(b)'s measured `rm -rf`/`git push --force` non-denies.
-            "Bash" => Coverage::Partial {
-                missing: BASH_PRETOOLUSE_HOOK_NAMES.to_vec(),
+            // Full: `run_pre_tool_use_standalone` -- the only path
+            // `--takeover` (implies `--standalone`) ever runs -- now runs
+            // the same fully-native Bash guard the non-standalone path
+            // does; see the module doc comment.
+            "Bash" => Coverage::Full {
+                native: BASH_PRETOOLUSE_HOOK_NAMES.to_vec(),
             },
             "Agent" => Coverage::Full {
                 native: AGENT_PRETOOLUSE_HOOK_NAMES.to_vec(),
@@ -126,6 +126,45 @@ pub fn coverage(event: &str, tool_matcher: &str) -> Coverage {
     }
 }
 
+/// The tool matcher each `PRETOOLUSE_NON_BASH_NON_AGENT_ONLY` name's own
+/// `HookSpec` carries in `registry.py`'s `HOOKS` tuple: `Read` for the two
+/// read guards, `Edit|Write|NotebookEdit` for the two edit guards, the
+/// graph-tool alternation for the two graph-wait/mark hooks.
+const PRETOOLUSE_MISSING_MATCHERS: [(&str, &str); 6] = [
+    ("current_work_guard_read", "Read"),
+    ("pre_read_skeleton", "Read"),
+    ("crg_gate_verify", "Edit|Write|NotebookEdit"),
+    ("current_work_guard_edit", "Edit|Write|NotebookEdit"),
+    ("crg_gate_mark", "mcp__code[-_]review[-_]graph__.*"),
+    ("crg_refresh_wait", "mcp__code[-_]review[-_]graph__.*"),
+];
+
+/// The alternation of tool matchers that still need Python for `event`, or
+/// `None` when nothing is missing (`coverage(event, ".*")` is `Full`, e.g.
+/// `PostToolUse`, or the event's missing names carry no matcher of their
+/// own, e.g. `SessionStart`/`SessionEnd`). For `PreToolUse` today:
+/// `Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*` -- exactly
+/// what `--takeover` narrows a `".*"` Python entry down to instead of
+/// leaving it wide open.
+pub fn residual_python_matcher(event: &str) -> Option<String> {
+    let Coverage::Partial { missing } = coverage(event, ".*") else {
+        return None;
+    };
+    let mut matchers: Vec<&str> = Vec::new();
+    for name in &missing {
+        if let Some((_, matcher)) = PRETOOLUSE_MISSING_MATCHERS.iter().find(|(n, _)| n == name) {
+            if !matchers.contains(matcher) {
+                matchers.push(matcher);
+            }
+        }
+    }
+    if matchers.is_empty() {
+        None
+    } else {
+        Some(matchers.join("|"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,18 +172,31 @@ mod tests {
     use std::collections::HashSet;
 
     #[test]
-    fn pretooluse_bash_is_partial_because_standalone_never_runs_the_guard() {
+    fn pretooluse_bash_is_full_now_that_standalone_runs_the_guard() {
         // `--takeover` implies `--standalone`, and
-        // `run_pre_tool_use_standalone` has nothing to say for Bash --
-        // confirmed live (item 3(b)): no deny for `rm -rf` or
-        // `git push --force` under
-        // `FORGE_MODE=warn FORGE_HOOK_STANDALONE=1 forge hook PreToolUse`.
-        let Coverage::Partial { missing } = coverage("PreToolUse", "Bash") else {
-            panic!("expected Partial");
+        // `run_pre_tool_use_standalone` now runs the same fully-native Bash
+        // guard the non-standalone path does.
+        let Coverage::Full { native } = coverage("PreToolUse", "Bash") else {
+            panic!("expected Full");
         };
         let expected: HashSet<&str> = BASH_PRETOOLUSE_HOOK_NAMES.into_iter().collect();
-        let got: HashSet<&str> = missing.into_iter().collect();
+        let got: HashSet<&str> = native.into_iter().collect();
         assert_eq!(got, expected);
+    }
+
+    #[test]
+    fn residual_python_matcher_names_exactly_the_still_missing_tools() {
+        let residual =
+            residual_python_matcher("PreToolUse").expect("PreToolUse still has missing tools");
+        assert_eq!(
+            residual,
+            "Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*"
+        );
+    }
+
+    #[test]
+    fn residual_python_matcher_is_none_once_coverage_is_full() {
+        assert_eq!(residual_python_matcher("PostToolUse"), None);
     }
 
     #[test]
@@ -320,8 +372,16 @@ pub enum EventOutcome {
     TakenOver,
     /// Already taken over by an earlier run; nothing changed this time.
     AlreadyTakenOver,
-    /// Coverage is `Partial`; the Python entry stays.
+    /// Coverage is `Partial` and there is no narrower matcher to give
+    /// Python (`residual_python_matcher` returned `None`); the entry stays
+    /// exactly as it was.
     Kept { missing: Vec<&'static str> },
+    /// Coverage is `Partial` but `residual_python_matcher` named a narrower
+    /// matcher than the entry's own: its `matcher` field was rewritten to
+    /// that (the original recorded verbatim, first time this ran).
+    Narrowed { matcher: String },
+    /// Already narrowed by an earlier run; nothing changed this time.
+    AlreadyNarrowed { matcher: String },
     /// No Python dispatcher entry exists for this event; nothing to do.
     NoPythonEntry,
 }
@@ -371,7 +431,29 @@ pub fn apply(
         };
         match coverage(event, &matcher) {
             Coverage::Partial { missing } => {
-                outcomes.push((event.to_string(), EventOutcome::Kept { missing }));
+                let Some(residual) = residual_python_matcher(event) else {
+                    outcomes.push((event.to_string(), EventOutcome::Kept { missing }));
+                    continue;
+                };
+                if matcher == residual {
+                    outcomes.push((
+                        event.to_string(),
+                        EventOutcome::AlreadyNarrowed { matcher: residual },
+                    ));
+                    continue;
+                }
+                let already_recorded = record.contains_key(event);
+                if !already_recorded {
+                    record.insert(event.to_string(), list[index].clone());
+                }
+                list[index]
+                    .as_object_mut()
+                    .with_context(|| format!("hooks.{event}[{index}] must be a JSON object"))?
+                    .insert("matcher".to_string(), Value::String(residual.clone()));
+                outcomes.push((
+                    event.to_string(),
+                    EventOutcome::Narrowed { matcher: residual },
+                ));
                 continue;
             }
             Coverage::Full { .. } => {}
@@ -437,9 +519,22 @@ pub fn restore(settings: &mut Value, host: &Path) -> Result<Vec<String>> {
             .or_insert_with(|| json!([]))
             .as_array_mut()
             .with_context(|| format!(r#""hooks.{event}" must be a JSON array"#))?;
-        if find_python_entry(list, event).is_none() {
-            list.push(entry.clone());
-            restored.push(event.clone());
+        match find_python_entry(list, event) {
+            // Full case: the entry was removed outright; add it back.
+            None => {
+                list.push(entry.clone());
+                restored.push(event.clone());
+            }
+            // Narrowed case: the entry is still present (same command) but
+            // its matcher was rewritten; replace it with the recorded
+            // original in place rather than duplicating the row.
+            Some((index, current_matcher)) => {
+                let original_matcher = entry.get("matcher").and_then(Value::as_str).unwrap_or("");
+                if current_matcher != original_matcher {
+                    list[index] = entry.clone();
+                    restored.push(event.clone());
+                }
+            }
         }
     }
     fs::remove_file(&path).with_context(|| format!("removing {}", path.display()))?;
@@ -447,25 +542,38 @@ pub fn restore(settings: &mut Value, host: &Path) -> Result<Vec<String>> {
 }
 
 /// `forge hooks status`'s `python` column: `present` (a Python dispatcher
-/// entry is in settings today), `taken-over` (removed, recorded in the
-/// takeover file) or `n/a` (never had one).
-pub fn python_status(settings: &Value, host: &Path, event: &str) -> &'static str {
-    let present = settings
+/// entry is in settings today, untouched), `narrowed(<matcher>)` (present
+/// but its matcher was rewritten to just the tools still needing Python),
+/// `taken-over` (removed outright, recorded in the takeover file) or `n/a`
+/// (never had one).
+pub fn python_status(settings: &Value, host: &Path, event: &str) -> String {
+    let matcher = settings
         .get("hooks")
         .and_then(Value::as_object)
         .and_then(|hooks| hooks.get(event))
         .and_then(Value::as_array)
-        .map(|list| find_python_entry(list, event).is_some())
-        .unwrap_or(false);
-    if present {
-        return "present";
+        .and_then(|list| find_python_entry(list, event));
+    if let Some((_, matcher)) = matcher {
+        let recorded_original = load_record(host)
+            .ok()
+            .and_then(|record| record.get(event).cloned());
+        let was_narrowed = recorded_original
+            .as_ref()
+            .and_then(|entry| entry.get("matcher"))
+            .and_then(Value::as_str)
+            .is_some_and(|original| original != matcher);
+        return if was_narrowed {
+            format!("narrowed({matcher})")
+        } else {
+            "present".to_string()
+        };
     }
     let recorded = load_record(host)
         .map(|record| record.contains_key(event))
         .unwrap_or(false);
     if recorded {
-        "taken-over"
+        "taken-over".to_string()
     } else {
-        "n/a"
+        "n/a".to_string()
     }
 }

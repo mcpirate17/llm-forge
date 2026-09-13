@@ -81,25 +81,51 @@ install` asks `native/forge/src/takeover.rs::coverage(event, tool_matcher)`
 whether every Python hook that event's host matcher would run has a native
 twin:
 
-- **Full** (`PostToolUse` today — see the coverage table below): the
-  host's Python dispatcher entry (`.../dispatch.py <Event>` or
-  `python -m tooling.hooks.dispatch <Event>`) is removed and recorded
-  **verbatim** in `.claude/settings.forge-takeover.json` (created once;
-  re-running `--takeover` merges into it and never blind-overwrites an
+- **Full** (`PostToolUse`, and `PreToolUse`+`Bash` since forge's standalone
+  entrypoint now runs the native Bash guard fully in-process — see the
+  coverage table below): the host's Python dispatcher entry (`.../dispatch.py
+  <Event>` or `python -m tooling.hooks.dispatch <Event>`) is removed and
+  recorded **verbatim** in `.claude/settings.forge-takeover.json` (created
+  once; re-running `--takeover` merges into it and never blind-overwrites an
   entry it already recorded), and a forge entry for that event is ensured.
-- **Partial** (`PreToolUse`, `SessionStart`, `SessionEnd` today): the
-  Python entry is left completely untouched and reported as `kept python:
-  <event> (missing: …)` — naming the Python hook names that have no
-  native twin yet, or, for `PreToolUse`+`Bash`, naming why: forge's
-  standalone entrypoint never invokes the Bash guard logic at all (see
-  the coverage table's note below).
+- **Partial** (`PreToolUse`'s catch-all matcher, `SessionStart`,
+  `SessionEnd` today): when the event has no narrower matcher to offer
+  (`SessionStart`/`SessionEnd`), the Python entry is left completely
+  untouched and reported as `kept python: <event> (missing: …)` — naming
+  the Python hook names that have no native twin yet. When it does
+  (`PreToolUse`'s `.*` entry, where Bash is Full but `Read`/`Edit`/`Write`/
+  `NotebookEdit`/the `mcp__code-review-graph__*` tools still need Python),
+  the Python entry's matcher is **narrowed** in place — not removed — to
+  exactly those still-missing tools, its original `.*` shape recorded
+  verbatim (same mechanism as a Full removal) so `uninstall` restores it,
+  and forge's own `PreToolUse` entry keeps matcher `.*` since it still has
+  to see every Bash call *and* `crg_refresh_report_pre`, whose own matcher
+  is `.*`: `handlers::run_generic_pretooluse_fully_native` runs it, alone,
+  for every `tool_name` that is neither `Bash` nor `Agent` (Grep, Glob,
+  WebFetch, TodoWrite, Task, ...), so a staged background-refresh-failure
+  report still surfaces for those calls even though the narrowed Python
+  entry no longer sees them. This prints `narrowed python: PreToolUse .* ->
+  <matcher>`; a second run is a no-op (`already narrowed`).
+
+Coverage today:
+
+| Event | Matcher | Coverage | Notes |
+|---|---|---|---|
+| `PreToolUse` | `Bash` | Full | native guard: `crg_refresh_report_pre`, `crg_gate_verify_bash`, `pre_bash`, `current_work_guard_bash` |
+| `PreToolUse` | `.*` (catch-all) | Partial, narrowed | native runs `crg_refresh_report_pre` for every tool (`handlers::run_generic_pretooluse_fully_native`); Python keeps only `Read\|Edit\|Write\|NotebookEdit\|mcp__code[-_]review[-_]graph__.*` |
+| `PostToolUse` | `.*` | Full | Python entry removed |
+| `SessionStart` | *(none)* | Partial | Python entry kept as-is |
+| `SessionEnd` | *(none)* | Partial | Python entry kept as-is |
 
 `--dry-run` prints what would change without writing anything.
-`forge hooks status` gains a `python: present|taken-over|n/a` column so a
-re-run (or a different operator) can see at a glance which events still
-run Python. `forge hooks uninstall` restores every recorded Python entry
-verbatim and deletes `.claude/settings.forge-takeover.json` — the same
-rollback command works whether or not `--takeover` was ever used.
+`forge hooks status` gains a `python: present|taken-over|narrowed(<matcher>)`
+column so a re-run (or a different operator) can see at a glance which
+events still run Python, and how much of each event Python still owns.
+`forge hooks uninstall` restores every recorded Python entry verbatim —
+narrowed matchers go back to their original shape in place, fully-removed
+entries come back as a new row — and deletes
+`.claude/settings.forge-takeover.json`; the same rollback command works
+whether or not `--takeover` was ever used.
 
 ## Session start in Rust
 

@@ -168,6 +168,32 @@ agent tokens. Stop porting; finish Phase 3, then install.
    runs only in the reaper (`allow_network`). DONE PR #68 (450 ms ->
    16 ms median on LLM, same command, no network).
 
+2g. (Claude) standalone Bash guard + matcher narrowing: `forge hook
+   PreToolUse` under `FORGE_HOOK_STANDALONE=1` now runs the native Bash
+   guard (`crg_refresh_report_pre`, `crg_gate_verify_bash`, `pre_bash`,
+   `current_work_guard_bash`) itself instead of silently deferring, so
+   `PreToolUse`+`Bash` is Full coverage; `--takeover` narrows (not
+   removes) the host's `PreToolUse` `.*` Python entry down to
+   `Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*` --
+   the tools still needing Python -- and `uninstall` restores it to
+   `.*` in place. `crg_refresh_report_pre`'s own matcher is `.*`, so
+   Python ran it for every tool before narrowing; closed the resulting
+   gap by having standalone `PreToolUse` run it alone
+   (`handlers::run_generic_pretooluse_fully_native`) for any `tool_name`
+   that is neither `Bash` nor `Agent`, so a staged background-refresh
+   failure still reports for Grep/Glob/WebFetch/TodoWrite/Task/etc.
+   Measured on a synthetic Bash deny payload, 20+ runs, median/mean wall
+   time:
+
+   | Path | ms |
+   |---|---|
+   | standalone forge alone, before this slice | ~0.80 ms |
+   | standalone forge alone, after this slice (now runs the real guard) | ~3.6 ms |
+   | `dispatch.py`+forge combined (reference, unchanged) | ~49.9 ms |
+
+   DONE PR #67 (`docs/install.md`, "Take over from the Python
+   dispatcher"; `docs/roadmap.md`, this item).
+
 2h. (Claude) `forge notes index|search` ports `conductor.index_notes`'s
    FTS5 note index to Rust (`native/forge/src/notes_index.rs`), and fixes
    the bug it was written to carry: `_source_roots()` returned EITHER the
@@ -176,12 +202,13 @@ agent tokens. Stop porting; finish Phase 3, then install.
    nowhere -- a rebuild silently dropped them and a search for a
    just-written note came back empty. Both trees are now indexed always
    (source tags `notes`/`tasks`/`vault_research`/`vault_dashboards`/
-   `vault_runbooks`, no dedupe). DONE PR #TBD (`docs/install.md`, "Prose
-   search of notes"); parity between the Python and Rust extraction/DDL
-   pinned by unit tests (`fts5_is_available`,
-   `rebuild_indexes_repo_and_vault_together`), a live Python-vs-Rust
-   byte-comparison harness on a larger fixture is debt for the follow-up
-   PR.
+   `vault_runbooks`, no dedupe). DONE PR #66 c94197c (`docs/install.md`,
+   "Prose search of notes"); parity pinned by unit tests
+   (`fts5_is_available`, `rebuild_indexes_repo_and_vault_together`) and
+   by `src/conductor/test_index_notes.py`'s Python-vs-forge fixture run
+   (18 `notes_fts` rows and 2 `note_tables` rows byte-identical, three
+   searches in the same order; it found and fixed one Rust bug, the JSON
+   cell separators in `note_tables`).
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"

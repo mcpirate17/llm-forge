@@ -100,11 +100,11 @@ fn standalone_mode() -> bool {
     std::env::var("FORGE_HOOK_STANDALONE").as_deref() == Ok("1")
 }
 
-/// `FORGE_HOOK_STANDALONE=1`: only `PreToolUse` (routing + live cap check)
-/// and `SubagentStop` (the ledger rollup) have anything forge wants to say;
-/// every other event -- and any `PreToolUse` call neither check has an
-/// opinion on -- prints nothing and exits 0, a bare allow. No Python child
-/// is ever spawned on this path.
+/// `FORGE_HOOK_STANDALONE=1`: `PreToolUse` (routing + live cap check + the
+/// native Bash guard) and `SubagentStop` (the ledger rollup) have anything
+/// forge wants to say; every other event -- and any `PreToolUse` call none
+/// of those three has an opinion on -- prints nothing and exits 0, a bare
+/// allow. No Python child is ever spawned on this path.
 fn run_hook_standalone(event: &str) -> Result<u8> {
     match event {
         "PreToolUse" => run_pre_tool_use_standalone(event),
@@ -115,11 +115,22 @@ fn run_hook_standalone(event: &str) -> Result<u8> {
 
 /// Standalone `PreToolUse`: the live cap check runs first, exactly as in the
 /// non-standalone path (`Warn`/`Deny` short-circuit with their own verdict);
+/// a `Bash` call runs the same fully-native guard path
+/// (`handlers::run_bash_pretooluse_fully_native` over the default native set,
+/// folded through `merge::merge` internally) the non-standalone path runs
+/// for a fully-opted-in call -- Bash is the hottest tool and this is now the
+/// only place its guard denials come from under standalone, so there is no
+/// Python fallback to check `bash_pretooluse_fully_native` against first;
 /// an `Agent` call gets forge's routing verdict alone (`route::
 /// hook_outcome_for_agent`, run through `merge::merge` on its own so a
 /// malformed embedded policy still fails closed the same way the merged,
-/// non-standalone path does); anything else -- Bash included -- has nothing
-/// native to say under standalone and prints nothing.
+/// non-standalone path does); every other parsed `tool_name` (Grep, Glob,
+/// WebFetch, TodoWrite, Task, ...) still gets `crg_refresh_report_pre`
+/// alone (`handlers::run_generic_pretooluse_fully_native`) -- that hook's
+/// own matcher is `.*`, so Python ran it for every tool before `--takeover`
+/// narrowed the host's Python `PreToolUse` entry down to a five-tool
+/// residual, and without this branch a staged refresh-failure report would
+/// go silently unreported for everything outside that residual plus Bash.
 fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
     let start = Instant::now();
     let mut input = String::new();
@@ -146,12 +157,38 @@ fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
         .as_ref()
         .and_then(|payload| payload.get("tool_name"))
         .and_then(Value::as_str);
+    if tool_name == Some("Bash") {
+        let payload = parsed.as_ref().expect("tool_name implies parsed payload");
+        let native_hooks = handlers::native_hook_names_from_env();
+        let answer = handlers::run_bash_pretooluse_fully_native(payload, &native_hooks);
+        telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+        let mut stdout = std::io::stdout();
+        stdout
+            .write_all(answer.to_string().as_bytes())
+            .context("failed to write the standalone hook verdict to stdout")?;
+        stdout
+            .write_all(b"\n")
+            .context("failed to write the standalone hook verdict to stdout")?;
+        return Ok(0);
+    }
     if tool_name == Some("Agent") {
         let payload = parsed.as_ref().expect("tool_name implies parsed payload");
         let answer = crate::merge::merge(
             "PreToolUse",
             &[crate::route::hook_outcome_for_agent(payload)],
         );
+        telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+        let mut stdout = std::io::stdout();
+        stdout
+            .write_all(answer.to_string().as_bytes())
+            .context("failed to write the standalone hook verdict to stdout")?;
+        stdout
+            .write_all(b"\n")
+            .context("failed to write the standalone hook verdict to stdout")?;
+        return Ok(0);
+    }
+    if let Some(payload) = parsed.as_ref() {
+        let answer = handlers::run_generic_pretooluse_fully_native(payload);
         telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
         let mut stdout = std::io::stdout();
         stdout
