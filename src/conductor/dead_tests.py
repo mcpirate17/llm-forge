@@ -46,7 +46,7 @@ from conductor.audit_root import (
     print_audit_provenance,
     resolve_audit_root,
 )
-from conductor.project_paths import DEFAULT_MUTATION_REGISTRY
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY, notes_relative
 
 ROOT = Path(__file__).resolve().parents[1]
 TEST_NAME = re.compile(r"^(test_.*|.*_test)\.py$")
@@ -68,7 +68,6 @@ CONFIG_SURFACES = frozenset(
 CONFIG_PREFIXES = (".github/", ".claude/", "conductor/")
 CONFIG_SUFFIXES = (".toml", ".json", ".yml", ".yaml", ".sh", ".md", ".txt")
 CONFIG_EXCLUDED_PREFIXES = (f"{DEFAULT_MUTATION_REGISTRY.parent}/",)
-NOTES_PREFIX = "research/notes/"
 
 
 class DeadTestsError(RuntimeError):
@@ -219,7 +218,8 @@ def _on_disk(prefix: str, suffixes: tuple[str, ...], *, root: Path = ROOT) -> li
 def config_corpus(tracked: Sequence[str], *, root: Path = ROOT) -> tuple[str, str]:
     config_paths = {p for p in tracked if _is_config_surface(p)}
     config_paths.update(_on_disk(".claude", CONFIG_SUFFIXES, root=root))
-    notes_paths = _on_disk(NOTES_PREFIX, (".md",), root=root)
+    # The knowledge tree per this root's own configuration, not a monorepo literal.
+    notes_paths = _on_disk(f"{notes_relative(root)}/", (".md",), root=root)
     config_text = "\n".join(_read_text(p, root=root) for p in sorted(config_paths))
     notes_text = "\n".join(_read_text(p, root=root) for p in notes_paths)
     return config_text, notes_text

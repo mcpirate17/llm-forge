@@ -17,15 +17,17 @@ import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from itertools import chain
 from pathlib import Path
 from typing import Any, Final
 
 from conductor.http_transport import open_http
+from conductor.project_paths import host_root, notes_root
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
-NOTES_DIR: Final[Path] = ROOT / "research" / "notes"
-INDEX_PATH: Final[Path] = ROOT / "research" / "cache" / "kb_card_index.json"
 BROKER_URL: Final[str] = "http://127.0.0.1:7317/v1/embeddings"
+# Two card spellings one tree may mix: the monorepo's lowercase ``kb_*.md`` and
+# the KB-id pages this repository's docs use. Both name knowledge cards.
+CARD_GLOBS: Final[tuple[str, ...]] = ("kb_*.md", "KB-*.md")
 EMBED_MODEL: Final[str] = "qwen3-embed-cpu"
 QUERY_INSTRUCT: Final[str] = (
     "Instruct: Given a search query about the Aria LLM workspace, "
@@ -219,11 +221,22 @@ def embed_text(
     )[0]
 
 
-def load_cards(notes_dir: Path = NOTES_DIR) -> list[dict[str, str]]:
-    if not notes_dir.is_dir():
-        raise RetrieveError(f"notes dir missing: {notes_dir}")
+def default_notes_dir() -> Path:
+    """The knowledge tree of the workspace this runs in, per its own config."""
+    return notes_root(host_root())
+
+
+def default_index_path() -> Path:
+    """The card-index cache, beside the notes tree's parent as the monorepo laid out."""
+    return host_root() / "research" / "cache" / "kb_card_index.json"
+
+
+def load_cards(notes_dir: Path | None = None) -> list[dict[str, str]]:
+    notes = default_notes_dir() if notes_dir is None else notes_dir
+    if not notes.is_dir():
+        raise RetrieveError(f"notes dir missing: {notes}")
     cards: list[dict[str, str]] = []
-    for path in sorted(notes_dir.glob("kb_*.md")):
+    for path in sorted(chain.from_iterable(notes.glob(glob) for glob in CARD_GLOBS)):
         cards.append(
             {
                 "name": path.name,
@@ -232,7 +245,7 @@ def load_cards(notes_dir: Path = NOTES_DIR) -> list[dict[str, str]]:
             }
         )
     if not cards:
-        raise RetrieveError(f"no kb_*.md cards in {notes_dir}")
+        raise RetrieveError(f"no card files ({', '.join(CARD_GLOBS)}) in {notes}")
     return cards
 
 
@@ -273,15 +286,16 @@ def build_index(
     }
 
 
-def save_index(index: dict[str, Any], path: Path = INDEX_PATH) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def save_index(index: dict[str, Any], path: Path | None = None) -> Path:
+    destination = default_index_path() if path is None else path
+    destination.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
             "w",
             encoding="utf-8",
-            dir=path.parent,
-            prefix=f".{path.name}.",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
             suffix=".tmp",
             delete=False,
         ) as handle:
@@ -290,22 +304,23 @@ def save_index(index: dict[str, Any], path: Path = INDEX_PATH) -> Path:
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        temporary.replace(path)
+        temporary.replace(destination)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
-    return path
+    return destination
 
 
-def load_index(path: Path = INDEX_PATH) -> dict[str, Any]:
-    if not path.is_file():
+def load_index(path: Path | None = None) -> dict[str, Any]:
+    source = default_index_path() if path is None else path
+    if not source.is_file():
         raise RetrieveError(
-            f"index missing: {path}; run: python -m conductor.kb_retrieve index"
+            f"index missing: {source}; run: python -m conductor.kb_retrieve index"
         )
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(source.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise RetrieveError(f"unreadable index {path}: {exc}") from exc
+        raise RetrieveError(f"unreadable index {source}: {exc}") from exc
     if not isinstance(payload, dict):
         raise RetrieveError("index root must be a JSON object")
     if payload.get("schema_version") != SCHEMA_VERSION:
@@ -374,7 +389,7 @@ def main(argv: list[str] | None = None) -> int:
     qparser = sub.add_parser("query", help="retrieve top cards for a query")
     qparser.add_argument("query", type=str)
     qparser.add_argument("--top-k", type=int, default=5)
-    qparser.add_argument("--index", type=Path, default=INDEX_PATH)
+    qparser.add_argument("--index", type=Path, default=None)
     args = parser.parse_args(argv)
     try:
         if args.command == "index":

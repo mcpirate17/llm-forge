@@ -1,0 +1,45 @@
+{
+  "campaign_id": "forge-notes-root_snapshot_worktree_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/snapshot_worktree.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/snapshot_worktree.py": "c7b93a242cbc3d4dbd0a9410401b4a1c79f1024abbd877d3c0ae7370c259085b"
+  },
+  "survivor_baseline": [
+    "constant_replace-6049030ad2fa-0",
+    "constant_replace-8d3964a9e477-0",
+    "constant_replace-9144f9cab2cb-0",
+    "constant_replace-9144f9cab2cb-1",
+    "constant_replace-f02fa060c4b7-0",
+    "constant_replace-fbd3ad0c7efb-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T01:51:03.702972+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_snapshot_worktree.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_snapshot_worktree.py": "f01c1ae41c032238fe5ed70affc729dd2f1cd417375e9627b6903dc934810b47"
+  },
+  "title": "Generated mutants for src/conductor/snapshot_worktree.py, scored on the survivor set"
+}

@@ -711,3 +711,32 @@ def test_chunk_text_maps_native_tuple_fields_into_dict_fields() -> None:
             "text": "body",
         }
     ]
+
+
+def test_expand_root_resolves_relative_roots_against_the_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nnotes_root = "cards"\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    # The catalog's "research/notes" spelling means the notes root, wherever
+    # this workspace configured it; other relative roots resolve literally.
+    assert memory_index._expand_root({"id": "notes", "root": "research/notes"}) == (
+        tmp_path / "cards"
+    )
+    assert memory_index._expand_root({"id": "tasks", "root": "tasks"}) == (
+        tmp_path / "tasks"
+    ).resolve()
+
+
+def test_expand_root_keeps_the_monorepo_default_for_a_host_so_configured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nnotes_root = "research/notes"\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    assert memory_index._expand_root({"id": "notes", "root": "research/notes"}) == (
+        tmp_path / "research/notes"
+    )

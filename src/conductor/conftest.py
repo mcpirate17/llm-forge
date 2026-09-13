@@ -18,7 +18,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import pytest
 
@@ -192,6 +192,46 @@ def hook_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(active_state, "ROOT", root)
     active_state.save_active_state(root / "conductor" / "active_state.json")
     return root
+
+
+@pytest.fixture
+def patched_urlopen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[[Any, bytes], dict[str, Any]]:
+    """Patch a module's ``urlopen`` with a canned-response double.
+
+    Every embed test that stubs the broker needs the same scaffold: a
+    context-manager response whose ``read()`` returns a fixed body, and a
+    ``urlopen`` fake that records the outgoing request and its timeout into a
+    capture dict. Only the target module and the body differ, so the scaffold
+    lives here once; error-path tests ignore the dict, and a request without a
+    body (the GET health probe) simply records nothing.
+    """
+
+    def install(target: Any, body: bytes) -> dict[str, Any]:
+        captured: dict[str, Any] = {}
+
+        class _Resp:
+            def read(self) -> bytes:
+                return body
+
+            def __enter__(self) -> _Resp:
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+        def fake_urlopen(request: Any, timeout: float = 0.0) -> _Resp:
+            data = getattr(request, "data", None)
+            if data is not None:
+                captured["request"] = json.loads(data.decode())
+            captured["timeout"] = timeout
+            return _Resp()
+
+        monkeypatch.setattr(target.urllib.request, "urlopen", fake_urlopen)
+        return captured
+
+    return install
 
 
 # Tests whose subject is something only a host project has. `_project_hooks.py`

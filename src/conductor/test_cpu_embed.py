@@ -41,6 +41,28 @@ def _attempt(
     return embedding_contract.RouteAttempt(route=route, reason=reason)
 
 
+def _pin_route(
+    monkeypatch: pytest.MonkeyPatch, route: embedding_contract.ResolvedRoute
+) -> None:
+    monkeypatch.setattr(
+        cpu_embed, "route_attempts", lambda *_args, **_kwargs: (_attempt(route),)
+    )
+
+
+def _fail_route_attempts(monkeypatch: pytest.MonkeyPatch, message: str) -> None:
+    def raise_contract_error(*_args: object, **_kwargs: object) -> None:
+        raise embedding_contract.EmbeddingContractError(message)
+
+    monkeypatch.setattr(cpu_embed, "route_attempts", raise_contract_error)
+
+
+def _refuse_urlopen(monkeypatch: pytest.MonkeyPatch) -> None:
+    def raise_url_error(*_args: object, **_kwargs: object) -> None:
+        raise cpu_embed.urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(cpu_embed.urllib.request, "urlopen", raise_url_error)
+
+
 def test_pin_options_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CPU_EMBED_NUM_GPU", "0")
     opts = cpu_embed.pin_options()
@@ -115,30 +137,15 @@ def test_choose_num_gpu_skips_malformed_csv_rows(
 
 
 def test_openai_route_forwards_pinned_ollama_payload(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, patched_urlopen
 ) -> None:
-    captured: dict[str, object] = {}
     first = [0.0] * 1024
     second = [0.0] * 1024
     first[0] = 1.0
     second[1] = 1.0
-
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps({"embeddings": [first, second]}).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    def fake_urlopen(request: object, timeout: float = 0.0) -> _Resp:
-        captured["payload"] = json.loads(request.data.decode())  # type: ignore[attr-defined]
-        captured["timeout"] = timeout
-        return _Resp()
-
-    monkeypatch.setattr(cpu_embed.urllib.request, "urlopen", fake_urlopen)
+    captured = patched_urlopen(
+        cpu_embed, json.dumps({"embeddings": [first, second]}).encode()
+    )
     monkeypatch.setenv("CPU_EMBED_MODEL", "qwen3-embed-cpu")
     monkeypatch.setenv("CPU_EMBED_NUM_GPU", "0")
     with TestClient(cpu_embed.build_app()) as client:
@@ -152,7 +159,7 @@ def test_openai_route_forwards_pinned_ollama_payload(
     assert body["workspace_embedding"]["route_id"] == "local-qwen3"
     assert body["workspace_embedding"]["fingerprint"].startswith("sha256:")
     assert body["workspace_embedding"]["paid"] is False
-    payload = captured["payload"]
+    payload = captured["request"]
     assert payload["options"]["num_gpu"] == 0
     assert payload["options"]["num_ctx"] == 2048
     assert payload["keep_alive"] == 0
@@ -165,20 +172,10 @@ def test_rejects_non_string_input() -> None:
     assert "error" in response.json()
 
 
-def test_rejects_malformed_embedding_vectors(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps({"embeddings": [[0.0, "bad"]]}).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    monkeypatch.setattr(
-        cpu_embed.urllib.request, "urlopen", lambda *_args, **_kwargs: _Resp()
-    )
+def test_rejects_malformed_embedding_vectors(
+    monkeypatch: pytest.MonkeyPatch, patched_urlopen
+) -> None:
+    patched_urlopen(cpu_embed, json.dumps({"embeddings": [[0.0, "bad"]]}).encode())
     monkeypatch.setenv("CPU_EMBED_NUM_GPU", "0")
     with pytest.raises(cpu_embed.CpuEmbedError, match="non-numeric"):
         cpu_embed.ollama_embed(["x"], model="test")
@@ -298,9 +295,7 @@ def test_embed_with_routing_skips_route_over_cost_cap(
         cost_per_million_tokens=1_000_000_000.0,
         max_request_usd=0.000001,
     )
-    monkeypatch.setattr(
-        cpu_embed, "route_attempts", lambda *_args, **_kwargs: (_attempt(route),)
-    )
+    _pin_route(monkeypatch, route)
 
     with pytest.raises(cpu_embed.CpuEmbedError) as excinfo:
         cpu_embed.embed_with_routing(["hello"])
@@ -315,9 +310,7 @@ def test_embed_with_routing_rechecks_gpu_and_retries_after_ollama_restart(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     route = _route()
-    monkeypatch.setattr(
-        cpu_embed, "route_attempts", lambda *_args, **_kwargs: (_attempt(route),)
-    )
+    _pin_route(monkeypatch, route)
     gpu_calls: list[int] = []
     monkeypatch.setattr(cpu_embed, "choose_num_gpu", lambda: gpu_calls.append(1) or 0)
     restarts: list[bool] = []
@@ -346,9 +339,7 @@ def test_embed_with_routing_rejects_unsupported_protocol(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     route = _route(route_id="carrier-pigeon-route", protocol="carrier-pigeon")
-    monkeypatch.setattr(
-        cpu_embed, "route_attempts", lambda *_args, **_kwargs: (_attempt(route),)
-    )
+    _pin_route(monkeypatch, route)
 
     with pytest.raises(cpu_embed.CpuEmbedError) as excinfo:
         cpu_embed.embed_with_routing(["hello"])
@@ -434,20 +425,10 @@ def test_paid_route_rejects_duplicate_response_indexes(
         cpu_embed.openai_compatible_embed(["a", "b"], route=route)
 
 
-def test_post_json_returns_parsed_object_body(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps({"ok": True, "value": 1}).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    monkeypatch.setattr(
-        cpu_embed.urllib.request, "urlopen", lambda *_args, **_kwargs: _Resp()
-    )
+def test_post_json_returns_parsed_object_body(
+    monkeypatch: pytest.MonkeyPatch, patched_urlopen
+) -> None:
+    patched_urlopen(cpu_embed, json.dumps({"ok": True, "value": 1}).encode())
     body = cpu_embed._post_json(
         "https://embeddings.example/v1/embeddings", {"input": ["x"]}, timeout_s=1.0
     )
@@ -463,10 +444,7 @@ def test_post_json_rejects_non_http_scheme() -> None:
 
 
 def test_post_json_wraps_network_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def raise_url_error(*_args: object, **_kwargs: object) -> None:
-        raise cpu_embed.urllib.error.URLError("connection refused")
-
-    monkeypatch.setattr(cpu_embed.urllib.request, "urlopen", raise_url_error)
+    _refuse_urlopen(monkeypatch)
     with pytest.raises(cpu_embed.CpuEmbedError, match="embedding request to"):
         cpu_embed._post_json(
             "https://embeddings.example/v1/embeddings", {}, timeout_s=1.0
@@ -474,21 +452,9 @@ def test_post_json_wraps_network_error(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_post_json_rejects_non_object_response(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, patched_urlopen
 ) -> None:
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps([1, 2, 3]).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    monkeypatch.setattr(
-        cpu_embed.urllib.request, "urlopen", lambda *_args, **_kwargs: _Resp()
-    )
+    patched_urlopen(cpu_embed, json.dumps([1, 2, 3]).encode())
     with pytest.raises(cpu_embed.CpuEmbedError, match="is not an object"):
         cpu_embed._post_json(
             "https://embeddings.example/v1/embeddings", {}, timeout_s=1.0
@@ -512,10 +478,7 @@ def test_health_route_reports_primary_route_metadata(
 def test_health_route_returns_503_when_routing_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def raise_contract_error(*_args: object, **_kwargs: object) -> None:
-        raise embedding_contract.EmbeddingContractError("no routes configured")
-
-    monkeypatch.setattr(cpu_embed, "route_attempts", raise_contract_error)
+    _fail_route_attempts(monkeypatch, "no routes configured")
     with TestClient(cpu_embed.build_app()) as client:
         response = client.get("/health")
     assert response.status_code == 503
@@ -531,10 +494,7 @@ def test_embed_with_routing_rejects_empty_texts() -> None:
 def test_embed_with_routing_wraps_contract_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def raise_contract_error(*_args: object, **_kwargs: object) -> None:
-        raise embedding_contract.EmbeddingContractError("pinned index has no route")
-
-    monkeypatch.setattr(cpu_embed, "route_attempts", raise_contract_error)
+    _fail_route_attempts(monkeypatch, "pinned index has no route")
     with pytest.raises(cpu_embed.CpuEmbedError, match="pinned index has no route"):
         cpu_embed.embed_with_routing(["hello"])
 
@@ -557,48 +517,23 @@ def test_ollama_embed_returns_empty_for_no_texts() -> None:
 
 
 def test_ollama_embed_wraps_network_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def raise_url_error(*_args: object, **_kwargs: object) -> None:
-        raise cpu_embed.urllib.error.URLError("connection refused")
-
-    monkeypatch.setattr(cpu_embed.urllib.request, "urlopen", raise_url_error)
+    _refuse_urlopen(monkeypatch)
     with pytest.raises(cpu_embed.CpuEmbedError, match="ollama embed failed"):
         cpu_embed.ollama_embed(["x"], model="test")
 
 
 def test_ollama_embed_rejects_wrong_vector_count(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, patched_urlopen
 ) -> None:
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps({"embeddings": [[1.0, 0.0]]}).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    monkeypatch.setattr(
-        cpu_embed.urllib.request, "urlopen", lambda *_args, **_kwargs: _Resp()
-    )
+    patched_urlopen(cpu_embed, json.dumps({"embeddings": [[1.0, 0.0]]}).encode())
     with pytest.raises(cpu_embed.CpuEmbedError, match="wrong vector count"):
         cpu_embed.ollama_embed(["a", "b"], model="test")
 
 
-def test_ollama_embed_rejects_empty_vector(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps({"embeddings": [[]]}).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    monkeypatch.setattr(
-        cpu_embed.urllib.request, "urlopen", lambda *_args, **_kwargs: _Resp()
-    )
+def test_ollama_embed_rejects_empty_vector(
+    monkeypatch: pytest.MonkeyPatch, patched_urlopen
+) -> None:
+    patched_urlopen(cpu_embed, json.dumps({"embeddings": [[]]}).encode())
     with pytest.raises(cpu_embed.CpuEmbedError, match="not a non-empty array"):
         cpu_embed.ollama_embed(["a"], model="test")
 
@@ -710,41 +645,19 @@ def test_startup_lock_serializes_and_releases_a_real_file_lock(
     assert entered == [True, True]
 
 
-def test_read_json_url_returns_parsed_object(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps({"ok": True}).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    monkeypatch.setattr(
-        cpu_embed.urllib.request, "urlopen", lambda *_args, **_kwargs: _Resp()
-    )
+def test_read_json_url_returns_parsed_object(
+    monkeypatch: pytest.MonkeyPatch, patched_urlopen
+) -> None:
+    patched_urlopen(cpu_embed, json.dumps({"ok": True}).encode())
     assert cpu_embed._read_json_url(
         "https://embeddings.example/health", timeout=1.0
     ) == {"ok": True}
 
 
 def test_read_json_url_rejects_non_object_response(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, patched_urlopen
 ) -> None:
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps([1, 2]).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    monkeypatch.setattr(
-        cpu_embed.urllib.request, "urlopen", lambda *_args, **_kwargs: _Resp()
-    )
+    patched_urlopen(cpu_embed, json.dumps([1, 2]).encode())
     with pytest.raises(cpu_embed.CpuEmbedError, match="is not an object"):
         cpu_embed._read_json_url("https://embeddings.example/health", timeout=1.0)
 
@@ -784,19 +697,14 @@ def test_resolve_model_returns_primary_route_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     route = _route(model="primary-model")
-    monkeypatch.setattr(
-        cpu_embed, "route_attempts", lambda *_args, **_kwargs: (_attempt(route),)
-    )
+    _pin_route(monkeypatch, route)
     assert cpu_embed.resolve_model() == "primary-model"
 
 
 def test_resolve_model_falls_back_to_env_or_default_on_contract_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def raise_contract_error(*_args: object, **_kwargs: object) -> None:
-        raise embedding_contract.EmbeddingContractError("no routes configured")
-
-    monkeypatch.setattr(cpu_embed, "route_attempts", raise_contract_error)
+    _fail_route_attempts(monkeypatch, "no routes configured")
 
     monkeypatch.delenv("CPU_EMBED_MODEL", raising=False)
     assert cpu_embed.resolve_model() == cpu_embed.DEFAULT_MODEL
@@ -823,10 +731,7 @@ def test_models_route_lists_every_attempt_as_openai_style_model(
 def test_models_route_propagates_contract_error_uncaught(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def raise_contract_error(*_args: object, **_kwargs: object) -> None:
-        raise embedding_contract.EmbeddingContractError("no routes configured")
-
-    monkeypatch.setattr(cpu_embed, "route_attempts", raise_contract_error)
+    _fail_route_attempts(monkeypatch, "no routes configured")
     with TestClient(cpu_embed.build_app(), raise_server_exceptions=True) as client:
         with pytest.raises(embedding_contract.EmbeddingContractError):
             client.get("/v1/models")

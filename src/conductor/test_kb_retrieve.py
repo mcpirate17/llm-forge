@@ -88,39 +88,25 @@ def test_load_index_allows_guest_gpu(tmp_path: Path) -> None:
     assert payload["embedding"]["num_gpu"] == 99
 
 
-def test_embed_payload_pins_ctx_and_guest_gpu(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: dict[str, object] = {}
-
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps(
-                {
-                    "data": [{"index": 0, "embedding": [3.0, 4.0]}],
-                    "workspace_embedding": {
-                        "fingerprint": "sha256:" + "b" * 64,
-                        "dimension": 2,
-                        "paid": False,
-                        "num_gpu": 99,
-                        "num_ctx": 2048,
-                    },
-                }
-            ).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    def fake_urlopen(request: object, timeout: float = 0.0) -> _Resp:
-        captured["data"] = json.loads(request.data.decode())  # type: ignore[attr-defined]
-        captured["timeout"] = timeout
-        return _Resp()
-
-    monkeypatch.setattr(kb_retrieve.urllib.request, "urlopen", fake_urlopen)
+def test_embed_payload_pins_ctx_and_guest_gpu(patched_urlopen) -> None:
+    captured = patched_urlopen(
+        kb_retrieve,
+        json.dumps(
+            {
+                "data": [{"index": 0, "embedding": [3.0, 4.0]}],
+                "workspace_embedding": {
+                    "fingerprint": "sha256:" + "b" * 64,
+                    "dimension": 2,
+                    "paid": False,
+                    "num_gpu": 99,
+                    "num_ctx": 2048,
+                },
+            }
+        ).encode(),
+    )
     vec = kb_retrieve.embed_text("hello")
-    assert captured["data"]["input"] == ["hello"]
-    assert captured["data"]["workspace_purpose"] == "document"
+    assert captured["request"]["input"] == ["hello"]
+    assert captured["request"]["workspace_purpose"] == "document"
     assert vec == pytest.approx([0.6, 0.8])
 
 
@@ -172,7 +158,7 @@ def test_broker_client_auto_starts_once_after_connection_refused(
 
 def test_load_cards_requires_kb_glob(tmp_path: Path) -> None:
     (tmp_path / "readme.md").write_text("nope", encoding="utf-8")
-    with pytest.raises(kb_retrieve.RetrieveError, match="no kb_"):
+    with pytest.raises(kb_retrieve.RetrieveError, match="no card files"):
         kb_retrieve.load_cards(tmp_path)
 
 
@@ -494,3 +480,34 @@ def test_native_l2_normalize_matches_builtin_sum_reference() -> None:
         norm = math.sqrt(sum(x * x for x in vector))
         expected = [x / norm for x in vector]
         assert kb_retrieve._l2_normalize(vector) == expected
+
+
+def test_default_notes_dir_reads_the_workspace_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nnotes_root = "cards"\n', encoding="utf-8"
+    )
+    (tmp_path / "cards").mkdir()
+    (tmp_path / "cards" / "kb_one.md").write_text("# one\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert kb_retrieve.default_notes_dir() == tmp_path / "cards"
+    assert [card["name"] for card in kb_retrieve.load_cards()] == ["kb_one.md"]
+
+
+def test_default_notes_dir_resolves_research_notes_for_a_host_so_configured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nnotes_root = "research/notes"\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    assert kb_retrieve.default_notes_dir() == tmp_path / "research/notes"
+
+
+def test_default_notes_dir_environment_overrides_the_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CONDUCTOR_NOTES_ROOT", "envnotes")
+    assert kb_retrieve.default_notes_dir() == tmp_path / "envnotes"

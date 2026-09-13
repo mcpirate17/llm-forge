@@ -70,7 +70,10 @@ byte where it was cut plus the `Read(offset=..., limit=...)` call that reaches t
 
 [`docs/`](docs/README.md) has one page per platform law (governance claims, the landing
 gate, risk/approval tiers, mutation evidence, context budget, CI coverage), written for a
-host project adopting this platform. `AGENTS.md` is the working contract for changes to
+host project adopting this platform, plus two reference pages:
+[`docs/makefile_targets.md`](docs/makefile_targets.md) (every `conductor.mk` target,
+generated from its help annotations) and [`docs/bootstrap.md`](docs/bootstrap.md)
+(scaffolding a host project). `AGENTS.md` is the working contract for changes to
 this repository itself.
 
 ## Baselines
