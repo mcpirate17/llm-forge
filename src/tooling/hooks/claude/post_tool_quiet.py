@@ -135,13 +135,7 @@ def bound_response(response: Any) -> Any | None:
 
 
 def hook_output(payload: Any) -> dict[str, Any]:
-    out: dict[str, Any] = {"hookSpecificOutput": {"hookEventName": "PostToolUse"}}
-    if not isinstance(payload, dict):
-        return out
-    updated = bound_response(payload.get("tool_response"))
-    if updated is not None:
-        out["hookSpecificOutput"][_bq.OUTPUT_FIELD] = updated
-    return out
+    return _bq.rewrite_envelope(payload, bound_response)
 
 
 def main() -> int:

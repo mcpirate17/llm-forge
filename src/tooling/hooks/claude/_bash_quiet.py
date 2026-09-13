@@ -32,7 +32,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Callable, Final
 
 # The checkout served: the launcher/shell entry point passes PROJECT_DIR; run
 # directly, the body sits at <root>/tooling/hooks/claude/.
@@ -141,7 +141,15 @@ def bound_response(response: Any) -> Any | None:
     return updated if changed else None
 
 
-def hook_output(payload: Any) -> dict[str, Any]:
+def rewrite_envelope(
+    payload: Any, bound_response: Callable[[Any], Any | None]
+) -> dict[str, Any]:
+    """The shared PostToolUse envelope every quiet hook returns.
+
+    Each hook passes its own ``bound_response`` (Bash bounds the
+    stdout/stderr/output fields, the tool hook bounds Read/Grep/MCP text);
+    the rewrite lands under the host's ``OUTPUT_FIELD``.
+    """
     out: dict[str, Any] = {"hookSpecificOutput": {"hookEventName": "PostToolUse"}}
     if not isinstance(payload, dict):
         return out
@@ -149,6 +157,10 @@ def hook_output(payload: Any) -> dict[str, Any]:
     if updated is not None:
         out["hookSpecificOutput"][OUTPUT_FIELD] = updated
     return out
+
+
+def hook_output(payload: Any) -> dict[str, Any]:
+    return rewrite_envelope(payload, bound_response)
 
 
 def main() -> int:
