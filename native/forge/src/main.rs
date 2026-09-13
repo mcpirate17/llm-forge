@@ -38,6 +38,7 @@ mod receipt_show;
 mod route;
 mod active_state;
 mod session_end;
+mod session_preamble;
 mod session_policy;
 mod subagent_stop;
 mod subagent_transcript;
@@ -98,6 +99,22 @@ enum Command {
     /// ledger, policy, and a live hook roundtrip (`docs/roadmap.md`
     /// Phase 4 item 2c).
     Doctor(doctor::DoctorArgs),
+    /// The SessionStart pair ported from `conductor.active_state` and
+    /// `conductor.session_preamble` (`docs/roadmap.md` Phase 4 item 2f).
+    Session {
+        #[command(subcommand)]
+        action: SessionCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum SessionCommand {
+    /// Write (or with --dump, print) conductor/active_state.json: standing
+    /// mandates, the top .current_work.md headings, active claims.
+    State(session_preamble::SessionStateArgs),
+    /// Refresh the state, then print the session inject -- the hook-payload
+    /// JSON, or the bare body with --text.
+    Preamble(session_preamble::SessionPreambleArgs),
 }
 
 #[derive(Subcommand)]
@@ -226,6 +243,22 @@ fn main() -> ExitCode {
                 eprintln!("forge hooks: {err:#}");
                 ExitCode::from(1)
             }
+        },
+        Command::Session { action } => match action {
+            SessionCommand::State(args) => match session_preamble::run_state(&args) {
+                Ok(code) => ExitCode::from(code),
+                Err(err) => {
+                    eprintln!("forge session state: {err:#}");
+                    ExitCode::from(1)
+                }
+            },
+            SessionCommand::Preamble(args) => match session_preamble::run_preamble(&args) {
+                Ok(code) => ExitCode::from(code),
+                Err(err) => {
+                    eprintln!("forge session preamble: {err:#}");
+                    ExitCode::from(1)
+                }
+            },
         },
         Command::Doctor(args) => match doctor::run(&args) {
             Ok(code) => ExitCode::from(code),
