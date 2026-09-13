@@ -146,6 +146,20 @@ pub fn join_commits<'a>(
     let in_project: Vec<&SessionRollupRow> =
         sessions.iter().filter(|s| s.project == project).collect();
 
+    // Fallback-eligible: same project AND the session itself carries no
+    // `harness_session_ids`. A session that ever saw its own claude.ai URL
+    // (e.g. because one of its own commits used a `Claude-Session:`
+    // trailer) would have joined by `session_url` on that work already; a
+    // *different*, URL-less commit falling back to it via time_window is
+    // exactly the long-lived-coordinator-session over-attribution found in
+    // the real-data check (`docs/ledger.md`), so such sessions are excluded
+    // from the fallback pool entirely, not merely scored lower.
+    let fallback_eligible: Vec<&SessionRollupRow> = in_project
+        .iter()
+        .copied()
+        .filter(|s| s.harness_session_ids.is_empty())
+        .collect();
+
     commits
         .iter()
         .map(|commit| {
@@ -172,11 +186,12 @@ pub fn join_commits<'a>(
                 };
             }
 
-            let fallback: Vec<&&SessionRollupRow> = match parse_utc_seconds(&commit.merged_at) {
+            let mut fallback: Vec<&SessionRollupRow> = match parse_utc_seconds(&commit.merged_at) {
                 Some(merged_at) => {
                     let window_start = merged_at - 6 * 3600;
-                    in_project
+                    fallback_eligible
                         .iter()
+                        .copied()
                         .filter(|s| {
                             let (Some(first), Some(last)) =
                                 (s.first_ts.as_deref(), s.last_ts.as_deref())
@@ -194,6 +209,24 @@ pub fn join_commits<'a>(
                 }
                 None => Vec::new(),
             };
+
+            // A `glm`-named agent's commit only ever falls back to a
+            // session whose own `models` say `glm`: crediting it to
+            // whichever unrelated session merely happened to overlap in
+            // time (the Fable-coordinator over-attribution this fix
+            // closes) is worse than reporting the commit unjoined. No
+            // matching session -> `unjoined`, on purpose, per commit.
+            if commit
+                .agent_names
+                .iter()
+                .any(|a| a.to_ascii_lowercase().starts_with("glm"))
+            {
+                fallback.retain(|s| {
+                    s.models
+                        .iter()
+                        .any(|m| m.to_ascii_lowercase().contains("glm"))
+                });
+            }
 
             CommitJoin {
                 sha: commit.sha.clone(),
@@ -456,6 +489,74 @@ mod tests {
         // 80_000+10_000=90_000, 90_000+5_000=95_000
         assert_eq!(rows[0].total_tokens, 185_000);
         assert_eq!(unjoined_commit_count(&joins), 0);
+    }
+
+    #[test]
+    fn a_session_with_its_own_harness_session_ids_is_ineligible_for_time_window() {
+        // Regression for the Fable-coordinator over-attribution found in
+        // the real-data check: a session that knows its own claude.ai URL
+        // would have joined by session_url on its own commits, so it must
+        // never also catch an unrelated, URL-less commit via time_window
+        // even when the windows overlap.
+        let sessions = vec![session(
+            "sess-fable",
+            "llm-forge",
+            &["session_01PoLjRxqVQGqy41fMDG26vX"],
+            "2026-09-11T23:09:00Z",
+            "2026-09-13T08:31:00Z",
+            1_000_000,
+            200_000,
+            0,
+            0,
+            &["claude-fable-5.1"],
+        )];
+        let commits = vec![commit(
+            "c7",
+            "2026-09-13T07:15:23Z",
+            Some(32),
+            &["glm"],
+            &[], // no Claude-Session trailer on this commit
+        )];
+        let (rows, joins) = build_agent_rollup(&commits, &sessions, "llm-forge", DEFAULT_CAP);
+        assert_eq!(joins[0].join_method, "unjoined");
+        assert_eq!(unjoined_commit_count(&joins), 1);
+        assert_eq!(rows[0].n_sessions, 0);
+        assert_eq!(rows[0].total_tokens, 0);
+        assert_eq!(rows[0].join_method, "unjoined");
+    }
+
+    #[test]
+    fn glm_agent_fallback_requires_a_glm_session_or_is_unjoined() {
+        // A time-window candidate exists and overlaps, but its models say
+        // sonnet, not glm -- a `glm`-named commit must not be credited to
+        // another agent's session just because the window overlapped.
+        let sessions = vec![session(
+            "sess-sonnet",
+            "llm-forge",
+            &[],
+            "2026-09-01T20:00:00Z",
+            "2026-09-01T21:00:00Z",
+            80_000,
+            10_000,
+            0,
+            0,
+            &["claude-sonnet-5"],
+        )];
+        let commits = vec![commit(
+            "c8",
+            "2026-09-02T00:00:00Z",
+            Some(40),
+            &["glm-4.6"],
+            &[],
+        )];
+        let (rows, joins) = build_agent_rollup(&commits, &sessions, "llm-forge", DEFAULT_CAP);
+        assert_eq!(joins[0].join_method, "unjoined");
+        assert_eq!(unjoined_commit_count(&joins), 1);
+        assert_eq!(rows[0].n_sessions, 0);
+        assert_eq!(rows[0].n_landed_prs, 1);
+        assert_eq!(rows[0].total_tokens, 0);
+        assert_eq!(rows[0].tokens_per_landed_pr, Some(0.0));
+        assert_eq!(rows[0].join_method, "unjoined");
     }
 
     #[test]

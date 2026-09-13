@@ -152,10 +152,26 @@ Join order, per commit:
    that commit `ambiguous` -- every overlapping session is still credited
    (dropping one silently would just trade over-attribution for
    under-attribution) but the flag says a human should look.
-3. **`unjoined`**: no session matched either way. Printed to stderr by
-   `forge ledger rollup --repo`, one line per commit -- a finding to fix
-   the join on or accept, never something to make disappear by loosening
-   the match.
+
+   Two restrictions keep this fallback from over-attributing, both found
+   via the real-data check below and since closed:
+
+   - **Fallback-eligible sessions must carry no `harness_session_ids` of
+     their own.** A session that ever saw its own claude.ai URL would have
+     joined by `session_url` on its own commits; letting it also catch a
+     different, URL-less commit via time_window is exactly how a
+     long-lived coordinator session ended up credited with unrelated PRs
+     (finding 2 below). Such sessions are excluded from the fallback pool
+     entirely, not merely scored lower.
+   - **A `glm`-named agent's commit only falls back to a session whose own
+     `models` mention `glm`.** Crediting a `glm` commit to whichever
+     unrelated session merely happened to overlap in time is worse than
+     reporting it unjoined.
+3. **`unjoined`**: no session matched either way -- including a commit that
+   had fallback candidates but none passed the restrictions above. Printed
+   to stderr by `forge ledger rollup --repo`, one line per commit -- a
+   finding to fix the join on or accept, never something to make disappear
+   by loosening the match.
 
 Both steps only ever look at sessions whose `project` equals the
 `--project` this run was given -- never any other project's sessions, full
@@ -196,15 +212,9 @@ Ran against this repo's own last 30 landed commits (`ab153e2`..`d90ffdf`)
 joined to transcripts under `/home/tim/.claude/projects/`:
 
 - `-home-tim-Projects-LLM/` (291 files, 1.4 GB): rollup + join completed in
-  **2.4s wall time**.
+  **2.2s wall time**.
 - `-home-tim-Projects-llm-forge/` ("if exists" per the brief): exists, but
   holds only `memory/*.md` notes, no transcripts -- contributes nothing.
-
-| agent | tier | n_sessions | n_landed_prs | total_tokens | tokens_per_landed_pr | cap_breaches | join_method |
-|---|---|---|---|---|---|---|---|
-| llm-b0 | mixed | 5 | 16 | 21,086,507 | 1,317,906.7 | 5 | session_url |
-| glm | fable | 1 | 9 | 7,165,776 | 796,197.3 | 1 | time_window |
-| conductor-67 | fable | 1 | 5 | 7,165,776 | 1,433,155.2 | 1 | time_window |
 
 Hand-cross-checked 3 commits:
 
@@ -213,17 +223,23 @@ Hand-cross-checked 3 commits:
    present in real transcript files under the LLM project dir --
    `session_url` join confirmed correct.
 2. `ab153e2` (PR #32, `glm`): no `Claude-Session` trailer, so the fallback
-   ran. The session it credited was traced by hand to this very ledger
-   task's own long-lived orchestrator session (job `a3348844`), whose
-   `[first_ts, last_ts]` span (2026-09-11 23:09 to 2026-09-13 08:31) covers
-   nearly this entire 30-commit window -- its `billed_noncache` total
-   (7,165,776) matches the reported row exactly. **Finding, not a bug in
-   the join as specified**: a session resumed/continued across days
-   satisfies the `[merged_at-6h, merged_at]` overlap test for every commit
-   merged during its lifetime, so `join_method: "time_window"` over-credits
+   ran. In the first pass (before the fix below) the session it credited
+   was traced by hand to this very ledger task's own long-lived
+   orchestrator session (job `a3348844`), whose `[first_ts, last_ts]` span
+   (2026-09-11 23:09 to 2026-09-13 08:31) covers nearly this entire
+   30-commit window -- its `billed_noncache` total (7,165,776) matched the
+   reported row exactly. **Finding**: a session resumed/continued across
+   days satisfies the `[merged_at-6h, merged_at]` overlap test for every
+   commit merged during its lifetime, so `time_window` over-credited
    long-lived sessions across unrelated commits when no `Claude-Session`
-   trailer narrows it. `ambiguous` does not catch this mode: each commit
-   individually matched exactly one session, so none were flagged.
+   trailer narrowed it -- and `ambiguous` did not catch it, since each
+   commit individually matched exactly one session. **Fixed** (see join
+   order above): a session that carries its own `harness_session_ids` is no
+   longer fallback-eligible at all, and a `glm`-named commit's fallback is
+   additionally restricted to sessions whose `models` mention `glm`. Since
+   the real transcripts under this project contain no logged GLM sessions
+   at all, both `glm` and `conductor-67` are now honestly `unjoined` rather
+   than mis-credited (see the updated table).
 3. `llm-b0`'s reported `n_sessions: 5`: real data also surfaced a `session_
    rollup` gap at the step-2/step-4 boundary -- one real session id
    (`65f84759-e8ac-...`) appears as *two* separate `session_rollup` rows
@@ -233,6 +249,23 @@ Hand-cross-checked 3 commits:
    agent's total. Under-counts, does not double-count; flagged as debt
    below rather than fixed here, since fixing it means merging split-file
    sessions inside `rollup.rs`'s `session_rollup` construction (step 2),
-   out of this PR's scope.
-- **0** landed commits were unjoined in this run (all 30 got a session via
-  one method or the other).
+   out of this PR's scope. Still true after the time_window fix above,
+   unaffected by it.
+
+Table after the fix:
+
+| agent | tier | n_sessions | n_landed_prs | total_tokens | tokens_per_landed_pr | cap_breaches | join_method |
+|---|---|---|---|---|---|---|---|
+| llm-b0 | mixed | 5 | 16 | 21,101,155 | 1,318,822.2 | 5 | session_url |
+| glm | unknown | 0 | 9 | 0 | 0.0 | 0 | unjoined |
+| conductor-67 | unknown | 0 | 5 | 0 | 0.0 | 0 | unjoined |
+
+**14 of 30** landed commits are now `unjoined` (up from 0 before the fix):
+every `glm`/`conductor-67` commit that previously borrowed the coordinator
+session's tokens. This is the honest result, not a regression to fix --
+those agents' actual work is not logged as a harness transcript under this
+project at all (GLM sessions run outside this harness), so `0` credited
+tokens is correct; the alternative was crediting someone else's session,
+which is what this fix removes. Closing this gap for real needs those
+agents' own token accounting to land in a transcript this ledger can see,
+which is out of this PR's scope.
