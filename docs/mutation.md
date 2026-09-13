@@ -70,7 +70,9 @@ Every rejection is classified where it is produced, never parsed back out of
 its message: each `receipt_rejections` entry is `{receipt, kind, detail}` with
 `kind` one of `no_campaign`, `scope_error`, `not_pass` (any status other than
 PASS, `RATCHET_HELD` included — one verdict, not a wall of follow-on schema
-noise), `superseded`, `runner_map_mismatch` (the component map and the
+noise — plus the two stale-PASS bindings, source drift and a manifest revision
+the campaign has moved past: the run was real, it is just not current, and the
+campaign re-runs), `superseded`, `runner_map_mismatch` (the component map and the
 core/adapter/scope-guard era bindings: same debt, the campaign re-runs),
 `decode_error`, `schema_error` (the validator refuses the receipt's claim —
 including survivors outside the baseline, which contradict the PASS it

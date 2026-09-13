@@ -651,7 +651,15 @@ fn generated_receipt_errors(
         errors.push(reject(RejectionKind::SchemaError, "manifest path mismatch"));
     }
     if payload.get("manifest_sha256").and_then(Value::as_str) != Some(&campaign.manifest_sha256) {
-        errors.push(reject(RejectionKind::SchemaError, "manifest hash mismatch"));
+        errors.push(reject(
+            // Same reasoning as source drift below: the manifest PATH matches,
+            // so this is a receipt for an earlier revision of the very campaign
+            // it names -- the run passed, the campaign has since been refreshed,
+            // and the campaign re-runs. A mismatched path or campaign_id stays
+            // schema_error: that receipt does not belong to this campaign at all.
+            RejectionKind::NotPass,
+            "manifest hash mismatch",
+        ));
     }
     if payload.get("source_sha256") != Some(&campaign.source_sha256) {
         errors.push(reject(
@@ -964,7 +972,13 @@ fn reviewed_receipt_errors(
         errors.push(reject(RejectionKind::SchemaError, "manifest path mismatch"));
     }
     if payload.get("manifest_sha256").and_then(Value::as_str) != Some(&campaign.manifest_sha256) {
-        errors.push(reject(RejectionKind::SchemaError, "manifest hash mismatch"));
+        errors.push(reject(
+            // Same verdict as the generated rule: the path matches, so the
+            // receipt documents an earlier revision of this campaign and the
+            // campaign re-runs.
+            RejectionKind::NotPass,
+            "manifest hash mismatch",
+        ));
     }
     if !anchored_legacy {
         errors.extend(runner_errors(payload, context));
@@ -2250,6 +2264,15 @@ mod generated_receipt_tests {
                 .iter()
                 .any(|error| error.kind == RejectionKind::RunnerMapMismatch
                     && error.detail == "core_sha256 hash mismatch")
+        );
+        // A receipt for an earlier revision of the same campaign (the path
+        // matched, the manifest has since been refreshed) is a stale PASS:
+        // not_pass, the campaign re-runs -- never a defect-class rejection.
+        assert!(
+            rejections(json!({"manifest_sha256": "f".repeat(64), "survivors": []}))
+                .iter()
+                .any(|error| error.kind == RejectionKind::NotPass
+                    && error.detail == "manifest hash mismatch")
         );
         // A survivor outside the baseline contradicts the claimed PASS: the
         // validator refuses the claim rather than filing it as re-run debt.
