@@ -18,6 +18,12 @@ walkdir = "2"
 sha2 = "0.10"
 libc = "0.2"
 toml = "0.8"
+# `bundled` vendors and builds sqlite3 (no system libsqlite3 dependency);
+# `bundled` alone compiles FTS5 in on modern rusqlite/libsqlite3-sys, but
+# `fts5` is pinned explicitly so a future rusqlite bump can't silently drop
+# it -- `forge notes index|search` (notes_index.rs) needs FTS5 and its own
+# `fts5_is_available` test fails loud if it is ever missing.
+rusqlite = { version = "0.32", features = ["bundled"] }
 # `forge mutation plan` calls `compute_plan` directly -- no pyo3 boundary, no
 # Python interpreter. conductor-native's default build (no `extension-module`
 # feature) still links libpython so its own `cargo test` can run; pulling that
