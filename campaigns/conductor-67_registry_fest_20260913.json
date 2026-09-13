@@ -32,7 +32,7 @@
     "src/tooling/hooks/dispatch/test_registry.py"
   ],
   "test_sha256": {
-    "src/tooling/hooks/dispatch/test_registry.py": "fedb68f1a5faa6e94f7ac2e21a7ef822fe733a548ffda377d7438cc6d6cf5359"
+    "src/tooling/hooks/dispatch/test_registry.py": "0694a92e0f21fd70e610c3620e8f1d8e0a262c4b929ced0f171142933aab1eea"
   },
   "title": "Generated mutants for src/tooling/hooks/dispatch/registry.py, scored on the survivor set"
 }
