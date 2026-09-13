@@ -211,7 +211,12 @@ def test_five_metric_payload_with_no_baseline_metric_is_ok(
     monkeypatch.setattr(
         cost_budget_audit,
         "run_forge_ledger_audit",
-        lambda **kwargs: _completed(payload),
+        # `_kwargs`, not `kwargs`: the file's other stub lambdas all name this
+        # parameter `kwargs` (an inherited, pre-existing vulture finding vulture
+        # already reports on this file at --min-confidence 100 on origin/main);
+        # a leading underscore is vulture's own convention for "intentionally
+        # unused," so this one new lambda does not add a NEW finding to fix.
+        lambda **_kwargs: _completed(payload),
     )
     result = cost_budget_audit.phase(tmp_path)
     assert result.ok
