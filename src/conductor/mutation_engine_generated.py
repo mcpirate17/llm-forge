@@ -63,6 +63,7 @@ def write_receipt(path: Path, receipt: Mapping[str, Any]) -> None:
 
     write_slim_receipt(Path(path), receipt)
 
+
 # engine name -> the module that adapts it. Imported lazily: each adapter
 # imports this module, so naming them at import time would be circular.
 ADAPTER_MODULES = {
@@ -447,7 +448,6 @@ def _missing_interpreter_hint(baseline: CommandResult) -> str | None:
             )
 
 
-
 def note_baseline(
     campaign: GeneratedCampaign,
     receipt: dict[str, Any],
@@ -687,7 +687,9 @@ def run_generated_campaign(
     binary = engine.binary()
     receipt = open_receipt(campaign, repo_root, Path(engine.__file__))
     receipt["memory_cap_bytes"] = cap_memory()
-    output_path, relative = resolve_receipt_path(campaign, receipt_path, repo_root)
+    output_path, relative = resolve_receipt_path(
+        campaign, receipt_path, repo_root, generated_at=receipt["generated_at"]
+    )
     write_receipt(output_path, receipt)
     try:
         with isolated_snapshot(repo_root) as snapshot:
@@ -717,17 +719,27 @@ def run_generated_campaign(
 
 
 def resolve_receipt_path(
-    campaign: GeneratedCampaign, receipt_path: Path | None, repo_root: Path
+    campaign: GeneratedCampaign,
+    receipt_path: Path | None,
+    repo_root: Path,
+    *,
+    generated_at: str,
 ) -> tuple[Path, str]:
     """Absolute output path and its repo-relative name, refusing anything outside.
 
     Absent an explicit ``receipt_path`` the default directory is host-configurable
     (``[tool.conductor].mutation_receipt_root``) and created on demand -- a host
     with no scratch-output tree of its own must not have to create one by hand.
+    The filename's timestamp is parsed from ``generated_at`` -- the receipt's own
+    stamp, already fixed by ``open_receipt`` -- rather than a second independent
+    ``datetime.now(UTC)`` read; two clock reads a few lines apart drift on a host
+    whose clock steps between them, landing a receipt whose filename names a
+    different moment than the receipt itself claims (seen live as a
+    `..._T999999Z.json` filename beside a normal `generated_at`).
     """
 
     if receipt_path is None:
-        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        stamp = datetime.fromisoformat(generated_at).strftime("%Y%m%dT%H%M%SZ")
         directory = repo_root / mutation_receipt_root_relative(repo_root).as_posix()
         try:
             directory.mkdir(parents=True, exist_ok=True)
