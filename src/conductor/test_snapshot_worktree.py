@@ -185,3 +185,57 @@ def test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged(
 
     assert _git(linked, "worktree", "list", "--porcelain") == worktrees_before
     assert _object_inventory(linked) == objects_before
+
+
+def test_the_exported_interpreter_defaults_to_the_running_one(
+    tmp_path: Path,
+) -> None:
+    """Which interpreter a snapshot hands its tests, in preference order."""
+
+    import sys
+
+    repo = _repository(tmp_path)
+    # No configuration: the interpreter building the snapshot, which by
+    # construction is one that can import conductor.
+    assert snapshot_worktree.snapshot_python(repo) == sys.executable
+
+    # A host that needs a specific one names it once.
+    (repo / "pyproject.toml").write_text(
+        '[tool.conductor]\nsnapshot_python = "/opt/other/python"\n',
+        encoding="utf-8",
+    )
+    assert snapshot_worktree.snapshot_python(repo) == "/opt/other/python"
+
+    # Anything that is not a usable path is a configuration error, not a guess.
+    for bad in ('snapshot_python = ""', "snapshot_python = 3"):
+        (repo / "pyproject.toml").write_text(
+            f"[tool.conductor]\n{bad}\n", encoding="utf-8"
+        )
+        with pytest.raises(ProjectPathError, match="snapshot_python"):
+            snapshot_worktree.snapshot_python(repo)
+
+
+def test_the_exported_interpreter_imports_conductor_inside_the_snapshot(
+    tmp_path: Path,
+) -> None:
+    """Gap 6's acceptance: a snapshot carries no .venv, yet a test that shells
+    out to Python inside it must reach an interpreter that can import
+    `conductor` -- the situation whose absence killed Rust campaigns at their
+    own baseline inside snapshots while the same suite passed on the host."""
+
+    from conductor import mutation_engine_generated
+
+    repo = _repository(tmp_path)
+    with snapshot_worktree.isolated_snapshot(repo) as snapshot:
+        # The snapshot is a git tree and .venv is gitignored: whatever resolves
+        # `python3` from PATH here is not an interpreter with conductor in it.
+        assert not (snapshot.worktree / ".venv").exists()
+        exported = mutation_engine_generated.snapshot_python_environment()
+        proc = subprocess.run(
+            [exported["CONDUCTOR_SNAPSHOT_PYTHON"], "-c", "import conductor"],
+            cwd=snapshot.worktree,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc.returncode == 0, proc.stderr

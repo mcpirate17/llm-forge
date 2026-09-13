@@ -226,6 +226,23 @@ def _read_report(output: Path) -> Mapping[str, Any]:
     return report
 
 
+def _environment(campaign: _core.GeneratedCampaign) -> dict[str, str]:
+    """What every cargo run in a snapshot inherits, and nothing it shouldn't.
+
+    PATH because cargo resolves its own toolchain; the snapshot interpreter
+    export because a crate's tests may drive Python and the snapshot carries
+    no ``.venv`` -- ranked after the export so a campaign cannot ship its own
+    broken interpreter pin past it.
+    """
+
+    return {
+        **campaign.environment,
+        **_core.snapshot_python_environment(),
+        "PATH": os.environ.get("PATH", ""),
+        "CARGO_TERM_COLOR": "never",
+    }
+
+
 def execute(
     campaign: _core.GeneratedCampaign,
     receipt: dict[str, Any],
@@ -238,11 +255,7 @@ def execute(
 
     if drifted := _core.drift(campaign, worktree):
         raise CampaignError(f"snapshot source hashes drifted: {drifted}")
-    environment = {
-        **campaign.environment,
-        "PATH": os.environ.get("PATH", ""),
-        "CARGO_TERM_COLOR": "never",
-    }
+    environment = _environment(campaign)
 
     baseline_argv = list(campaign.test_argv)
     baseline, _ = _core.run(

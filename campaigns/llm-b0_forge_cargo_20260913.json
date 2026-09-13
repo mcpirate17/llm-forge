@@ -36,11 +36,11 @@
   "source_sha256": {
     "native/forge/src/bash_guard.rs": "c8893e81fd61f3721df8dd6129a764383a3a404b42356bda4ff96203dd6bf73d",
     "native/forge/src/civil.rs": "9acac46ea18abc73fbb6cd5173e82d421be97337e0a904b0aa50b9bda91a258c",
-    "native/forge/src/crg_gate.rs": "268d2d23ff19ca0b826b2cd1b1a464d0d34d1e808e7cdfab1a0e3431fdd4ec82",
-    "native/forge/src/crg_refresh.rs": "154b76479b44eb0de2a638ab323f2ee1be6c9ea4866d96fd74203f68ede475c8",
+    "native/forge/src/crg_gate.rs": "14ff650d6922a00108af6dfeb62168d55b17b21fe72c9cad7fea3a2764738fd5",
+    "native/forge/src/crg_refresh.rs": "411778a8dcb360f56b022f6259ec3470d939ffd569a86958415dd44cf3652522",
     "native/forge/src/current_work_guard.rs": "a2c933eceed20848b652d2ad27cae891bd13487b3417a09d25d176aa7f23488f",
     "native/forge/src/dispatch.rs": "f4f1c5050f037acc0e1f858b038986e9db0e61d977822b7f20397b74cc40b484",
-    "native/forge/src/handlers.rs": "7e03e7816004b52d464a90bcc1c5908f9d18b64ae80cf214809e94bcd7f1259d",
+    "native/forge/src/handlers.rs": "76ca5e234f6dd4f5af5d750e783784cfe19a8fc5af1aac8bb29149e56647595e",
     "native/forge/src/identity.rs": "301b2072244de09a1efe70dea5c2b8f66d70524883f1261f2cd74b0f16b0956e",
     "native/forge/src/instant.rs": "a8a0a770a4b2605cb42778a11f515f1f5ae48fdd1bb0589dc26a3688d1b19e22",
     "native/forge/src/local_ai_policy.rs": "9c419ff8f8c1261959e3ec3188ae7c6310e04e436d011a942e748bc28d4dbc6d",
@@ -83,6 +83,7 @@
     "UnaryOperator-a017e0b2f7e1-0",
     "UnaryOperator-b04f54269bd9-1"
   ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
   "survivor_baseline_recorded": true,
   "survivor_baseline_recorded_at": "2026-09-13T03:04:19.189692+00:00",
   "test_argv": [
@@ -95,24 +96,20 @@
   ],
   "test_sha256": {
     "native/forge/src/bash_guard.rs": "c8893e81fd61f3721df8dd6129a764383a3a404b42356bda4ff96203dd6bf73d",
-    "native/forge/src/bash_impact.rs": "fc461f5bee186d125ad23a881c70be2e3291a489323b8107dfcc2a19ff1c9297",
     "native/forge/src/civil.rs": "9acac46ea18abc73fbb6cd5173e82d421be97337e0a904b0aa50b9bda91a258c",
-    "native/forge/src/crg_gate.rs": "268d2d23ff19ca0b826b2cd1b1a464d0d34d1e808e7cdfab1a0e3431fdd4ec82",
-    "native/forge/src/crg_refresh.rs": "154b76479b44eb0de2a638ab323f2ee1be6c9ea4866d96fd74203f68ede475c8",
+    "native/forge/src/crg_gate.rs": "14ff650d6922a00108af6dfeb62168d55b17b21fe72c9cad7fea3a2764738fd5",
+    "native/forge/src/crg_refresh.rs": "411778a8dcb360f56b022f6259ec3470d939ffd569a86958415dd44cf3652522",
     "native/forge/src/current_work_guard.rs": "a2c933eceed20848b652d2ad27cae891bd13487b3417a09d25d176aa7f23488f",
-    "native/forge/src/handlers.rs": "7e03e7816004b52d464a90bcc1c5908f9d18b64ae80cf214809e94bcd7f1259d",
+    "native/forge/src/dispatch.rs": "f4f1c5050f037acc0e1f858b038986e9db0e61d977822b7f20397b74cc40b484",
+    "native/forge/src/handlers.rs": "76ca5e234f6dd4f5af5d750e783784cfe19a8fc5af1aac8bb29149e56647595e",
     "native/forge/src/identity.rs": "301b2072244de09a1efe70dea5c2b8f66d70524883f1261f2cd74b0f16b0956e",
     "native/forge/src/instant.rs": "a8a0a770a4b2605cb42778a11f515f1f5ae48fdd1bb0589dc26a3688d1b19e22",
-    "native/forge/src/interpreter.rs": "8ff087abdb19392728949fa20db60259386c90b8980d601a25d1f9b8042b108c",
     "native/forge/src/local_ai_policy.rs": "9c419ff8f8c1261959e3ec3188ae7c6310e04e436d011a942e748bc28d4dbc6d",
+    "native/forge/src/main.rs": "01d10fbe8ea20c86b388cfcb805f2d05317fb1436845502af42f1967e7f03a40",
     "native/forge/src/merge.rs": "84d583a0a3af836ffec4546deb6c3264fff360476ebe9885a75db22c2e07bb0a",
     "native/forge/src/ownership.rs": "1c2c17f141192b30877e97eca3febc8564d987af30c1f40359e9c600b3e5649a",
     "native/forge/src/telemetry.rs": "6dae7a78bbe3f89fbcfa26445841eed4c88224609fee519af74a150478575216",
-    "native/forge/src/write_targets.rs": "81b4c50b4f1dee51824d970813cb09defa713f7dbd8fdc76cae537d033a17633",
-    "native/forge/tests/bash_impact_parity.rs": "04bd5dfc9fc9eb143ef110e78a40d17fc4073b57f0ab85322a85ef38ab9cb64c",
-    "native/forge/tests/bash_pretooluse_hooks_parity.rs": "4b2fdcc86cd71f48ebaced28c895314698b3c46a3884fdb728bbc5cb9be08691",
-    "native/forge/tests/guard_parity.rs": "6c87cb87e95ef6b75fdcad46ca4cfdc32ee78681585f43be04a454496e00fc8c",
-    "native/forge/tests/hook_delegation.rs": "6654fe5af18f4da0ed2946f9a9759a00d4af94db321e85018b91c5ddddb3f5a8"
+    "native/forge/src/write_targets.rs": "81b4c50b4f1dee51824d970813cb09defa713f7dbd8fdc76cae537d033a17633"
   },
   "title": "Generated mutants for the forge crate, scored on the survivor set"
 }
