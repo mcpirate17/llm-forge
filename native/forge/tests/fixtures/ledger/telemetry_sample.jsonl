@@ -1,0 +1,7 @@
+{"event":"PreToolUse","elapsed_ms":1.5,"delegated":true,"ts":"2026-09-13T04:00:00.000+00:00"}
+{"event":"PreToolUse","elapsed_ms":2.5,"delegated":false,"ts":"2026-09-13T04:00:01.000+00:00"}
+{"timestamp":"2026-09-13T04:00:02.000+00:00","pid":1,"provider":"claude","event":"HookTiming","tool":"bash_guard","hook_event":"PreToolUse","elapsed_ms":3.2,"status":"ok","output_bytes":0}
+{"timestamp":"2026-09-13T04:00:03.000+00:00","pid":1,"provider":"claude","event":"HookTiming","tool":"bash_guard","hook_event":"PreToolUse","elapsed_ms":4.8,"status":"ok","output_bytes":0}
+{"timestamp":"2026-09-13T04:00:04.000+00:00","pid":1,"provider":"claude","event":"HookContext","hook_event":"PostToolUse","tool":"bash_guard","input_bytes":0,"output_bytes":128,"tool_input_tokens_estimate":0,"output_tokens_estimate":32,"output_tokens_estimate_scope":"hook-additional-context-bytes","output_bounded":false}
+{"timestamp":"2026-09-13T04:00:05.000+00:00","pid":1,"provider":"claude","event":"HookTiming","tool":"workspace_hygiene","hook_event":"SessionStart","elapsed_ms":10.0,"status":"ok","output_bytes":0}
+not-json-telemetry-line
