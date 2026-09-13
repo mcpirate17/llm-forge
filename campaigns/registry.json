@@ -52,7 +52,7 @@
       "manifest": "campaigns/conductor-67_bash_guard_fest_20260913.json"
     },
     {
-"manifest": "campaigns/forge-integration-branch_branch_policy_fest_20260913.json"
+      "manifest": "campaigns/forge-integration-branch_branch_policy_fest_20260913.json"
     },
     {
       "manifest": "campaigns/forge-integration-branch_project_paths_fest_20260913.json"
@@ -62,6 +62,30 @@
     },
     {
       "manifest": "campaigns/forge-integration-branch_workspace_hygiene_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_bash_quiet_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_merge_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_native_freshness_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_paths_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_registry_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_runner_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_attribution_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_campaign_generate_fest_20260913.json"
     }
   ],
   "enforcement": "changed_tests",
