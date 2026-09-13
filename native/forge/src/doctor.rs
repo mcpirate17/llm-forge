@@ -468,12 +468,21 @@ fn run_capture_bounded(
         Some(bytes) => {
             command.stdin(Stdio::piped());
             let mut child = command.spawn().context("spawning the probe child")?;
-            child
-                .stdin
-                .take()
-                .expect("piped stdin")
-                .write_all(bytes)
-                .context("feeding the probe child its stdin payload")?;
+            {
+                let mut stdin = child.stdin.take().expect("piped stdin");
+                // A child that exits before reading its payload (a broken
+                // binary -- exactly what the roundtrip check exists to
+                // catch) closes the pipe and turns this write into EPIPE.
+                // That is the child's verdict to report, not a probe
+                // failure: swallow BrokenPipe and let the wait below judge
+                // by exit status and stdout. Every other write error is a
+                // real feeding failure and fails the check.
+                if let Err(err) = stdin.write_all(bytes) {
+                    if err.kind() != std::io::ErrorKind::BrokenPipe {
+                        return Err(err).context("feeding the probe child its stdin payload");
+                    }
+                }
+            }
             wait_bounded(child, timeout)
         }
         None => {
