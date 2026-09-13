@@ -14,7 +14,8 @@ from typing import Any, Final
 
 from conductor import workspace_runtime_matrix as matrix
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final[Path] = host_root()
 RECEIPTS_DIR: Final[Path] = ROOT / "research" / "reports" / "avo_receipts"
 REQUIRED_CELL_IDS: Final[frozenset[str]] = frozenset(
     {

@@ -55,40 +55,20 @@ class HygieneError(RuntimeError):
     """Raised when the report cannot be produced from trustworthy inputs."""
 
 
-def _repo_root() -> Path:
-    """The repository root this module reports on, from the cwd, once per process.
-
-    ``Path(__file__).resolve().parents[1]`` is the package parent -- the repo
-    root only in the layout conductor was extracted from. Imported from this
-    repo's ``src/`` layout (or an installed package) it lands one level short,
-    which silently re-pointed every defaulting caller at a directory with no
-    ``.git``, no ``campaigns/`` and no ``.venv``: the full report died on the
-    mutation registry, the claim query died executing a ``.venv/bin/python``
-    relative to ``src/``, and idle-claim mtimes were read from
-    ``src/<claim path>``, where nothing is ever found. One ``git rev-parse
-    --show-toplevel`` from the cwd resolves the real root; it fails loud
-    rather than guessing, and callers that can degrade (the session inject)
-    catch ``HygieneError`` and say so.
-    """
-    done = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if done.returncode != 0 or not done.stdout.strip():
-        raise HygieneError(
-            "workspace_hygiene resolves its repository with "
-            f"git rev-parse --show-toplevel from the cwd, which failed: {done.stderr.strip()}"
-        )
-    return Path(done.stdout.strip()).resolve()
-
-
-ROOT = _repo_root()
+# ``ROOT`` used to be re-derived here with ``git rev-parse --show-toplevel``
+# because ``Path(__file__).resolve().parents[1]`` -- the package parent -- is
+# the repo root only in the layout conductor was extracted from; imported from
+# this repo's ``src/`` layout (or an installed package) it lands one level
+# short, silently re-pointing every defaulting caller at a directory with no
+# ``.git``, no ``campaigns/`` and no ``.venv``. ``project_paths.host_root()``
+# is the shared fix (nearest ``.git`` ancestor of the cwd, or
+# ``$CONDUCTOR_HOST_ROOT``): it fails loud rather than guessing, and callers
+# that can degrade (the session inject) catch ``HygieneError`` and say so.
+ROOT = host_root()
 # ``ROOT`` is the checkout root, so the host-relative campaign layout resolves
 # against the repository that actually holds it.
-CAMPAIGN_DIR = str(campaigns_relative(host_root(ROOT)))
-REGISTRY = str(registry_relative(host_root(ROOT)))
+CAMPAIGN_DIR = str(campaigns_relative(ROOT))
+REGISTRY = str(registry_relative(ROOT))
 
 
 def _git(*args: str) -> str:

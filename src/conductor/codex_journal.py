@@ -9,7 +9,8 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 
-ROOT = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT = host_root()
 DEFAULT_OUT_DIR = ROOT / "tasks" / "codex_journal"
 DEFAULT_MAX_STATUS = 80
 SECRETISH_RE = re.compile(

@@ -33,7 +33,8 @@ from conductor import workspace_launcher_smokes as _launcher_smokes
 from conductor import workspace_runtime_support as _runtime_support
 from conductor.workspace_runtime_types import CellReceipt, LauncherSpec, ReceiptStatus
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final[Path] = host_root()
 # Relative to --root (see main()), not to Path(__file__) -- a caller in a
 # different worktree must not write receipts into some other checkout.
 DEFAULT_OUTPUT: Final[Path] = Path("research/reports/workspace_reliability_20260823")

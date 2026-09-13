@@ -17,7 +17,8 @@ from conductor.crg_response_shim import (
 )
 from conductor.crg_workspace_tools import register_workspace_tools, search_enrichers
 
-ROOT = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT = host_root()
 
 
 def main(argv: list[str] | None = None) -> int:

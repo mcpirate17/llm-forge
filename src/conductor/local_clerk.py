@@ -26,7 +26,8 @@ from typing import Any, Final
 from conductor.context_envelope import fit_text
 from conductor.local_ai_policy import CLERK_SYSTEM_PROMPT, require_clerical_task
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final[Path] = host_root()
 MAX_SOURCE_BYTES: Final[int] = 64_000
 MAX_SOURCE_TEXT_CHARS: Final[int] = 2_400
 MAX_SOURCE_COUNT: Final[int] = 3

@@ -48,7 +48,8 @@ from conductor.audit_root import (
 )
 from conductor.project_paths import DEFAULT_MUTATION_REGISTRY, notes_relative
 
-ROOT = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT = host_root()
 TEST_NAME = re.compile(r"^(test_.*|.*_test)\.py$")
 DOTTED = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$")
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

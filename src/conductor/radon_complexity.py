@@ -8,7 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+REPO_ROOT = host_root()
 DEFAULT_PATHS = ("conductor", "research", "aria_core", "aria_designer")
 DEFAULT_EXCLUDES = (
     "*/rust/*",

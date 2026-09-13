@@ -15,7 +15,8 @@ from conductor.audit_root import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT = host_root()
 PROTECTED_PATTERNS = (
     "*.db",
     "*.db-wal",

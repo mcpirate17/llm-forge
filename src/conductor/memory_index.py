@@ -40,7 +40,7 @@ from conductor.kb_retrieve import (
 )
 from conductor.project_paths import DEFAULT_NOTES_ROOT, host_root, notes_root
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+ROOT: Final[Path] = host_root()
 SOURCES_PATH: Final[Path] = ROOT / "conductor" / "memory_sources.toml"
 INDEX_PATH: Final[Path] = ROOT / "research" / "cache" / "memory_index.jsonl"
 CATALOG_SCHEMA_VERSION: Final[int] = 1

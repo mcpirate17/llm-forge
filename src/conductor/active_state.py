@@ -22,7 +22,8 @@ from typing import Any, Final
 
 from conductor.session_policy import load_session_policy
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final[Path] = host_root()
 ACTIVE_STATE_PATH: Final[Path] = ROOT / "conductor" / "active_state.json"
 CURRENT_WORK_PATH: Final[Path] = ROOT / ".current_work.md"
 

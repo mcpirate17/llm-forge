@@ -20,7 +20,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final[Path] = host_root()
 ACTIVE_STATE: Final[Path] = ROOT / "conductor" / "active_state.json"
 HELM_SEAT: Final[str] = "fable-helm"
 INBOX_LIMIT: Final[int] = 40

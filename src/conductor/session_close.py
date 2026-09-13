@@ -24,7 +24,8 @@ from conductor.candidate_review.ownership import (
 )
 from conductor.handoff import HandoffError, append_status
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final[Path] = host_root()
 
 
 class SessionCloseError(RuntimeError):

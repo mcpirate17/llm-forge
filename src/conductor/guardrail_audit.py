@@ -21,7 +21,8 @@ from conductor.audit_root import (
 )
 from conductor.run_duplicate_audit import should_skip_python
 
-ROOT = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT = host_root()
 DEFAULT_TARGETS = ("research", "aria_core", "aria_designer", "component_fab")
 ALLOWLIST_PATH = Path(__file__).resolve().parent / "guardrail_allowlist.json"
 

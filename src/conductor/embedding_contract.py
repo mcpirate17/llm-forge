@@ -18,7 +18,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Final, Mapping
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final[Path] = host_root()
 ROUTES_PATH: Final[Path] = ROOT / "conductor" / "embedding_routes.toml"
 CONTRACT_VERSION: Final[int] = 1
 QUALITY_SCHEMA_VERSION: Final[int] = 1

@@ -34,7 +34,8 @@ from conductor.duplicate_audit_config import (
     VULTURE_SOURCE_SUFFIXES,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT = host_root()
 
 
 class DuplicateAuditError(RuntimeError):

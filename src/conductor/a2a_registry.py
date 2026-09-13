@@ -21,7 +21,8 @@ import httpx
 from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
 
 
-ROOT: Final = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final = host_root()
 DEFAULT_STATE_DIR: Final = ROOT / ".agents" / "a2a"
 BIND_HOST: Final = "127.0.0.1"
 SCHEMA_VERSION: Final = 1

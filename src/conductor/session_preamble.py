@@ -17,7 +17,8 @@ from typing import Any, Final
 
 from conductor.session_policy import SessionPolicyError, load_session_policy
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final[Path] = host_root()
 ACTIVE_STATE_PATH: Final[Path] = ROOT / "conductor" / "active_state.json"
 MAX_INJECT_CHARS: Final[int] = 2200
 MAX_A2A_CHARS: Final[int] = 1200

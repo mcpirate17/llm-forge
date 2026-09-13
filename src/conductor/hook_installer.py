@@ -19,7 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+from conductor.project_paths import host_root
+ROOT: Final[Path] = host_root()
 BACKUP_SUFFIX: Final[str] = ".a2a-session-start.bak"
 BACKUP_SCHEMA_VERSION: Final[int] = 1
 MANAGED_MODULE: Final[str] = "conductor.a2a_session_start"
