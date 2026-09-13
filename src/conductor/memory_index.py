@@ -595,6 +595,30 @@ def _native_hits(
     ]
 
 
+def _embed_query_vector(
+    query: str,
+    *,
+    embedder: Callable[[str], list[float]],
+    fingerprint: str,
+    dimension: int,
+) -> list[float]:
+    """Embed the query against the index's fingerprint and refuse a dimension
+    mismatch -- shared by the scan and sidecar paths so they cannot drift."""
+
+    if embedder is embed_text:
+        return embed_text(
+            QUERY_INSTRUCT + query.strip(),
+            purpose="query",
+            required_fingerprint=fingerprint,
+        )
+    qvec = embedder(QUERY_INSTRUCT + query.strip())
+    if len(qvec) != dimension:
+        raise RetrieveError(
+            f"query dimension {len(qvec)} != index dimension {dimension}"
+        )
+    return qvec
+
+
 def _query_index_file_scan(
     query: str,
     path: Path = INDEX_PATH,
@@ -617,18 +641,9 @@ def _query_index_file_scan(
         fingerprint, dimension, _count = memory_index_metadata_native(str(path))
     except ValueError as exc:
         raise RetrieveError(str(exc)) from exc
-    if embedder is embed_text:
-        qvec = embed_text(
-            QUERY_INSTRUCT + query.strip(),
-            purpose="query",
-            required_fingerprint=fingerprint,
-        )
-    else:
-        qvec = embedder(QUERY_INSTRUCT + query.strip())
-    if len(qvec) != dimension:
-        raise RetrieveError(
-            f"query dimension {len(qvec)} != index dimension {dimension}"
-        )
+    qvec = _embed_query_vector(
+        query, embedder=embedder, fingerprint=fingerprint, dimension=dimension
+    )
     try:
         native_hits = memory_index_query_file_native(
             str(path), qvec, top_k, fingerprint
@@ -729,18 +744,9 @@ def query_index_file(
         )
     except ValueError as exc:
         raise RetrieveError(str(exc)) from exc
-    if embedder is embed_text:
-        qvec = embed_text(
-            QUERY_INSTRUCT + query.strip(),
-            purpose="query",
-            required_fingerprint=fingerprint,
-        )
-    else:
-        qvec = embedder(QUERY_INSTRUCT + query.strip())
-    if len(qvec) != dimension:
-        raise RetrieveError(
-            f"query dimension {len(qvec)} != index dimension {dimension}"
-        )
+    qvec = _embed_query_vector(
+        query, embedder=embedder, fingerprint=fingerprint, dimension=dimension
+    )
     candidates = max(top_k * 8, 64)
     hits = _rank_and_seek(sidecar, path, qvec, candidates)
     if len(hits) < top_k and candidates < rows:
