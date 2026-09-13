@@ -161,6 +161,12 @@
     },
     {
       "manifest": "campaigns/forge-harness-doctor_main_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-mutation-platform-gaps_mutation_campaign_generate_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-mutation-platform-gaps_snapshot_worktree_fest_20260913.json"
     }
   ],
   "enforcement": "changed_tests",
