@@ -68,6 +68,11 @@ fn write_matches_hand_computed_tables() {
         paths: vec![scenario_dir()],
         out: Some(root.clone()),
         dry_run: false,
+        repo: None,
+        project: None,
+        cap: ledger::agent::DEFAULT_CAP,
+        since: None,
+        last: None,
     };
     let code = run(args).expect("rollup run succeeds");
     assert_eq!(code, 0);
@@ -99,13 +104,13 @@ fn write_matches_hand_computed_tables() {
     let session_2026_01_01 = read_day_file(&root, "session_rollup", "2026-01-01");
     assert_eq!(
         session_2026_01_01.trim_end(),
-        "{\"first_ts\":\"2026-01-01T00:00:00Z\",\"last_ts\":\"2026-01-01T00:10:00Z\",\"n_compactions\":1,\"n_turns\":2,\"project\":\"rollup_scenario\",\"resend_bytes\":0,\"resend_events\":0,\"session_id\":\"sess-compact-1\",\"total_cache_creation\":0,\"total_cache_read\":50,\"total_input\":140,\"total_output\":30}"
+        "{\"first_ts\":\"2026-01-01T00:00:00Z\",\"harness_session_ids\":[],\"last_ts\":\"2026-01-01T00:10:00Z\",\"models\":[\"claude-sonnet-5\"],\"n_compactions\":1,\"n_turns\":2,\"project\":\"rollup_scenario\",\"resend_bytes\":0,\"resend_events\":0,\"session_id\":\"sess-compact-1\",\"total_cache_creation\":0,\"total_cache_read\":50,\"total_input\":140,\"total_output\":30}"
     );
 
     let session_2026_02_01 = read_day_file(&root, "session_rollup", "2026-02-01");
     assert_eq!(
         session_2026_02_01.trim_end(),
-        "{\"first_ts\":\"2026-02-01T00:00:00Z\",\"last_ts\":\"2026-02-01T00:05:00Z\",\"n_compactions\":0,\"n_turns\":2,\"project\":\"rollup_scenario\",\"resend_bytes\":320,\"resend_events\":1,\"session_id\":\"sess-resend-1\",\"total_cache_creation\":180,\"total_cache_read\":0,\"total_input\":250,\"total_output\":35}"
+        "{\"first_ts\":\"2026-02-01T00:00:00Z\",\"harness_session_ids\":[],\"last_ts\":\"2026-02-01T00:05:00Z\",\"models\":[\"claude-sonnet-5\"],\"n_compactions\":0,\"n_turns\":2,\"project\":\"rollup_scenario\",\"resend_bytes\":320,\"resend_events\":1,\"session_id\":\"sess-resend-1\",\"total_cache_creation\":180,\"total_cache_read\":0,\"total_input\":250,\"total_output\":35}"
     );
 
     let hook_today = read_day_file(&root, "hook_rollup", &today_utc_date());
@@ -133,6 +138,11 @@ fn rerunning_rollup_is_idempotent() {
         paths: vec![scenario_dir()],
         out: Some(root.clone()),
         dry_run: false,
+        repo: None,
+        project: None,
+        cap: ledger::agent::DEFAULT_CAP,
+        since: None,
+        last: None,
     };
 
     run(make_args()).expect("first rollup run succeeds");

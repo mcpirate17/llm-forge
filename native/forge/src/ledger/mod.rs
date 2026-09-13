@@ -3,9 +3,12 @@
 //! and hook telemetry JSONL into the shapes section 2 defines, without ever
 //! retaining block text past this boundary.
 
+pub mod agent;
+pub mod landed;
 pub mod reader;
 pub mod rollup;
 pub mod schema;
+pub mod session_ids;
 pub mod writer;
 
 use std::path::{Path, PathBuf};

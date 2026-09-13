@@ -50,6 +50,34 @@ pub struct RollupArgs {
     /// Print the rows to stdout as JSONL and write nothing.
     #[arg(long)]
     pub dry_run: bool,
+
+    /// Landed-PR git repo to join `session_rollup` against (design step 4).
+    /// When absent, `agent_rollup` is not computed at all -- steps 1-2's
+    /// three tables behave exactly as before this flag existed.
+    #[arg(long)]
+    pub repo: Option<PathBuf>,
+
+    /// Project name the `--repo` scan's commits join against (must match
+    /// the `session_rollup` rows' own `project` field, i.e. the transcript
+    /// directory's basename `project_of()` already derives). Required with
+    /// `--repo`; there is no default because guessing it wrong would either
+    /// silently drop every join or -- far worse -- cross a project
+    /// boundary, which this design forbids outright.
+    #[arg(long)]
+    pub project: Option<String>,
+
+    /// Per-session token cap for `agent_rollup.cap_breaches` (design step
+    /// 4, `--cap`).
+    #[arg(long, default_value_t = super::agent::DEFAULT_CAP)]
+    pub cap: u64,
+
+    /// `--since`/`--last` passed straight through to `forge ledger landed`
+    /// when `--repo` is given (both optional; omit both to scan every
+    /// first-parent commit on `main`).
+    #[arg(long)]
+    pub since: Option<String>,
+    #[arg(long)]
+    pub last: Option<u64>,
 }
 
 /// One `turn_attribution` row: `TurnSummary`'s own fields (same order) plus
@@ -105,6 +133,18 @@ pub struct SessionRollupRow {
     /// keeps enough of a turn's actual content to prove byte-identity.
     pub resend_bytes: u64,
     pub resend_events: u64,
+    /// `TranscriptSummary::harness_session_ids` (design step 4 join key)
+    /// carried through unchanged: a transcript *file* already is one
+    /// session in every real case (main-session and `agent-*.jsonl`
+    /// transcripts alike), so the file-wide set the reader already computed
+    /// is this session's set too -- no second regex pass needed. If a file
+    /// ever mixed two `session_id`s (not observed), both sessions built
+    /// from it would carry the same superset rather than under-attributing
+    /// either.
+    pub harness_session_ids: Vec<String>,
+    /// Distinct `TurnSummary::model` values seen on this session's turns,
+    /// sorted (design step 4, `agent_rollup`'s tier inference input).
+    pub models: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -121,6 +161,10 @@ struct RollupOutput {
     turn_attribution: Vec<(String, TurnAttributionRow)>, // (day, row)
     session_rollup: Vec<(String, SessionRollupRow)>,
     hook_rollup: Vec<(String, HookRollupRow)>,
+    /// `(day, row)` too, for the same idempotent-write-by-day machinery as
+    /// the other three tables, even though every row in one invocation
+    /// shares today's date (an aggregate has no single "day it happened").
+    agent_rollup: Vec<(String, super::agent::AgentRollupRow)>,
 }
 
 pub fn run(args: RollupArgs) -> Result<i32> {
@@ -132,10 +176,15 @@ pub fn run(args: RollupArgs) -> Result<i32> {
         bail!("forge ledger rollup: no *.jsonl files found under the given path(s)");
     }
 
+    if args.repo.is_some() && args.project.is_none() {
+        bail!("forge ledger rollup: --repo requires --project");
+    }
+
     let mut output = RollupOutput {
         turn_attribution: Vec::new(),
         session_rollup: Vec::new(),
         hook_rollup: Vec::new(),
+        agent_rollup: Vec::new(),
     };
     let today = today_utc_date();
 
@@ -154,6 +203,44 @@ pub fn run(args: RollupArgs) -> Result<i32> {
                     output.hook_rollup.push((today.clone(), hook_row(hook)));
                 }
             }
+        }
+    }
+
+    if let Some(repo) = &args.repo {
+        let project = args.project.as_deref().expect("checked above");
+        let commits = super::landed::scan(repo, args.since.as_deref(), args.last)
+            .with_context(|| format!("scanning landed commits in {}", repo.display()))?;
+        let sessions: Vec<SessionRollupRow> = output
+            .session_rollup
+            .iter()
+            .map(|(_, row)| row.clone())
+            .collect();
+        let (agent_rows, joins) =
+            super::agent::build_agent_rollup(&commits, &sessions, project, args.cap);
+        let unjoined = super::agent::unjoined_commit_count(&joins);
+        if unjoined > 0 {
+            eprintln!(
+                "forge ledger rollup: {unjoined}/{} landed commits have no joined session (design step 4 finding, not tuned away):",
+                joins.len()
+            );
+            for join in joins.iter().filter(|j| j.join_method == "unjoined") {
+                eprintln!(
+                    "  {} pr={}",
+                    join.sha,
+                    join.pr_number
+                        .map(|n| n.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+            }
+        }
+        let ambiguous = joins.iter().filter(|j| j.ambiguous).count();
+        if ambiguous > 0 {
+            eprintln!(
+                "forge ledger rollup: {ambiguous} landed commit(s) matched more than one session on the time-window fallback (agent_rollup.join_method=\"time_window\"; every candidate was credited)"
+            );
+        }
+        for row in agent_rows {
+            output.agent_rollup.push((today.clone(), row));
         }
     }
 
@@ -254,7 +341,13 @@ fn process_transcript(
             // gets no `session_rollup` row -- there is nothing to total.
             continue;
         }
-        let row = session_rollup_row(&session_id, project, &turns, &markers);
+        let row = session_rollup_row(
+            &session_id,
+            project,
+            &turns,
+            &markers,
+            &summary.harness_session_ids,
+        );
         let day = day_of_timestamp(row.first_ts.as_deref()).with_context(|| {
             format!(
                 "{}: session {session_id} has no usable timestamp for its session_rollup day",
@@ -360,6 +453,7 @@ fn session_rollup_row(
     project: &str,
     turns: &[&TurnSummary],
     markers: &[&CompactionMarker],
+    harness_session_ids: &[String],
 ) -> SessionRollupRow {
     let mut first_ts: Option<String> = None;
     let mut last_ts: Option<String> = None;
@@ -392,6 +486,12 @@ fn session_rollup_row(
         }
     }
     let (resend_bytes, resend_events) = resend(turns);
+    let models: Vec<String> = turns
+        .iter()
+        .filter_map(|turn| turn.model.clone())
+        .collect::<BTreeSet<String>>()
+        .into_iter()
+        .collect();
     SessionRollupRow {
         session_id: session_id.to_string(),
         project: project.to_string(),
@@ -405,6 +505,8 @@ fn session_rollup_row(
         total_cache_creation,
         resend_bytes,
         resend_events,
+        harness_session_ids: harness_session_ids.to_vec(),
+        models,
     }
 }
 
@@ -478,6 +580,9 @@ fn print_dry_run(output: &RollupOutput) -> Result<()> {
     for (_, row) in &output.hook_rollup {
         println!("{}", serde_json::to_string(row)?);
     }
+    for (_, row) in &output.agent_rollup {
+        println!("{}", serde_json::to_string(row)?);
+    }
     Ok(())
 }
 
@@ -495,6 +600,12 @@ fn write_all(ledger_root: &Path, output: &RollupOutput) -> Result<()> {
         &output.session_rollup,
     )?;
     write_table(ledger_root, "hook_rollup", "hook_name", &output.hook_rollup)?;
+    write_table(
+        ledger_root,
+        "agent_rollup",
+        "agent_name",
+        &output.agent_rollup,
+    )?;
     Ok(())
 }
 

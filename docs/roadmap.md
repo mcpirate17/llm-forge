@@ -56,7 +56,7 @@ Build plan (design section 6):
 1. Reader + schema (`native/forge/src/ledger/{schema,reader}.rs`, `forge ledger read`). DONE PR #35: parses all 5 sessions measured in the design doc with zero panics and matches its cache_read/cache_creation/output sums exactly; unit tests on malformed/truncated/unknown-block lines.
 2. Turn/session/hook rollups (`forge ledger rollup`; `agent_rollup` is step 4). DONE: writes `turn_attribution`, `session_rollup`, `hook_rollup` JSONL with compaction and resend detection; verified against all 5 sessions measured in the design doc (n_turns and total_cache_read match exactly for the ~100 MB session, 1.77s/22 MB peak RSS dry-run).
 3. Calibration harness (`forge ledger calibrate`, GLM). Not started.
-4. `agent_rollup` + `Agent:` trailer join to landed PRs. Not started.
+4. `agent_rollup` + `Agent:` trailer join to landed PRs. DONE PR #38: `native/forge/src/ledger/landed.rs` shells out to `git log --first-parent main` for `sha`/`merged_at`/`pr_number`/`agent_names`/`harness_session_ids`/shortstat; `agent.rs` joins to `session_rollup` (primary `session_url`, fallback `time_window` with `ambiguous`, never cross-project); `forge ledger rollup --repo <path> --project <name>` writes `agent_rollup/<date>.jsonl`. Verified against this repo's own last 30 landed commits (2.4s over 291 real transcript files, 1.4 GB); 3 commits hand-cross-checked; 0 unjoined, one over-attribution mode found and documented (`docs/ledger.md`'s real-data section) rather than tuned away.
 5. Gate phase `cost_budget_audit`. Not started.
 6. CLI plumbing + docs (GLM). Not started.
 
