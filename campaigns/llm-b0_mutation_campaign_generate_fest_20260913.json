@@ -1,0 +1,60 @@
+{
+  "campaign_id": "llm-b0_mutation_campaign_generate_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/mutation_campaign_generate.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/mutation_campaign_generate.py": "2ce2a5777eb6fde95d98be3e7ec8f2285c2053d06e8328ca3d86d61a01f93a45"
+  },
+  "survivor_baseline": [
+    "bitwise_op-c3e04db605ec-0",
+    "comparison_op-3094db031da9-2",
+    "constant_replace-1a254ea99a58-0",
+    "constant_replace-24d1e858c22d-3",
+    "constant_replace-3d031cd599a6-1",
+    "constant_replace-3d031cd599a6-2",
+    "constant_replace-634da607d143-0",
+    "constant_replace-634da607d143-1",
+    "constant_replace-80ea86a8e811-0",
+    "constant_replace-90ea02c8089f-2",
+    "constant_replace-97657b52f5ae-1",
+    "constant_replace-97657b52f5ae-3",
+    "constant_replace-a43c861d18f3-0",
+    "constant_replace-bea60657b84b-1",
+    "constant_replace-c307d4a20a55-0",
+    "constant_replace-cf568a44dea6-0",
+    "constant_replace-d69e3baddcbf-1",
+    "constant_replace-db23c5f83890-0",
+    "constant_replace-e4f02f029ca5-2",
+    "negate_condition-8c9d8bfa3fd0-0",
+    "return_value-c07ae1b6a790-0",
+    "zero_iteration_loop-80d2357a4fd1-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T07:13:38.725473+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_campaign_generate.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_campaign_generate.py": "9467ebd9617652062803c5fef4d88e0ce373dc49269388066095b9b380bffbb2"
+  },
+  "title": "Generated mutants for src/conductor/mutation_campaign_generate.py, scored on the survivor set"
+}
