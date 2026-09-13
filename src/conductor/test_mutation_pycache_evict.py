@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from conductor import mutation_pycache_evict as eviction
 from conductor.bytecode_isolation import cache_paths_for, scratch_root_for
 from conductor.mutation_pycache_evict import (
     PLUGIN_NAME,
@@ -70,6 +71,62 @@ def test_evict_now_without_both_engine_variables_does_nothing(
     # Half a configuration is not a license to guess where the caches live.
     monkeypatch.setenv(SOURCES_ENV, str(tmp_path / "m.py"))
     assert evict_now() == []
+
+
+def test_a_broken_eviction_fails_closed_on_the_whole_prefix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Eviction trouble must never kill the child -- engines read that as a kill.
+
+    A mutant of the cache mapping raises instead of mapping (the exact
+    failure a shared helper would import into this child). The plugin must
+    not raise: it deletes the run's whole prefix tree instead, so every child
+    of the run recompiles and the tests still grade the mutant honestly --
+    slower, never wrong.
+    """
+
+    source = tmp_path / "m.py"
+    source.write_text("x = 1\n", encoding="utf-8")
+    scratch = scratch_root_for(tmp_path)
+    stale = cache_paths_for(source, scratch / "pycache")[0]
+    stale.parent.mkdir(parents=True)
+    stale.write_bytes(b"stale")
+    monkeypatch.setenv(SCRATCH_ENV, str(scratch))
+    monkeypatch.setenv(SOURCES_ENV, str(source))
+
+    def broken(source: str, prefix: Path) -> list[Path]:
+        raise TypeError("mutated away")
+
+    monkeypatch.setattr(eviction, "_cache_paths", broken)
+
+    assert evict_now() == []
+    assert not (scratch / "pycache").exists()
+
+
+def test_the_plugin_imports_nothing_of_the_module_under_mutation() -> None:
+    """The eviction must survive mutants of the code it would otherwise import.
+
+    This plugin runs inside the children whose modules are mutated; if it
+    reached for `conductor.bytecode_isolation`, a mutant that breaks those
+    helpers would break the eviction too, the child would die at pytest
+    startup, and an engine grading by exit code would count a kill for which
+    no test ever ran. `conductor` is a namespace package, so importing the
+    plugin pulls in exactly one module -- this pins that.
+    """
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import conductor.mutation_pycache_evict, sys; "
+            "assert 'conductor.bytecode_isolation' not in sys.modules",
+        ],
+        cwd=_SRC.parent,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_the_plugin_evicts_at_pytest_startup_before_the_imports(
