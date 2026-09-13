@@ -57,6 +57,25 @@ def _inert_corpus_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+@pytest.fixture(autouse=True)
+def _inert_cost_budget_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """None of these fixtures carry ledger data or a `forge` binary.
+
+    `cost_budget_audit` refuses loudly when either is missing (design step 5,
+    same shape as `mutation_corpus_audit`'s refusal on a missing registry).
+    Nothing in this module is about that phase either, so it is stubbed the
+    same way; its own contracts live in `test_gate.py`.
+    """
+
+    monkeypatch.setattr(
+        gate,
+        "cost_budget_audit",
+        lambda export_root: gate.PhaseResult(
+            name="cost-budget-audit", ok=True, detail="stubbed for this module"
+        ),
+    )
+
+
 def _run_gate(repo: Path, json_out: Path) -> None:
     gate.run_gate(
         repo,

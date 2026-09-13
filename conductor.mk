@@ -44,6 +44,7 @@ CONDUCTOR_GATE_FINDINGS_DIR ?= $(CONDUCTOR_REPORTS_DIR)/gate_findings
 	dupes dupes-jscpd dupes-jscpd-check dupes-pmd dupes-pmd-check dupes-pylint \
 	dupes-nicad dupes-deep dupes-deep-check \
 	mutation-retention mutation-patch-audit mutation-patch-audit-record \
+	cost-budget-audit cost-budget-record \
 	graph-seed-worktree worktree-reap workspace-hygiene branch-policy \
 	branch-policy-audit checkout-sync crg-probe crg-sync crg-check \
 	dead-tests test-graph codex-journal notebooklm-bundle notebooklm-research-bundle \
@@ -236,6 +237,23 @@ mutation-patch-audit-record:  ## Re-record the reproducibility baseline after re
 	$(PYTHON) -m conductor.mutation_patch_audit \
 		--registry "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_MUTATION_REGISTRY)" \
 		--summary --write-baseline
+
+# ── Cost ledger budget ratchet (docs/design/cost_ledger.md section 4) ───
+# Shells to `forge ledger audit` (native/forge/src/ledger/audit.rs); the Python
+# side only resolves the binary and maps its verdict to a gate phase / exit
+# code -- see src/conductor/cost_budget_audit.py.
+
+COST_BUDGET_ARGS ?=
+
+cost-budget-audit:  ## Check hook latency, resend bytes and tokens/landed-PR against the recorded baseline
+	$(PYTHON) -m conductor.cost_budget_audit --repo-root "$(CONDUCTOR_HOST_ROOT)" $(COST_BUDGET_ARGS)
+
+# Records this window's metrics as the new baseline. Run only after a deliberate
+# improvement or an accepted regression -- recording a grown baseline is how the
+# ratchet is defeated.
+cost-budget-record:  ## Re-record the cost-ledger budget baseline for the current window
+	$(PYTHON) -m conductor.cost_budget_audit --repo-root "$(CONDUCTOR_HOST_ROOT)" \
+		--record $(COST_BUDGET_ARGS)
 
 # ── Worktree and graph maintenance ───────────────────────────────────────
 # graph-seed-worktree and worktree-reap manage OTHER worktrees a host project

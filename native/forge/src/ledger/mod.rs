@@ -4,6 +4,7 @@
 //! retaining block text past this boundary.
 
 pub mod agent;
+pub mod audit;
 pub mod landed;
 pub mod reader;
 pub mod rollup;
