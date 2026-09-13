@@ -12,6 +12,10 @@ from conductor.check_json_in_notes import is_forbidden, main
 
 
 def _run(argv, monkeypatch):
+    # main() resolves the notes root of the workspace it runs in; pin it so the
+    # test answers for a monorepo-shaped host regardless of this repo's own
+    # `notes_root` configuration.
+    monkeypatch.setenv("CONDUCTOR_NOTES_ROOT", "research/notes")
     monkeypatch.setattr("sys.argv", ["guard", *argv])
     return main()
 

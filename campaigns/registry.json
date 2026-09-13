@@ -131,6 +131,24 @@
     },
     {
       "manifest": "campaigns/forge-tool-output-quiet_bash_quiet_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-notes-root_check_json_in_notes_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-notes-root_dead_tests_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-notes-root_kb_retrieve_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-notes-root_memory_index_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-notes-root_project_paths_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-notes-root_snapshot_worktree_fest_20260913.json"
     }
   ],
   "enforcement": "changed_tests",

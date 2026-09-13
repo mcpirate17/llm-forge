@@ -37,17 +37,23 @@ DEFAULT_RETIRED_INTEGRATION_BRANCHES: tuple[str, ...] = ()
 # the monorepo treats it as auto-pruned staging under `research/reports/`, which a
 # host with no `research/` tree at all must be able to repoint via `[tool.conductor]`.
 DEFAULT_MUTATION_RECEIPT_ROOT = PurePosixPath("research/reports/mutation_testing")
+# The knowledge tree: KB cards and durable findings. Every module that reads it
+# (kb_retrieve, memory_index's catalog, the notes guards) resolves through
+# `notes_root` so a host with another layout names its own tree once.
+DEFAULT_NOTES_ROOT = PurePosixPath("research/notes")
 
 CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"
 MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
 PACKAGE_ROOT_ENV = "CONDUCTOR_PACKAGE_ROOT"
 MUTATION_RECEIPT_ROOT_ENV = "CONDUCTOR_MUTATION_RECEIPT_ROOT"
+NOTES_ROOT_ENV = "CONDUCTOR_NOTES_ROOT"
 INTEGRATION_BRANCH_ENV = "CONDUCTOR_INTEGRATION_BRANCH"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
 MUTATION_REGISTRY_KEY = "mutation_registry"
 PACKAGE_ROOT_KEY = "package_root"
 MUTATION_RECEIPT_ROOT_KEY = "mutation_receipt_root"
+NOTES_ROOT_KEY = "notes_root"
 INTEGRATION_BRANCH_KEY = "integration_branch"
 RETIRED_INTEGRATION_BRANCHES_KEY = "retired_integration_branches"
 DEFAULTS = {
@@ -55,6 +61,7 @@ DEFAULTS = {
     MUTATION_REGISTRY_KEY: DEFAULT_MUTATION_REGISTRY,
     PACKAGE_ROOT_KEY: DEFAULT_PACKAGE_ROOT,
     MUTATION_RECEIPT_ROOT_KEY: DEFAULT_MUTATION_RECEIPT_ROOT,
+    NOTES_ROOT_KEY: DEFAULT_NOTES_ROOT,
 }
 
 
@@ -168,10 +175,12 @@ class ProjectPaths:
     registry_relative: PurePosixPath
     package_relative: PurePosixPath
     receipt_root_relative: PurePosixPath
+    notes_relative: PurePosixPath
     policy_configured: bool
     registry_configured: bool
     package_configured: bool
     receipt_root_configured: bool
+    notes_configured: bool
 
     @property
     def policy_path(self) -> Path:
@@ -200,6 +209,11 @@ class ProjectPaths:
         """Where a freshly-run receipt lands absent an explicit output path."""
         return self.root / self.receipt_root_relative.as_posix()
 
+    @property
+    def notes_path(self) -> Path:
+        """The knowledge tree: KB cards and durable findings."""
+        return self.root / self.notes_relative.as_posix()
+
 
 def project_paths(root: Path | str) -> ProjectPaths:
     """Resolve every host path against ``root``. Not cached: hosts differ per call."""
@@ -212,16 +226,19 @@ def project_paths(root: Path | str) -> ProjectPaths:
     receipt_root, named_receipt_root = _configured(
         base, MUTATION_RECEIPT_ROOT_KEY, MUTATION_RECEIPT_ROOT_ENV
     )
+    notes, named_notes = _configured(base, NOTES_ROOT_KEY, NOTES_ROOT_ENV)
     return ProjectPaths(
         base,
         policy,
         registry,
         package,
         receipt_root,
+        notes,
         named_policy,
         named_reg,
         named_pkg,
         named_receipt_root,
+        named_notes,
     )
 
 
@@ -266,6 +283,22 @@ def mutation_receipt_root_relative(root: Path | str) -> PurePosixPath:
 
 def mutation_receipt_root(root: Path | str) -> Path:
     return project_paths(root).receipt_root_path
+
+
+def notes_relative(root: Path | str) -> PurePosixPath:
+    """Where the knowledge tree sits inside ``root`` (``research/notes``, ...)."""
+    return project_paths(root).notes_relative
+
+
+def notes_root(root: Path | str) -> Path:
+    """The knowledge tree, joined onto the root the caller already holds.
+
+    Modules that read notes (kb_retrieve, memory_index's catalog, the notes
+    guards) resolve through this at call time, never from a module constant: a
+    host repoints its notes tree once in ``[tool.conductor]`` and every reader
+    follows. Note the argument is the tree root, not the package directory.
+    """
+    return project_paths(root).notes_path
 
 
 def package_relative(root: Path | str) -> PurePosixPath:

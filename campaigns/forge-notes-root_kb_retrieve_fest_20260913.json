@@ -1,0 +1,63 @@
+{
+  "campaign_id": "forge-notes-root_kb_retrieve_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/kb_retrieve.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/kb_retrieve.py": "a445db65220f6095e40d5d28a0c135a39ada90679bc36a38f98b6bb4311ee747"
+  },
+  "survivor_baseline": [
+    "boolean_op-a83f414c2b2c-1",
+    "boolean_op-a83f414c2b2c-5",
+    "boolean_op-a83f414c2b2c-6",
+    "boolean_op-a83f414c2b2c-7",
+    "boolean_op-a83f414c2b2c-8",
+    "boolean_op-a83f414c2b2c-9",
+    "constant_replace-081695e5ff2b-0",
+    "constant_replace-081695e5ff2b-1",
+    "constant_replace-10d23e3c78e1-1",
+    "constant_replace-140020522e7e-0",
+    "constant_replace-214c0d458170-4",
+    "constant_replace-248824fb2c92-0",
+    "constant_replace-2ed329ad6f0a-0",
+    "constant_replace-67f83d7b17a9-1",
+    "constant_replace-9da0fc380c48-0",
+    "constant_replace-9deb413131a6-1",
+    "constant_replace-a6a1bbe20716-1",
+    "constant_replace-bf5192faf448-2",
+    "constant_replace-bf5192faf448-3",
+    "constant_replace-bf5192faf448-4",
+    "constant_replace-fc0325ea3598-1",
+    "constant_replace-fd5fddbec3ae-1",
+    "negate_condition-e0bffae8d649-0"
+  ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T01:46:45.832646+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_kb_retrieve.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_kb_retrieve.py": "a09ae810423ff665916d11ba1525bf6706224d43aefa1ca1830a7113c2d3af49"
+  },
+  "title": "Generated mutants for src/conductor/kb_retrieve.py, scored on the survivor set"
+}

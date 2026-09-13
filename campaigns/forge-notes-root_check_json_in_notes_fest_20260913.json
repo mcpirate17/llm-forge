@@ -1,0 +1,38 @@
+{
+  "campaign_id": "forge-notes-root_check_json_in_notes_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/check_json_in_notes.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/check_json_in_notes.py": "e9a81048304facb944a78be651ce8b0a6c074175a5c936c73c0309a13cf5eb06"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T01:44:38.788199+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_check_json_in_notes.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_check_json_in_notes.py": "fab334f9e46c81166b651e1c4fbe5e534f5a0593ee6c6f9c9c0a2b7f55b8e769"
+  },
+  "title": "Generated mutants for src/conductor/check_json_in_notes.py, scored on the survivor set"
+}

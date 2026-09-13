@@ -405,3 +405,47 @@ def test_mutation_receipt_root_is_distinct_from_receipts_relative(tmp_path):
     assert pp.mutation_receipt_root_relative(tmp_path) == PurePosixPath(
         "scratch/staging"
     )
+
+
+def test_notes_root_defaults_to_the_monorepo_literal():
+    assert pp.DEFAULT_NOTES_ROOT == PurePosixPath("research/notes")
+    assert pp.DEFAULTS[pp.NOTES_ROOT_KEY] == pp.DEFAULT_NOTES_ROOT
+
+
+def test_notes_root_is_the_default_without_configuration(tmp_path):
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.notes_relative == PurePosixPath("research/notes")
+    assert resolved.notes_configured is False
+    assert resolved.notes_path == tmp_path / "research/notes"
+    assert pp.notes_relative(tmp_path) == PurePosixPath("research/notes")
+    assert pp.notes_root(tmp_path) == tmp_path / "research/notes"
+
+
+def test_notes_root_comes_from_the_conductor_table(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nnotes_root = "docs"\n')
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.notes_relative == PurePosixPath("docs")
+    assert resolved.notes_configured is True
+    assert pp.notes_relative(tmp_path) == PurePosixPath("docs")
+    assert pp.notes_root(tmp_path) == tmp_path / "docs"
+
+
+def test_notes_root_environment_overrides_the_table(tmp_path, monkeypatch):
+    _write(tmp_path, '[tool.conductor]\nnotes_root = "docs"\n')
+    monkeypatch.setenv(pp.NOTES_ROOT_ENV, "knowledge/cards")
+    assert pp.notes_relative(tmp_path) == PurePosixPath("knowledge/cards")
+
+
+def test_notes_root_refuses_an_unusable_value(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nnotes_root = "../elsewhere"\n')
+    with pytest.raises(pp.ProjectPathError):
+        pp.notes_relative(tmp_path)
+
+
+def test_a_host_configured_with_the_monorepo_default_still_resolves_there(tmp_path):
+    """A host that spells out `research/notes` gets it, not the package default's
+    refusal to special-case itself: configured-literal and default agree."""
+    _write(tmp_path, '[tool.conductor]\nnotes_root = "research/notes"\n')
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.notes_configured is True
+    assert pp.notes_root(tmp_path) == tmp_path / "research/notes"

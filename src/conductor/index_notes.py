@@ -31,17 +31,23 @@ import sqlite3
 import sys
 import time
 
+from conductor.project_paths import host_root, notes_root
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(REPO, "research", "runs.db")
 VAULT_ROOT = os.path.expanduser("~/Documents/CodexVault")
 
-FALLBACK_NOTES_SOURCE = ("notes", os.path.join(REPO, "research", "notes"))
 VAULT_SOURCES = (
     ("vault_research", os.path.join(VAULT_ROOT, "research")),
     ("vault_dashboards", os.path.join(VAULT_ROOT, "dashboards")),
     ("vault_runbooks", os.path.join(VAULT_ROOT, "runbooks")),
 )
 TASKS_SOURCE = ("tasks", os.path.join(REPO, "tasks"))
+
+
+def _fallback_notes_source() -> tuple[str, str]:
+    """('notes', the configured notes tree of the workspace this runs in)."""
+    return ("notes", str(notes_root(host_root())))
 
 EXCLUDED_REL_PREFIXES = ("tasks/audit/",)
 
@@ -125,7 +131,7 @@ def _source_roots() -> tuple[tuple[str, str], ...]:
     vault_research = os.path.join(VAULT_ROOT, "research")
     if os.path.isdir(vault_research):
         return (*VAULT_SOURCES, TASKS_SOURCE)
-    return (FALLBACK_NOTES_SOURCE, TASKS_SOURCE)
+    return (_fallback_notes_source(), TASKS_SOURCE)
 
 
 def _fts_match_query(query: str) -> str:

@@ -15,16 +15,16 @@ import hashlib
 import json
 import os
 import sys
-import tempfile
 import time
 import tomllib
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import chain
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
+from conductor.atomic_json import write_lines_atomic
 from conductor._native import (
     memory_index_chunk_text_native,
     memory_index_metadata_native,
@@ -38,6 +38,7 @@ from conductor.kb_retrieve import (
     embed_batch,
     embed_text,
 )
+from conductor.project_paths import DEFAULT_NOTES_ROOT, host_root, notes_root
 
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 SOURCES_PATH: Final[Path] = ROOT / "conductor" / "memory_sources.toml"
@@ -89,11 +90,26 @@ def load_catalog(path: Path = SOURCES_PATH) -> dict[str, Any]:
     return payload
 
 
+def _expand_relative(text: str) -> Path:
+    """Resolve a catalog's repo-relative root against the workspace, not the package.
+
+    ``ROOT`` is the package's ``src/`` here, which never held the workspace's
+    ``research/`` tree; the monorepo only worked because its package sat at the
+    root. The notes spelling is the DEFAULT_NOTES_ROOT literal: a host that
+    repointed ``notes_root`` means that tree, so it resolves through the
+    configured path instead of the default location.
+    """
+    workspace = host_root()
+    if PurePosixPath(text) == DEFAULT_NOTES_ROOT:
+        return notes_root(workspace)
+    return (workspace / text).resolve()
+
+
 def _expand_root(entry: dict[str, Any]) -> Path:
     if "absolute_root" in entry:
         return Path(entry["absolute_root"]).expanduser()
     if "root" in entry:
-        return (ROOT / str(entry["root"])).resolve()
+        return _expand_relative(str(entry["root"]))
     raise RetrieveError(f"source {entry.get('id')!r} missing root")
 
 
@@ -101,12 +117,12 @@ def _iter_roots(entry: dict[str, Any]) -> list[Path]:
     if "absolute_root" in entry or "root" in entry:
         roots = [_expand_root(entry)]
     else:
-        roots = [(ROOT / str(r)).resolve() for r in entry.get("roots", [])]
+        roots = [_expand_relative(str(r)) for r in entry.get("roots", [])]
         if "include_dirs" in entry:
             base = (
                 Path(entry["absolute_root"]).expanduser()
                 if "absolute_root" in entry
-                else ROOT
+                else host_root()
             )
             roots = [base / d for d in entry["include_dirs"]]
     return [p for p in roots if p.exists()]
@@ -421,47 +437,20 @@ def build_index_result(
     )
 
 
-def build_index(
-    *,
-    source_ids: set[str] | None = None,
-    catalog_path: Path = SOURCES_PATH,
-    embedder: Callable[[str], list[float]] = embed_text,
-    incremental: bool = True,
-    index_path: Path = INDEX_PATH,
-) -> list[dict[str, Any]]:
-    """Compatibility wrapper returning only the built rows."""
+def build_index(**kwargs: Any) -> list[dict[str, Any]]:
+    """Compatibility wrapper returning only the built rows.
 
-    return build_index_result(
-        source_ids=source_ids,
-        catalog_path=catalog_path,
-        embedder=embedder,
-        incremental=incremental,
-        index_path=index_path,
-    ).materialize_rows()
+    Takes the same keyword arguments as :func:`build_index_result`, spelled
+    out there once.
+    """
+
+    return build_index_result(**kwargs).materialize_rows()
 
 
 def _save_index_lines(lines: Iterator[str], path: Path) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as handle:
-            temporary = Path(handle.name)
-            for line in lines:
-                handle.write(line.rstrip("\n") + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        temporary.replace(path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-    return path
+    # The atomic-write scaffold is atomic_json's, not a local copy: one
+    # implementation of "no partial file behind", every writer sharing it.
+    return write_lines_atomic(path, lines)
 
 
 def save_index(rows: list[dict[str, Any]], path: Path = INDEX_PATH) -> Path:
