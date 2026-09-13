@@ -16,7 +16,10 @@
 //! Resolution of the integration line is shared semantics with
 //! `worktree_reap.default_integration_ref` (fixed in the same PR):
 //! `[tool.conductor].integration_branch` (env override included), else the
-//! remote's own HEAD symref -- never an `origin/master` literal.
+//! remote's own HEAD symref, else exactly one of the conventional
+//! `origin/{master,main}` refs -- offline. The remote advertisement
+//! (`ls-remote`) runs only where the caller allows the network: the reaper
+//! does, the SessionStart path never does.
 
 use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
@@ -137,9 +140,13 @@ fn configured_integration_branch(root: &Path) -> Result<String> {
 /// The line containment is judged against, resolved exactly as
 /// `worktree_reap.default_integration_ref`: configured candidates first
 /// (`origin/<branch>` preferred over the local branch), else the remote HEAD
-/// symref -- bound locally, else advertised by the remote itself. Never a
-/// literal.
-pub fn default_integration_ref(repo: &Path) -> Result<String> {
+/// symref, else -- offline -- the one conventional remote-tracking ref when
+/// exactly one of `refs/remotes/origin/{master,main}` exists (both is
+/// ambiguous and falls through). Never a literal. `ls-remote --symref`, the
+/// last resort, runs only when `allow_network` is true: the reaper (an
+/// explicit command) allows it; `cheap_exposure_counts` and the SessionStart
+/// path pass false so session start never opens a connection.
+pub fn default_integration_ref(repo: &Path, allow_network: bool) -> Result<String> {
     let branch = configured_integration_branch(&host_root(repo))?;
     let candidates = [format!("origin/{branch}"), branch];
     for refname in &candidates {
@@ -165,6 +172,24 @@ pub fn default_integration_ref(repo: &Path) -> Result<String> {
             return Ok(line.to_string());
         }
     }
+    // Offline: a repo whose line is conventional (master or main) and whose
+    // fetch already created the remote-tracking ref needs no network to name
+    // it. Exactly one answers; both present is ambiguous and falls through --
+    // guessing between them could judge containment against the wrong line.
+    let conventional = conventional_remote_refs(repo);
+    if conventional.len() == 1 {
+        return Ok(conventional[0].clone());
+    }
+    if !allow_network {
+        return Err(anyhow!(
+            "{}: no integration line to judge containment against \
+             (tried {}, {}; origin HEAD symref unavailable; \
+             network advertisement skipped)",
+            repo.display(),
+            candidates[0],
+            candidates[1]
+        ));
+    }
     if let Some(advertised) = git_quiet(repo, &["ls-remote", "--symref", "origin", "HEAD"]) {
         for line in advertised.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
@@ -185,6 +210,27 @@ pub fn default_integration_ref(repo: &Path) -> Result<String> {
         candidates[0],
         candidates[1]
     ))
+}
+
+/// The conventional `origin/{master,main}` remote-tracking refs that exist,
+/// short-named -- the offline leg of `default_integration_ref`.
+fn conventional_remote_refs(repo: &Path) -> Vec<String> {
+    git_quiet(
+        repo,
+        &[
+            "for-each-ref",
+            "--format=%(refname:short)",
+            "refs/remotes/origin/master",
+            "refs/remotes/origin/main",
+        ],
+    )
+    .map(|listed| {
+        listed
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect::<Vec<String>>()
+    })
+    .unwrap_or_default()
 }
 
 /// Commits on HEAD reachable from no `refs/remotes/*` or `refs/snapshots/**`
@@ -420,7 +466,9 @@ pub fn landed_worktrees(live_ref: &str, repo: &Path) -> Result<usize> {
 /// The four SessionStart-safe counts -- `cheap_exposure_counts`. A repo with
 /// no integration line reports `landed_worktrees: None` plus the reason in
 /// `worktrees_skipped` (rendered as "unknown") rather than zero, which would
-/// read as "nothing to clean up"; the other two counts still answer.
+/// read as "nothing to clean up"; the other two counts still answer. The
+/// line resolves offline (`allow_network=false`): a session start must never
+/// open a network connection.
 ///
 /// The three facts are independent, so they compute concurrently -- the git
 /// discipline is unchanged (one invocation per fact) but the wall time is the
@@ -431,7 +479,9 @@ pub fn cheap_exposure_counts(repo: &Path) -> Result<(usize, usize, Option<usize>
         let local = scope.spawn(|| local_only_commit_count(repo));
         let stale = scope.spawn(|| stale_dirty_file_count(repo, DEFAULT_STALE_HOURS));
         let landed = scope
-            .spawn(|| default_integration_ref(repo).and_then(|live| landed_worktrees(&live, repo)));
+            .spawn(|| {
+                default_integration_ref(repo, false).and_then(|live| landed_worktrees(&live, repo))
+            });
 
         // Error precedence matches Python's sequential order: a local-only
         // failure surfaces before a stale-files failure, and a landed failure
@@ -572,7 +622,7 @@ mod tests {
         .unwrap();
         bare_origin(&repo, "configured-origin", "main");
         git(&repo, &["push", "--quiet", "origin", "main"]);
-        assert_eq!(default_integration_ref(&repo).unwrap(), "origin/main");
+        assert_eq!(default_integration_ref(&repo, true).unwrap(), "origin/main");
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
 
@@ -594,7 +644,7 @@ mod tests {
         git(&repo, &["push", "--quiet", "origin", "wip"]);
         let sub = repo.join("sub");
         std::fs::create_dir_all(&sub).unwrap();
-        assert_eq!(default_integration_ref(&sub).unwrap(), "origin/wip");
+        assert_eq!(default_integration_ref(&sub, true).unwrap(), "origin/wip");
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
 
@@ -612,7 +662,7 @@ mod tests {
         .unwrap();
         git(&repo, &["branch", "main"]); // local-only: verifies, never pushed
         std::env::set_var("CONDUCTOR_INTEGRATION_BRANCH", "main");
-        let resolved = default_integration_ref(&repo);
+        let resolved = default_integration_ref(&repo, true);
         std::env::remove_var("CONDUCTOR_INTEGRATION_BRANCH");
         assert_eq!(resolved.unwrap(), "main");
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
@@ -634,19 +684,99 @@ mod tests {
         );
         // No manifest (default "main") and no local/pushed "main": only the
         // bound symref can answer, and it must arrive as the short form.
-        assert_eq!(default_integration_ref(&repo).unwrap(), "origin/master");
+        assert_eq!(default_integration_ref(&repo, true).unwrap(), "origin/master");
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
 
     #[test]
     fn the_remote_advertised_head_answers_when_nothing_local_does() {
         let _guard = lock_env();
+        // The remote's line is `trunk` -- unconventional on purpose, so the
+        // offline leg (exactly one of origin/{master,main}) cannot answer and
+        // the advertisement arm is what resolves.
         let repo = seeded("ls-remote", "work");
-        bare_origin(&repo, "ls-remote-origin", "master");
-        git(&repo, &["push", "--quiet", "origin", "work:master"]);
+        bare_origin(&repo, "ls-remote-origin", "trunk");
+        git(&repo, &["push", "--quiet", "origin", "work:trunk"]);
         // No bound refs/remotes/origin/HEAD (a plain push never creates one),
         // so only `ls-remote --symref` can name the line.
-        assert_eq!(default_integration_ref(&repo).unwrap(), "origin/master");
+        assert_eq!(
+            default_integration_ref(&repo, true).unwrap(),
+            "origin/trunk"
+        );
+        std::fs::remove_dir_all(repo.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn a_lone_conventional_remote_ref_resolves_without_the_network() {
+        let _guard = lock_env();
+        let repo = seeded("offline-master", "work");
+        // `origin` points where nothing exists, so any `ls-remote origin`
+        // fails loudly: success proves the network was never touched. The
+        // shape is the LLM host's -- master-line, no symref, no config, the
+        // remote-tracking ref itself already fetched.
+        git(
+            &repo,
+            &["remote", "add", "origin", "/nonexistent/offline-origin.git"],
+        );
+        let head = git_out(&repo, &["rev-parse", "HEAD"]).unwrap();
+        git(
+            &repo,
+            &["update-ref", "refs/remotes/origin/master", head.trim()],
+        );
+        assert_eq!(
+            default_integration_ref(&repo, false).unwrap(),
+            "origin/master"
+        );
+        assert_eq!(
+            default_integration_ref(&repo, true).unwrap(),
+            "origin/master",
+            "the offline leg answers before the advertisement either way"
+        );
+        std::fs::remove_dir_all(repo.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn both_conventional_refs_are_ambiguous_offline() {
+        let _guard = lock_env();
+        let repo = seeded("offline-ambiguous", "work");
+        // The configured line is unconventional ("wip", which verifies
+        // nowhere): with the default "main" the first candidate would answer
+        // before the offline leg ever runs, so ambiguity needs this setup.
+        std::fs::write(
+            repo.join("pyproject.toml"),
+            b"[tool.conductor]\nintegration_branch = \"wip\"\n",
+        )
+        .unwrap();
+        git(
+            &repo,
+            &["remote", "add", "origin", "/nonexistent/ambiguous-origin.git"],
+        );
+        let head = git_out(&repo, &["rev-parse", "HEAD"]).unwrap();
+        for branch in ["master", "main"] {
+            git(
+                &repo,
+                &[
+                    "update-ref",
+                    &format!("refs/remotes/origin/{branch}"),
+                    head.trim(),
+                ],
+            );
+        }
+        // Offline the pair is ambiguous: guessing between master and main
+        // could judge containment against the wrong line, so the session
+        // path declines instead.
+        let err = default_integration_ref(&repo, false).unwrap_err();
+        assert!(
+            err.to_string().contains("network advertisement skipped"),
+            "{err}"
+        );
+        // And the SessionStart counts degrade to landed=unknown, not zero.
+        let (_, _, landed, skipped) = cheap_exposure_counts(&repo).unwrap();
+        assert_eq!(landed, None);
+        assert!(
+            skipped.unwrap().contains("network advertisement skipped"),
+            "the skip reason names the offline refusal"
+        );
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
 
@@ -654,7 +784,7 @@ mod tests {
     fn integration_ref_refuses_a_repo_with_no_line() {
         let _guard = lock_env();
         let repo = seeded("lineless", "trunk");
-        assert!(default_integration_ref(&repo)
+        assert!(default_integration_ref(&repo, true)
             .unwrap_err()
             .to_string()
             .contains("no integration line"));
