@@ -495,3 +495,80 @@ mod tests {
         assert_eq!(state_after_2.billed_total, 150);
     }
 }
+
+#[cfg(test)]
+mod timing_probe {
+    use super::*;
+    use std::time::Instant as StdInstant;
+
+    fn median_ms(mut samples: Vec<f64>) -> f64 {
+        samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mid = samples.len() / 2;
+        if samples.len() % 2 == 1 {
+            samples[mid]
+        } else {
+            (samples[mid - 1] + samples[mid]) / 2.0
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn median_hook_ms_fast_path_vs_derived_path() {
+        let scratch_fast = std::env::temp_dir().join("forge-timing-probe-fast");
+        let _ = std::fs::create_dir_all(&scratch_fast);
+        let fast_payload = serde_json::json!({"tool_name": "Bash"});
+        let mut fast_samples = Vec::new();
+        for _ in 0..10 {
+            let start = StdInstant::now();
+            let _ = check_with_deadline(
+                &fast_payload,
+                StdInstant::now() + Duration::from_millis(200),
+                &scratch_fast,
+            );
+            fast_samples.push(start.elapsed().as_secs_f64() * 1_000_000.0);
+        }
+
+        let scratch_derived = std::env::temp_dir().join("forge-timing-probe-derived");
+        let _ = std::fs::remove_dir_all(&scratch_derived);
+        std::fs::create_dir_all(&scratch_derived).unwrap();
+        let agent_id = "timingprobe";
+        let dir = scratch_derived.join("sess-1").join("subagents");
+        std::fs::create_dir_all(&dir).unwrap();
+        let transcript_path = dir.join(format!("agent-{agent_id}.jsonl"));
+        let mut lines = String::new();
+        for _ in 0..50 {
+            lines.push_str(
+                r#"{"type":"assistant","message":{"model":"claude-sonnet-4","usage":{"input_tokens":100,"output_tokens":50,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}"#,
+            );
+            lines.push('\n');
+        }
+        std::fs::write(&transcript_path, lines).unwrap();
+        let derived_payload = serde_json::json!({
+            "session_id": "sess-1",
+            "transcript_path": scratch_derived.join("sess-1.jsonl").to_string_lossy(),
+            "agent_id": agent_id,
+            "agent_type": "general-purpose",
+            "tool_name": "Bash",
+        });
+        let ledger_root = scratch_derived.join("ledger");
+        let mut derived_samples = Vec::new();
+        for _ in 0..10 {
+            let start = StdInstant::now();
+            let _ = check_with_deadline(
+                &derived_payload,
+                StdInstant::now() + Duration::from_millis(200),
+                &ledger_root,
+            );
+            derived_samples.push(start.elapsed().as_secs_f64() * 1_000_000.0);
+        }
+
+        eprintln!(
+            "TIMING_PROBE fast_path_median_us={:.2} derived_path_median_us={:.2}",
+            median_ms(fast_samples),
+            median_ms(derived_samples)
+        );
+
+        let _ = std::fs::remove_dir_all(&scratch_fast);
+        let _ = std::fs::remove_dir_all(&scratch_derived);
+    }
+}
