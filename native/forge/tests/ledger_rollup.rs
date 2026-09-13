@@ -203,11 +203,11 @@ fn subagent_walk_keys_rows_by_agent_id_and_joins_dispatches() {
     );
     assert_eq!(
         dispatch_lines[0],
-        "{\"agent_id\":\"7fa9c1b0123456789\",\"billed_tokens\":350,\"description\":\"search the repo\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":\"2026-04-01T00:03:00Z\",\"last_ts\":\"2026-04-01T00:03:00Z\",\"model_requested\":\"sonnet\",\"model_used\":[\"claude-sonnet-5\"],\"n_turns\":1,\"over_cap\":false,\"parent_session_id\":\"parent-1\",\"subagent_type\":\"general-purpose\",\"tier\":\"sonnet\",\"tool_use_id\":\"toolu_dispatch1\",\"total_cache_read\":5000}"
+        "{\"agent_id\":\"7fa9c1b0123456789\",\"billed_tokens\":350,\"ci_red_on_first_push\":null,\"description\":\"search the repo\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":\"2026-04-01T00:03:00Z\",\"landed\":null,\"last_ts\":\"2026-04-01T00:03:00Z\",\"model_requested\":\"sonnet\",\"model_used\":[\"claude-sonnet-5\"],\"n_turns\":1,\"over_cap\":false,\"parent_session_id\":\"parent-1\",\"required_rework\":null,\"subagent_type\":\"general-purpose\",\"tier\":\"sonnet\",\"tool_use_id\":\"toolu_dispatch1\",\"total_cache_read\":5000}"
     );
     assert_eq!(
         dispatch_lines[1],
-        "{\"agent_id\":null,\"billed_tokens\":null,\"description\":\"never answered\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":null,\"last_ts\":null,\"model_requested\":null,\"model_used\":null,\"n_turns\":null,\"over_cap\":null,\"parent_session_id\":\"parent-1\",\"subagent_type\":\"general-purpose\",\"tier\":null,\"tool_use_id\":\"toolu_dispatch2\",\"total_cache_read\":null}"
+        "{\"agent_id\":null,\"billed_tokens\":null,\"ci_red_on_first_push\":null,\"description\":\"never answered\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":null,\"landed\":null,\"last_ts\":null,\"model_requested\":null,\"model_used\":null,\"n_turns\":null,\"over_cap\":null,\"parent_session_id\":\"parent-1\",\"required_rework\":null,\"subagent_type\":\"general-purpose\",\"tier\":null,\"tool_use_id\":\"toolu_dispatch2\",\"total_cache_read\":null}"
     );
 
     // The one sanctioned piece of dispatch text is `description`; the

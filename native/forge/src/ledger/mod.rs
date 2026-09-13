@@ -4,11 +4,14 @@
 //! retaining block text past this boundary.
 
 pub mod agent;
+pub mod agent_upsert;
 pub mod audit;
 pub mod calibrate;
 pub mod landed;
+pub mod outcome;
 pub mod prune;
 pub mod reader;
+pub mod report;
 pub mod rollup;
 pub mod schema;
 pub mod session_ids;
@@ -18,6 +21,17 @@ pub mod writer;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+
+/// Ledger root directory, shared by every subcommand that reads or writes
+/// the ledger tables: `--out`/`--ledger-root` when given, else `LEDGER_ROOT`,
+/// else the default. One function so `rollup.rs`, `subagent_stop.rs` and
+/// `cap_enforce.rs` can never disagree about where "the ledger" lives.
+pub const DEFAULT_LEDGER_ROOT: &str = "/mnt/data/llm/ledger/";
+
+pub fn resolve_ledger_root(out: Option<PathBuf>) -> PathBuf {
+    out.or_else(|| std::env::var("LEDGER_ROOT").ok().map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_LEDGER_ROOT))
+}
 use clap::{Args, ValueEnum};
 
 use schema::InputKind;

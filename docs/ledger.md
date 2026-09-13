@@ -450,3 +450,118 @@ verdict as one line per metric with its status, exiting by the same
   under a `-llm-forge` project dir -- `~/.claude/projects/-home-tim-Projects-llm-forge/`
   holds only memory files. Nothing to fix; it just means a rollup of this
   repo's "own" transcript directory finds nothing, by construction.
+
+## The outcome join (Phase 3 step 3, item 3)
+
+`native/forge/src/ledger/outcome.rs::apply()` runs inside `forge ledger
+rollup --repo <repo> --project <name>`, right after the `agent_rollup`
+commit-join, and fills three fields on every `task_dispatch` row whose
+`parent_session_id` is set: `landed: Option<bool>`, `required_rework:
+Option<bool>`, `ci_red_on_first_push: Option<bool>`. **Absent the cache
+file below, all three stay `null` -- never `false`.** `gh` is not available
+to Rust code in this repo, so the join reads a cache file instead of
+shelling out live.
+
+### `ci_history` cache schema
+
+One file per repo, `<repo>/ledger/ci_history/<owner>_<name>.json` (the
+`owner_name` slug parsed from `origin`'s remote URL, lower-cased,
+`.git`-stripped -- `native/forge/src/ledger/outcome.rs::owner_repo_slug`).
+When `repo` has no git metadata or no `origin` remote at all (a scratch
+checkout mid-setup), that is the same "no data yet" case as the file being
+absent, not a hard error.
+
+```json
+{
+  "fetched_utc": "2026-09-13T00:00:00Z",
+  "prs": {
+    "50": {
+      "branch": "forge/routing-policy",
+      "first_push_sha": "aaa111",
+      "first_push_ci": "red",
+      "commits": [
+        {"sha": "aaa111", "subject": "feat: first cut",
+         "trailers": {"Agent": "glm"}},
+        {"sha": "bbb222", "subject": "fix: CI",
+         "trailers": {"Agent": "llm-b0",
+                       "Claude-Session": "https://claude.ai/code/session_01X"}}
+      ]
+    }
+  }
+}
+```
+
+- `prs`: keyed by PR number as a string (matches `gh pr view --json number`
+  and this repo's own PR references in commit subjects).
+- `commits`: the **pre-squash** commit list on the PR branch, in the order
+  `gh api repos/{owner}/{repo}/pulls/{n}/commits` returns them -- `git log
+  --first-parent main` only ever sees the single post-squash commit on
+  `main`, which is why this join needs its own cache at all rather than
+  reading local git history.
+- `first_push_ci`: `"green"` / `"red"` / `"unknown"` -- the check-run
+  conclusion for the PR's first pushed commit, before any fix-up commits.
+- `trailers.Agent` / `trailers.Claude-Session`: parsed the same way the
+  gate already parses trailers on a landed commit (`AGENTS.md`'s
+  `Agent:`/`Claude-Session:` convention); both optional per commit.
+
+Field derivation in `apply()`:
+- `landed`: `true` iff the row's `parent_session_id` matches a
+  `CommitJoin` `agent_rollup` already computed for this rollup (i.e. the
+  session's work is credited to a landed commit); `false` when the cache
+  exists but no join was found (an honest negative, not a gap); never set
+  at all when the cache file itself is missing.
+- `ci_red_on_first_push`: the landed PR's `first_push_ci`, mapped
+  `green -> false`, `red -> true`, `unknown -> null`. `null` when the PR
+  landed but is not yet in the cache (fetcher lag).
+- `required_rework`: `false` when the PR is a single commit; otherwise
+  `true` iff any commit after the first carries an `Agent:` trailer whose
+  presumed tier (`docs/roadmap.md`'s Ownership rule: any `glm`-named agent
+  is the cheap tier, everything else is not -- a documented approximation,
+  not a per-commit measurement) ranks strictly above the row's own `tier`.
+  The first commit is treated as the dispatch's own work; the cache has no
+  other way to say which commit was whose.
+
+### `ci_history` fetcher, not yet built (GLM slice)
+
+This file is never written by `native/forge` -- a separate GLM-owned CLI
+slice fetches it. Requirements for that fetcher:
+
+1. Python CLI/glue only (per `CLAUDE.md`'s language hierarchy); no Rust,
+   no compute-heavy logic here.
+2. One invocation per repo: `python -m conductor.ci_history_fetch --repo
+   <path> --out ledger/ci_history/<owner>_<name>.json`.
+3. Uses `gh pr list --state merged --json number,headRefName` then, per
+   PR, `gh api repos/{o}/{r}/pulls/{n}/commits` for the commit list and
+   `gh api repos/{o}/{r}/commits/{sha}/check-runs` (first commit only) for
+   `first_push_ci`.
+4. Parses `Agent:`/`Claude-Session:` trailers out of each commit's message
+   into `trailers` exactly as shown above; missing trailers serialize as
+   absent keys, never empty strings.
+5. Merges into the existing file rather than overwriting it wholesale --
+   PRs already cached and unchanged (same `first_push_sha`) are left alone,
+   so re-runs are cheap and idempotent.
+6. Writes `fetched_utc` as the run's own UTC timestamp (RFC 3339).
+7. Rate-limit aware: backs off on `gh`'s own 403/secondary-rate-limit exit
+   codes rather than treating them as a real per-PR failure.
+8. Exits non-zero (loud) on any PR it could not resolve, but keeps every
+   already-written PR in the output file -- a partial fetch must still be
+   the best data available, not thrown away.
+9. Scheduled periodically (a cron/CI job), not run inline by `forge ledger
+   rollup` -- the join always reads whatever is on disk *now*.
+10. Ships its own test fixture and a dry-run mode (`--dry-run` prints what
+    it would fetch/write without calling `gh`) so it can be verified without
+    live API credits.
+
+### Known debt: `agent_upsert`'s synthetic key
+
+`native/forge/src/ledger/agent_upsert.rs` (`forge ledger rollup-agent`, the
+`SubagentStop`-triggered upsert, `docs/routing.md`'s enforcement section)
+has no access to the parent transcript, so it never learns the real
+`tool_use_id` a later full `forge ledger rollup --repo` sweep uses to key
+that same dispatch's `task_dispatch` row. It upserts under a synthetic key
+`agent-<agent_id>` instead -- stable and idempotent across repeated
+`SubagentStop` calls for the same agent, but a **separate row** from the
+one a subsequent full sweep writes for the same dispatch, until something
+reconciles the two keys (a follow-up that teaches the full sweep to look up
+an existing `agent-<agent_id>` row by `agent_id` and merge into it, rather
+than always writing a fresh `tool_use_id`-keyed row).

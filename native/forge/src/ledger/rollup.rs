@@ -41,8 +41,6 @@ const ESTIMATE_METHOD: &str = "byte_proportional_uncalibrated_cpt4";
 /// unmeasured split up as a calibrated one.
 const CALIBRATION_FIXTURE_JSON: &str = include_str!("../../tests/fixtures/ledger/calibration.json");
 
-const DEFAULT_LEDGER_ROOT: &str = "/mnt/data/llm/ledger/";
-
 #[derive(Args)]
 pub struct RollupArgs {
     /// Transcript/telemetry file(s), or a directory of `*.jsonl` files
@@ -231,6 +229,13 @@ pub struct TaskDispatchRow {
     pub over_cap: Option<bool>,
     pub first_ts: Option<String>,
     pub last_ts: Option<String>,
+    /// The outcome join (design section 5, item 3): `None` for all three
+    /// whenever there is no `ledger/ci_history/<owner>_<repo>.json` cache to
+    /// join against (no `--repo`, or the file does not exist) -- absence of
+    /// data, never a measured negative. See `super::outcome`.
+    pub landed: Option<bool>,
+    pub required_rework: Option<bool>,
+    pub ci_red_on_first_push: Option<bool>,
 }
 
 struct RollupOutput {
@@ -339,6 +344,15 @@ pub fn run(args: RollupArgs) -> Result<i32> {
         for row in agent_rows {
             output.agent_rollup.push((today.clone(), row));
         }
+
+        // The outcome join (design section 5, item 3): reuses the same
+        // `joins` the agent_rollup step above just computed, so a
+        // `task_dispatch` row's `landed`/`required_rework`/
+        // `ci_red_on_first_push` agree with whatever `agent_rollup` already
+        // decided about that session's commits. Gated entirely on the
+        // `ci_history` cache existing under `repo` -- see `outcome::apply`.
+        super::outcome::apply(&mut output.task_dispatch, &joins, repo)
+            .with_context(|| format!("outcome join against {}", repo.display()))?;
     }
 
     if args.dry_run {
@@ -346,7 +360,7 @@ pub fn run(args: RollupArgs) -> Result<i32> {
         return Ok(0);
     }
 
-    let ledger_root = resolve_ledger_root(args.out);
+    let ledger_root = super::resolve_ledger_root(args.out);
     write_all(&ledger_root, &output)?;
     Ok(0)
 }
@@ -781,6 +795,9 @@ fn task_dispatch_row(
         over_cap: None,
         first_ts: None,
         last_ts: None,
+        landed: None,
+        required_rework: None,
+        ci_red_on_first_push: None,
     };
     let Some(sub) = joined else {
         return row;
@@ -865,11 +882,6 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
     let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
     (if m <= 2 { y + 1 } else { y }, m, d)
-}
-
-fn resolve_ledger_root(out: Option<PathBuf>) -> PathBuf {
-    out.or_else(|| std::env::var("LEDGER_ROOT").ok().map(PathBuf::from))
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_LEDGER_ROOT))
 }
 
 fn print_dry_run(output: &RollupOutput) -> Result<()> {
