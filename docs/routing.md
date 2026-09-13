@@ -249,11 +249,14 @@ and must never block the harness):
 5. Delegates to the Python dispatcher exactly as before -- `SubagentStop`
    owns no verdict of its own, same posture as `SessionEnd`.
 
-**Known debt** (also in `docs/ledger.md`): `rollup-agent` has no access to
-the parent transcript, so it never learns the real `tool_use_id` a later
-full `forge ledger rollup --repo` sweep will key that same dispatch's row
-under. It is a *separate* row from the one a subsequent full sweep writes
-for the same dispatch until something reconciles the two keys.
+**Row identity** (fixed, was debt from PR #52; also in `docs/ledger.md`):
+`rollup-agent` has no access to the parent transcript, so it never learns
+the real `tool_use_id` a later full `forge ledger rollup --repo` sweep
+would key that same dispatch's row under. It writes that synthetic id into
+the row's `tool_use_id` field only; the day-file upsert itself is keyed by
+`agent_id`, the one field both this live path and the full sweep agree on.
+A live row followed by a full sweep of the same dispatch therefore
+collapses to one row, not two.
 
 ### Installing the hook
 
@@ -277,5 +280,47 @@ for the same dispatch until something reconciles the two keys.
 
 `FORGE_LEDGER_DISABLE=1` skips the `SubagentStop` rollup entirely (the
 escape hatch for a broken ledger root); it does not affect the live
-`PreToolUse` cap check itself, which has no disable flag of its own today
-(tracked as debt below).
+`PreToolUse` cap check itself -- that check has its own hatch,
+`FORGE_CAP_DISABLE=1` (`cap_enforce.rs`), which forces a bare `NoOp`
+regardless of how far over cap the subagent already is, without touching
+the ledger rollup `FORGE_LEDGER_DISABLE` gates. All three escape hatches:
+
+| Variable | Skips |
+|---|---|
+| `FORGE_ROUTE_DISABLE=1` | routing (`forge route`, `PreToolUse`'s `additionalContext`/`updatedInput`) |
+| `FORGE_LEDGER_DISABLE=1` | the `SessionEnd`/`SubagentStop`-triggered ledger rollup |
+| `FORGE_CAP_DISABLE=1` | the live `PreToolUse` cap check only (`cap_enforce.rs`) |
+
+## How the gate ratchets routing (`docs/roadmap.md` Phase 3 step 4, Claude part)
+
+Step 3 gave the ledger a `task_dispatch` row per dispatch and `forge ledger
+report`'s per-tier table (above); step 4 turns two of those numbers into gate
+metrics that `forge ledger audit`/`cost-budget-audit` ratchet the same way it
+already ratchets `median_hook_ms`, `resend_bytes_per_session` and
+`tokens_per_landed_pr` (`docs/ledger.md`):
+
+| Metric | Direction | Definition |
+|---|---|---|
+| `cap_breach_rate` | lower is better | `task_dispatch` rows with `over_cap == true` / rows with a non-null `billed_tokens` -- the live cap check's own miss rate: how often a dispatch got billed past its class cap despite the `PreToolUse` deny path above. |
+| `cheap_tier_rework_rate` | lower is better | rows with `tier` in `{haiku, glm}` and `required_rework == true` / rows with `tier` in `{haiku, glm}` and `required_rework` non-null -- whether routing cheap-tier work is actually cheaper once rework is counted, not just cheaper per dispatch. |
+
+Both live in `native/forge/src/ledger/audit.rs` alongside the original three
+and follow the identical status rules (`PASS`/`RATCHET_HELD`/`REGRESSION`/
+`NO_BASELINE`/`NO_DATA`, `docs/ledger.md`). `cheap_tier_rework_rate` is the
+metric that actually depends on step 3's outcome join: its denominator is
+zero -- `required_rework` is `null` on every row -- until the GLM-owned
+`ci_history` fetcher (`docs/ledger.md`, still not built) populates the cache
+that join reads. The recorded baseline therefore carries an explicit `null`
+for it (`ledger/cost_budget_baseline.json`), which reads as `NO_BASELINE` on
+every check, not as a false `NO_DATA` regression -- see `docs/ledger.md`'s
+status table for why those two are now distinct.
+
+`cap_breach_rate` has real data today: the baseline recorded from
+`/home/tim/.claude/projects/-home-tim-Projects-LLM/`'s own transcripts
+(2026-09-07 through 2026-09-13, 199 rows with a billed-token count) came out
+at `0.7738...` (roughly 3 in 4 billed dispatches went over their class cap).
+That is a large number precisely because it predates step 2b -- the hook
+that would actually deny those calls (`forge hook PreToolUse`, matcher
+`Agent`) is not installed in the LLM monorepo's own `.claude/settings.json`
+yet (`docs/roadmap.md` step 2b, still TODO). This baseline is the honest
+"before" number the gate will ratchet down from once that hook is live.

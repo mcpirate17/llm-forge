@@ -28,6 +28,11 @@
 //! state is still persisted (the work already happened; only the verdict is
 //! downgraded) and the call is allowed, with one stderr line -- never a
 //! denial manufactured by a slow disk.
+//!
+//! `FORGE_CAP_DISABLE=1` skips this live check entirely (bare `NoOp`), same
+//! escape-hatch idiom as `FORGE_LEDGER_DISABLE` and `FORGE_ROUTE_DISABLE`
+//! (`docs/routing.md`); it turns off only this `PreToolUse` enforcement,
+//! never the ledger rollups those other two variables gate.
 
 use std::fs::File;
 use std::io::{Read as _, Seek, SeekFrom};
@@ -73,6 +78,16 @@ pub fn check(payload: &Value) -> CapCheck {
     check_with_deadline(payload, deadline, &ledger_root)
 }
 
+/// `FORGE_CAP_DISABLE=1` skips the live cap check entirely (bare `NoOp`),
+/// same escape-hatch idiom as `FORGE_LEDGER_DISABLE` (`session_end.rs`,
+/// `subagent_stop.rs`) and `FORGE_ROUTE_DISABLE` (`route.rs`) --
+/// `docs/routing.md` documents all three together. This turns off only
+/// this `PreToolUse` enforcement; it does not disable the ledger rollups
+/// those other two variables gate.
+fn cap_disabled() -> bool {
+    std::env::var("FORGE_CAP_DISABLE").ok().as_deref() == Some("1")
+}
+
 /// The full check, parameterized for tests: a caller-supplied `deadline`
 /// (so a test can force an overrun with one already in the past) and
 /// `ledger_root` (so tests never touch the real ledger).
@@ -81,6 +96,10 @@ pub(crate) fn check_with_deadline(
     deadline: Instant,
     ledger_root: &Path,
 ) -> CapCheck {
+    if cap_disabled() {
+        eprintln!("forge: live cap enforcement disabled (FORGE_CAP_DISABLE=1)");
+        return CapCheck::NoOp;
+    }
     let Some(agent_id) = crate::subagent_transcript::agent_id(payload) else {
         return CapCheck::NoOp; // the fast path: zero further work.
     };
@@ -323,6 +342,13 @@ mod tests {
     use super::*;
     use std::io::Write;
 
+    /// `FORGE_CAP_DISABLE` is process-wide state; every test in this module
+    /// that calls `check_with_deadline` (which now consults it) holds this
+    /// lock for its duration so `disable_env_skips_the_check_entirely`
+    /// setting the var cannot make a concurrently-running test see a
+    /// spurious `NoOp`. Same convention as `read_budget::tests::ENV_LOCK`.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     struct ScratchDir(PathBuf);
     impl ScratchDir {
         fn new(tag: &str) -> Self {
@@ -374,6 +400,9 @@ mod tests {
 
     #[test]
     fn a_payload_without_agent_id_is_the_fast_path_noop() {
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let scratch = ScratchDir::new("fastpath");
         let payload = serde_json::json!({"tool_name": "Bash"});
         let verdict = check_with_deadline(&payload, far_future_deadline(), &scratch.0);
@@ -382,6 +411,9 @@ mod tests {
 
     #[test]
     fn a_missing_subagent_transcript_is_noop() {
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let scratch = ScratchDir::new("missingfile");
         let payload = payload_for("agent-x", &scratch.0);
         let verdict = check_with_deadline(&payload, far_future_deadline(), &scratch.0);
@@ -390,6 +422,9 @@ mod tests {
 
     #[test]
     fn grown_across_three_calls_it_warns_then_denies() {
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let scratch = ScratchDir::new("threecalls");
         let ledger_root = scratch.0.join("ledger");
         let agent_id = "agentthree";
@@ -465,6 +500,9 @@ mod tests {
 
     #[test]
     fn an_already_past_deadline_is_a_stderr_allow_not_a_panic() {
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let scratch = ScratchDir::new("overrun");
         let agent_id = "agentoverrun";
         let transcript_path = subagent_transcript_path(&scratch.0, agent_id);
@@ -477,6 +515,9 @@ mod tests {
 
     #[test]
     fn a_second_call_never_recounts_bytes_already_folded_in() {
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let scratch = ScratchDir::new("norecount");
         let ledger_root = scratch.0.join("ledger");
         let agent_id = "agentnorecount";
@@ -493,6 +534,47 @@ mod tests {
         check_with_deadline(&payload, far_future_deadline(), &ledger_root);
         let state_after_2 = load_state(&state_path);
         assert_eq!(state_after_2.billed_total, 150);
+    }
+
+    /// PR #52 debt item 0b: `FORGE_CAP_DISABLE=1` must short-circuit the
+    /// live check to a bare `NoOp` even for a subagent already well past
+    /// its cap -- proven against the same over-cap transcript
+    /// `grown_across_three_calls_it_warns_then_denies` uses to get `Deny`
+    /// without the hatch.
+    #[test]
+    fn disable_env_skips_the_check_entirely() {
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let scratch = ScratchDir::new("capdisable");
+        let ledger_root = scratch.0.join("ledger");
+        let agent_id = "agentdisabled";
+        let transcript_path = subagent_transcript_path(&scratch.0, agent_id);
+        let payload = payload_for(agent_id, &scratch.0);
+
+        let policy = route::Policy::embedded().unwrap();
+        let decision = route::route(
+            &policy,
+            &AgentInput {
+                subagent_type: Some("general-purpose".to_string()),
+                requested_model: None,
+                description: None,
+            },
+        );
+        std::fs::write(
+            &transcript_path,
+            line_with_usage(decision.cap_tokens * 2, 0, 0),
+        )
+        .unwrap();
+
+        std::env::set_var("FORGE_CAP_DISABLE", "1");
+        let verdict = check_with_deadline(&payload, far_future_deadline(), &ledger_root);
+        std::env::remove_var("FORGE_CAP_DISABLE");
+        assert_eq!(
+            verdict,
+            CapCheck::NoOp,
+            "FORGE_CAP_DISABLE=1 must allow even a well-over-cap subagent"
+        );
     }
 }
 

@@ -43,12 +43,21 @@ def _metric(status: str, *, value: float = 1.0, baseline: float | None = 0.9) ->
 
 
 def _payload(status: str, metric_status: str) -> dict:
+    """All five Phase 3 step 4 metrics, `median_hook_ms` /
+    `resend_bytes_per_session` / `tokens_per_landed_pr` from step 3 plus
+    `cap_breach_rate` / `cheap_tier_rework_rate` -- a real `forge ledger
+    audit` JSON always carries all five keys now (`METRIC_NAMES`,
+    `audit.rs`), so a fixture with fewer would no longer match production
+    shape.
+    """
     return {
         "window": {"from": "2026-09-06", "to": "2026-09-13", "days": 7},
         "metrics": {
             "median_hook_ms": _metric(metric_status),
             "resend_bytes_per_session": _metric(metric_status),
             "tokens_per_landed_pr": _metric(metric_status),
+            "cap_breach_rate": _metric(metric_status),
+            "cheap_tier_rework_rate": _metric(metric_status),
         },
         "status": status,
     }
@@ -180,6 +189,40 @@ def test_single_regression_metric_makes_phase_not_ok(
     )
     result = cost_budget_audit.phase(tmp_path)
     assert not result.ok
+
+
+def test_five_metric_payload_with_no_baseline_metric_is_ok(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`cheap_tier_rework_rate`'s debt case (Phase 3 step 4, item 2): a real
+    recorded baseline can carry `null` for it until the `ci_history` cache
+    file exists, which `audit.rs` reports as a `NO_BASELINE` metric on every
+    subsequent check, not `NO_DATA`, and not as this metric's own
+    `REGRESSION` -- `phase()` must stay `ok` and must still name the status
+    verbatim in `detail`.
+    """
+
+    payload = _payload("NO_BASELINE", "RATCHET_HELD")
+    payload["metrics"]["cheap_tier_rework_rate"] = _metric(
+        "NO_BASELINE", value=None, baseline=None
+    )
+    payload["status"] = "NO_BASELINE"
+    assert len(payload["metrics"]) == 5
+    monkeypatch.setattr(
+        cost_budget_audit,
+        "run_forge_ledger_audit",
+        # `_kwargs`, not `kwargs`: the file's other stub lambdas all name this
+        # parameter `kwargs` (an inherited, pre-existing vulture finding vulture
+        # already reports on this file at --min-confidence 100 on origin/main);
+        # a leading underscore is vulture's own convention for "intentionally
+        # unused," so this one new lambda does not add a NEW finding to fix.
+        lambda **_kwargs: _completed(payload),
+    )
+    result = cost_budget_audit.phase(tmp_path)
+    assert result.ok
+    assert "cheap_tier_rework_rate=NO_BASELINE" in result.detail
+    assert result.evidence["metrics"]["cheap_tier_rework_rate"]["value"] is None
+    assert result.evidence["metrics"]["cheap_tier_rework_rate"]["baseline"] is None
 
 
 def test_missing_forge_binary_raises(
