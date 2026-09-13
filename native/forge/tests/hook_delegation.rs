@@ -123,18 +123,74 @@ fn run_forge_with_native_hooks(
     child.wait_with_output().expect("wait for forge")
 }
 
+/// State 1 of 3 required by the port: **all-native**. `FORGE_NATIVE_HOOKS`
+/// unset entirely defaults to every Bash `PreToolUse` hook the Python
+/// registry lists (`handlers::BASH_PRETOOLUSE_HOOK_NAMES`) plus
+/// `bash_write_targets`, so `bash_pretooluse_fully_native` is true and
+/// `dispatch::run_hook` must answer the merged verdict itself and never
+/// start Python for this event -- proven here by the stub dispatcher never
+/// running at all: were it invoked, stdout would carry its `"echoed"` /
+/// `"forge_native_hooks"` shape instead of forge's own
+/// `hookSpecificOutput` shape.
 #[test]
-fn default_native_serves_pre_bash_and_forwards_its_deny_answer() {
+fn default_native_coverage_answers_bash_pretooluse_without_starting_python() {
     let project = tempdir();
     stub_project(project.path());
     let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}"#;
 
-    // FORGE_NATIVE_HOOKS unset entirely: the native path must be the default.
     let out = run_forge_with_native_hooks(project.path(), payload, None);
+
+    assert_eq!(out.status.code(), Some(0), "a deny verdict still exits 0");
+    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
+    assert!(
+        stdout.get("echoed").is_none(),
+        "the stub dispatcher must never have run: {stdout}"
+    );
+    assert_eq!(
+        stdout["hookSpecificOutput"]["permissionDecision"], "deny",
+        "forge's own merged verdict: {stdout}"
+    );
+}
+
+/// State 2 of 3: **partial coverage** -- one of the four Bash `PreToolUse`
+/// hooks the Python registry lists (`current_work_guard_bash` here) is *not*
+/// in the opted-in native set, whether because forge does not know it or the
+/// operator excluded it. `bash_pretooluse_fully_native` must be false, so
+/// Python still starts, but only for the hooks forge did not already answer
+/// -- the three it did answer are spliced in via `FORGE_NATIVE_HOOKS` /
+/// `FORGE_NATIVE_ANSWERS` rather than re-run.
+#[test]
+fn partial_native_coverage_still_starts_python_for_the_remaining_hook() {
+    let project = tempdir();
+    stub_project(project.path());
+    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"echo hi"}}"#;
+
+    let out = run_forge_with_native_hooks(
+        project.path(),
+        payload,
+        Some("crg_refresh_report_pre,crg_gate_verify_bash,pre_bash"),
+    );
 
     assert_eq!(out.status.code(), Some(0), "Python still runs and allows");
     let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert_eq!(stdout["forge_native_hooks"], "pre_bash");
+    assert_eq!(
+        stdout["echoed"]["tool_name"], "Bash",
+        "the stub dispatcher must have run: {stdout}"
+    );
+    let served: std::collections::HashSet<&str> = stdout["forge_native_hooks"]
+        .as_str()
+        .expect("forge_native_hooks is a string")
+        .split(',')
+        .collect();
+    assert_eq!(
+        served,
+        std::collections::HashSet::from([
+            "crg_refresh_report_pre",
+            "crg_gate_verify_bash",
+            "pre_bash"
+        ]),
+        "current_work_guard_bash was left for Python to answer itself"
+    );
     let answers: serde_json::Value = serde_json::from_str(
         stdout["forge_native_answers"]
             .as_str()
@@ -143,10 +199,13 @@ fn default_native_serves_pre_bash_and_forwards_its_deny_answer() {
     .expect("valid json");
     assert_eq!(
         answers["pre_bash"]["hookSpecificOutput"]["permissionDecision"],
-        "deny"
+        "allow"
     );
+    assert!(answers.get("current_work_guard_bash").is_none());
 }
 
+/// State 3 of 3: `FORGE_NATIVE_HOOKS=""` is the documented escape hatch back
+/// to the pre-port, all-Python behaviour.
 #[test]
 fn empty_native_hooks_is_the_escape_hatch_back_to_all_python() {
     let project = tempdir();
@@ -185,7 +244,11 @@ fn forwards_stdin_to_the_dispatcher_and_its_allow_exit_code() {
     stub_project(project.path());
     let payload = r#"{"tool_name":"Bash","tool_input":{"command":"echo hi"}}"#;
 
-    let out = run_forge(project.path(), "PreToolUse", payload, None);
+    // Forces the escape hatch: this test's purpose is the generic
+    // stdin/exit-code forwarding contract, not nativity, and the default
+    // native coverage would otherwise answer `echo hi` itself and never
+    // start the stub dispatcher this test inspects.
+    let out = run_forge_with_native_hooks(project.path(), payload, Some(""));
 
     assert_eq!(out.status.code(), Some(0));
     let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");

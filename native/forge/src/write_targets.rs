@@ -158,7 +158,14 @@ static FALLBACK_WRITE_SHAPE: LazyLock<Regex> = LazyLock::new(|| {
 // ---------------------------------------------------------------------------
 pub mod posix_shlex {
     const WHITESPACE: &str = " \t\r\n";
-    const PUNCTUATION_CHARS: &str = "();<>|&";
+    /// `shlex.shlex(text, punctuation_chars=True)`'s actual character set --
+    /// the default most callers in this crate want.
+    pub const PUNCTUATION_CHARS_FULL: &str = "();<>|&";
+    /// `shlex.shlex(text, punctuation_chars=";&|")` -- the narrower set
+    /// `conductor.current_work_guard` and `conductor.local_ai_policy` pass
+    /// explicitly. With this set, `(`, `)`, `<` and `>` are ordinary word
+    /// characters rather than their own punctuation tokens.
+    pub const PUNCTUATION_CHARS_NARROW: &str = ";&|";
     const QUOTES: &str = "'\"";
     const WORDCHARS_UNICODE: &str =
         "ßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ";
@@ -176,8 +183,8 @@ pub mod posix_shlex {
     fn is_ws(c: char) -> bool {
         WHITESPACE.contains(c)
     }
-    fn is_punct(c: char) -> bool {
-        PUNCTUATION_CHARS.contains(c)
+    fn is_punct(c: char, punctuation_chars: &str) -> bool {
+        punctuation_chars.contains(c)
     }
     fn is_quote(c: char) -> bool {
         QUOTES.contains(c)
@@ -193,14 +200,43 @@ pub mod posix_shlex {
     /// `whitespace_split = True`; `list(lexer)`. Returns `Err` for the two
     /// `ValueError`s cpython's shlex raises ("No closing quotation" and "No
     /// escaped character") -- callers fall back the same way the Python
-    /// callers do.
-    pub fn tokenize(command: &str) -> Result<Vec<String>, &'static str> {
+    /// callers do. Comments (`#` to end of line) are active, matching every
+    /// caller in this file, all of which leave `lexer.commenters` at its
+    /// default `"#"`. Use `tokenize_no_comments` for the two `conductor`
+    /// callers that explicitly set `lexer.commenters = ""`.
+    pub fn tokenize(command: &str, punctuation_chars: &str) -> Result<Vec<String>, &'static str> {
+        tokenize_with_comments(command, punctuation_chars, true)
+    }
+
+    /// `tokenize`, but with `#` an ordinary word character rather than a
+    /// comment marker -- `shlex.shlex(command, posix=True,
+    /// punctuation_chars=";&|")` followed by `lexer.commenters = ""`, as
+    /// `conductor.current_work_guard._command_segments` and
+    /// `conductor.local_ai_policy._command_segments` both do.
+    pub fn tokenize_no_comments(
+        command: &str,
+        punctuation_chars: &str,
+    ) -> Result<Vec<String>, &'static str> {
+        tokenize_with_comments(command, punctuation_chars, false)
+    }
+
+    fn tokenize_with_comments(
+        command: &str,
+        punctuation_chars: &str,
+        comments_enabled: bool,
+    ) -> Result<Vec<String>, &'static str> {
         let chars: Vec<char> = command.chars().collect();
         let mut pos = 0usize;
         let mut pushback: Option<char> = None;
         let mut tokens = Vec::new();
 
-        while let Some(tok) = read_token(&chars, &mut pos, &mut pushback)? {
+        while let Some(tok) = read_token(
+            &chars,
+            &mut pos,
+            &mut pushback,
+            punctuation_chars,
+            comments_enabled,
+        )? {
             tokens.push(tok);
         }
         Ok(tokens)
@@ -238,6 +274,8 @@ pub mod posix_shlex {
         chars: &[char],
         pos: &mut usize,
         pushback: &mut Option<char>,
+        punctuation_chars: &str,
+        comments_enabled: bool,
     ) -> Result<Option<String>, &'static str> {
         let mut token = String::new();
         let mut quoted = false;
@@ -256,7 +294,7 @@ pub mod posix_shlex {
                         }
                         continue;
                     }
-                    Some('#') => {
+                    Some('#') if comments_enabled => {
                         consume_comment(chars, pos);
                         continue;
                     }
@@ -268,7 +306,7 @@ pub mod posix_shlex {
                         token.push(c);
                         state = St::Word;
                     }
-                    Some(c) if is_punct(c) => {
+                    Some(c) if is_punct(c, punctuation_chars) => {
                         token.push(c);
                         state = St::Punct;
                     }
@@ -318,7 +356,7 @@ pub mod posix_shlex {
                         }
                         continue;
                     }
-                    Some('#') => {
+                    Some('#') if comments_enabled => {
                         consume_comment(chars, pos);
                         state = St::Start;
                         if !token.is_empty() || quoted {
@@ -333,7 +371,7 @@ pub mod posix_shlex {
                         escapedstate = St::Word;
                         state = St::Escape;
                     }
-                    Some(c) if !is_punct(c) => {
+                    Some(c) if !is_punct(c, punctuation_chars) => {
                         // wordchars, quotes (handled above) or
                         // (whitespace_split && not punctuation_chars).
                         token.push(c);
@@ -353,12 +391,12 @@ pub mod posix_shlex {
                         state = St::Start;
                         break;
                     }
-                    Some('#') => {
+                    Some('#') if comments_enabled => {
                         consume_comment(chars, pos);
                         state = St::Start;
                         break;
                     }
-                    Some(c) if is_punct(c) => token.push(c),
+                    Some(c) if is_punct(c, punctuation_chars) => token.push(c),
                     Some(c) => {
                         if !is_ws(c) {
                             *pushback = Some(c);
@@ -376,6 +414,21 @@ pub mod posix_shlex {
             Ok(Some(token))
         }
     }
+}
+
+/// `PUNCTUATION_CHARS_NARROW` and `tokenize_no_comments` are real,
+/// exercised API -- `current_work_guard.rs` and `local_ai_policy.rs` both
+/// call them -- but this crate has no lib target, so each `tests/*.rs`
+/// binary pulls in only the `src` modules it names via `#[path]`. A test
+/// binary (e.g. `guard_parity`) that includes this file without also
+/// including those two callers sees them as unused from its own,
+/// independently-linted, crate root. Referencing them here keeps that
+/// false positive from becoming a real `-D warnings` failure, matching
+/// `crg_gate::unused_constants_reference`'s established use of the same
+/// pattern in this crate.
+#[allow(dead_code)]
+fn unused_from_some_test_binaries() -> Result<Vec<String>, &'static str> {
+    posix_shlex::tokenize_no_comments("", posix_shlex::PUNCTUATION_CHARS_NARROW)
 }
 
 /// Split a flat token stream into individual commands at shell operators.
@@ -805,7 +858,7 @@ fn command_targets(argv: &[String]) -> Vec<String> {
 }
 
 fn tokenize_or_fallback(stripped: &str) -> (Vec<Vec<String>>, bool) {
-    match posix_shlex::tokenize(stripped) {
+    match posix_shlex::tokenize(stripped, posix_shlex::PUNCTUATION_CHARS_FULL) {
         Ok(tokens) => (split_commands(&tokens), false),
         Err(_) => (Vec::new(), true),
     }
@@ -856,7 +909,7 @@ pub fn working_directory(command: &str, repo_root: &Path) -> Option<PathBuf> {
     let (stripped_raw, _) = split_heredocs(command);
     let bindings = assignments(&stripped_raw);
     let stripped = separate_lines(&stripped_raw);
-    let commands = match posix_shlex::tokenize(&stripped) {
+    let commands = match posix_shlex::tokenize(&stripped, posix_shlex::PUNCTUATION_CHARS_FULL) {
         Ok(tokens) => split_commands(&tokens),
         Err(_) => return Some(repo_root.to_path_buf()),
     };

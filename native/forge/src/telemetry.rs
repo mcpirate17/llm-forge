@@ -8,6 +8,8 @@ use std::io::Write;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::civil::civil_from_days;
+
 #[derive(Serialize)]
 struct DelegationEvent<'a> {
     event: &'a str,
@@ -30,6 +32,14 @@ struct DelegationEvent<'a> {
 /// broken one.
 pub fn record_delegation(event: &str, elapsed_ms: f64) {
     record(event, elapsed_ms, true);
+}
+
+/// Appends one JSON line recording that `event` was answered fully natively
+/// -- forge never started Python for this call at all -- so telemetry can
+/// distinguish "delegated" and "fully native" calls the same way `dispatch.py`
+/// already distinguishes hooks it ran itself from ones it spliced in.
+pub fn record_native(event: &str, elapsed_ms: f64) {
+    record(event, elapsed_ms, false);
 }
 
 fn record(event: &str, elapsed_ms: f64, delegated: bool) {
@@ -64,9 +74,9 @@ fn append_line(path: &Path, record: &DelegationEvent) -> std::io::Result<()> {
 
 /// UTC timestamp with millisecond precision, formatted like Python's
 /// `datetime.now(UTC).isoformat(timespec="milliseconds")`
-/// (e.g. `2026-09-12T14:23:01.123+00:00`). Plain integer arithmetic -- Howard
-/// Hinnant's civil-from-days algorithm -- instead of a `chrono` dependency for one
-/// timestamp format.
+/// (e.g. `2026-09-12T14:23:01.123+00:00`). See `civil.rs` for the calendar
+/// arithmetic (shared with `crg_gate.rs`'s claim-expiry math) instead of a
+/// `chrono` dependency for one timestamp format.
 fn iso8601_utc_millis(now: SystemTime) -> String {
     let dur = now.duration_since(UNIX_EPOCH).unwrap_or_default();
     let millis_total = dur.as_millis() as i64;
@@ -81,34 +91,9 @@ fn iso8601_utc_millis(now: SystemTime) -> String {
     format!("{y:04}-{m:02}-{d:02}T{h:02}:{min:02}:{s:02}.{millis:03}+00:00")
 }
 
-/// Days-since-epoch (1970-01-01) to a proleptic Gregorian (year, month, day).
-/// Source: <http://howardhinnant.github.io/date_algorithms.html> (`civil_from_days`).
-fn civil_from_days(z: i64) -> (i64, u32, u32) {
-    let z = z + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    (if m <= 2 { y + 1 } else { y }, m, d)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn civil_from_days_matches_known_epoch_dates() {
-        assert_eq!(civil_from_days(0), (1970, 1, 1));
-        assert_eq!(civil_from_days(-1), (1969, 12, 31));
-        // 2026-09-12 -> 20708 days since epoch (checked against Python's `date`).
-        assert_eq!(civil_from_days(20708), (2026, 9, 12));
-        // A leap-year boundary: 2024-02-29.
-        assert_eq!(civil_from_days(19782), (2024, 2, 29));
-    }
 
     #[test]
     fn formats_with_millisecond_precision_and_utc_offset() {
