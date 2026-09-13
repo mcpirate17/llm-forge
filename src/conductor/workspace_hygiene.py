@@ -222,7 +222,7 @@ def worktree_state() -> tuple[list[str], list[dict[str, object]]]:
     return stale, dirty
 
 
-def _live_ref_or_default(repo: Path = ROOT) -> str:
+def _live_ref_or_default(repo: Path = ROOT, *, allow_network: bool = True) -> str:
     """The ref the hook judges containment against: the remote integration line.
 
     Prefers ``origin/<branch>`` over the local branch. A local branch can sit days
@@ -232,13 +232,16 @@ def _live_ref_or_default(repo: Path = ROOT) -> str:
 
     Resolution is shared with the reaper (``worktree_reap.default_integration_ref``):
     the configured ``[tool.conductor].integration_branch``, else the remote's own
-    HEAD symref -- never a hardcoded ``origin/master``.
+    HEAD symref, else the one conventional ``origin/{master,main}`` ref -- offline.
+    ``allow_network`` gates the ``ls-remote`` advertisement, exactly as in the
+    reaper; the hook path (``cheap_exposure_counts``) passes false so session
+    start never opens a network connection.
 
     Raises rather than guessing when none resolves: a containment check with no line
     to check against would silently report every worktree as finished.
     """
     try:
-        return worktree_reap.default_integration_ref(repo)
+        return worktree_reap.default_integration_ref(repo, allow_network=allow_network)
     except worktree_reap.ReapError as exc:
         raise HygieneError(str(exc)) from exc
 
@@ -769,7 +772,12 @@ def cheap_exposure_counts(repo: Path = ROOT) -> dict[str, object]:
     rather than silently omitting it.
     """
     try:
-        landed: int | None = len(landed_worktrees(_live_ref_or_default(repo), repo))
+        # Offline resolution: a session start must never open a network
+        # connection (the ls-remote advertisement is the reaper's, not the
+        # hook's). No line -> landed=None + the reason, as below.
+        landed: int | None = len(
+            landed_worktrees(_live_ref_or_default(repo, allow_network=False), repo)
+        )
         worktrees_skipped = None
     except HygieneError as exc:
         # A repo with no integration line cannot be judged for containment. Report that

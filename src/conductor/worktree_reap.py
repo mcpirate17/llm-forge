@@ -374,7 +374,7 @@ def triggers(
     return found
 
 
-def default_integration_ref(repo: Path) -> str:
+def default_integration_ref(repo: Path, *, allow_network: bool = True) -> str:
     """The line containment is judged against -- resolved, never a literal.
 
     ``[tool.conductor].integration_branch`` (``CONDUCTOR_INTEGRATION_BRANCH``
@@ -382,12 +382,17 @@ def default_integration_ref(repo: Path) -> str:
     local branch so a checkout behind its remote cannot make landed work read
     unlanded. When the configured name verifies nowhere, the remote's own HEAD
     symref answers -- bound locally as ``refs/remotes/origin/HEAD`` when a
-    clone set it, else advertised by the remote itself via ``ls-remote
-    --symref`` -- so a repo whose line is ``master`` and whose only naming of
-    it is the remote still resolves ``origin/master``. This replaced a hardcoded
-    ``origin/master`` default that ignored all of the above: on a ``main``-line
-    repo the containment trigger silently never fired and finished worktrees
-    read as "run is not over".
+    clone set it. Next, offline: when exactly one of the conventional
+    ``refs/remotes/origin/{master,main}`` exists it is the line (both present
+    is ambiguous and falls through -- guessing could judge containment against
+    the wrong line). The remote advertisement (``ls-remote --symref``) is the
+    last resort and runs only when ``allow_network`` is true: the reaper (an
+    explicit command) allows it; the SessionStart path passes false so session
+    start never opens a network connection.
+
+    This replaced a hardcoded ``origin/master`` default that ignored all of
+    the above: on a ``main``-line repo the containment trigger silently never
+    fired and finished worktrees read as "run is not over".
     """
     candidates = integration_refs(host_root(repo))
     for ref in candidates:
@@ -398,6 +403,22 @@ def default_integration_ref(repo: Path) -> str:
         remote_line = bound.stdout.strip().removeprefix("refs/remotes/")
         if remote_line:
             return remote_line
+    listed = _run(
+        repo,
+        "for-each-ref",
+        "--format=%(refname:short)",
+        "refs/remotes/origin/master",
+        "refs/remotes/origin/main",
+    )
+    conventional = [name for name in listed.stdout.split() if name]
+    if len(conventional) == 1:
+        return conventional[0]
+    if not allow_network:
+        raise ReapError(
+            f"{repo}: no integration line to judge containment against "
+            f"(tried {', '.join(candidates)}; origin HEAD symref unavailable; "
+            "network advertisement skipped)"
+        )
     advertised = _run(repo, "ls-remote", "--symref", "origin", "HEAD")
     if advertised.returncode == 0:
         for line in advertised.stdout.splitlines():

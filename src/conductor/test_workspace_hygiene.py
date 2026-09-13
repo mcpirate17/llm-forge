@@ -106,13 +106,61 @@ def test_default_integration_ref_falls_back_to_the_local_head_symref(
     assert worktree_reap.default_integration_ref(repo) == "origin/master"
 
 
+def _dead_origin_with_refs(repo: Path, *branches: str) -> None:
+    """Point ``origin`` where nothing exists (any ``ls-remote`` fails loudly)
+    and fabricate remote-tracking refs for ``branches`` at HEAD -- the
+    offline-resolution fixtures' shared shape."""
+    _git_ok(repo, "remote", "rm", "origin")
+    _git_ok(repo, "remote", "add", "origin", "/nonexistent/origin.git")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    for branch in branches:
+        _git_ok(repo, "update-ref", f"refs/remotes/origin/{branch}", head)
+
+
+def test_default_integration_ref_resolves_a_lone_conventional_ref_offline(
+    tmp_path: Path,
+) -> None:
+    """A master-line repo with no symref and no config -- the LLM host's shape.
+
+    ``origin`` points where nothing exists, so any ``ls-remote`` fails loudly:
+    success proves the network was never touched.
+    """
+    repo = _seeded_repo(tmp_path, "offline", branch="work")
+    _dead_origin_with_refs(repo, "master")
+    assert (
+        worktree_reap.default_integration_ref(repo, allow_network=False)
+        == "origin/master"
+    )
+
+
+def test_default_integration_ref_offline_ambiguity_needs_the_network_opt_in(
+    tmp_path: Path,
+) -> None:
+    """Both conventional refs present is ambiguous offline: guessing between
+    master and main could judge containment against the wrong line."""
+    repo = _seeded_repo(tmp_path, "ambiguous", branch="work", integration="wip")
+    _dead_origin_with_refs(repo, "master", "main")
+    with pytest.raises(
+        worktree_reap.ReapError, match="network advertisement skipped"
+    ):
+        worktree_reap.default_integration_ref(repo, allow_network=False)
+
+
 def test_default_integration_ref_asks_the_remote_when_nothing_local_is_bound(
     tmp_path: Path,
 ) -> None:
-    """A clone of an empty bare repo never binds origin/HEAD locally; the remote
-    itself still advertises its line, and that answers."""
-    repo = _seeded_repo(tmp_path, "advertised", branch="master")
-    assert worktree_reap.default_integration_ref(repo) == "origin/master"
+    """A clone whose line is unconventional (``trunk``) resolves through the
+    remote's own advertisement -- the reaper's opt-in, not the hook's."""
+    repo = _seeded_repo(tmp_path, "advertised", branch="trunk")
+    assert worktree_reap.default_integration_ref(repo) == "origin/trunk"
+    with pytest.raises(worktree_reap.ReapError, match="network advertisement skipped"):
+        worktree_reap.default_integration_ref(repo, allow_network=False)
 
 
 def test_default_integration_ref_prefers_origin_over_the_local_branch(
@@ -160,6 +208,18 @@ def test_live_ref_or_default_resolves_without_a_literal(tmp_path: Path) -> None:
     assert wh._live_ref_or_default(repo) == "origin/master"
     with pytest.raises(wh.HygieneError, match="no integration line"):
         wh._live_ref_or_default(_lineless_repo(tmp_path, "lineless"))
+
+
+def test_cheap_exposure_counts_degrade_to_unknown_when_offline_cannot_resolve(
+    tmp_path: Path,
+) -> None:
+    """The hook path resolves offline: ambiguous conventional refs mean
+    landed=unknown plus the reason, never a network call and never a 0."""
+    repo = _seeded_repo(tmp_path, "offline-counts", branch="work", integration="wip")
+    _dead_origin_with_refs(repo, "master", "main")
+    counts = wh.cheap_exposure_counts(repo)
+    assert counts["landed_worktrees"] is None
+    assert "network advertisement skipped" in counts["worktrees_skipped"]
 
 
 # ---------------------------------------------------------------------------
