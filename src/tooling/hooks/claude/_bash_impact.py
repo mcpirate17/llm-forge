@@ -52,22 +52,29 @@ def _emit(decision: str, reason: str = "", additional: str = "") -> None:
 
 
 def _du_summary(path: str) -> Tuple[int, str]:
-    """Return (file_count, human_size). Best-effort, never raises."""
+    """Return (file_count, human_size). Best-effort, never raises.
+
+    In-process: no `du` shellout. Sums `st_size` over the same files
+    `p.rglob("*")` would visit (matching pathlib's refusal to descend into
+    symlinked directories; a symlink to a file is counted at its target's
+    size, since `Path.is_file()`/`Path.stat()` follow symlinks). This mirrors
+    `native/forge/src/bash_impact.rs::du_summary` exactly so the Rust port and
+    this module agree byte-for-byte instead of one reporting allocated-block
+    sizes (`du`) and the other apparent byte sizes.
+    """
     p = Path(path)
     if not p.exists():
         return 0, "0B"
     try:
         if p.is_file():
             return 1, _human_size(p.stat().st_size)
-        files = sum(1 for _ in p.rglob("*") if _.is_file())
-        size = (
-            subprocess.run(
-                ["du", "-sh", path], capture_output=True, text=True, timeout=5
-            )
-            .stdout.split("\t", 1)[0]
-            .strip()
-        )
-        return files, size or "?"
+        files = 0
+        total = 0
+        for entry in p.rglob("*"):
+            if entry.is_file():
+                files += 1
+                total += entry.stat().st_size
+        return files, _human_size(total)
     except Exception:
         return -1, "?"
 

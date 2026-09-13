@@ -9,6 +9,7 @@ project root, under the running interpreter for ``.py`` bodies).
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -298,24 +299,53 @@ def settings_block() -> dict:
 
 def natively_served() -> frozenset[str]:
     """Hook names ``native/forge`` (the Rust `forge` binary) has told this
-    Python process it may answer itself, via ``FORGE_NATIVE_HOOKS`` -- a
+    Python process it already answered itself, via ``FORGE_NATIVE_HOOKS`` -- a
     comma-separated list of `HookSpec.name` values, e.g. ``"pre_bash"``.
 
-    Dormant by default (unset, or a name registered here never being placed in
-    ``FORGE_NATIVE_HOOKS`` by a caller): nothing filters `select()`'s output
-    unless a caller opts a specific hook in. `forge`'s own Rust dispatcher
-    (``native/forge/src/dispatch.rs``) deliberately never sets this for
-    ``pre_bash`` when delegating to Python, because ``pre_bash``'s Python
-    adapter also runs `_bash_impact.main()` on the allow path (unported), and
-    skipping the whole spec here would silently drop that contribution too --
-    see `native/forge/src/handlers.rs`'s module doc for the full reasoning.
-    This exists so a *different* caller (a test harness, or a future forge
-    handler with no such hidden dependency) has a documented, working way to
-    tell this dispatcher "skip this one, it already ran natively" without
-    inventing a second mechanism.
+    Dormant by default (unset): nothing filters `select()`'s output unless a
+    caller opts specific hooks in. `forge`'s own Rust dispatcher
+    (``native/forge/src/dispatch.rs``) sets this to ``"pre_bash"`` by default
+    as of the Rust port of `_bash_impact.py` -- `pre_bash`'s Python adapter
+    (which also ran `_bash_impact.main()` on the allow path) is fully
+    superseded by `native/forge/src/handlers.rs::precheck_pretooluse_bash`,
+    so served names always come with a matching entry in
+    `native_answers()`: `select()` dropping a served spec never drops a
+    contribution, it is spliced back in by `runner.dispatch` instead. See
+    `native/forge/src/handlers.rs`'s module doc for the full design.
+    ``FORGE_NATIVE_HOOKS=""`` (explicitly empty) is the documented escape
+    hatch back to running every hook in Python.
     """
     raw = os.environ.get("FORGE_NATIVE_HOOKS", "")
     return frozenset(name.strip() for name in raw.split(",") if name.strip())
+
+
+def native_answers() -> dict[str, dict]:
+    """Precomputed verdicts `forge` already answered natively, keyed by
+    `HookSpec.name`, read from ``FORGE_NATIVE_ANSWERS`` -- a JSON object
+    mapping hook name to the exact hook-output dict its adapter would have
+    produced (e.g. ``{"pre_bash": {"hookSpecificOutput": {...}}}``).
+
+    Every name in `natively_served()` must have a matching key here --
+    `runner.dispatch` fails loud, not silently, if one is missing, since a
+    served hook with no answer would otherwise vanish from the merged result
+    with no trace. Unset or empty means no answers (the common case: either
+    the escape hatch is active, or this event has no natively-answerable
+    hooks at all).
+    """
+    raw = os.environ.get("FORGE_NATIVE_ANSWERS", "")
+    if not raw.strip():
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"FORGE_NATIVE_ANSWERS is set but is not valid JSON: {raw!r}"
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(
+            f"FORGE_NATIVE_ANSWERS must decode to a JSON object, got {type(parsed).__name__}"
+        )
+    return parsed
 
 
 def resolve_legacy(command: str) -> HookSpec | None:

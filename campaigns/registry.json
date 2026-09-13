@@ -131,6 +131,12 @@
     },
     {
       "manifest": "campaigns/forge-tool-output-quiet_bash_quiet_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/llm-b0_bash_impact_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/llm-b0_forge_cargo_20260913.json"
     }
   ],
   "enforcement": "changed_tests",

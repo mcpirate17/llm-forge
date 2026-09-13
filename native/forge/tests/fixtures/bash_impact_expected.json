@@ -1,0 +1,162 @@
+[
+  {
+    "command_template": "echo hi",
+    "tier": "allow",
+    "impact_template": ""
+  },
+  {
+    "command_template": "ls -la {ROOT}",
+    "tier": "allow",
+    "impact_template": ""
+  },
+  {
+    "command_template": "git status",
+    "tier": "allow",
+    "impact_template": ""
+  },
+  {
+    "command_template": "find {ROOT} -type f",
+    "tier": "allow",
+    "impact_template": ""
+  },
+  {
+    "command_template": "cat {ROOT}/small/a.txt",
+    "tier": "allow",
+    "impact_template": ""
+  },
+  {
+    "command_template": "sqlite3 {ROOT}/test.db 'SELECT * FROM items'",
+    "tier": "allow",
+    "impact_template": ""
+  },
+  {
+    "command_template": "rm -rf {ROOT}/missing_target",
+    "tier": "allow",
+    "impact_template": ""
+  },
+  {
+    "command_template": "find {ROOT}/missing_target -delete",
+    "tier": "allow",
+    "impact_template": ""
+  },
+  {
+    "command_template": "git clean -fdx {ROOT}/missing_target",
+    "tier": "allow",
+    "impact_template": ""
+  },
+  {
+    "command_template": "rm -rf {ROOT}/small",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/small: 2 files, 328B"
+  },
+  {
+    "command_template": "rm -rf {ROOT}/nested",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/nested: 2 files, 1K"
+  },
+  {
+    "command_template": "rm -rf {ROOT}/dotdir",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/dotdir: 1 files, 50B"
+  },
+  {
+    "command_template": "rm -rf {ROOT}/large_tree",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/large_tree: 12 files, 96B"
+  },
+  {
+    "command_template": "rm -rf {ROOT}/outer_dir",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/outer_dir: 1 files, 10B"
+  },
+  {
+    "command_template": "rm -rf {ROOT}/symlink_to_file",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/symlink_to_file: 1 files, 100B"
+  },
+  {
+    "command_template": "rm -rf {ROOT}/small {ROOT}/nested",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/small: 2 files, 328B\n  \u2022 rm -rf {ROOT}/nested: 2 files, 1K\n  \u2022 TOTAL: 4 files, 1K"
+  },
+  {
+    "command_template": "find {ROOT}/large_tree -delete",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 find -delete in {ROOT}/large_tree: up to 12 files, 96B"
+  },
+  {
+    "command_template": "git clean -fdx {ROOT}/nested",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 git clean in {ROOT}/nested: scope ~2 files, 1K"
+  },
+  {
+    "command_template": "sqlite3 {ROOT}/test.db \"DELETE FROM items WHERE status='done'\"",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 sqlite3 {ROOT}/test.db DELETE FROM items WHERE status="
+  },
+  {
+    "command_template": "sqlite3 {ROOT}/test.db \"DELETE FROM items\"",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 sqlite3 {ROOT}/test.db DELETE FROM items \u2192 4 rows"
+  },
+  {
+    "command_template": "sqlite3 {ROOT}/test.db \"DROP TABLE items\"",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 sqlite3 {ROOT}/test.db DROP TABLE items"
+  },
+  {
+    "command_template": "sqlite3 {ROOT}/missing.db \"DELETE FROM items\"",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 sqlite3 {ROOT}/missing.db DELETE FROM items"
+  },
+  {
+    "command_template": "rm -rf \"{ROOT}/small\"",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/small: 2 files, 328B"
+  },
+  {
+    "command_template": "rm -rf {ROOT}/small && echo done",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/small: 2 files, 328B"
+  },
+  {
+    "command_template": "rm -fr {ROOT}/nested",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/nested: 2 files, 1K"
+  },
+  {
+    "command_template": "rm -Rf {ROOT}/dotdir",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/dotdir: 1 files, 50B"
+  },
+  {
+    "command_template": "sqlite3 {ROOT}/test.db \"UPDATE items SET status='x'\"",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 sqlite3 {ROOT}/test.db UPDATE items SET status="
+  },
+  {
+    "command_template": "sqlite3 {ROOT}/test.db \"TRUNCATE items\"",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 sqlite3 {ROOT}/test.db TRUNCATE items"
+  },
+  {
+    "command_template": "find \"{ROOT}/large_tree\" -type f -delete",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 find -delete in {ROOT}/large_tree: up to 12 files, 96B"
+  },
+  {
+    "command_template": "rm -rf {ROOT}/small {ROOT}/missing_target",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/small: 2 files, 328B"
+  },
+  {
+    "command_template": "rm -rf {ROOT}/large_tree; find {ROOT}/nested -delete",
+    "tier": "soft_warn",
+    "impact_template": "\n  \u2022 rm -rf {ROOT}/large_tree: 12 files, 96B\n  \u2022 find -delete in {ROOT}/nested: up to 2 files, 1K"
+  },
+  {
+    "command_template": "echo 'rm -rf nothing happens here'",
+    "tier": "allow",
+    "impact_template": ""
+  }
+]

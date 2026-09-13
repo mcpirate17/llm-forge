@@ -25,7 +25,17 @@ def main() -> int:
     stdin_payload = sys.stdin.read()
 
     if event == "PreToolUse":
-        sys.stdout.write(json.dumps({"echoed": json.loads(stdin_payload)}))
+        import os
+
+        sys.stdout.write(
+            json.dumps(
+                {
+                    "echoed": json.loads(stdin_payload),
+                    "forge_native_hooks": os.environ.get("FORGE_NATIVE_HOOKS"),
+                    "forge_native_answers": os.environ.get("FORGE_NATIVE_ANSWERS"),
+                }
+            )
+        )
         return 0
     if event == "PostToolUse":
         sys.stderr.write("stub dispatcher: soft warning on stderr\n")
