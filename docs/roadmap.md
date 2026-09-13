@@ -150,6 +150,15 @@ agent tokens. Stop porting; finish Phase 3, then install.
    quantifying the double-run cost, not yet realized since Python stays
    wired there) -- see the coverage table and proof in the PR. DONE
    PR #64 (`docs/install.md`, "Take over from the Python dispatcher").
+2f. (GLM) session_preamble + active_state in forge: the SessionStart
+   inject pair (`conductor.active_state update` 37 ms + Python
+   `conductor.session_preamble hook` 89 ms, measured 2026-09-13) ports
+   to `forge session preamble` / `forge session state` -- one process,
+   state refresh folded into the render, byte-identical payload and
+   active_state.json on the LLM host. `session-start.sh` prefers the
+   binary when `FORGE_BIN` or PATH resolves it (16 ms vs 126 ms for the
+   Python pair, same host and day; 3 ms on llm-forge itself). DONE
+   PR #65 (`docs/install.md`, "Session start in Rust").
 2h. (Claude) `forge notes index|search` ports `conductor.index_notes`'s
    FTS5 note index to Rust (`native/forge/src/notes_index.rs`), and fixes
    the bug it was written to carry: `_source_roots()` returned EITHER the

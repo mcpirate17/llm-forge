@@ -101,6 +101,24 @@ run Python. `forge hooks uninstall` restores every recorded Python entry
 verbatim and deletes `.claude/settings.forge-takeover.json` — the same
 rollback command works whether or not `--takeover` was ever used.
 
+## Session start in Rust
+
+`forge session preamble` replaces the Python SessionStart inject pair —
+`conductor.active_state update` (background) plus `conductor
+.session_preamble hook` — with one process that refreshes
+`conductor/active_state.json` itself and prints the same hook-payload
+JSON; `forge session state [--dump]` is the state half alone
+(`--dump` prints the JSON instead of writing it). The generic
+`session-start.sh` runs the binary whenever `FORGE_BIN` (env) or
+`command -v forge` resolves it — the A2A name still comes from the
+identity the script resolved, the summary from `A2A_SUMMARY`. Two ways
+to tell which path ran: the Python path logs exactly one stderr line,
+`[session-start] forge not on PATH; python preamble (slower)`; and
+`forge session preamble --host <root> --a2a-name <id> --text` prints the
+inject body directly, so a manual run shows what the binary would inject.
+Set `FORGE_BIN=` (empty) to force the Python stages — the same convention
+as `FORGE_NATIVE_HOOKS`.
+
 ## Verify the install
 
 ```
