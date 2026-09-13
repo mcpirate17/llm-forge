@@ -28,28 +28,6 @@ class PreambleError(ValueError):
     """Rejected session preamble."""
 
 
-def _exposure_line(repo: Path = ROOT) -> str:
-    """Cheap EXPOSED summary for the inject. Degrades visibly rather than crashing the
-    hook or silently disappearing -- see ``workspace_hygiene.cheap_exposure_counts``
-    for why the branch-staleness check (needs ``gh``, ~10s over this repo's branch
-    count) is excluded from this hook-safe path.
-    """
-    try:
-        from conductor.workspace_hygiene import cheap_exposure_counts
-
-        counts = cheap_exposure_counts(repo)
-    except (ImportError, RuntimeError, OSError) as exc:
-        return f"EXPOSED: unavailable ({exc}). python -m conductor.workspace_hygiene"
-    return (
-        f"EXPOSED: {counts['local_only_commits']} local-only commit(s), "
-        f"{counts['stale_dirty_files']} stale dirty file(s), "
-        f"{counts['landed_worktrees'] if counts['worktrees_skipped'] is None else 'unknown'}"
-        " finished worktree(s) to remove, "
-        "branches skipped (needs gh). "
-        "python -m conductor.workspace_hygiene"
-    )
-
-
 def load_state(
     path: Path = ACTIVE_STATE_PATH,
     *,
@@ -75,9 +53,14 @@ def load_state(
     return payload
 
 
-def compact_state(
-    state: dict[str, Any], *, include_exposure: bool = True, repo: Path = ROOT
-) -> str:
+def compact_state(state: dict[str, Any], *, repo: Path = ROOT) -> str:
+    """The preamble text: policy lines, then the live-state summary.
+
+    The EXPOSED line used to be spliced in here; it moved to its own registry
+    hook (``workspace_exposure_session`` -> ``workspace_hygiene.exposure_line``)
+    so the dispatcher can serve it natively without re-running the whole
+    preamble, and so its degrade path cannot take the inject down with it.
+    """
     mandates = state.get("standing_mandates")
     mandate_ids: list[str] = []
     if isinstance(mandates, list):
@@ -98,8 +81,6 @@ def compact_state(
         "MANDATES: " + (", ".join(mandate_ids) if mandate_ids else "none"),
         f"CLAIMS: {n_claims} active. Inspect with `make governance-claims`.",
     ]
-    if include_exposure:
-        lines.append(_exposure_line(repo))
     if heading_lines:
         lines.append("HEADINGS:")
         lines.extend(heading_lines)

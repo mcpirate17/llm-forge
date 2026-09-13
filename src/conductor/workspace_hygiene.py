@@ -47,20 +47,48 @@ from conductor.project_paths import (
     campaigns_relative,
     host_root,
     integration_branch,
-    integration_refs,
     registry_relative,
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
-# ``ROOT`` is the package parent, which is the repo root only in the layout
-# conductor was extracted from; walk to the enclosing repository instead.
-CAMPAIGN_DIR = str(campaigns_relative(host_root(ROOT)))
-REGISTRY = str(registry_relative(host_root(ROOT)))
-
-
 class HygieneError(RuntimeError):
     """Raised when the report cannot be produced from trustworthy inputs."""
+
+
+def _repo_root() -> Path:
+    """The repository root this module reports on, from the cwd, once per process.
+
+    ``Path(__file__).resolve().parents[1]`` is the package parent -- the repo
+    root only in the layout conductor was extracted from. Imported from this
+    repo's ``src/`` layout (or an installed package) it lands one level short,
+    which silently re-pointed every defaulting caller at a directory with no
+    ``.git``, no ``campaigns/`` and no ``.venv``: the full report died on the
+    mutation registry, the claim query died executing a ``.venv/bin/python``
+    relative to ``src/``, and idle-claim mtimes were read from
+    ``src/<claim path>``, where nothing is ever found. One ``git rev-parse
+    --show-toplevel`` from the cwd resolves the real root; it fails loud
+    rather than guessing, and callers that can degrade (the session inject)
+    catch ``HygieneError`` and say so.
+    """
+    done = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if done.returncode != 0 or not done.stdout.strip():
+        raise HygieneError(
+            "workspace_hygiene resolves its repository with "
+            f"git rev-parse --show-toplevel from the cwd, which failed: {done.stderr.strip()}"
+        )
+    return Path(done.stdout.strip()).resolve()
+
+
+ROOT = _repo_root()
+# ``ROOT`` is the checkout root, so the host-relative campaign layout resolves
+# against the repository that actually holds it.
+CAMPAIGN_DIR = str(campaigns_relative(host_root(ROOT)))
+REGISTRY = str(registry_relative(host_root(ROOT)))
 
 
 def _git(*args: str) -> str:
@@ -224,24 +252,17 @@ def _live_ref_or_default(repo: Path = ROOT) -> str:
     worktree judged against a stale local tip reads as unlanded long after its work
     merged, which is the opposite of the nag this check exists to produce.
 
-    Raises rather than guessing when neither exists: a containment check with no line
+    Resolution is shared with the reaper (``worktree_reap.default_integration_ref``):
+    the configured ``[tool.conductor].integration_branch``, else the remote's own
+    HEAD symref -- never a hardcoded ``origin/master``.
+
+    Raises rather than guessing when none resolves: a containment check with no line
     to check against would silently report every worktree as finished.
     """
-    candidates = integration_refs(host_root(repo))
-    for ref in candidates:
-        probe = subprocess.run(
-            ["git", "rev-parse", "--verify", "--quiet", ref],
-            cwd=repo,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if probe.returncode == 0:
-            return ref
-    raise HygieneError(
-        f"{repo}: no integration line to judge worktrees against "
-        f"(tried {', '.join(candidates)})"
-    )
+    try:
+        return worktree_reap.default_integration_ref(repo)
+    except worktree_reap.ReapError as exc:
+        raise HygieneError(str(exc)) from exc
 
 
 def landed_worktrees(live_ref: str, repo: Path = ROOT) -> list[dict[str, object]]:
@@ -362,17 +383,19 @@ def _git_in_quiet(repo: Path, *args: str) -> str:
 
 
 def _claim_store() -> list[dict[str, object]]:
-    """Every claim the store holds. Both claim checks read the same query."""
-    raw = subprocess.run(
-        [".venv/bin/python", "-m", "conductor.candidate_review.cli", "claims"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if raw.returncode != 0:
-        raise HygieneError(f"claims query failed: {raw.stderr.strip()}")
-    return json.loads(raw.stdout).get("claims", [])
+    """Every claim the store holds. Both claim checks read the same query.
+
+    Used to answer by spawning ``.venv/bin/python -m conductor.candidate_review.cli
+    claims`` with ``cwd=ROOT``: a second interpreter per query, and once the
+    package lived under ``src/`` a relative ``.venv/bin/python`` resolved
+    against ``src/`` and the query stopped working at all. The CLI's own rows --
+    ``load_claims`` serialized exactly as its ``claims`` command prints them --
+    answer in-process with no subprocess.
+    """
+    from conductor.candidate_review.cli import _stored_fields
+
+    claims, _digest = load_claims(ROOT)
+    return [_stored_fields(claim) for claim in claims]
 
 
 def expired_claims() -> list[dict[str, str]]:
@@ -782,6 +805,32 @@ def cheap_exposure_counts(repo: Path = ROOT) -> dict[str, object]:
         "worktrees_skipped": worktrees_skipped,
         "branches_skipped": "PR lookup needs `gh`; run `python -m conductor.workspace_hygiene`",
     }
+
+
+def exposure_line(repo: Path = ROOT) -> str:
+    """The one-line EXPOSED summary the SessionStart inject carries.
+
+    Moved here from ``session_preamble._exposure_line`` when the line became
+    its own registry hook (``workspace_exposure_session``) so the native port
+    serves exactly this text. Degrades visibly rather than crashing the hook
+    or silently disappearing -- see ``cheap_exposure_counts`` for why branch
+    staleness (needs ``gh``, ~10s over this repo's branch count) is excluded
+    from this hook-safe path.
+    """
+    try:
+        counts = cheap_exposure_counts(repo)
+    except (ImportError, RuntimeError, OSError) as exc:
+        return f"EXPOSED: unavailable ({exc}). python -m conductor.workspace_hygiene"
+    landed = (
+        counts["landed_worktrees"] if counts["worktrees_skipped"] is None else "unknown"
+    )
+    return (
+        f"EXPOSED: {counts['local_only_commits']} local-only commit(s), "
+        f"{counts['stale_dirty_files']} stale dirty file(s), "
+        f"{landed} finished worktree(s) to remove, "
+        "branches skipped (needs gh). "
+        "python -m conductor.workspace_hygiene"
+    )
 
 
 def build_report(live_ref: str) -> Report:

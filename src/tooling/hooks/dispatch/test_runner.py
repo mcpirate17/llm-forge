@@ -161,6 +161,25 @@ def test_subprocess_timeout_is_an_error(tmp_path):
     assert outcome.error == "timed out after 1s"
 
 
+def test_workspace_exposure_adapter_emits_exposure_line_verbatim(tmp_path):
+    """The SessionStart EXPOSED hook's adapter is exactly ``exposure_line`` --
+    nothing may drift between the text the preamble-era line produced and the
+    one the native port is parity-tested against."""
+    ctx = runner.build_context(
+        "SessionStart", json.dumps({"source": "startup"}).encode(), tmp_path
+    )
+    output = adapters.workspace_exposure(ctx)
+    from conductor.workspace_hygiene import exposure_line
+
+    assert output == {
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": exposure_line(tmp_path),
+        }
+    }
+    assert output["hookSpecificOutput"]["additionalContext"].startswith("EXPOSED:")
+
+
 def test_select_uses_registry_matchers():
     assert [s.name for s in runner.select("PreToolUse", PAYLOAD)] == [
         "crg_refresh_report_pre",
@@ -171,6 +190,7 @@ def test_select_uses_registry_matchers():
     assert [s.name for s in runner.select("SessionStart", {"source": "resume"})] == [
         "crg_refresh_report_session",
         "session_start",
+        "workspace_exposure_session",
         "session_handoff",
         "native_freshness",
     ]

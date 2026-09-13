@@ -245,6 +245,14 @@ HOOKS: Final[tuple[HookSpec, ...]] = (
         argv=("tooling/hooks/claude/session-start.sh",),
     ),
     HookSpec(
+        "workspace_exposure_session",
+        "SessionStart",
+        "",
+        10,
+        "",
+        adapter="workspace_exposure",
+    ),
+    HookSpec(
         "session_handoff",
         "SessionStart",
         "",
@@ -304,11 +312,12 @@ def natively_served() -> frozenset[str]:
 
     Dormant by default (unset): nothing filters `select()`'s output unless a
     caller opts specific hooks in. `forge`'s own Rust dispatcher
-    (``native/forge/src/dispatch.rs``) sets this to ``"pre_bash"`` by default
-    as of the Rust port of `_bash_impact.py` -- `pre_bash`'s Python adapter
-    (which also ran `_bash_impact.main()` on the allow path) is fully
-    superseded by `native/forge/src/handlers.rs::precheck_pretooluse_bash`,
-    so served names always come with a matching entry in
+    (``native/forge/src/dispatch.rs``) sets this to the names it serves
+    natively -- the Bash `PreToolUse` set as of the #28 port, plus
+    ``workspace_exposure_session`` (the SessionStart EXPOSED line,
+    ``workspace_hygiene.exposure_line`, served by
+    `native/forge/src/workspace_hygiene.rs`) as of the workspace-hygiene
+    port -- so served names always come with a matching entry in
     `native_answers()`: `select()` dropping a served spec never drops a
     contribution, it is spliced back in by `runner.dispatch` instead. See
     `native/forge/src/handlers.rs`'s module doc for the full design.
