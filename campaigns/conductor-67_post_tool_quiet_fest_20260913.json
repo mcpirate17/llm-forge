@@ -1,0 +1,50 @@
+{
+  "campaign_id": "conductor-67_post_tool_quiet_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/claude/post_tool_quiet.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/claude/post_tool_quiet.py": "4b50a4c46ca25ea82a67a972faebc65d45cc99c7a4c2a5c2071f33506596e029"
+  },
+  "survivor_baseline": [
+    "constant_replace-2299f7f1574c-0",
+    "constant_replace-7b83782a810a-0",
+    "constant_replace-7f3fafdac086-0",
+    "constant_replace-9e8cf5a91716-1",
+    "constant_replace-9fefc49e34ea-0",
+    "constant_replace-9fefc49e34ea-1",
+    "constant_replace-e12e2f6b2261-1",
+    "return_value-612d33d559ba-0",
+    "return_value-612d33d559ba-3",
+    "return_value-612d33d559ba-5"
+  ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T01:14:13.475445+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/claude/test_post_tool_quiet.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/claude/test_post_tool_quiet.py": "72525cbeb1c59cd59ea83fa90eddc2e109e05ccab36d08ef4dd9815c804da7fe"
+  },
+  "title": "Generated mutants for src/tooling/hooks/claude/post_tool_quiet.py, scored on the survivor set"
+}

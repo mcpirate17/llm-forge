@@ -58,6 +58,14 @@ needs to find the host's own layout instead of assuming this repo's.
 `conductor.bootstrap` is an alias onto `conductor init` (`conductor/project_init.py`),
 not a separate implementation — see that module for the full contract.
 
+**Bounded tool output.** The dispatcher's `post_tool_quiet` hook bounds what Read, Grep
+and every MCP tool (`mcp__*`) return before the model sees it: above
+`TOOL_OUTPUT_QUIET_BYTES` (default 16000, `0` disables) a response is rewritten to
+head + elision marker + tail — Grep and MCP results spill to the same directory as
+`_bash_quiet`'s Bash spills (`$BASH_QUIET_SAVE_DIR`) and the marker names the spill
+path, while Read output is never spilled (the file is on disk) and the marker names the
+byte where it was cut plus the `Read(offset=..., limit=...)` call that reaches the rest.
+
 ## Documentation
 
 [`docs/`](docs/README.md) has one page per platform law (governance claims, the landing

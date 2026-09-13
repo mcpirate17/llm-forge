@@ -18,12 +18,13 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/tooling/hooks/dispatch/registry.py": "f99e68fe7331aa4790cb4c376ea0bbf68ddb50c16116eaf2059d56220b58508f"
+    "src/tooling/hooks/dispatch/registry.py": "f2977bd67468274868a412b0ffd462a352339f4b3d3553fb3c018fd08aa1542f"
   },
   "survivor_baseline": [
     "constant_replace-c47a780b3463-0",
     "return_value-20eab81ddfdc-0"
   ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
   "survivor_baseline_recorded": true,
   "survivor_baseline_recorded_at": "2026-09-13T00:57:35.429087+00:00",
   "test_argv": [

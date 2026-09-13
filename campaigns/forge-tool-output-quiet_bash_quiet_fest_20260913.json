@@ -1,5 +1,5 @@
 {
-  "campaign_id": "conductor-67_bash_quiet_fest_20260913",
+  "campaign_id": "forge-tool-output-quiet_bash_quiet_fest_20260913",
   "environment": {},
   "generator": {
     "exclude": [
@@ -18,7 +18,7 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/tooling/hooks/claude/_bash_quiet.py": "d1e31e989f364dde2dc95c354aedfa1f2ff5a139a8484f1c29bdadb4549c4c87"
+    "src/tooling/hooks/claude/_bash_quiet.py": "a152b2285ecaddea74cbe7ac11415b0327034afcdfdb9ea70583d65bec897703"
   },
   "survivor_baseline": [
     "arithmetic_op-8a8afb54e882-0",
@@ -36,7 +36,7 @@
     "return_value-fa30b476fa6b-0"
   ],
   "survivor_baseline_recorded": true,
-  "survivor_baseline_recorded_at": "2026-09-13T01:12:58.644063+00:00",
+  "survivor_baseline_recorded_at": "2026-09-13T01:26:19.306581+00:00",
   "test_argv": [
     "python",
     "-m",

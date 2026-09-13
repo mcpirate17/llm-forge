@@ -32,7 +32,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Callable, Final
 
 # The checkout served: the launcher/shell entry point passes PROJECT_DIR; run
 # directly, the body sits at <root>/tooling/hooks/claude/.
@@ -72,40 +72,68 @@ def _save(data: bytes) -> Path:
     return path
 
 
-def bound(data: bytes) -> bytes:
-    """Return *data* unchanged when small; otherwise head + marker + tail."""
-    if len(data) <= LIMIT_BYTES:
-        return data
+def split_head_tail(
+    data: bytes, limit_bytes: int
+) -> tuple[bytes, bytes, int, int]:
+    """Head and tail halves of the bounding split, with what they elide.
+
+    Line-count split first (``HEAD_LINES`` + ``TAIL_LINES``); a response of
+    few but very long lines falls back to a byte split. Returns
+    ``(head, tail, elided_bytes, elided_lines)`` so a caller can compose its
+    own elision marker -- Bash names a spill path, Read names a resume
+    offset -- without duplicating the split.
+    """
     lines = data.splitlines(keepends=True)
-    saved = _save(data)
-    where = saved.relative_to(REPO_ROOT) if saved.is_relative_to(REPO_ROOT) else saved
     if len(lines) <= HEAD_LINES + TAIL_LINES:
         # Few but very long lines: cut by bytes instead.
-        head, tail = data[: LIMIT_BYTES // 2], data[-(LIMIT_BYTES // 4) :]
-        elided = len(data) - len(head) - len(tail)
-        marker = f"\n... [elided {elided:,} bytes; full output: {where}] ...\n"
-        return head + marker.encode() + tail
-    head_lines, tail_lines = lines[:HEAD_LINES], lines[-TAIL_LINES:]
-    elided = len(lines) - HEAD_LINES - TAIL_LINES
-    marker = (
-        f"... [elided {elided:,} lines / {len(data) // 1024} KB; "
-        f"full output: {where}] ...\n"
+        head, tail = data[: limit_bytes // 2], data[-(limit_bytes // 4) :]
+        return head, tail, len(data) - len(head) - len(tail), 0
+    head, tail = b"".join(lines[:HEAD_LINES]), b"".join(lines[-TAIL_LINES:])
+    return (
+        head,
+        tail,
+        len(data) - len(head) - len(tail),
+        len(lines) - HEAD_LINES - TAIL_LINES,
     )
-    return b"".join(head_lines) + marker.encode() + b"".join(tail_lines)
+
+
+def bound(data: bytes, *, limit_bytes: int | None = None) -> bytes:
+    """Return *data* unchanged when small; otherwise head + marker + tail."""
+    limit = LIMIT_BYTES if limit_bytes is None else limit_bytes
+    if len(data) <= limit:
+        return data
+    saved = _save(data)
+    where = saved.relative_to(REPO_ROOT) if saved.is_relative_to(REPO_ROOT) else saved
+    head, tail, elided_bytes, elided_lines = split_head_tail(data, limit)
+    if elided_lines == 0:
+        marker = f"\n... [elided {elided_bytes:,} bytes; full output: {where}] ...\n"
+    else:
+        marker = (
+            f"... [elided {elided_lines:,} lines / {len(data) // 1024} KB; "
+            f"full output: {where}] ...\n"
+        )
+    return head + marker.encode() + tail
 
 
 def bound_response(response: Any) -> Any | None:
     """Bounded copy of a Bash tool response, or None when nothing exceeds the limit."""
     if isinstance(response, str):
-        out = bound(response.encode("utf-8", "surrogateescape"))
-        return None if len(out) == len(response) else out.decode("utf-8", "replace")
+        data = response.encode("utf-8", "surrogateescape")
+        out = bound(data)
+        return None if out == data else out.decode("utf-8", "replace")
     if not isinstance(response, dict):
         return None
     updated = dict(response)
     changed = False
     for key in TEXT_FIELDS:
         value = response.get(key)
-        if isinstance(value, str) and len(value) > LIMIT_BYTES:
+        # The declared bound is 8 KB of OUTPUT, not 8000 characters: a multi-byte
+        # response between 8000 characters and 8000 bytes used to slip through
+        # unbounded because the gate counted characters.
+        if (
+            isinstance(value, str)
+            and len(value.encode("utf-8", "surrogateescape")) > LIMIT_BYTES
+        ):
             updated[key] = bound(value.encode("utf-8", "surrogateescape")).decode(
                 "utf-8", "replace"
             )
@@ -113,7 +141,15 @@ def bound_response(response: Any) -> Any | None:
     return updated if changed else None
 
 
-def hook_output(payload: Any) -> dict[str, Any]:
+def rewrite_envelope(
+    payload: Any, bound_response: Callable[[Any], Any | None]
+) -> dict[str, Any]:
+    """The shared PostToolUse envelope every quiet hook returns.
+
+    Each hook passes its own ``bound_response`` (Bash bounds the
+    stdout/stderr/output fields, the tool hook bounds Read/Grep/MCP text);
+    the rewrite lands under the host's ``OUTPUT_FIELD``.
+    """
     out: dict[str, Any] = {"hookSpecificOutput": {"hookEventName": "PostToolUse"}}
     if not isinstance(payload, dict):
         return out
@@ -121,6 +157,10 @@ def hook_output(payload: Any) -> dict[str, Any]:
     if updated is not None:
         out["hookSpecificOutput"][OUTPUT_FIELD] = updated
     return out
+
+
+def hook_output(payload: Any) -> dict[str, Any]:
+    return rewrite_envelope(payload, bound_response)
 
 
 def main() -> int:
