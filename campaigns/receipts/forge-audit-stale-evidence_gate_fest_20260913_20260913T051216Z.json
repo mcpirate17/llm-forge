@@ -35,7 +35,7 @@
   "core_sha256": "3f09a0e62624ab0b2763db36119b215d72e88eb5180cbfffa72406eb933231a1",
   "detail": {
     "encoding": "superseded",
-    "superseded_by": "forge-audit-stale-evidence_gate_fest_20260913_20260913T053855Z.json"
+    "superseded_by": "forge-audit-stale-evidence_gate_fest_20260913_20260913T183817Z.json"
   },
   "engine_result": {
     "duration_seconds": 42.050613,

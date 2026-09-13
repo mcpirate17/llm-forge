@@ -39,7 +39,7 @@
   "core_sha256": "e969ce2e9fc4224b088fe01998010aeed83e8103ba9cc3c89ae5557fe7535ecd",
   "detail": {
     "encoding": "superseded",
-    "superseded_by": "forge-evidence-hash_mutation_patch_audit_fest_20260912_20260913T110619Z.json"
+    "superseded_by": "forge-evidence-hash_mutation_patch_audit_fest_20260912_20260913T175537Z.json"
   },
   "engine_result": {
     "duration_seconds": 68.939323,

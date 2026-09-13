@@ -34,7 +34,7 @@
   "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
   "detail": {
     "encoding": "superseded",
-    "superseded_by": "conductor-67_mutation_engine_fest_fest_20260913_20260913T043743Z.json"
+    "superseded_by": "conductor-67_mutation_engine_fest_fest_20260913_20260913T193053Z.json"
   },
   "engine_result": {
     "duration_seconds": 10.630425,
