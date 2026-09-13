@@ -10,6 +10,8 @@
 
 mod bash_guard;
 mod bash_impact;
+mod bounded_child;
+mod cap_enforce;
 mod civil;
 mod context_telemetry;
 mod crg_gate;
@@ -32,6 +34,8 @@ mod read_budget;
 mod receipt_show;
 mod route;
 mod session_end;
+mod subagent_stop;
+mod subagent_transcript;
 mod telemetry;
 mod tool_quiet;
 mod workspace_hygiene;
@@ -103,6 +107,11 @@ enum LedgerCommand {
         #[command(subcommand)]
         action: ledger::calibrate::CalibrateCommand,
     },
+    /// `SubagentStop`-triggered narrow upsert of one `task_dispatch` row
+    /// from a single subagent transcript (Phase 3 step 3, item 1).
+    RollupAgent(ledger::agent_upsert::AgentUpsertArgs),
+    /// Per-tier aggregation over `task_dispatch` (Phase 3 step 3, item 4).
+    Report(ledger::report::ReportArgs),
 }
 
 #[derive(Subcommand)]
@@ -117,6 +126,31 @@ enum MutationCommand {
 enum ReceiptCommand {
     /// Print a receipt with its slim detail block expanded back to full rows.
     Show(receipt_show::ShowArgs),
+}
+
+/// `forge route`'s cap for one subagent_type, for `ledger rollup-agent`
+/// (Phase 3 step 3, item 1): lives here, not in `ledger::agent_upsert`,
+/// because `route` is a top-level module the `ledger` tree cannot `use`
+/// when compiled standalone by the `tests/ledger_*.rs` integration
+/// binaries -- see `agent_upsert::run`'s doc comment. Falls back to the
+/// crate's `DEFAULT_CAP` if the embedded policy ever fails to parse, same
+/// as `dispatch.rs`/`cap_enforce.rs` do for the live `PreToolUse` seam.
+fn resolve_agent_cap(subagent_type: Option<&str>) -> u64 {
+    let policy = match route::Policy::embedded() {
+        Ok(policy) => policy,
+        Err(err) => {
+            eprintln!(
+                "forge ledger rollup-agent: embedded routing policy failed to parse ({err:#}); over_cap left unresolved against the crate default"
+            );
+            return ledger::agent::DEFAULT_CAP;
+        }
+    };
+    let input = route::AgentInput {
+        subagent_type: subagent_type.map(str::to_string),
+        requested_model: None,
+        description: None,
+    };
+    route::route(&policy, &input).cap_tokens
 }
 
 fn main() -> ExitCode {
@@ -199,6 +233,22 @@ fn main() -> ExitCode {
                             ExitCode::from(1)
                         }
                     }
+                }
+            },
+            LedgerCommand::RollupAgent(args) => {
+                match ledger::agent_upsert::run(args, resolve_agent_cap) {
+                    Ok(code) => ExitCode::from(code as u8),
+                    Err(err) => {
+                        eprintln!("forge ledger rollup-agent: {err:#}");
+                        ExitCode::from(1)
+                    }
+                }
+            }
+            LedgerCommand::Report(args) => match ledger::report::run(args) {
+                Ok(code) => ExitCode::from(code as u8),
+                Err(err) => {
+                    eprintln!("forge ledger report: {err:#}");
+                    ExitCode::from(1)
                 }
             },
         },
