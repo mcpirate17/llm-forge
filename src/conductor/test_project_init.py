@@ -208,8 +208,9 @@ def test_render_settings_with_a_forge_binary_switches_every_event_command() -> N
         )
 
 
+@pytest.mark.usefixtures("quiet_doctor")
 def test_plan_wires_settings_to_a_detected_project_local_forge_binary(
-    tmp_path: Path, quiet_doctor: None
+    tmp_path: Path,
 ) -> None:
     project = _repo(tmp_path)
     local = _write_executable_forge_binary(project)
@@ -223,8 +224,9 @@ def test_plan_wires_settings_to_a_detected_project_local_forge_binary(
         )
 
 
+@pytest.mark.usefixtures("quiet_doctor")
 def test_plan_keeps_the_python_launcher_when_no_forge_binary_is_found(
-    tmp_path: Path, quiet_doctor: None, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project = _repo(tmp_path)
     monkeypatch.setattr(pi.shutil, "which", lambda name: None)
