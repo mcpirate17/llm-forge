@@ -22,6 +22,7 @@ mod memory_index;
 mod mutation_coverage;
 mod mutation_evidence;
 mod mutation_manifest;
+pub mod mutation_plan;
 mod mutation_receipt;
 mod mutation_value;
 mod native_reuse;
@@ -47,6 +48,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     git_source::register(module)?;
     mutation_coverage::register(module)?;
     mutation_evidence::register(module)?;
+    mutation_plan::register(module)?;
     kb_retrieve::register(module)?;
     memory_chunking::register(module)?;
     memory_index::register(module)?;

@@ -1,0 +1,46 @@
+{
+  "campaign_id": "llm-b0_mutation_plan_bridge_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/mutation_plan_bridge.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/mutation_plan_bridge.py": "c7bd6bb4a658bba2494ea8e6b3941da63c7638f5973ed5a7b687c944b7c6ac6a"
+  },
+  "survivor_baseline": [
+    "comparison_op-b948cda7460c-0",
+    "constant_replace-0d7be2c73aa3-1",
+    "constant_replace-0ea2cb840414-1",
+    "constant_replace-30289d9b60f3-1",
+    "constant_replace-698a369451af-2",
+    "constant_replace-e08d4e060314-1",
+    "constant_replace-e7a4cb9b5a0b-0",
+    "negate_condition-1101761082e1-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T07:03:28.401561+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_plan_parity.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_plan_parity.py": "825f1f3ee6260d23a8ac60558c242b510ff25244ddba7d5aacbb446b0895dadc"
+  },
+  "title": "Generated mutants for src/conductor/mutation_plan_bridge.py, scored on the survivor set"
+}

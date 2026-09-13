@@ -1,0 +1,15 @@
+{
+  "already_covered": [],
+  "language": "rust",
+  "manifests": [],
+  "unpaired": [],
+  "unpaired_lines": 0,
+  "untested": [
+    {
+      "lines": 1,
+      "package": "crate_c",
+      "reason": "crate crate_c has no tests: no tests/*.rs and no #[cfg(test)] module. A mutation campaign over untested code would report every mutant as survived and prove nothing that reading the crate does not already say.",
+      "root": "crate_c"
+    }
+  ]
+}

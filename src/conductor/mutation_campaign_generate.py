@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
@@ -38,6 +39,7 @@ from conductor.candidate_review.ownership import (
     paths_overlap,
 )
 from conductor.mutation_campaign_model import REPO_ROOT, _sha256
+from conductor.mutation_plan_bridge import plan_native as _plan_native
 from conductor.mutation_scope import CampaignError
 from conductor.project_paths import campaigns_relative, campaigns_root
 
@@ -626,6 +628,44 @@ def _plan_rust(
     return manifests, already, untested
 
 
+def _plan_python_fallback(
+    language: str, repo_root: Path, ctx: dict[str, Any]
+) -> dict[str, Any]:
+    """The pre-native `plan()` body; kept for `CONDUCTOR_PLAN_IMPL=python`."""
+    covered = set() if ctx["include_covered"] else existing_subjects(repo_root)
+    scope = set(ctx["only_sources"]) if ctx["only_sources"] is not None else None
+    unpaired: list[dict[str, Any]] = []
+    untested: list[dict[str, Any]] = []
+    if language == "python":
+        manifests, unpaired, already = _plan_python(
+            repo_root=repo_root,
+            covered=covered,
+            scope=scope,
+            owner=ctx["owner"],
+            day=ctx["day"],
+            run_timeout_seconds=ctx["run_timeout_seconds"],
+            extra_tests=ctx["extra_tests"] or {},
+        )
+    else:
+        manifests, already, untested = _plan_rust(
+            repo_root=repo_root,
+            covered=covered,
+            scope=scope,
+            owner=ctx["owner"],
+            day=ctx["day"],
+            jobs=ctx["jobs"],
+            run_timeout_seconds=ctx["run_timeout_seconds"],
+        )
+    return {
+        "language": language,
+        "manifests": manifests,
+        "unpaired": unpaired,
+        "unpaired_lines": sum(int(u["lines"]) for u in unpaired),
+        "already_covered": already,
+        "untested": untested,
+    }
+
+
 def plan(
     language: str,
     *,
@@ -650,47 +690,29 @@ def plan(
     to answer a question about a single file. A second, narrower campaign is the
     supported answer; the newest valid receipt wins the evidence row, and the
     incumbent stays registered rather than being retired to make room.
-    """
 
+    The walk, pairing and manifest emission run natively (`conductor.mutation_plan_bridge.plan_native`)
+    unless `CONDUCTOR_PLAN_IMPL=python` selects the pure-Python fallback below.
+    """
     if language not in ("python", "rust"):
         raise CampaignError(f"unknown language {language!r}; known: python, rust")
     if extra_tests and language != "python":
         raise CampaignError("--extra-test pairs python subjects only")
-    day = day or datetime.now(UTC).strftime("%Y%m%d")
-    covered = set() if include_covered else existing_subjects(repo_root)
-    scope = set(only_sources) if only_sources is not None else None
-    unpaired: list[dict[str, Any]] = []
-    untested: list[dict[str, Any]] = []
-
-    if language == "python":
-        manifests, unpaired, already = _plan_python(
-            repo_root=repo_root,
-            covered=covered,
-            scope=scope,
-            owner=owner,
-            day=day,
-            run_timeout_seconds=run_timeout_seconds,
-            extra_tests=extra_tests or {},
-        )
-    else:
-        manifests, already, untested = _plan_rust(
-            repo_root=repo_root,
-            covered=covered,
-            scope=scope,
-            owner=owner,
-            day=day,
-            jobs=jobs,
-            run_timeout_seconds=run_timeout_seconds,
-        )
-
-    return {
-        "language": language,
-        "manifests": manifests,
-        "unpaired": unpaired,
-        "unpaired_lines": sum(int(u["lines"]) for u in unpaired),
-        "already_covered": already,
-        "untested": untested,
+    ctx = {
+        "owner": owner,
+        "day": day or datetime.now(UTC).strftime("%Y%m%d"),
+        "jobs": jobs,
+        "run_timeout_seconds": run_timeout_seconds,
+        "only_sources": only_sources,
+        "include_covered": include_covered,
+        "extra_tests": extra_tests,
     }
+    impl = (
+        _plan_python_fallback
+        if os.environ.get("CONDUCTOR_PLAN_IMPL") == "python"
+        else _plan_native
+    )
+    return impl(language, repo_root, ctx)
 
 
 def write(

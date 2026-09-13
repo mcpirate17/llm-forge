@@ -21,6 +21,7 @@ mod instant;
 mod interpreter;
 mod local_ai_policy;
 mod merge;
+mod mutation_plan;
 mod ownership;
 mod telemetry;
 mod tool_quiet;
@@ -49,6 +50,19 @@ enum Command {
         /// The event name, e.g. PreToolUse, PostToolUse, SessionStart, SessionEnd.
         event: String,
     },
+    /// Mutation-campaign commands that run natively, no Python interpreter.
+    Mutation {
+        #[command(subcommand)]
+        action: MutationCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum MutationCommand {
+    /// Report what `conductor.mutation_campaign_generate write` would emit,
+    /// without writing anything. Same computation as the Python `plan()`
+    /// function's native path (`CONDUCTOR_PLAN_IMPL` unset).
+    Plan(mutation_plan::PlanArgs),
 }
 
 fn main() -> ExitCode {
@@ -60,6 +74,15 @@ fn main() -> ExitCode {
                 eprintln!("forge hook {event}: {err:#}");
                 ExitCode::from(1)
             }
+        },
+        Command::Mutation { action } => match action {
+            MutationCommand::Plan(args) => match mutation_plan::run(args) {
+                Ok(code) => ExitCode::from(code as u8),
+                Err(err) => {
+                    eprintln!("forge mutation plan: {err:#}");
+                    ExitCode::from(1)
+                }
+            },
         },
     }
 }

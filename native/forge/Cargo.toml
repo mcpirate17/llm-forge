@@ -17,6 +17,12 @@ regex = "1"
 walkdir = "2"
 sha2 = "0.10"
 toml = "0.8"
+# `forge mutation plan` calls `compute_plan` directly -- no pyo3 boundary, no
+# Python interpreter. conductor-native's default build (no `extension-module`
+# feature) still links libpython so its own `cargo test` can run; pulling that
+# link into this binary too is an accepted tradeoff over duplicating the
+# ~400-line plan algorithm in a second, drift-prone copy (see mutation_plan.rs).
+conductor-native = { path = "../conductor-native" }
 
 [profile.release]
 opt-level = 3

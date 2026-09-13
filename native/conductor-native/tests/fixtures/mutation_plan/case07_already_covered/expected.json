@@ -1,0 +1,10 @@
+{
+  "already_covered": [
+    "pkg/g.py"
+  ],
+  "language": "python",
+  "manifests": [],
+  "unpaired": [],
+  "unpaired_lines": 0,
+  "untested": []
+}

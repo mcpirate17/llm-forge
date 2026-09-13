@@ -1,0 +1,49 @@
+{
+  "already_covered": [],
+  "language": "rust",
+  "manifests": [
+    {
+      "campaign_id": "llm-b0_crate_b_cargo_20260913",
+      "environment": {},
+      "generator": {
+        "exclude": [],
+        "jobs": 4,
+        "operators": [],
+        "options": {
+          "manifest_path": "crate_b/Cargo.toml",
+          "package": "crate_b",
+          "package_root": "crate_b"
+        },
+        "run_timeout_seconds": 1800,
+        "seed": 0,
+        "source": [
+          "src/lib.rs"
+        ]
+      },
+      "language": "rust",
+      "mutation_engine": "cargo-mutants",
+      "schema_version": 1,
+      "source_sha256": {
+        "crate_b/src/lib.rs": "d107563fbb33561ee350af69567b2abd106b57ea0f84fefb3496c85e36130317"
+      },
+      "survivor_baseline": [],
+      "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+      "survivor_baseline_recorded": false,
+      "test_argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "crate_b/Cargo.toml",
+        "--package",
+        "crate_b"
+      ],
+      "test_sha256": {
+        "crate_b/tests/integration.rs": "bc067b8bd30c0064c97068839d60e8a853d3197a3642ae01f26585f8de45a364"
+      },
+      "title": "Generated mutants for the crate_b crate, scored on the survivor set"
+    }
+  ],
+  "unpaired": [],
+  "unpaired_lines": 0,
+  "untested": []
+}
