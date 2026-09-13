@@ -627,3 +627,25 @@ always agree on. A live row followed by a full sweep of the same dispatch
 therefore collapses to exactly one row (`write_day_file`'s existing
 supersede-by-key behavior does the merge; no reconciliation pass is
 needed), instead of the two rows the mismatched keys used to produce.
+
+## Index layout: the memory_index sidecar
+
+`research/cache/memory_index.jsonl` is the source of truth for
+`conductor.memory_index` — 16K+ rows, ~400 MB, embeddings written as JSON
+float text. Parsing all of it cost 4-6 s per query, so query builds a binary
+sidecar once next to it and mmaps that instead (`docs/roadmap.md` Phase 4
+item 2d, PR #63):
+
+- **Path**: `<index>.sidecar` (e.g. `memory_index.jsonl.sidecar`, ~67 MB for
+  the current index).
+- **Header** (little-endian): magic `FORGEIDX`, format version, dims, row
+  count, source length + mtime_ns + sha256 of the JSONL's first 64 KB, and
+  the embedding fingerprint. Then an f32 row-major vector matrix and one u64
+  byte offset per row into the JSONL.
+- **Rebuild**: automatic, on the first query after any JSONL change (the
+  freshness check is len + mtime + prefix hash — the writer replaces the
+  file atomically, so every rebuild is one streaming pass, announced by one
+  `memory_index: building sidecar (N rows)` stderr line). To force a rebuild
+  by hand: delete the sidecar. A query only ever seeks the JSONL for its
+  top rows' payloads; the full-parse path survives as
+  `memory_index._query_index_file_scan`, the parity reference.

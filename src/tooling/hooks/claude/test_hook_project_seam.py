@@ -67,15 +67,30 @@ def _write_project_hook(root: Path, body: str) -> Path:
     return hook
 
 
-def _run_session_start(root: Path) -> subprocess.CompletedProcess[str]:
+def _run_session_start_with(
+    root: Path, extra_env: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
+    """Run the hook as the launcher would; `extra_env` overrides the pinned
+    Python-path defaults (FORGE_BIN set-but-empty keeps a forge on the test
+    machine's PATH out of the Python-path tests)."""
     return subprocess.run(
         ["bash", str(root / "tooling" / "hooks" / "claude" / "session-start.sh")],
         input=json.dumps(PAYLOAD),
         capture_output=True,
         text=True,
         cwd=str(root),
-        env={**os.environ, "A2A_AGENT_NAME": "", "PYTHONPATH": ""},
+        env={
+            **os.environ,
+            "A2A_AGENT_NAME": "",
+            "PYTHONPATH": "",
+            "FORGE_BIN": "",
+            **extra_env,
+        },
     )
+
+
+def _run_session_start(root: Path) -> subprocess.CompletedProcess[str]:
+    return _run_session_start_with(root, {})
 
 
 def _context(proc: subprocess.CompletedProcess[str]) -> str:
@@ -160,6 +175,56 @@ def test_session_start_survives_a_failing_project_extension(tmp_path: Path) -> N
     assert proc.returncode == 0, proc.stderr
     assert _context(proc) == "GENERIC"
     assert "project extension failed" in proc.stderr
+
+
+def test_session_start_prefers_forge_when_it_resolves(tmp_path: Path) -> None:
+    """FORGE_BIN replaces the Python preamble stages when it resolves.
+
+    The stub must receive `session preamble --host <root> --a2a-name <id>` and
+    its hook JSON is what reaches the context; the Python preamble stub (whose
+    additionalContext is GENERIC) proves it did not also run.
+    """
+    root = _fake_root(tmp_path)
+    marker = root / "forge-args.txt"
+    forge = root / "bin" / "forge"
+    forge.parent.mkdir(parents=True)
+    forge.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\n' \"$@\" > {marker}\n"
+        'printf \'{"hookSpecificOutput": {"hookEventName": "SessionStart",'
+        ' "additionalContext": "FORGE-PREAMBLE"}}\n\'\n'
+    )
+    forge.chmod(0o755)
+    proc = _run_session_start_with(root, {"FORGE_BIN": str(forge)})
+    assert proc.returncode == 0, proc.stderr
+    assert _context(proc) == "FORGE-PREAMBLE"
+    assert "python preamble (slower)" not in proc.stderr
+    args = marker.read_text().splitlines()
+    assert args[:3] == ["session", "preamble", "--host"]
+    assert args[3] == str(root)
+    assert args[4:] == ["--a2a-name", ""]
+
+    # And with FORGE_BIN unset, PATH resolution must find the same stub --
+    # the production shape: no env override, forge simply installed.
+    marker.unlink()
+    env = {
+        **os.environ,
+        "A2A_AGENT_NAME": "",
+        "PYTHONPATH": "",
+        "PATH": f"{forge.parent}{os.pathsep}{os.environ['PATH']}",
+    }
+    env.pop("FORGE_BIN", None)
+    proc = subprocess.run(
+        ["bash", str(root / "tooling" / "hooks" / "claude" / "session-start.sh")],
+        input=json.dumps(PAYLOAD),
+        capture_output=True,
+        text=True,
+        cwd=str(root),
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert _context(proc) == "FORGE-PREAMBLE"
+    assert marker.read_text().splitlines()[3] == str(root)
 
 
 def test_session_start_ignores_a_non_executable_project_file(tmp_path: Path) -> None:

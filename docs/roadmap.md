@@ -132,6 +132,13 @@ agent tokens. Stop porting; finish Phase 3, then install.
    root, the embedded routing policy, and a live hook roundtrip that
    writes nothing. One line per check, exit 1 names the broken piece.
    DONE PR #61 (`docs/install.md`, "Verify the install").
+2d. (GLM) memory_index sidecar: query built a 406 MB JSONL parse into
+   every call (measured 4.3 s on the real index); a binary f32 matrix +
+   row-offset sidecar beside the JSONL (mmap, rank all rows, seek only
+   the winners; identical top-10 on five real queries, scores within
+   1e-4) makes warm query 0.74 s end to end -- the JSON parse is gone,
+   the remaining time is process start + the embed call. DONE PR #63
+   (4.28 s -> 0.74 s median; `docs/ledger.md`, "Index layout").
 2e. (Claude) `forge hooks install --takeover`: one command retires the
    host's Python dispatcher entry for every event forge fully covers
    natively (`native/forge/src/takeover.rs::coverage`), records what it
@@ -143,6 +150,16 @@ agent tokens. Stop porting; finish Phase 3, then install.
    quantifying the double-run cost, not yet realized since Python stays
    wired there) -- see the coverage table and proof in the PR. DONE
    PR #64 (`docs/install.md`, "Take over from the Python dispatcher").
+2f. (GLM) session_preamble + active_state in forge: the SessionStart
+   inject pair (`conductor.active_state update` 37 ms + Python
+   `conductor.session_preamble hook` 89 ms, measured 2026-09-13) ports
+   to `forge session preamble` / `forge session state` -- one process,
+   state refresh folded into the render, byte-identical payload and
+   active_state.json on the LLM host. `session-start.sh` prefers the
+   binary when `FORGE_BIN` or PATH resolves it (16 ms vs 126 ms for the
+   Python pair, same host and day; 3 ms on llm-forge itself). DONE
+   PR #65 (`docs/install.md`, "Session start in Rust").
+
 2g. (Claude) standalone Bash guard + matcher narrowing: `forge hook
    PreToolUse` under `FORGE_HOOK_STANDALONE=1` now runs the native Bash
    guard (`crg_refresh_report_pre`, `crg_gate_verify_bash`, `pre_bash`,
