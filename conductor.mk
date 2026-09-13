@@ -44,7 +44,7 @@ CONDUCTOR_GATE_FINDINGS_DIR ?= $(CONDUCTOR_REPORTS_DIR)/gate_findings
 	dupes dupes-jscpd dupes-jscpd-check dupes-pmd dupes-pmd-check dupes-pylint \
 	dupes-nicad dupes-deep dupes-deep-check \
 	mutation-retention mutation-patch-audit mutation-patch-audit-record mutation-reap \
-	ledger-rollup ledger-report cost-budget-audit cost-budget-record \
+	ledger-rollup ledger-report route-report cost-budget-audit cost-budget-record \
 	graph-seed-worktree worktree-reap workspace-hygiene branch-policy \
 	branch-policy-audit checkout-sync crg-probe crg-sync crg-check \
 	dead-tests test-graph codex-journal notebooklm-bundle notebooklm-research-bundle \
@@ -279,6 +279,20 @@ ledger-rollup:  ## Roll this project's harness transcripts into the ledger root
 ledger-report:  ## Print the three budget metrics for the window, one line per metric with status
 	$(PYTHON) -m conductor.cost_ledger --repo-root "$(CONDUCTOR_HOST_ROOT)" \
 		--ledger-root "$(LEDGER_ROOT)" report $(LEDGER_ARGS)
+
+# The routing side of the same ledger: forge's per-tier dispatch table incl.
+# over_cap, would_deny, would_route, rework and ci_red over a trailing
+# window. Goes straight to the binary (no Python shim): the table is the
+# thing itself, and `forge` is installable standalone via cargo.
+FORGE ?= forge
+ROUTE_REPORT_ARGS ?= --window-days 7
+
+route-report:  ## Per-tier dispatch table: over_cap, would_deny, would_route, rework, ci_red
+	@if ! command -v "$(FORGE)" >/dev/null 2>&1; then \
+		echo "forge is not on PATH: cargo install --git https://github.com/mcpirate17/llm-forge --locked forge" >&2; \
+		exit 2; \
+	fi
+	"$(FORGE)" ledger report --ledger-root "$(LEDGER_ROOT)" $(ROUTE_REPORT_ARGS)
 
 # The audit reads whatever rows sit in the ledger root, so refresh them first
 # (ledger-rollup above) rather than auditing a stale window.
