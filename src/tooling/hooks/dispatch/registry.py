@@ -313,10 +313,11 @@ def natively_served() -> frozenset[str]:
     Dormant by default (unset): nothing filters `select()`'s output unless a
     caller opts specific hooks in. `forge`'s own Rust dispatcher
     (``native/forge/src/dispatch.rs``) sets this to the names it serves
-    natively -- the Bash `PreToolUse` set as of the #28 port, plus
-    ``workspace_exposure_session`` (the SessionStart EXPOSED line,
-    ``workspace_hygiene.exposure_line`, served by
-    `native/forge/src/workspace_hygiene.rs`) as of the workspace-hygiene
+    natively -- the Bash `PreToolUse` set as of the #28 port, the
+    `PostToolUse` output-bounding pair (`post_bash_quiet`,
+    `post_tool_quiet`) as of #31, and ``workspace_exposure_session`` (the
+    SessionStart EXPOSED line, ``workspace_hygiene.exposure_line``, served
+    by `native/forge/src/workspace_hygiene.rs`) as of the workspace-hygiene
     port -- so served names always come with a matching entry in
     `native_answers()`: `select()` dropping a served spec never drops a
     contribution, it is spliced back in by `runner.dispatch` instead. See

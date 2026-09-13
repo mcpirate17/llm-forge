@@ -1,0 +1,37 @@
+{
+  "campaign_id": "glm_session_preamble_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/session_preamble.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/session_preamble.py": "2cd0acf3a7e6597f572122716e1d3ff35d82aeda1534ff3c9de3b126a106e94f"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T06:28:30.948460+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_session_preamble.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_session_preamble.py": "fe07792707800ed02ba318de2a0584ade61fa202f1b2b1b16d69fab2729f2947"
+  },
+  "title": "Generated mutants for src/conductor/session_preamble.py, scored on the survivor set"
+}
