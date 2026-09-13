@@ -63,3 +63,11 @@ the entries install recognises (all five events, whatever the install
 flags were), prints what it removed, and deliberately leaves the backup in
 place — rollback is either `uninstall` or restoring
 `.claude/settings.pre-forge.bak.json` by hand.
+
+## Known host issues fixed
+
+SessionEnd/SubagentStop/Stop no longer emit `hookSpecificOutput` (Claude
+Code 2.1.268 rejected it); the hook doctor no longer calls a compiled
+`forge` binary "dead" for lacking a shebang; a mutation receipt's filename
+now always carries the receipt's own `generated_at`, not a second clock
+read.
