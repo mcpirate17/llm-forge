@@ -54,8 +54,12 @@ def _specific(output: dict[str, Any]) -> dict[str, Any]:
 
 def merge(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
     payload = [
-        {"name": outcome.name, "output": outcome.output, "error": outcome.error,
-         "fail_closed": outcome.fail_closed}
+        {
+            "name": outcome.name,
+            "output": outcome.output,
+            "error": outcome.error,
+            "fail_closed": outcome.fail_closed,
+        }
         for outcome in outcomes
     ]
     return json.loads(hook_merge_native(event, json.dumps(payload)))
@@ -139,7 +143,21 @@ def _merge_reference(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
         specific_out["additionalContext"] = SEPARATOR.join(contexts)
     specific_out.update(rewrites)
     specific_out.update(extra_specific)
+    return _assemble(
+        event, specific_out, block_reasons, stop, stop_reasons, suppress, system
+    )
 
+
+def _assemble(
+    event: str,
+    specific_out: dict[str, Any],
+    block_reasons: list[str],
+    stop: bool,
+    stop_reasons: list[str],
+    suppress: bool,
+    system: list[str],
+) -> dict[str, Any]:
+    """Fold the collected votes into the top-level hook result."""
     result: dict[str, Any] = {}
     if event in _SPECIFIC_SCHEMA_EVENTS:
         result["hookSpecificOutput"] = specific_out
