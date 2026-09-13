@@ -43,7 +43,13 @@ from conductor.candidate_review.ownership import (
 )
 from conductor.dead_tests import tracked_files
 from conductor.worktree_lease import is_linked_worktree, lease_state
-from conductor.project_paths import campaigns_relative, host_root, registry_relative
+from conductor.project_paths import (
+    campaigns_relative,
+    host_root,
+    integration_branch,
+    integration_refs,
+    registry_relative,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -123,7 +129,7 @@ def _default_branch() -> str:
     head = ROOT / ".git" / "refs" / "remotes" / "origin" / "HEAD"
     if head.is_file():
         return head.read_text().strip().rsplit("/", 1)[-1]
-    return "master"
+    return integration_branch(host_root(ROOT))
 
 
 def redundant_branches(live_ref: str, protected: Iterable[str]) -> list[dict[str, str]]:
@@ -213,7 +219,7 @@ def worktree_state() -> tuple[list[str], list[dict[str, object]]]:
 def _live_ref_or_default(repo: Path = ROOT) -> str:
     """The ref the hook judges containment against: the remote integration line.
 
-    Prefers ``origin/master`` over the local branch. A local ``master`` can sit days
+    Prefers ``origin/<branch>`` over the local branch. A local branch can sit days
     behind origin -- this checkout was 3 commits behind while four PRs landed -- and a
     worktree judged against a stale local tip reads as unlanded long after its work
     merged, which is the opposite of the nag this check exists to produce.
@@ -221,10 +227,7 @@ def _live_ref_or_default(repo: Path = ROOT) -> str:
     Raises rather than guessing when neither exists: a containment check with no line
     to check against would silently report every worktree as finished.
     """
-    candidates = (
-        f"origin/{branch_policy.INTEGRATION_BRANCH}",
-        branch_policy.INTEGRATION_BRANCH,
-    )
+    candidates = integration_refs(host_root(repo))
     for ref in candidates:
         probe = subprocess.run(
             ["git", "rev-parse", "--verify", "--quiet", ref],

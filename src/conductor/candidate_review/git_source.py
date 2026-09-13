@@ -13,6 +13,7 @@ from dataclasses import replace
 from pathlib import Path, PurePosixPath
 from typing import Protocol
 
+from conductor import project_paths
 from conductor.candidate_review.model import Candidate, Change, TreeEntry
 
 EMPTY_TREE_OID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # pragma: allowlist secret
@@ -29,8 +30,10 @@ class _ChangeClassifier(Protocol):
 
 MAX_MATERIALIZED_BLOB_BYTES = 64 * 1024 * 1024
 MAX_MATERIALIZED_TREE_BYTES = 2 * 1024 * 1024 * 1024
-# The integration line, in resolution order; CONDUCTOR_INTEGRATION_REF overrides it.
-DEFAULT_INTEGRATION_REFS: tuple[str, ...] = ("origin/master", "master")
+# A single full ref (e.g. a PR's merge-base target) that overrides the host's
+# configured integration line outright; distinct from $CONDUCTOR_INTEGRATION_BRANCH
+# (a branch name the host's own line is renamed to), which `integration_refs` below
+# falls through to via `project_paths`.
 INTEGRATION_REF_ENV = "CONDUCTOR_INTEGRATION_REF"
 
 
@@ -123,10 +126,18 @@ def _head_or_empty(repo: Path) -> tuple[str | None, str]:
 
 
 def integration_refs() -> tuple[str, ...]:
-    """Refs that name the integration line, most specific first."""
+    """Refs that name the integration line, most specific first.
+
+    $CONDUCTOR_INTEGRATION_REF, when set, wins outright as a single explicit ref.
+    Otherwise resolved fresh from the host's configured integration branch (never
+    cached), against ``project_paths.host_root()`` -- the enclosing repo of the
+    current directory, matching how this function is always invoked in practice.
+    """
 
     override = os.environ.get(INTEGRATION_REF_ENV, "").strip()
-    return (override,) if override else DEFAULT_INTEGRATION_REFS
+    if override:
+        return (override,)
+    return project_paths.integration_refs(project_paths.host_root())
 
 
 def resolve_integration_base(
