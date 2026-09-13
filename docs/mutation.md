@@ -152,7 +152,7 @@ CPython stops reading beside-source caches entirely, so a stale one cannot be
 read even where it already exists.
 
 Only the mutated file can be stale — every other module is byte-identical
-across the mutants of one run — so PR #52 caches instead of refusing to write:
+across the mutants of one run — so PR #53 caches instead of refusing to write:
 `PYTHONDONTWRITEBYTECODE` is gone (PR #51's version set it, making every
 child recompile every module and costing the retention campaign 2.6x wall
 time), unmutated modules compile once into the run's prefix and are served
