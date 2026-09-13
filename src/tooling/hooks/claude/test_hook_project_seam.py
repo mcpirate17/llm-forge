@@ -197,8 +197,9 @@ def test_obsidian_sync_resolves_the_repo_root_from_its_own_location(
 ) -> None:
     monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
     root = osync.repo_root()
-    assert (root / "tooling" / "hooks" / "claude" / "obsidian_sync.py").is_file()
-    assert root == HOOKS.parents[2]
+    module = root / "src" / "tooling" / "hooks" / "claude" / "obsidian_sync.py"
+    assert module.is_file()
+    assert root == HOOKS.parents[3]
     # Installed outside a checkout: git cannot answer, the layout still can.
     stray = tmp_path / "elsewhere" / "tooling" / "hooks" / "claude"
     stray.mkdir(parents=True)

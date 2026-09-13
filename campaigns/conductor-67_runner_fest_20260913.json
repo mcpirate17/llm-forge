@@ -1,0 +1,64 @@
+{
+  "campaign_id": "conductor-67_runner_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/dispatch/runner.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/runner.py": "bab189f470e567b0cb8aa20f6cc6fdb40829d54be473dc29f7bc63136dcc23c3"
+  },
+  "survivor_baseline": [
+    "arithmetic_op-0e293ddda530-0",
+    "arithmetic_op-0e293ddda530-1",
+    "arithmetic_op-d5a95470c447-0",
+    "arithmetic_op-d5a95470c447-1",
+    "arithmetic_op-d5a95470c447-2",
+    "arithmetic_op-d5a95470c447-3",
+    "boolean_op-091edbe7142a-0",
+    "boolean_op-091edbe7142a-3",
+    "boolean_op-091edbe7142a-5",
+    "comparison_op-160752f38640-1",
+    "constant_replace-26e4236d93ad-0",
+    "constant_replace-53b06adea51d-0",
+    "constant_replace-53b06adea51d-2",
+    "constant_replace-7f670421e827-0",
+    "constant_replace-973572857a5a-0",
+    "constant_replace-973572857a5a-1",
+    "constant_replace-9d68ac2cc54e-0",
+    "constant_replace-9d68ac2cc54e-1",
+    "constant_replace-9d68ac2cc54e-2",
+    "constant_replace-c2da4e9571aa-0",
+    "constant_replace-c5d8ab6891f7-0",
+    "constant_replace-d3db2cdc3f21-0",
+    "constant_replace-fb3ee6edf31a-0",
+    "negate_condition-f746e403674f-0",
+    "return_value-f7c0ee36aef4-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:31:22.768130+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test_runner.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test_runner.py": "e7551f22bc9f8b9b26d7edfba0db4fa78fc089df4ab0984a73b1c5ff507e71bb"
+  },
+  "title": "Generated mutants for src/tooling/hooks/dispatch/runner.py, scored on the survivor set"
+}

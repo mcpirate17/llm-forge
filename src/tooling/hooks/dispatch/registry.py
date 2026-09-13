@@ -199,6 +199,14 @@ HOOKS: Final[tuple[HookSpec, ...]] = (
         adapter="post_bash_quiet",
     ),
     HookSpec(
+        "post_tool_quiet",
+        "PostToolUse",
+        "Read|Grep|mcp__.*",
+        10,
+        "",
+        adapter="post_tool_quiet",
+    ),
+    HookSpec(
         "context_telemetry",
         "PostToolUse",
         ".*",

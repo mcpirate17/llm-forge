@@ -1,0 +1,48 @@
+{
+  "campaign_id": "conductor-67_mutation_retention_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/mutation_retention.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/mutation_retention.py": "c395ea0440bc9c95e9dbbd96924eb61de92c18680485f60f437473693a1d0b6c"
+  },
+  "survivor_baseline": [
+    "break_continue-60540d7f444b-0",
+    "break_continue-60540d7f444b-1",
+    "break_continue-60540d7f444b-2",
+    "break_continue-60540d7f444b-4",
+    "break_continue-60540d7f444b-5",
+    "constant_replace-25d922089956-0",
+    "constant_replace-37eedecd415f-0",
+    "constant_replace-583e145a9844-0",
+    "constant_replace-a72c0fa77daf-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:47:49.190688+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_retention.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_retention.py": "57ad005122368780c0250133136fa38838356540b4ed0db9695dd880b1307ffc"
+  },
+  "title": "Generated mutants for src/conductor/mutation_retention.py, scored on the survivor set"
+}

@@ -1,0 +1,38 @@
+{
+  "campaign_id": "conductor-67_merge_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/dispatch/merge.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/merge.py": "ecfdc9d78eb5b1db2dbda2888ed0e22d72f270a9fdbc18e069edce7d43aa8f54"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:29:10.619464+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test_merge.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test_merge.py": "85a947f4ab7b2bb881c0523acb7d3d21ff198551fe6b52179a6e41a490db79a2"
+  },
+  "title": "Generated mutants for src/tooling/hooks/dispatch/merge.py, scored on the survivor set"
+}
