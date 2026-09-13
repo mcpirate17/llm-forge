@@ -146,8 +146,11 @@ Every new or behavior-changing test requires a current registered automatic
 `PASS` receipt before handoff or landing. A zero process exit is insufficient:
 `RATCHET_HELD` retains diagnostic survivor history but is not PASS evidence.
 
-1. Register the manifest path in the central registry or a narrow `registry.d`
-   fragment. Registration contains pointers, not hand-authored receipt hashes.
+1. Register the manifest path as a one-row `registry.d/<campaign-id>.json`
+   fragment (`{"manifest": "campaigns/<id>.json"}`). The shared `campaigns`
+   array is empty since the one-shot split and is never appended to again --
+   two lanes registering in parallel must not write one file. Registration
+   contains pointers, not hand-authored receipt hashes.
 2. Publish the current complete PASS receipt with the runner's `--receipt`
    option into `conductor/mutation_campaigns/receipts/`. Keep diagnostic reruns
    in ignored `research/reports/mutation_testing/`; do not commit every run.
