@@ -1,0 +1,37 @@
+{
+  "campaign_id": "forge-host-root_notebooklm_bundle_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/notebooklm_bundle.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/notebooklm_bundle.py": "430f6c832d50129911270c8194e54ca612f97e3720267938703de8f9fefaa7a7"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_notebooklm_bundle.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_notebooklm_bundle.py": "aef806415d40f98682044623d90c7775be06e5a78057f2cd2c63e25cb16fed01"
+  },
+  "title": "Generated mutants for src/conductor/notebooklm_bundle.py, scored on the survivor set"
+}

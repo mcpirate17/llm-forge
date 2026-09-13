@@ -1,0 +1,37 @@
+{
+  "campaign_id": "forge-host-root_check_protected_deletes_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/check_protected_deletes.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/check_protected_deletes.py": "17bb08dedae02ef674721be1044670b32d826f137c4ba91bd1f4d110096e7797"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_check_protected_deletes.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_check_protected_deletes.py": "a770dce37d328546d241feab94bc9b57e34a927889f03e36cfe9788ebcde25fe"
+  },
+  "title": "Generated mutants for src/conductor/check_protected_deletes.py, scored on the survivor set"
+}
