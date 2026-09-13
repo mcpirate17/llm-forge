@@ -454,7 +454,9 @@ fn session_start_delegates_and_carries_the_exposure_answer() {
 
 /// Events with no native handlers at all (`SessionEnd` today) take the bare
 /// delegation arm: payload forwarded, no native env claimed beyond the
-/// documented empty escape hatch.
+/// documented empty escape hatch. Since design step 6 the native SessionEnd
+/// handler runs its ledger rollup first -- this payload carries no
+/// `transcript_path`, so the rollup is a stderr note and nothing else.
 #[test]
 fn events_without_native_handlers_still_delegate() {
     let project = tempdir();
@@ -473,6 +475,72 @@ fn events_without_native_handlers_still_delegate() {
         "no native hooks are claimed for an event forge does not answer"
     );
     assert_eq!(stdout["echoed"]["reason"], "clear");
+}
+
+/// Design step 6, end to end: `forge hook SessionEnd` rolls the ending
+/// session's own transcript (the payload's `transcript_path`) into the ledger
+/// via a 2 s-bounded `forge ledger rollup` child, then still delegates the
+/// event -- the rollup writes under `LEDGER_ROOT` and the stub dispatcher's
+/// echo proves both halves ran, in that order, with one process exit code 0.
+#[test]
+fn session_end_rolls_the_ending_session_into_the_ledger() {
+    let project = tempdir();
+    stub_project(project.path());
+    let transcript = project.path().join("transcript.jsonl");
+    std::fs::write(
+        &transcript,
+        concat!(
+            r#"{"uuid":"u1","session_id":"sess-end-1","timestamp":"2026-09-13T00:00:00Z","type":"assistant","message":{"role":"assistant","model":"m","usage":{"input_tokens":1,"output_tokens":1,"cache_read_input_tokens":0,"cache_creation_input_tokens":0},"content":[{"type":"text","text":"x"}]}}"#,
+            "\n"
+        ),
+    )
+    .expect("write transcript");
+    let ledger_root = tempdir();
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
+    cmd.arg("hook")
+        .arg("SessionEnd")
+        .env("CLAUDE_PROJECT_DIR", project.path())
+        .env("LEDGER_ROOT", ledger_root.path())
+        .env_remove("CONTEXT_TELEMETRY_PATH")
+        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
+        .env_remove("FORGE_NATIVE_HOOKS")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let payload = format!(
+        r#"{{"session_id":"s","reason":"clear","transcript_path":"{}"}}"#,
+        transcript.display()
+    );
+    let mut child = cmd.spawn().expect("spawn forge");
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(payload.as_bytes())
+        .expect("write stdin");
+    let out = child.wait_with_output().expect("wait for forge");
+
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "the hook still exits 0 whatever the rollup did: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let rollup = ledger_root
+        .path()
+        .join("session_rollup")
+        .join("2026-09-13.jsonl");
+    let text = std::fs::read_to_string(&rollup)
+        .unwrap_or_else(|err| panic!("SessionEnd rollup missing ({err}): {}", rollup.display()));
+    assert!(
+        text.contains(r#""session_id":"sess-end-1""#),
+        "the ending session's own row: {text}"
+    );
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran after the rollup");
+    assert_eq!(stdout["event"], "SessionEnd");
+    assert_eq!(stdout["echoed"]["session_id"], "s");
 }
 
 /// An empty `CLAUDE_PROJECT_DIR` must fall back to the working directory (the

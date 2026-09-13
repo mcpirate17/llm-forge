@@ -44,7 +44,7 @@ CONDUCTOR_GATE_FINDINGS_DIR ?= $(CONDUCTOR_REPORTS_DIR)/gate_findings
 	dupes dupes-jscpd dupes-jscpd-check dupes-pmd dupes-pmd-check dupes-pylint \
 	dupes-nicad dupes-deep dupes-deep-check \
 	mutation-retention mutation-patch-audit mutation-patch-audit-record \
-	cost-budget-audit cost-budget-record \
+	ledger-rollup ledger-report cost-budget-audit cost-budget-record \
 	graph-seed-worktree worktree-reap workspace-hygiene branch-policy \
 	branch-policy-audit checkout-sync crg-probe crg-sync crg-check \
 	dead-tests test-graph codex-journal notebooklm-bundle notebooklm-research-bundle \
@@ -241,19 +241,39 @@ mutation-patch-audit-record:  ## Re-record the reproducibility baseline after re
 # ── Cost ledger budget ratchet (docs/design/cost_ledger.md section 4) ───
 # Shells to `forge ledger audit` (native/forge/src/ledger/audit.rs); the Python
 # side only resolves the binary and maps its verdict to a gate phase / exit
-# code -- see src/conductor/cost_budget_audit.py.
+# code -- see src/conductor/cost_budget_audit.py. ledger-rollup/ledger-report
+# go through conductor.cost_ledger, the verbatim-forwarding shim (step 6).
 
 COST_BUDGET_ARGS ?=
+LEDGER_ROOT ?= /mnt/data/llm/ledger
+LEDGER_ARGS ?=
 
-cost-budget-audit:  ## Check hook latency, resend bytes and tokens/landed-PR against the recorded baseline
-	$(PYTHON) -m conductor.cost_budget_audit --repo-root "$(CONDUCTOR_HOST_ROOT)" $(COST_BUDGET_ARGS)
+# Rolls this project's harness transcripts (~/.claude/projects/<this repo,
+# dashes for slashes>) into the ledger root, joined to this repository's
+# landed commits. Idempotent per session per day: rerunning replaces a
+# session's rows for that day instead of duplicating them, which is what
+# makes cost-budget-audit's dependency below safe -- the audit always reads
+# fresh rows, never a stale or empty root.
+ledger-rollup:  ## Roll this project's harness transcripts into the ledger root
+	$(PYTHON) -m conductor.cost_ledger --repo-root "$(CONDUCTOR_HOST_ROOT)" \
+		--ledger-root "$(LEDGER_ROOT)" rollup $(LEDGER_ARGS)
+
+ledger-report:  ## Print the three budget metrics for the window, one line per metric with status
+	$(PYTHON) -m conductor.cost_ledger --repo-root "$(CONDUCTOR_HOST_ROOT)" \
+		--ledger-root "$(LEDGER_ROOT)" report $(LEDGER_ARGS)
+
+# The audit reads whatever rows sit in the ledger root, so refresh them first
+# (ledger-rollup above) rather than auditing a stale window.
+cost-budget-audit: ledger-rollup  ## Check hook latency, resend bytes and tokens/landed-PR against the recorded baseline
+	$(PYTHON) -m conductor.cost_budget_audit --repo-root "$(CONDUCTOR_HOST_ROOT)" \
+		--ledger-root "$(LEDGER_ROOT)" $(COST_BUDGET_ARGS)
 
 # Records this window's metrics as the new baseline. Run only after a deliberate
 # improvement or an accepted regression -- recording a grown baseline is how the
 # ratchet is defeated.
 cost-budget-record:  ## Re-record the cost-ledger budget baseline for the current window
 	$(PYTHON) -m conductor.cost_budget_audit --repo-root "$(CONDUCTOR_HOST_ROOT)" \
-		--record $(COST_BUDGET_ARGS)
+		--ledger-root "$(LEDGER_ROOT)" --record $(COST_BUDGET_ARGS)
 
 # ── Worktree and graph maintenance ───────────────────────────────────────
 # graph-seed-worktree and worktree-reap manage OTHER worktrees a host project

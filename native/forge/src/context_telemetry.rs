@@ -44,21 +44,33 @@ pub const MAX_LOG_BYTES: u64 = 10 * 1024 * 1024;
 pub const MAX_ROTATED_LOGS: usize = 5;
 
 /// `adapters._telemetry_path`: `CONTEXT_TELEMETRY_PATH` when set, else the
-/// module's `DEFAULT_PATH`. The default is derived from the module file's own
-/// location (`src/conductor/context_telemetry.py` -> `<root>/src/research/...`),
-/// which for a checkout-rooted session is `project_root()/src/research/...` --
-/// ported path-for-path, including the `src/` quirk (an inherited defect on
-/// main; see the PR body's Debt section), so native and Python records land
-/// in one file.
-pub fn telemetry_path(root: &Path) -> PathBuf {
+/// module's `DEFAULT_PATH`. The default used to live inside the checkout
+/// (`<root>/src/research/tmp/...`, an inherited defect from PR #36's port)
+/// -- it now lives under the ledger root (`<ledger_root>/telemetry/...`,
+/// `LEDGER_ROOT` env var else `/mnt/data/llm/ledger/`), the same root
+/// `forge ledger rollup` writes to, so the SessionEnd rollup finds the
+/// telemetry beside the tables it feeds (`hook_rollup`) and no hook ever
+/// writes inside a read-only checkout. Native and Python records still land
+/// in one file: both twins resolve this exact shape.
+pub fn telemetry_path() -> PathBuf {
     if let Ok(raw) = std::env::var("CONTEXT_TELEMETRY_PATH") {
         return PathBuf::from(raw);
     }
-    root.join("src")
-        .join("research")
-        .join("tmp")
+    ledger_root()
+        .join("telemetry")
         .join("context_telemetry")
         .join("events.jsonl")
+}
+
+/// `LEDGER_ROOT` env var else the same default `forge ledger rollup`
+/// (`ledger::rollup::DEFAULT_LEDGER_ROOT`) uses -- duplicated rather than
+/// imported for the same reason the civil-calendar helpers are: this module
+/// is compiled standalone via `#[path]` in the integration tests.
+fn ledger_root() -> PathBuf {
+    std::env::var("LEDGER_ROOT")
+        .ok()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/mnt/data/llm/ledger"))
 }
 
 /// `context_telemetry.provider()`: which harness family is recording, by
@@ -832,8 +844,8 @@ pub fn record_encoded(path: &Path, encoded: &[u8]) {
 /// in for the record builders alone (e.g. `post_tool_zero_start_parity.rs`) --
 /// the same pattern `instant.rs`'s `isoformat_millis_utc` established.
 #[allow(dead_code)]
-pub fn record_event(payload: &Value, root: &Path) {
-    record_encoded(&telemetry_path(root), &event_line(payload));
+pub fn record_event(payload: &Value) {
+    record_encoded(&telemetry_path(), &event_line(payload));
 }
 
 /// `adapters._telemetry`'s hook-context variant: record only when the hook
@@ -842,12 +854,12 @@ pub fn record_event(payload: &Value, root: &Path) {
 /// in for the record builders alone (e.g. `post_tool_zero_start_parity.rs`) --
 /// the same pattern `instant.rs`'s `isoformat_millis_utc` established.
 #[allow(dead_code)]
-pub fn record_hook_context(hook: &str, hook_json: &Value, session_id: &str, root: &Path) {
+pub fn record_hook_context(hook: &str, hook_json: &Value, session_id: &str) {
     if injected_context_text(hook_json).is_empty() {
         return;
     }
     record_encoded(
-        &telemetry_path(root),
+        &telemetry_path(),
         &hook_context_line(hook, hook_json, "", session_id),
     );
 }
@@ -1067,15 +1079,14 @@ pub(crate) mod tests {
     fn telemetry_path_honours_the_env_override() {
         let _guard = pin_qwen();
         std::env::set_var("CONTEXT_TELEMETRY_PATH", "/tmp/alt-events.jsonl");
-        assert_eq!(
-            telemetry_path(Path::new("/repo")),
-            PathBuf::from("/tmp/alt-events.jsonl")
-        );
+        assert_eq!(telemetry_path(), PathBuf::from("/tmp/alt-events.jsonl"));
         std::env::remove_var("CONTEXT_TELEMETRY_PATH");
+        std::env::set_var("LEDGER_ROOT", "/tmp/ledger-a");
         assert_eq!(
-            telemetry_path(Path::new("/repo")),
-            PathBuf::from("/repo/src/research/tmp/context_telemetry/events.jsonl")
+            telemetry_path(),
+            PathBuf::from("/tmp/ledger-a/telemetry/context_telemetry/events.jsonl")
         );
+        std::env::remove_var("LEDGER_ROOT");
         unpinned(_guard);
     }
 }

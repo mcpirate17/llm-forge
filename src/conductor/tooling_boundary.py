@@ -65,6 +65,14 @@ ALLOWLIST: tuple[tuple[str, str, str, str], ...] = (
         )
         for literal in PATH_LITERALS
     ),
+    (
+        "context_telemetry.py",
+        "literal",
+        "/mnt/data",
+        "the telemetry sink defaults under the ledger root, the same default "
+        "the forge binary owns (forge ledger rollup --out; docs/ledger.md) -- "
+        "one shared host convention, not a per-module path",
+    ),
 )
 
 

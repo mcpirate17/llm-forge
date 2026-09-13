@@ -1,0 +1,59 @@
+{
+  "campaign_id": "forge-ledger-cli-docs_cost_ledger_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/cost_ledger.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/cost_ledger.py": "38a1d6cdb8e8b2213b2a1180e80a6bba014e7389202b38da163816b6f35853e7"
+  },
+  "survivor_baseline": [
+    "boolean_op-a9238c2826f4-2",
+    "boolean_op-b5455aa63d91-4",
+    "comparison_op-2b22a0fa55a4-1",
+    "comparison_op-77b5db29456a-2",
+    "constant_replace-11dcc684f0ed-0",
+    "constant_replace-2c73880e895f-0",
+    "constant_replace-5516e8a8fee7-1",
+    "constant_replace-559a1051b182-0",
+    "constant_replace-81d8d90e8a2f-1",
+    "constant_replace-8c94b9628994-0",
+    "constant_replace-cbbd1eed4591-0",
+    "constant_replace-d192b63b330c-0",
+    "constant_replace-d4e52bdb2842-0",
+    "constant_replace-df00123ee8b3-1",
+    "constant_replace-f1770cee42af-0",
+    "constant_replace-fda37e121692-0",
+    "constant_replace-fda37e121692-1",
+    "constant_replace-fda37e121692-2",
+    "negate_condition-eb6c079506aa-1",
+    "return_value-8c83769ca894-0"
+  ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T12:20:40.986267+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_cost_ledger.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_cost_ledger.py": "d81216ff14919642328088b444736115546122a07ea2419a88d531a683e3eba3"
+  },
+  "title": "Generated mutants for src/conductor/cost_ledger.py, scored on the survivor set"
+}

@@ -192,6 +192,11 @@ pub(crate) mod tests {
 
     #[test]
     fn quiet_for_a_small_read_and_a_missing_session() {
+        // hook_output reads STEP_ENV once tokens are nonzero, so this test
+        // races `an_unparseable_step_fails_loud`'s "30k" without the lock.
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = scratch("quiet");
         let small = json!({
             "session_id": "s-quiet", "tool_name": "Read",

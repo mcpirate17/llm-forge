@@ -291,7 +291,7 @@ impl NativeHandler for PostBashGraph {
             .get("session_id")
             .and_then(Value::as_str)
             .unwrap_or("");
-        context_telemetry::record_hook_context("post-bash-graph", &output, session_id, &root);
+        context_telemetry::record_hook_context("post-bash-graph", &output, session_id);
         Ok(output)
     }
 }
@@ -312,8 +312,7 @@ impl NativeHandler for ContextTelemetry {
     }
 
     fn run(&self, payload: &Value) -> Result<Value> {
-        let root = crate::interpreter::project_root();
-        context_telemetry::record_event(payload, &root);
+        context_telemetry::record_event(payload);
         Ok(Value::Null)
     }
 }

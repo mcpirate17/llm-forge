@@ -22,8 +22,20 @@ from pathlib import Path
 from typing import Any, Final
 
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+# The default sink lives under the ledger root (``LEDGER_ROOT`` env var,
+# else /mnt/data/llm/ledger), never inside the checkout: the old
+# ``<ROOT>/src/research/tmp/...`` default was an inherited defect from the
+# native port -- a read-only checkout must not be a hook's write target,
+# and ``forge ledger rollup`` reads the telemetry that lands here from the
+# same root (``hook_rollup``). Resolved at import time, which for this
+# module is per hook invocation (one process per dispatch), so it matches
+# the Rust twin's call-time ``telemetry_path()``. ``CONTEXT_TELEMETRY_PATH``
+# still overrides the default per call wherever it is honoured.
 DEFAULT_PATH: Final[Path] = (
-    ROOT / "research" / "tmp" / "context_telemetry" / "events.jsonl"
+    Path(os.environ.get("LEDGER_ROOT", "/mnt/data/llm/ledger"))
+    / "telemetry"
+    / "context_telemetry"
+    / "events.jsonl"
 )
 MAX_LOG_BYTES: Final[int] = 10 * 1024 * 1024
 MAX_ROTATED_LOGS: Final[int] = 5

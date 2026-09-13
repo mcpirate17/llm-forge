@@ -76,6 +76,7 @@ pub fn run_hook(event: &str) -> Result<u8> {
         "PreToolUse" => run_pre_tool_use(event),
         "PostToolUse" => run_post_tool_use(event),
         "SessionStart" => run_session_start(event),
+        "SessionEnd" => run_session_end(event),
         _ => {
             // No native handlers exist for any other event yet: read nothing,
             // change nothing, delegate exactly as before this PR.
@@ -177,6 +178,19 @@ fn run_post_tool_use(event: &str) -> Result<u8> {
 /// line over the session's checkout -- exactly like a partially-native
 /// `PreToolUse`/`PostToolUse` call. The payload is forwarded unread-by-this
 /// path (the answer depends on the checkout, not the input).
+/// `SessionEnd` (design step 6): the ledger rollup of the ending session's
+/// transcript runs natively first (best-effort, 2 s bound, stderr only --
+/// `session_end::rollup_ending_session`), then the event delegates to the
+/// Python dispatcher unchanged, exactly as before this arm existed.
+fn run_session_end(event: &str) -> Result<u8> {
+    let mut input = String::new();
+    std::io::stdin()
+        .read_to_string(&mut input)
+        .context("failed to read hook payload from stdin")?;
+    crate::session_end::rollup_ending_session(&input);
+    delegate(event, Some(input.as_bytes()), &no_native_env())
+}
+
 fn run_session_start(event: &str) -> Result<u8> {
     let mut input = String::new();
     std::io::stdin()

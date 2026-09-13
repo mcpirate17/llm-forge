@@ -140,7 +140,7 @@
   "path": "/tmp/pt-events-override.jsonl"
  },
  "pt-tele-path-default": {
-  "path_suffix": "src/research/tmp/context_telemetry/events.jsonl"
+  "path_suffix": "telemetry/context_telemetry/events.jsonl"
  },
  "pe-py-clean": {
   "output": {
