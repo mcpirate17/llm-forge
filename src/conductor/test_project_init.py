@@ -131,14 +131,26 @@ def test_an_absent_settings_file_is_created_not_preserved() -> None:
 # ── forge binary detection and the hook-command switch ──────────────────────
 
 
-def test_resolve_forge_binary_prefers_project_local_tools_bin(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    project = _repo(tmp_path)
+def _write_executable_forge_binary(project: Path) -> Path:
+    """Create an executable stub at ``<project>/.tools/bin/forge`` and return it.
+
+    Shared setup for the two tests below that prove a project-local forge build
+    is discovered and preferred: one exercises `resolve_forge_binary` directly,
+    the other exercises it indirectly through `plan`. Both need the identical
+    on-disk binary; only what they assert about it differs.
+    """
     local = project / ".tools" / "bin" / "forge"
     local.parent.mkdir(parents=True)
     local.write_text("#!/bin/sh\n")
     local.chmod(local.stat().st_mode | stat.S_IEXEC)
+    return local
+
+
+def test_resolve_forge_binary_prefers_project_local_tools_bin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _repo(tmp_path)
+    local = _write_executable_forge_binary(project)
     # An ambient PATH forge exists too -- the project-local build must still win.
     monkeypatch.setattr(pi.shutil, "which", lambda name: "/usr/bin/forge")
     assert pi.resolve_forge_binary(project) == local
@@ -200,10 +212,7 @@ def test_plan_wires_settings_to_a_detected_project_local_forge_binary(
     tmp_path: Path, quiet_doctor: None
 ) -> None:
     project = _repo(tmp_path)
-    local = project / ".tools" / "bin" / "forge"
-    local.parent.mkdir(parents=True)
-    local.write_text("#!/bin/sh\n")
-    local.chmod(local.stat().st_mode | stat.S_IEXEC)
+    local = _write_executable_forge_binary(project)
     plan_ = pi.plan(_config(project), today=date(2026, 1, 1))
     settings_action = next(a for a in plan_.actions if a.path == pi.SETTINGS)
     rendered = json.loads(settings_action.after)
