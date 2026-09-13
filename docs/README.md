@@ -40,42 +40,32 @@ not exist here.
 
 `conductor.kb_retrieve` and `conductor.memory_index` are the tooling this platform ships to
 retrieve knowledge cards and indexed notes at query time (`KB-OPS-CTX-01`, "retrieve before
-re-deriving"). Unlike `candidate_policy`, `mutation_registry`, `package_root` and
-`mutation_receipt_root` — which all resolve through `conductor.project_paths`, honouring an
-environment variable and then a `[tool.conductor]` key in `pyproject.toml` before falling
-back to a default — **`kb_retrieve`'s notes directory has no equivalent knob**:
+re-deriving"). The notes tree resolves through `conductor.project_paths` like every other
+host path: the `CONDUCTOR_NOTES_ROOT` environment variable first, then the
+`[tool.conductor]` `notes_root` key in the host's `pyproject.toml`, then the
+`research/notes` default. Every reader — `kb_retrieve.load_cards`, `memory_index`'s
+catalog (whose `root = "research/notes"` spelling means "the notes root", wherever the
+host put it), the `check_json_in_notes` guard, `dead_tests`'s notes corpus,
+`index_notes`'s fallback source and `snapshot_worktree`'s exclusions — resolves through it
+at call time, never from a module constant.
 
-```python
-# src/conductor/kb_retrieve.py
-ROOT: Final[Path] = Path(__file__).resolve().parents[1]
-NOTES_DIR: Final[Path] = ROOT / "research" / "notes"
+Cards are files matching `kb_*.md` or `KB-*.md` in the notes root. This repository
+configures `notes_root = "docs"`, so its own law pages are its knowledge base:
+
+```sh
+uv run python -m conductor.kb_retrieve index        # embed the KB pages
+uv run python -m conductor.kb_retrieve query "mutation campaigns" --top-k 3
 ```
 
-`ROOT` resolves to this package's `src/` directory (one level above `src/conductor/`), so
-`NOTES_DIR` currently means `<repo>/src/research/notes/` — there is no environment variable
-and no `[tool.conductor]` key that overrides it, and the `index`/`query` CLI subcommands
-take no `--notes-dir` flag either. `conductor.memory_index` inherits the same `ROOT`
-pattern for its own catalog file. A host project that wants `kb_retrieve query "..."` to
-search its **own** knowledge cards today has exactly one option: place `kb_*.md` cards at
-that literal path.
+A host configured with the monorepo's `research/notes` (or with nothing, which means the
+same thing) keeps resolving there unchanged.
 
-**This repository's own `docs/` cannot be indexed by `kb_retrieve` as it stands**, for two
-reasons: the pages here are named `KB-<ID>.md` (uppercase, hyphenated) rather than the
-`kb_*.md` glob `load_cards()` requires, and `docs/` is not `src/research/notes/` regardless
-of naming. Renaming the pages to fit the glob would not be enough on its own.
+## Reference pages
 
-**Debt, not fixed here:** adding a real notes-root knob is a code change to
-`conductor.kb_retrieve` and `conductor.project_paths` (a new `NOTES_ROOT_KEY` /
-`CONDUCTOR_NOTES_ROOT` env var following the existing `project_paths.py` precedence
-pattern, a `notes_root()` resolver, and `load_cards()`/`memory_index`'s catalog resolution
-updated to use it), plus the tests and mutation evidence that change requires under
-`KB-MUT-02`. That is out of scope for a documentation-only change. Until it lands:
-
-* A host project that wants its own cards indexed should place them under
-  `<repo>/src/research/notes/kb_*.md` (matching the current hardcoded resolution) and name
-  each file `kb_<topic>.md`, lowercase, matching `load_cards()`'s glob.
-* This repository's own dogfood indexing of `docs/` is blocked on the same debt — it is not
-  wired here for the same reason a host project cannot repoint it today.
+| Page | Topic |
+|---|---|
+| [makefile_targets.md](makefile_targets.md) | Every `conductor.mk` target with its help text (generated — regenerate, do not hand-edit) |
+| [bootstrap.md](bootstrap.md) | Scaffolding a host project with `python -m conductor bootstrap` |
 
 ## Top-level index
 
