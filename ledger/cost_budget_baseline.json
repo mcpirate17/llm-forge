@@ -1,0 +1,21 @@
+{
+  "recorded_utc": "2026-09-13T09:32:45Z",
+  "window": {
+    "from": "2026-09-07",
+    "to": "2026-09-13",
+    "days": 7
+  },
+  "metrics": {
+    "resend_bytes_per_session": {
+      "value": 8815583.0,
+      "n": 20,
+      "tolerance_pct": 5.0
+    },
+    "tokens_per_landed_pr": {
+      "value": 7850228.694444444,
+      "n": 72,
+      "tolerance_pct": 5.0
+    }
+  },
+  "ledger_root_sha": "aa9264b6d2b2dc6bf35de3edc9137e297aa3e931cb3d94551df3049f3a619357"
+}

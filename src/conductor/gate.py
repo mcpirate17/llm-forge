@@ -578,9 +578,6 @@ def clean_clone_closure(repo: Path, export_root: Path) -> PhaseResult:
 MUTATION_REGISTRY = Path(DEFAULT_MUTATION_REGISTRY)
 
 
-
-
-
 def mutation_corpus_audit(
     export_root: Path, changed_files: frozenset[str] | None = None
 ) -> PhaseResult:
@@ -658,6 +655,28 @@ def mutation_corpus_audit(
         detail=_corpus_detail(delta["status"], regressions, resolved),
         evidence=evidence,
     )
+
+
+def cost_budget_audit(export_root: Path) -> PhaseResult:
+    """`cost-budget-audit`: the three-metric budget ratchet (design step 5).
+
+    Delegates entirely to `conductor.cost_budget_audit.phase`, imported lazily
+    (module-body, not top-of-file) so that module's own `from conductor.gate
+    import PhaseResult` never becomes an import cycle -- the same reason
+    `mutation_corpus_audit` imports `conductor.mutation_patch_audit` inside its
+    own body instead of at the top of this file.
+    """
+
+    try:
+        from conductor.cost_budget_audit import CostBudgetAuditError
+        from conductor.cost_budget_audit import phase as cost_budget_phase
+    except ImportError as exc:
+        raise GateRefusal(f"cost budget audit is unavailable: {exc}") from exc
+
+    try:
+        return cost_budget_phase(export_root)
+    except CostBudgetAuditError as exc:
+        raise GateRefusal(f"cost budget audit did not run: {exc}") from exc
 
 
 def _corpus_detail(
@@ -744,6 +763,7 @@ def run_gate(
             ).splitlines()
         )
         phases.append(mutation_corpus_audit(export_root, changed_files=changed))
+        phases.append(cost_budget_audit(export_root))
         if not skip_review:
             review_phase, _payload = run_review(
                 repo,

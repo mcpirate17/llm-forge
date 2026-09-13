@@ -284,7 +284,24 @@ Combined across the 5: cache-read tokens are **97.6%** of the
 input+output+cache total (vs. 66% on the roadmap's 40-largest-session
 sample — these 5 skew toward long-running sessions, which is exactly why
 Question 1's per-tier, per-session breakdown matters more than one repo-wide
-percentage). Tool-result content is **95.1%** of text+tool_result
-characters across the same 5 sessions — the resident-context composition
-question (Section 1.2) is not close in these samples: tool output, not
-prose, dominates what a turn resends.
+percentage). Tool-result content is **74.3%** of text+tool_result
+characters across the same 5 sessions (corrected from an earlier 95.1%
+figure computed before PR #35's `tool_result.content` fix — see that PR's
+`tool_result_char_len`, which measures the string or array-of-text-subblock
+shape correctly instead of over-counting; step 2's `forge ledger rollup`
+re-derives this number from the same reader, so it will not drift again
+silently) — the resident-context composition question (Section 1.2) is not
+close in these samples either way: tool output, not prose, dominates what a
+turn resends.
+
+| Session | tool_use share of estimated tokens (step 2, uncalibrated) |
+|---|---|
+| `c38ffd05...` | 65.0% |
+| `agent-ac760022...` (subagent) | 96.2% |
+| `206702fb...` | 83.2% |
+| `ada28b6b...` | 82.5% |
+| `5e93df87...` | see PR body — `forge ledger rollup` dry-run |
+
+(`estimated_tokens_by_block_type`, design Section 3: this turn's billed
+input tokens redistributed by byte share, `thinking` excluded; labeled
+`byte_proportional_uncalibrated_cpt4` in every row, never printed silently.)
