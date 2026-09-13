@@ -703,6 +703,31 @@ def test_the_report_counts_what_protection_saved(
     assert report["deleted"] == 0
 
 
+def test_a_no_pass_campaign_is_stepped_over_not_terminal(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`continue` past a broken campaign, never `break` out of the plan.
+
+    The broken campaign's receipts sort first, so a loop that stopped at the
+    first campaign with no PASS would never reach the healthy one behind it.
+    """
+
+    broken = _receipt(
+        repo, "aaa_broken_a", "aaa_broken", "FAIL", "2026-09-01T00:00:00+00:00"
+    )
+    _campaign(repo, "aaa_broken")
+    _campaign(repo, "alpha")
+    old = _receipt(repo, "alpha_old", "alpha", "PASS", "2026-09-01T00:00:00+00:00")
+    new = _receipt(repo, "alpha_new", "alpha", "PASS", "2026-09-05T00:00:00+00:00")
+    _no_citations(monkeypatch)
+
+    plan_ = mutation_retention.plan(repo)
+
+    assert set(plan_.delete) == {old}
+    assert plan_.keep[new] == "newest PASS for alpha"
+    assert plan_.keep[broken] == "campaign aaa_broken has no PASS receipt to supersede"
+
+
 def test_compacted_receipts_are_judged_by_their_summary_alone(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
