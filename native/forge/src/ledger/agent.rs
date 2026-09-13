@@ -47,9 +47,10 @@ pub struct AgentRollupRow {
     pub cap_breaches: u64,
     /// The strongest join evidence behind any session credited to this
     /// agent: `"session_url"` if at least one of its sessions matched by
-    /// id, else `"time_window"` if at least one matched only by the
-    /// fallback, else `"unjoined"` when this agent has landed PRs but no
-    /// session could be attributed to any of them at all.
+    /// id, else `"commit_subject"` if at least one matched by its typed
+    /// subject's digest, else `"time_window"` if at least one matched only
+    /// by the time fallback, else `"unjoined"` when this agent has landed
+    /// PRs but no session could be attributed to any of them at all.
     pub join_method: String,
 }
 
@@ -189,6 +190,52 @@ pub fn join_commits<'a>(
                 };
             }
 
+            // (2) `commit_subject`: the session that typed this commit
+            // holds its subject's digest (`subject.rs` -- the `git commit
+            // -m` / `gh pr create --title` the reader hashed). An empty
+            // digest means the subject was refused (shorter than
+            // `MIN_SUBJECT_CHARS`) or absent: no key, no match. A subagent
+            // row that matches credits BOTH itself and its parent (the
+            // parent from the subagent's recorded `parent_session_id`, per
+            // #45's identity rule) so per-agent totals are not split
+            // between a dispatch and the subagent that typed for it.
+            if !commit.subject_digest.is_empty() {
+                let subject_matches: Vec<&SessionRollupRow> = in_project
+                    .iter()
+                    .copied()
+                    .filter(|s| s.commit_subject_digests.contains(&commit.subject_digest))
+                    .collect();
+                if !subject_matches.is_empty() {
+                    let mut credited: Vec<String> = subject_matches
+                        .iter()
+                        .map(|s| s.session_id.clone())
+                        .collect();
+                    for matched in &subject_matches {
+                        if let Some(parent) = matched
+                            .parent_session_id
+                            .as_deref()
+                            .filter(|_| matched.is_subagent)
+                            .filter(|p| in_project.iter().any(|s| s.session_id.as_str() == *p))
+                        {
+                            if !credited.iter().any(|sid| sid == parent) {
+                                credited.push(parent.to_string());
+                            }
+                        }
+                    }
+                    return CommitJoin {
+                        sha: commit.sha.clone(),
+                        pr_number: commit.pr_number,
+                        session_ids: credited,
+                        join_method: "commit_subject",
+                        // Ambiguity counts MATCHES, not the parent rows a
+                        // match expanded to: a coordinator and its
+                        // subagent both typing the same PR title is a real
+                        // case -- reported, not guessed.
+                        ambiguous: subject_matches.len() > 1,
+                    };
+                }
+            }
+
             let mut fallback: Vec<&SessionRollupRow> = match parse_utc_seconds(&commit.merged_at) {
                 Some(merged_at) => {
                     let window_start = merged_at - 6 * 3600;
@@ -320,10 +367,12 @@ pub fn build_agent_rollup(
                 .collect();
             let n_landed_prs = agg.landed_keys.len() as u64;
 
-            // Strongest evidence wins: session_url > time_window > unjoined
-            // (comment on `AgentRollupRow::join_method`).
+            // Strongest evidence wins: session_url > commit_subject >
+            // time_window > unjoined (comment on `AgentRollupRow::join_method`).
             let join_method = if agg.methods.contains("session_url") {
                 "session_url"
+            } else if agg.methods.contains("commit_subject") {
+                "commit_subject"
             } else if agg.methods.contains("time_window") {
                 "time_window"
             } else {
@@ -672,5 +721,210 @@ mod tests {
         let (rows, _joins) = build_agent_rollup(&commits, &sessions, "llm-forge", DEFAULT_CAP);
         assert_eq!(rows[0].tier, "mixed");
         assert_eq!(rows[0].n_landed_prs, 2);
+    }
+
+    /// A session carrying typed-subject digests, built with struct update
+    /// over the plain helper so the old call sites stay untouched.
+    fn session_with_subjects(base: SessionRollupRow, digests: Vec<String>) -> SessionRollupRow {
+        SessionRollupRow {
+            commit_subject_digests: digests,
+            ..base
+        }
+    }
+
+    fn commit_with_subject(base: LandedCommitRow, subject: &str) -> LandedCommitRow {
+        LandedCommitRow {
+            subject_digest: super::super::subject::subject_digest(subject),
+            ..base
+        }
+    }
+
+    const TYPED_SUBJECT: &str = "feat(forge): a subject only the typing session holds (#60)";
+
+    #[test]
+    fn one_subject_match_joins_by_commit_subject() {
+        let sessions = vec![session_with_subjects(
+            session(
+                "sess-typed",
+                "llm-forge",
+                &[],
+                "2026-09-10T00:00:00Z",
+                "2026-09-10T00:10:00Z",
+                100,
+                10,
+                0,
+                0,
+                &["glm-4.6"],
+            ),
+            vec![super::super::subject::subject_digest(TYPED_SUBJECT)],
+        )];
+        // merged_at far outside the session's window: no time overlap at
+        // all, only the digest can join.
+        let commits = vec![commit_with_subject(
+            commit("c9", "2026-09-12T00:00:00Z", Some(60), &["glm"], &[]),
+            TYPED_SUBJECT,
+        )];
+        let (rows, joins) = build_agent_rollup(&commits, &sessions, "llm-forge", DEFAULT_CAP);
+        assert_eq!(joins[0].join_method, "commit_subject");
+        assert!(!joins[0].ambiguous);
+        assert_eq!(joins[0].session_ids, vec!["sess-typed".to_string()]);
+        assert_eq!(rows[0].join_method, "commit_subject");
+        assert_eq!(rows[0].n_sessions, 1);
+        assert_eq!(rows[0].total_tokens, 110);
+        assert_eq!(unjoined_commit_count(&joins), 0);
+    }
+
+    #[test]
+    fn two_sessions_with_the_same_digest_are_commit_subject_ambiguous() {
+        // A coordinator and its worker both typing the same PR title is a
+        // real case: report it (ambiguous), credit both, guess nothing.
+        let digest = super::super::subject::subject_digest(TYPED_SUBJECT);
+        let sessions = vec![
+            session_with_subjects(
+                session(
+                    "sess-coordinator",
+                    "llm-forge",
+                    &[],
+                    "2026-09-10T00:00:00Z",
+                    "2026-09-10T00:10:00Z",
+                    100,
+                    10,
+                    0,
+                    0,
+                    &["claude-fable-5.1"],
+                ),
+                vec![digest.clone()],
+            ),
+            session_with_subjects(
+                session(
+                    "sess-worker",
+                    "llm-forge",
+                    &[],
+                    "2026-09-10T05:00:00Z",
+                    "2026-09-10T05:10:00Z",
+                    200,
+                    20,
+                    0,
+                    0,
+                    &["glm-4.6"],
+                ),
+                vec![digest.clone()],
+            ),
+        ];
+        let commits = vec![commit_with_subject(
+            commit("c10", "2026-09-12T00:00:00Z", Some(61), &["glm"], &[]),
+            TYPED_SUBJECT,
+        )];
+        let (rows, joins) = build_agent_rollup(&commits, &sessions, "llm-forge", DEFAULT_CAP);
+        assert_eq!(joins[0].join_method, "commit_subject");
+        assert!(joins[0].ambiguous);
+        assert_eq!(joins[0].session_ids.len(), 2);
+        assert_eq!(rows[0].join_method, "commit_subject");
+        assert_eq!(rows[0].n_sessions, 2);
+    }
+
+    #[test]
+    fn a_subagent_subject_match_credits_the_subagent_and_its_parent() {
+        let digest = super::super::subject::subject_digest(TYPED_SUBJECT);
+        let mut subagent = session_with_subjects(
+            session(
+                "agent-abc123def45678901",
+                "llm-forge",
+                &[],
+                "2026-09-10T00:00:00Z",
+                "2026-09-10T00:10:00Z",
+                500,
+                50,
+                0,
+                0,
+                &["glm-4.6"],
+            ),
+            vec![digest],
+        );
+        subagent.agent_id = Some("abc123def45678901".to_string());
+        subagent.parent_session_id = Some("sess-parent".to_string());
+        subagent.is_subagent = true;
+        let parent = session(
+            "sess-parent",
+            "llm-forge",
+            &[],
+            "2026-09-09T00:00:00Z",
+            "2026-09-10T00:30:00Z",
+            1000,
+            100,
+            0,
+            0,
+            &["claude-fable-5.1"],
+        );
+        let commits = vec![commit_with_subject(
+            commit("c11", "2026-09-12T00:00:00Z", Some(62), &["glm"], &[]),
+            TYPED_SUBJECT,
+        )];
+        let (rows, joins) =
+            build_agent_rollup(&commits, &[subagent, parent], "llm-forge", DEFAULT_CAP);
+        assert_eq!(joins[0].join_method, "commit_subject");
+        assert!(!joins[0].ambiguous);
+        assert_eq!(
+            joins[0].session_ids,
+            vec![
+                "agent-abc123def45678901".to_string(),
+                "sess-parent".to_string()
+            ]
+        );
+        // Both credited sessions land on the commit's named agent: the
+        // subagent that typed it and its parent travel together, so the
+        // pair can never be split across agent rows by a later join.
+        assert_eq!(rows[0].agent_name, "glm");
+        assert_eq!(rows[0].n_sessions, 2);
+        assert_eq!(rows[0].total_tokens, 550 + 1100);
+    }
+
+    #[test]
+    fn commit_subject_outranks_time_window_and_needs_no_overlap() {
+        // Two URL-less sessions overlap the merge window; only one holds
+        // the digest. The join must pick commit_subject and credit exactly
+        // the typing session -- the 146-commit over-credit this tier fixes.
+        let digest = super::super::subject::subject_digest(TYPED_SUBJECT);
+        let sessions = vec![
+            session_with_subjects(
+                session(
+                    "sess-typed",
+                    "llm-forge",
+                    &[],
+                    "2026-09-11T20:00:00Z",
+                    "2026-09-11T21:00:00Z",
+                    80_000,
+                    10_000,
+                    0,
+                    0,
+                    &["glm-4.6"],
+                ),
+                vec![digest.clone()],
+            ),
+            session(
+                "sess-bystander",
+                "llm-forge",
+                &[],
+                "2026-09-11T22:00:00Z",
+                "2026-09-11T23:30:00Z",
+                90_000,
+                5_000,
+                0,
+                0,
+                &["glm-4.6"],
+            ),
+        ];
+        let commits = vec![commit_with_subject(
+            commit("c12", "2026-09-12T00:00:00Z", Some(63), &["glm"], &[]),
+            TYPED_SUBJECT,
+        )];
+        let (rows, joins) = build_agent_rollup(&commits, &sessions, "llm-forge", DEFAULT_CAP);
+        assert_eq!(joins[0].join_method, "commit_subject");
+        assert!(!joins[0].ambiguous);
+        assert_eq!(joins[0].session_ids, vec!["sess-typed".to_string()]);
+        assert_eq!(rows[0].join_method, "commit_subject");
+        // The bystander's 95_000 billed tokens stay out of the credit.
+        assert_eq!(rows[0].total_tokens, 90_000);
+        assert_eq!(rows[0].n_sessions, 1);
     }
 }

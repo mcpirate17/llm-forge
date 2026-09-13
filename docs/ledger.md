@@ -52,7 +52,13 @@ so `<project>/<uuid>/subagents/agent-x.jsonl` reports `<project>`, not
 `total_input`, `total_output`, `total_cache_read`, `total_cache_creation`,
 `resend_bytes`, `resend_events`, `harness_session_ids` (every
 `session_[a-zA-Z0-9]+` id the transcript itself mentions -- the
-`agent_rollup` join key), `models` (distinct model values, sorted).
+`agent_rollup` join key), `commit_subject_digests` (sha256-truncated
+digests of the commit subjects this session's `Bash` commands typed --
+`git commit -m`, a `-F -` heredoc's first line, `gh pr create --title`;
+never the text, and refused outright for subjects shorter than 12
+normalized characters -- the second `agent_rollup` join key), `models`
+(distinct model values, sorted). A subagent row (`agent-<id>`) keeps its
+own digest list; the join credits a subagent match to its parent too.
 
 **Subagent identity rule.** Every line of a subagent transcript
 (`<session-uuid>/subagents/agent-<17 hex>.jsonl`) carries its PARENT's uuid
@@ -88,18 +94,32 @@ output + cache_creation; cache_read is billed once, steeply discounted, kept
 separately in `total_cache_read`), `token_basis`, `tokens_per_landed_pr`
 (`null` when `n_landed_prs` is 0), `cap_breaches` (credited sessions over
 `--cap`, default 150000 billed tokens), `join_method` (the strongest evidence
-behind any credit: `session_url` > `time_window` > `unjoined`).
+behind any credit: `session_url` > `commit_subject` > `time_window` >
+`unjoined`).
 
 Join order, per landed commit: (1) `session_url` -- the commit's
 `harness_session_ids` intersect a session's own; exact evidence. (2)
-`time_window` -- only when (1) finds nothing: a same-project session whose
-`[first_ts, last_ts]` overlaps `[merged_at - 6h, merged_at]`, with two
-restrictions found the hard way on real data: a fallback-eligible session
-must carry no `harness_session_ids` of its own, and a `glm`-named commit only
-falls back to a session whose `models` mention `glm`. More than one
-overlapping session credits all of them and flags the commit `ambiguous`.
-(3) `unjoined` -- printed to stderr, a finding, never hidden by loosening the
-match. Both steps only ever look at sessions whose `project` equals this
+`commit_subject` -- only when (1) finds nothing: a same-project session
+whose `commit_subject_digests` contain the commit subject's digest. The
+session that typed a commit holds its subject in a `Bash` tool_use (the
+`git commit -m` value, a `-F -` heredoc's first non-empty line, or the
+`gh pr create --title` value; a squash-merge's ` (#N)` suffix is stripped
+before hashing on the landed side), both sides hash with the same
+normalization (`subject.rs`), and only the digest ever crosses the reader
+boundary. A subagent row that matches credits BOTH itself and its parent
+session (per the subagent identity rule), so a dispatch and the subagent
+that typed for it are never split across agent rows. More than one session
+holding the same digest (a coordinator and its worker both typing the PR
+title) credits all of them and flags the commit `ambiguous` -- reported,
+not guessed. (3) `time_window` -- only when (2) also finds nothing: a
+same-project session whose `[first_ts, last_ts]` overlaps
+`[merged_at - 6h, merged_at]`, with two restrictions found the hard way on
+real data: a fallback-eligible session must carry no
+`harness_session_ids` of its own, and a `glm`-named commit only falls back
+to a session whose `models` mention `glm`. More than one overlapping
+session credits all of them and flags the commit `ambiguous`. (4)
+`unjoined` -- printed to stderr, a finding, never hidden by loosening the
+match. Every step only ever looks at sessions whose `project` equals this
 run's `--project`.
 
 ### `task_dispatch`
@@ -409,7 +429,14 @@ verdict as one line per metric with its status, exiting by the same
   during its life, so the fallback is restricted to sessions carrying no
   `harness_session_ids` of their own (and `glm` commits to `glm` sessions);
   commits that then match nothing are reported `unjoined` rather than
-  credited to a bystander.
+  credited to a bystander. The `commit_subject` tier now sits above it and
+  takes most of that load (the session that typed the subject wins over
+  every mere time-overlap), but it cannot fix everything: a commit typed in
+  a session whose transcript is gone (deleted, or never walked by the
+  rollup) has no digest to match, and a subject shorter than 12 normalized
+  characters is refused a digest on BOTH sides -- `fix` or `wip` matches
+  far too much for the join to mean anything -- so those commits still fall
+  through to `time_window` or `unjoined`.
 - **Split-file sessions under-count**: one session id whose transcript log
   spans two physical files becomes two `session_rollup` rows; the
   `agent_rollup` join dedupes by `session_id`, so only one row's tokens

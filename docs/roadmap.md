@@ -80,7 +80,7 @@ Phase 2 exit table (all six steps landed; baseline values from `ledger/cost_budg
 ## Phase 3: model routing at the dispatch seam (follows from the ledger's numbers)
 Cheap tier for Explore/clerical dispatches by default, measured before it is enforced.
 
-1. Ledger plumbing for routing evidence: subagent identity (`agent-<id>` keying, `parent_session_id`), the `task_dispatch` table (one row per `Agent` tool_use: tier requested vs. used, billed tokens, over-cap), the subagent walk (`<dir>/<session>/subagents/agent-*.jsonl`, `--no-subagents` to opt out) and `--branch` for non-main repos. DONE PR #45.
+1. Ledger plumbing for routing evidence: subagent identity (`agent-<id>` keying, `parent_session_id`), the `task_dispatch` table (one row per `Agent` tool_use: tier requested vs. used, billed tokens, over-cap), the subagent walk (`<dir>/<session>/subagents/agent-*.jsonl`, `--no-subagents` to opt out) and `--branch` for non-main repos. DONE PR #45. Credit accuracy: the `commit_subject` join (a landed commit's subject digest, typed in the session's own Bash commands, outranks any time overlap). DONE PR #48.
 2. Routing policy: which tier a dispatch gets by default, from the measured per-tier dispatch costs. (Claude)
 3. The hook that applies it at the dispatch seam. (Claude)
 4. A gate metric that ratchets routing cost. (Claude)

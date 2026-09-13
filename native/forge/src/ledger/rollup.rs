@@ -321,9 +321,19 @@ pub fn run(args: RollupArgs) -> Result<i32> {
             }
         }
         let ambiguous = joins.iter().filter(|j| j.ambiguous).count();
+        let by_method = |method: &str| joins.iter().filter(|j| j.join_method == method).count();
+        eprintln!(
+            "forge ledger rollup: joined {}/{} landed commits: session_url={} commit_subject={} time_window={} unjoined={}",
+            joins.len() - by_method("unjoined"),
+            joins.len(),
+            by_method("session_url"),
+            by_method("commit_subject"),
+            by_method("time_window"),
+            by_method("unjoined"),
+        );
         if ambiguous > 0 {
             eprintln!(
-                "forge ledger rollup: {ambiguous} landed commit(s) matched more than one session on the time-window fallback (agent_rollup.join_method=\"time_window\"; every candidate was credited)"
+                "forge ledger rollup: {ambiguous} landed commit(s) matched more than one session on a fallback join (commit_subject or time_window; every candidate was credited)"
             );
         }
         for row in agent_rows {
