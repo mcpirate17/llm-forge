@@ -345,6 +345,7 @@ def activate_handoff(
 # the next turn opens with the bounded projection instead of the old context.
 
 from conductor.project_paths import host_root
+
 ROOT: Final[Path] = host_root()
 IDENTITY_ENV: Final[str] = "A2A_AGENT_NAME"
 DEFAULT_IDENTITY: Final[str] = "claude"

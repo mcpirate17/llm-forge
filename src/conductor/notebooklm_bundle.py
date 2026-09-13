@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 from conductor.project_paths import host_root
+
 ROOT = host_root()
 VAULT_ROOT_ENV = "CODEX_VAULT_ROOT"
 

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from conductor.project_paths import host_root
+
 ROOT: Final[Path] = host_root()
 DOC_CHARS: Final[int] = 160
 TEXT_CHARS: Final[int] = 600

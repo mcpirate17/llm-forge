@@ -13,15 +13,15 @@ from pathlib import Path
 from typing import Any
 
 from conductor._native import guardrail_ast_metrics_native
-from conductor.candidate_review.vulture_audit import whitelist_args
 from conductor.audit_root import (
     AuditRootError,
     print_audit_provenance,
     resolve_audit_root,
 )
+from conductor.candidate_review.vulture_audit import whitelist_args
+from conductor.project_paths import host_root
 from conductor.run_duplicate_audit import should_skip_python
 
-from conductor.project_paths import host_root
 ROOT = host_root()
 DEFAULT_TARGETS = ("research", "aria_core", "aria_designer", "component_fab")
 ALLOWLIST_PATH = Path(__file__).resolve().parent / "guardrail_allowlist.json"

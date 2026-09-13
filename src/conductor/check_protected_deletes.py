@@ -5,7 +5,7 @@ import argparse
 import fnmatch
 import subprocess
 import sys
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 from typing import Sequence
 
 from conductor.audit_root import (
@@ -13,9 +13,8 @@ from conductor.audit_root import (
     print_audit_provenance,
     resolve_audit_root,
 )
-
-
 from conductor.project_paths import host_root
+
 ROOT = host_root()
 PROTECTED_PATTERNS = (
     "*.db",

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Final
 
 from conductor.project_paths import host_root
+
 ROOT: Final[Path] = host_root()
 CURRENT_WORK_PATH: Final[Path] = ROOT / ".current_work.md"
 MAX_TITLE_CHARS: Final[int] = 120

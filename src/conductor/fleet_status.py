@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from conductor.project_paths import host_root
+
 ROOT: Final[Path] = host_root()
 ACTIVE_STATE: Final[Path] = ROOT / "conductor" / "active_state.json"
 HELM_SEAT: Final[str] = "fable-helm"

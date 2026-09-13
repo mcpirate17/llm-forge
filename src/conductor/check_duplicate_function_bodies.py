@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from conductor._native import duplicate_body_fingerprints_native
-
 from conductor.project_paths import host_root
+
 ROOT = host_root()
 ROOTS = ("research", "aria_core", "aria_designer", "component_fab")
 SKIP_PARTS = {"tests", "test", ".venv", "node_modules", "__pycache__", "migrations"}

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from conductor.project_paths import host_root
+
 ROOT: Final[Path] = host_root()
 BACKUP_SUFFIX: Final[str] = ".a2a-session-start.bak"
 BACKUP_SCHEMA_VERSION: Final[int] = 1

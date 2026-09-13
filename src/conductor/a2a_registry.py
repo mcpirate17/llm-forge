@@ -20,8 +20,8 @@ from typing import Any, Final
 import httpx
 from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
 
-
 from conductor.project_paths import host_root
+
 ROOT: Final = host_root()
 DEFAULT_STATE_DIR: Final = ROOT / ".agents" / "a2a"
 BIND_HOST: Final = "127.0.0.1"

@@ -33,8 +33,8 @@ from conductor.duplicate_audit_config import (
     VULTURE_SOURCE_DIRS,
     VULTURE_SOURCE_SUFFIXES,
 )
-
 from conductor.project_paths import host_root
+
 ROOT = host_root()
 
 

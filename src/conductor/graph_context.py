@@ -22,8 +22,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
 from conductor.candidate_review.git_source import repository_root
-
 from conductor.project_paths import host_root
+
 ROOT: Final[Path] = host_root()
 
 

@@ -40,15 +40,13 @@ from conductor._native import (
     DeadTestsResolverNative,
     dead_tests_closure_native,
 )
-
 from conductor.audit_root import (
     AuditRootError,
     print_audit_provenance,
     resolve_audit_root,
 )
-from conductor.project_paths import DEFAULT_MUTATION_REGISTRY, notes_relative
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY, host_root, notes_relative
 
-from conductor.project_paths import host_root
 ROOT = host_root()
 TEST_NAME = re.compile(r"^(test_.*|.*_test)\.py$")
 DOTTED = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$")

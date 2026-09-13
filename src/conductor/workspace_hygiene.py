@@ -33,22 +33,20 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from conductor import _native
-
-from conductor import branch_policy, worktree_reap
+from conductor import _native, branch_policy, worktree_reap
 from conductor.candidate_review.ownership import (
     OwnershipClaim,
     load_claims,
     paths_overlap,
 )
 from conductor.dead_tests import tracked_files
-from conductor.worktree_lease import is_linked_worktree, lease_state
 from conductor.project_paths import (
     campaigns_relative,
     host_root,
     integration_branch,
     registry_relative,
 )
+from conductor.worktree_lease import is_linked_worktree, lease_state
 
 
 class HygieneError(RuntimeError):

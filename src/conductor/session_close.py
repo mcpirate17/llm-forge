@@ -23,8 +23,8 @@ from conductor.candidate_review.ownership import (
     release_claim,
 )
 from conductor.handoff import HandoffError, append_status
-
 from conductor.project_paths import host_root
+
 ROOT: Final[Path] = host_root()
 
 

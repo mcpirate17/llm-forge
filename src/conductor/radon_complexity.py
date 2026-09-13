@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from conductor.project_paths import host_root
+
 REPO_ROOT = host_root()
 DEFAULT_PATHS = ("conductor", "research", "aria_core", "aria_designer")
 DEFAULT_EXCLUDES = (

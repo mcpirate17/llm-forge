@@ -13,7 +13,6 @@ import fcntl
 import fnmatch
 import hashlib
 import json
-import os
 import sys
 import time
 import tomllib
@@ -24,13 +23,13 @@ from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
-from conductor.atomic_json import write_lines_atomic
 from conductor._native import (
     memory_index_chunk_text_native,
     memory_index_metadata_native,
     memory_index_query_file_native,
     memory_index_score_rows_native,
 )
+from conductor.atomic_json import write_lines_atomic
 from conductor.kb_retrieve import (
     QUERY_INSTRUCT,
     RetrieveError,

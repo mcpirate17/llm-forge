@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Final, Mapping
 
 from conductor.project_paths import host_root
+
 ROOT: Final[Path] = host_root()
 ROUTES_PATH: Final[Path] = ROOT / "conductor" / "embedding_routes.toml"
 CONTRACT_VERSION: Final[int] = 1
