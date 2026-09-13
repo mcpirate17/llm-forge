@@ -1,0 +1,121 @@
+{
+  "adapter_sha256": "5bb39b662a1af370b3241d8d41f29f9f7d78414fc035568a01af667ccc00cd70",
+  "attribution": {
+    "attributed_mutants": 131,
+    "baseline_repetitions": 2,
+    "killed_mutants": 131,
+    "ranked_tests": 27,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.924568,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "............................                                             [100%]\n28 passed in 0.20s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-pycache-speed/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_engine_generated.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "forge-evidence-hash_mutation_engine_generated_fest_20260912",
+  "classification_required": [],
+  "core_sha256": "8bad6c0bcd26ab876410c9f5079e1e4879159e40da9b9d61da71d7e5a9b97dd4",
+  "detail": {
+    "encoding": "superseded",
+    "superseded_by": "forge-evidence-hash_mutation_engine_generated_fest_20260912_20260913T194446Z.json"
+  },
+  "engine_result": {
+    "duration_seconds": 30.557063,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "    }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-ndepcef0/worktree/src/conductor/mutation_engine_generated.py\",\n        \"line\": 832,\n        \"column\": 21,\n        \"byte_offset\": 34333,\n        \"byte_length\": 8,\n        \"original_text\": \"\\\"status\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-ndepcef0/worktree/src/conductor/mutation_engine_generated.py\",\n        \"line\": 832,\n        \"column\": 31,\n        \"byte_offset\": 34343,\n        \"byte_length\": 9,\n        \"original_text\": \"\\\"REFUSED\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-ndepcef0/worktree/src/conductor/mutation_engine_generated.py\",\n        \"line\": 832,\n        \"column\": 42,\n        \"byte_offset\": 34354,\n        \"byte_length\": 7,\n        \"original_text\": \"\\\"error\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-ndepcef0/worktree/src/conductor/mutation_engine_generated.py\",\n        \"line\": 833,\n        \"column\": 16,\n        \"byte_offset\": 34389,\n        \"byte_length\": 1,\n        \"original_text\": \"4\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-ndepcef0/worktree/src/conductor/mutation_engine_generated.py\",\n        \"line\": 833,\n        \"column\": 16,\n        \"byte_offset\": 34389,\n        \"byte_length\": 1,\n        \"original_text\": \"4\",\n        \"mutated_text\": \"5\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-ndepcef0/worktree/src/conductor/mutation_engine_generated.py\",\n        \"line\": 836,\n        \"column\": 4,\n        \"byte_offset\": 34396,\n        \"byte_length\": 22,\n        \"original_text\": \"__name__ == \\\"__main__\\\"\",\n        \"mutated_text\": \"not (__name__ == \\\"__main__\\\")\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-ndepcef0/worktree/src/conductor/mutation_engine_generated.py\",\n        \"line\": 836,\n        \"column\": 13,\n        \"byte_offset\": 34405,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-ndepcef0/worktree/src/conductor/mutation_engine_generated.py\",\n        \"line\": 836,\n        \"column\": 16,\n        \"byte_offset\": 34408,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"__main__\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 30,\n    \"nanos\": 547613974\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 131,
+    "mutants_generated": 331,
+    "mutants_tested": 133,
+    "no_coverage": 198,
+    "survived": 2,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T19:21:03.239826+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-pycache-speed/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/forge-evidence-hash_mutation_engine_generated_fest_20260912.json",
+  "manifest_sha256": "d9ec872632baec5f0450ff8776ad44039bbb4ef6b0f7b1fa612b173f43c4eac9",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 60,
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.9849624060150376,
+  "new_survivors": [],
+  "no_coverage": 198,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 131,
+    "NO_COVERAGE": 198,
+    "SURVIVED": 2,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/.iterations/forge-evidence-hash_mutation_engine_generated_fest_20260912_20260913T192103Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "8547341a8ab0448e586620da3adbdced0c6add1444645d79cc7cc73d9e1a3173",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fbaf4781cb73027fb336508b3fc8ec082497ced9edb6a3344e09fb40f58f37ad",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "699ab1e78eccea669c833105b32982e8fc15f53f13fa404d20e55246a0ce5488",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "98412200e5a9b7ed93e5c2b14a70f73bab207e2e49ce8441863c7c6136336b30"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/mutation_engine_generated.py": "8bad6c0bcd26ab876410c9f5079e1e4879159e40da9b9d61da71d7e5a9b97dd4"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [
+    "arithmetic_op-e0a44816bc5d-4",
+    "constant_replace-1f340b9f9e9c-0"
+  ],
+  "survivors": [
+    "arithmetic_op-e0a44816bc5d-4",
+    "constant_replace-1f340b9f9e9c-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_engine_generated.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_engine_generated.py": "1536b407918ac51dfd8968dcdb96522455c026e96f6f82784bfd0b95e72ae231"
+  },
+  "timed_out": 0,
+  "unviable": 0
+}

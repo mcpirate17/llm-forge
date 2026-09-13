@@ -5,7 +5,7 @@
   "core_sha256": "5844c55e1769a5c2b7e87772347c8d9854bc39e35a4791d6d3ed3a5044ef0ba9",
   "detail": {
     "encoding": "superseded",
-    "superseded_by": "conductor-67_mutation_engine_fest_fest_20260913_20260913T043743Z.json"
+    "superseded_by": "conductor-67_mutation_engine_fest_fest_20260913_20260913T193053Z.json"
   },
   "generated_at": "2026-09-13T04:33:37.053681+00:00",
   "interpreter": "/mnt/data/llm/scratch/forge-glm-timeouts/.venv/bin/python3",

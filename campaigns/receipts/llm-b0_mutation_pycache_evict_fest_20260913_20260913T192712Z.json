@@ -1,0 +1,546 @@
+{
+  "adapter_sha256": "365003176c192969d035b8028e796e9a7b04618820d84d5ef6fa508cac61ec29",
+  "attribution": {
+    "attributed_mutants": 11,
+    "baseline_repetitions": 2,
+    "killed_mutants": 11,
+    "ranked_tests": 3,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 1.556161,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": ".....                                                                    [100%]\n5 passed in 0.84s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-pycache-speed/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_pycache_evict.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "llm-b0_mutation_pycache_evict_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "8bad6c0bcd26ab876410c9f5079e1e4879159e40da9b9d61da71d7e5a9b97dd4",
+  "detail": {
+    "encoding": "json",
+    "mutants": [
+      {
+        "byte_length": 1704,
+        "byte_offset": 0,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-b9c925db002b-0",
+        "line": 1,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"Per-child eviction of mutated sources' cached bytecode, at pytest startup.\n\nfest's subprocess backend builds and launches each mutant's pytest command\nitself, so no launcher of ours sits between the mutant's rewrite and the child\nthat imports it -- the only hook that does is pytest's own plugin loading:\n``PYTEST_ADDOPTS=\"-p conductor.mutation_pycache_evict\"`` imports this module\nbefore collection imports anything under test. When the adapter's environment\ntells this process where the run's cache scratch is and which sources the run\nmutates, importing this module deletes those sources' cached bytecode under\nthe run-private prefix, so the first import of a mutated file compiles the\nbytes fest just wrote, never a same-size, same-second predecessor.\n\nThis module deliberately does not import `conductor.bytecode_isolation`. It\nruns inside the very children whose modules are mutated, so a mutant that\nbreaks the shared helpers must not break the eviction with it: the plugin\nwould die at startup, pytest would write no report, and an engine that grades\nby exit code would record a kill for which not one test ran. The small cache\nmapping below is a shadow copy of the one in `bytecode_isolation`, kept apart\nfor the same reason a checksum's reimplementation is.\n\nEviction failure fails closed on the whole run-private prefix: deleting the\nentire prefix tree makes every child of the run recompile, which is slower\nand always honest. Only if even that deletion fails does the import raise --\na cache this process cannot control is not one it can grade against.\n\nImported anywhere else -- as a library, or in a pytest no engine launched --\nthe variables are absent and the import does nothing.\n\"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 34,
+        "byte_offset": 1839,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-273da41d804b-0",
+        "line": 38,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"conductor.mutation_pycache_evict\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 33,
+        "byte_offset": 1888,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-cd5d54cecfa2-0",
+        "line": 39,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"CONDUCTOR_PYCACHE_EVICT_SCRATCH\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 33,
+        "byte_offset": 1936,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-13f903b46c1a-0",
+        "line": 40,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"CONDUCTOR_PYCACHE_EVICT_SOURCES\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 2074,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-081d6d215979-0",
+        "line": 44,
+        "mutated_text": "\"mutant\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 3,
+        "byte_offset": 2078,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-e7fb261820fe-0",
+        "line": 44,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"1\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 3,
+        "byte_offset": 2083,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-7ffcc4e5af55-0",
+        "line": 44,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"2\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 293,
+        "byte_offset": 2153,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-1301451bf52c-0",
+        "line": 48,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"The cache files a prefix-using interpreter may hold for `source`.\n\n    The interpreter's own mapping (a copy here would drift), via the same\n    ``sys.pycache_prefix`` switch ``bytecode_isolation`` uses -- see the\n    module docstring for why this is a local copy and not an import.\n    \"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 133,
+        "byte_offset": 2585,
+        "duration_seconds": 0.318757,
+        "id": "return_value-0060977549b6-0",
+        "line": 59,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "[\n            Path(importlib.util.cache_from_source(str(absolute), optimization=tag))\n            for tag in _OPTIMIZATIONS\n        ]",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources"
+        ]
+      },
+      {
+        "byte_length": 253,
+        "byte_offset": 2807,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-5c80086c7a3b-0",
+        "line": 68,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"Delete the mutated sources' caches named by the environment, if any.\n\n    Both variables must be present: sources without a scratch name caches this\n    process cannot locate, and refusing to guess is cheaper than evicting the\n    wrong tree.\n    \"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 3153,
+        "duration_seconds": 0.584048,
+        "id": "boolean_op-b1bf18cd689a-0",
+        "line": 77,
+        "mutated_text": "",
+        "operator": "boolean_op",
+        "original_text": "not ",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing"
+        ]
+      },
+      {
+        "byte_length": 26,
+        "byte_offset": 3153,
+        "duration_seconds": 0.603015,
+        "id": "negate_condition-2a584e3bc34c-0",
+        "line": 77,
+        "mutated_text": "not (not scratch or not sources)",
+        "operator": "negate_condition",
+        "original_text": "not scratch or not sources",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 3165,
+        "duration_seconds": 0.60619,
+        "id": "boolean_op-5af138464d7c-0",
+        "line": 77,
+        "mutated_text": "and",
+        "operator": "boolean_op",
+        "original_text": "or",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing"
+        ]
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 3168,
+        "duration_seconds": 0.575788,
+        "id": "boolean_op-b1bf18cd689a-1",
+        "line": 77,
+        "mutated_text": "",
+        "operator": "boolean_op",
+        "original_text": "not ",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 3196,
+        "duration_seconds": 0.585742,
+        "id": "return_value-978ce83465b9-0",
+        "line": 78,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "[]",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 3240,
+        "duration_seconds": 0.367869,
+        "id": "arithmetic_op-3ba0be62d2c9-0",
+        "line": 80,
+        "mutated_text": "*",
+        "operator": "arithmetic_op",
+        "original_text": "/",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources"
+        ]
+      },
+      {
+        "byte_length": 6,
+        "byte_offset": 3468,
+        "duration_seconds": 0.582609,
+        "id": "zero_iteration_loop-a8d1cb9c1265-0",
+        "line": 87,
+        "mutated_text": "[]",
+        "operator": "zero_iteration_loop",
+        "original_text": "caches",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources"
+        ]
+      },
+      {
+        "byte_length": 6,
+        "byte_offset": 3518,
+        "duration_seconds": 0.583687,
+        "id": "return_value-cba948a47ba0-0",
+        "line": 89,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "caches",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources"
+        ]
+      },
+      {
+        "byte_length": 40,
+        "byte_offset": 4051,
+        "duration_seconds": 0.579544,
+        "id": "exception_swallow-0b6aab875999-0",
+        "line": 98,
+        "mutated_text": "pass",
+        "operator": "exception_swallow",
+        "original_text": "shutil.rmtree(scratch)\n        return []",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 4089,
+        "duration_seconds": 0.580023,
+        "id": "return_value-978ce83465b9-1",
+        "line": 99,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "[]",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_pycache_evict.py",
+        "tests_run": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix"
+        ]
+      }
+    ],
+    "test_value": {
+      "adapter": "pytest-junit",
+      "baseline_repetitions": 2,
+      "classification_counts": {
+        "CORE": 3,
+        "DELETE_CANDIDATE": 0,
+        "INTENTIONAL_REDUNDANCY": 0,
+        "MERGE": 0
+      },
+      "errors": [],
+      "killers_by_mutant": {
+        "arithmetic_op-3ba0be62d2c9-0": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources"
+        ],
+        "boolean_op-5af138464d7c-0": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing"
+        ],
+        "boolean_op-b1bf18cd689a-0": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing"
+        ],
+        "boolean_op-b1bf18cd689a-1": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources"
+        ],
+        "exception_swallow-0b6aab875999-0": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix"
+        ],
+        "negate_condition-2a584e3bc34c-0": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources",
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing"
+        ],
+        "return_value-0060977549b6-0": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources"
+        ],
+        "return_value-978ce83465b9-0": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing"
+        ],
+        "return_value-978ce83465b9-1": [
+          "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix"
+        ],
+        "return_value-cba948a47ba0-0": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources"
+        ],
+        "zero_iteration_loop-a8d1cb9c1265-0": [
+          "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources"
+        ]
+      },
+      "required_contracts": [
+        {
+          "active_paths": [
+            "src/conductor/mutation_pycache_evict.py"
+          ],
+          "criticality": "high",
+          "id": "llm-b0_mutation_pycache_evict_fest_20260913"
+        }
+      ],
+      "retained_core": [
+        "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources",
+        "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing",
+        "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix"
+      ],
+      "schema_version": "llm.mutation-testing.test-value.v1",
+      "status": "PASS",
+      "subprocess_scaling": "baseline_repetitions + mutants",
+      "tests": [
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "llm-b0_mutation_pycache_evict_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "boolean_op-b1bf18cd689a-0",
+            "boolean_op-b1bf18cd689a-1",
+            "exception_swallow-0b6aab875999-0",
+            "negate_condition-2a584e3bc34c-0",
+            "return_value-978ce83465b9-1"
+          ],
+          "nodeid": "src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix",
+          "runtime_seconds_median": 0.0015,
+          "unique_kills": [
+            "exception_swallow-0b6aab875999-0",
+            "return_value-978ce83465b9-1"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "llm-b0_mutation_pycache_evict_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "arithmetic_op-3ba0be62d2c9-0",
+            "boolean_op-b1bf18cd689a-0",
+            "boolean_op-b1bf18cd689a-1",
+            "negate_condition-2a584e3bc34c-0",
+            "return_value-0060977549b6-0",
+            "return_value-cba948a47ba0-0",
+            "zero_iteration_loop-a8d1cb9c1265-0"
+          ],
+          "nodeid": "src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources",
+          "runtime_seconds_median": 0.001,
+          "unique_kills": [
+            "arithmetic_op-3ba0be62d2c9-0",
+            "return_value-0060977549b6-0",
+            "return_value-cba948a47ba0-0",
+            "zero_iteration_loop-a8d1cb9c1265-0"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "llm-b0_mutation_pycache_evict_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "boolean_op-5af138464d7c-0",
+            "boolean_op-b1bf18cd689a-0",
+            "negate_condition-2a584e3bc34c-0",
+            "return_value-978ce83465b9-0"
+          ],
+          "nodeid": "src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": [
+            "boolean_op-5af138464d7c-0",
+            "return_value-978ce83465b9-0"
+          ]
+        }
+      ]
+    }
+  },
+  "engine_result": {
+    "duration_seconds": 5.972886,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\"src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 575788415\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-5lkp5mv3/worktree/src/conductor/mutation_pycache_evict.py\",\n        \"line\": 78,\n        \"column\": 16,\n        \"byte_offset\": 3196,\n        \"byte_length\": 2,\n        \"original_text\": \"[]\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_pycache_evict.py::test_evict_now_without_both_engine_variables_does_nothing\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 585742314\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-5lkp5mv3/worktree/src/conductor/mutation_pycache_evict.py\",\n        \"line\": 80,\n        \"column\": 33,\n        \"byte_offset\": 3240,\n        \"byte_length\": 1,\n        \"original_text\": \"/\",\n        \"mutated_text\": \"*\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix\",\n        \"src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 367869117\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-5lkp5mv3/worktree/src/conductor/mutation_pycache_evict.py\",\n        \"line\": 87,\n        \"column\": 22,\n        \"byte_offset\": 3468,\n        \"byte_length\": 6,\n        \"original_text\": \"caches\",\n        \"mutated_text\": \"[]\",\n        \"mutator_name\": \"zero_iteration_loop\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 582608880\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-5lkp5mv3/worktree/src/conductor/mutation_pycache_evict.py\",\n        \"line\": 89,\n        \"column\": 16,\n        \"byte_offset\": 3518,\n        \"byte_length\": 6,\n        \"original_text\": \"caches\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_pycache_evict.py::test_evict_now_deletes_every_tag_of_the_named_sources\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 583687475\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-5lkp5mv3/worktree/src/conductor/mutation_pycache_evict.py\",\n        \"line\": 98,\n        \"column\": 9,\n        \"byte_offset\": 4051,\n        \"byte_length\": 40,\n        \"original_text\": \"shutil.rmtree(scratch)\\n        return []\",\n        \"mutated_text\": \"pass\",\n        \"mutator_name\": \"exception_swallow\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 579544285\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-5lkp5mv3/worktree/src/conductor/mutation_pycache_evict.py\",\n        \"line\": 99,\n        \"column\": 16,\n        \"byte_offset\": 4089,\n        \"byte_length\": 2,\n        \"original_text\": \"[]\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_pycache_evict.py::test_a_broken_eviction_fails_closed_on_the_whole_prefix\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 580023247\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 5,\n    \"nanos\": 967621109\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 11,
+    "mutants_generated": 20,
+    "mutants_tested": 11,
+    "no_coverage": 9,
+    "survived": 0,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T19:27:13.180187+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-pycache-speed/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/llm-b0_mutation_pycache_evict_fest_20260913.json",
+  "manifest_sha256": "40d6118d65c1e0aa65d480d693988e6da5ae3be689ccee81780a29905212b2e4",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 60,
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 1.0,
+  "new_survivors": [],
+  "no_coverage": 9,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 11,
+    "NO_COVERAGE": 9,
+    "SURVIVED": 0,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/.iterations/llm-b0_mutation_pycache_evict_fest_20260913_20260913T192712Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "8547341a8ab0448e586620da3adbdced0c6add1444645d79cc7cc73d9e1a3173",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fbaf4781cb73027fb336508b3fc8ec082497ced9edb6a3344e09fb40f58f37ad",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "699ab1e78eccea669c833105b32982e8fc15f53f13fa404d20e55246a0ce5488",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "98412200e5a9b7ed93e5c2b14a70f73bab207e2e49ce8441863c7c6136336b30"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/mutation_pycache_evict.py": "bd93b404dac5646ab41b35acbe16037609d438adb7c95ef0b5c0b9f9cf3cc0a8"
+  },
+  "status": "PASS",
+  "survivor_baseline": [],
+  "survivors": [],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_pycache_evict.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_pycache_evict.py": "38098471a211c0035ef143cd971f1f6de9bfd7cc8dc0e8813236284c0a6a227f"
+  },
+  "timed_out": 0,
+  "unviable": 0
+}

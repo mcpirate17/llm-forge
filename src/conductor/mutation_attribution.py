@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from conductor import mutation_engine_generated as _core
+from conductor.bytecode_isolation import evict_mutated_caches, scratch_root_for
 from conductor.mutation_scope import CampaignError
 from conductor.mutation_value import (
     ADAPTER,
@@ -149,19 +150,23 @@ def _selection(
     return list(pytest_junit_argv([*_narrowed(argv, worktree), *nodeids], junit))
 
 
-def _invalidate(target: Path) -> None:
-    """Drop the target's cached bytecode.
+def _invalidate(target: Path, worktree: Path) -> None:
+    """Drop the target's cached bytecode, beside the source and in the run's cache.
 
     CPython validates a `.pyc` against the source's size and its mtime in whole
     seconds. A one-operator mutation frequently changes neither, so a re-run
     inside the same second would import the *unmutated* module and every mutant
-    would come back unattributed with nothing to show for it.
+    would come back unattributed with nothing to show for it. The launcher
+    points every child at the run's private prefix, so that copy is evicted
+    with the same stroke; the beside-source glob stays for any run whose
+    runner does not isolate.
     """
 
     cache = target.parent / "__pycache__"
     if cache.is_dir():
         for entry in cache.glob(f"{target.stem}.*.pyc"):
             entry.unlink()
+    evict_mutated_caches([target], scratch_root_for(worktree))
 
 
 @contextmanager
@@ -181,12 +186,12 @@ def _applied(worktree: Path, row: Mapping[str, Any]) -> Iterator[None]:
         )
     mutated = str(row["mutated_text"]).encode("utf-8")
     target.write_bytes(original[:offset] + mutated + original[offset + length :])
-    _invalidate(target)
+    _invalidate(target, worktree)
     try:
         yield
     finally:
         target.write_bytes(original)
-        _invalidate(target)
+        _invalidate(target, worktree)
 
 
 def _spec(
@@ -226,9 +231,11 @@ class _Session:
     ) -> None:
         self.worktree = worktree
         self.argv = _core.pinned(campaign.test_argv, interpreter)
-        # Nothing may write bytecode during attribution: a `.pyc` produced
-        # while a mutant is live outlives the restore and poisons later runs.
-        self.environment = {**environment, "PYTHONDONTWRITEBYTECODE": "1"}
+        # Children cache into the run's private prefix (the shared launcher
+        # binds it), and the mutated file's cache is evicted around every
+        # re-apply below and again by the engine's plugin at each child's
+        # startup -- so no re-run imports a mutant's predecessor.
+        self.environment = dict(environment)
         self.timeout = campaign.run_timeout_seconds
         self.run = run
         self.reports = worktree / ".attribution"

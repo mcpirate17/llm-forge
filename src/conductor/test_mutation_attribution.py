@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from conductor import mutation_attribution as attribution
+from conductor.bytecode_isolation import cache_paths_for, scratch_root_for
 from conductor.mutation_campaign_model import CommandResult
 from conductor.mutation_engine_generated import KILLED, SURVIVED
 from conductor.mutation_scope import CampaignError
@@ -402,7 +403,15 @@ def test_narrowing_keeps_what_follows_a_selector_and_refuses_what_it_cannot(
         )
 
 
-def test_no_run_is_allowed_to_write_bytecode(worktree: Path) -> None:
+def test_re_runs_never_disable_the_run_private_cache(worktree: Path) -> None:
+    """The session must not smuggle PYTHONDONTWRITEBYTECODE back into a run.
+
+    Children cache into the run's private prefix and the mutated file's cache
+    is evicted around every re-apply (the test below) and by the engine's
+    plugin at each child's startup. A session that re-added the no-write flag
+    would quietly return the run to recompiling every module of every re-run.
+    """
+
     runner = FakeRunner(worktree)
     attribution.attribute(
         Campaign(),
@@ -415,8 +424,43 @@ def test_no_run_is_allowed_to_write_bytecode(worktree: Path) -> None:
 
     assert runner.environments
     for environment in runner.environments:
-        assert environment["PYTHONDONTWRITEBYTECODE"] == "1"
+        assert "PYTHONDONTWRITEBYTECODE" not in environment
         assert environment["EXISTING"] == "kept"
+
+
+def test_reapplying_a_mutant_evicts_its_cached_bytecode(worktree: Path) -> None:
+    """The mutated file's caches die with the mutant, on both sides of the re-run.
+
+    `_applied` writes the mutant byte-exactly -- same size, inside the same
+    mtime second as the file the cache recorded -- so the `.pyc` a previous
+    child left is exactly the stale read this module exists to prevent. It
+    must be gone before the re-run reads the file and gone again after the
+    restore, or the next mutant inherits the last one's verdict.
+    """
+
+    row = mutant("add-op", "a + b", "a - b")
+    target = worktree / MODULE
+    scratch = scratch_root_for(worktree)
+    cached = cache_paths_for(target, scratch / "pycache")[0]
+    beside = target.parent / "__pycache__" / (
+        f"{target.stem}.{sys.implementation.cache_tag}.pyc"
+    )
+    beside.parent.mkdir()
+    beside.write_bytes(b"stale")
+    cached.parent.mkdir(parents=True)
+    cached.write_bytes(b"stale")
+
+    with attribution._applied(worktree, row):
+        assert "a - b" in target.read_text(encoding="utf-8")
+        assert not beside.exists()
+        assert not cached.exists()
+        # What the re-run's own child would leave behind for the next mutant.
+        beside.write_bytes(b"stale")
+        cached.write_bytes(b"stale")
+
+    assert "a + b" in target.read_text(encoding="utf-8")
+    assert not beside.exists()
+    assert not cached.exists()
 
 
 def test_reports_are_written_to_their_own_directory(worktree: Path) -> None:

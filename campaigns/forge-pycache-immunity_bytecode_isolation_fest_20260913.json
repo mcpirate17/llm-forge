@@ -17,9 +17,10 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/conductor/bytecode_isolation.py": "84baddfbea153a805441ea5028ba8452e2121b29b12810121f205dde8f9cd1bf"
+    "src/conductor/bytecode_isolation.py": "8c11af9579a3c49497e7995b96adb6605bb15e3225c09db55f7e5e7052e0940d"
   },
   "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
   "survivor_baseline_recorded": true,
   "survivor_baseline_recorded_at": "2026-09-13T18:26:35.983972+00:00",
   "test_argv": [
@@ -31,7 +32,7 @@
     "src/conductor/test_bytecode_isolation.py"
   ],
   "test_sha256": {
-    "src/conductor/test_bytecode_isolation.py": "e4c4311cd98eed83a7cb7754baf5df9e95d26e6d46d32743a35466d27add1cc3"
+    "src/conductor/test_bytecode_isolation.py": "95d95c8e62c6d5c5286fdf9291c8c9093479916994acea353c56697a45f4d1d8"
   },
   "title": "Generated mutants for src/conductor/bytecode_isolation.py, scored on the survivor set"
 }

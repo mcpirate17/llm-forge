@@ -28,6 +28,12 @@ from typing import Any
 
 from conductor import mutation_attribution as _attribution
 from conductor import mutation_engine_generated as _core
+from conductor.bytecode_isolation import scratch_root_for
+from conductor.mutation_pycache_evict import (
+    PLUGIN_NAME,
+    SCRATCH_ENV,
+    SOURCES_ENV,
+)
 from conductor.mutation_scope import CampaignError
 
 ENGINE = "fest"
@@ -206,16 +212,36 @@ def _environment(
     somewhere else. Binding PATH and VIRTUAL_ENV to the interpreter that is
     already pinned in the receipt keeps the probe and the test command in the
     same environment.
+
+    fest also builds each mutant's pytest command itself, so no launcher of
+    ours sits between a mutant's rewrite and the child that imports it. Every
+    such child is pytest, though, so PYTEST_ADDOPTS loads the eviction plugin
+    before collection imports anything, and the two CONDUCTOR variables tell
+    it where this run's caches live and which files this run mutates --
+    per-child eviction without touching fest.
     """
 
     bin_dir = str(Path(sys.executable).parent)
     declared = campaign.environment.get("PYTHONPATH", "").split(os.pathsep)
     roots = [*_import_roots(worktree), *declared]
+    # Only what the campaign declares: this environment is built inside
+    # children that already carry our own PYTEST_ADDOPTS, so inheriting from
+    # the ambient os.environ would append the plugin to itself.
+    declared_addopts = campaign.environment.get("PYTEST_ADDOPTS", "")
     return {
         **campaign.environment,
         "PYTHONPATH": os.pathsep.join(root for root in roots if root),
         "VIRTUAL_ENV": str(Path(sys.executable).parents[1]),
         "PATH": bin_dir + os.pathsep + os.environ.get("PATH", ""),
+        "PYTEST_ADDOPTS": " ".join(
+            part
+            for part in (declared_addopts.strip(), f"-p {PLUGIN_NAME}")
+            if part
+        ),
+        SCRATCH_ENV: str(scratch_root_for(worktree)),
+        SOURCES_ENV: os.pathsep.join(
+            str(worktree / relative) for relative in campaign.source_sha256
+        ),
     }
 
 
@@ -271,6 +297,10 @@ def execute(
         cwd=worktree,
         timeout_seconds=campaign.run_timeout_seconds,
         environment=environment,
+        # The engine's own per-mutant children evict again at pytest startup
+        # (the plugin above); this parent-side eviction keeps the same
+        # guarantee for this launch whatever fest does internally.
+        mutated_paths=[worktree / relative for relative in campaign.source_sha256],
     )
     receipt["engine_result"] = result.as_dict()
     if result.timed_out:
