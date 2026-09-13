@@ -67,7 +67,8 @@ Claude agents (≤150K each): anything Rust, anything that needs a design decisi
 
 - PR #25 ff1d7d8: `refresh` accepts campaigns admitted with extra tests (no more `--force` ratchet resets); `snapshot_worktree` keeps every tracked file under `tests/`, `fixtures/` and `test_*` paths plus `[tool.conductor].snapshot_extra_suffixes`; the generator pairs tests by package-relative path, not basename.
 - PR #26 3e536f7: `campaigns/registry.d/<campaign-id>.json`, one file per row; `registry.json` is an empty read-only envelope; `conductor.mutation_registry_split` is the one-shot migration. Concurrent PRs no longer conflict on the registry.
-- Open: cargo-mutants TIMED_OUT mutants still turn a campaign ERROR (debt in PR bodies); re-runs of campaigns that mutate other lanes' files need `--base` pinned to the pre-lane commit.
+- Slice G: a timed-out mutant is a measurement, not an engine error — TIMED_OUT counts beside `no_coverage`/`unviable` and never blocks the ratchet; the per-mutant bound is 3x the baseline suite's wall time (floor 60 s) unless the manifest pins one, and the resolved value lands in the receipt.
+- Open: re-runs of campaigns that mutate other lanes' files need `--base` pinned to the pre-lane commit.
 
 
 ## Landed this week
@@ -88,3 +89,4 @@ Claude agents (≤150K each): anything Rust, anything that needs a design decisi
 | #24 | d4e4431 | feat(doctor): --harness verifies the settings that dominate agent cost |
 | #25 | ff1d7d8 | fix(mutation): refresh accepts extra-test campaigns; snapshots keep fixture trees |
 | #26 | 3e536f7 | refactor(mutation): one registry file per campaign, no more registry.json conflicts |
+| #27 | 83504e7 | docs: roadmap, registry.d layout, doctor --harness |

@@ -18,8 +18,9 @@ Two behaviours of the tool matter to the adapter:
 There is no coverage phase: cargo-mutants has no coverage filter, so `cargo
 test` runs in full for each mutant. That is affordable because the crates are
 small and the target directory is shared -- 196 mutants of `snapshot-retention`
-in 43 seconds -- but it is why `jobs` and `mutant_timeout_seconds` are pinned in
-the manifest rather than left to the tool.
+in 43 seconds -- but it is why `jobs` is pinned in the manifest rather than
+left to the tool, and the per-mutant bound is either pinned there too or
+derived from the baseline suite's own wall time.
 """
 
 from __future__ import annotations
@@ -256,6 +257,9 @@ def execute(
         receipt["status"] = "BASELINE_FAILED"
         _core.atomic_json(output_path, receipt)
         raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+    receipt["mutant_timeout_seconds"] = _core.resolve_mutant_timeout(
+        campaign, baseline.duration_seconds
+    )
 
     output = worktree / ".cargo-mutants-out"
     result, _ = _core.run(

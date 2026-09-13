@@ -17,7 +17,10 @@ from conductor.mutation_engine_cargo import (
     _require_baseline,
     _rows,
 )
-from conductor.mutation_engine_generated import load_generated_campaign
+from conductor.mutation_engine_generated import (
+    load_generated_campaign,
+    resolve_mutant_timeout,
+)
 from conductor.mutation_scope import CampaignError
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -182,7 +185,9 @@ def test_the_invocation_pins_every_bound_from_the_manifest() -> None:
     assert argv[:2] == ["/bin/cargo-mutants", "mutants"]
     assert argv[argv.index("--output") + 1] == "/out"
     assert argv[argv.index("--jobs") + 1] == str(subject.jobs)
-    assert argv[argv.index("--timeout") + 1] == str(subject.mutant_timeout_seconds)
+    # By value: the fixture pins 30, and an unresolved (None) bound must never
+    # reach the tool as the string "None".
+    assert argv[argv.index("--timeout") + 1] == "30"
     assert argv[argv.index("--package") + 1] == "conductor-native"
     assert argv[argv.index("--manifest-path") + 1].endswith("Cargo.toml")
 
@@ -202,6 +207,25 @@ def test_a_crate_without_a_package_is_not_narrowed_to_one() -> None:
     subject.options = {"manifest_path": "x/Cargo.toml"}
     argv = _engine_argv(subject, "/bin/cargo-mutants", Path("/out"))
     assert "--package" not in argv
+
+
+def test_an_unpinned_bound_is_derived_before_the_invocation_is_built() -> None:
+    """A manifest without `mutant_timeout_seconds` still bounds every mutant.
+
+    The 30 s pin timed out six honest kills of this crate on every run, and
+    each of those runs came home status ERROR -- a measurement the campaign
+    itself requested, read as an engine failure. The bound is now resolved
+    from the baseline suite's wall time (3x, floored at 60 s) before any argv
+    is built, so the tool is never handed the string "None".
+    """
+
+    subject = campaign()
+    assert subject.mutant_timeout_seconds == 30  # the fixture pins one
+    subject.mutant_timeout_seconds = None
+    resolved = resolve_mutant_timeout(subject, 41.2)
+    argv = _engine_argv(subject, "/bin/cargo-mutants", Path("/out"))
+    assert resolved == 124
+    assert argv[argv.index("--timeout") + 1] == "124"
 
 
 def test_every_receipt_field_a_row_carries_is_pinned() -> None:

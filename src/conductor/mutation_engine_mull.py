@@ -596,6 +596,9 @@ def execute(
         receipt["status"] = "BASELINE_FAILED"
         _core.atomic_json(output_path, receipt)
         raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+    receipt["mutant_timeout_seconds"] = _core.resolve_mutant_timeout(
+        campaign, baseline.duration_seconds
+    )
 
     reports = _engine_reports(
         campaign,

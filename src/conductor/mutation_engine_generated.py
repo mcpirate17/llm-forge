@@ -22,6 +22,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import math
 import os
 import resource
 import sys
@@ -58,7 +59,10 @@ OUTPUT_TAIL_CHARS = 4000
 
 # The receipt's outcome vocabulary. KILLED and SURVIVED are the only two that
 # score; the rest are measurements the hand-written runner could not make.
-# NO_COVERAGE is a mutant no test reaches, UNVIABLE one that does not compile.
+# NO_COVERAGE is a mutant no test reaches, UNVIABLE one that does not compile,
+# TIMED_OUT one the per-mutant bound cut off -- unknown, and deliberately
+# counted as neither killed nor surviving so a slow kill is never misread as
+# either.
 KILLED = "KILLED"
 SURVIVED = "SURVIVED"
 TIMED_OUT = "TIMED_OUT"
@@ -66,6 +70,15 @@ NO_COVERAGE = "NO_COVERAGE"
 UNVIABLE = "UNVIABLE"
 ERROR = "ERROR"
 OUTCOMES = (KILLED, SURVIVED, TIMED_OUT, NO_COVERAGE, UNVIABLE, ERROR)
+
+# The per-mutant bound when the manifest does not pin one: three times the
+# baseline suite's wall time, never less than a minute. Three because a mutant
+# that hangs typically does so on the first test that touches it while an
+# honest-but-slow kill pays the suite's full cost plus the mutant's own work;
+# a floor because a suite that runs in two seconds says nothing about what a
+# wedged mutant in it deserves.
+MUTANT_TIMEOUT_BASELINE_MULTIPLIER = 3
+MUTANT_TIMEOUT_FLOOR_SECONDS = 60
 
 
 class EngineAdapter(Protocol):
@@ -143,7 +156,13 @@ class GeneratedCampaign:
         self.options = dict(generator.get("options", {}))
         self.seed = int(generator.get("seed", 0))
         self.jobs = int(generator.get("jobs", 1))
-        self.mutant_timeout_seconds = int(generator.get("mutant_timeout_seconds", 30))
+        # None means the manifest pins no per-mutant bound and the run derives
+        # one from the baseline suite's wall time once it exists (see
+        # `resolve_mutant_timeout`). The adapters read this field only after
+        # that resolution, so None never reaches an engine flag.
+        self.mutant_timeout_seconds = generator.get("mutant_timeout_seconds")
+        if self.mutant_timeout_seconds is not None:
+            self.mutant_timeout_seconds = int(self.mutant_timeout_seconds)
         self.run_timeout_seconds = int(_require(generator, "run_timeout_seconds", int))
         self.test_argv = tuple(_require(payload, "test_argv", list))
         self.source_sha256 = dict(_require(payload, "source_sha256", dict))
@@ -323,6 +342,32 @@ def pinned(argv: Sequence[str], interpreter: str) -> list[str]:
     return list(argv)
 
 
+def resolve_mutant_timeout(
+    campaign: GeneratedCampaign, baseline_duration_seconds: float
+) -> int:
+    """Pin the per-mutant bound onto the campaign, from the manifest or the baseline.
+
+    A manifest's `mutant_timeout_seconds` wins outright -- a lane that knows its
+    suite is slow says so once. Otherwise the bound is three times the baseline
+    suite's wall time with a 60 s floor, resolved here because only the adapter,
+    having just run that baseline, knows the number. The resolved value lands on
+    the campaign (adapters build their engine flags from the field) and the
+    caller writes it into the receipt, so a reader can tell a pinned bound from
+    a derived one by diffing against the manifest.
+    """
+
+    if campaign.mutant_timeout_seconds is not None:
+        return campaign.mutant_timeout_seconds
+    derived = max(
+        MUTANT_TIMEOUT_FLOOR_SECONDS,
+        math.ceil(
+            MUTANT_TIMEOUT_BASELINE_MULTIPLIER * max(0.0, baseline_duration_seconds)
+        ),
+    )
+    campaign.mutant_timeout_seconds = derived
+    return derived
+
+
 def require_executed(generated: int, tested: int, source: Sequence[str]) -> None:
     """Refuse a run that scored nothing, however green it looks.
 
@@ -408,13 +453,18 @@ def score(campaign: GeneratedCampaign, receipt: dict[str, Any]) -> None:
     receipt["mutation_score"] = counts[KILLED] / denominator if denominator else None
     receipt["no_coverage"] = counts[NO_COVERAGE]
     receipt["unviable"] = counts[UNVIABLE]
+    # Timed-out mutants are measurements the bound made, not failures the run
+    # caused: the engine cut them off exactly as the campaign asked it to.
+    # Reported beside the other non-scoring counts so a campaign that is merely
+    # slow never reads as one that errored.
+    receipt["timed_out"] = counts[TIMED_OUT]
     survivors = sorted(row["id"] for row in rows if row["outcome"] == SURVIVED)
     baseline = set(campaign.survivor_baseline)
     receipt["survivors"] = survivors
     receipt["new_survivors"] = sorted(set(survivors) - baseline)
     receipt["resolved_survivors"] = sorted(baseline - {*survivors})
     receipt["classification_required"] = list(receipt["new_survivors"])
-    if counts[ERROR] or counts[TIMED_OUT]:
+    if counts[ERROR]:
         receipt["status"] = "ERROR"
     elif receipt["new_survivors"]:
         receipt["status"] = "FAIL"

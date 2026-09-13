@@ -136,7 +136,11 @@ def test_fest_manifest_binds_its_generated_engine_contract(tmp_path: Path) -> No
     assert manifest["generator"]["exclude"] == ["**/test_*.py", "**/conftest.py"]
     assert manifest["generator"]["operators"] == []
     assert manifest["generator"]["seed"] == 0
-    assert manifest["generator"]["mutant_timeout_seconds"] == 30
+    # No per-mutant bound is written: the run derives it from the baseline
+    # suite's wall time (3x, floored at 60 s) and records the value it used.
+    # The old pinned 30 timed out six honest kills of native/forge on every
+    # run, each of them then read as a campaign ERROR.
+    assert "mutant_timeout_seconds" not in manifest["generator"]
     assert manifest["generator"]["run_timeout_seconds"] == 91
     assert manifest["environment"] == {}
     assert manifest["survivor_baseline"] == []
@@ -219,7 +223,8 @@ def test_cargo_manifest_preserves_the_exact_scoped_engine_contract(
         "package_root": "crate",
     }
     assert manifest["generator"]["seed"] == 0
-    assert manifest["generator"]["mutant_timeout_seconds"] == 30
+    # Derived per run from the baseline wall time; see the fest builder test.
+    assert "mutant_timeout_seconds" not in manifest["generator"]
     assert manifest["generator"]["run_timeout_seconds"] == 91
     assert manifest["test_argv"] == [
         "cargo",
