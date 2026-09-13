@@ -1,0 +1,38 @@
+{
+  "campaign_id": "forge-rust-bash-guard_runner_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/dispatch/runner.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/runner.py": "5aa78897a83e71fd71a4c415988e585d7c24f62e50628262f4f69bb4ffc94aa2"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test_runner.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test_runner.py": "d39c2486953e4140f4f06d508a1c99e2c6d1a798cfae30a0179b7e63f5cad293"
+  },
+  "title": "Generated mutants for src/tooling/hooks/dispatch/runner.py, scored on the survivor set"
+}
