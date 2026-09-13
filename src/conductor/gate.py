@@ -45,6 +45,7 @@ import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from conductor.bytecode_isolation import isolated_python_env
 from conductor.candidate_review.policy import PolicyError, ToolPolicy, load_policy
 from conductor.candidate_review.policy_path import resolve_policy_path
 from conductor.project_paths import (
@@ -93,7 +94,11 @@ class PhaseResult:
 
 
 def _run(
-    command: list[str], *, cwd: Path | None = None, timeout: int = 60
+    command: list[str],
+    *,
+    cwd: Path | None = None,
+    timeout: int = 60,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
@@ -102,6 +107,7 @@ def _run(
         text=True,
         timeout=timeout,
         check=False,
+        env=env,
     )
 
 
@@ -346,6 +352,14 @@ def preflight_pytest_config(export_root: Path, python: str) -> PhaseResult:
     checked: list[str] = []
     empty = export_root / ".gate-empty-collect"
     empty.mkdir(exist_ok=True)
+    # The probes import conftest chains and test modules, and under an editable
+    # install `import conductor` resolves through site-packages to the live
+    # checkout -- where a same-second edit can have left a `__pycache__` the
+    # import would execute as gospel. The probes therefore run with their
+    # bytecode caches isolated into the gate's own scratch, beside the export.
+    isolated = isolated_python_env(
+        os.environ, export_root.parent / ".bytecode-isolation"
+    )
     for config in discover_pytest_configs(export_root):
         if config.name == "pyproject.toml":
             text = config.read_text(encoding="utf-8", errors="replace")
@@ -370,6 +384,7 @@ def preflight_pytest_config(export_root: Path, python: str) -> PhaseResult:
             ],
             cwd=export_root,
             timeout=120,
+            env=isolated,
         )
         if parse.returncode not in (0, 5):
             tail = (parse.stderr or parse.stdout).strip().splitlines()
@@ -398,6 +413,7 @@ def preflight_pytest_config(export_root: Path, python: str) -> PhaseResult:
             ],
             cwd=export_root,
             timeout=300,
+            env=isolated,
         )
         if collect.returncode not in (0, 5):
             tail = (collect.stderr or collect.stdout).strip().splitlines()

@@ -135,6 +135,23 @@ clone and CI checkout paid for it. When a loop settles,
 `make mutation-receipt-promote` copies the newest iteration receipt into the
 tracked directory; only that copy is committed.
 
+### Bytecode isolation
+
+Every child command an engine spawns — the baseline suite, the engine binary
+(and the per-mutant test commands it spawns in turn), attribution's re-applied
+mutants — and the gate's two pytest collect probes run with
+`PYTHONDONTWRITEBYTECODE=1` and a fresh `PYTHONPYCACHEPREFIX` scratch, wired
+once in `mutation_engine_generated.run` (the choke point all engine children
+flow through) and `gate.preflight_pytest_config`. CPython validates a
+`__pycache__` entry by source mtime and size, so a same-size rewrite within
+one mtime second leaves a stale `.pyc` that later interpreters keep
+executing — and applying a mutant *is* a same-size same-second rewrite, which
+let a campaign grade the unmutated bytecode and report a survivor no source
+diff explained (PR #49's spurious `arithmetic_op`). With a prefix set,
+CPython stops reading beside-source caches entirely, so a stale one cannot be
+read even where it already exists; the price is one compile per module per
+run, reported as wall time in the campaign receipts.
+
 ### Orphaned runs
 
 `run_command` starts every engine in its own session and binds it to the

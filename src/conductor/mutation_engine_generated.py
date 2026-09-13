@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from conductor import mutation_testing_support as _support
+from conductor.bytecode_isolation import isolated_python_env
 from conductor.mutation_campaign_model import (
     RECEIPT_SCHEMA,
     REPO_ROOT,
@@ -333,14 +334,24 @@ def run(
     timeout_seconds: int,
     environment: Mapping[str, str],
 ) -> tuple[CommandResult, str]:
-    """Run one bounded command, keeping full stdout for the caller to parse."""
+    """Run one bounded command, keeping full stdout for the caller to parse.
+
+    Every command through here is a child of a mutation run -- the baseline
+    suite, the engine binary (whose own per-mutant children inherit this
+    environment), attribution's re-applied mutants -- and the engines' whole
+    method is same-size, same-second rewrites of the files under test. The
+    child environment is therefore always bytecode-isolated into a scratch
+    beside `cwd`, which the snapshot destroys with the run: without it a
+    mutant can be graded against the unmutated baseline's cached bytecode and
+    report a survivor (or a kill) that no source diff explains.
+    """
 
     captured: list[str] = []
     result = _support.run_command(
         argv,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
-        environment=environment,
+        environment=isolated_python_env(environment, cwd / ".bytecode-isolation"),
         pin_argv=list,
         result_factory=CommandResult,
         output_tail_chars=OUTPUT_TAIL_CHARS,

@@ -1,0 +1,37 @@
+{
+  "campaign_id": "forge-pycache-immunity_bytecode_isolation_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/bytecode_isolation.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/bytecode_isolation.py": "84baddfbea153a805441ea5028ba8452e2121b29b12810121f205dde8f9cd1bf"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T18:26:35.983972+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_bytecode_isolation.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_bytecode_isolation.py": "e4c4311cd98eed83a7cb7754baf5df9e95d26e6d46d32743a35466d27add1cc3"
+  },
+  "title": "Generated mutants for src/conductor/bytecode_isolation.py, scored on the survivor set"
+}

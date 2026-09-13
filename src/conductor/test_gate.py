@@ -294,6 +294,25 @@ def test_pytest_config_check_passes_on_a_valid_addopts(tmp_path: Path) -> None:
     assert phase.ok is True
 
 
+def test_the_pytest_probes_run_with_isolated_bytecode_caches(tmp_path: Path) -> None:
+    """The probe children must not execute a stale beside-source cache.
+
+    The probes import conftest chains, and under an editable install
+    `import conductor` resolves through site-packages to the live checkout,
+    where a same-second edit can have left a `__pycache__` the import would
+    execute. Their caches therefore go to a scratch beside the export (see
+    `conductor.bytecode_isolation`), and this asserts where: a probe run that
+    silently fell back to shared caches would defeat the isolation.
+    """
+    (tmp_path / "pytest.ini").write_text(
+        "[pytest]\naddopts = --tb=short\n", encoding="utf-8"
+    )
+    phase = gate.preflight_pytest_config(tmp_path, sys.executable)
+    assert phase.ok is True
+    scratch = tmp_path.parent / ".bytecode-isolation" / "pycache"
+    assert scratch.is_dir(), "the probes' cache scratch must live beside the export"
+
+
 # --------------------------------------------------------------------------
 # waiver activation -- both sides of the integration_base comparison
 # --------------------------------------------------------------------------
