@@ -32,6 +32,41 @@ fn search_term_re() -> &'static Regex {
     RE.get_or_init(|| Regex::new(r"\S+").unwrap())
 }
 
+/// A `serde_json::ser::Formatter` matching Python's `json.dumps` default
+/// separators (`", "` between array/object items, `": "` after an object
+/// key) instead of serde_json's compact `","`/`":"` -- `headers_json` and
+/// `rows_json` must be byte-identical to the Python reference, and a bare
+/// `serde_json::to_string` disagrees on every comma.
+struct PySeparatorFormatter;
+
+impl serde_json::ser::Formatter for PySeparatorFormatter {
+    fn begin_array_value<W: ?Sized + std::io::Write>(
+        &mut self,
+        writer: &mut W,
+        first: bool,
+    ) -> std::io::Result<()> {
+        if first {
+            Ok(())
+        } else {
+            writer.write_all(b", ")
+        }
+    }
+
+    fn begin_object_value<W: ?Sized + std::io::Write>(
+        &mut self,
+        writer: &mut W,
+    ) -> std::io::Result<()> {
+        writer.write_all(b": ")
+    }
+}
+
+fn to_python_json<T: serde::Serialize>(value: &T) -> Result<String> {
+    let mut buf = Vec::new();
+    let mut ser = serde_json::Serializer::with_formatter(&mut buf, PySeparatorFormatter);
+    value.serialize(&mut ser)?;
+    Ok(String::from_utf8(buf)?)
+}
+
 /// One markdown table extracted from a note, `serde_json`-encoded the same
 /// shape the Python `note_tables.headers_json`/`rows_json` columns hold.
 struct Table {
@@ -269,8 +304,8 @@ pub fn rebuild(conn: &mut Connection, host: &Path, vault: Option<&Path>) -> Resu
                         t.section,
                         t.headers.len() as i64,
                         t.rows.len() as i64,
-                        serde_json::to_string(&t.headers)?,
-                        serde_json::to_string(&t.rows)?,
+                        to_python_json(&t.headers)?,
+                        to_python_json(&t.rows)?,
                         now,
                     ],
                 )?;
