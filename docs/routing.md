@@ -280,5 +280,13 @@ collapses to one row, not two.
 
 `FORGE_LEDGER_DISABLE=1` skips the `SubagentStop` rollup entirely (the
 escape hatch for a broken ledger root); it does not affect the live
-`PreToolUse` cap check itself, which has no disable flag of its own today
-(tracked as debt below).
+`PreToolUse` cap check itself -- that check has its own hatch,
+`FORGE_CAP_DISABLE=1` (`cap_enforce.rs`), which forces a bare `NoOp`
+regardless of how far over cap the subagent already is, without touching
+the ledger rollup `FORGE_LEDGER_DISABLE` gates. All three escape hatches:
+
+| Variable | Skips |
+|---|---|
+| `FORGE_ROUTE_DISABLE=1` | routing (`forge route`, `PreToolUse`'s `additionalContext`/`updatedInput`) |
+| `FORGE_LEDGER_DISABLE=1` | the `SessionEnd`/`SubagentStop`-triggered ledger rollup |
+| `FORGE_CAP_DISABLE=1` | the live `PreToolUse` cap check only (`cap_enforce.rs`) |
