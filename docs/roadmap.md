@@ -143,6 +143,25 @@ agent tokens. Stop porting; finish Phase 3, then install.
    quantifying the double-run cost, not yet realized since Python stays
    wired there) -- see the coverage table and proof in the PR. DONE
    PR #64 (`docs/install.md`, "Take over from the Python dispatcher").
+2g. (Claude) standalone Bash guard + matcher narrowing: `forge hook
+   PreToolUse` under `FORGE_HOOK_STANDALONE=1` now runs the native Bash
+   guard (`crg_refresh_report_pre`, `crg_gate_verify_bash`, `pre_bash`,
+   `current_work_guard_bash`) itself instead of silently deferring, so
+   `PreToolUse`+`Bash` is Full coverage; `--takeover` narrows (not
+   removes) the host's `PreToolUse` `.*` Python entry down to
+   `Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*` --
+   the tools still needing Python -- and `uninstall` restores it to
+   `.*` in place. Measured on a synthetic Bash deny payload, 20+ runs,
+   median/mean wall time:
+
+   | Path | ms |
+   |---|---|
+   | standalone forge alone, before this slice | ~0.80 ms |
+   | standalone forge alone, after this slice (now runs the real guard) | ~3.6 ms |
+   | `dispatch.py`+forge combined (reference, unchanged) | ~49.9 ms |
+
+   DONE PR #67 (`docs/install.md`, "Take over from the Python
+   dispatcher"; `docs/roadmap.md`, this item).
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
