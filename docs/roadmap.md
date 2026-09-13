@@ -54,7 +54,7 @@ Rust JSONL reader over harness transcripts: tokens by category (cache read/write
 
 Build plan (design section 6):
 1. Reader + schema (`native/forge/src/ledger/{schema,reader}.rs`, `forge ledger read`). DONE PR #35: parses all 5 sessions measured in the design doc with zero panics and matches its cache_read/cache_creation/output sums exactly; unit tests on malformed/truncated/unknown-block lines.
-2. Turn/session/agent rollups (`forge ledger rollup`). Not started.
+2. Turn/session/hook rollups (`forge ledger rollup`; `agent_rollup` is step 4). DONE: writes `turn_attribution`, `session_rollup`, `hook_rollup` JSONL with compaction and resend detection; verified against all 5 sessions measured in the design doc (n_turns and total_cache_read match exactly for the ~100 MB session, 1.77s/22 MB peak RSS dry-run).
 3. Calibration harness (`forge ledger calibrate`, GLM). Not started.
 4. `agent_rollup` + `Agent:` trailer join to landed PRs. Not started.
 5. Gate phase `cost_budget_audit`. Not started.

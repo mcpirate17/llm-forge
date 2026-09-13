@@ -21,12 +21,32 @@ pub struct TranscriptLine {
     #[serde(default)]
     #[allow(dead_code)]
     pub parent_uuid: Option<String>,
+    /// The harness's own field is `sessionId` (camelCase); this repo's
+    /// existing tooling additionally stamps a `session_id` duplicate onto
+    /// main-session transcript lines (not this reader's doing), which is
+    /// why PR #35's fixtures and this reader use snake_case as the primary
+    /// name. A real *subagent* transcript (`agent-*.jsonl`) never gets that
+    /// duplicate, only the harness's own `sessionId` -- `serde(alias)` is
+    /// not used here because a line carrying *both* keys (every real
+    /// main-session line) would then hit serde's "duplicate field" error;
+    /// `reader.rs::read_transcript_file` instead reads `sessionId` off the
+    /// raw `Value` itself and fills this field only when it parsed empty.
     #[serde(default)]
     pub session_id: Option<String>,
     #[serde(default)]
     pub timestamp: Option<String>,
     #[serde(default)]
     pub message: Option<RawMessage>,
+    /// True on the one line the harness writes immediately after a
+    /// compaction (a `type: "user"` line carrying the compaction summary,
+    /// no `usage`). Step 2's compaction detection (`rollup.rs`,
+    /// `docs/design/cost_ledger.md` section 2) keys off this field; picked
+    /// over the sibling `type: "system"`/`subtype: "compact_boundary"`
+    /// marker so one compaction yields exactly one counted event instead of
+    /// two redundant ones. Additive since PR #35: defaults `false` so every
+    /// existing fixture and caller is unaffected.
+    #[serde(default, rename = "isCompactSummary")]
+    pub is_compact_summary: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -170,6 +190,18 @@ pub struct TranscriptSummary {
     pub chars_by_block_type: BlockTypeCounts,
     pub read_stats: ReadStats,
     pub turns: Vec<TurnSummary>,
+    /// One entry per `isCompactSummary` line seen (additive since PR #35;
+    /// empty for a file with no compaction). Step 2's `rollup.rs` primary
+    /// compaction-count signal.
+    pub compaction_markers: Vec<CompactionMarker>,
+}
+
+/// One `isCompactSummary` line: the harness-written marker for one
+/// compaction event (`docs/design/cost_ledger.md` section 2).
+#[derive(Debug, Clone, Serialize)]
+pub struct CompactionMarker {
+    pub session_id: Option<String>,
+    pub timestamp: Option<String>,
 }
 
 /// One row of `hook_rollup`-shaped telemetry (design section 2): per hook
@@ -179,6 +211,15 @@ pub struct TranscriptSummary {
 #[derive(Debug, Clone, Serialize)]
 pub struct HookStats {
     pub hook: String,
+    /// The line's raw top-level `"event"` value: the telemetry record kind
+    /// for the Python shapes (`HookTiming`/`HookContext`), or the Claude
+    /// Code hook event name itself for forge's own `DelegationEvent` lines
+    /// (which carry no separate `tool` field, so `hook` above is already
+    /// that same value -- `event` duplicates it in that case, documented in
+    /// `rollup.rs`, not fabricated). First value seen for this hook name.
+    /// Additive since PR #35; `String::new()` for a hook name whose only
+    /// lines carried neither key (should not occur for either known shape).
+    pub event: String,
     pub n_calls: u64,
     pub p50_ms: Option<f64>,
     pub p90_ms: Option<f64>,

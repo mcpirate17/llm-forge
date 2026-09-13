@@ -70,6 +70,9 @@ enum Command {
 enum LedgerCommand {
     /// Parse transcript or telemetry JSONL file(s) into ledger summaries.
     Read(ledger::ReadArgs),
+    /// Roll transcript/telemetry JSONL up into `turn_attribution`,
+    /// `session_rollup` and `hook_rollup` (design step 2).
+    Rollup(ledger::rollup::RollupArgs),
 }
 
 #[derive(Subcommand)]
@@ -104,6 +107,13 @@ fn main() -> ExitCode {
                 Ok(code) => ExitCode::from(code as u8),
                 Err(err) => {
                     eprintln!("forge ledger read: {err:#}");
+                    ExitCode::from(1)
+                }
+            },
+            LedgerCommand::Rollup(args) => match ledger::rollup::run(args) {
+                Ok(code) => ExitCode::from(code as u8),
+                Err(err) => {
+                    eprintln!("forge ledger rollup: {err:#}");
                     ExitCode::from(1)
                 }
             },
