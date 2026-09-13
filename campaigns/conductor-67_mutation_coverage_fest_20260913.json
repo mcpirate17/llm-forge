@@ -1,0 +1,53 @@
+{
+  "campaign_id": "conductor-67_mutation_coverage_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/mutation_coverage.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/mutation_coverage.py": "d0ce8399da90ab4454a73bc5a5b31f38dfdfad0708be3e746f060bfdb725c69f"
+  },
+  "survivor_baseline": [
+    "boolean_op-effadc5c73c1-0",
+    "boolean_op-effadc5c73c1-1",
+    "boolean_op-effadc5c73c1-2",
+    "constant_replace-3d9f25eb1e72-0",
+    "constant_replace-6311541f18d7-0",
+    "constant_replace-6311541f18d7-1",
+    "constant_replace-6667f8e4e302-0",
+    "constant_replace-82835c5c5ef9-0",
+    "constant_replace-a1b143da8d61-0",
+    "constant_replace-a6f313a6f637-0",
+    "constant_replace-bcaabcbc001c-0",
+    "constant_replace-bcaabcbc001c-1",
+    "constant_replace-bf938a13ba31-0",
+    "constant_replace-bf938a13ba31-1"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:43:41.140768+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_coverage.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_coverage.py": "39eddd1d618b6373aa8470cb35e9fc47176046b576d2455c9bcfacc04e010a52"
+  },
+  "title": "Generated mutants for src/conductor/mutation_coverage.py, scored on the survivor set"
+}

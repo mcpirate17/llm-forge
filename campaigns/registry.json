@@ -86,6 +86,36 @@
     },
     {
       "manifest": "campaigns/conductor-67_mutation_campaign_generate_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_coverage_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_engine_cargo_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_engine_fest_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_engine_mull_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_patch_apply_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_retention_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_run_scope_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_mutation_testing_support_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-telemetry_context_telemetry_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-telemetry_dispatch_main_fest_20260913.json"
     }
   ],
   "enforcement": "changed_tests",

@@ -1,0 +1,38 @@
+{
+  "campaign_id": "conductor-67_mutation_run_scope_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/mutation_run_scope.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/mutation_run_scope.py": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:48:25.878141+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_run_scope.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_run_scope.py": "2e447f5d7a55e8971ef2438f3077788f69bfc21e1865d524c14b89a9109ab772"
+  },
+  "title": "Generated mutants for src/conductor/mutation_run_scope.py, scored on the survivor set"
+}

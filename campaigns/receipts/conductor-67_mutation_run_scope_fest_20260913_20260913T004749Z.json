@@ -1,0 +1,1700 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 56,
+    "baseline_repetitions": 2,
+    "killed_mutants": 56,
+    "ranked_tests": 6,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.394669,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "......                                                                   [100%]\n6 passed in 0.12s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-campaigns/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_run_scope.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "conductor-67_mutation_run_scope_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "engine_result": {
+    "duration_seconds": 21.545948,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "ted_text\": \"-\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex\",\n        \"src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 256361183\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-vxerpcj5/worktree/src/conductor/mutation_run_scope.py\",\n        \"line\": 134,\n        \"column\": 8,\n        \"byte_offset\": 4793,\n        \"byte_length\": 18,\n        \"original_text\": \"campaign.operators\",\n        \"mutated_text\": \"not (campaign.operators)\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex\",\n        \"src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 240805563\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-vxerpcj5/worktree/src/conductor/mutation_run_scope.py\",\n        \"line\": 135,\n        \"column\": 22,\n        \"byte_offset\": 4834,\n        \"byte_length\": 11,\n        \"original_text\": \"\\\"mutators:\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 229580160\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-vxerpcj5/worktree/src/conductor/mutation_run_scope.py\",\n        \"line\": 137,\n        \"column\": 23,\n        \"byte_offset\": 4956,\n        \"byte_length\": 1,\n        \"original_text\": \"/\",\n        \"mutated_text\": \"*\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex\",\n        \"src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 233167964\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-vxerpcj5/worktree/src/conductor/mutation_run_scope.py\",\n        \"line\": 137,\n        \"column\": 25,\n        \"byte_offset\": 4958,\n        \"byte_length\": 26,\n        \"original_text\": \"\\\".mutation-mull-scope.yml\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex\",\n        \"src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 235188657\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-vxerpcj5/worktree/src/conductor/mutation_run_scope.py\",\n        \"line\": 139,\n        \"column\": 12,\n        \"byte_offset\": 5054,\n        \"byte_length\": 6,\n        \"original_text\": \"config\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex\",\n        \"src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 224963260\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 21,\n    \"nanos\": 541661648\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 56,
+    "mutants_generated": 62,
+    "mutants_tested": 56,
+    "no_coverage": 6,
+    "survived": 0,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T00:47:49.435357+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-campaigns/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/conductor-67_mutation_run_scope_fest_20260913.json",
+  "manifest_sha256": "6dd4a8e746af743e3210e31cc9b837ab4c2b1eb04e8e9993e49ccdfe849eee4c",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 89,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f24dae379ba3-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Check mutation targets against the invoking agent's changed files before execution.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 398,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-d49438d26938-0",
+      "line": 16,
+      "mutated_text": "not (TYPE_CHECKING)",
+      "operator": "negate_condition",
+      "original_text": "TYPE_CHECKING",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 77,
+      "byte_offset": 540,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-fbe0720a43eb-0",
+      "line": 21,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Resolve a literal file inside the checkout, refusing globs and escapes.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 77,
+      "byte_offset": 652,
+      "duration_seconds": 0.213758,
+      "id": "negate_condition-3f2099e2d231-0",
+      "line": 24,
+      "mutated_text": "not (path.is_absolute() or \"..\" in path.parts or any(c in relative for c in \"*?[\"))",
+      "operator": "negate_condition",
+      "original_text": "path.is_absolute() or \"..\" in path.parts or any(c in relative for c in \"*?[\")",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 671,
+      "duration_seconds": 0.258496,
+      "id": "boolean_op-9fe4713635e1-0",
+      "line": 24,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 674,
+      "duration_seconds": 2.58629,
+      "id": "constant_replace-fd5e75e31962-0",
+      "line": 24,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"..\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 679,
+      "duration_seconds": 3.141315,
+      "id": "comparison_op-a61127ca2d7a-0",
+      "line": 24,
+      "mutated_text": "not in",
+      "operator": "comparison_op",
+      "original_text": "in",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 693,
+      "duration_seconds": 2.15233,
+      "id": "boolean_op-9fe4713635e1-1",
+      "line": 24,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 864,
+      "duration_seconds": 1.486685,
+      "id": "arithmetic_op-dc617675a4ee-0",
+      "line": 28,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 878,
+      "duration_seconds": 0.222121,
+      "id": "boolean_op-c25b8d281f44-0",
+      "line": 29,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 75,
+      "byte_offset": 878,
+      "duration_seconds": 0.220741,
+      "id": "negate_condition-014e19ced12a-0",
+      "line": 29,
+      "mutated_text": "not (not target.is_file() or not target.resolve().is_relative_to(root.resolve()))",
+      "operator": "negate_condition",
+      "original_text": "not target.is_file() or not target.resolve().is_relative_to(root.resolve())",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 899,
+      "duration_seconds": 0.229995,
+      "id": "boolean_op-9fe4713635e1-2",
+      "line": 29,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 902,
+      "duration_seconds": 0.257308,
+      "id": "boolean_op-c25b8d281f44-1",
+      "line": 29,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 1088,
+      "duration_seconds": 0.243905,
+      "id": "return_value-6b301d32ce57-0",
+      "line": 33,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "path.as_posix()",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 78,
+      "byte_offset": 1183,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-421cd8b011cb-0",
+      "line": 37,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Expand archival Mull globs into pinned targets for its engine allowlist.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 1313,
+      "duration_seconds": 0.228844,
+      "id": "zero_iteration_loop-9bde8277d844-0",
+      "line": 40,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "campaign.source",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 1459,
+      "duration_seconds": 0.234913,
+      "id": "boolean_op-c25b8d281f44-2",
+      "line": 44,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 1459,
+      "duration_seconds": 0.239641,
+      "id": "negate_condition-685b07ec552b-0",
+      "line": 44,
+      "mutated_text": "not (not matches)",
+      "operator": "negate_condition",
+      "original_text": "not matches",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 1634,
+      "duration_seconds": 0.257399,
+      "id": "boolean_op-c25b8d281f44-3",
+      "line": 47,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 1634,
+      "duration_seconds": 0.233911,
+      "id": "negate_condition-ced85a53d848-0",
+      "line": 47,
+      "mutated_text": "not (not selected)",
+      "operator": "negate_condition",
+      "original_text": "not selected",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 1735,
+      "duration_seconds": 0.228715,
+      "id": "return_value-c8a99cc99566-0",
+      "line": 49,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "sorted(selected)",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 308,
+      "byte_offset": 1952,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9cf37eff8d47-0",
+      "line": 60,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Refuse broad/unchanged targets before an engine or snapshot is started.\n\n    A changed Python test permits its named paired source, not every source in\n    the manifest. Explicit selectors narrow the ownership-filtered diff; they\n    cannot authorize unchanged files or another agent's dirty work.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 2310,
+      "duration_seconds": 0.231877,
+      "id": "constant_replace-a4ce6b735810-0",
+      "line": 68,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"package_root\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2326,
+      "duration_seconds": 0.23352,
+      "id": "constant_replace-c7d12f1b60bf-0",
+      "line": 68,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2367,
+      "duration_seconds": 0.236016,
+      "id": "comparison_op-d0d14f7ed410-0",
+      "line": 69,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 2370,
+      "duration_seconds": 0.23491,
+      "id": "constant_replace-ab9e09b1f530-0",
+      "line": 69,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"cargo-mutants\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2399,
+      "duration_seconds": 0.236639,
+      "id": "constant_replace-c7d12f1b60bf-1",
+      "line": 70,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2508,
+      "duration_seconds": 0.233184,
+      "id": "comparison_op-d0d14f7ed410-1",
+      "line": 74,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 2511,
+      "duration_seconds": 0.233838,
+      "id": "constant_replace-2cb4cc419319-0",
+      "line": 74,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mull\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2661,
+      "duration_seconds": 0.233505,
+      "id": "boolean_op-c25b8d281f44-4",
+      "line": 80,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 57,
+      "byte_offset": 2661,
+      "duration_seconds": 0.229836,
+      "id": "negate_condition-e1f5a60828d2-0",
+      "line": 80,
+      "mutated_text": "not (not targets or not targets <= set(campaign.source_sha256))",
+      "operator": "negate_condition",
+      "original_text": "not targets or not targets <= set(campaign.source_sha256)",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2673,
+      "duration_seconds": 0.238598,
+      "id": "boolean_op-9fe4713635e1-3",
+      "line": 80,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2676,
+      "duration_seconds": 0.237467,
+      "id": "boolean_op-c25b8d281f44-5",
+      "line": 80,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2688,
+      "duration_seconds": 0.223995,
+      "id": "comparison_op-7154a4b20a78-0",
+      "line": 80,
+      "mutated_text": ">",
+      "operator": "comparison_op",
+      "original_text": "<=",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2882,
+      "duration_seconds": 0.226347,
+      "id": "negate_condition-45e62fba1384-0",
+      "line": 83,
+      "mutated_text": "not (only)",
+      "operator": "negate_condition",
+      "original_text": "only",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2970,
+      "duration_seconds": 0.226967,
+      "id": "boolean_op-c25b8d281f44-6",
+      "line": 85,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour"
+      ]
+    },
+    {
+      "byte_length": 23,
+      "byte_offset": 2970,
+      "duration_seconds": 0.240482,
+      "id": "negate_condition-611073eb6718-0",
+      "line": 85,
+      "mutated_text": "not (not selected <= changed)",
+      "operator": "negate_condition",
+      "original_text": "not selected <= changed",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2983,
+      "duration_seconds": 0.214451,
+      "id": "comparison_op-7154a4b20a78-1",
+      "line": 85,
+      "mutated_text": ">",
+      "operator": "comparison_op",
+      "original_text": "<=",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3155,
+      "duration_seconds": 0.236163,
+      "id": "augmented_assign-7993d5ce31d8-0",
+      "line": 89,
+      "mutated_text": "|=",
+      "operator": "augmented_assign",
+      "original_text": "&=",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3240,
+      "duration_seconds": 0.251455,
+      "id": "bitwise_op-bac1dce0f48f-0",
+      "line": 91,
+      "mutated_text": "|",
+      "operator": "bitwise_op",
+      "original_text": "&",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ]
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 3266,
+      "duration_seconds": 0.228442,
+      "id": "zero_iteration_loop-e7120adbdd18-0",
+      "line": 92,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "changed_tests",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 3891,
+      "duration_seconds": 0.225615,
+      "id": "negate_condition-e1b9566fa75c-0",
+      "line": 111,
+      "mutated_text": "not (len(paired) == 1)",
+      "operator": "negate_condition",
+      "original_text": "len(paired) == 1",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3903,
+      "duration_seconds": 0.241786,
+      "id": "comparison_op-d0d14f7ed410-2",
+      "line": 111,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3906,
+      "duration_seconds": 0.222647,
+      "id": "constant_replace-3ddac4eab1d1-0",
+      "line": 111,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3966,
+      "duration_seconds": 0.231015,
+      "id": "arithmetic_op-f4bb2bbc57a2-0",
+      "line": 113,
+      "mutated_text": "+",
+      "operator": "arithmetic_op",
+      "original_text": "-",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 3983,
+      "duration_seconds": 0.227,
+      "id": "negate_condition-5c704e462995-0",
+      "line": 114,
+      "mutated_text": "not (outside)",
+      "operator": "negate_condition",
+      "original_text": "outside",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 4217,
+      "duration_seconds": 0.230904,
+      "id": "return_value-88de5fbb58ff-0",
+      "line": 119,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "sorted(targets)",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ]
+    },
+    {
+      "byte_length": 237,
+      "byte_offset": 4315,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0e0b6b80bc5e-0",
+      "line": 123,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Give Mull's compiler plugin and runner the same exact path allowlist.\n\n    Mull reads ``includePaths`` regexes through MULL_CONFIG before selecting\n    mutants. Quoted YAML strings preserve regex escapes and unusual filenames.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 4615,
+      "duration_seconds": 0.221606,
+      "id": "constant_replace-8bce30fd9e34-0",
+      "line": 130,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"includePaths:\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 4650,
+      "duration_seconds": 0.250077,
+      "id": "zero_iteration_loop-949e260aa22a-0",
+      "line": 131,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "sources",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 4677,
+      "duration_seconds": 0.24428,
+      "id": "constant_replace-b37e5638dfdb-0",
+      "line": 132,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"^\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4681,
+      "duration_seconds": 0.218212,
+      "id": "arithmetic_op-c0614b249940-0",
+      "line": 132,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4707,
+      "duration_seconds": 0.24049,
+      "id": "arithmetic_op-dc617675a4ee-1",
+      "line": 132,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4729,
+      "duration_seconds": 0.229289,
+      "id": "arithmetic_op-c0614b249940-1",
+      "line": 132,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 4731,
+      "duration_seconds": 0.24715,
+      "id": "constant_replace-27c066446777-0",
+      "line": 132,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"$\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 4756,
+      "duration_seconds": 0.226035,
+      "id": "constant_replace-add19557f313-0",
+      "line": 133,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"  - \"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4763,
+      "duration_seconds": 0.256361,
+      "id": "arithmetic_op-c0614b249940-2",
+      "line": 133,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 4793,
+      "duration_seconds": 0.240806,
+      "id": "negate_condition-6732318818a9-0",
+      "line": 134,
+      "mutated_text": "not (campaign.operators)",
+      "operator": "negate_condition",
+      "original_text": "campaign.operators",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 4834,
+      "duration_seconds": 0.22958,
+      "id": "constant_replace-2c71cfc22d9a-0",
+      "line": 135,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutators:\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4956,
+      "duration_seconds": 0.233168,
+      "id": "arithmetic_op-dc617675a4ee-2",
+      "line": 137,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 4958,
+      "duration_seconds": 0.235189,
+      "id": "constant_replace-86d3ed74f394-0",
+      "line": 137,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".mutation-mull-scope.yml\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 5054,
+      "duration_seconds": 0.224963,
+      "id": "return_value-2b8551fae676-0",
+      "line": 139,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "config",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_run_scope.py",
+      "tests_run": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ]
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 1.0,
+  "new_survivors": [],
+  "no_coverage": 6,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 56,
+    "NO_COVERAGE": 6,
+    "SURVIVED": 0,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/conductor-67_mutation_run_scope_fest_20260913_20260913T004749Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "d3f6448839921567e1562d7237abaf62600d958339172afb7a12cab9a63dbe29"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/mutation_run_scope.py": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511"
+  },
+  "status": "PASS",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_run_scope.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_run_scope.py": "2e447f5d7a55e8971ef2438f3077788f69bfc21e1865d524c14b89a9109ab772"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 6,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 0
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-c0614b249940-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "arithmetic_op-c0614b249940-1": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "arithmetic_op-c0614b249940-2": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "arithmetic_op-dc617675a4ee-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "arithmetic_op-dc617675a4ee-1": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "arithmetic_op-dc617675a4ee-2": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "arithmetic_op-f4bb2bbc57a2-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ],
+      "augmented_assign-7993d5ce31d8-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour"
+      ],
+      "bitwise_op-bac1dce0f48f-0": [
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source"
+      ],
+      "boolean_op-9fe4713635e1-0": [
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "boolean_op-9fe4713635e1-1": [
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "boolean_op-9fe4713635e1-2": [
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "boolean_op-9fe4713635e1-3": [
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "boolean_op-c25b8d281f44-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "boolean_op-c25b8d281f44-1": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "boolean_op-c25b8d281f44-2": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "boolean_op-c25b8d281f44-3": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "boolean_op-c25b8d281f44-4": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "boolean_op-c25b8d281f44-5": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "boolean_op-c25b8d281f44-6": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour"
+      ],
+      "comparison_op-7154a4b20a78-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "comparison_op-7154a4b20a78-1": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour"
+      ],
+      "comparison_op-a61127ca2d7a-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "comparison_op-d0d14f7ed410-0": [
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ],
+      "comparison_op-d0d14f7ed410-1": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "comparison_op-d0d14f7ed410-2": [
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source"
+      ],
+      "constant_replace-27c066446777-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "constant_replace-2c71cfc22d9a-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex"
+      ],
+      "constant_replace-2cb4cc419319-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "constant_replace-3ddac4eab1d1-0": [
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source"
+      ],
+      "constant_replace-86d3ed74f394-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "constant_replace-8bce30fd9e34-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex"
+      ],
+      "constant_replace-a4ce6b735810-0": [
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ],
+      "constant_replace-ab9e09b1f530-0": [
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ],
+      "constant_replace-add19557f313-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "constant_replace-b37e5638dfdb-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "constant_replace-c7d12f1b60bf-0": [
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ],
+      "constant_replace-c7d12f1b60bf-1": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "constant_replace-fd5e75e31962-0": [
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "negate_condition-014e19ced12a-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "negate_condition-3f2099e2d231-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "negate_condition-45e62fba1384-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ],
+      "negate_condition-5c704e462995-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ],
+      "negate_condition-611073eb6718-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour"
+      ],
+      "negate_condition-6732318818a9-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "negate_condition-685b07ec552b-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "negate_condition-ced85a53d848-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "negate_condition-e1b9566fa75c-0": [
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source"
+      ],
+      "negate_condition-e1f5a60828d2-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse"
+      ],
+      "return_value-2b8551fae676-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "return_value-6b301d32ce57-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ],
+      "return_value-88de5fbb58ff-0": [
+        "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff"
+      ],
+      "return_value-c8a99cc99566-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "zero_iteration_loop-949e260aa22a-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "zero_iteration_loop-9bde8277d844-0": [
+        "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check"
+      ],
+      "zero_iteration_loop-e7120adbdd18-0": [
+        "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/conductor/mutation_run_scope.py"
+        ],
+        "criticality": "high",
+        "id": "conductor-67_mutation_run_scope_fest_20260913"
+      }
+    ],
+    "retained_core": [
+      "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+      "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+      "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+      "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse",
+      "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+      "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_run_scope_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-dc617675a4ee-0",
+          "arithmetic_op-f4bb2bbc57a2-0",
+          "augmented_assign-7993d5ce31d8-0",
+          "boolean_op-c25b8d281f44-0",
+          "boolean_op-c25b8d281f44-1",
+          "boolean_op-c25b8d281f44-4",
+          "boolean_op-c25b8d281f44-5",
+          "boolean_op-c25b8d281f44-6",
+          "comparison_op-7154a4b20a78-0",
+          "comparison_op-7154a4b20a78-1",
+          "comparison_op-a61127ca2d7a-0",
+          "constant_replace-c7d12f1b60bf-1",
+          "negate_condition-014e19ced12a-0",
+          "negate_condition-3f2099e2d231-0",
+          "negate_condition-45e62fba1384-0",
+          "negate_condition-5c704e462995-0",
+          "negate_condition-611073eb6718-0",
+          "negate_condition-e1f5a60828d2-0",
+          "return_value-6b301d32ce57-0",
+          "return_value-88de5fbb58ff-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_run_scope.py::test_agent_scope_and_explicit_selection_cannot_admit_a_neighbour",
+        "runtime_seconds_median": 0.003,
+        "unique_kills": [
+          "augmented_assign-7993d5ce31d8-0",
+          "boolean_op-c25b8d281f44-6",
+          "comparison_op-7154a4b20a78-1",
+          "negate_condition-611073eb6718-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_run_scope_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-dc617675a4ee-0",
+          "arithmetic_op-f4bb2bbc57a2-0",
+          "bitwise_op-bac1dce0f48f-0",
+          "boolean_op-c25b8d281f44-0",
+          "boolean_op-c25b8d281f44-1",
+          "boolean_op-c25b8d281f44-4",
+          "boolean_op-c25b8d281f44-5",
+          "comparison_op-7154a4b20a78-0",
+          "comparison_op-a61127ca2d7a-0",
+          "comparison_op-d0d14f7ed410-2",
+          "constant_replace-3ddac4eab1d1-0",
+          "constant_replace-c7d12f1b60bf-1",
+          "negate_condition-014e19ced12a-0",
+          "negate_condition-3f2099e2d231-0",
+          "negate_condition-45e62fba1384-0",
+          "negate_condition-5c704e462995-0",
+          "negate_condition-e1b9566fa75c-0",
+          "negate_condition-e1f5a60828d2-0",
+          "return_value-6b301d32ce57-0",
+          "return_value-88de5fbb58ff-0",
+          "zero_iteration_loop-e7120adbdd18-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_run_scope.py::test_changed_test_admits_only_its_named_source",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "bitwise_op-bac1dce0f48f-0",
+          "comparison_op-d0d14f7ed410-2",
+          "constant_replace-3ddac4eab1d1-0",
+          "negate_condition-e1b9566fa75c-0",
+          "zero_iteration_loop-e7120adbdd18-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_run_scope_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-c0614b249940-0",
+          "arithmetic_op-c0614b249940-1",
+          "arithmetic_op-c0614b249940-2",
+          "arithmetic_op-dc617675a4ee-0",
+          "arithmetic_op-dc617675a4ee-1",
+          "arithmetic_op-dc617675a4ee-2",
+          "boolean_op-c25b8d281f44-0",
+          "boolean_op-c25b8d281f44-1",
+          "boolean_op-c25b8d281f44-2",
+          "boolean_op-c25b8d281f44-3",
+          "comparison_op-a61127ca2d7a-0",
+          "constant_replace-27c066446777-0",
+          "constant_replace-2c71cfc22d9a-0",
+          "constant_replace-86d3ed74f394-0",
+          "constant_replace-8bce30fd9e34-0",
+          "constant_replace-add19557f313-0",
+          "constant_replace-b37e5638dfdb-0",
+          "negate_condition-014e19ced12a-0",
+          "negate_condition-3f2099e2d231-0",
+          "negate_condition-6732318818a9-0",
+          "negate_condition-685b07ec552b-0",
+          "negate_condition-ced85a53d848-0",
+          "return_value-2b8551fae676-0",
+          "return_value-6b301d32ce57-0",
+          "return_value-c8a99cc99566-0",
+          "zero_iteration_loop-949e260aa22a-0",
+          "zero_iteration_loop-9bde8277d844-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_run_scope.py::test_mull_config_filters_before_execution_and_escapes_regex",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "constant_replace-2c71cfc22d9a-0",
+          "constant_replace-8bce30fd9e34-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_run_scope_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-c0614b249940-0",
+          "arithmetic_op-c0614b249940-1",
+          "arithmetic_op-c0614b249940-2",
+          "arithmetic_op-dc617675a4ee-0",
+          "arithmetic_op-dc617675a4ee-1",
+          "arithmetic_op-dc617675a4ee-2",
+          "arithmetic_op-f4bb2bbc57a2-0",
+          "boolean_op-c25b8d281f44-0",
+          "boolean_op-c25b8d281f44-1",
+          "boolean_op-c25b8d281f44-2",
+          "boolean_op-c25b8d281f44-3",
+          "boolean_op-c25b8d281f44-4",
+          "boolean_op-c25b8d281f44-5",
+          "comparison_op-7154a4b20a78-0",
+          "comparison_op-a61127ca2d7a-0",
+          "comparison_op-d0d14f7ed410-1",
+          "constant_replace-27c066446777-0",
+          "constant_replace-2cb4cc419319-0",
+          "constant_replace-86d3ed74f394-0",
+          "constant_replace-add19557f313-0",
+          "constant_replace-b37e5638dfdb-0",
+          "negate_condition-014e19ced12a-0",
+          "negate_condition-3f2099e2d231-0",
+          "negate_condition-45e62fba1384-0",
+          "negate_condition-5c704e462995-0",
+          "negate_condition-6732318818a9-0",
+          "negate_condition-685b07ec552b-0",
+          "negate_condition-ced85a53d848-0",
+          "negate_condition-e1f5a60828d2-0",
+          "return_value-2b8551fae676-0",
+          "return_value-6b301d32ce57-0",
+          "return_value-88de5fbb58ff-0",
+          "return_value-c8a99cc99566-0",
+          "zero_iteration_loop-949e260aa22a-0",
+          "zero_iteration_loop-9bde8277d844-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_run_scope.py::test_mull_globs_are_expanded_to_pins_before_ownership_check",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "constant_replace-2cb4cc419319-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_run_scope_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-dc617675a4ee-0",
+          "arithmetic_op-f4bb2bbc57a2-0",
+          "boolean_op-9fe4713635e1-1",
+          "boolean_op-c25b8d281f44-0",
+          "boolean_op-c25b8d281f44-1",
+          "boolean_op-c25b8d281f44-4",
+          "boolean_op-c25b8d281f44-5",
+          "comparison_op-7154a4b20a78-0",
+          "comparison_op-a61127ca2d7a-0",
+          "comparison_op-d0d14f7ed410-0",
+          "comparison_op-d0d14f7ed410-1",
+          "constant_replace-a4ce6b735810-0",
+          "constant_replace-ab9e09b1f530-0",
+          "constant_replace-c7d12f1b60bf-0",
+          "negate_condition-014e19ced12a-0",
+          "negate_condition-3f2099e2d231-0",
+          "negate_condition-45e62fba1384-0",
+          "negate_condition-5c704e462995-0",
+          "negate_condition-e1f5a60828d2-0",
+          "return_value-6b301d32ce57-0",
+          "return_value-88de5fbb58ff-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_run_scope.py::test_rust_package_relative_path_is_checked_against_repo_relative_diff",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "comparison_op-d0d14f7ed410-0",
+          "constant_replace-a4ce6b735810-0",
+          "constant_replace-ab9e09b1f530-0",
+          "constant_replace-c7d12f1b60bf-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_run_scope_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-dc617675a4ee-0",
+          "boolean_op-9fe4713635e1-0",
+          "boolean_op-9fe4713635e1-1",
+          "boolean_op-9fe4713635e1-2",
+          "boolean_op-9fe4713635e1-3",
+          "boolean_op-c25b8d281f44-0",
+          "boolean_op-c25b8d281f44-1",
+          "boolean_op-c25b8d281f44-4",
+          "boolean_op-c25b8d281f44-5",
+          "comparison_op-7154a4b20a78-0",
+          "comparison_op-a61127ca2d7a-0",
+          "comparison_op-d0d14f7ed410-1",
+          "constant_replace-c7d12f1b60bf-1",
+          "constant_replace-fd5e75e31962-0",
+          "negate_condition-014e19ced12a-0",
+          "negate_condition-3f2099e2d231-0",
+          "negate_condition-e1f5a60828d2-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_run_scope.py::test_symlink_escape_and_unpinned_source_refuse",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "boolean_op-9fe4713635e1-0",
+          "boolean_op-9fe4713635e1-2",
+          "boolean_op-9fe4713635e1-3",
+          "constant_replace-fd5e75e31962-0"
+        ]
+      }
+    ]
+  },
+  "unviable": 0
+}
