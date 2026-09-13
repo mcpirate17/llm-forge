@@ -37,6 +37,7 @@ mod read_budget;
 mod receipt_show;
 mod route;
 mod session_end;
+mod session_policy;
 mod subagent_stop;
 mod subagent_transcript;
 mod telemetry;
