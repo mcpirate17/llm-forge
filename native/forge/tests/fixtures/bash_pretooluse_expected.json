@@ -1,0 +1,320 @@
+{
+  "gate-append-unclaimed": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: no live exact claim for owner='llm-b0' path='combined.log'. Create a narrow governance claim first: make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+    }
+  },
+  "gate-both-claimed": null,
+  "gate-claim-disjoint": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: no live exact claim for owner='llm-b0' path='out.txt'. Create a narrow governance claim first: make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+    }
+  },
+  "gate-claim-expired": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: your claim on 'out.txt' is no longer live: claim-32a72e80d2366d4d5f13 (idle since creation at 2019-12-31 00:00Z (overran its expected 02:00Z, so it lapses after 10m without a write)) \u2014 re-claim the path before writing. Create a narrow governance claim first: make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+    }
+  },
+  "gate-claim-other-owner": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: path 'out.txt' is held by someone-else until 2099-01-01T00:45Z (claim-4e7fb0b0585c2b79030d); owner='llm-b0' has no live claim on it \u2014 coordinate via A2A or wait for expiry. Create a narrow governance claim first: make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+    }
+  },
+  "gate-dd-claimed": null,
+  "gate-empty-cmd": null,
+  "gate-empty-owner": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: hook has no governance identity, so no claim can be matched \u2014 export GOVERNANCE_OWNER=<lane>. Create a narrow governance claim first: make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+    }
+  },
+  "gate-exact-claim-allows": null,
+  "gate-git-apply-claimed": null,
+  "gate-git-apply-unclaimed": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: no live exact claim for owner='llm-b0' path='patch.diff'. Create a narrow governance claim first: make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+    }
+  },
+  "gate-no-claims": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: no live exact claim for owner='llm-b0' path='out.txt'. Create a narrow governance claim first: make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+    }
+  },
+  "gate-no-graph-use": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: call a code-review-graph MCP tool before writing repo files in this session (this command writes out.txt)."
+    }
+  },
+  "gate-opaque": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: this Bash command writes repo files through an interpreter whose target cannot be resolved, so the claim gate cannot check it. Use Edit/Write, or name the path as a literal."
+    }
+  },
+  "gate-partial-claim": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: no live exact claim for owner='llm-b0' path='b.txt'. Create a narrow governance claim first: make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+    }
+  },
+  "gate-prefix-claim-allows": null,
+  "gate-python-literal-claimed": null,
+  "gate-readonly": null,
+  "gate-sed-claimed": null,
+  "gate-sed-unclaimed": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: no live exact claim for owner='llm-b0' path='config.toml'. Create a narrow governance claim first: make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide)."
+    }
+  },
+  "gate-tee-claimed": null,
+  "gate-wrong-session": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: call a code-review-graph MCP tool before writing repo files in this session (this command writes out.txt)."
+    }
+  },
+  "guard-bash-cat-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-bash-echo-mention-allowed": null,
+  "guard-bash-grep-pattern-after-target-allowed": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-bash-grep-pattern-before-target-denied": null,
+  "guard-bash-head-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-bash-mv-current-work-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-bash-sed-current-work-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-bash-unrelated-command-allowed": null,
+  "guard-edit-current-work-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: Edit cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-edit-other-file-allowed": null,
+  "guard-empty-payload-allowed": null,
+  "guard-grok-protocol-allowed": null,
+  "guard-grok-protocol-denied": {
+    "decision": "deny",
+    "reason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+  },
+  "guard-local-ai-runtime-off-shell-echo-allowed": null,
+  "guard-local-ai-runtime-on-plain-command-allowed": null,
+  "guard-mutation-hint-advisory-on-new-test-file": {
+    "hookSpecificOutput": {
+      "additionalContext": "Mutation evidence covers ONLY the files you changed and the tests that exercise them -- never the whole repo. `make mutation-plan`, then `make mutation-generate`, then `make mutation-engine-run`. Automatic engines only; hand-authored mutants, manifests, survivor baselines and receipts are forbidden (KB-MUT-02). A changed test with no current receipt is debt to record in the PR body, not a reason to hold the branch.",
+      "hookEventName": "PreToolUse"
+    }
+  },
+  "guard-no-advisory-on-non-test-new-file": null,
+  "guard-notebookedit-current-work-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: NotebookEdit cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-read-current-work-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: Read cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-run-shell-command-alias-current-work-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-shell-tool-alias-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "guard-write-current-work-denied": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "BLOCKED: Write cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    }
+  },
+  "refresh-combined-multiple-failures-and-warnings": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+  },
+  "refresh-default-kind-is-failure": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-empty-marker": null,
+  "refresh-failure-and-warning-shared-path": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['shared.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['shared.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+  },
+  "refresh-failure-empty-paths": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing []. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing []. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-failure-real-writer-shape": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['z.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['z.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-failure-then-warning": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+  },
+  "refresh-failure-with-multiple-paths": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py', 'b.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py', 'b.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-malformed-line-falls-back-to-failure": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-many-failures-preserves-order": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: first while refreshing ['a.py']; second while refreshing ['b.py']; third while refreshing ['c.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: first while refreshing ['a.py']; second while refreshing ['b.py']; third while refreshing ['c.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-no-marker": null,
+  "refresh-one-failure": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-one-warning": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh: slow",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh: slow"
+  },
+  "refresh-single-failure-with-long-text": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: TimeoutError: refresh exceeded 30s while walking the dependency graph while refreshing ['deep/nested/module.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: TimeoutError: refresh exceeded 30s while walking the dependency graph while refreshing ['deep/nested/module.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-text-field-preferred-over-error": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: t while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: t while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-two-failures": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py', 'd.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py', 'd.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "refresh-two-warnings": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh: slow a; slow b",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh: slow a; slow b"
+  },
+  "refresh-warning-empty-paths": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh: slow",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh: slow"
+  },
+  "refresh-warning-then-failure": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['b.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['b.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+  },
+  "refresh-warning-then-two-failures": {
+    "hookSpecificOutput": {
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['b.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "hookEventName": "PreToolUse"
+    },
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['b.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+  }
+}

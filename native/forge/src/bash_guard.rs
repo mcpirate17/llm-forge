@@ -184,7 +184,7 @@ fn check_command(argv: &[String]) -> Option<String> {
 
 /// Return a block reason for a full command line, or `None` to allow.
 pub fn check(command: &str) -> Option<String> {
-    let tokens = match posix_shlex::tokenize(command) {
+    let tokens = match posix_shlex::tokenize(command, posix_shlex::PUNCTUATION_CHARS_FULL) {
         Ok(tokens) => tokens,
         Err(_) => {
             // Unparseable: fall back to the permissive-parse / aggressive-match path.

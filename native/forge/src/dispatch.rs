@@ -1,27 +1,40 @@
-//! `forge hook <Event>`: answer what can be answered natively, then always
-//! still invoke the Python dispatcher once so the hooks that are not (yet)
-//! ported still run -- see `handlers` module docs for exactly which names are
-//! native today.
+//! `forge hook <Event>`: answer what can be answered natively, then either
+//! skip Python entirely (every Bash `PreToolUse` hook the Python registry
+//! lists for this project is natively served) or still invoke the Python
+//! dispatcher once for whatever is not (yet) ported -- see `handlers` module
+//! docs for exactly which names are native today.
 //!
 //! For `PreToolUse` this binary always reads stdin itself (rather than
 //! `Stdio::inherit()`) so it can inspect the payload and compute
-//! `handlers::precheck_pretooluse_bash`'s verdict before Python starts. The
-//! Python child then always still runs, but is told via two env vars --
-//! `FORGE_NATIVE_HOOKS` (which hook names forge already answered) and
-//! `FORGE_NATIVE_ANSWERS` (their precomputed JSON verdicts) -- to splice those
-//! answers back in at their normal registry position instead of re-running
-//! their adapters (`registry.native_answers`, `runner.dispatch`). Both env
-//! vars are always set explicitly on the child, every call, overriding
-//! whatever the parent shell's environment happened to hold: a stale
-//! inherited `FORGE_NATIVE_HOOKS` naming a hook forge did *not* answer this
-//! call would otherwise make Python silently skip it with no replacement,
-//! which must never happen.
+//! `handlers::native_answers_for_bash`'s per-hook verdicts before deciding
+//! whether Python needs to start at all.
+//!
+//! Two cases:
+//!
+//! * **Fully native** (`tool_name == "Bash"` and
+//!   `handlers::bash_pretooluse_fully_native` is true for the opted-in set):
+//!   `handlers::run_bash_pretooluse_fully_native` computes the same merged
+//!   verdict Python's own `merge()` would produce across all four
+//!   Bash-matching `HookSpec`s, forge prints it to stdout itself, and the
+//!   Python dispatcher never starts for this call.
+//! * **Partially native or non-Bash**: the Python child still always runs,
+//!   but is told via two env vars -- `FORGE_NATIVE_HOOKS` (which hook names
+//!   forge already answered) and `FORGE_NATIVE_ANSWERS` (their precomputed
+//!   JSON verdicts) -- to splice those answers back in at their normal
+//!   registry position instead of re-running their adapters
+//!   (`registry.native_answers`, `runner.dispatch`). Both env vars are always
+//!   set explicitly on the child, every call, overriding whatever the parent
+//!   shell's environment happened to hold: a stale inherited
+//!   `FORGE_NATIVE_HOOKS` naming a hook forge did *not* answer this call
+//!   would otherwise make Python silently skip it with no replacement, which
+//!   must never happen.
 //!
 //! `FORGE_NATIVE_HOOKS=""` (explicitly set to the empty string, by whoever
 //! invokes `forge`) is the documented escape hatch back to the pre-port,
 //! all-Python behaviour: `handlers::native_hook_names_from_env` returns an
-//! empty set, `precheck_pretooluse_bash` then always returns `None`, and this
-//! module forwards that same empty override to the Python child.
+//! empty set, `native_answers_for_bash` then always returns an empty map,
+//! `bash_pretooluse_fully_native` is false, and this module forwards that
+//! same empty override to the Python child.
 
 use crate::{handlers, interpreter, telemetry};
 use anyhow::{Context, Result};
@@ -32,13 +45,6 @@ use std::time::Instant;
 
 /// Runs one hook event and returns the exit code to propagate to the caller.
 pub fn run_hook(event: &str) -> Result<u8> {
-    if handlers::fully_native(event) {
-        anyhow::bail!(
-            "handlers::fully_native(\"{event}\") is true but dispatch::run_hook has \
-             no native routing path yet -- this is a wiring bug, not a fallback"
-        );
-    }
-
     if event != "PreToolUse" {
         // No native handlers exist for any other event yet: read nothing,
         // change nothing, delegate exactly as before this PR.
@@ -52,19 +58,45 @@ pub fn run_hook(event: &str) -> Result<u8> {
 
     let native_hooks = handlers::native_hook_names_from_env();
     let parsed: Option<Value> = serde_json::from_str(&input).ok();
-    let native_answer = parsed
+    let is_bash = parsed
         .as_ref()
-        .and_then(|payload| handlers::precheck_pretooluse_bash(payload, &native_hooks));
+        .and_then(|payload| payload.get("tool_name"))
+        .and_then(Value::as_str)
+        == Some("Bash");
 
-    let extra_env = match &native_answer {
-        Some(answer) => {
-            let answers = serde_json::json!({ "pre_bash": answer });
-            vec![
-                ("FORGE_NATIVE_HOOKS".to_string(), "pre_bash".to_string()),
-                ("FORGE_NATIVE_ANSWERS".to_string(), answers.to_string()),
-            ]
-        }
-        None => no_native_env(),
+    if is_bash && handlers::bash_pretooluse_fully_native(&native_hooks) {
+        let payload = parsed.as_ref().expect("is_bash implies parsed payload");
+        let start = Instant::now();
+        let answer = handlers::run_bash_pretooluse_fully_native(payload, &native_hooks);
+        let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+        telemetry::record_native(event, elapsed_ms);
+
+        let mut stdout = std::io::stdout();
+        stdout
+            .write_all(answer.to_string().as_bytes())
+            .context("failed to write the native hook verdict to stdout")?;
+        stdout
+            .write_all(b"\n")
+            .context("failed to write the native hook verdict to stdout")?;
+        return Ok(0);
+    }
+
+    let native_answers = parsed
+        .as_ref()
+        .filter(|_| is_bash)
+        .map(|payload| handlers::native_answers_for_bash(payload, &native_hooks))
+        .unwrap_or_default();
+
+    let extra_env = if native_answers.is_empty() {
+        no_native_env()
+    } else {
+        let names: Vec<&str> = native_answers.keys().map(String::as_str).collect();
+        let answers = serde_json::to_string(&native_answers)
+            .context("failed to serialize native hook answers")?;
+        vec![
+            ("FORGE_NATIVE_HOOKS".to_string(), names.join(",")),
+            ("FORGE_NATIVE_ANSWERS".to_string(), answers),
+        ]
     };
 
     delegate(event, Some(input.as_bytes()), &extra_env)

@@ -10,9 +10,18 @@
 
 mod bash_guard;
 mod bash_impact;
+mod civil;
+mod crg_gate;
+mod crg_refresh;
+mod current_work_guard;
 mod dispatch;
 mod handlers;
+mod identity;
+mod instant;
 mod interpreter;
+mod local_ai_policy;
+mod merge;
+mod ownership;
 mod telemetry;
 mod write_targets;
 
