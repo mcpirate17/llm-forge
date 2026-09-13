@@ -51,7 +51,7 @@ def _inert_corpus_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         gate,
         "mutation_corpus_audit",
-        lambda export_root: gate.PhaseResult(
+        lambda export_root, changed_files=None: gate.PhaseResult(
             name="mutation-corpus", ok=True, detail="stubbed for this module"
         ),
     )

@@ -381,10 +381,11 @@ def export_with_registry(tmp_path: Path) -> Path:
 
 
 def _stub_audit(monkeypatch, result: dict[str, object], seen: dict[str, object]):
-    def fake(registry, *, repo_root, summary=False, **kwargs):
+    def fake(registry, *, repo_root, summary=False, changed_files=None, **kwargs):
         seen["registry"] = registry
         seen["repo_root"] = repo_root
         seen["summary"] = summary
+        seen["changed_files"] = changed_files
         return result
 
     monkeypatch.setattr("conductor.mutation_patch_audit.audit_corpus", fake)
@@ -412,6 +413,24 @@ def test_corpus_audit_reads_the_export_not_the_working_tree(
     gate.mutation_corpus_audit(export_with_registry)
     assert seen["repo_root"] == export_with_registry
     assert seen["registry"] == export_with_registry / gate.MUTATION_REGISTRY
+
+
+def test_corpus_audit_forwards_the_candidate_diff(
+    export_with_registry: Path, monkeypatch
+) -> None:
+    """The per-PR dimension must judge THIS candidate's changed files, or it is
+    guessing -- PR #28 shipped ten unpinned files through a green audit."""
+
+    seen: dict[str, object] = {}
+    _stub_audit(monkeypatch, _corpus_result(), seen)
+    gate.mutation_corpus_audit(
+        export_with_registry, changed_files=frozenset({"src/one.py", "src/two.py"})
+    )
+    assert seen["changed_files"] == frozenset({"src/one.py", "src/two.py"})
+
+    # Whole-tree legacy mode stays available: no diff handed over, no dimension.
+    gate.mutation_corpus_audit(export_with_registry)
+    assert seen["changed_files"] is None
 
 
 def test_corpus_audit_fails_on_a_newly_rotted_mutant(

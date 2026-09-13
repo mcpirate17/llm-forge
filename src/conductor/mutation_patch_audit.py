@@ -39,16 +39,27 @@ number before. The repair for a DELETE_CANDIDATE is the mutant it uniquely
 kills, never deleting the test -- a test that kills nothing is first evidence
 that the corpus is missing a mutant.
 
-The four share one expensive step -- loading every registered manifest -- and
+The fifth is whether the receipt describes *these bytes*. Every receipt pins
+the SHA-256 of each source file it mutated, yet a receipt whose pins disagree
+with the audited tree still counted as acceptable -- PR #28 landed that way,
+its only registered receipt hashing five files of which four differed from the
+tree the PR shipped. A receipt over other bytes is not evidence for this tree
+and now reads as one. The mirror question is per-PR: a changed file sitting
+beside or inside the files registered campaigns pin, that no campaign pins
+itself, ships unmeasured while the audit calls its neighbourhood covered --
+also PR #28, which changed ten files no campaign pinned. Given the candidate's
+``--changed-file`` set, those files are reported as uncovered.
+
+The five share one expensive step -- loading every registered manifest -- and
 differ only in what they then ask, so they are one walk.
 
 The patch work is one ``git apply --check`` process per mutant -- fork/exec bound,
 not compute -- so it is spread across a thread pool rather than ported native: the
 interpreter is idle in ``waitpid`` either way. A mutant git refuses is retried
 in-process against ``mutation_patch_apply``, mirroring what the runner does, so a
-verdict here means what a run would mean. The three added dimensions are dict
-comparisons over the manifests and receipts already in memory and cost nothing
-measurable.
+verdict here means what a run would mean. The four added dimensions are dict
+comparisons over the manifests, receipts and tree files already in memory and
+cost nothing measurable.
 """
 
 from __future__ import annotations
@@ -56,11 +67,12 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
-from collections.abc import Mapping, Sequence
-from pathlib import Path
+from collections.abc import Iterable, Mapping, Sequence
+from pathlib import Path, PurePosixPath
 import subprocess
 from typing import Any
 
+from conductor.changed_files_cli import add_changed_files_arguments, resolve_changed_files
 from conductor.mutation_patch_apply import PatchApplyError, check_patch_text
 from conductor.project_paths import campaigns_relative, host_root, registry_relative
 from conductor.mutation_scope import CampaignError, _safe_relative_path
@@ -190,8 +202,30 @@ def _receipts_by_campaign(
 PASSING_RECEIPT_STATUSES = frozenset({"PASS", "RATCHET_HELD"})
 
 
+class _TreeHasher:
+    """Hash the audited tree once per file, not once per receipt pinning it."""
+
+    def __init__(self, repo_root: Path) -> None:
+        self._root = repo_root
+        self._cache: dict[str, str | None] = {}
+
+    def sha(self, relative: str) -> str | None:
+        """The file's digest, or ``None`` when the audited tree lacks it."""
+
+        if relative not in self._cache:
+            try:
+                self._cache[relative] = _sha256(self._root / relative)
+            except OSError:
+                self._cache[relative] = None
+        return self._cache[relative]
+
+
 def _receipt_rejection(
-    receipt: Mapping[str, Any], current: Mapping[str, str], package_root: Path
+    receipt: Mapping[str, Any],
+    current: Mapping[str, str],
+    package_root: Path,
+    tree: _TreeHasher,
+    campaign: Campaign,
 ) -> str | None:
     """Why this receipt is not usable evidence, or ``None`` when it is.
 
@@ -199,6 +233,13 @@ def _receipt_rejection(
     the lineage ledger's own path) resolves from -- ``runner_component_root()`` in
     production, or a test's isolated ``tmp_path`` stand-in -- never the git root,
     which differs from it under a src layout.
+
+    ``tree`` answers the question PR #28 slipped past: a receipt pins the exact
+    bytes of every file it mutated, and a PASS over bytes this tree no longer
+    contains is a pass over code nobody shipped. Files the campaign pins
+    symbol-by-symbol are exempt -- their whole-file digest is expected to move,
+    because edits outside the pinned functions do not drift the campaign, and
+    the symbol pins say so precisely.
     """
 
     status = receipt.get("status")
@@ -209,6 +250,15 @@ def _receipt_rejection(
         return "no runner component map"
     if not (recorded == dict(current) or _lineage_accepts(recorded, package_root)):
         return "runner components match neither this runner nor any lineage entry"
+    stale_sources = sorted(
+        relative
+        for relative, pinned in (receipt.get("source_sha256") or {}).items()
+        if relative not in (campaign.source_symbols or {})
+        and tree.sha(relative) != pinned
+    )
+    if stale_sources:
+        return f"source hashes differ from this tree: {stale_sources}"
+    return None
 
 
 def _evidence_verdict(
@@ -216,6 +266,7 @@ def _evidence_verdict(
     receipts: Mapping[str, list[Mapping[str, Any]]],
     current: Mapping[str, str],
     package_root: Path,
+    tree: _TreeHasher,
 ) -> dict[str, Any] | None:
     """Why no receipt vouches for this campaign, or ``None`` when one does."""
 
@@ -227,7 +278,9 @@ def _evidence_verdict(
             "receipts": 0,
             "detail": "no receipt declares this campaign_id",
         }
-    rejections = [_receipt_rejection(row, current, package_root) for row in rows]
+    rejections = [
+        _receipt_rejection(row, current, package_root, tree, campaign) for row in rows
+    ]
     if not any(reason is None for reason in rejections):
         return {
             "campaign_id": campaign.campaign_id,
@@ -242,6 +295,7 @@ def _acceptable_receipt(
     receipts: Mapping[str, list[Mapping[str, Any]]],
     current: Mapping[str, str],
     package_root: Path,
+    tree: _TreeHasher,
 ) -> Mapping[str, Any] | None:
     """The newest receipt that vouches for this campaign, or ``None``.
 
@@ -253,7 +307,7 @@ def _acceptable_receipt(
     rows = [
         row
         for row in receipts.get(campaign.campaign_id, [])
-        if _receipt_rejection(row, current, package_root) is None
+        if _receipt_rejection(row, current, package_root, tree, campaign) is None
     ]
     if rows:
         return max(rows, key=lambda row: str(row.get("generated_at") or ""))
@@ -264,6 +318,7 @@ def _value_verdicts(
     receipts: Mapping[str, list[Mapping[str, Any]]],
     current: Mapping[str, str],
     package_root: Path,
+    tree: _TreeHasher,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     """Campaigns that never measured their tests, and tests measured to kill nothing.
 
@@ -288,7 +343,7 @@ def _value_verdicts(
     unmeasured: list[dict[str, str]] = []
     inert: list[dict[str, str]] = []
     for campaign in campaigns:
-        receipt = _acceptable_receipt(campaign, receipts, current, package_root)
+        receipt = _acceptable_receipt(campaign, receipts, current, package_root, tree)
         value = receipt.get("test_value") if isinstance(receipt, Mapping) else None
         if value is None:
             if campaign.value_analysis is None and not campaign.generated:
@@ -339,11 +394,16 @@ def audit_reproducibility(
     registry: Mapping[str, Any],
     *,
     repo_root: Path = REPO_ROOT,
+    changed_files: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     """Report the campaigns that cannot be re-run, and the ones nothing vouches for.
 
     Takes already-loaded campaigns because loading them is the expensive part and
-    the patch audit has just paid it.
+    the patch audit has just paid it. ``changed_files``, when a caller knows the
+    candidate's diff, adds the per-PR question PR #28 slipped past: a changed
+    file sitting beside or inside the files registered campaigns pin, that no
+    campaign pins itself, ships unmeasured while the audit calls its
+    neighbourhood covered.
     """
 
     try:
@@ -355,6 +415,7 @@ def audit_reproducibility(
     package_root = runner_component_root()
     directories = registry.get("receipt_directories") or []
     receipts = _receipts_by_campaign(repo_root, [str(item) for item in directories])
+    tree = _TreeHasher(repo_root)
 
     interpreters = [
         verdict
@@ -364,11 +425,20 @@ def audit_reproducibility(
     evidence = [
         verdict
         for campaign in campaigns
-        if (verdict := _evidence_verdict(campaign, receipts, current, package_root))
+        if (
+            verdict := _evidence_verdict(
+                campaign, receipts, current, package_root, tree
+            )
+        )
         is not None
     ]
     absent = [row for row in interpreters if row["reason"] == "INTERPRETER_ABSENT"]
-    unmeasured, inert = _value_verdicts(campaigns, receipts, current, package_root)
+    unmeasured, inert = _value_verdicts(campaigns, receipts, current, package_root, tree)
+    uncovered_files = (
+        _uncovered_changed_files(changed_files, campaigns)
+        if changed_files is not None
+        else []
+    )
     return {
         "campaigns": len(campaigns),
         "receipt_files": sum(len(rows) for rows in receipts.values()),
@@ -377,13 +447,68 @@ def audit_reproducibility(
         "uncovered_campaigns": len(evidence),
         "campaigns_without_value_analysis": len(unmeasured),
         "tests_that_kill_nothing": len(inert),
+        "uncovered_changed_files": len(uncovered_files),
         "interpreters": sorted(interpreters, key=lambda row: row["campaign_id"]),
         "evidence": sorted(evidence, key=lambda row: row["campaign_id"]),
         "unmeasured": sorted(unmeasured, key=lambda row: row["campaign_id"]),
         "inert_tests": sorted(
             inert, key=lambda row: (row["campaign_id"], row["nodeid"])
         ),
+        "uncovered_files": uncovered_files,
     }
+
+
+_LANGUAGE_SUFFIXES = {"python": ".py", "rust": ".rs"}
+
+
+def _uncovered_changed_files(
+    changed: Iterable[str], campaigns: Sequence[Campaign]
+) -> list[dict[str, str]]:
+    """Changed files inside measured territory that no registered campaign pins.
+
+    PR #28 changed ten ``.rs`` files under ``native/forge`` while the crate's
+    only campaign pinned five others, and the audit called the crate covered.
+    Measured territory is every directory a registered campaign pins a file
+    in -- and, suffix-matched to that campaign's language, everything beneath
+    such a directory, because a campaign scoped to a crate speaks for the
+    crate's submodules too. A changed file inside territory that nothing pins
+    ships unmeasured; the repair is the generator: plan the narrow campaign.
+    """
+
+    pinned: set[str] = set()
+    directories: set[str] = set()
+    territories: list[tuple[str, str]] = []
+    for campaign in campaigns:
+        scope = [*(campaign.source_sha256 or {}), *(campaign.test_sha256 or {})]
+        if not scope:
+            continue
+        pinned.update(scope)
+        parents = {PurePosixPath(path).parent.as_posix() for path in scope}
+        directories.update(parents)
+        if suffix := _LANGUAGE_SUFFIXES.get(campaign.language):
+            territories.extend((parent, suffix) for parent in parents)
+    rows: list[dict[str, str]] = []
+    for relative in sorted(set(changed)):
+        if relative in pinned:
+            continue
+        parent = PurePosixPath(relative).parent.as_posix()
+        inside = any(
+            parent == root or parent.startswith(f"{root}/")
+            for root, suffix in territories
+            if PurePosixPath(relative).suffix == suffix
+        )
+        if parent in directories or inside:
+            rows.append(
+                {
+                    "file": relative,
+                    "reason": "NO_PINNING_CAMPAIGN",
+                    "detail": (
+                        "changed file sits beside or inside files registered "
+                        "campaigns pin, but no campaign pins it; plan one"
+                    ),
+                }
+            )
+    return rows
 
 
 DEFAULT_BASELINE = Path(
@@ -396,6 +521,7 @@ BASELINE_KEYS = (
     "uncovered_campaigns",
     "campaigns_without_value_analysis",
     "tests_that_kill_nothing",
+    "uncovered_changed_files",
 )
 PATCH_KEYS = ("stale_mutations", "unloadable_manifests")
 
@@ -443,6 +569,7 @@ def _findings(
         "tests_that_kill_nothing": {
             f"{row['campaign_id']}::{row['nodeid']}" for row in repro["inert_tests"]
         },
+        "uncovered_changed_files": {str(row["file"]) for row in repro["uncovered_files"]},
     }
 
 
@@ -581,6 +708,7 @@ def audit_corpus(
     max_workers: int = 16,
     summary: bool = False,
     write_baseline: bool = False,
+    changed_files: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     """One walk of the registered corpus, judged against the recorded debt.
 
@@ -589,6 +717,11 @@ def audit_corpus(
     reader here -- manifests, patches, receipts, the baseline -- resolves from
     disk, so in a shared checkout the working tree carries whatever campaigns
     other lanes have in flight, and those must not decide this lane's verdict.
+
+    ``changed_files`` is the candidate's diff, repo-relative; the gate passes
+    ``git diff --name-only base..target`` so the uncovered-files dimension asks
+    about exactly the PR under judgement. ``None`` keeps the legacy whole-tree
+    mode, where the dimension is empty rather than wrong-by-guessing.
     """
 
     loaded = load_registered_campaigns(registry_path, repo_root=repo_root)
@@ -596,7 +729,9 @@ def audit_corpus(
     patches = audit_patches(
         registry_path, repo_root=repo_root, max_workers=max_workers, loaded=loaded
     )
-    repro = audit_reproducibility(campaigns, registry, repo_root=repo_root)
+    repro = audit_reproducibility(
+        campaigns, registry, repo_root=repo_root, changed_files=changed_files
+    )
 
     found = _findings(patches, repro)
     if write_baseline:
@@ -620,7 +755,8 @@ def audit_corpus(
         result["reproducibility"] = {
             key: value
             for key, value in repro.items()
-            if key not in ("interpreters", "evidence", "unmeasured", "inert_tests")
+            if key
+            not in ("interpreters", "evidence", "unmeasured", "inert_tests", "uncovered_files")
         }
     return result
 
@@ -670,6 +806,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="record today's findings as the baseline instead of judging against it",
     )
+    add_changed_files_arguments(parser)
     args = parser.parse_args(argv)
 
     result = audit_corpus(
@@ -678,6 +815,7 @@ def main(argv: list[str] | None = None) -> int:
         max_workers=args.max_workers,
         summary=args.summary,
         write_baseline=args.write_baseline,
+        changed_files=resolve_changed_files(args),
     )
     print(json.dumps(result, indent=2, sort_keys=True))
     return corpus_exit_code(result)

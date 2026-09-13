@@ -70,6 +70,12 @@ def _mutation(
     )
 
 
+def _tree(root: Path) -> mutation_patch_audit._TreeHasher:
+    """The audited tree, hashed once per file -- what the stale-byte check reads."""
+
+    return mutation_patch_audit._TreeHasher(root)
+
+
 def test_a_rotted_anchor_is_reported_and_a_live_patch_is_not(tmp_path: Path) -> None:
     """The audit exists to separate mutants that still land from ones that cannot."""
 
@@ -297,12 +303,16 @@ def test_a_receipt_is_evidence_only_when_a_known_runner_produced_it(
     """
 
     current = {"conductor/mutation_testing.py": "a" * 64}
+    tree = _tree(tmp_path)
+    campaign = _campaign(tmp_path, "corpus", ())
 
     assert (
         mutation_patch_audit._receipt_rejection(
             {"status": "PASS", "runner_components_sha256": dict(current)},
             current,
             tmp_path,
+            tree,
+            campaign,
         )
         is None
     )
@@ -311,11 +321,15 @@ def test_a_receipt_is_evidence_only_when_a_known_runner_produced_it(
             {"status": "BASELINE_FAILED", "runner_components_sha256": dict(current)},
             current,
             tmp_path,
+            tree,
+            campaign,
         )
         == "status=BASELINE_FAILED"
     )
     assert (
-        mutation_patch_audit._receipt_rejection({"status": "PASS"}, current, tmp_path)
+        mutation_patch_audit._receipt_rejection(
+            {"status": "PASS"}, current, tmp_path, tree, campaign
+        )
         == "no runner component map"
     )
     assert (
@@ -326,6 +340,8 @@ def test_a_receipt_is_evidence_only_when_a_known_runner_produced_it(
             },
             current,
             tmp_path,
+            tree,
+            campaign,
         )
         == "runner components match neither this runner nor any lineage entry"
     )
@@ -341,6 +357,8 @@ def test_a_receipt_is_evidence_only_when_a_known_runner_produced_it(
             {"status": "RATCHET_HELD", "runner_components_sha256": dict(current)},
             current,
             tmp_path,
+            tree,
+            campaign,
         )
         is None
     )
@@ -352,6 +370,8 @@ def test_a_receipt_is_evidence_only_when_a_known_runner_produced_it(
             },
             current,
             tmp_path,
+            tree,
+            campaign,
         )
         == "runner components match neither this runner nor any lineage entry"
     )
@@ -372,15 +392,18 @@ def test_one_acceptable_receipt_covers_a_campaign_and_none_leaves_it_uncovered(
         "status": "PASS",
         "runner_components_sha256": {"conductor/mutation_testing.py": "b" * 64},
     }
+    tree = mutation_patch_audit._TreeHasher(tmp_path)
 
     assert (
         mutation_patch_audit._evidence_verdict(
-            campaign, {"corpus": [stale, good]}, current, tmp_path
+            campaign, {"corpus": [stale, good]}, current, tmp_path, tree
         )
         is None
     )
 
-    missing = mutation_patch_audit._evidence_verdict(campaign, {}, current, tmp_path)
+    missing = mutation_patch_audit._evidence_verdict(
+        campaign, {}, current, tmp_path, tree
+    )
     assert missing is not None
     assert missing["reason"] == "NO_RECEIPT"
     assert missing["campaign_id"] == "corpus"
@@ -388,7 +411,7 @@ def test_one_acceptable_receipt_covers_a_campaign_and_none_leaves_it_uncovered(
     assert missing["detail"] == "no receipt declares this campaign_id"
 
     unusable = mutation_patch_audit._evidence_verdict(
-        campaign, {"corpus": [stale, stale]}, current, tmp_path
+        campaign, {"corpus": [stale, stale]}, current, tmp_path, tree
     )
     assert unusable is not None
     assert unusable["reason"] == "NO_ACCEPTABLE_RECEIPT"
@@ -440,6 +463,7 @@ def test_a_campaign_is_unmeasured_or_its_inert_tests_are_named(tmp_path: Path) -
         {"measured": [_value_receipt(current, value, "20260905T000000Z")]},
         current,
         tmp_path,
+        _tree(tmp_path),
     )
     assert [row["campaign_id"] for row in unmeasured] == ["unmeasured"]
     assert unmeasured[0]["reason"] == "NO_VALUE_ANALYSIS"
@@ -451,7 +475,7 @@ def test_a_campaign_is_unmeasured_or_its_inert_tests_are_named(tmp_path: Path) -
         {"conductor/mutation_testing.py": "b" * 64}, value, "20260905T000000Z"
     )
     assert mutation_patch_audit._value_verdicts(
-        [measured], {"measured": [stale]}, current, tmp_path
+        [measured], {"measured": [stale]}, current, tmp_path, _tree(tmp_path)
     ) == ([], [])
 
     generated, inert = mutation_patch_audit._value_verdicts(
@@ -459,6 +483,7 @@ def test_a_campaign_is_unmeasured_or_its_inert_tests_are_named(tmp_path: Path) -
         {"unmeasured": [_value_receipt(current, value, "20260908T000000Z")]},
         current,
         tmp_path,
+        _tree(tmp_path),
     )
     assert generated == []
     assert [row["nodeid"] for row in inert] == ["t.py::test_inert"]
@@ -469,6 +494,7 @@ def test_a_campaign_is_unmeasured_or_its_inert_tests_are_named(tmp_path: Path) -
         {"unmeasured": [_value_receipt(current, None, "20260908T000000Z")]},
         current,
         tmp_path,
+        _tree(tmp_path),
     )
     assert missing == [] and inert == []
 
@@ -483,6 +509,7 @@ def test_a_campaign_is_unmeasured_or_its_inert_tests_are_named(tmp_path: Path) -
         },
         current,
         tmp_path,
+        _tree(tmp_path),
     )
     assert invalid[0]["reason"] == "INVALID_VALUE_ANALYSIS"
     assert "nodeid and classification" in invalid[0]["detail"]
@@ -508,11 +535,11 @@ def test_the_newest_acceptable_receipt_is_the_one_that_speaks(tmp_path: Path) ->
     }
 
     chosen = mutation_patch_audit._acceptable_receipt(
-        campaign, {"corpus": [new, old]}, current, tmp_path
+        campaign, {"corpus": [new, old]}, current, tmp_path, _tree(tmp_path)
     )
     assert chosen is not None and chosen["generated_at"] == "20260905T000000Z"
     assert (
-        mutation_patch_audit._acceptable_receipt(campaign, {}, current, tmp_path)
+        mutation_patch_audit._acceptable_receipt(campaign, {}, current, tmp_path, _tree(tmp_path))
         is None
     )
 
@@ -544,6 +571,7 @@ def test_every_dimension_reduces_to_comparable_ids(tmp_path: Path) -> None:
                 {"campaign_id": "one", "nodeid": "t.py::test_x"},
                 {"campaign_id": "two", "nodeid": "t.py::test_x"},
             ],
+            "uncovered_files": [{"file": "src/new.py"}],
         },
     )
 
@@ -552,6 +580,7 @@ def test_every_dimension_reduces_to_comparable_ids(tmp_path: Path) -> None:
     assert found["host_pinned_interpreters"] == {"pinned"}
     assert found["uncovered_campaigns"] == {"uncovered"}
     assert found["campaigns_without_value_analysis"] == {"unmeasured"}
+    assert found["uncovered_changed_files"] == {"src/new.py"}
     # An inert test is keyed by campaign AND nodeid for the same reason a stale
     # mutant is: two campaigns can name the same test.
     assert found["tests_that_kill_nothing"] == {
@@ -630,10 +659,12 @@ def _audit_fixture(tmp_path: Path) -> tuple[dict[str, object], dict[str, object]
         "uncovered_campaigns": 0,
         "campaigns_without_value_analysis": 1,
         "tests_that_kill_nothing": 1,
+        "uncovered_changed_files": 0,
         "interpreters": [{"campaign_id": "pinned"}],
         "evidence": [],
         "unmeasured": [{"campaign_id": "unmeasured"}],
         "inert_tests": [{"campaign_id": "corpus", "nodeid": "t.py::test_x"}],
+        "uncovered_files": [],
     }
     return patches, repro
 
@@ -662,6 +693,7 @@ def _assert_clean_summary(reported: dict[str, object], tmp_path: Path) -> None:
     assert "interpreters" not in reported["reproducibility"]
     assert "unmeasured" not in reported["reproducibility"]
     assert "inert_tests" not in reported["reproducibility"]
+    assert "uncovered_files" not in reported["reproducibility"]
     assert reported["patches"]["stale_mutations"] == 1
     assert reported["patches"]["stale_campaigns"] == {"corpus": 1}
     assert reported["patches"]["repo_root"] == str(tmp_path)
@@ -670,6 +702,7 @@ def _assert_clean_summary(reported: dict[str, object], tmp_path: Path) -> None:
     assert reported["reproducibility"]["host_pinned_interpreters"] == 1
     assert reported["reproducibility"]["campaigns_without_value_analysis"] == 1
     assert reported["reproducibility"]["tests_that_kill_nothing"] == 1
+    assert reported["reproducibility"]["uncovered_changed_files"] == 0
     assert reported["status"] == "CLEAN"
     assert reported["repo_root"] == str(tmp_path)
     assert reported["campaigns"] == 1
@@ -764,6 +797,7 @@ def test_write_baseline_records_instead_of_judging(
             "evidence": [{"campaign_id": "uncovered"}],
             "unmeasured": [{"campaign_id": "unmeasured"}],
             "inert_tests": [{"campaign_id": "corpus", "nodeid": "t.py::test_x"}],
+            "uncovered_files": [],
         },
     )
     baseline = tmp_path / "baseline.json"
@@ -810,6 +844,7 @@ def test_optional_attribution_rejects_each_malformed_shape(tmp_path: Path) -> No
             },
             current,
             tmp_path,
+            _tree(tmp_path),
         )
         assert len(unmeasured) == 1
         assert unmeasured[0]["campaign_id"] == "generated"
@@ -828,6 +863,7 @@ def test_optional_attribution_rejects_each_malformed_shape(tmp_path: Path) -> No
         },
         current,
         tmp_path,
+        _tree(tmp_path),
     )
     assert unmeasured == []
     assert inert == [
@@ -855,6 +891,7 @@ def test_optional_attribution_rejects_each_malformed_shape(tmp_path: Path) -> No
         },
         current,
         tmp_path,
+        _tree(tmp_path),
     )
     assert unmeasured == [
         {
@@ -977,3 +1014,237 @@ def test_audit_reproducibility_resolves_lineage_from_runner_component_root(
     )
     assert regressed["uncovered_campaigns"] == 1
     assert regressed["evidence"][0]["reason"] == "NO_ACCEPTABLE_RECEIPT"
+
+
+def _evidence_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> dict[str, str]:
+    """Pin the runner-component facts so only the stale-byte question varies."""
+
+    current = {"conductor/mutation_testing.py": "a" * 64}
+    monkeypatch.setattr(
+        mutation_patch_audit, "runner_component_root", lambda: tmp_path
+    )
+    monkeypatch.setattr(
+        mutation_patch_audit, "_runner_components_sha256", lambda: dict(current)
+    )
+    return current
+
+
+def _receipt_file(root: Path, name: str, receipt: dict[str, object]) -> None:
+    (root / "receipts").mkdir(exist_ok=True)
+    (root / "receipts" / f"{name}.json").write_text(
+        json.dumps(receipt), encoding="utf-8"
+    )
+
+
+def test_a_receipt_pinning_other_bytes_is_not_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #28 passed with a receipt hashing files the PR tip had rewritten.
+
+    A PASS over bytes this tree does not contain is a pass over code nobody
+    shipped, and must read as a rejection. The one exemption is symbol-pinned
+    files: their whole-file digest is expected to move when the edit sits
+    outside the pinned symbols, and the symbol pins say so precisely.
+    """
+
+    _git_repo(tmp_path)
+    current = _evidence_env(tmp_path, monkeypatch)
+    digest = mutation_testing._sha256(tmp_path / "source.py")  # noqa: SLF001
+    campaign = _campaign(tmp_path, "corpus", ())
+    registry = {"receipt_directories": ["receipts"]}
+    fresh = {
+        "campaign_id": "corpus",
+        "status": "PASS",
+        "runner_components_sha256": dict(current),
+        "source_sha256": {"source.py": digest},
+    }
+    stale = {**fresh, "source_sha256": {"source.py": "b" * 64}}
+
+    rejection = mutation_patch_audit._receipt_rejection(
+        stale, current, tmp_path, _tree(tmp_path), campaign
+    )
+    assert rejection == "source hashes differ from this tree: ['source.py']"
+    assert (
+        mutation_patch_audit._receipt_rejection(
+            fresh, current, tmp_path, _tree(tmp_path), campaign
+        )
+        is None
+    )
+    # A pinned file the audited tree lacks is the loudest form of stale.
+    absent = {**fresh, "source_sha256": {"gone.py": digest}}
+    assert "gone.py" in (
+        mutation_patch_audit._receipt_rejection(
+            absent, current, tmp_path, _tree(tmp_path), campaign
+        )
+        or ""
+    )
+
+    _receipt_file(tmp_path, "stale", stale)
+    result = mutation_patch_audit.audit_reproducibility(
+        [campaign], registry, repo_root=tmp_path
+    )
+    assert result["uncovered_campaigns"] == 1
+    assert result["evidence"][0]["reason"] == "NO_ACCEPTABLE_RECEIPT"
+    assert "source hashes differ" in result["evidence"][0]["detail"]
+
+    # The same stale receipt under a campaign that pins source.py symbol-by-
+    # symbol stays acceptable: out-of-symbol edits move whole-file digests.
+    symbols = dataclasses.replace(
+        campaign, source_symbols={"source.py": {"VALUE": digest}}
+    )
+    assert (
+        mutation_patch_audit._receipt_rejection(
+            stale, current, tmp_path, _tree(tmp_path), symbols
+        )
+        is None
+    )
+
+
+def test_one_stale_hash_fails_the_whole_audit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The fixture PR from the brief: one stale hash, audit exits 7, not 0."""
+
+    _git_repo(tmp_path)
+    current = _evidence_env(tmp_path, monkeypatch)
+    campaign = _campaign(tmp_path, "corpus", ())
+    _receipt_file(
+        tmp_path,
+        "run",
+        {
+            "campaign_id": "corpus",
+            "status": "PASS",
+            "runner_components_sha256": dict(current),
+            "source_sha256": {"source.py": "b" * 64},
+        },
+    )
+    monkeypatch.setattr(
+        mutation_patch_audit,
+        "load_registered_campaigns",
+        lambda *_a, **_k: ({"receipt_directories": ["receipts"]}, [campaign], []),
+    )
+    monkeypatch.setattr(
+        mutation_patch_audit,
+        "audit_patches",
+        lambda *_a, **_k: {
+            "status": "CLEAN",
+            "repo_root": str(tmp_path),
+            "campaigns": 1,
+            "stale": [],
+            "unloadable": [],
+        },
+    )
+    baseline = tmp_path / "baseline.json"
+
+    assert (
+        mutation_patch_audit.main(["--baseline", str(baseline), "--summary"]) == 7
+    )
+    reported = json.loads(capsys.readouterr().out)
+    assert reported["status"] == "REGRESSED"
+    delta = reported["reproducibility"]["baseline"]
+    assert delta["new_uncovered_campaigns"] == ["corpus"]
+
+
+def test_a_new_file_beside_a_covered_file_is_reported_uncovered(
+    tmp_path: Path,
+) -> None:
+    """The mirror half of PR #28: in-scope-looking changes nobody pins.
+
+    A file beside pinned files, or deeper inside a directory the campaign's
+    pins occupy in its own language, is inside territory the corpus claims to
+    speak for; a doc file or an unrelated crate's source is not, and must not
+    flood the finding.
+    """
+
+    covered = dataclasses.replace(
+        _campaign(tmp_path, "covered", ()),
+        source_sha256={"src/one.py": "d" * 64},
+        test_sha256={"tests/test_one.py": "e" * 64},
+    )
+    rows = mutation_patch_audit._uncovered_changed_files(
+        {
+            "src/one.py",  # pinned: covered
+            "tests/test_one.py",  # pinned: covered
+            "src/two.py",  # beside a pinned file
+            "src/nested/three.py",  # deeper inside the campaign's territory
+            "docs/readme.md",  # outside every territory, wrong suffix
+            "native/other/lib.rs",  # right suffix, no rust campaign anywhere
+        },
+        [covered],
+    )
+    assert [row["file"] for row in rows] == ["src/nested/three.py", "src/two.py"]
+    assert all(row["reason"] == "NO_PINNING_CAMPAIGN" for row in rows)
+    assert "plan one" in rows[0]["detail"]
+
+    # Legacy whole-tree mode: no changed-file set, no per-PR dimension.
+    assert mutation_patch_audit._uncovered_changed_files(set(), [covered]) == []
+
+
+def test_unpinned_changed_files_fail_the_whole_audit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The dimension is not advisory: an unpinned beside-file exits 7."""
+
+    _git_repo(tmp_path)
+    current = _evidence_env(tmp_path, monkeypatch)
+    covered = dataclasses.replace(
+        _campaign(tmp_path, "covered", ()),
+        source_sha256={"source.py": "d" * 64},
+        test_sha256={},
+    )
+    # An acceptable receipt, so the ONLY failing dimension is the new one: the
+    # campaign itself is covered while the file beside its pin is not.
+    _receipt_file(
+        tmp_path,
+        "covered",
+        {
+            "campaign_id": "covered",
+            "status": "PASS",
+            "runner_components_sha256": dict(current),
+            "source_sha256": {
+                "source.py": mutation_testing._sha256(tmp_path / "source.py")  # noqa: SLF001
+            },
+        },
+    )
+    monkeypatch.setattr(
+        mutation_patch_audit,
+        "load_registered_campaigns",
+        lambda *_a, **_k: ({"receipt_directories": ["receipts"]}, [covered], []),
+    )
+    monkeypatch.setattr(
+        mutation_patch_audit,
+        "audit_patches",
+        lambda *_a, **_k: {
+            "status": "CLEAN",
+            "repo_root": str(tmp_path),
+            "campaigns": 1,
+            "stale": [],
+            "unloadable": [],
+        },
+    )
+    baseline = tmp_path / "baseline.json"
+    # The campaign's own recorded debt (it has no value analysis) is paid for
+    # up front, so the audit fails on the new dimension and nothing else.
+    _record_baseline(baseline, campaigns_without_value_analysis=["covered"])
+
+    assert (
+        mutation_patch_audit.main(
+            [
+                "--baseline",
+                str(baseline),
+                "--summary",
+                "--changed-file",
+                "source.py",
+                "--changed-file",
+                "sibling.py",
+            ]
+        )
+        == 7
+    )
+    reported = json.loads(capsys.readouterr().out)
+    delta = reported["reproducibility"]["baseline"]
+    assert delta["new_uncovered_changed_files"] == ["sibling.py"]
+    assert delta["status"] == "REGRESSED"
+    assert reported["reproducibility"]["uncovered_changed_files"] == 1
