@@ -17,11 +17,12 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/conductor/cost_budget_audit.py": "8bda59ac421e480c467226fea982657d1cfeb86a43f909fff722cdb08645ec7b"
+    "src/conductor/cost_budget_audit.py": "4c8d863ed30df11b5085264af89d8050a03ccb6b3ed92c90a9ec125b21ae991d"
   },
   "survivor_baseline": [
     "constant_replace-98b392f65c77-0"
   ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
   "survivor_baseline_recorded": true,
   "survivor_baseline_recorded_at": "2026-09-13T09:36:26.924743+00:00",
   "test_argv": [
@@ -33,7 +34,7 @@
     "src/conductor/test_cost_budget_audit.py"
   ],
   "test_sha256": {
-    "src/conductor/test_cost_budget_audit.py": "ee624c17dca38dfbbfec115540026b0184214dab90c81bd09106ad35ad77b257"
+    "src/conductor/test_cost_budget_audit.py": "99dc1241525e9648117bc7122db2b16623680d9f121052132cec5f8083ef3ccc"
   },
   "title": "Generated mutants for src/conductor/cost_budget_audit.py, scored on the survivor set"
 }

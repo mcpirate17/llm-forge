@@ -143,6 +143,25 @@ def test_no_data_exit_code_is_ok_with_status_in_detail(
     assert result.ok
     assert "NO_DATA" in result.detail
     assert result.evidence["status"] == "NO_DATA"
+    # stderr, not the (always-JSON, so always-truthy) stdout, is the message
+    # source when both are present -- pins the `or` in `phase()`, not `and`.
+    assert "window has zero rows" in result.detail
+    assert result.evidence["message"] == "window has zero rows"
+
+
+def test_no_data_falls_back_to_stdout_when_stderr_is_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        cost_budget_audit,
+        "run_forge_ledger_audit",
+        lambda **kwargs: subprocess.CompletedProcess(
+            args=["forge"], returncode=3, stdout="stdout says zero rows too", stderr=""
+        ),
+    )
+    result = cost_budget_audit.phase(tmp_path)
+    assert result.ok
+    assert result.evidence["message"] == "stdout says zero rows too"
 
 
 def test_single_regression_metric_makes_phase_not_ok(
