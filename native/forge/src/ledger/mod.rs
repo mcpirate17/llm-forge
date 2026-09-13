@@ -5,6 +5,7 @@
 
 pub mod agent;
 pub mod audit;
+pub mod calibrate;
 pub mod landed;
 pub mod reader;
 pub mod rollup;

@@ -22,6 +22,11 @@ dependencies = [
   # with "fest is not installed" and the mutation routine this package exists to
   # provide cannot run from a clean install at all.
   "fest-mutate>=0.1.3",
+  # conductor/ledger_calibrate.py imports anthropic lazily inside its network
+  # path (so --offline works without it), but the online calibration path is a
+  # shipped feature, not a CI-only step -- declared here per KB-CI-01, the
+  # same rule fest-mutate above follows.
+  "anthropic>=0.40",
   "httpx>=0.28",
   "numpy>=1.26",
   "pydantic>=2",

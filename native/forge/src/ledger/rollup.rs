@@ -33,6 +33,14 @@ const CHARS_PER_TOKEN: f64 = 4.0;
 
 const ESTIMATE_METHOD: &str = "byte_proportional_uncalibrated_cpt4";
 
+/// The calibration fixture (design step 3), embedded at build time so the
+/// bound a row claims is the bound the fixture tests froze -- no runtime
+/// path that could drift from it. When the fixture carries no measured
+/// `per_block_type` (the no-API-key debt path), rows keep the uncalibrated
+/// method string above and a `null` error rather than dressing an
+/// unmeasured split up as a calibrated one.
+const CALIBRATION_FIXTURE_JSON: &str = include_str!("../../tests/fixtures/ledger/calibration.json");
+
 const DEFAULT_LEDGER_ROOT: &str = "/mnt/data/llm/ledger/";
 
 #[derive(Args)]
@@ -81,7 +89,7 @@ pub struct RollupArgs {
 }
 
 /// One `turn_attribution` row: `TurnSummary`'s own fields (same order) plus
-/// the two this step adds. Field order matches the design's name order for
+/// the three this step adds. Field order matches the design's name order for
 /// the `TurnSummary`-covered fields; `tier` stays absent (step 4).
 #[derive(Debug, Clone, Serialize)]
 pub struct TurnAttributionRow {
@@ -97,6 +105,11 @@ pub struct TurnAttributionRow {
     pub bytes_by_block_type: BlockTypeCounts,
     pub estimated_tokens_by_block_type: EstimatedTokensByBlockType,
     pub estimate_method: String,
+    /// The measured per-block-type MAPE from the embedded calibration
+    /// fixture (design step 3), `null` when no bound was measured -- a bare
+    /// estimated number is what design section 3.4 forbids, so the error
+    /// travels beside the estimate everywhere the estimate goes.
+    pub estimate_error_pct: Option<super::calibrate::ErrorByBlockType>,
 }
 
 /// `usage.input_tokens + cache_read_input_tokens + cache_creation_input_tokens`
@@ -359,7 +372,32 @@ fn process_transcript(
     Ok(())
 }
 
+/// The embedded calibration bound, parsed once. `None` when the fixture
+/// shipped without a measured `per_block_type` (the offline debt path) --
+/// the row label then stays uncalibrated and the error field `null`.
+fn calibration() -> Option<&'static super::calibrate::CalibrationBound> {
+    static BOUND: std::sync::OnceLock<Option<super::calibrate::CalibrationBound>> =
+        std::sync::OnceLock::new();
+    BOUND
+        .get_or_init(|| {
+            super::calibrate::parse_calibration_fixture(CALIBRATION_FIXTURE_JSON).expect(
+                "the committed calibration fixture must parse; a corrupt bound stops the build",
+            )
+        })
+        .as_ref()
+}
+
 fn turn_attribution_row(turn: &TurnSummary) -> TurnAttributionRow {
+    build_turn_attribution_row(turn, calibration())
+}
+
+/// The row builder takes the bound as a parameter (the caller passes the
+/// embedded fixture's parse) so the calibrated and uncalibrated labels are
+/// both unit-testable without rewriting the committed fixture.
+fn build_turn_attribution_row(
+    turn: &TurnSummary,
+    bound: Option<&super::calibrate::CalibrationBound>,
+) -> TurnAttributionRow {
     TurnAttributionRow {
         session_id: turn.session_id.clone(),
         turn_index: turn.turn_index,
@@ -372,17 +410,20 @@ fn turn_attribution_row(turn: &TurnSummary) -> TurnAttributionRow {
         cache_creation_input_tokens: turn.cache_creation_input_tokens,
         bytes_by_block_type: turn.bytes_by_block_type,
         estimated_tokens_by_block_type: estimate_tokens_by_block_type(turn),
-        estimate_method: ESTIMATE_METHOD.to_string(),
+        estimate_method: match bound {
+            Some(bound) => format!("byte_proportional_calibrated_{}", bound.date),
+            None => ESTIMATE_METHOD.to_string(),
+        },
+        estimate_error_pct: bound.map(|bound| bound.per_block_type),
     }
 }
 
 /// Design section 3: redistribute this turn's total billed input tokens
 /// (`input_tokens + cache_read_input_tokens + cache_creation_input_tokens`)
 /// across blocks by their share of this turn's chars, excluding `thinking`.
-/// `tool_use`/`image` carry a block *count* in `bytes_by_block_type`, not a
-/// true char length (the reader, PR #35, never measured their bytes) -- a
-/// known imprecision in the split this row inherits rather than hides;
-/// `estimate_method` names it uncalibrated for exactly this reason.
+/// Every split field is a char count in the same unit since the calibration
+/// step's reader fix (`tool_use` = serialized `input` + tool name, `image`
+/// = base64 payload), so the proportional denominator mixes no block counts.
 fn estimate_tokens_by_block_type(turn: &TurnSummary) -> EstimatedTokensByBlockType {
     let b = &turn.bytes_by_block_type;
     let total_tokens =
@@ -626,4 +667,65 @@ fn write_table<T: Serialize>(
         writer::write_day_file(ledger_root, table, day, key_field, &day_rows)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn turn() -> TurnSummary {
+        TurnSummary {
+            session_id: Some("s".to_string()),
+            turn_index: 0,
+            turn_uuid: "u".to_string(),
+            timestamp: Some("2026-09-13T00:00:00Z".to_string()),
+            model: Some("claude-sonnet-5".to_string()),
+            input_tokens: 100,
+            output_tokens: 1,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            bytes_by_block_type: BlockTypeCounts {
+                text: 60,
+                tool_result: 40,
+                ..BlockTypeCounts::default()
+            },
+        }
+    }
+
+    /// No bound (the committed debt fixture, or none at all): the row keeps
+    /// the uncalibrated label and a `null` error -- design 3.4's rule that
+    /// an estimate never travels without its error *or* its named absence.
+    #[test]
+    fn without_a_bound_the_row_stays_honestly_uncalibrated() {
+        let row = build_turn_attribution_row(&turn(), None);
+        assert_eq!(row.estimate_method, "byte_proportional_uncalibrated_cpt4");
+        assert!(row.estimate_error_pct.is_none());
+        assert_eq!(row.estimated_tokens_by_block_type.text, 60.0);
+    }
+
+    /// A measured bound renames the method after its measurement date and
+    /// carries the per-block error beside the estimate.
+    #[test]
+    fn a_measured_bound_labels_and_stamps_the_row() {
+        let bound = super::super::calibrate::parse_calibration_fixture(
+            r#"{"generated_utc": "2026-09-13T00:00:00Z",
+                "per_block_type": {
+                  "text": {"mape": 0.11, "n": 50, "mean_est": 1.0, "mean_actual": 1.0},
+                  "tool_result": {"mape": 0.22, "n": 50, "mean_est": 1.0, "mean_actual": 1.0},
+                  "tool_use": {"mape": 0.33, "n": 50, "mean_est": 1.0, "mean_actual": 1.0},
+                  "image": {"mape": 0.44, "n": 3, "mean_est": 1.0, "mean_actual": 1.0},
+                  "other": {"mape": 0.55, "n": 9, "mean_est": 1.0, "mean_actual": 1.0}
+                }}"#,
+        )
+        .unwrap()
+        .unwrap();
+        let row = build_turn_attribution_row(&turn(), Some(&bound));
+        assert_eq!(
+            row.estimate_method,
+            "byte_proportional_calibrated_2026-09-13"
+        );
+        let error = row.estimate_error_pct.expect("bound present");
+        assert!((error.text - 0.11).abs() < 1e-12);
+        assert!((error.other - 0.55).abs() < 1e-12);
+    }
 }

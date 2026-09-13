@@ -83,6 +83,15 @@ pub struct Usage {
 /// when the block's text starts with `<system-reminder>`, decided inside the
 /// reader (which sees the text once, then drops it) and carried out here as
 /// a bool rather than the string that produced it.
+///
+/// `tool_use` and `image` carry a char length too (the calibration step's
+/// reader gap fix): a tool use's structural JSON is billed as input on the
+/// next turn exactly like text, and an image's base64 payload dominates its
+/// block, so both must be measured in the same unit as every other block
+/// type -- `BlockTypeCounts` was mixing block counts into a byte-proportional
+/// split before this. `thinking` stays the one count-shaped field: it is
+/// excluded from the input-side split outright (design section 3), so its
+/// size is never attributed to anything.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContentBlock {
     Text {
@@ -91,13 +100,16 @@ pub enum ContentBlock {
     },
     ToolUse {
         name: String,
+        char_len: usize,
     },
     ToolResult {
         char_len: usize,
         tool_use_id: String,
     },
     Thinking,
-    Image,
+    Image {
+        char_len: usize,
+    },
     /// A `type` the reader does not recognize. The design (section 2) lists
     /// five variants observed at design time; this sixth one is the hard
     /// rule from the build brief -- an unknown block type counts here
@@ -110,7 +122,8 @@ pub enum ContentBlock {
 /// Per-block-type char totals, accumulated either over one turn or one
 /// whole file depending on where it is stored. Field order matches the
 /// design's `bytes_by_block_type` key order (section 2) plus `other` for
-/// the hard-rule catch-all.
+/// the hard-rule catch-all. Every field in the input-side proportional
+/// split (all but `thinking`, which is a block count by design) is chars.
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct BlockTypeCounts {
     pub text: u64,
@@ -126,9 +139,9 @@ impl BlockTypeCounts {
         match block {
             ContentBlock::Text { char_len, .. } => self.text += *char_len as u64,
             ContentBlock::ToolResult { char_len, .. } => self.tool_result += *char_len as u64,
-            ContentBlock::ToolUse { .. } => self.tool_use += 1,
+            ContentBlock::ToolUse { char_len, .. } => self.tool_use += *char_len as u64,
             ContentBlock::Thinking => self.thinking += 1,
-            ContentBlock::Image => self.image += 1,
+            ContentBlock::Image { char_len } => self.image += *char_len as u64,
             ContentBlock::Other { char_len } => self.other += *char_len as u64,
         }
     }
