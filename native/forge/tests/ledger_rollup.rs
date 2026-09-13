@@ -20,6 +20,15 @@ fn scenario_dir() -> PathBuf {
     PathBuf::from("tests/fixtures/ledger/rollup_scenario")
 }
 
+/// The subagent walk scenario (PR #45): one top-level parent session that
+/// dispatches two `Agent` tool_uses (one answered by a `tool_result` naming
+/// its `agentId`, one never answered), plus the dispatched subagent's
+/// `agent-*.jsonl` transcript under `<session>/subagents/` -- the layout the
+/// walk reads and `--no-subagents` skips.
+fn subagent_scenario_dir() -> PathBuf {
+    PathBuf::from("tests/fixtures/ledger/subagent_scenario")
+}
+
 fn expected_dry_run() -> String {
     fs::read_to_string("tests/fixtures/ledger/expected_rollup_scenario_dry_run.jsonl")
         .expect("reading expected_rollup_scenario_dry_run.jsonl")
@@ -73,6 +82,8 @@ fn write_matches_hand_computed_tables() {
         cap: ledger::agent::DEFAULT_CAP,
         since: None,
         last: None,
+        no_subagents: false,
+        branch: None,
     };
     let code = run(args).expect("rollup run succeeds");
     assert_eq!(code, 0);
@@ -122,6 +133,187 @@ fn write_matches_hand_computed_tables() {
     let _ = fs::remove_dir_all(&root);
 }
 
+/// The subagent walk (PR #45): a directory argument also reads each child
+/// directory's `subagents/agent-*.jsonl`, the subagent's rows key themselves
+/// `agent-<agentId>` with `parent_session_id`/`is_subagent` set (the
+/// identity rule -- keying by the file's own `sessionId` would collapse
+/// every subagent of one parent into that parent's row), and every `Agent`
+/// tool_use becomes a `task_dispatch` row joined to the subagent transcript
+/// by the `agentId` its `tool_result` reported. Hand-computed expectations
+/// mirror `expected_subagent_scenario_dry_run.jsonl`.
+#[test]
+fn subagent_walk_keys_rows_by_agent_id_and_joins_dispatches() {
+    let root = std::env::temp_dir().join(format!(
+        "forge-ledger-rollup-subagent-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&root);
+
+    let code = run(RollupArgs {
+        paths: vec![subagent_scenario_dir()],
+        out: Some(root.clone()),
+        dry_run: false,
+        repo: None,
+        project: None,
+        cap: ledger::agent::DEFAULT_CAP,
+        since: None,
+        last: None,
+        no_subagents: false,
+        branch: None,
+    })
+    .expect("subagent-scenario rollup succeeds");
+    assert_eq!(code, 0);
+
+    // Identity rule: two session rows for the day -- the parent (no
+    // identity keys at all, byte-shape unchanged from before the walk) and
+    // the subagent keyed agent-<id> with its parent named.
+    let sessions = read_day_file(&root, "session_rollup", "2026-04-01");
+    let session_lines: Vec<&str> = sessions.lines().collect();
+    assert_eq!(session_lines.len(), 2, "parent + subagent rows: {sessions}");
+    assert!(
+        session_lines[0].contains(r#""session_id":"parent-1""#)
+            && !session_lines[0].contains("agent_id"),
+        "parent row keeps the pre-subagent shape: {}",
+        session_lines[0]
+    );
+    assert_eq!(
+        session_lines[1],
+        "{\"agent_id\":\"7fa9c1b0123456789\",\"first_ts\":\"2026-04-01T00:03:00Z\",\"harness_session_ids\":[],\"is_subagent\":true,\"last_ts\":\"2026-04-01T00:03:00Z\",\"models\":[\"claude-sonnet-5\"],\"n_compactions\":0,\"n_turns\":1,\"parent_session_id\":\"parent-1\",\"project\":\"subagent_scenario\",\"resend_bytes\":0,\"resend_events\":0,\"session_id\":\"agent-7fa9c1b0123456789\",\"total_cache_creation\":10,\"total_cache_read\":5000,\"total_input\":300,\"total_output\":40}"
+    );
+
+    // The subagent's turn row is keyed agent-<id> too, not the parent uuid
+    // it carries in its own lines.
+    let turns = read_day_file(&root, "turn_attribution", "2026-04-01");
+    assert!(
+        turns
+            .lines()
+            .any(|l| l.contains(r#""session_id":"agent-7fa9c1b0123456789""#)),
+        "subagent turn keyed agent-<id>: {turns}"
+    );
+
+    // task_dispatch: the answered dispatch joins (billed 300+40+10=350
+    // under billed_noncache, under the 150K cap), the unanswered one keeps
+    // its dispatch fields and nulls every transcript-side field.
+    let dispatches = read_day_file(&root, "task_dispatch", "2026-04-01");
+    let dispatch_lines: Vec<&str> = dispatches.lines().collect();
+    assert_eq!(
+        dispatch_lines.len(),
+        2,
+        "one row per Agent tool_use: {dispatches}"
+    );
+    assert_eq!(
+        dispatch_lines[0],
+        "{\"agent_id\":\"7fa9c1b0123456789\",\"billed_tokens\":350,\"description\":\"search the repo\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":\"2026-04-01T00:03:00Z\",\"last_ts\":\"2026-04-01T00:03:00Z\",\"model_requested\":\"sonnet\",\"model_used\":[\"claude-sonnet-5\"],\"n_turns\":1,\"over_cap\":false,\"parent_session_id\":\"parent-1\",\"subagent_type\":\"general-purpose\",\"tier\":\"sonnet\",\"tool_use_id\":\"toolu_dispatch1\",\"total_cache_read\":5000}"
+    );
+    assert_eq!(
+        dispatch_lines[1],
+        "{\"agent_id\":null,\"billed_tokens\":null,\"description\":\"never answered\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":null,\"last_ts\":null,\"model_requested\":null,\"model_used\":null,\"n_turns\":null,\"over_cap\":null,\"parent_session_id\":\"parent-1\",\"subagent_type\":\"general-purpose\",\"tier\":null,\"tool_use_id\":\"toolu_dispatch2\",\"total_cache_read\":null}"
+    );
+
+    // The one sanctioned piece of dispatch text is `description`; the
+    // prompt itself never crosses into any written row.
+    for table in ["turn_attribution", "session_rollup", "task_dispatch"] {
+        let day = read_day_file(&root, table, "2026-04-01");
+        assert!(
+            !day.contains("NEVER COPIED PROMPT TEXT"),
+            "{table} leaked the dispatch prompt"
+        );
+    }
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// `--no-subagents` restores the flat walk exactly: the subagent transcript
+/// is not read (no agent-<id> session row, no turns), while the parent's
+/// dispatches still become task_dispatch rows -- the answered one now keeps
+/// its `agent_id` (the parent's own tool_result reported it) but nulls every
+/// transcript-side field, because the subagent file was not part of the
+/// rollup. An honest null, not a fabricated zero-turn session.
+#[test]
+fn no_subagents_flag_restores_the_flat_walk() {
+    let root = std::env::temp_dir().join(format!(
+        "forge-ledger-rollup-no-subagents-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&root);
+
+    let code = run(RollupArgs {
+        paths: vec![subagent_scenario_dir()],
+        out: Some(root.clone()),
+        dry_run: false,
+        repo: None,
+        project: None,
+        cap: ledger::agent::DEFAULT_CAP,
+        since: None,
+        last: None,
+        no_subagents: true,
+        branch: None,
+    })
+    .expect("no-subagents rollup succeeds");
+    assert_eq!(code, 0);
+
+    let sessions = read_day_file(&root, "session_rollup", "2026-04-01");
+    assert_eq!(
+        sessions.lines().count(),
+        1,
+        "only the parent row: {sessions}"
+    );
+    assert!(sessions.contains(r#""session_id":"parent-1""#));
+
+    let dispatches = read_day_file(&root, "task_dispatch", "2026-04-01");
+    let dispatch_lines: Vec<&str> = dispatches.lines().collect();
+    assert_eq!(
+        dispatch_lines.len(),
+        2,
+        "dispatches live in the parent: {dispatches}"
+    );
+    assert!(
+        dispatch_lines[0].contains(r#""agent_id":"7fa9c1b0123456789""#)
+            && dispatch_lines[0].contains(r#""n_turns":null"#)
+            && dispatch_lines[0].contains(r#""billed_tokens":null"#),
+        "answered dispatch unjoined without the file: {}",
+        dispatch_lines[0]
+    );
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Frozen-JSON parity for the subagent scenario's dry run (same pattern as
+/// `dry_run_matches_frozen_scenario`), plus the `--no-subagents` walk's
+/// absence of every subagent-derived row.
+#[test]
+fn subagent_dry_run_matches_frozen_scenario() {
+    let exe = env!("CARGO_BIN_EXE_forge");
+    let output = std::process::Command::new(exe)
+        .args(["ledger", "rollup", "--dry-run", "--no-subagents"])
+        .arg(subagent_scenario_dir())
+        .output()
+        .expect("forge ledger rollup --dry-run --no-subagents runs");
+    assert!(
+        output.status.success(),
+        "forge ledger rollup exited {:?}: {}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let actual = String::from_utf8(output.stdout).expect("stdout is valid UTF-8");
+    assert!(
+        !actual.contains("agent-7fa9c1b0123456789"),
+        "subagent rows must be absent under --no-subagents: {actual}"
+    );
+
+    let output = std::process::Command::new(exe)
+        .args(["ledger", "rollup", "--dry-run"])
+        .arg(subagent_scenario_dir())
+        .output()
+        .expect("forge ledger rollup --dry-run runs");
+    assert!(output.status.success());
+    let actual = String::from_utf8(output.stdout).expect("stdout is valid UTF-8");
+    let expected =
+        fs::read_to_string("tests/fixtures/ledger/expected_subagent_scenario_dry_run.jsonl")
+            .expect("reading expected_subagent_scenario_dry_run.jsonl");
+    assert_eq!(actual.trim_end(), expected.trim_end());
+}
+
 /// Idempotence (design step 2 item 2, "replaces that session's rows for
 /// that day"): rerunning the rollup over the same input must not duplicate
 /// rows or otherwise perturb the day files -- every table's bytes must be
@@ -143,6 +335,8 @@ fn rerunning_rollup_is_idempotent() {
         cap: ledger::agent::DEFAULT_CAP,
         since: None,
         last: None,
+        no_subagents: false,
+        branch: None,
     };
 
     run(make_args()).expect("first rollup run succeeds");

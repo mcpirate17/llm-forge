@@ -77,10 +77,18 @@ Phase 2 exit table (all six steps landed; baseline values from `ledger/cost_budg
 | `tokens_per_landed_pr` | 7,850,228.694444444 | 72 |
 | `median_hook_ms` | omitted at record time (no `hook_rollup` rows yet -- step 6's SessionEnd telemetry rides the rollup from now on) | 0 |
 
-## Phase 3: bet B2, correct incremental verification (Claude)
+## Phase 3: model routing at the dispatch seam (follows from the ledger's numbers)
+Cheap tier for Explore/clerical dispatches by default, measured before it is enforced.
+
+1. Ledger plumbing for routing evidence: subagent identity (`agent-<id>` keying, `parent_session_id`), the `task_dispatch` table (one row per `Agent` tool_use: tier requested vs. used, billed tokens, over-cap), the subagent walk (`<dir>/<session>/subagents/agent-*.jsonl`, `--no-subagents` to opt out) and `--branch` for non-main repos. DONE PR #45.
+2. Routing policy: which tier a dispatch gets by default, from the measured per-tier dispatch costs. (Claude)
+3. The hook that applies it at the dispatch seam. (Claude)
+4. A gate metric that ratchets routing cost. (Claude)
+
+## Phase 4: bet B2, correct incremental verification (Claude)
 Transitive closure index (Rust) over imports and fixtures, per-test timing DB, flake ledger from the 1,494 receipts, content-addressed check cache keyed per file not per tree. Bound or de-scope the equivalence probe. Exit: gate time proportional to the diff, not the repo.
 
-## Phase 4: bet B3, sandbox runner (Claude, after Tim's design nod)
+## Phase 5: bet B3, sandbox runner (Claude, after Tim's design nod)
 Landlock/seccomp runner with write scope bound to the session's claims; replaces command-string heuristics as the safety floor.
 
 ## Do not build

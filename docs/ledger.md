@@ -25,7 +25,7 @@ so the hook rolls it up then (2 s bound, best-effort to stderr, escape hatch
 
 ## Tables
 
-`<ledger_root>` (env `LEDGER_ROOT`, else `/mnt/data/llm/ledger/`) holds five
+`<ledger_root>` (env `LEDGER_ROOT`, else `/mnt/data/llm/ledger/`) holds six
 tables plus `archive/`. Day-file names are UTC dates; a session's rows land
 under the day of its own timestamps.
 
@@ -46,11 +46,25 @@ an estimate never travels without its error *or* its named absence).
 ### `session_rollup`
 
 One row per session: `session_id`, `project` (the transcript file's parent
-directory name), `first_ts`, `last_ts`, `n_turns`, `n_compactions`,
+directory name -- for a subagent file, the project directory three levels up,
+so `<project>/<uuid>/subagents/agent-x.jsonl` reports `<project>`, not
+`subagents`), `first_ts`, `last_ts`, `n_turns`, `n_compactions`,
 `total_input`, `total_output`, `total_cache_read`, `total_cache_creation`,
 `resend_bytes`, `resend_events`, `harness_session_ids` (every
 `session_[a-zA-Z0-9]+` id the transcript itself mentions -- the
 `agent_rollup` join key), `models` (distinct model values, sorted).
+
+**Subagent identity rule.** Every line of a subagent transcript
+(`<session-uuid>/subagents/agent-<17 hex>.jsonl`) carries its PARENT's uuid
+as `sessionId` -- keying a subagent by that value would collapse every
+subagent of one parent into a single row. A subagent's rows therefore key
+themselves `agent-<agentId>` (unique per file, from the first line that
+carries an `agentId`) and name the parent in `parent_session_id`, with
+`is_subagent: true`. All three fields are omit-when-unset, so a top-level
+session's row is byte-identical to before subagents were modelled. The join
+dedupes by `session_id`, so each subagent now counts as its own session --
+which is what made `agent_rollup.cap_breaches` able to see a subagent that
+alone burned past the cap.
 
 Compaction detection prefers the harness's `isCompactSummary` marker (one per
 compaction, unambiguous); the `cache_read_input_tokens` sharp-drop heuristic
@@ -88,6 +102,29 @@ overlapping session credits all of them and flags the commit `ambiguous`.
 match. Both steps only ever look at sessions whose `project` equals this
 run's `--project`.
 
+### `task_dispatch`
+
+One row per `Agent` tool_use in a *top-level* transcript (nested dispatches
+-- a subagent dispatching its own subagent -- are out of scope until a
+consumer needs their parent linkage): `parent_session_id` (the dispatching
+line's session), `dispatch_ts`, `tool_use_id` (the day-file key), `agent_id`
+(from the matching `tool_result`'s `agentId: <17 hex>` line, `null` when the
+result never arrived or named no id), `subagent_type`, `description` (the
+only text stored -- `prompt` and block content never cross the reader
+boundary), `model_requested` (`null` when the call set no model), then the
+transcript-side fields, all `null` when unjoined: `model_used` (distinct
+model values in the subagent's file, sorted), `tier` (the same tier table as
+`agent_rollup`), `n_turns`, `billed_tokens` (`billed_noncache`: input +
+output + cache_creation), `total_cache_read`, `over_cap` (billed >
+`--cap`), `first_ts`, `last_ts`. An unjoined row keeps its dispatch fields
+and nulls the rest -- an honest null, never a zero that reads like a
+measured empty session. Filed under the day of `dispatch_ts`; a dispatch
+with no timestamp is a loud error, not a guessed day.
+
+This is the routing evidence Phase 3 (model routing) decides on: which tier
+a dispatch *asked for* (`model_requested`) vs. which actually ran
+(`model_used`), at what cost per dispatch, over cap or not.
+
 ### `archive/<year-month>.jsonl`
 
 Retention's landing zone for aged aggregate rows; see
@@ -112,27 +149,33 @@ always carries `uuid`; telemetry lines carry a top-level `event` and none).
 
 ```
 forge ledger rollup <path>... [--out <ledger_root>] [--repo <path> --project <name>] \
-    [--cap <n>] [--since <date> | --last <n>] [--dry-run]
+    [--cap <n>] [--since <date> | --last <n>] [--branch <name>] [--no-subagents] [--dry-run]
 ```
 
 A path may be a file or a directory walked non-recursively for its immediate
-`*.jsonl` children -- a subagent transcript beside its parent rolls up as its
-own session. `--out` defaults to `$LEDGER_ROOT`, else `/mnt/data/llm/ledger/`.
+`*.jsonl` children, plus -- since PR #45 -- each child directory's
+`subagents/agent-*.jsonl` (the layout the harness moved subagent transcripts
+to; 521 of them sat unread under the LLM project on 2026-09-13, and every
+one of them keyed itself into its parent's row before the identity rule).
+`--no-subagents` restores the flat, pre-PR-45 walk exactly.
+`--out` defaults to `$LEDGER_ROOT`, else `/mnt/data/llm/ledger/`.
 `--dry-run` prints the rows as JSONL and writes nothing.
 
-`--repo` scans that repository's `git log --first-parent main` (see
+`--repo` scans that repository's `git log --first-parent <branch>` (see
 [`forge ledger landed`](#forge-ledger-landed-step-4)) and joins it to this
 run's `session_rollup` rows into `agent_rollup`; without it `agent_rollup` is
 not computed. `--project` (required with `--repo`) is the transcript
 directory basename this repo's commits may join against -- no default,
 because guessing wrong either drops every join silently or crosses a project
-boundary. One invocation joins exactly one project. `--cap` and
-`--since`/`--last` pass through to the landed scan.
+boundary. One invocation joins exactly one project. A project name that
+begins with `-` (every munged path does: `-home-tim-...`) needs the `=` form,
+`--project=-home-tim-Projects-LLM`, or the value parses as a flag. `--cap`,
+`--since`/`--last` and `--branch` pass through to the landed scan.
 
 ## `forge ledger landed` (step 4)
 
 ```
-forge ledger landed --repo <path> [--since <date> | --last <n>]
+forge ledger landed --repo <path> [--since <date> | --last <n>] [--branch <name>]
 ```
 
 One JSON row per landed first-parent commit: `sha`, `merged_at` (committer
@@ -141,6 +184,11 @@ date, UTC, `YYYY-MM-DDTHH:MM:SSZ` -- `%cd` with `--date=format-local:...` and
 in the subject, `null` when absent), `agent_names` (every `Agent: <name>`
 trailer, sorted, deduplicated -- a squash commit can carry several),
 `harness_session_ids`, `files_changed`, `insertions`, `deletions`.
+
+`--branch` names the integration branch. Default: the ref
+`refs/remotes/origin/HEAD` points at, falling back to `main` when a repo has
+no origin/HEAD at all -- the LLM monorepo integrates on `master` and has no
+`main`, which is why the default is resolved rather than hardcoded.
 
 ## `forge ledger calibrate` (step 3)
 
@@ -369,3 +417,9 @@ verdict as one line per metric with its status, exiting by the same
   `rollup.rs`, not the join.
 - **Compaction/resend never double-signal**: the sharp-drop heuristic only
   runs when a session has zero `isCompactSummary` markers.
+- **This repo's own sessions are not under its own project dir**: sessions
+  that worked on llm-forge are recorded under the harness's directory for
+  `/home/tim/Projects/LLM` (the monorepo this checkout lives inside), not
+  under a `-llm-forge` project dir -- `~/.claude/projects/-home-tim-Projects-llm-forge/`
+  holds only memory files. Nothing to fix; it just means a rollup of this
+  repo's "own" transcript directory finds nothing, by construction.

@@ -1,0 +1,1 @@
+{"uuid":"sg1","sessionId":"parent-1","agentId":"7fa9c1b0123456789","timestamp":"2026-04-01T00:03:00Z","type":"assistant","message":{"role":"assistant","model":"claude-sonnet-5","usage":{"input_tokens":300,"output_tokens":40,"cache_read_input_tokens":5000,"cache_creation_input_tokens":10},"content":[{"type":"text","text":"subagent did the search"}]}}
