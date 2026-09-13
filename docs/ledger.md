@@ -1,9 +1,8 @@
 # `forge ledger`: the cost ledger's reader and rollups
 
-Steps 1, 2 and 4 of `docs/design/cost_ledger.md`'s build plan (section 6).
-This is a stub: the CLI synopsis for what steps 1-2-4 ship. Step 6 fills in
-the rest of this page once calibration (step 3) and the gate phase (step 5)
-exist.
+Steps 1, 2, 4 and 5 of `docs/design/cost_ledger.md`'s build plan (section 6).
+This is a stub: the CLI synopsis for what steps 1-2-4-5 ship. Step 6 fills in
+the rest of this page once calibration (step 3) exists.
 
 ## `forge ledger read`
 
@@ -269,3 +268,112 @@ tokens is correct; the alternative was crediting someone else's session,
 which is what this fix removes. Closing this gap for real needs those
 agents' own token accounting to land in a transcript this ledger can see,
 which is out of this PR's scope.
+
+## `forge ledger audit` (step 5)
+
+```
+forge ledger audit --ledger-root <dir> --baseline <file> [--window-days N] [--record]
+```
+
+Computes the three budget-ratchet metrics from design section 4 over a
+trailing `N`-day window ending today (`--window-days`, default 7) and either
+records them as the new baseline (`--record`) or checks them against the
+last recorded one. Never rounds a tie up to `PASS`; never invents a value
+for a metric with no rows in the window.
+
+- **`median_hook_ms`**: the weighted median of `hook_rollup.p50_ms` across
+  the window's day files, weighted by each row's `n_calls` (a hook called
+  1,000 times outweighs one called once, even at the same `p50_ms`).
+- **`resend_bytes_per_session`**: the mean of `session_rollup.resend_bytes`
+  across the window's sessions.
+- **`tokens_per_landed_pr`**: `sum(total_tokens) / sum(n_landed_prs)` over
+  `agent_rollup` rows whose `join_method` is not `unjoined` -- an
+  unattributed agent's tokens have no landed-PR denominator to divide by
+  honestly, so they are excluded rather than either dropped silently from
+  the numerator alone or credited to `n=0`.
+
+Per-metric status, `value` compared against the recorded `baseline.value`
+with `baseline.tolerance_pct` (5% at record time, from `DEFAULT_TOLERANCE_PCT`,
+not reconfigurable per metric today):
+
+| Status | Meaning |
+|---|---|
+| `PASS` | `value` strictly improved on the baseline (`value < baseline`). |
+| `RATCHET_HELD` | `value` is within tolerance of the baseline but did not improve on it -- a tie is `RATCHET_HELD`, never rounded up to `PASS`; this is what the design's own worked example computes on a fresh baseline checked against itself. |
+| `REGRESSION` | `value` exceeds `baseline * (1 + tolerance_pct / 100)`. |
+| `NO_BASELINE` | the metric has a value this window but no recorded baseline entry to compare against (never recorded, or explicitly skipped at record time for lack of data). |
+| `NO_DATA` | the metric has no rows in this window at all (`value` is `null`), regardless of what the baseline says. |
+
+Overall `status` is the worst of the three per-metric statuses, ranked
+`REGRESSION > NO_DATA > NO_BASELINE > RATCHET_HELD > PASS`. If **every**
+metric has zero rows in the window the command fails loud instead of
+printing a hollow verdict: it prints an error to stderr and exits `3`
+without writing anything, `--record` included -- an empty window is not a
+baseline.
+
+`--record` is the only way a baseline file changes; a metric with no data
+at record time is omitted from the written baseline (one line to stderr
+naming it as debt, not a failure) rather than recorded as `0` or copied
+forward from whatever was there before. The baseline file
+(`ledger/cost_budget_baseline.json` by convention, tracked in git) also
+carries `recorded_utc` and a `ledger_root_sha` -- a `sha256` over every day
+file actually read, path and bytes, sorted -- so a baseline receipt names
+exactly which rows it was computed from.
+
+### Gate wiring: `cost-budget-audit`
+
+`src/conductor/cost_budget_audit.py` wraps this command as gate phase
+`cost-budget-audit` (`conductor.gate.run_gate`): it resolves the `forge`
+binary the same way `project_init.py` already does, shells out with the
+export root's `ledger/cost_budget_baseline.json` as `--baseline`, and maps
+the JSON verdict onto a `PhaseResult` with `ok = False` iff at least one
+metric's status is `REGRESSION`. `PASS`, `RATCHET_HELD`, `NO_BASELINE` and
+`NO_DATA` -- including the hard-empty exit-3 case where every table is
+empty -- are all `ok`: a fresh clone or CI runner has no recorded baseline
+and no ledger rows on its first run, and there is nothing to regress
+against yet, so that must not make `make gate` permanently red. `detail`
+still names every metric's status verbatim, never rounded up to `PASS`, so
+`RATCHET_HELD`/`NO_BASELINE`/`NO_DATA` stay visible in gate output even
+though they do not fail the phase. Only a missing `forge` binary or output
+that fails to parse at all raises loud (`CostBudgetAuditError` ->
+`GateRefusal`) -- those are tool failures, not verdicts. The direct CLI path
+(`make cost-budget-audit`, `forge ledger audit` run by a human) is
+unchanged and still fails loud: exit 3 on the hard-empty window, exit 1 on
+anything but `PASS`/`RATCHET_HELD`.
+
+The design also names a `ledger/registry.d/<scope>.json` convention
+(mirroring `campaigns/registry.d/`) for concurrency-safe baseline pointers.
+That split is coupled to mutation-campaign manifest fragments and a native
+registry loader that only understands that one shape (`mutation_registry_
+split.py`); it does not generalize to an arbitrary metric baseline, so this
+phase uses one tracked file instead, as the design permits when the
+registry.d code path does not already generalize.
+
+`make cost-budget-audit` / `make cost-budget-record` (`conductor.mk`) run
+this against the live repo (not an export -- there is no candidate review
+happening at the command line), mirroring `mutation-patch-audit` /
+`mutation-patch-audit-record`.
+
+### First real run (this repo)
+
+`forge ledger rollup` over this project's own transcript directory
+(2.4s, 291 files, 1.4 GB), joined to this scratch clone's own history via
+`--repo`/`--project`, then `forge ledger audit --record` over the trailing
+7-day window:
+
+| metric | n | baseline value |
+|---|---|---|
+| `median_hook_ms` | 0 | omitted -- no `hook_rollup` rows in this window (debt below) |
+| `resend_bytes_per_session` | 20 | 8,815,583 bytes |
+| `tokens_per_landed_pr` | 72 | 7,850,228.7 |
+
+A second, unmodified check against that just-recorded baseline reproduces
+`resend_bytes_per_session` and `tokens_per_landed_pr` exactly
+(`delta_pct: 0.0`, `RATCHET_HELD`) -- both compute in under 5ms once the
+rollup exists. `median_hook_ms` has no `hook_rollup` rows at all in this
+window: this project's transcript directory (the only input this step is
+told to read) carries no hook-telemetry-kind JSONL files, so the metric is
+honestly `NO_DATA` rather than a fabricated number. That makes the overall
+recorded-window status `NO_DATA` (the worst of the three, per the ranking
+above) rather than the `RATCHET_HELD` the design's exit criterion names --
+debt, tracked in the PR body, not something this step invents data to hide.

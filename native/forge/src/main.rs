@@ -77,6 +77,10 @@ enum LedgerCommand {
     /// Scan a repo's `git log --first-parent main` into one JSONL row per
     /// landed commit (design step 4).
     Landed(ledger::landed::LandedArgs),
+    /// Compute the three budget-ratchet metrics over a trailing window and
+    /// compare (or, with `--record`, replace) the baseline receipt (design
+    /// step 5).
+    Audit(ledger::audit::AuditArgs),
 }
 
 #[derive(Subcommand)]
@@ -125,6 +129,13 @@ fn main() -> ExitCode {
                 Ok(code) => ExitCode::from(code as u8),
                 Err(err) => {
                     eprintln!("forge ledger landed: {err:#}");
+                    ExitCode::from(1)
+                }
+            },
+            LedgerCommand::Audit(args) => match ledger::audit::run(args) {
+                Ok(code) => ExitCode::from(code as u8),
+                Err(err) => {
+                    eprintln!("forge ledger audit: {err:#}");
                     ExitCode::from(1)
                 }
             },
