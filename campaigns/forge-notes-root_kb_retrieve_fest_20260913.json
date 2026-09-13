@@ -45,6 +45,7 @@
     "constant_replace-fd5fddbec3ae-1",
     "negate_condition-e0bffae8d649-0"
   ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
   "survivor_baseline_recorded": true,
   "survivor_baseline_recorded_at": "2026-09-13T01:46:45.832646+00:00",
   "test_argv": [
@@ -56,7 +57,7 @@
     "src/conductor/test_kb_retrieve.py"
   ],
   "test_sha256": {
-    "src/conductor/test_kb_retrieve.py": "e3b2d6f3e9e17b7e43dfdcde17eac7e6a642890fd9e67c281e481c8465288853"
+    "src/conductor/test_kb_retrieve.py": "a09ae810423ff665916d11ba1525bf6706224d43aefa1ca1830a7113c2d3af49"
   },
   "title": "Generated mutants for src/conductor/kb_retrieve.py, scored on the survivor set"
 }
