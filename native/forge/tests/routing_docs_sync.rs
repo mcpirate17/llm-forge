@@ -69,13 +69,20 @@ fn policy_table_rows_match_the_embedded_policy() {
 
     let mut rows = 0;
     for line in section.lines().filter(|l| l.trim_start().starts_with('|')) {
-        let cells: Vec<&str> = line.trim().trim_matches('|').split('|').map(str::trim).collect();
+        let cells: Vec<&str> = line
+            .trim()
+            .trim_matches('|')
+            .split('|')
+            .map(str::trim)
+            .collect();
         if cells.len() != 4 {
             continue;
         }
         // Header row and `|---|---|---|---|` separator.
         if cells[0] == "class"
-            || cells.iter().all(|c| !c.is_empty() && c.trim_matches('-').is_empty())
+            || cells
+                .iter()
+                .all(|c| !c.is_empty() && c.trim_matches('-').is_empty())
         {
             continue;
         }
