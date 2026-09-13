@@ -3,10 +3,12 @@
 ``python -m tooling.hooks.dispatch.doctor [--project-dir DIR] [--settings FILE]``
 
 For each declared command: the script exists and is non-empty, carries the
-executable bit when invoked directly, has a resolvable shebang or interpreter,
-compiles (Python) or resolves as a module (``python -m``), resolves to a
-registered hook (legacy or dispatcher wiring), and runs on a synthetic payload
-within its timeout, exiting 0 with either nothing or valid JSON on stdout. A
+executable bit when invoked directly (an executable with no shebang is a
+native binary -- a cargo-installed ``forge`` -- and is live; only a script's
+shebang interpreter must resolve), compiles (Python) or resolves as a module
+(``python -m``), resolves to a registered hook (legacy or dispatcher wiring),
+and runs on a synthetic payload within its timeout, exiting 0 with either
+nothing or valid JSON on stdout. A
 non-zero exit is DEAD even though the harness ignores it — that is the silent
 failure this tool exists to catch. Exit status is 1 when any hook is DEAD.
 
@@ -157,15 +159,17 @@ def static_checks(resolved: Resolved, report: Report, project_dir: Path) -> None
                 f"not executable (mode {oct(script.stat().st_mode)[-3:]}): {script}"
             )
         shebang = _shebang(script)
-        if shebang is None:
-            report.dead(f"no shebang: {script}")
-        else:
+        if shebang is not None:
             words = shebang.split()
             target = (
                 words[1] if words[0].endswith("/env") and len(words) > 1 else words[0]
             )
             if shutil.which(target) is None and not Path(target).is_file():
                 report.dead(f"shebang interpreter not resolvable: {shebang}")
+        # An executable with no shebang is a native binary (ELF/Mach-O --
+        # e.g. a cargo-installed `forge`), not a dead script: exec-bit set
+        # means live here. A text file the exec bit was set on wrongly still
+        # fails `run_check`, which really executes the command.
     elif shutil.which(resolved.interpreter) is None:
         report.dead(f"interpreter not on PATH: {resolved.interpreter}")
     if script.suffix == ".py":
