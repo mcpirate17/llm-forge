@@ -21,9 +21,9 @@ const MAX_HIT_TEXT_CHARS: usize = 500;
 type NativeHit = (f64, String, String, String, String);
 
 #[derive(Debug)]
-struct EmbeddingMeta<'a> {
-    fingerprint: &'a str,
-    dimension: usize,
+pub(crate) struct EmbeddingMeta<'a> {
+    pub(crate) fingerprint: &'a str,
+    pub(crate) dimension: usize,
 }
 
 #[derive(Debug)]
@@ -45,7 +45,7 @@ fn python_repr(value: Option<&Value>) -> String {
     }
 }
 
-fn row_object(value: &Value) -> Result<&Map<String, Value>, String> {
+pub(crate) fn row_object(value: &Value) -> Result<&Map<String, Value>, String> {
     value
         .as_object()
         .ok_or_else(|| "memory index row must be a JSON object".to_owned())
@@ -63,7 +63,7 @@ fn integer(value: Option<&Value>) -> Option<i64> {
     value.filter(|value| !value.is_boolean())?.as_i64()
 }
 
-fn validate_row(row: &Map<String, Value>) -> Result<EmbeddingMeta<'_>, String> {
+pub(crate) fn validate_row(row: &Map<String, Value>) -> Result<EmbeddingMeta<'_>, String> {
     if !schema_matches(row.get("schema_version")) {
         return Err(format!(
             "unsupported memory index schema {}; reindex required",
@@ -162,7 +162,7 @@ fn visit_rows(
 }
 
 // Match the improved Kahan-Babuska/Neumaier loop used by CPython 3.12 sum().
-fn compensated_dot(query: &[f64], vector: impl Iterator<Item = f64>) -> f64 {
+pub(crate) fn compensated_dot(query: &[f64], vector: impl Iterator<Item = f64>) -> f64 {
     let mut total = 0.0_f64;
     let mut compensation = 0.0_f64;
     for (query_value, value) in query.iter().zip(vector) {

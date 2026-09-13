@@ -19,6 +19,7 @@ mod hook_merge;
 mod kb_retrieve;
 mod memory_chunking;
 mod memory_index;
+mod memory_index_sidecar;
 mod mutation_coverage;
 mod mutation_evidence;
 mod mutation_manifest;
@@ -53,6 +54,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     kb_retrieve::register(module)?;
     memory_chunking::register(module)?;
     memory_index::register(module)?;
+    memory_index_sidecar::register(module)?;
     mutation_value::register(module)?;
     native_reuse::register(module)?;
     project_context::register(module)?;
