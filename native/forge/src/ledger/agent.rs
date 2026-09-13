@@ -126,7 +126,10 @@ fn tier_of_model(model: &str) -> Option<&'static str> {
 /// `docs/ledger.md`'s tier table: one tier if every session's model maps to
 /// the same one, `"mixed"` if more than one distinct tier is present,
 /// `"unknown"` if no session's model matched any known substring at all.
-fn infer_tier(models: &BTreeSet<&str>) -> String {
+/// `pub(crate)` because `task_dispatch` (`rollup.rs`) infers its rows' tier
+/// with the exact same table -- one definition, so the two tables can never
+/// disagree about what a model string is worth.
+pub(crate) fn infer_tier(models: &BTreeSet<&str>) -> String {
     let tiers: BTreeSet<&'static str> = models.iter().filter_map(|m| tier_of_model(m)).collect();
     match tiers.len() {
         0 => "unknown".to_string(),
@@ -249,12 +252,14 @@ pub fn join_commits<'a>(
 /// `DEFAULT_CAP`).
 ///
 /// `cap_breaches` counts every session credited to the agent whose own
-/// `billed_noncache` total exceeds `cap` -- `SessionRollupRow` carries no
-/// "this was a subagent transcript" flag (`rollup.rs`'s own note: an
-/// `agent-*.jsonl` file "counts as its own session, no special-cased
-/// handling"), so this is every session, not literally only ones from an
-/// `agent-*.jsonl` file. That is the intended meaning here: any single
-/// session run under this agent's name that alone burned past the cap.
+/// `billed_noncache` total exceeds `cap`. Since the subagent walk landed,
+/// those sessions include `agent-*.jsonl` subagent transcripts (`is_subagent`
+/// rows, keyed `agent-<id>`) alongside top-level ones -- on purpose: the
+/// per-tier finding that motivated the walk was that a subagent alone can
+/// burn past the cap while every top-level session stayed under it, and
+/// `cap_breaches` is "any single session run under this agent's name that
+/// alone burned past the cap", subagent or not. Before the walk, no
+/// `agent-*.jsonl` file was ever read, so those breaches were invisible.
 pub fn build_agent_rollup(
     commits: &[LandedCommitRow],
     sessions: &[SessionRollupRow],
@@ -373,6 +378,9 @@ mod tests {
         SessionRollupRow {
             session_id: id.to_string(),
             project: project.to_string(),
+            agent_id: None,
+            parent_session_id: None,
+            is_subagent: false,
             first_ts: Some(first_ts.to_string()),
             last_ts: Some(last_ts.to_string()),
             n_turns: 1,

@@ -3,7 +3,7 @@
 //! `BufRead::lines` -- never `read_to_string` -- because transcripts reach
 //! 100 MB (design "Measured this session" table).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -12,10 +12,10 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 
 use super::schema::{
-    BlockTypeCounts, CompactionMarker, ContentBlock, HookStats, InputKind, ReadStats, SkippedLine,
-    TelemetrySummary, TranscriptLine, TranscriptSummary, TurnSummary,
+    AgentDispatch, BlockTypeCounts, CompactionMarker, ContentBlock, HookStats, InputKind,
+    ReadStats, SkippedLine, TelemetrySummary, TranscriptLine, TranscriptSummary, TurnSummary,
 };
-use super::session_ids::find_session_ids;
+use super::session_ids::{find_agent_id, find_session_ids};
 
 const SYSTEM_REMINDER_PREFIX: &str = "<system-reminder>";
 
@@ -71,10 +71,22 @@ pub fn read_transcript_file(path: &Path) -> Result<TranscriptSummary> {
         chars_by_block_type: BlockTypeCounts::default(),
         read_stats: ReadStats::default(),
         turns: Vec::new(),
+        agent_id: None,
+        parent_session_id: None,
+        is_subagent: false,
+        agent_dispatches: Vec::new(),
         compaction_markers: Vec::new(),
         harness_session_ids: Vec::new(),
     };
     let mut harness_session_ids: BTreeSet<String> = BTreeSet::new();
+    // The first session id any line carries: for a subagent file this is the
+    // PARENT session's uuid (every subagent line's `sessionId` names its
+    // parent), which `parent_session_id` reports; for a top-level file it is
+    // simply unused (its own turns already carry their session per line).
+    let mut first_session_id: Option<String> = None;
+    // tool_use_id -> index into `summary.agent_dispatches` for an `Agent`
+    // dispatch still waiting for its `tool_result` to name the subagent.
+    let mut pending_dispatches: BTreeMap<String, usize> = BTreeMap::new();
 
     for (idx, line) in reader.lines().enumerate() {
         let line_number = idx + 1;
@@ -114,6 +126,19 @@ pub fn read_transcript_file(path: &Path) -> Result<TranscriptSummary> {
             .get("sessionId")
             .and_then(Value::as_str)
             .map(str::to_string);
+        // A subagent transcript's identity: every line carries the same
+        // `agentId` (17 hex) alongside its parent's `sessionId`. The first
+        // line that has one settles the file's identity; read off the raw
+        // value before `from_value` consumes it, exactly like the fallback
+        // above.
+        if summary.agent_id.is_none() {
+            if let Some(agent_id) = value.get("agentId").and_then(Value::as_str) {
+                summary.agent_id = Some(agent_id.to_string());
+            }
+        }
+        if first_session_id.is_none() {
+            first_session_id = parsed_session_id_hint(&value).or(session_id_fallback.clone());
+        }
         let Ok(mut parsed) = serde_json::from_value::<TranscriptLine>(value) else {
             summary.read_stats.skipped_lines.push(SkippedLine {
                 line_number,
@@ -124,17 +149,37 @@ pub fn read_transcript_file(path: &Path) -> Result<TranscriptSummary> {
         if parsed.session_id.is_none() {
             parsed.session_id = session_id_fallback;
         }
-        accumulate_transcript_line(&mut summary, parsed, &mut harness_session_ids);
+        accumulate_transcript_line(
+            &mut summary,
+            parsed,
+            &mut harness_session_ids,
+            &mut pending_dispatches,
+        );
     }
 
+    summary.is_subagent = summary.agent_id.is_some();
+    if summary.is_subagent {
+        summary.parent_session_id = first_session_id;
+    }
     summary.harness_session_ids = harness_session_ids.into_iter().collect();
     Ok(summary)
+}
+
+/// A line's snake_case `session_id` duplicate (this repo's own tooling
+/// stamps it onto main-session lines) -- the other half of the
+/// first-session-id capture besides the harness's camelCase `sessionId`.
+fn parsed_session_id_hint(value: &Value) -> Option<String> {
+    value
+        .get("session_id")
+        .and_then(Value::as_str)
+        .map(str::to_string)
 }
 
 fn accumulate_transcript_line(
     summary: &mut TranscriptSummary,
     line: TranscriptLine,
     harness_session_ids: &mut BTreeSet<String>,
+    pending_dispatches: &mut BTreeMap<String, usize>,
 ) {
     if line.is_compact_summary {
         summary.compaction_markers.push(CompactionMarker {
@@ -145,6 +190,13 @@ fn accumulate_transcript_line(
     let Some(message) = line.message else {
         return;
     };
+    track_agent_dispatch(
+        summary,
+        &message.content,
+        &line.session_id,
+        &line.timestamp,
+        pending_dispatches,
+    );
     let blocks = parse_content_blocks(&message.content, harness_session_ids);
     for block in &blocks {
         summary.chars_by_block_type.add(block);
@@ -177,6 +229,81 @@ fn accumulate_transcript_line(
         cache_creation_input_tokens: usage.cache_creation_input_tokens,
         bytes_by_block_type: turn_bytes,
     });
+}
+
+/// Extracts `Agent` dispatches from one line's content blocks: an
+/// `Agent`-named `tool_use` opens a pending dispatch (its structural input
+/// fields only -- never `prompt`), and a `tool_result` whose id matches
+/// closes it with the `agentId` its text reports. The result arrives on a
+/// later line than the call, which is why the pending map lives across
+/// lines in the caller.
+fn track_agent_dispatch(
+    summary: &mut TranscriptSummary,
+    content: &Value,
+    line_session_id: &Option<String>,
+    line_timestamp: &Option<String>,
+    pending_dispatches: &mut BTreeMap<String, usize>,
+) {
+    let Some(items) = content.as_array() else {
+        return;
+    };
+    for item in items {
+        match item.get("type").and_then(Value::as_str) {
+            Some("tool_use") if item.get("name").and_then(Value::as_str) == Some("Agent") => {
+                let Some(id) = item.get("id").and_then(Value::as_str) else {
+                    continue;
+                };
+                let input = item.get("input");
+                let field = |key: &str| -> Option<String> {
+                    input
+                        .and_then(|value| value.get(key))
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                };
+                let index = summary.agent_dispatches.len();
+                summary.agent_dispatches.push(AgentDispatch {
+                    session_id: line_session_id.clone(),
+                    timestamp: line_timestamp.clone(),
+                    tool_use_id: id.to_string(),
+                    subagent_type: field("subagent_type"),
+                    description: field("description"),
+                    model_requested: field("model"),
+                    agent_id: None,
+                });
+                pending_dispatches.insert(id.to_string(), index);
+            }
+            Some("tool_result") => {
+                let Some(id) = item.get("tool_use_id").and_then(Value::as_str) else {
+                    continue;
+                };
+                let Some(&index) = pending_dispatches.get(id) else {
+                    continue;
+                };
+                let text = tool_result_texts(item.get("content").unwrap_or(&Value::Null)).join("");
+                if let Some(agent_id) = find_agent_id(&text) {
+                    summary.agent_dispatches[index].agent_id = Some(agent_id);
+                    pending_dispatches.remove(id);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// A `tool_result`'s text pieces (plain string, or the text sub-blocks of
+/// an array), for the one scan that legitimately reads result text: the
+/// `agentId` line the Agent tool itself writes. Bytes never leave this fn
+/// except as the matched id.
+fn tool_result_texts(content: &Value) -> Vec<&str> {
+    match content {
+        Value::String(text) => vec![text.as_str()],
+        Value::Array(items) => items
+            .iter()
+            .filter(|item| item.get("type").and_then(Value::as_str) == Some("text"))
+            .filter_map(|item| item.get("text").and_then(Value::as_str))
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// `message.content` is either a plain string (short user turns) or an

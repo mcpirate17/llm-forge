@@ -45,6 +45,24 @@ pub fn find_session_ids(text: &str, ids: &mut BTreeSet<String>) {
     }
 }
 
+fn agent_id_pattern() -> &'static Regex {
+    static PATTERN: OnceLock<Regex> = OnceLock::new();
+    PATTERN
+        .get_or_init(|| Regex::new(r"agentId:\s*([0-9a-fA-F]{17})").expect("valid agent id regex"))
+}
+
+/// The `agentId: <17 hex>` an `Agent` tool's `tool_result` reports -- the
+/// measured join between a dispatch in a parent transcript and the
+/// subagent transcript it produced (every subagent line carries the same
+/// id as its `agentId` field). First match only: the result names one
+/// subagent, and `None` means the text named none.
+pub fn find_agent_id(text: &str) -> Option<String> {
+    agent_id_pattern()
+        .captures(text)
+        .and_then(|caps| caps.get(1))
+        .map(|m| m.as_str().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,5 +104,19 @@ mod tests {
             ids.into_iter().collect::<Vec<_>>(),
             vec!["session_01PoLjRxqVQGqy41fMDG26vX".to_string()]
         );
+    }
+
+    #[test]
+    fn an_agent_tool_result_yields_its_agent_id() {
+        assert_eq!(
+            find_agent_id("agentId: 7fa9c1b0123456789 (running)\n"),
+            Some("7fa9c1b0123456789".to_string())
+        );
+    }
+
+    #[test]
+    fn a_shorter_hex_string_or_plain_text_yields_no_agent_id() {
+        assert_eq!(find_agent_id("agentId: abc123"), None);
+        assert_eq!(find_agent_id("no id here at all"), None);
     }
 }

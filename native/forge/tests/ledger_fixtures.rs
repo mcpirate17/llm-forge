@@ -98,6 +98,35 @@ fn tool_result_string_and_mixed_array_content_are_measured_correctly() {
     );
 }
 
+/// A subagent transcript (`agent-*.jsonl`, PR #45): every line carries the
+/// same 17-hex `agentId` alongside its PARENT's uuid as `sessionId`. The
+/// reader settles the file's identity from the first `agentId` seen and
+/// reports the parent's uuid in `parent_session_id` -- while each turn's own
+/// `session_id` field stays the raw per-line value (the `agent-<id>` keying
+/// rule is rollup's, not the reader's; a reader that rewrote it would make
+/// `forge ledger read` lie about what the file actually says).
+#[test]
+fn subagent_transcript_reports_identity_fields() {
+    let summary =
+        ledger::reader::read_transcript_file(Path::new(&fixture("transcript_subagent.jsonl")))
+            .expect("subagent fixture parses");
+    assert_eq!(summary.agent_id.as_deref(), Some("7fa9c1b0123456789"));
+    assert_eq!(
+        summary.parent_session_id.as_deref(),
+        Some("5a1f0c33-90d1-4a2f-b1e1-7c2d3e4f5a6b")
+    );
+    assert!(summary.is_subagent);
+    // Raw per-line session ids, un-rewritten: the parent's uuid.
+    assert_eq!(
+        summary.turns[0].session_id.as_deref(),
+        Some("5a1f0c33-90d1-4a2f-b1e1-7c2d3e4f5a6b")
+    );
+    assert_matches_frozen(
+        serde_json::to_string(&summary).unwrap(),
+        "expected_transcript_subagent.json",
+    );
+}
+
 #[test]
 fn telemetry_file_matches_frozen_summary() {
     let summary =

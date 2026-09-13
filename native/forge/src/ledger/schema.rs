@@ -203,6 +203,29 @@ pub struct TranscriptSummary {
     pub chars_by_block_type: BlockTypeCounts,
     pub read_stats: ReadStats,
     pub turns: Vec<TurnSummary>,
+    /// The `agentId` of a subagent transcript (`agent-*.jsonl`), from the
+    /// first line that carries one; `None` for a top-level session file.
+    /// Every new identity field below is `skip_serializing_if`-guarded so a
+    /// top-level file serializes byte-identically to before subagents were
+    /// modelled -- the reader's frozen fixture parity is part of step 1's
+    /// contract, and a summary that grew keys would move every one of them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
+    /// The subagent file's own `sessionId` -- which is its PARENT session's
+    /// uuid, the whole reason `session_rollup` needed an explicit identity
+    /// rule. `None` unless `agent_id` is set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_session_id: Option<String>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_subagent: bool,
+    /// One row per `Agent` tool_use block in this file, closed by the
+    /// `agentId: <17 hex>` line of its matching `tool_result` (the join
+    /// between a dispatch and its subagent transcript; `agent_id` stays
+    /// `None` when no result or no id ever arrived). Never the `prompt` --
+    /// description and structural fields only, per the shapes-not-content
+    /// rule's one sanctioned exception.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub agent_dispatches: Vec<AgentDispatch>,
     /// One entry per `isCompactSummary` line seen (additive since PR #35;
     /// empty for a file with no compaction). Step 2's `rollup.rs` primary
     /// compaction-count signal.
@@ -224,6 +247,33 @@ pub struct TranscriptSummary {
 pub struct CompactionMarker {
     pub session_id: Option<String>,
     pub timestamp: Option<String>,
+}
+
+/// One `Agent` tool_use observed in a top-level transcript, plus the
+/// `agentId` its `tool_result` reported. The `task_dispatch` table's raw
+/// material: `rollup.rs` joins `agent_id` to the subagent file read in the
+/// same invocation and adds the transcript-side fields (turns, tokens,
+/// tier). `description` is the only text that travels; `prompt` and every
+/// other block byte stay behind the reader boundary.
+#[derive(Debug, Clone, Serialize)]
+pub struct AgentDispatch {
+    /// The dispatching line's own session id (the parent session).
+    pub session_id: Option<String>,
+    pub timestamp: Option<String>,
+    pub tool_use_id: String,
+    pub subagent_type: Option<String>,
+    pub description: Option<String>,
+    pub model_requested: Option<String>,
+    /// From the matching `tool_result` text (`agentId: <17 hex>`), `None`
+    /// when the result never arrived or named no id.
+    pub agent_id: Option<String>,
+}
+
+/// Serde `skip_serializing_if` helper: a `false` bool serializes nothing,
+/// so `is_subagent` on a top-level summary adds no key (frozen-fixture
+/// parity, see `TranscriptSummary::agent_id`'s doc comment).
+pub fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// One row of `hook_rollup`-shaped telemetry (design section 2): per hook

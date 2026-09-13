@@ -46,8 +46,8 @@ const DEFAULT_LEDGER_ROOT: &str = "/mnt/data/llm/ledger/";
 #[derive(Args)]
 pub struct RollupArgs {
     /// Transcript/telemetry file(s), or a directory of `*.jsonl` files
-    /// (walked non-recursively; `agent-*.jsonl` subagent transcripts count
-    /// as their own sessions, no special-cased handling).
+    /// (walked non-recursively, plus each child directory's
+    /// `subagents/agent-*.jsonl` -- see `--no-subagents`).
     pub paths: Vec<PathBuf>,
 
     /// Ledger root directory; defaults to `LEDGER_ROOT`, else
@@ -81,11 +81,23 @@ pub struct RollupArgs {
 
     /// `--since`/`--last` passed straight through to `forge ledger landed`
     /// when `--repo` is given (both optional; omit both to scan every
-    /// first-parent commit on `main`).
+    /// first-parent commit on the integration branch).
     #[arg(long)]
     pub since: Option<String>,
     #[arg(long)]
     pub last: Option<u64>,
+
+    /// Do not read `<dir>/<session>/subagents/agent-*.jsonl` under directory
+    /// arguments -- restores the pre-subagent walk exactly.
+    #[arg(long)]
+    pub no_subagents: bool,
+
+    /// Integration branch `forge ledger landed` scans when `--repo` is
+    /// given. Default: whatever `refs/remotes/origin/HEAD` points at (the
+    /// LLM monorepo integrates on `master`, not `main`), falling back to
+    /// `main` when a repo has no origin/HEAD at all.
+    #[arg(long)]
+    pub branch: Option<String>,
 }
 
 /// One `turn_attribution` row: `TurnSummary`'s own fields (same order) plus
@@ -131,6 +143,20 @@ pub struct EstimatedTokensByBlockType {
 pub struct SessionRollupRow {
     pub session_id: String,
     pub project: String,
+    /// The identity rule for subagent transcripts: every line of an
+    /// `agent-*.jsonl` file carries its PARENT's uuid as `sessionId`, so
+    /// keying a subagent by that value collapses every subagent of one
+    /// parent into a single row. A subagent file therefore keys itself
+    /// `agent-<agentId>` -- unique per file -- and carries its parent's
+    /// uuid in `parent_session_id` instead. All three fields are
+    /// skip-serialized so a top-level session's row is byte-identical to
+    /// before subagents were modelled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_session_id: Option<String>,
+    #[serde(skip_serializing_if = "super::schema::is_false")]
+    pub is_subagent: bool,
     pub first_ts: Option<String>,
     pub last_ts: Option<String>,
     pub n_turns: u64,
@@ -170,10 +196,40 @@ pub struct HookRollupRow {
     pub total_output_bytes: u64,
 }
 
+/// One `task_dispatch` row (design section 5's routing evidence): a single
+/// `Agent` tool_use in a top-level transcript, joined to the subagent
+/// transcript it produced. The dispatch-side fields come from the parent;
+/// the transcript-side fields (from `model_used` on) are `None` when the
+/// dispatch never reported an `agentId` or that subagent's file was not
+/// part of this rollup -- an honest null, never a zero that reads like a
+/// measured empty session. `description` is the only text stored; `prompt`
+/// and block content never cross the reader boundary.
+#[derive(Debug, Clone, Serialize)]
+pub struct TaskDispatchRow {
+    pub parent_session_id: Option<String>,
+    pub dispatch_ts: Option<String>,
+    pub tool_use_id: String,
+    pub agent_id: Option<String>,
+    pub subagent_type: Option<String>,
+    pub description: Option<String>,
+    pub model_requested: Option<String>,
+    pub model_used: Option<Vec<String>>,
+    /// `agent_rollup`'s tier table applied to `model_used`; `None` when
+    /// unjoined (there is nothing to infer a tier from).
+    pub tier: Option<String>,
+    pub n_turns: Option<u64>,
+    pub billed_tokens: Option<u64>,
+    pub total_cache_read: Option<u64>,
+    pub over_cap: Option<bool>,
+    pub first_ts: Option<String>,
+    pub last_ts: Option<String>,
+}
+
 struct RollupOutput {
     turn_attribution: Vec<(String, TurnAttributionRow)>, // (day, row)
     session_rollup: Vec<(String, SessionRollupRow)>,
     hook_rollup: Vec<(String, HookRollupRow)>,
+    task_dispatch: Vec<(String, TaskDispatchRow)>,
     /// `(day, row)` too, for the same idempotent-write-by-day machinery as
     /// the other three tables, even though every row in one invocation
     /// shares today's date (an aggregate has no single "day it happened").
@@ -184,7 +240,7 @@ pub fn run(args: RollupArgs) -> Result<i32> {
     if args.paths.is_empty() {
         bail!("forge ledger rollup: pass at least one transcript/telemetry file or directory");
     }
-    let files = resolve_inputs(&args.paths)?;
+    let files = resolve_inputs(&args.paths, !args.no_subagents)?;
     if files.is_empty() {
         bail!("forge ledger rollup: no *.jsonl files found under the given path(s)");
     }
@@ -197,9 +253,11 @@ pub fn run(args: RollupArgs) -> Result<i32> {
         turn_attribution: Vec::new(),
         session_rollup: Vec::new(),
         hook_rollup: Vec::new(),
+        task_dispatch: Vec::new(),
         agent_rollup: Vec::new(),
     };
     let today = today_utc_date();
+    let mut summaries: Vec<super::schema::TranscriptSummary> = Vec::new();
 
     for path in &files {
         match reader::detect_kind(path)? {
@@ -208,6 +266,7 @@ pub fn run(args: RollupArgs) -> Result<i32> {
                     .with_context(|| format!("reading transcript {}", path.display()))?;
                 let project = project_of(path);
                 process_transcript(&summary, &project, &mut output)?;
+                summaries.push(summary);
             }
             InputKind::Telemetry => {
                 let summary = reader::read_telemetry_file(path)
@@ -219,10 +278,17 @@ pub fn run(args: RollupArgs) -> Result<i32> {
         }
     }
 
+    build_task_dispatch(&summaries, args.cap, &mut output)?;
+
     if let Some(repo) = &args.repo {
         let project = args.project.as_deref().expect("checked above");
-        let commits = super::landed::scan(repo, args.since.as_deref(), args.last)
-            .with_context(|| format!("scanning landed commits in {}", repo.display()))?;
+        let commits = super::landed::scan(
+            repo,
+            args.since.as_deref(),
+            args.last,
+            args.branch.as_deref(),
+        )
+        .with_context(|| format!("scanning landed commits in {}", repo.display()))?;
         let sessions: Vec<SessionRollupRow> = output
             .session_rollup
             .iter()
@@ -269,21 +335,54 @@ pub fn run(args: RollupArgs) -> Result<i32> {
 
 /// Non-recursive: a directory argument contributes its immediate `*.jsonl`
 /// children only (design step 2, item 3) -- a subagent transcript
-/// (`agent-*.jsonl`) sits beside its parent's file and is walked the same
-/// way, no special case.
-fn resolve_inputs(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
+/// (`agent-*.jsonl`) sat beside its parent's file and was walked the same
+/// way before subagents were separated out. They live one level deeper now
+/// (`<dir>/<session-uuid>/subagents/agent-*.jsonl`, 521 of them under the
+/// LLM project on 2026-09-13), so with `include_subagents` the walk also
+/// reads each child directory's `subagents/agent-*.jsonl`. `--no-subagents`
+/// restores the flat walk exactly.
+fn resolve_inputs(paths: &[PathBuf], include_subagents: bool) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for path in paths {
         let meta = fs::metadata(path).with_context(|| format!("stat {}", path.display()))?;
         if meta.is_dir() {
-            let mut entries: Vec<PathBuf> = fs::read_dir(path)
+            let entries: Vec<PathBuf> = fs::read_dir(path)
                 .with_context(|| format!("reading directory {}", path.display()))?
                 .filter_map(|entry| entry.ok())
                 .map(|entry| entry.path())
-                .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
                 .collect();
-            entries.sort();
-            files.extend(entries);
+            let mut transcripts: Vec<PathBuf> = entries
+                .iter()
+                .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
+                .cloned()
+                .collect();
+            transcripts.sort();
+            files.extend(transcripts);
+            if include_subagents {
+                let mut subagents: Vec<PathBuf> = entries
+                    .iter()
+                    .filter(|p| p.is_dir())
+                    .flat_map(|child| {
+                        let dir = child.join("subagents");
+                        let mut found: Vec<PathBuf> = match fs::read_dir(&dir) {
+                            Ok(read) => read
+                                .filter_map(|entry| entry.ok())
+                                .map(|entry| entry.path())
+                                .filter(|p| {
+                                    p.extension().and_then(|e| e.to_str()) == Some("jsonl")
+                                        && p.file_name()
+                                            .and_then(|n| n.to_str())
+                                            .is_some_and(|n| n.starts_with("agent-"))
+                                })
+                                .collect(),
+                            Err(_) => Vec::new(),
+                        };
+                        found.sort();
+                        found
+                    })
+                    .collect();
+                files.append(&mut subagents);
+            }
         } else {
             files.push(path.clone());
         }
@@ -291,7 +390,31 @@ fn resolve_inputs(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
+/// The transcript directory's own basename is the project name -- except a
+/// subagent file, whose parent directory is `subagents/`. Its project is
+/// the directory that actually holds the sessions (`<project>/<uuid>/
+/// subagents/agent-x.jsonl` -> `<project>`), or every subagent row would
+/// land in a project named `subagents` and never join a commit.
 fn project_of(path: &Path) -> String {
+    if path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        == Some("subagents")
+    {
+        // Canonical layout: <project>/<session-uuid>/subagents/agent-x.jsonl
+        // -- three parent() hops from the file reach the project directory.
+        if let Some(project) = path
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+        {
+            return project
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+        }
+    }
     path.parent()
         .and_then(|p| p.file_name())
         .map(|s| s.to_string_lossy().to_string())
@@ -303,22 +426,36 @@ fn process_transcript(
     project: &str,
     output: &mut RollupOutput,
 ) -> Result<()> {
+    // A subagent's turns all carry the PARENT's uuid as their session_id;
+    // keying by it would collapse every subagent of one parent into one
+    // row, so the whole file keys itself `agent-<agentId>` instead (the
+    // identity rule on `SessionRollupRow`).
+    let session_override = summary.agent_id.as_ref().map(|id| format!("agent-{id}"));
+    let key_of = |id: &Option<String>| -> String {
+        session_override
+            .clone()
+            .or_else(|| id.clone())
+            .unwrap_or_default()
+    };
     let mut turns_by_session: BTreeMap<String, Vec<&TurnSummary>> = BTreeMap::new();
     for turn in &summary.turns {
-        let Some(session_id) = turn.session_id.clone() else {
+        if turn.session_id.is_none() && session_override.is_none() {
             bail!(
                 "{}: turn {} has no session_id -- cannot attribute or roll it up",
                 summary.path,
                 turn.turn_uuid
             );
-        };
-        turns_by_session.entry(session_id).or_default().push(turn);
+        }
+        turns_by_session
+            .entry(key_of(&turn.session_id))
+            .or_default()
+            .push(turn);
     }
     let mut markers_by_session: BTreeMap<String, Vec<&CompactionMarker>> = BTreeMap::new();
     for marker in &summary.compaction_markers {
-        if let Some(session_id) = &marker.session_id {
+        if marker.session_id.is_some() || session_override.is_some() {
             markers_by_session
-                .entry(session_id.clone())
+                .entry(key_of(&marker.session_id))
                 .or_default()
                 .push(marker);
         }
@@ -338,7 +475,10 @@ fn process_transcript(
             .unwrap_or_default();
 
         for turn in &turns {
-            let row = turn_attribution_row(turn);
+            let mut row = turn_attribution_row(turn);
+            if let Some(key) = &session_override {
+                row.session_id = Some(key.clone());
+            }
             let day = day_of_timestamp(turn.timestamp.as_deref()).with_context(|| {
                 format!(
                     "{}: turn {} has no usable timestamp to bucket into a day file",
@@ -354,13 +494,7 @@ fn process_transcript(
             // gets no `session_rollup` row -- there is nothing to total.
             continue;
         }
-        let row = session_rollup_row(
-            &session_id,
-            project,
-            &turns,
-            &markers,
-            &summary.harness_session_ids,
-        );
+        let row = session_rollup_row(summary, &session_id, project, &turns, &markers);
         let day = day_of_timestamp(row.first_ts.as_deref()).with_context(|| {
             format!(
                 "{}: session {session_id} has no usable timestamp for its session_rollup day",
@@ -490,11 +624,11 @@ fn block_total(b: &BlockTypeCounts) -> u64 {
 }
 
 fn session_rollup_row(
+    summary: &super::schema::TranscriptSummary,
     session_id: &str,
     project: &str,
     turns: &[&TurnSummary],
     markers: &[&CompactionMarker],
-    harness_session_ids: &[String],
 ) -> SessionRollupRow {
     let mut first_ts: Option<String> = None;
     let mut last_ts: Option<String> = None;
@@ -536,6 +670,9 @@ fn session_rollup_row(
     SessionRollupRow {
         session_id: session_id.to_string(),
         project: project.to_string(),
+        agent_id: summary.agent_id.clone(),
+        parent_session_id: summary.parent_session_id.clone(),
+        is_subagent: summary.is_subagent,
         first_ts,
         last_ts,
         n_turns: turns.len() as u64,
@@ -546,7 +683,7 @@ fn session_rollup_row(
         total_cache_creation,
         resend_bytes,
         resend_events,
-        harness_session_ids: harness_session_ids.to_vec(),
+        harness_session_ids: summary.harness_session_ids.to_vec(),
         models,
     }
 }
@@ -560,6 +697,111 @@ fn hook_row(hook: &HookStats) -> HookRollupRow {
         p90_ms: hook.p90_ms,
         total_output_bytes: hook.total_output_bytes,
     }
+}
+
+/// Design section 5's routing evidence: one `task_dispatch` row per `Agent`
+/// tool_use in a *top-level* transcript (a subagent can itself dispatch, but
+/// those nested rows would need their own parent linkage -- out of scope
+/// until a consumer asks for it), joined to the subagent transcript read in
+/// this same invocation by the `agentId` the dispatch's `tool_result`
+/// reported. Unjoined dispatches (no result, no id in it, or the subagent
+/// file outside this rollup's paths) keep their dispatch fields and null
+/// every transcript-side field. A dispatch with no timestamp has no day to
+/// file under, so it fails loud naming the tool_use_id rather than guessing.
+fn build_task_dispatch(
+    summaries: &[super::schema::TranscriptSummary],
+    cap: u64,
+    output: &mut RollupOutput,
+) -> Result<()> {
+    let by_agent_id: BTreeMap<&str, &super::schema::TranscriptSummary> = summaries
+        .iter()
+        .filter_map(|summary| summary.agent_id.as_deref().map(|id| (id, summary)))
+        .collect();
+    for summary in summaries.iter().filter(|s| !s.is_subagent) {
+        for dispatch in &summary.agent_dispatches {
+            let joined = dispatch
+                .agent_id
+                .as_deref()
+                .and_then(|id| by_agent_id.get(id).copied());
+            let row = task_dispatch_row(dispatch, joined, cap);
+            let day = day_of_timestamp(dispatch.timestamp.as_deref()).with_context(|| {
+                format!(
+                    "Agent dispatch {} has no usable timestamp to bucket into a task_dispatch day file",
+                    dispatch.tool_use_id
+                )
+            })?;
+            output.task_dispatch.push((day, row));
+        }
+    }
+    Ok(())
+}
+
+/// One dispatch's row: dispatch-side fields verbatim, transcript-side fields
+/// from the joined subagent summary (or `None` when unjoined). Billed tokens
+/// use `agent_rollup`'s own definition (`agent.rs::billed_noncache`:
+/// input + output + cache_creation, cache reads excluded) so a dispatch's
+/// `over_cap` and its session's `cap_breaches` can never disagree.
+fn task_dispatch_row(
+    dispatch: &super::schema::AgentDispatch,
+    joined: Option<&super::schema::TranscriptSummary>,
+    cap: u64,
+) -> TaskDispatchRow {
+    let mut row = TaskDispatchRow {
+        parent_session_id: dispatch.session_id.clone(),
+        dispatch_ts: dispatch.timestamp.clone(),
+        tool_use_id: dispatch.tool_use_id.clone(),
+        agent_id: dispatch.agent_id.clone(),
+        subagent_type: dispatch.subagent_type.clone(),
+        description: dispatch.description.clone(),
+        model_requested: dispatch.model_requested.clone(),
+        model_used: None,
+        tier: None,
+        n_turns: None,
+        billed_tokens: None,
+        total_cache_read: None,
+        over_cap: None,
+        first_ts: None,
+        last_ts: None,
+    };
+    let Some(sub) = joined else {
+        return row;
+    };
+    let models: BTreeSet<&str> = sub
+        .turns
+        .iter()
+        .filter_map(|turn| turn.model.as_deref())
+        .collect();
+    row.model_used = Some(models.iter().map(|m| (*m).to_string()).collect());
+    row.tier = Some(super::agent::infer_tier(&models));
+    row.n_turns = Some(sub.turns_with_usage);
+    let billed =
+        sub.total_input_tokens + sub.total_output_tokens + sub.total_cache_creation_input_tokens;
+    row.billed_tokens = Some(billed);
+    row.total_cache_read = Some(sub.total_cache_read_input_tokens);
+    row.over_cap = Some(billed > cap);
+    let (first, last) = ts_range(sub);
+    row.first_ts = first;
+    row.last_ts = last;
+    row
+}
+
+/// Min/max timestamp over a summary's turns (a subagent file is one session,
+/// so file-wide IS session-wide for the summaries joined into
+/// `task_dispatch`), `(None, None)` when no turn carried a timestamp.
+fn ts_range(summary: &super::schema::TranscriptSummary) -> (Option<String>, Option<String>) {
+    let mut first: Option<&str> = None;
+    let mut last: Option<&str> = None;
+    for turn in &summary.turns {
+        if let Some(ts) = turn.timestamp.as_deref() {
+            if first.is_none_or(|f| ts < f) {
+                first = Some(ts);
+            }
+            if last.is_none_or(|l| ts > l) {
+                last = Some(ts);
+            }
+        }
+    }
+    (first.map(str::to_string), last.map(str::to_string))
 }
 
 /// First 10 characters of an RFC3339 timestamp (`YYYY-MM-DD`). Fails loud
@@ -621,6 +863,9 @@ fn print_dry_run(output: &RollupOutput) -> Result<()> {
     for (_, row) in &output.hook_rollup {
         println!("{}", serde_json::to_string(row)?);
     }
+    for (_, row) in &output.task_dispatch {
+        println!("{}", serde_json::to_string(row)?);
+    }
     for (_, row) in &output.agent_rollup {
         println!("{}", serde_json::to_string(row)?);
     }
@@ -641,6 +886,12 @@ fn write_all(ledger_root: &Path, output: &RollupOutput) -> Result<()> {
         &output.session_rollup,
     )?;
     write_table(ledger_root, "hook_rollup", "hook_name", &output.hook_rollup)?;
+    write_table(
+        ledger_root,
+        "task_dispatch",
+        "tool_use_id",
+        &output.task_dispatch,
+    )?;
     write_table(
         ledger_root,
         "agent_rollup",

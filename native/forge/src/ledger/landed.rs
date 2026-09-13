@@ -1,10 +1,13 @@
 //! `forge ledger landed`: design step 4 (`docs/design/cost_ledger.md`
-//! section 6 step 4). Scans `git log --first-parent main` on a repo and
+//! section 6 step 4). Scans `git log --first-parent <branch>` on a repo and
 //! emits one JSONL row per landed commit, carrying its `Agent:` trailer
 //! names and harness session ids for `agent_rollup`'s join -- shells out to
 //! `git`, no libgit2, matching this crate's other native tools
 //! (`bash_guard`, `crg_refresh`) that already shell out to `git` the same
-//! way rather than link a git library.
+//! way rather than link a git library. The branch defaults to whatever
+//! `refs/remotes/origin/HEAD` points at, else `main` (the LLM monorepo
+//! integrates on `master`, which is why the default is resolved, not
+//! hardcoded).
 //!
 //! Join keys measured against this repo's real history (design step 4
 //! brief, 2026-09-13): every squash commit on `main` carries one or more
@@ -45,10 +48,18 @@ pub struct LandedArgs {
     #[arg(long)]
     pub since: Option<String>,
 
-    /// Only the most recent N commits on `--first-parent main`. Mutually
-    /// exclusive with `--since`.
+    /// Only the most recent N commits on the first-parent history of the
+    /// integration branch. Mutually exclusive with `--since`.
     #[arg(long)]
     pub last: Option<u64>,
+
+    /// Integration branch to scan (`git log --first-parent <branch>`).
+    /// Default: the ref `refs/remotes/origin/HEAD` points at, falling back
+    /// to `main` when a repo has no origin/HEAD at all (the LLM monorepo
+    /// integrates on `master`, and hardcoding `main` there fails with
+    /// "ambiguous argument 'main'").
+    #[arg(long)]
+    pub branch: Option<String>,
 }
 
 /// One landed commit on `main`'s first-parent history (design section 2,
@@ -75,22 +86,57 @@ pub fn run(args: LandedArgs) -> Result<i32> {
     if args.since.is_some() && args.last.is_some() {
         bail!("forge ledger landed: --since and --last are mutually exclusive");
     }
-    let rows = scan(&args.repo, args.since.as_deref(), args.last)?;
+    let rows = scan(
+        &args.repo,
+        args.since.as_deref(),
+        args.last,
+        args.branch.as_deref(),
+    )?;
     for row in &rows {
         println!("{}", serde_json::to_string(row)?);
     }
     Ok(0)
 }
 
-/// Scans `repo`'s `git log --first-parent main` into one `LandedCommitRow`
-/// per commit, newest first (git log's own default order).
-pub fn scan(repo: &Path, since: Option<&str>, last: Option<u64>) -> Result<Vec<LandedCommitRow>> {
+/// The ref `refs/remotes/origin/HEAD` points at (e.g.
+/// `refs/remotes/origin/master`), or `main` when the repo has no origin/HEAD
+/// (git prints that ref only when a remote has been fetched or configured;
+/// a fresh `git init` has none). Never an error: a repo whose integration
+/// branch really is `main` and has no origin/HEAD gets `main`, which is
+/// what it would have resolved to anyway.
+fn default_branch(repo: &Path) -> String {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
+        .output();
+    match output {
+        Ok(output)
+            if output.status.success()
+                && !String::from_utf8_lossy(&output.stdout).trim().is_empty() =>
+        {
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        }
+        _ => "main".to_string(),
+    }
+}
+
+/// Scans `repo`'s `git log --first-parent <branch>` into one
+/// `LandedCommitRow` per commit, newest first (git log's own default order).
+/// `branch: None` means the default resolution (`default_branch`).
+pub fn scan(
+    repo: &Path,
+    since: Option<&str>,
+    last: Option<u64>,
+    branch: Option<&str>,
+) -> Result<Vec<LandedCommitRow>> {
+    let rev = branch.unwrap_or(&default_branch(repo)).to_string();
     let format = format!("{RECORD_SEP}%H{FIELD_SEP}%cd{FIELD_SEP}%s{FIELD_SEP}%b{STAT_SEP}");
     let mut cmd = Command::new("git");
     cmd.env("TZ", "UTC")
         .arg("-C")
         .arg(repo)
-        .args(["log", "--first-parent", "main", "--shortstat"])
+        .args(["log", "--first-parent", &rev, "--shortstat"])
         .arg("--date=format-local:%Y-%m-%dT%H:%M:%SZ")
         .arg(format!("--format={format}"));
     if let Some(since) = since {

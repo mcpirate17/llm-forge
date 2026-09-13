@@ -253,4 +253,13 @@ def test_has_positional_path_treats_flags_and_separators_correctly() -> None:
     # `rollup --dry-run` names no path, so the project defaults still apply.
     assert not cost_ledger._has_positional_path(["--dry-run"])
     assert not cost_ledger._has_positional_path(["--out", "/x", "--dry-run"])
+    # `--branch` takes a value (PR #45): its argument must not be mistaken
+    # for a positional path, or the shim would skip the project defaults on
+    # e.g. `rollup --branch master`.
+    assert not cost_ledger._has_positional_path(["--branch", "master"])
+    assert not cost_ledger._has_positional_path(["--branch=master"])
+    assert not cost_ledger._has_positional_path(
+        ["--branch", "master", "--out", "/x", "--dry-run"]
+    )
+    assert cost_ledger._has_positional_path(["--branch", "master", "/a.jsonl"])
     assert not cost_ledger._has_positional_path([])

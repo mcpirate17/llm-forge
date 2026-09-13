@@ -1,21 +1,26 @@
 {
-  "recorded_utc": "2026-09-13T09:32:45Z",
+  "recorded_utc": "2026-09-13T13:44:36Z",
   "window": {
     "from": "2026-09-07",
     "to": "2026-09-13",
     "days": 7
   },
   "metrics": {
+    "median_hook_ms": {
+      "value": 6.334064000000001,
+      "n": 288,
+      "tolerance_pct": 5.0
+    },
     "resend_bytes_per_session": {
-      "value": 8815583.0,
-      "n": 20,
+      "value": 937440.1191489361,
+      "n": 235,
       "tolerance_pct": 5.0
     },
     "tokens_per_landed_pr": {
-      "value": 7850228.694444444,
-      "n": 72,
+      "value": 10246491.488636363,
+      "n": 88,
       "tolerance_pct": 5.0
     }
   },
-  "ledger_root_sha": "aa9264b6d2b2dc6bf35de3edc9137e297aa3e931cb3d94551df3049f3a619357"
+  "ledger_root_sha": "2c7b242fdaa2e1b90db405482ab22f91fccb794783b5acfd69467465bfa5f2ba"
 }

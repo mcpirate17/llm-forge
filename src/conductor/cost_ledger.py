@@ -283,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 ROLLUP_VALUE_FLAGS = frozenset(
-    {"--out", "--repo", "--project", "--cap", "--since", "--last"}
+    {"--out", "--repo", "--project", "--cap", "--since", "--last", "--branch"}
 )
 
 
