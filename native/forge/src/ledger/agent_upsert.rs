@@ -319,9 +319,10 @@ mod tests {
     #[test]
     fn the_row_carries_decision_mode_and_applied() {
         // `resolve_mode` reads `FORGE_MODE` fresh, same as `route::
-        // resolve_mode`; serialize against the same convention used
-        // elsewhere in this crate (e.g. `cap_enforce::tests::ENV_LOCK`).
-        static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        // resolve_mode`; serialize on the ONE shared `FORGE_MODE` lock
+        // (`super::super` so it also resolves when `ledger/` is
+        // `#[path]`-included into the integration tests).
+        use super::super::FORGE_MODE_LOCK as ENV_LOCK;
         let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
 
         let scratch = ScratchDir::new("modeapplied");

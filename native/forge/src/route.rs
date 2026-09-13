@@ -536,10 +536,10 @@ mod tests {
     use super::*;
 
     /// `FORGE_MODE` is a per-process env var read fresh by `resolve_mode`
-    /// on every call; any test that sets it must serialize against every
-    /// other test in this module touching it, or a parallel `cargo test`
-    /// run races (codebase convention -- see `handlers::tests::ENV_LOCK`).
-    pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// on every call; any test that sets it serializes on the ONE crate-wide
+    /// lock shared with `cap_enforce::tests` and `ledger::agent_upsert::tests`
+    /// (see `ledger::FORGE_MODE_LOCK` for why it lives there).
+    use crate::ledger::FORGE_MODE_LOCK as ENV_LOCK;
 
     fn policy() -> Policy {
         Policy::embedded().expect("embedded policy parses")

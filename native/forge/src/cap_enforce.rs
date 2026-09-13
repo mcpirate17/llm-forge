@@ -375,8 +375,11 @@ mod tests {
     /// its duration so a concurrently-running test can never observe a
     /// spurious `NoOp` (from `FORGE_CAP_DISABLE`) or a spurious warn-mode
     /// verdict (from `FORGE_MODE`) it did not itself set. Same convention as
-    /// `handlers::tests::ENV_LOCK` and friends.
-    pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// `handlers::tests::ENV_LOCK` and friends. `FORGE_MODE` is also set by
+    /// `route::tests` and `ledger::agent_upsert::tests`, so all three share
+    /// ONE lock -- a per-module lock left a cross-module race that failed
+    /// about one full `cargo test` run in three.
+    use crate::ledger::FORGE_MODE_LOCK as ENV_LOCK;
 
     struct ScratchDir(PathBuf);
     impl ScratchDir {
