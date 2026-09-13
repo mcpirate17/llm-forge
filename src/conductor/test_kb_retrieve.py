@@ -88,39 +88,25 @@ def test_load_index_allows_guest_gpu(tmp_path: Path) -> None:
     assert payload["embedding"]["num_gpu"] == 99
 
 
-def test_embed_payload_pins_ctx_and_guest_gpu(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: dict[str, object] = {}
-
-    class _Resp:
-        def read(self) -> bytes:
-            return json.dumps(
-                {
-                    "data": [{"index": 0, "embedding": [3.0, 4.0]}],
-                    "workspace_embedding": {
-                        "fingerprint": "sha256:" + "b" * 64,
-                        "dimension": 2,
-                        "paid": False,
-                        "num_gpu": 99,
-                        "num_ctx": 2048,
-                    },
-                }
-            ).encode()
-
-        def __enter__(self) -> _Resp:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-    def fake_urlopen(request: object, timeout: float = 0.0) -> _Resp:
-        captured["data"] = json.loads(request.data.decode())  # type: ignore[attr-defined]
-        captured["timeout"] = timeout
-        return _Resp()
-
-    monkeypatch.setattr(kb_retrieve.urllib.request, "urlopen", fake_urlopen)
+def test_embed_payload_pins_ctx_and_guest_gpu(patched_urlopen) -> None:
+    captured = patched_urlopen(
+        kb_retrieve,
+        json.dumps(
+            {
+                "data": [{"index": 0, "embedding": [3.0, 4.0]}],
+                "workspace_embedding": {
+                    "fingerprint": "sha256:" + "b" * 64,
+                    "dimension": 2,
+                    "paid": False,
+                    "num_gpu": 99,
+                    "num_ctx": 2048,
+                },
+            }
+        ).encode(),
+    )
     vec = kb_retrieve.embed_text("hello")
-    assert captured["data"]["input"] == ["hello"]
-    assert captured["data"]["workspace_purpose"] == "document"
+    assert captured["request"]["input"] == ["hello"]
+    assert captured["request"]["workspace_purpose"] == "document"
     assert vec == pytest.approx([0.6, 0.8])
 
 

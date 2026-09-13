@@ -15,7 +15,6 @@ import hashlib
 import json
 import os
 import sys
-import tempfile
 import time
 import tomllib
 from collections.abc import Callable, Iterator
@@ -25,6 +24,7 @@ from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
+from conductor.atomic_json import write_lines_atomic
 from conductor._native import (
     memory_index_chunk_text_native,
     memory_index_metadata_native,
@@ -437,47 +437,20 @@ def build_index_result(
     )
 
 
-def build_index(
-    *,
-    source_ids: set[str] | None = None,
-    catalog_path: Path = SOURCES_PATH,
-    embedder: Callable[[str], list[float]] = embed_text,
-    incremental: bool = True,
-    index_path: Path = INDEX_PATH,
-) -> list[dict[str, Any]]:
-    """Compatibility wrapper returning only the built rows."""
+def build_index(**kwargs: Any) -> list[dict[str, Any]]:
+    """Compatibility wrapper returning only the built rows.
 
-    return build_index_result(
-        source_ids=source_ids,
-        catalog_path=catalog_path,
-        embedder=embedder,
-        incremental=incremental,
-        index_path=index_path,
-    ).materialize_rows()
+    Takes the same keyword arguments as :func:`build_index_result`, spelled
+    out there once.
+    """
+
+    return build_index_result(**kwargs).materialize_rows()
 
 
 def _save_index_lines(lines: Iterator[str], path: Path) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as handle:
-            temporary = Path(handle.name)
-            for line in lines:
-                handle.write(line.rstrip("\n") + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        temporary.replace(path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-    return path
+    # The atomic-write scaffold is atomic_json's, not a local copy: one
+    # implementation of "no partial file behind", every writer sharing it.
+    return write_lines_atomic(path, lines)
 
 
 def save_index(rows: list[dict[str, Any]], path: Path = INDEX_PATH) -> Path:
