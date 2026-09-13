@@ -1,5 +1,5 @@
 {
-  "campaign_id": "forge-candidate-review-src-layout_engine_fest_20260912",
+  "campaign_id": "conductor-67_crg_refresh_state_fest_20260913",
   "environment": {},
   "generator": {
     "exclude": [
@@ -11,29 +11,28 @@
     "run_timeout_seconds": 1800,
     "seed": 0,
     "source": [
-      "src/conductor/candidate_review/engine.py"
+      "src/tooling/hooks/agent/crg_refresh_state.py"
     ]
   },
   "language": "python",
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/conductor/candidate_review/engine.py": "deb78b87140bc829103aad5dab53a465d93ddcb9a32afb2fc05572bcecc0ca33"
+    "src/tooling/hooks/agent/crg_refresh_state.py": "da98bb6ceb98d8bc99ee913f3fa4ed4633c536eb4be6319427431959c50bf7a7"
   },
   "survivor_baseline": [],
   "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": true,
-  "survivor_baseline_recorded_at": "2026-09-12T21:47:40.293996+00:00",
+  "survivor_baseline_recorded": false,
   "test_argv": [
     "python",
     "-m",
     "pytest",
     "-q",
     "--rootdir=.",
-    "src/conductor/candidate_review/test_engine.py"
+    "src/tooling/hooks/agent/test_crg_refresh_state.py"
   ],
   "test_sha256": {
-    "src/conductor/candidate_review/test_engine.py": "224864f3fd0d806fe7e2648938c5707065b9c18960aa30b40a7e73a9b268a7ae"
+    "src/tooling/hooks/agent/test_crg_refresh_state.py": "7d5d04d141019069fd8411a2332f33534383e0dc7b7247358d3e59ac2ac04eef"
   },
-  "title": "Generated mutants for src/conductor/candidate_review/engine.py, scored on the survivor set"
+  "title": "Generated mutants for src/tooling/hooks/agent/crg_refresh_state.py, scored on the survivor set"
 }

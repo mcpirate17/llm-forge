@@ -1,0 +1,1350 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 39,
+    "baseline_repetitions": 2,
+    "killed_mutants": 39,
+    "ranked_tests": 5,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.345038,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "..........                                                               [100%]\n10 passed in 0.09s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-campaigns/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/agent/test_read_budget.py",
+    "--cov=src/tooling/hooks/agent",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "conductor-67_read_budget_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "engine_result": {
+    "duration_seconds": 8.456714,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "h\": 1,\n        \"original_text\": \">\",\n        \"mutated_text\": \"<=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 216396812\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-snqmvsas/worktree/src/tooling/hooks/agent/read_budget.py\",\n        \"line\": 80,\n        \"column\": 33,\n        \"byte_offset\": 2818,\n        \"byte_length\": 2,\n        \"original_text\": \"//\",\n        \"mutated_text\": \"*\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 234757009\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-snqmvsas/worktree/src/tooling/hooks/agent/read_budget.py\",\n        \"line\": 85,\n        \"column\": 12,\n        \"byte_offset\": 3057,\n        \"byte_length\": 3,\n        \"original_text\": \"out\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 224158559\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-snqmvsas/worktree/src/tooling/hooks/agent/read_budget.py\",\n        \"line\": 90,\n        \"column\": 12,\n        \"byte_offset\": 3159,\n        \"byte_length\": 1,\n        \"original_text\": \"0\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-snqmvsas/worktree/src/tooling/hooks/agent/read_budget.py\",\n        \"line\": 90,\n        \"column\": 12,\n        \"byte_offset\": 3159,\n        \"byte_length\": 1,\n        \"original_text\": \"0\",\n        \"mutated_text\": \"1\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-snqmvsas/worktree/src/tooling/hooks/agent/read_budget.py\",\n        \"line\": 93,\n        \"column\": 4,\n        \"byte_offset\": 3166,\n        \"byte_length\": 22,\n        \"original_text\": \"__name__ == \\\"__main__\\\"\",\n        \"mutated_text\": \"not (__name__ == \\\"__main__\\\")\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-snqmvsas/worktree/src/tooling/hooks/agent/read_budget.py\",\n        \"line\": 93,\n        \"column\": 13,\n        \"byte_offset\": 3175,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-snqmvsas/worktree/src/tooling/hooks/agent/read_budget.py\",\n        \"line\": 93,\n        \"column\": 16,\n        \"byte_offset\": 3178,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"__main__\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 8,\n    \"nanos\": 452479251\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 39,
+    "mutants_generated": 55,
+    "mutants_tested": 41,
+    "no_coverage": 14,
+    "survived": 2,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T00:14:33.525880+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-campaigns/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/conductor-67_read_budget_fest_20260913.json",
+  "manifest_sha256": "b3349f2803ec49cb5f0a411bafb9025b4b60fe7a1b7a6794bd92a675d4ebb8ef",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 571,
+      "byte_offset": 23,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-1c3b5dfbb9d8-0",
+      "line": 2,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"PostToolUse read-token budget: tally what ``Read`` pulls into context.\n\nEvery Read response's text is counted (~4 chars/token) into a per-session\nledger next to the graph-gate state. Each time the running total crosses\nanother ``READ_BUDGET_STEP_TOKENS`` (default 30,000) the hook adds one\nadvisory line pointing at the cheaper graph tools. It never blocks; it exists\nto make the delegation rule visible and to produce the numbers that decide\nwhether a hard limit is warranted. Harness-agnostic (Claude/Codex/Qwen/Grok\npayload parsing shared with ``crg_gate.py``).\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 793,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-409a3c5ea55e-0",
+      "line": 22,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 908,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-42932cae74e1-0",
+      "line": 25,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"READ_BUDGET_STEP_TOKENS\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 961,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-345385ae2cb4-0",
+      "line": 26,
+      "mutated_text": "30001",
+      "operator": "constant_replace",
+      "original_text": "30_000",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 998,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b77f61fa297c-0",
+      "line": 27,
+      "mutated_text": "5",
+      "operator": "constant_replace",
+      "original_text": "4",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 1032,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5baecc88b00f-0",
+      "line": 28,
+      "mutated_text": "4000001",
+      "operator": "constant_replace",
+      "original_text": "4_000_000",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 146,
+      "byte_offset": 1069,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9a77d503afdf-0",
+      "line": 30,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"Prefer locate_tool / ast_context_tool / symbol_source_tool / query_graph, \"\n    \"Read with offset+limit, or delegate bulk reading to a subagent.\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 78,
+      "byte_offset": 1295,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6b61df15af80-0",
+      "line": 36,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Total characters of text in a tool response (dict/list walked, bounded).\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 1381,
+      "duration_seconds": 0.206238,
+      "id": "negate_condition-d1c4e0c811f7-0",
+      "line": 37,
+      "mutated_text": "not (isinstance(value, str))",
+      "operator": "negate_condition",
+      "original_text": "isinstance(value, str)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[-0]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[abcd-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 1420,
+      "duration_seconds": 0.23533,
+      "id": "return_value-cce145625a0e-0",
+      "line": 38,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "min(len(value), limit)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[-0]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[abcd-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 1455,
+      "duration_seconds": 0.198299,
+      "id": "constant_replace-409a3c5ea55e-1",
+      "line": 39,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 23,
+      "byte_offset": 1464,
+      "duration_seconds": 0.201404,
+      "id": "negate_condition-2693c1424672-0",
+      "line": 40,
+      "mutated_text": "not (isinstance(value, dict))",
+      "operator": "negate_condition",
+      "original_text": "isinstance(value, dict)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 23,
+      "byte_offset": 1546,
+      "duration_seconds": 0.199647,
+      "id": "negate_condition-c7ff068c5399-0",
+      "line": 42,
+      "mutated_text": "not (isinstance(value, list))",
+      "operator": "negate_condition",
+      "original_text": "isinstance(value, list)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 1618,
+      "duration_seconds": 0.204104,
+      "id": "return_value-c66399477a86-0",
+      "line": 45,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 1618,
+      "duration_seconds": 0.202985,
+      "id": "constant_replace-409a3c5ea55e-2",
+      "line": 45,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 1636,
+      "duration_seconds": 0.195644,
+      "id": "zero_iteration_loop-6bf577b8db7e-0",
+      "line": 46,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "items",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 1657,
+      "duration_seconds": 0.214243,
+      "id": "augmented_assign-f1afa5a90d38-0",
+      "line": 47,
+      "mutated_text": "-=",
+      "operator": "augmented_assign",
+      "original_text": "+=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 1687,
+      "duration_seconds": 0.164387,
+      "id": "arithmetic_op-4b741097b4f2-0",
+      "line": 47,
+      "mutated_text": "+",
+      "operator": "arithmetic_op",
+      "original_text": "-",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 1707,
+      "duration_seconds": 0.206571,
+      "id": "negate_condition-3d6ba7349ea5-0",
+      "line": 48,
+      "mutated_text": "not (total >= limit)",
+      "operator": "negate_condition",
+      "original_text": "total >= limit",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 1713,
+      "duration_seconds": 0.199913,
+      "id": "comparison_op-cb8f6c50b497-0",
+      "line": 48,
+      "mutated_text": "<",
+      "operator": "comparison_op",
+      "original_text": ">=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 1742,
+      "duration_seconds": 0.191206,
+      "id": "return_value-a1ce2ce9e2a6-0",
+      "line": 49,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "limit",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 1759,
+      "duration_seconds": 0.195918,
+      "id": "return_value-c17d0848eeff-0",
+      "line": 50,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "total",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value2-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value3-4]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property[value4-20]",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    {
+      "byte_length": 33,
+      "byte_offset": 1851,
+      "duration_seconds": 0.200312,
+      "id": "return_value-d5917037edd7-0",
+      "line": 55,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "int(raw) if raw else DEFAULT_STEP",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 77,
+      "byte_offset": 1961,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-4a98171ad037-0",
+      "line": 59,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Add *tokens* to the session ledger; return (previous_total, new_total).\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2060,
+      "duration_seconds": 0.208257,
+      "id": "arithmetic_op-227fbc6fe720-0",
+      "line": 60,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2156,
+      "duration_seconds": 0.20536,
+      "id": "boolean_op-8166a36779c3-0",
+      "line": 62,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2159,
+      "duration_seconds": 0.159869,
+      "id": "constant_replace-8e74d94f995b-0",
+      "line": 62,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"0\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 2206,
+      "duration_seconds": 0.193716,
+      "id": "exception_swallow-a3cd5d0bceb0-0",
+      "line": 64,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "previous = 0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2217,
+      "duration_seconds": 0.193302,
+      "id": "constant_replace-409a3c5ea55e-3",
+      "line": 64,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2244,
+      "duration_seconds": 0.204304,
+      "id": "arithmetic_op-607941c4fdb0-0",
+      "line": 65,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 2320,
+      "duration_seconds": 0.196101,
+      "id": "return_value-7e9999d047b8-0",
+      "line": 67,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "previous, new_total",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 2435,
+      "duration_seconds": 0.208751,
+      "id": "constant_replace-e17129e4ee4c-0",
+      "line": 71,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"hookSpecificOutput\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 2458,
+      "duration_seconds": 0.205554,
+      "id": "constant_replace-11a983947f94-0",
+      "line": 71,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"hookEventName\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 2475,
+      "duration_seconds": 0.194313,
+      "id": "constant_replace-f4e4ea8ff276-0",
+      "line": 71,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"PostToolUse\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2498,
+      "duration_seconds": 0.205221,
+      "id": "boolean_op-584415a7dac5-0",
+      "line": 72,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 2498,
+      "duration_seconds": 0.224295,
+      "id": "negate_condition-1a3b851b979e-0",
+      "line": 72,
+      "mutated_text": "not (not isinstance(payload, dict))",
+      "operator": "negate_condition",
+      "original_text": "not isinstance(payload, dict)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2544,
+      "duration_seconds": 0.251853,
+      "id": "return_value-8a289bfd7e79-0",
+      "line": 73,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "out",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 2618,
+      "duration_seconds": 0.20525,
+      "id": "constant_replace-822f99fb7bd0-0",
+      "line": 75,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tool_response\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2636,
+      "duration_seconds": 0.209968,
+      "id": "arithmetic_op-160d5026b454-0",
+      "line": 75,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "//",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 2662,
+      "duration_seconds": 0.217057,
+      "id": "negate_condition-d6c78e9b08ae-0",
+      "line": 76,
+      "mutated_text": "not (key is None or tokens == 0)",
+      "operator": "negate_condition",
+      "original_text": "key is None or tokens == 0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2666,
+      "duration_seconds": 0.209961,
+      "id": "comparison_op-bdb39c2e0ca1-0",
+      "line": 76,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2674,
+      "duration_seconds": 0.195773,
+      "id": "boolean_op-8166a36779c3-1",
+      "line": 76,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2684,
+      "duration_seconds": 0.210438,
+      "id": "comparison_op-c6e01abbb8bf-0",
+      "line": 76,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2687,
+      "duration_seconds": 0.227401,
+      "id": "constant_replace-409a3c5ea55e-4",
+      "line": 76,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2705,
+      "duration_seconds": 0.200441,
+      "id": "return_value-8a289bfd7e79-1",
+      "line": 77,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "out",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed"
+      ]
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 2793,
+      "duration_seconds": 0.226014,
+      "id": "negate_condition-912cae74b9ab-0",
+      "line": 80,
+      "mutated_text": "not (total // step > previous // step)",
+      "operator": "negate_condition",
+      "original_text": "total // step > previous // step",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2799,
+      "duration_seconds": 0.206537,
+      "id": "arithmetic_op-160d5026b454-1",
+      "line": 80,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "//",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2807,
+      "duration_seconds": 0.216397,
+      "id": "comparison_op-3b1c3068b3ca-0",
+      "line": 80,
+      "mutated_text": "<=",
+      "operator": "comparison_op",
+      "original_text": ">",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2818,
+      "duration_seconds": 0.234757,
+      "id": "arithmetic_op-160d5026b454-2",
+      "line": 80,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "//",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 3057,
+      "duration_seconds": 0.224159,
+      "id": "return_value-8a289bfd7e79-2",
+      "line": 85,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "out",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3159,
+      "duration_seconds": 0.0,
+      "id": "return_value-c66399477a86-1",
+      "line": 90,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3159,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-409a3c5ea55e-5",
+      "line": 90,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 3166,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-88dc5f20a00c-0",
+      "line": 93,
+      "mutated_text": "not (__name__ == \"__main__\")",
+      "operator": "negate_condition",
+      "original_text": "__name__ == \"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3175,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-c6e01abbb8bf-1",
+      "line": 93,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3178,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ec8678d9d371-0",
+      "line": 93,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/agent/read_budget.py",
+      "tests_run": []
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.9512195121951219,
+  "new_survivors": [],
+  "no_coverage": 14,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 39,
+    "NO_COVERAGE": 14,
+    "SURVIVED": 2,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/conductor-67_read_budget_fest_20260913_20260913T001433Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "d3f6448839921567e1562d7237abaf62600d958339172afb7a12cab9a63dbe29"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/tooling/hooks/agent/read_budget.py": "6fe0837e9464415c4dbe888eeeba28b6d59c8650cac862e7dae0980f1a46a93d"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "arithmetic_op-4b741097b4f2-0",
+    "constant_replace-8e74d94f995b-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/agent/test_read_budget.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/agent/test_read_budget.py": "0a67bfa39645de893e4df2370dd5bc4df5c854a7d288bb3702cdbcdc132da698"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 3,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 2
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-160d5026b454-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "arithmetic_op-160d5026b454-1": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "arithmetic_op-160d5026b454-2": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "arithmetic_op-227fbc6fe720-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ],
+      "arithmetic_op-607941c4fdb0-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ],
+      "augmented_assign-f1afa5a90d38-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "boolean_op-584415a7dac5-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "boolean_op-8166a36779c3-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ],
+      "boolean_op-8166a36779c3-1": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed"
+      ],
+      "comparison_op-3b1c3068b3ca-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "comparison_op-bdb39c2e0ca1-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "comparison_op-c6e01abbb8bf-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "comparison_op-cb8f6c50b497-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "constant_replace-11a983947f94-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "constant_replace-409a3c5ea55e-1": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "constant_replace-409a3c5ea55e-2": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "constant_replace-409a3c5ea55e-3": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ],
+      "constant_replace-409a3c5ea55e-4": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed"
+      ],
+      "constant_replace-822f99fb7bd0-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "constant_replace-e17129e4ee4c-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "constant_replace-f4e4ea8ff276-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "exception_swallow-a3cd5d0bceb0-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ],
+      "negate_condition-1a3b851b979e-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "negate_condition-2693c1424672-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "negate_condition-3d6ba7349ea5-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "negate_condition-912cae74b9ab-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "negate_condition-c7ff068c5399-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "negate_condition-d1c4e0c811f7-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "negate_condition-d6c78e9b08ae-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "return_value-7e9999d047b8-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session"
+      ],
+      "return_value-8a289bfd7e79-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed"
+      ],
+      "return_value-8a289bfd7e79-1": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed"
+      ],
+      "return_value-8a289bfd7e79-2": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "return_value-a1ce2ce9e2a6-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "return_value-c17d0848eeff-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "return_value-c66399477a86-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "return_value-cce145625a0e-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ],
+      "return_value-d5917037edd7-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step"
+      ],
+      "zero_iteration_loop-6bf577b8db7e-0": [
+        "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/tooling/hooks/agent/read_budget.py"
+        ],
+        "criticality": "high",
+        "id": "conductor-67_read_budget_fest_20260913"
+      }
+    ],
+    "retained_core": [
+      "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+      "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+      "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_read_budget_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-584415a7dac5-0",
+          "boolean_op-8166a36779c3-1",
+          "comparison_op-bdb39c2e0ca1-0",
+          "comparison_op-c6e01abbb8bf-0",
+          "constant_replace-11a983947f94-0",
+          "constant_replace-409a3c5ea55e-4",
+          "constant_replace-e17129e4ee4c-0",
+          "constant_replace-f4e4ea8ff276-0",
+          "negate_condition-1a3b851b979e-0",
+          "negate_condition-d6c78e9b08ae-0",
+          "return_value-8a289bfd7e79-0",
+          "return_value-8a289bfd7e79-1",
+          "return_value-c17d0848eeff-0",
+          "return_value-cce145625a0e-0"
+        ],
+        "nodeid": "src/tooling/hooks/agent/test_read_budget.py::test_hook_ignores_sessionless_empty_and_malformed",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "boolean_op-8166a36779c3-1",
+          "constant_replace-409a3c5ea55e-4",
+          "return_value-8a289bfd7e79-0",
+          "return_value-8a289bfd7e79-1"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_read_budget_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-160d5026b454-0",
+          "arithmetic_op-160d5026b454-1",
+          "arithmetic_op-160d5026b454-2",
+          "arithmetic_op-227fbc6fe720-0",
+          "arithmetic_op-607941c4fdb0-0",
+          "augmented_assign-f1afa5a90d38-0",
+          "boolean_op-584415a7dac5-0",
+          "boolean_op-8166a36779c3-0",
+          "comparison_op-3b1c3068b3ca-0",
+          "comparison_op-bdb39c2e0ca1-0",
+          "comparison_op-c6e01abbb8bf-0",
+          "comparison_op-cb8f6c50b497-0",
+          "constant_replace-11a983947f94-0",
+          "constant_replace-409a3c5ea55e-3",
+          "constant_replace-822f99fb7bd0-0",
+          "constant_replace-e17129e4ee4c-0",
+          "constant_replace-f4e4ea8ff276-0",
+          "exception_swallow-a3cd5d0bceb0-0",
+          "negate_condition-1a3b851b979e-0",
+          "negate_condition-2693c1424672-0",
+          "negate_condition-3d6ba7349ea5-0",
+          "negate_condition-912cae74b9ab-0",
+          "negate_condition-c7ff068c5399-0",
+          "negate_condition-d1c4e0c811f7-0",
+          "negate_condition-d6c78e9b08ae-0",
+          "return_value-7e9999d047b8-0",
+          "return_value-8a289bfd7e79-2",
+          "return_value-c17d0848eeff-0",
+          "return_value-c66399477a86-0",
+          "return_value-cce145625a0e-0",
+          "return_value-d5917037edd7-0",
+          "zero_iteration_loop-6bf577b8db7e-0"
+        ],
+        "nodeid": "src/tooling/hooks/agent/test_read_budget.py::test_hook_nudges_only_when_crossing_a_step",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "arithmetic_op-160d5026b454-0",
+          "arithmetic_op-160d5026b454-1",
+          "arithmetic_op-160d5026b454-2",
+          "comparison_op-3b1c3068b3ca-0",
+          "constant_replace-822f99fb7bd0-0",
+          "negate_condition-912cae74b9ab-0",
+          "return_value-8a289bfd7e79-2",
+          "return_value-d5917037edd7-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_read_budget_fest_20260913",
+        "dominated_by": [
+          "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded"
+        ],
+        "killed_mutants": [
+          "augmented_assign-f1afa5a90d38-0",
+          "comparison_op-cb8f6c50b497-0",
+          "constant_replace-409a3c5ea55e-1",
+          "constant_replace-409a3c5ea55e-2",
+          "negate_condition-2693c1424672-0",
+          "negate_condition-3d6ba7349ea5-0",
+          "negate_condition-c7ff068c5399-0",
+          "negate_condition-d1c4e0c811f7-0",
+          "return_value-a1ce2ce9e2a6-0",
+          "return_value-c17d0848eeff-0",
+          "return_value-c66399477a86-0",
+          "return_value-cce145625a0e-0",
+          "zero_iteration_loop-6bf577b8db7e-0"
+        ],
+        "nodeid": "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_read_budget_fest_20260913",
+        "dominated_by": [
+          "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_property"
+        ],
+        "killed_mutants": [
+          "augmented_assign-f1afa5a90d38-0",
+          "comparison_op-cb8f6c50b497-0",
+          "constant_replace-409a3c5ea55e-1",
+          "constant_replace-409a3c5ea55e-2",
+          "negate_condition-2693c1424672-0",
+          "negate_condition-3d6ba7349ea5-0",
+          "negate_condition-c7ff068c5399-0",
+          "negate_condition-d1c4e0c811f7-0",
+          "return_value-a1ce2ce9e2a6-0",
+          "return_value-c17d0848eeff-0",
+          "return_value-c66399477a86-0",
+          "return_value-cce145625a0e-0",
+          "zero_iteration_loop-6bf577b8db7e-0"
+        ],
+        "nodeid": "src/tooling/hooks/agent/test_read_budget.py::test_response_chars_walks_nested_and_is_bounded",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_read_budget_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-227fbc6fe720-0",
+          "arithmetic_op-607941c4fdb0-0",
+          "boolean_op-8166a36779c3-0",
+          "constant_replace-409a3c5ea55e-3",
+          "exception_swallow-a3cd5d0bceb0-0",
+          "return_value-7e9999d047b8-0"
+        ],
+        "nodeid": "src/tooling/hooks/agent/test_read_budget.py::test_tally_accumulates_per_session",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      }
+    ]
+  },
+  "unviable": 0
+}

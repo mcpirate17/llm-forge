@@ -1,0 +1,54 @@
+{
+  "campaign_id": "conductor-67_bash_guard_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/claude/_bash_guard.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/claude/_bash_guard.py": "36904f09ec1e9bf55d9a5f84a0295776d7d780c87b3105896143d0e016f98d87"
+  },
+  "survivor_baseline": [
+    "arithmetic_op-01cf300e8d26-0",
+    "arithmetic_op-01cf300e8d26-1",
+    "boolean_op-d7c809809309-0",
+    "boolean_op-d7c809809309-1",
+    "boolean_op-d7c809809309-6",
+    "boolean_op-d7c809809309-8",
+    "constant_replace-3c6992fba1e9-1",
+    "constant_replace-3c6992fba1e9-2",
+    "constant_replace-3c6992fba1e9-3",
+    "constant_replace-72a67f5d82bc-1",
+    "constant_replace-7fa4f3b517c2-0",
+    "constant_replace-ae932aff37ac-0",
+    "return_value-dcd9b49af684-1",
+    "return_value-dcd9b49af684-2",
+    "return_value-dcd9b49af684-3"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:18:04.664181+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/claude/test_bash_guard.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/claude/test_bash_guard.py": "75b74df29be9bac7fa774657589155adf071580337f936fe045912cde125e7d8"
+  },
+  "title": "Generated mutants for src/tooling/hooks/claude/_bash_guard.py, scored on the survivor set"
+}

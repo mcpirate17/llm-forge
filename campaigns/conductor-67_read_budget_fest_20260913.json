@@ -1,0 +1,41 @@
+{
+  "campaign_id": "conductor-67_read_budget_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/agent/read_budget.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/agent/read_budget.py": "6fe0837e9464415c4dbe888eeeba28b6d59c8650cac862e7dae0980f1a46a93d"
+  },
+  "survivor_baseline": [
+    "arithmetic_op-4b741097b4f2-0",
+    "constant_replace-8e74d94f995b-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:14:51.082532+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/agent/test_read_budget.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/agent/test_read_budget.py": "0a67bfa39645de893e4df2370dd5bc4df5c854a7d288bb3702cdbcdc132da698"
+  },
+  "title": "Generated mutants for src/tooling/hooks/agent/read_budget.py, scored on the survivor set"
+}
