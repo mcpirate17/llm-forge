@@ -172,7 +172,7 @@ outcomes and survivor set identical in every run):
 | pre-#51, no isolation (single run) | 51.1 s | 90/8/19 |
 | #51, refuse to write (single run) | 131.8 s | 90/8/19 |
 | #51 as merged (3 runs) | 127.67 s | 90/8/19 |
-| #52, cache + evict (3 runs) | **51.12 s** | 90/8/19 |
+| #53, cache + evict (3 runs) | **51.12 s** | 90/8/19 |
 
 ### Orphaned runs
 
