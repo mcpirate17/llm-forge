@@ -78,6 +78,16 @@ def test_every_live_command_resolves_to_a_registered_spec():
     assert registry.resolve_legacy("$CLAUDE_PROJECT_DIR/.claude/hooks/nope.sh") is None
 
 
+def test_natively_served_is_empty_by_default(monkeypatch):
+    monkeypatch.delenv("FORGE_NATIVE_HOOKS", raising=False)
+    assert registry.natively_served() == frozenset()
+
+
+def test_natively_served_parses_and_trims_the_env_var(monkeypatch):
+    monkeypatch.setenv("FORGE_NATIVE_HOOKS", " pre_bash ,, bash_write_targets")
+    assert registry.natively_served() == frozenset({"pre_bash", "bash_write_targets"})
+
+
 def test_matchers():
     spec = next(s for s in registry.HOOKS if s.name == "crg_gate_mark")
     assert spec.matches("mcp__code-review-graph__locate_tool")

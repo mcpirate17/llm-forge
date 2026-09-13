@@ -29,6 +29,16 @@ struct DelegationEvent<'a> {
 /// failing the hook): a telemetry write must never turn a working hook into a
 /// broken one.
 pub fn record_delegation(event: &str, elapsed_ms: f64) {
+    record(event, elapsed_ms, true);
+}
+
+/// Same telemetry line, but for a call `dispatch::run_hook` answered natively
+/// (no Python subprocess spawned) -- the `FORGE_NATIVE_HOOKS` deny fast path.
+pub fn record_native(event: &str, elapsed_ms: f64) {
+    record(event, elapsed_ms, false);
+}
+
+fn record(event: &str, elapsed_ms: f64, delegated: bool) {
     let Ok(path) = env::var("CONTEXT_TELEMETRY_PATH") else {
         return;
     };
@@ -38,7 +48,7 @@ pub fn record_delegation(event: &str, elapsed_ms: f64) {
     let record = DelegationEvent {
         event,
         elapsed_ms,
-        delegated: true,
+        delegated,
         ts: iso8601_utc_millis(SystemTime::now()),
     };
     if let Err(err) = append_line(Path::new(&path), &record) {

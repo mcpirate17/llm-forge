@@ -1,0 +1,57 @@
+{
+  "campaign_id": "forge-rust-bash-guard_forge_cargo_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [],
+    "jobs": 4,
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "options": {
+      "manifest_path": "native/forge/Cargo.toml",
+      "package": "forge",
+      "package_root": "native/forge"
+    },
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/bash_guard.rs",
+      "src/dispatch.rs",
+      "src/handlers.rs",
+      "src/main.rs",
+      "src/telemetry.rs",
+      "src/write_targets.rs"
+    ]
+  },
+  "language": "rust",
+  "mutation_engine": "cargo-mutants",
+  "schema_version": 1,
+  "source_sha256": {
+    "native/forge/src/bash_guard.rs": "41fe816e52d768a86228d99fc8abac0c00bf07072c458d2a6ebf36b49371eadf",
+    "native/forge/src/dispatch.rs": "1db93440b45bd6ddac830428386235a421eca5ab0ab07b3b58e7f45f100c986e",
+    "native/forge/src/handlers.rs": "00ea75238418b2fd607487fb94d603c02f821252891e8c7ed16872179ecece27",
+    "native/forge/src/main.rs": "3c3e39bfecb4fb89b4ac6120a3eea81f0ad43056a64a75769884c234473a079e",
+    "native/forge/src/telemetry.rs": "1b3d1ac103c5baac6d4c2380f74fa6ca77789d728ca10a98f789736acf1fecc8",
+    "native/forge/src/write_targets.rs": "cb0a7d833cd1a0018a4b4e4d71fd6a2a43ca27097d6feadca1f48c2c0790f1e2"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "cargo",
+    "test",
+    "--manifest-path",
+    "native/forge/Cargo.toml",
+    "--package",
+    "forge"
+  ],
+  "test_sha256": {
+    "native/forge/src/bash_guard.rs": "41fe816e52d768a86228d99fc8abac0c00bf07072c458d2a6ebf36b49371eadf",
+    "native/forge/src/handlers.rs": "00ea75238418b2fd607487fb94d603c02f821252891e8c7ed16872179ecece27",
+    "native/forge/src/interpreter.rs": "8ff087abdb19392728949fa20db60259386c90b8980d601a25d1f9b8042b108c",
+    "native/forge/src/telemetry.rs": "1b3d1ac103c5baac6d4c2380f74fa6ca77789d728ca10a98f789736acf1fecc8",
+    "native/forge/src/write_targets.rs": "cb0a7d833cd1a0018a4b4e4d71fd6a2a43ca27097d6feadca1f48c2c0790f1e2",
+    "native/forge/tests/guard_parity.rs": "6c87cb87e95ef6b75fdcad46ca4cfdc32ee78681585f43be04a454496e00fc8c",
+    "native/forge/tests/hook_delegation.rs": "342e27278f306d88f60886b74f5e8c33f3571865f44575fed124254f1cf18e51"
+  },
+  "title": "Generated mutants for the forge crate, scored on the survivor set"
+}

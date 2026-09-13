@@ -8,10 +8,12 @@
 //! time into `handlers::registry()` and `dispatch::run_hook` stops shelling out for
 //! whatever is covered.
 
+mod bash_guard;
 mod dispatch;
 mod handlers;
 mod interpreter;
 mod telemetry;
+mod write_targets;
 
 use clap::{Parser, Subcommand};
 use std::process::ExitCode;

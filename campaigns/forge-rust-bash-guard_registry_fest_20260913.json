@@ -1,0 +1,38 @@
+{
+  "campaign_id": "forge-rust-bash-guard_registry_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/dispatch/registry.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/registry.py": "306b7fc2820241534056761beec855f3b3baf6236d9d5857075b7cfdf5474233"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test_registry.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test_registry.py": "15346ac4b128c970fbdae61f6a2639032a585313c2c1000d4e905d908e8e9be1"
+  },
+  "title": "Generated mutants for src/tooling/hooks/dispatch/registry.py, scored on the survivor set"
+}

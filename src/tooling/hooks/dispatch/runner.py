@@ -23,7 +23,7 @@ from typing import Any
 from tooling.hooks.dispatch import adapters
 from tooling.hooks.dispatch.merge import HookOutcome, merge
 from tooling.hooks.dispatch.paths import body_path, interpreter_bin
-from tooling.hooks.dispatch.registry import HookSpec, hooks_for
+from tooling.hooks.dispatch.registry import HookSpec, hooks_for, natively_served
 
 
 @dataclass
@@ -112,8 +112,17 @@ def subject_of(event: str, payload: dict[str, Any]) -> str:
 
 
 def select(event: str, payload: dict[str, Any]) -> tuple[HookSpec, ...]:
+    """Hooks to run for this event/payload: registry matches minus whatever
+    ``FORGE_NATIVE_HOOKS`` says a caller already served natively (see
+    ``registry.natively_served`` -- dormant by default, opt-in per hook name).
+    """
     subject = subject_of(event, payload)
-    return tuple(spec for spec in hooks_for(event) if spec.matches(subject))
+    served = natively_served()
+    return tuple(
+        spec
+        for spec in hooks_for(event)
+        if spec.matches(subject) and spec.name not in served
+    )
 
 
 def parse_output(text: str) -> tuple[dict[str, Any] | None, str | None]:

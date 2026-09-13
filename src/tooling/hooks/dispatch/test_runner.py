@@ -185,6 +185,24 @@ def test_select_uses_registry_matchers():
     ]
 
 
+def test_select_drops_hooks_named_in_forge_native_hooks(monkeypatch):
+    monkeypatch.setenv("FORGE_NATIVE_HOOKS", " pre_bash ,,current_work_guard_bash")
+    assert [s.name for s in runner.select("PreToolUse", PAYLOAD)] == [
+        "crg_refresh_report_pre",
+        "crg_gate_verify_bash",
+    ]
+
+
+def test_select_runs_everything_when_forge_native_hooks_is_unset(monkeypatch):
+    monkeypatch.delenv("FORGE_NATIVE_HOOKS", raising=False)
+    assert [s.name for s in runner.select("PreToolUse", PAYLOAD)] == [
+        "crg_refresh_report_pre",
+        "crg_gate_verify_bash",
+        "pre_bash",
+        "current_work_guard_bash",
+    ]
+
+
 def test_dispatch_merges_and_reports_errors(tmp_path, fake_adapters, monkeypatch):
     fake_adapters(
         "deny",
