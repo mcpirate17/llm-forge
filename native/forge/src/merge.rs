@@ -15,6 +15,11 @@ use serde_json::{json, Map, Value};
 
 const SEPARATOR: &str = "\n\n";
 
+/// Events whose Claude Code schema defines `hookSpecificOutput`; everything
+/// else folds to the top-level fields only (`merge.py`'s module docstring
+/// is the contract -- Claude Code 2.1.268 rejects the field on SessionEnd).
+const SPECIFIC_SCHEMA_EVENTS: [&str; 3] = ["PreToolUse", "PostToolUse", "SessionStart"];
+
 /// One hook's contribution: the same shape `HookOutcome` carries in
 /// `merge.py` (minus `elapsed_ms`, which never affects the merge).
 pub struct HookOutcome {
@@ -184,10 +189,12 @@ pub fn merge(event: &str, outcomes: &[HookOutcome]) -> Value {
     }
 
     let mut result: Map<String, Value> = Map::new();
-    result.insert(
-        "hookSpecificOutput".to_string(),
-        Value::Object(specific_out),
-    );
+    if SPECIFIC_SCHEMA_EVENTS.contains(&event) {
+        result.insert(
+            "hookSpecificOutput".to_string(),
+            Value::Object(specific_out),
+        );
+    }
     if !block_reasons.is_empty() {
         result.insert("decision".to_string(), json!("block"));
         result.insert(
@@ -399,5 +406,51 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("HOOK CONFLICT [b]"));
+    }
+
+    /// Byte-for-byte twin of `test_session_end_folds_to_top_level_fields_only`
+    /// in `conductor-native`'s `hook_merge.rs` and the `merge.py` tests: only
+    /// PreToolUse/PostToolUse/SessionStart carry `hookSpecificOutput`; a
+    /// quiet SessionEnd folds to `{}` (Claude Code 2.1.268 rejects the field
+    /// there), and SubagentStop/Stop drop even a voting hook's wrapper.
+    #[test]
+    fn non_schema_events_fold_to_top_level_fields_only() {
+        let quiet = merge("SessionEnd", &[outcome("telemetry", json!({}), false)]);
+        assert_eq!(quiet, json!({}));
+
+        let errored = HookOutcome {
+            name: "ledger".to_string(),
+            output: json!({}),
+            error: Some("rollup failed".to_string()),
+            fail_closed: false,
+        };
+        let merged = merge("SessionEnd", &[errored]);
+        assert!(merged.get("hookSpecificOutput").is_none());
+        assert!(merged["systemMessage"]
+            .as_str()
+            .unwrap()
+            .contains("rollup failed"));
+
+        for event in ["SubagentStop", "Stop"] {
+            let voting = outcome(
+                "gate",
+                json!({"hookSpecificOutput": {"permissionDecision": "deny"}}),
+                false,
+            );
+            assert_eq!(
+                merge(event, &[voting]),
+                json!({}),
+                "{event} has no schema for the wrapper or the decision"
+            );
+        }
+
+        for event in ["PreToolUse", "PostToolUse", "SessionStart"] {
+            let merged = merge(event, &[outcome("quiet", json!({}), false)]);
+            assert_eq!(
+                merged["hookSpecificOutput"]["hookEventName"],
+                json!(event),
+                "schema events keep the wrapper exactly as before"
+            );
+        }
     }
 }

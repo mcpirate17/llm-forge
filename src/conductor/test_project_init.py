@@ -313,7 +313,13 @@ def test_apply_then_second_run_is_idempotent(tmp_path: Path) -> None:
     _write(project, ".gitignore", "node_modules/\n")
     assert pi.run(_config(project)) == 0
     settings = json.loads((project / pi.SETTINGS).read_text())
-    assert settings["hooks"] == TEMPLATE_HOOKS
+    # The expected wiring follows this machine's forge detection: with an
+    # ambient (or project-local) forge every event command is
+    # ``<forge> hook <Event>``, without it the Python launcher TEMPLATE_HOOKS
+    # encodes -- both are correct scaffolds, and idempotency must hold for
+    # whichever one was written.
+    expected = pi._hooks_block(pi.resolve_forge_binary(project))
+    assert settings["hooks"] == expected
     launcher = project / pi.LAUNCHER
     assert launcher.stat().st_mode & stat.S_IXUSR
     assert launcher.read_text().startswith(f"#!{sys.executable}\n")

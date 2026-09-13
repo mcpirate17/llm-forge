@@ -95,3 +95,11 @@ PASS hook-roundtrip: exit 0, stdout empty, 1 ms
 "detail"}], "ok"}` object. Exit 1 means: fix whatever the one `FAIL` line
 names — that line is the broken piece, not a suggestion to re-run install
 blind (`forge hooks status` remains the narrower settings-only check).
+
+## Known host issues fixed
+
+SessionEnd/SubagentStop/Stop no longer emit `hookSpecificOutput` (Claude
+Code 2.1.268 rejected it); the hook doctor no longer calls a compiled
+`forge` binary "dead" for lacking a shebang; a mutation receipt's filename
+now always carries the receipt's own `generated_at`, not a second clock
+read.
