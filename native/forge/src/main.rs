@@ -30,6 +30,7 @@ mod post_edit_audit;
 mod post_tool;
 mod read_budget;
 mod receipt_show;
+mod route;
 mod session_end;
 mod telemetry;
 mod tool_quiet;
@@ -73,6 +74,9 @@ enum Command {
         #[command(subcommand)]
         action: LedgerCommand,
     },
+    /// Routing-policy decision for one `Agent` dispatch (`docs/roadmap.md`
+    /// Phase 3 step 2).
+    Route(route::RouteArgs),
 }
 
 #[derive(Subcommand)]
@@ -142,6 +146,13 @@ fn main() -> ExitCode {
                     ExitCode::from(1)
                 }
             },
+        },
+        Command::Route(args) => match route::run(args) {
+            Ok(code) => ExitCode::from(code as u8),
+            Err(err) => {
+                eprintln!("forge route: {err:#}");
+                ExitCode::from(2)
+            }
         },
         Command::Ledger { action } => match action {
             LedgerCommand::Read(args) => match ledger::run(args) {
