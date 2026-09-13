@@ -26,6 +26,15 @@ use std::time::SystemTime;
 /// Python's `stale_dirty_files` default: files older than 24h uncommitted.
 pub const DEFAULT_STALE_HOURS: f64 = 24.0;
 
+/// Serializes tests that set `CONDUCTOR_INTEGRATION_BRANCH`: every test that
+/// resolves an integration line reads it, and the handlers' session-start test
+/// reaches it through `exposure_line`, so it takes this lock too. Lives at
+/// module level (not in `tests`) because this file is also compiled verbatim
+/// into the parity binary via `#[path]`, where `crate::handlers` does not
+/// exist -- the lock must not reference anything outside this file.
+#[cfg(test)]
+pub(crate) static INTEGRATION_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 fn git_out(repo: &Path, args: &[&str]) -> Result<String> {
     let done = Command::new("git")
         .args(args)
@@ -154,8 +163,11 @@ pub fn default_integration_ref(repo: &Path) -> Result<String> {
     if let Some(advertised) = git_quiet(repo, &["ls-remote", "--symref", "origin", "HEAD"]) {
         for line in advertised.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 2 && parts[0] == "ref:" {
-                if let Some(head) = parts[1].strip_prefix("refs/heads/") {
+            if parts.first() == Some(&"ref:") {
+                if let Some(head) = parts
+                    .get(1)
+                    .and_then(|refname| refname.strip_prefix("refs/heads/"))
+                {
                     return Ok(format!("origin/{head}"));
                 }
             }
@@ -247,7 +259,13 @@ fn status_paths(repo: &Path) -> Result<Vec<String>> {
 /// exist (staged deletions) and future mtimes never count, matching Python's
 /// `exists()` check and its `<=` skip.
 pub fn stale_dirty_file_count(repo: &Path, stale_hours: f64) -> Result<usize> {
-    let now = SystemTime::now();
+    stale_dirty_file_count_at(repo, stale_hours, SystemTime::now())
+}
+
+/// `stale_dirty_file_count` with the clock supplied, so the exactly-at-threshold
+/// case (`age == stale_hours` is NOT stale, Python compares strictly) is
+/// testable without racing the filesystem against a real clock.
+fn stale_dirty_file_count_at(repo: &Path, stale_hours: f64, now: SystemTime) -> Result<usize> {
     let mut count = 0usize;
     for path in status_paths(repo)? {
         let Ok(metadata) = std::fs::metadata(repo.join(&path)) else {
@@ -456,6 +474,12 @@ pub fn exposure_line(repo: &Path) -> String {
 mod tests {
     use super::*;
 
+    fn lock_env() -> std::sync::MutexGuard<'static, ()> {
+        INTEGRATION_ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     fn scratch(label: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
             "forge-workspace-hygiene-{}-{label}-{}",
@@ -483,6 +507,19 @@ mod tests {
         );
     }
 
+    fn touch(cwd: &Path, epoch: u64, path: &str) {
+        let done = Command::new("touch")
+            .args(["-d", &format!("@{epoch}"), path])
+            .current_dir(cwd)
+            .output()
+            .unwrap();
+        assert!(
+            done.status.success(),
+            "touch: {}",
+            String::from_utf8_lossy(&done.stderr)
+        );
+    }
+
     fn seeded(label: &str, branch: &str) -> PathBuf {
         let parent = scratch(label);
         let repo = parent.join("repo");
@@ -498,37 +535,119 @@ mod tests {
         repo
     }
 
+    /// A bare origin whose HEAD advertises `head_branch`, wired to `repo`.
+    fn bare_origin(repo: &Path, label: &str, head_branch: &str) -> PathBuf {
+        let origin = scratch(label);
+        git(
+            repo,
+            &[
+                "init",
+                "--quiet",
+                "--bare",
+                "-b",
+                head_branch,
+                &origin.display().to_string(),
+            ],
+        );
+        git(
+            repo,
+            &["remote", "add", "origin", &origin.display().to_string()],
+        );
+        origin
+    }
+
     #[test]
     fn integration_ref_prefers_the_configured_origin_line() {
+        let _guard = lock_env();
         let repo = seeded("configured", "main");
         std::fs::write(
             repo.join("pyproject.toml"),
             b"[tool.conductor]\nintegration_branch = \"main\"\n",
         )
         .unwrap();
-        let origin = scratch("configured-origin");
-        git(
-            &repo,
-            &[
-                "init",
-                "--quiet",
-                "--bare",
-                "-b",
-                "main",
-                &origin.display().to_string(),
-            ],
-        );
-        git(
-            &repo,
-            &["remote", "add", "origin", &origin.display().to_string()],
-        );
+        bare_origin(&repo, "configured-origin", "main");
         git(&repo, &["push", "--quiet", "origin", "main"]);
         assert_eq!(default_integration_ref(&repo).unwrap(), "origin/main");
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
 
     #[test]
+    fn the_configured_branch_resolves_from_a_nested_start_too() {
+        // The manifest lives at the repo root while the caller starts from a
+        // subdirectory: `enclosing_repo` must walk up to find it, and the
+        // configured branch (wip, remote HEAD trunk) must win over every
+        // fallback -- which is what separates the configured resolution from
+        // the symref/ls-remote defaults.
+        let _guard = lock_env();
+        let repo = seeded("nested", "wip");
+        std::fs::write(
+            repo.join("pyproject.toml"),
+            b"[tool.conductor]\nintegration_branch = \"wip\"\n",
+        )
+        .unwrap();
+        bare_origin(&repo, "nested-origin", "trunk");
+        git(&repo, &["push", "--quiet", "origin", "wip"]);
+        let sub = repo.join("sub");
+        std::fs::create_dir_all(&sub).unwrap();
+        assert_eq!(default_integration_ref(&sub).unwrap(), "origin/wip");
+        std::fs::remove_dir_all(repo.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn the_env_override_wins_over_the_manifest() {
+        // The handlers' session-start test reads this variable through
+        // `exposure_line`; it takes this same lock so the override cannot
+        // leak into its resolution.
+        let _guard = lock_env();
+        let repo = seeded("env-override", "wip");
+        std::fs::write(
+            repo.join("pyproject.toml"),
+            b"[tool.conductor]\nintegration_branch = \"wip\"\n",
+        )
+        .unwrap();
+        git(&repo, &["branch", "main"]); // local-only: verifies, never pushed
+        std::env::set_var("CONDUCTOR_INTEGRATION_BRANCH", "main");
+        let resolved = default_integration_ref(&repo);
+        std::env::remove_var("CONDUCTOR_INTEGRATION_BRANCH");
+        assert_eq!(resolved.unwrap(), "main");
+        std::fs::remove_dir_all(repo.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn the_origin_head_symref_answers_stripped_of_its_namespace() {
+        let _guard = lock_env();
+        let repo = seeded("symref", "work");
+        bare_origin(&repo, "symref-origin", "master");
+        git(&repo, &["push", "--quiet", "origin", "work:master"]);
+        git(
+            &repo,
+            &[
+                "symbolic-ref",
+                "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/master",
+            ],
+        );
+        // No manifest (default "main") and no local/pushed "main": only the
+        // bound symref can answer, and it must arrive as the short form.
+        assert_eq!(default_integration_ref(&repo).unwrap(), "origin/master");
+        std::fs::remove_dir_all(repo.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn the_remote_advertised_head_answers_when_nothing_local_does() {
+        let _guard = lock_env();
+        let repo = seeded("ls-remote", "work");
+        bare_origin(&repo, "ls-remote-origin", "master");
+        git(&repo, &["push", "--quiet", "origin", "work:master"]);
+        // No bound refs/remotes/origin/HEAD (a plain push never creates one),
+        // so only `ls-remote --symref` can name the line.
+        assert_eq!(default_integration_ref(&repo).unwrap(), "origin/master");
+        std::fs::remove_dir_all(repo.parent().unwrap()).ok();
+    }
+
+    #[test]
     fn integration_ref_refuses_a_repo_with_no_line() {
+        let _guard = lock_env();
         let repo = seeded("lineless", "trunk");
         assert!(default_integration_ref(&repo)
             .unwrap_err()
@@ -538,7 +657,36 @@ mod tests {
     }
 
     #[test]
+    fn a_branch_with_only_half_its_upstream_configured_is_not_finished() {
+        // Uncontained, clean worktree whose branch names a merge ref but no
+        // remote: that is not a pushed-then-pruned branch, so the worktree
+        // must not read as landed.
+        let repo = seeded("half-upstream", "main");
+        bare_origin(&repo, "half-upstream-origin", "main");
+        git(&repo, &["push", "--quiet", "origin", "main"]);
+        let wt = repo.parent().unwrap().join("wt");
+        git(
+            &repo,
+            &[
+                "worktree",
+                "add",
+                "--quiet",
+                &wt.display().to_string(),
+                "-b",
+                "feat",
+            ],
+        );
+        std::fs::write(wt.join("feat.txt"), b"feat\n").unwrap();
+        git(&wt, &["add", "feat.txt"]);
+        git(&wt, &["commit", "--quiet", "-m", "feat"]);
+        git(&repo, &["config", "branch.feat.merge", "refs/heads/feat"]);
+        assert_eq!(landed_worktrees("origin/main", &repo).unwrap(), 0);
+        std::fs::remove_dir_all(repo.parent().unwrap()).ok();
+    }
+
+    #[test]
     fn exposure_line_renders_the_counts_and_the_unknown_skipped_line() {
+        let _guard = lock_env();
         let repo = seeded("exposure", "main");
         let line = exposure_line(&repo);
         assert!(
@@ -556,16 +704,7 @@ mod tests {
         git(&repo, &["add", "gone.txt"]);
         std::fs::remove_file(repo.join("gone.txt")).unwrap(); // staged deletion
                                                               // Aged past the stale threshold so exactly the untracked file counts.
-        let touched = Command::new("touch")
-            .args(["-d", "@1000000000", "with space.txt"])
-            .current_dir(&repo)
-            .output()
-            .unwrap();
-        assert!(
-            touched.status.success(),
-            "touch: {}",
-            String::from_utf8_lossy(&touched.stderr)
-        );
+        touch(&repo, 1_000_000_000, "with space.txt");
         let paths = status_paths(&repo).unwrap();
         assert!(paths.contains(&"with space.txt".to_string()));
         assert!(paths.contains(&"gone.txt".to_string()));
@@ -573,6 +712,50 @@ mod tests {
             stale_dirty_file_count(&repo, DEFAULT_STALE_HOURS).unwrap(),
             1,
             "the untracked file exists and the staged deletion does not"
+        );
+        std::fs::remove_dir_all(repo.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn a_file_younger_than_the_threshold_is_never_stale() {
+        // Two hours and change, not twenty-four: pins the hours arithmetic
+        // (seconds divided by 3600, never multiplied or taken modulo) with a
+        // remainder deliberately past 24 seconds either way.
+        let repo = seeded("young-file", "main");
+        std::fs::write(repo.join("young.txt"), b"x\n").unwrap();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let young = (now - 2 * 3600) / 3600 * 3600 + 30; // 2h..2h+59m30s old
+        touch(&repo, young, "young.txt");
+        assert_eq!(
+            stale_dirty_file_count(&repo, DEFAULT_STALE_HOURS).unwrap(),
+            0,
+            "a file at most three hours old is not stale"
+        );
+        std::fs::remove_dir_all(repo.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn exactly_at_the_threshold_is_not_stale() {
+        // Python compares strictly (`age > stale_hours`), so a file exactly
+        // 24h old is fresh; the clock is supplied to hit the boundary exactly.
+        let repo = seeded("boundary", "main");
+        std::fs::write(repo.join("edge.txt"), b"x\n").unwrap();
+        touch(&repo, 1_000_000_000, "edge.txt");
+        let mtime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
+        let exactly = mtime + std::time::Duration::from_secs(24 * 3600);
+        assert_eq!(
+            stale_dirty_file_count_at(&repo, DEFAULT_STALE_HOURS, exactly).unwrap(),
+            0,
+            "exactly 24h old is not stale: the comparison is strict"
+        );
+        let past = exactly + std::time::Duration::from_secs(1);
+        assert_eq!(
+            stale_dirty_file_count_at(&repo, DEFAULT_STALE_HOURS, past).unwrap(),
+            1,
+            "one second past 24h is stale"
         );
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }

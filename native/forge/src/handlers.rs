@@ -690,7 +690,7 @@ pub fn run_bash_pretooluse_fully_native(payload: &Value, native_hooks: &HashSet<
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::sync::Mutex;
 
@@ -700,7 +700,7 @@ mod tests {
     /// (concurrently running) test's override. Every test in this module
     /// that sets, unsets, or depends on the default of any of them takes
     /// this lock first.
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    pub(crate) static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     fn all_four() -> HashSet<String> {
         BASH_PRETOOLUSE_HOOK_NAMES
@@ -760,6 +760,12 @@ mod tests {
         use std::process::Command;
 
         let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // The exposure line resolves the integration line, which reads
+        // CONDUCTOR_INTEGRATION_BRANCH; workspace_hygiene's env-override test
+        // sets that variable under this same lock.
+        let _integration = crate::workspace_hygiene::INTEGRATION_ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         // A scratch git repo so the line is a real count, not the degrade
@@ -1046,5 +1052,41 @@ mod tests {
             out["hookSpecificOutput"]["permissionDecision"],
             json!("deny")
         );
+    }
+
+    #[test]
+    fn post_tool_matchers_mirror_the_registry_matchers() {
+        // `post_bash_quiet` is Bash-only; `post_tool_quiet` is the
+        // Read/Grep/mcp__ triple; anything else claims no match, so a native
+        // answer is never promised for a hook Python's own `select()` would
+        // not have run.
+        assert!(post_tool_use_matches("post_bash_quiet", "Bash"));
+        assert!(!post_tool_use_matches("post_bash_quiet", "Read"));
+        assert!(post_tool_use_matches("post_tool_quiet", "Read"));
+        assert!(post_tool_use_matches("post_tool_quiet", "Grep"));
+        assert!(post_tool_use_matches(
+            "post_tool_quiet",
+            "mcp__code_review_graph__x"
+        ));
+        assert!(!post_tool_use_matches("post_tool_quiet", "Bash"));
+        assert!(!post_tool_use_matches("post_tool_quiet", "Edit"));
+        assert!(!post_tool_use_matches("context_telemetry", "Read"));
+    }
+
+    #[test]
+    fn post_tool_answers_cover_only_the_opted_in_matcher_eligible_hooks() {
+        let payload = serde_json::json!({"tool_name": "Bash"});
+        let mut hooks = HashSet::new();
+        hooks.insert("post_bash_quiet".to_string());
+        let answers = native_answers_for_post_tool_use(&payload, &hooks);
+        assert!(
+            answers.contains_key("post_bash_quiet"),
+            "the opted-in, matcher-eligible hook must be answered: {answers:?}"
+        );
+        // `post_tool_quiet` opted in but its matcher excludes Bash: no answer
+        // may be claimed for a hook Python would not have run.
+        hooks.insert("post_tool_quiet".to_string());
+        let answers = native_answers_for_post_tool_use(&payload, &hooks);
+        assert!(!answers.contains_key("post_tool_quiet"));
     }
 }

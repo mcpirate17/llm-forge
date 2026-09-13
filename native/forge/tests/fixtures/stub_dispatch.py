@@ -37,6 +37,20 @@ def main() -> int:
             )
         )
         return 0
+    if event in ("SessionStart", "SessionEnd"):
+        import os
+
+        sys.stdout.write(
+            json.dumps(
+                {
+                    "event": event,
+                    "echoed": json.loads(stdin_payload or "{}"),
+                    "forge_native_hooks": os.environ.get("FORGE_NATIVE_HOOKS"),
+                    "forge_native_answers": os.environ.get("FORGE_NATIVE_ANSWERS"),
+                }
+            )
+        )
+        return 0
     if event == "PostToolUse":
         sys.stderr.write("stub dispatcher: soft warning on stderr\n")
         sys.stdout.write(json.dumps({"ok": True}))
