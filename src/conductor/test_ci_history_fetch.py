@@ -234,6 +234,32 @@ def test_first_push_ci_classifies_the_recorded_check_runs() -> None:
     assert first_push_ci({"check_runs": []}) == "unknown"
 
 
+def test_the_merged_listing_always_names_an_explicit_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No --limit means gh's own default of 30, which is not "all merged PRs".
+
+    A PR missing from the cache reads as unknown to the outcome join, so the
+    silent 30-newest cap would blank the outcome columns of every older PR.
+    This pins that the fetcher always sends a limit, however large the default.
+    """
+
+    argvs: list[list[str]] = []
+
+    def recording(self: GhClient, *args: str) -> str:
+        argvs.append(list(args))
+        return "[]"
+
+    monkeypatch.setattr(GhClient, "_run_gh", recording)
+    client = GhClient(Path("."), "octo", "widget")
+
+    client.list_merged()
+    client.list_merged(limit=5)
+
+    assert argvs[0][-2:] == ["--limit", str(fetcher._DEFAULT_LIMIT)]
+    assert argvs[1][-2:] == ["--limit", "5"]
+
+
 def test_trailers_come_from_interpret_trailers_not_a_regex(
     tmp_path: Path,
 ) -> None:

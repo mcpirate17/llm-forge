@@ -58,6 +58,12 @@ _RATE_LIMIT_MARKERS = ("rate limit", "too many requests")
 _BACKOFF_SECONDS = 30.0
 _BACKOFF_ATTEMPTS = 3
 _AUTH_MARKERS = ("not logged in", "authentication required", "gh auth login")
+# gh caps `pr list` at its own default of 30 when no --limit is passed, and
+# "the merged PRs" means all of them: the join treats a PR missing from the
+# cache as unknown, so a silent 30-newest cap would quietly blank the outcome
+# columns of every older PR. An explicit large default; the incremental rule
+# keeps re-runs at one `pr list` plus whatever is new regardless.
+_DEFAULT_LIMIT = 1000
 
 
 class EnvError(RuntimeError):
@@ -198,9 +204,9 @@ class GhClient:
             "merged",
             "--json",
             "number,headRefName,mergedAt",
+            "--limit",
+            str(limit if limit is not None else _DEFAULT_LIMIT),
         ]
-        if limit is not None:
-            args += ["--limit", str(limit)]
         return json.loads(self._run_gh(*args))
 
     def view_pr(self, number: int) -> dict[str, Any]:
@@ -372,8 +378,8 @@ def fetch(
 ) -> tuple[int, list[int]]:
     """Merge a fresh fetch into ``out``; (exit code, unresolved PR numbers)."""
 
-    existing = load_existing(out)
     gh.require_ready()
+    existing = load_existing(out)
     merged = gh.list_merged(limit=max_prs)
     if since_days is not None:
         cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
