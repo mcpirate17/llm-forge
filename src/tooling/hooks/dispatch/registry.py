@@ -9,6 +9,7 @@ project root, under the running interpreter for ``.py`` bodies).
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from typing import Final
@@ -285,6 +286,28 @@ def settings_block() -> dict:
             for event in EVENTS
         }
     }
+
+
+def natively_served() -> frozenset[str]:
+    """Hook names ``native/forge`` (the Rust `forge` binary) has told this
+    Python process it may answer itself, via ``FORGE_NATIVE_HOOKS`` -- a
+    comma-separated list of `HookSpec.name` values, e.g. ``"pre_bash"``.
+
+    Dormant by default (unset, or a name registered here never being placed in
+    ``FORGE_NATIVE_HOOKS`` by a caller): nothing filters `select()`'s output
+    unless a caller opts a specific hook in. `forge`'s own Rust dispatcher
+    (``native/forge/src/dispatch.rs``) deliberately never sets this for
+    ``pre_bash`` when delegating to Python, because ``pre_bash``'s Python
+    adapter also runs `_bash_impact.main()` on the allow path (unported), and
+    skipping the whole spec here would silently drop that contribution too --
+    see `native/forge/src/handlers.rs`'s module doc for the full reasoning.
+    This exists so a *different* caller (a test harness, or a future forge
+    handler with no such hidden dependency) has a documented, working way to
+    tell this dispatcher "skip this one, it already ran natively" without
+    inventing a second mechanism.
+    """
+    raw = os.environ.get("FORGE_NATIVE_HOOKS", "")
+    return frozenset(name.strip() for name in raw.split(",") if name.strip())
 
 
 def resolve_legacy(command: str) -> HookSpec | None:
