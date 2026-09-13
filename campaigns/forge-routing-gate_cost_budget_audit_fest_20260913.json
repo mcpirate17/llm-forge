@@ -1,0 +1,37 @@
+{
+  "campaign_id": "forge-routing-gate_cost_budget_audit_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/cost_budget_audit.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/cost_budget_audit.py": "f3e9ce585bd8a901a94a5df81d40231040b7ac6a715b20fd42870fcfd76903e7"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_cost_budget_audit.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_cost_budget_audit.py": "00363bb33c66c166405bcc3f14bea8eafa963c325ff111c32ba82dc43cd69216"
+  },
+  "title": "Generated mutants for src/conductor/cost_budget_audit.py, scored on the survivor set"
+}
