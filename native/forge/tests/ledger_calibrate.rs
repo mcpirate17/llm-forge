@@ -5,6 +5,9 @@
 //! compiles the ledger module in via `#[path]`, the same pattern as
 //! `tests/ledger_fixtures.rs` (this crate has no lib target).
 
+#[path = "../src/json_canon.rs"]
+#[allow(dead_code)]
+mod json_canon;
 #[path = "../src/ledger/mod.rs"]
 #[allow(dead_code)]
 // only calibrate's fixture parser is exercised here; the CLI tests below

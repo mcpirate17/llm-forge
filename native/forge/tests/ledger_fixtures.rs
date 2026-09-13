@@ -7,6 +7,9 @@
 //! ledger module is compiled in via `#[path]` rather than an external
 //! `extern crate forge` import.
 
+#[path = "../src/json_canon.rs"]
+#[allow(dead_code)]
+mod json_canon;
 #[path = "../src/ledger/mod.rs"]
 #[allow(dead_code)]
 // only reader/schema are exercised here; run()/CLI printing are covered by the `forge` binary itself.
