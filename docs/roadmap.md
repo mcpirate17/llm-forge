@@ -202,12 +202,13 @@ agent tokens. Stop porting; finish Phase 3, then install.
    nowhere -- a rebuild silently dropped them and a search for a
    just-written note came back empty. Both trees are now indexed always
    (source tags `notes`/`tasks`/`vault_research`/`vault_dashboards`/
-   `vault_runbooks`, no dedupe). DONE PR #TBD (`docs/install.md`, "Prose
-   search of notes"); parity between the Python and Rust extraction/DDL
-   pinned by unit tests (`fts5_is_available`,
-   `rebuild_indexes_repo_and_vault_together`), a live Python-vs-Rust
-   byte-comparison harness on a larger fixture is debt for the follow-up
-   PR.
+   `vault_runbooks`, no dedupe). DONE PR #66 c94197c (`docs/install.md`,
+   "Prose search of notes"); parity pinned by unit tests
+   (`fts5_is_available`, `rebuild_indexes_repo_and_vault_together`) and
+   by `src/conductor/test_index_notes.py`'s Python-vs-forge fixture run
+   (18 `notes_fts` rows and 2 `note_tables` rows byte-identical, three
+   searches in the same order; it found and fixed one Rust bug, the JSON
+   cell separators in `note_tables`).
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
