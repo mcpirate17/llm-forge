@@ -564,6 +564,7 @@ def execute(
 
     environment = {
         **campaign.environment,
+        **_core.snapshot_python_environment(),
         "PATH": os.environ.get("PATH", ""),
         "MULL_CONFIG": str(mull_scope_config(campaign, worktree)),
     }

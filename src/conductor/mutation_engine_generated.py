@@ -41,7 +41,7 @@ from conductor.mutation_campaign_model import (
 )
 from conductor.mutation_scope import CampaignError
 from conductor.project_paths import mutation_receipt_root_relative
-from conductor.snapshot_worktree import isolated_snapshot
+from conductor.snapshot_worktree import isolated_snapshot, snapshot_python
 
 # Re-exported so an adapter can write its own partial receipt without reaching
 # into a private alias of a module it does not import.
@@ -366,6 +366,50 @@ def resolve_mutant_timeout(
     return derived
 
 
+def snapshot_python_environment() -> dict[str, str]:
+    """The interpreter export that lets a snapshot's tests drive Python.
+
+    A git snapshot carries no ``.venv`` (it is gitignored), so a Rust suite
+    that shells out to Python resolves ``python3`` from PATH and cannot import
+    ``conductor`` -- the campaign dies at its own baseline inside a snapshot
+    that passes outside it. The adapters merge this into every environment
+    they build; the Rust harness ranks ``CONDUCTOR_SNAPSHOT_PYTHON`` ahead of
+    its venv-over-PATH rule, so inside a sandbox the export is the only
+    interpreter that works and outside one it never fires.
+    """
+
+    return {"CONDUCTOR_SNAPSHOT_PYTHON": snapshot_python(REPO_ROOT)}
+
+
+# What a Python-less snapshot looks like from the baseline's own output. The
+# point is not to diagnose every failure -- it is to stop the one failure mode
+# that reads as a mystery ("baseline failed in the snapshot, passes on the
+# host") from being a mystery.
+_INTERPRETER_FAILURE_MARKERS = (
+    "python3: not found",
+    "ModuleNotFoundError",
+    "No module named",
+)
+
+
+def _missing_interpreter_hint(baseline: CommandResult) -> str | None:
+    """Why this baseline may have died for want of a Python interpreter."""
+
+    recorded = baseline.as_dict()
+    tails = " ".join(
+        str(recorded.get(key) or "") for key in ("stdout_tail", "stderr_tail")
+    )
+    for marker in _INTERPRETER_FAILURE_MARKERS:
+        if marker in tails:
+            return (
+                "the baseline could not drive Python inside the snapshot: "
+                "export CONDUCTOR_SNAPSHOT_PYTHON (the engine adapters do "
+                "this automatically; [tool.conductor].snapshot_python "
+                "overrides which interpreter)"
+            )
+    return None
+
+
 def note_baseline(
     campaign: GeneratedCampaign,
     receipt: dict[str, Any],
@@ -387,7 +431,9 @@ def note_baseline(
     if baseline.timed_out or baseline.returncode != 0:
         receipt["status"] = "BASELINE_FAILED"
         atomic_json(output_path, receipt)
-        raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+        hint = _missing_interpreter_hint(baseline)
+        detail = f"unmutated baseline failed; receipt={output_path}"
+        raise CampaignError(f"{detail}; {hint}" if hint else detail)
     receipt["mutant_timeout_seconds"] = resolve_mutant_timeout(
         campaign, baseline.duration_seconds
     )

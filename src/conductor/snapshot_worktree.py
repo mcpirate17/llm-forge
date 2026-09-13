@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -89,6 +90,28 @@ def _configured_extra_suffixes(repo: Path) -> frozenset[str]:
             raise ProjectPathError(f"{source} must not contain an empty suffix")
         out.add(text if text.startswith(".") else f".{text}")
     return frozenset(out)
+
+
+def snapshot_python(repo: Path) -> str:
+    """The interpreter a snapshot exports for tests that drive Python.
+
+    A snapshot is a git tree and ``.venv`` is gitignored, so a test that shells
+    out to Python (the forge parity twins are the standing case) finds no
+    interpreter that can import ``conductor`` inside the worktree and the
+    campaign dies at its own baseline. The venv is never copied -- the host's
+    interpreter is exported instead, as ``CONDUCTOR_SNAPSHOT_PYTHON``:
+    ``[tool.conductor].snapshot_python`` when the host needs a specific one,
+    else ``sys.executable`` of whatever built the snapshot, which is by
+    construction an interpreter with ``conductor`` importable.
+    """
+
+    raw = conductor_table(repo).get("snapshot_python")
+    if raw is None:
+        return sys.executable
+    source = "[tool.conductor].snapshot_python"
+    if not isinstance(raw, str) or not raw.strip():
+        raise ProjectPathError(f"{source} must be a path to a Python interpreter")
+    return raw
 
 
 @dataclass(frozen=True, slots=True)
