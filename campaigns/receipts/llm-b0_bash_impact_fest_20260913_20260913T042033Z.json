@@ -1,0 +1,3022 @@
+{
+  "adapter_sha256": "94ba82a0851d208c0fa62dc8b2942d969f7b18c781c17834c953bbf1a7f337b3",
+  "attribution": {
+    "attributed_mutants": 84,
+    "baseline_repetitions": 2,
+    "killed_mutants": 84,
+    "ranked_tests": 1,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.289172,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "..                                                                       [100%]\n2 passed in 0.04s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-timeouts/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/claude/test_bash_impact_parity.py",
+    "--cov=src/tooling/hooks/claude",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "llm-b0_bash_impact_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "079a891de598d1db6bb3a596637f69720417a99aea7c5ca480b4779fe1694ab0",
+  "engine_result": {
+    "duration_seconds": 19.859875,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": " 75,\n        \"original_text\": \"\\\"DESTRUCTIVE COMMAND IMPACT (must summarize to user before/after running):\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-liujq2wm/worktree/src/tooling/hooks/claude/_bash_impact.py\",\n        \"line\": 214,\n        \"column\": 9,\n        \"byte_offset\": 7522,\n        \"byte_length\": 1,\n        \"original_text\": \"+\",\n        \"mutated_text\": \"-\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-liujq2wm/worktree/src/tooling/hooks/claude/_bash_impact.py\",\n        \"line\": 215,\n        \"column\": 9,\n        \"byte_offset\": 7540,\n        \"byte_length\": 1,\n        \"original_text\": \"+\",\n        \"mutated_text\": \"-\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-liujq2wm/worktree/src/tooling/hooks/claude/_bash_impact.py\",\n        \"line\": 215,\n        \"column\": 11,\n        \"byte_offset\": 7542,\n        \"byte_length\": 208,\n        \"original_text\": \"\\\"\\\\nIf the user did not explicitly authorize this scope, stop and ask. \\\"\\n        \\\"Do not run cleanups for impact >100 files / >100 MB / >1000 rows \\\"\\n        \\\"without explicit confirmation in the current turn.\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-liujq2wm/worktree/src/tooling/hooks/claude/_bash_impact.py\",\n        \"line\": 219,\n        \"column\": 11,\n        \"byte_offset\": 7767,\n        \"byte_length\": 7,\n        \"original_text\": \"\\\"allow\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-liujq2wm/worktree/src/tooling/hooks/claude/_bash_impact.py\",\n        \"line\": 222,\n        \"column\": 4,\n        \"byte_offset\": 7804,\n        \"byte_length\": 22,\n        \"original_text\": \"__name__ == \\\"__main__\\\"\",\n        \"mutated_text\": \"not (__name__ == \\\"__main__\\\")\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-liujq2wm/worktree/src/tooling/hooks/claude/_bash_impact.py\",\n        \"line\": 222,\n        \"column\": 13,\n        \"byte_offset\": 7813,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-liujq2wm/worktree/src/tooling/hooks/claude/_bash_impact.py\",\n        \"line\": 222,\n        \"column\": 16,\n        \"byte_offset\": 7816,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"__main__\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 19,\n    \"nanos\": 855668295\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 84,
+    "mutants_generated": 170,
+    "mutants_tested": 100,
+    "no_coverage": 70,
+    "survived": 16,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T04:20:34.091146+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-timeouts/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/llm-b0_bash_impact_fest_20260913.json",
+  "manifest_sha256": "1e4092a018b5d671f077568406d4b299c2e3b965a833fdcf6fd9683501ef814c",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 30,
+  "mutants": [
+    {
+      "byte_length": 885,
+      "byte_offset": 23,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7750d4b83421-0",
+      "line": 2,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Bash impact analyzer for the PreToolUse/Bash hook.\n\nReads the proposed command from stdin (Claude Code hook payload), classifies it,\nand emits a JSON decision. For borderline-destructive commands, computes a quick\nimpact summary (file count, size, row count) and surfaces it so the agent must\necho the impact back to the user before proceeding.\n\nTiers:\n  hard_deny   \u2014 never allowed regardless of context (rm -rf /, push --force, etc.)\n                (handled by pre-bash.sh, kept here only for symmetry)\n  soft_warn   \u2014 allowed but the additionalContext force-surfaces the impact\n                to the user; the agent must summarize before continuing.\n  allow       \u2014 fast path for everything else.\n\nDesigned so the user can ask \"clean up failed experiments\" without being\nblocked, while still getting an impact summary every time something\ndestructive is about to run.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 1182,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-2111ff224ea4-0",
+      "line": 35,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "return \"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 1189,
+      "duration_seconds": 0.0,
+      "id": "return_value-0e7e182bfc05-0",
+      "line": 35,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 1189,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b5efa0fe6783-0",
+      "line": 35,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 55,
+      "byte_offset": 1203,
+      "duration_seconds": 0.0,
+      "id": "return_value-e05a4d686b7f-0",
+      "line": 36,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "str(payload.get(\"tool_input\", {}).get(\"command\") or \"\")",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 1241,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b72f3b654da9-0",
+      "line": 36,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"command\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 1252,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-ccba03f73584-0",
+      "line": 36,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 1255,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b5efa0fe6783-1",
+      "line": 36,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 1355,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9a9747a0dfa7-0",
+      "line": 41,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"hookSpecificOutput\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 1391,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-67ac61f0028e-0",
+      "line": 42,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"hookEventName\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 1408,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-71fe1e932d29-0",
+      "line": 42,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"PreToolUse\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 1434,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e12ba94cfa4c-0",
+      "line": 43,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"permissionDecision\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 1489,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-75f702bd92a0-0",
+      "line": 46,
+      "mutated_text": "not (reason)",
+      "operator": "negate_condition",
+      "original_text": "reason",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 1575,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-f1556cfd801a-0",
+      "line": 48,
+      "mutated_text": "not (additional)",
+      "operator": "negate_condition",
+      "original_text": "additional",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 1695,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-021faadca77e-0",
+      "line": 51,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 575,
+      "byte_offset": 1751,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f4f7649f5543-0",
+      "line": 55,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Return (file_count, human_size). Best-effort, never raises.\n\n    In-process: no `du` shellout. Sums `st_size` over the same files\n    `p.rglob(\"*\")` would visit (matching pathlib's refusal to descend into\n    symlinked directories; a symlink to a file is counted at its target's\n    size, since `Path.is_file()`/`Path.stat()` follow symlinks). This mirrors\n    `native/forge/src/bash_impact.rs::du_summary` exactly so the Rust port and\n    this module agree byte-for-byte instead of one reporting allocated-block\n    sizes (`du`) and the other apparent byte sizes.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2353,
+      "duration_seconds": 0.194162,
+      "id": "boolean_op-8717bd52d63c-0",
+      "line": 66,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 2353,
+      "duration_seconds": 0.195344,
+      "id": "negate_condition-be23345e6a87-0",
+      "line": 66,
+      "mutated_text": "not (not p.exists())",
+      "operator": "negate_condition",
+      "original_text": "not p.exists()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 2384,
+      "duration_seconds": 0.188176,
+      "id": "return_value-282a689d3606-0",
+      "line": 67,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "0, \"0B\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2384,
+      "duration_seconds": 0.18725,
+      "id": "constant_replace-021faadca77e-1",
+      "line": 67,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2387,
+      "duration_seconds": 0.155234,
+      "id": "constant_replace-3e986242bd47-0",
+      "line": 67,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"0B\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 2412,
+      "duration_seconds": 0.217177,
+      "id": "negate_condition-1be08201737b-0",
+      "line": 69,
+      "mutated_text": "not (p.is_file())",
+      "operator": "negate_condition",
+      "original_text": "p.is_file()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 2444,
+      "duration_seconds": 0.198127,
+      "id": "return_value-cdae1fa547c9-0",
+      "line": 70,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "1, _human_size(p.stat().st_size)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2444,
+      "duration_seconds": 0.192123,
+      "id": "constant_replace-6caa3bf43261-0",
+      "line": 70,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2493,
+      "duration_seconds": 0.18624,
+      "id": "constant_replace-021faadca77e-2",
+      "line": 71,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2511,
+      "duration_seconds": 0.188142,
+      "id": "constant_replace-021faadca77e-3",
+      "line": 72,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 2534,
+      "duration_seconds": 0.198964,
+      "id": "zero_iteration_loop-4f8eccc05497-0",
+      "line": 73,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "p.rglob(\"*\")",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 2563,
+      "duration_seconds": 0.2145,
+      "id": "negate_condition-c7486acffa81-0",
+      "line": 74,
+      "mutated_text": "not (entry.is_file())",
+      "operator": "negate_condition",
+      "original_text": "entry.is_file()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2602,
+      "duration_seconds": 0.188026,
+      "id": "augmented_assign-95bba8f2d340-0",
+      "line": 75,
+      "mutated_text": "-=",
+      "operator": "augmented_assign",
+      "original_text": "+=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2605,
+      "duration_seconds": 0.196325,
+      "id": "constant_replace-6caa3bf43261-1",
+      "line": 75,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2629,
+      "duration_seconds": 0.206494,
+      "id": "augmented_assign-95bba8f2d340-1",
+      "line": 76,
+      "mutated_text": "-=",
+      "operator": "augmented_assign",
+      "original_text": "+=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 2668,
+      "duration_seconds": 0.19325,
+      "id": "return_value-59b078f4f01d-0",
+      "line": 77,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "files, _human_size(total)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 2724,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-55e29745a17e-0",
+      "line": 79,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "return -1, \"?\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 2731,
+      "duration_seconds": 0.0,
+      "id": "return_value-36a5950cdc9d-0",
+      "line": 79,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "-1, \"?\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2731,
+      "duration_seconds": 0.0,
+      "id": "unary_op-34cfafaef702-0",
+      "line": 79,
+      "mutated_text": "+",
+      "operator": "unary_op",
+      "original_text": "-",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2731,
+      "duration_seconds": 0.0,
+      "id": "unary_op-88f121e2e699-0",
+      "line": 79,
+      "mutated_text": "~",
+      "operator": "unary_op",
+      "original_text": "-",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2731,
+      "duration_seconds": 0.0,
+      "id": "unary_op-335c90090992-0",
+      "line": 79,
+      "mutated_text": "",
+      "operator": "unary_op",
+      "original_text": "-",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2732,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6caa3bf43261-2",
+      "line": 79,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2735,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-4c19c49c1cab-0",
+      "line": 79,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"?\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 2789,
+      "duration_seconds": 0.186383,
+      "id": "zero_iteration_loop-8e3b2f3ffd03-0",
+      "line": 83,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "(\"B\", \"K\", \"M\", \"G\")",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 2822,
+      "duration_seconds": 0.192266,
+      "id": "negate_condition-1e2586340a94-0",
+      "line": 84,
+      "mutated_text": "not (n < 1024)",
+      "operator": "negate_condition",
+      "original_text": "n < 1024",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2824,
+      "duration_seconds": 0.189984,
+      "id": "comparison_op-9ca95f8d68f5-0",
+      "line": 84,
+      "mutated_text": ">=",
+      "operator": "comparison_op",
+      "original_text": "<",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2826,
+      "duration_seconds": 0.156033,
+      "id": "constant_replace-64ccc92d3949-0",
+      "line": 84,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 2851,
+      "duration_seconds": 0.194191,
+      "id": "return_value-a2c8049c5715-0",
+      "line": 85,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "f\"{n:.0f}{unit}\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2878,
+      "duration_seconds": 0.206371,
+      "id": "augmented_assign-3572febc5c1a-0",
+      "line": 86,
+      "mutated_text": "*=",
+      "operator": "augmented_assign",
+      "original_text": "//=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2882,
+      "duration_seconds": 0.161165,
+      "id": "constant_replace-64ccc92d3949-1",
+      "line": 86,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 2898,
+      "duration_seconds": 0.0,
+      "id": "return_value-92908e045db8-0",
+      "line": 87,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "f\"{n}T\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2923,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-2be59e83d580-0",
+      "line": 90,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"B\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2928,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6caa3bf43261-3",
+      "line": 90,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2931,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-73d1bd0e5c63-0",
+      "line": 90,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"K\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2936,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-64ccc92d3949-2",
+      "line": 90,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2942,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-3d8e31c96652-0",
+      "line": 90,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"M\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2947,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-64ccc92d3949-3",
+      "line": 90,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2953,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-272b913f542f-0",
+      "line": 90,
+      "mutated_text": "3",
+      "operator": "constant_replace",
+      "original_text": "2",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2956,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c4131181bacf-0",
+      "line": 90,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"G\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2961,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-64ccc92d3949-4",
+      "line": 90,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2967,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-717f97b49185-0",
+      "line": 90,
+      "mutated_text": "4",
+      "operator": "constant_replace",
+      "original_text": "3",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2970,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-bac34c36a250-0",
+      "line": 90,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"T\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2975,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-64ccc92d3949-5",
+      "line": 90,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2981,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9b3b765bb527-0",
+      "line": 90,
+      "mutated_text": "5",
+      "operator": "constant_replace",
+      "original_text": "4",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 80,
+      "byte_offset": 3024,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c19c9900161d-0",
+      "line": 94,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Inverse of _du_summary's human size. Best-effort, returns 0 on parse fail.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3112,
+      "duration_seconds": 0.190988,
+      "id": "boolean_op-8717bd52d63c-1",
+      "line": 95,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 3112,
+      "duration_seconds": 0.186932,
+      "id": "negate_condition-a77d94c6afdd-0",
+      "line": 95,
+      "mutated_text": "not (not human)",
+      "operator": "negate_condition",
+      "original_text": "not human",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3138,
+      "duration_seconds": 0.0,
+      "id": "return_value-c2520a2059d8-0",
+      "line": 96,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3138,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-021faadca77e-4",
+      "line": 96,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 3157,
+      "duration_seconds": 0.235624,
+      "id": "constant_replace-564e4e21ea3b-0",
+      "line": 97,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"^([\\d.]+)\\s*([BKMGT])\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3220,
+      "duration_seconds": 0.214887,
+      "id": "boolean_op-8717bd52d63c-2",
+      "line": 98,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 3220,
+      "duration_seconds": 0.244394,
+      "id": "negate_condition-bead3d61ccea-0",
+      "line": 98,
+      "mutated_text": "not (not m)",
+      "operator": "negate_condition",
+      "original_text": "not m",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3242,
+      "duration_seconds": 0.0,
+      "id": "return_value-c2520a2059d8-1",
+      "line": 99,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3242,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-021faadca77e-5",
+      "line": 99,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 56,
+      "byte_offset": 3268,
+      "duration_seconds": 0.247645,
+      "id": "return_value-8f503a74d068-0",
+      "line": 101,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "int(float(m.group(1)) * _SIZE_UNITS[m.group(2).upper()])",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3286,
+      "duration_seconds": 0.200831,
+      "id": "constant_replace-6caa3bf43261-4",
+      "line": 101,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3290,
+      "duration_seconds": 0.213025,
+      "id": "arithmetic_op-8db9670114a0-0",
+      "line": 101,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 3368,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-ff3c9bc6584a-0",
+      "line": 103,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "return 0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3375,
+      "duration_seconds": 0.0,
+      "id": "return_value-c2520a2059d8-2",
+      "line": 103,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3375,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-021faadca77e-6",
+      "line": 103,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3471,
+      "duration_seconds": 0.190916,
+      "id": "boolean_op-8717bd52d63c-3",
+      "line": 107,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 3471,
+      "duration_seconds": 0.193704,
+      "id": "negate_condition-f55577860736-0",
+      "line": 107,
+      "mutated_text": "not (not Path(db_path).exists())",
+      "operator": "negate_condition",
+      "original_text": "not Path(db_path).exists()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3514,
+      "duration_seconds": 0.153517,
+      "id": "return_value-2c728ef975ee-0",
+      "line": 108,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 3568,
+      "duration_seconds": 0.190291,
+      "id": "negate_condition-39f247bb2918-0",
+      "line": 110,
+      "mutated_text": "not (where)",
+      "operator": "negate_condition",
+      "original_text": "where",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3587,
+      "duration_seconds": 0.187771,
+      "id": "augmented_assign-95bba8f2d340-2",
+      "line": 111,
+      "mutated_text": "-=",
+      "operator": "augmented_assign",
+      "original_text": "+=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 3661,
+      "duration_seconds": 0.189154,
+      "id": "constant_replace-8329b71d1987-0",
+      "line": 114,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"sqlite3\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 3751,
+      "duration_seconds": 0.197895,
+      "id": "negate_condition-374d62aa2097-0",
+      "line": 116,
+      "mutated_text": "not (proc.returncode != 0)",
+      "operator": "negate_condition",
+      "original_text": "proc.returncode != 0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3767,
+      "duration_seconds": 0.189918,
+      "id": "comparison_op-fc9bb0016912-0",
+      "line": 116,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3770,
+      "duration_seconds": 0.191892,
+      "id": "constant_replace-021faadca77e-7",
+      "line": 116,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3792,
+      "duration_seconds": 0.161843,
+      "id": "return_value-2c728ef975ee-1",
+      "line": 117,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 3812,
+      "duration_seconds": 0.233149,
+      "id": "return_value-a83f4a4f1185-0",
+      "line": 118,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "int(proc.stdout.strip())",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 3867,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-bb091ef90516-0",
+      "line": 120,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "return None",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3874,
+      "duration_seconds": 0.0,
+      "id": "return_value-2c728ef975ee-2",
+      "line": 120,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 34,
+      "byte_offset": 4110,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-98fb4af229e1-0",
+      "line": 125,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"\\brm\\s+-[rRf]+\\w*\\s+([^;|&\\n]+)\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 28,
+      "byte_offset": 4172,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-09e4f8d336ca-0",
+      "line": 126,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"\\bfind\\s+(\\S+).*-delete\\b\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 41,
+      "byte_offset": 4226,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-eeccfa480b00-0",
+      "line": 127,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"\\bgit\\s+clean\\s+-[fdxX]+\\s*([^\\s;|&]*)\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 72,
+      "byte_offset": 4302,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ace7e290526d-0",
+      "line": 129,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"\\bsqlite3\\s+(\\S+)\\s+[\\\"']?\\s*(DELETE|DROP|UPDATE|TRUNCATE)\\b([^\\\"']*)\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 56,
+      "byte_offset": 4435,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-49d827668d11-0",
+      "line": 133,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"DELETE\\s+FROM\\s+(\\w+)\\s*(?:WHERE\\s+(.+?))?\\s*[\\\"';]?$\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4507,
+      "duration_seconds": 0.0,
+      "id": "bitwise_op-d062f499f849-0",
+      "line": 133,
+      "mutated_text": "&",
+      "operator": "bitwise_op",
+      "original_text": "|",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 61,
+      "byte_offset": 4571,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8ed90ecd5c29-0",
+      "line": 138,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Return (tier, impact_text). tier in {soft_warn, allow}.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4683,
+      "duration_seconds": 0.205132,
+      "id": "constant_replace-021faadca77e-8",
+      "line": 141,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4706,
+      "duration_seconds": 0.166402,
+      "id": "constant_replace-021faadca77e-9",
+      "line": 142,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 4750,
+      "duration_seconds": 0.190653,
+      "id": "zero_iteration_loop-0f2f1e442a2e-0",
+      "line": 144,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "_RM_RF_ARGS.finditer(cmd)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4805,
+      "duration_seconds": 0.158032,
+      "id": "constant_replace-6caa3bf43261-5",
+      "line": 145,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 4912,
+      "duration_seconds": 0.201704,
+      "id": "constant_replace-2dd0208c5309-0",
+      "line": 147,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"\\s(?:&&|\\|\\||>>?|<<?)\\s\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4963,
+      "duration_seconds": 0.201184,
+      "id": "constant_replace-021faadca77e-10",
+      "line": 147,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 4987,
+      "duration_seconds": 0.191079,
+      "id": "zero_iteration_loop-02263ede5c35-0",
+      "line": 148,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "args_blob.split()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 5039,
+      "duration_seconds": 0.200789,
+      "id": "constant_replace-dc9ae102b3c1-0",
+      "line": 149,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\\\"'\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 5061,
+      "duration_seconds": 0.194408,
+      "id": "boolean_op-8717bd52d63c-4",
+      "line": 150,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 5061,
+      "duration_seconds": 0.210112,
+      "id": "negate_condition-a2addf56e2c4-0",
+      "line": 150,
+      "mutated_text": "not (not target or target.startswith(\"-\"))",
+      "operator": "negate_condition",
+      "original_text": "not target or target.startswith(\"-\")",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5072,
+      "duration_seconds": 0.186416,
+      "id": "boolean_op-ccba03f73584-1",
+      "line": 150,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5093,
+      "duration_seconds": 0.213259,
+      "id": "constant_replace-d3b2b4997f63-0",
+      "line": 150,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"-\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 5115,
+      "duration_seconds": 0.0,
+      "id": "break_continue-330b555c4d0d-0",
+      "line": 151,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 5185,
+      "duration_seconds": 0.211763,
+      "id": "negate_condition-7612c17d44a3-0",
+      "line": 153,
+      "mutated_text": "not (files <= 0)",
+      "operator": "negate_condition",
+      "original_text": "files <= 0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5191,
+      "duration_seconds": 0.189682,
+      "id": "comparison_op-35d13868383c-0",
+      "line": 153,
+      "mutated_text": ">",
+      "operator": "comparison_op",
+      "original_text": "<=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5194,
+      "duration_seconds": 0.195113,
+      "id": "constant_replace-021faadca77e-11",
+      "line": 153,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 5213,
+      "duration_seconds": 0.163686,
+      "id": "break_continue-330b555c4d0d-1",
+      "line": 154,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5249,
+      "duration_seconds": 0.205015,
+      "id": "augmented_assign-95bba8f2d340-3",
+      "line": 155,
+      "mutated_text": "-=",
+      "operator": "augmented_assign",
+      "original_text": "+=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5285,
+      "duration_seconds": 0.233701,
+      "id": "augmented_assign-95bba8f2d340-4",
+      "line": 156,
+      "mutated_text": "-=",
+      "operator": "augmented_assign",
+      "original_text": "+=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 5382,
+      "duration_seconds": 0.212285,
+      "id": "negate_condition-62e3d7d056d5-0",
+      "line": 158,
+      "mutated_text": "not (rm_lines)",
+      "operator": "negate_condition",
+      "original_text": "rm_lines",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 5403,
+      "duration_seconds": 0.193424,
+      "id": "negate_condition-5c783db1f3f8-0",
+      "line": 159,
+      "mutated_text": "not (len(rm_lines) > 1)",
+      "operator": "negate_condition",
+      "original_text": "len(rm_lines) > 1",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5417,
+      "duration_seconds": 0.195194,
+      "id": "comparison_op-0b80f0a96847-0",
+      "line": 159,
+      "mutated_text": "<=",
+      "operator": "comparison_op",
+      "original_text": ">",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5419,
+      "duration_seconds": 0.190614,
+      "id": "constant_replace-6caa3bf43261-6",
+      "line": 159,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 5592,
+      "duration_seconds": 0.186656,
+      "id": "zero_iteration_loop-aacca5547444-0",
+      "line": 165,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "_FIND_DELETE.finditer(cmd)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 5654,
+      "duration_seconds": 0.207251,
+      "id": "constant_replace-dc9ae102b3c1-1",
+      "line": 166,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\\\"'\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 5714,
+      "duration_seconds": 0.19511,
+      "id": "negate_condition-2bf00b084f67-0",
+      "line": 168,
+      "mutated_text": "not (files > 0)",
+      "operator": "negate_condition",
+      "original_text": "files > 0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5720,
+      "duration_seconds": 0.190405,
+      "id": "comparison_op-0b80f0a96847-1",
+      "line": 168,
+      "mutated_text": "<=",
+      "operator": "comparison_op",
+      "original_text": ">",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5722,
+      "duration_seconds": 0.154874,
+      "id": "constant_replace-021faadca77e-12",
+      "line": 168,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 5824,
+      "duration_seconds": 0.193224,
+      "id": "zero_iteration_loop-c077c75d3445-0",
+      "line": 171,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "_GIT_CLEAN.finditer(cmd)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 5884,
+      "duration_seconds": 0.153345,
+      "id": "constant_replace-dc9ae102b3c1-2",
+      "line": 172,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\\\"'\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5891,
+      "duration_seconds": 0.19285,
+      "id": "boolean_op-ccba03f73584-2",
+      "line": 172,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5894,
+      "duration_seconds": 0.159309,
+      "id": "constant_replace-a854f5106886-0",
+      "line": 172,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 5951,
+      "duration_seconds": 0.217443,
+      "id": "negate_condition-2bf00b084f67-1",
+      "line": 174,
+      "mutated_text": "not (files > 0)",
+      "operator": "negate_condition",
+      "original_text": "files > 0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5957,
+      "duration_seconds": 0.199949,
+      "id": "comparison_op-0b80f0a96847-2",
+      "line": 174,
+      "mutated_text": "<=",
+      "operator": "comparison_op",
+      "original_text": ">",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5959,
+      "duration_seconds": 0.184422,
+      "id": "constant_replace-021faadca77e-13",
+      "line": 174,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 28,
+      "byte_offset": 6059,
+      "duration_seconds": 0.204582,
+      "id": "zero_iteration_loop-3e4c8fbf16bb-0",
+      "line": 177,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "_SQLITE_MUTATE.finditer(cmd)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 6124,
+      "duration_seconds": 0.167164,
+      "id": "constant_replace-dc9ae102b3c1-3",
+      "line": 178,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\\\"'\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6188,
+      "duration_seconds": 0.240665,
+      "id": "constant_replace-717f97b49185-1",
+      "line": 180,
+      "mutated_text": "4",
+      "operator": "constant_replace",
+      "original_text": "3",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6191,
+      "duration_seconds": 0.301613,
+      "id": "boolean_op-ccba03f73584-3",
+      "line": 180,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6194,
+      "duration_seconds": 0.210371,
+      "id": "constant_replace-b5efa0fe6783-2",
+      "line": 180,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6215,
+      "duration_seconds": 0.195614,
+      "id": "constant_replace-b5efa0fe6783-3",
+      "line": 181,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 6229,
+      "duration_seconds": 0.215759,
+      "id": "negate_condition-a0f0426fe29c-0",
+      "line": 182,
+      "mutated_text": "not (verb == \"DELETE\")",
+      "operator": "negate_condition",
+      "original_text": "verb == \"DELETE\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6234,
+      "duration_seconds": 0.210355,
+      "id": "comparison_op-20b576962a33-0",
+      "line": 182,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 6237,
+      "duration_seconds": 0.197929,
+      "id": "constant_replace-dd038b7a78b8-0",
+      "line": 182,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"DELETE\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6304,
+      "duration_seconds": 0.216672,
+      "id": "arithmetic_op-d59f0e9366a2-0",
+      "line": 183,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 6327,
+      "duration_seconds": 0.210765,
+      "id": "negate_condition-0b4f6e5cbd77-0",
+      "line": 184,
+      "mutated_text": "not (from_match)",
+      "operator": "negate_condition",
+      "original_text": "from_match",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6380,
+      "duration_seconds": 0.216497,
+      "id": "constant_replace-6caa3bf43261-7",
+      "line": 185,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 6450,
+      "duration_seconds": 0.185144,
+      "id": "constant_replace-590c4d73c65f-0",
+      "line": 186,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\";\\\"' \"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6520,
+      "duration_seconds": 0.205602,
+      "id": "boolean_op-ccba03f73584-4",
+      "line": 187,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 6548,
+      "duration_seconds": 0.233217,
+      "id": "negate_condition-e7f13d17c66e-0",
+      "line": 188,
+      "mutated_text": "not (count is not None)",
+      "operator": "negate_condition",
+      "original_text": "count is not None",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 6554,
+      "duration_seconds": 0.217365,
+      "id": "comparison_op-86c7e041be62-0",
+      "line": 188,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 6693,
+      "duration_seconds": 0.221167,
+      "id": "negate_condition-9b325bbaed53-0",
+      "line": 192,
+      "mutated_text": "not (impacts)",
+      "operator": "negate_condition",
+      "original_text": "impacts",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 50,
+      "byte_offset": 6717,
+      "duration_seconds": 0.229243,
+      "id": "return_value-44a40cdb7b1f-0",
+      "line": 193,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "\"soft_warn\", \"\\n  \u2022 \" + \"\\n  \u2022 \".join(impacts)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 6717,
+      "duration_seconds": 0.218784,
+      "id": "constant_replace-66e6c38b4449-0",
+      "line": 193,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"soft_warn\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 6730,
+      "duration_seconds": 0.217907,
+      "id": "constant_replace-5aef8b1d7201-0",
+      "line": 193,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\\n  \u2022 \"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6741,
+      "duration_seconds": 0.191595,
+      "id": "arithmetic_op-d59f0e9366a2-1",
+      "line": 193,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 6779,
+      "duration_seconds": 0.185007,
+      "id": "return_value-0734cab322a0-0",
+      "line": 194,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "\"allow\", \"\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 6779,
+      "duration_seconds": 0.207855,
+      "id": "constant_replace-782d4beaf93a-0",
+      "line": 194,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"allow\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6788,
+      "duration_seconds": 0.208333,
+      "id": "constant_replace-b5efa0fe6783-4",
+      "line": 194,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 6846,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-8717bd52d63c-5",
+      "line": 199,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 6846,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-d3514520ea92-0",
+      "line": 199,
+      "mutated_text": "not (not cmd)",
+      "operator": "negate_condition",
+      "original_text": "not cmd",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 6869,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-782d4beaf93a-1",
+      "line": 200,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"allow\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 7071,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-98de3d864e2f-0",
+      "line": 205,
+      "mutated_text": "not (tier == \"allow\")",
+      "operator": "negate_condition",
+      "original_text": "tier == \"allow\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 7076,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-20b576962a33-1",
+      "line": 205,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 7079,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-782d4beaf93a-2",
+      "line": 205,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"allow\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 7102,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-782d4beaf93a-3",
+      "line": 206,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"allow\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 75,
+      "byte_offset": 7438,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-3809f783f966-0",
+      "line": 213,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"DESTRUCTIVE COMMAND IMPACT (must summarize to user before/after running):\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 7522,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-d59f0e9366a2-2",
+      "line": 214,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 7540,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-d59f0e9366a2-3",
+      "line": 215,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 7542,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b1b144835378-0",
+      "line": 215,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\\nIf the user did not explicitly authorize this scope, stop and ask. \"\n        \"Do not run cleanups for impact >100 files / >100 MB / >1000 rows \"\n        \"without explicit confirmation in the current turn.\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 7767,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-782d4beaf93a-4",
+      "line": 219,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"allow\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 7804,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-478adbc63af8-0",
+      "line": 222,
+      "mutated_text": "not (__name__ == \"__main__\")",
+      "operator": "negate_condition",
+      "original_text": "__name__ == \"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 7813,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-20b576962a33-2",
+      "line": 222,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 7816,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-2780e9f41df6-0",
+      "line": 222,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/claude/_bash_impact.py",
+      "tests_run": []
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.84,
+  "new_survivors": [],
+  "no_coverage": 70,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 84,
+    "NO_COVERAGE": 70,
+    "SURVIVED": 16,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/llm-b0_bash_impact_fest_20260913_20260913T042033Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "5743cd8973f377be22581505e52af44011da6e740c8a03d0208eed4cf76916c8",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "b75962e0c67452fec0dbdd6792f024dd88fef7d4238786f4de40edb96cad2bb9"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/tooling/hooks/claude/_bash_impact.py": "8900b8291382915d8b4e02354e5aace82158a21f2c0ac264c12acecac468dfb8"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [
+    "boolean_op-ccba03f73584-1",
+    "break_continue-330b555c4d0d-1",
+    "constant_replace-021faadca77e-12",
+    "constant_replace-021faadca77e-13",
+    "constant_replace-021faadca77e-9",
+    "constant_replace-3e986242bd47-0",
+    "constant_replace-590c4d73c65f-0",
+    "constant_replace-64ccc92d3949-0",
+    "constant_replace-64ccc92d3949-1",
+    "constant_replace-6caa3bf43261-5",
+    "constant_replace-a854f5106886-0",
+    "constant_replace-b5efa0fe6783-2",
+    "constant_replace-dc9ae102b3c1-2",
+    "constant_replace-dc9ae102b3c1-3",
+    "return_value-2c728ef975ee-0",
+    "return_value-2c728ef975ee-1"
+  ],
+  "survivors": [
+    "boolean_op-ccba03f73584-1",
+    "break_continue-330b555c4d0d-1",
+    "constant_replace-021faadca77e-12",
+    "constant_replace-021faadca77e-13",
+    "constant_replace-021faadca77e-9",
+    "constant_replace-3e986242bd47-0",
+    "constant_replace-590c4d73c65f-0",
+    "constant_replace-64ccc92d3949-0",
+    "constant_replace-64ccc92d3949-1",
+    "constant_replace-6caa3bf43261-5",
+    "constant_replace-a854f5106886-0",
+    "constant_replace-b5efa0fe6783-2",
+    "constant_replace-dc9ae102b3c1-2",
+    "constant_replace-dc9ae102b3c1-3",
+    "return_value-2c728ef975ee-0",
+    "return_value-2c728ef975ee-1"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/claude/test_bash_impact_parity.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/claude/test_bash_impact_parity.py": "9ec67bbda309443addd2f2cd2795795b5fad8cb09605e7c3def42762372b284a"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 1,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 0
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-8db9670114a0-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "arithmetic_op-d59f0e9366a2-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "arithmetic_op-d59f0e9366a2-1": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "augmented_assign-3572febc5c1a-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "augmented_assign-95bba8f2d340-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "augmented_assign-95bba8f2d340-1": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "augmented_assign-95bba8f2d340-2": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "augmented_assign-95bba8f2d340-3": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "augmented_assign-95bba8f2d340-4": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "boolean_op-8717bd52d63c-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "boolean_op-8717bd52d63c-1": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "boolean_op-8717bd52d63c-2": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "boolean_op-8717bd52d63c-3": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "boolean_op-8717bd52d63c-4": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "boolean_op-ccba03f73584-2": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "boolean_op-ccba03f73584-3": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "boolean_op-ccba03f73584-4": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "comparison_op-0b80f0a96847-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "comparison_op-0b80f0a96847-1": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "comparison_op-0b80f0a96847-2": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "comparison_op-20b576962a33-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "comparison_op-35d13868383c-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "comparison_op-86c7e041be62-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "comparison_op-9ca95f8d68f5-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "comparison_op-fc9bb0016912-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-021faadca77e-1": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-021faadca77e-10": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-021faadca77e-11": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-021faadca77e-2": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-021faadca77e-3": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-021faadca77e-7": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-021faadca77e-8": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-2dd0208c5309-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-564e4e21ea3b-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-5aef8b1d7201-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-66e6c38b4449-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-6caa3bf43261-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-6caa3bf43261-1": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-6caa3bf43261-4": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-6caa3bf43261-6": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-6caa3bf43261-7": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-717f97b49185-1": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-782d4beaf93a-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-8329b71d1987-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-b5efa0fe6783-3": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-b5efa0fe6783-4": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-d3b2b4997f63-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-dc9ae102b3c1-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-dc9ae102b3c1-1": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "constant_replace-dd038b7a78b8-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-0b4f6e5cbd77-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-1be08201737b-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-1e2586340a94-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-2bf00b084f67-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-2bf00b084f67-1": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-374d62aa2097-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-39f247bb2918-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-5c783db1f3f8-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-62e3d7d056d5-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-7612c17d44a3-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-9b325bbaed53-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-a0f0426fe29c-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-a2addf56e2c4-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-a77d94c6afdd-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-be23345e6a87-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-bead3d61ccea-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-c7486acffa81-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-e7f13d17c66e-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "negate_condition-f55577860736-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "return_value-0734cab322a0-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "return_value-282a689d3606-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "return_value-44a40cdb7b1f-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "return_value-59b078f4f01d-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "return_value-8f503a74d068-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "return_value-a2c8049c5715-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "return_value-a83f4a4f1185-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "return_value-cdae1fa547c9-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "zero_iteration_loop-02263ede5c35-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "zero_iteration_loop-0f2f1e442a2e-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "zero_iteration_loop-3e4c8fbf16bb-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "zero_iteration_loop-4f8eccc05497-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "zero_iteration_loop-8e3b2f3ffd03-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "zero_iteration_loop-aacca5547444-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ],
+      "zero_iteration_loop-c077c75d3445-0": [
+        "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/tooling/hooks/claude/_bash_impact.py"
+        ],
+        "criticality": "high",
+        "id": "llm-b0_bash_impact_fest_20260913"
+      }
+    ],
+    "retained_core": [
+      "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-b0_bash_impact_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-8db9670114a0-0",
+          "arithmetic_op-d59f0e9366a2-0",
+          "arithmetic_op-d59f0e9366a2-1",
+          "augmented_assign-3572febc5c1a-0",
+          "augmented_assign-95bba8f2d340-0",
+          "augmented_assign-95bba8f2d340-1",
+          "augmented_assign-95bba8f2d340-2",
+          "augmented_assign-95bba8f2d340-3",
+          "augmented_assign-95bba8f2d340-4",
+          "boolean_op-8717bd52d63c-0",
+          "boolean_op-8717bd52d63c-1",
+          "boolean_op-8717bd52d63c-2",
+          "boolean_op-8717bd52d63c-3",
+          "boolean_op-8717bd52d63c-4",
+          "boolean_op-ccba03f73584-2",
+          "boolean_op-ccba03f73584-3",
+          "boolean_op-ccba03f73584-4",
+          "comparison_op-0b80f0a96847-0",
+          "comparison_op-0b80f0a96847-1",
+          "comparison_op-0b80f0a96847-2",
+          "comparison_op-20b576962a33-0",
+          "comparison_op-35d13868383c-0",
+          "comparison_op-86c7e041be62-0",
+          "comparison_op-9ca95f8d68f5-0",
+          "comparison_op-fc9bb0016912-0",
+          "constant_replace-021faadca77e-1",
+          "constant_replace-021faadca77e-10",
+          "constant_replace-021faadca77e-11",
+          "constant_replace-021faadca77e-2",
+          "constant_replace-021faadca77e-3",
+          "constant_replace-021faadca77e-7",
+          "constant_replace-021faadca77e-8",
+          "constant_replace-2dd0208c5309-0",
+          "constant_replace-564e4e21ea3b-0",
+          "constant_replace-5aef8b1d7201-0",
+          "constant_replace-66e6c38b4449-0",
+          "constant_replace-6caa3bf43261-0",
+          "constant_replace-6caa3bf43261-1",
+          "constant_replace-6caa3bf43261-4",
+          "constant_replace-6caa3bf43261-6",
+          "constant_replace-6caa3bf43261-7",
+          "constant_replace-717f97b49185-1",
+          "constant_replace-782d4beaf93a-0",
+          "constant_replace-8329b71d1987-0",
+          "constant_replace-b5efa0fe6783-3",
+          "constant_replace-b5efa0fe6783-4",
+          "constant_replace-d3b2b4997f63-0",
+          "constant_replace-dc9ae102b3c1-0",
+          "constant_replace-dc9ae102b3c1-1",
+          "constant_replace-dd038b7a78b8-0",
+          "negate_condition-0b4f6e5cbd77-0",
+          "negate_condition-1be08201737b-0",
+          "negate_condition-1e2586340a94-0",
+          "negate_condition-2bf00b084f67-0",
+          "negate_condition-2bf00b084f67-1",
+          "negate_condition-374d62aa2097-0",
+          "negate_condition-39f247bb2918-0",
+          "negate_condition-5c783db1f3f8-0",
+          "negate_condition-62e3d7d056d5-0",
+          "negate_condition-7612c17d44a3-0",
+          "negate_condition-9b325bbaed53-0",
+          "negate_condition-a0f0426fe29c-0",
+          "negate_condition-a2addf56e2c4-0",
+          "negate_condition-a77d94c6afdd-0",
+          "negate_condition-be23345e6a87-0",
+          "negate_condition-bead3d61ccea-0",
+          "negate_condition-c7486acffa81-0",
+          "negate_condition-e7f13d17c66e-0",
+          "negate_condition-f55577860736-0",
+          "return_value-0734cab322a0-0",
+          "return_value-282a689d3606-0",
+          "return_value-44a40cdb7b1f-0",
+          "return_value-59b078f4f01d-0",
+          "return_value-8f503a74d068-0",
+          "return_value-a2c8049c5715-0",
+          "return_value-a83f4a4f1185-0",
+          "return_value-cdae1fa547c9-0",
+          "zero_iteration_loop-02263ede5c35-0",
+          "zero_iteration_loop-0f2f1e442a2e-0",
+          "zero_iteration_loop-3e4c8fbf16bb-0",
+          "zero_iteration_loop-4f8eccc05497-0",
+          "zero_iteration_loop-8e3b2f3ffd03-0",
+          "zero_iteration_loop-aacca5547444-0",
+          "zero_iteration_loop-c077c75d3445-0"
+        ],
+        "nodeid": "src/tooling/hooks/claude/test_bash_impact_parity.py::test_classify_matches_the_frozen_expected_values",
+        "runtime_seconds_median": 0.004,
+        "unique_kills": [
+          "arithmetic_op-8db9670114a0-0",
+          "arithmetic_op-d59f0e9366a2-0",
+          "arithmetic_op-d59f0e9366a2-1",
+          "augmented_assign-3572febc5c1a-0",
+          "augmented_assign-95bba8f2d340-0",
+          "augmented_assign-95bba8f2d340-1",
+          "augmented_assign-95bba8f2d340-2",
+          "augmented_assign-95bba8f2d340-3",
+          "augmented_assign-95bba8f2d340-4",
+          "boolean_op-8717bd52d63c-0",
+          "boolean_op-8717bd52d63c-1",
+          "boolean_op-8717bd52d63c-2",
+          "boolean_op-8717bd52d63c-3",
+          "boolean_op-8717bd52d63c-4",
+          "boolean_op-ccba03f73584-2",
+          "boolean_op-ccba03f73584-3",
+          "boolean_op-ccba03f73584-4",
+          "comparison_op-0b80f0a96847-0",
+          "comparison_op-0b80f0a96847-1",
+          "comparison_op-0b80f0a96847-2",
+          "comparison_op-20b576962a33-0",
+          "comparison_op-35d13868383c-0",
+          "comparison_op-86c7e041be62-0",
+          "comparison_op-9ca95f8d68f5-0",
+          "comparison_op-fc9bb0016912-0",
+          "constant_replace-021faadca77e-1",
+          "constant_replace-021faadca77e-10",
+          "constant_replace-021faadca77e-11",
+          "constant_replace-021faadca77e-2",
+          "constant_replace-021faadca77e-3",
+          "constant_replace-021faadca77e-7",
+          "constant_replace-021faadca77e-8",
+          "constant_replace-2dd0208c5309-0",
+          "constant_replace-564e4e21ea3b-0",
+          "constant_replace-5aef8b1d7201-0",
+          "constant_replace-66e6c38b4449-0",
+          "constant_replace-6caa3bf43261-0",
+          "constant_replace-6caa3bf43261-1",
+          "constant_replace-6caa3bf43261-4",
+          "constant_replace-6caa3bf43261-6",
+          "constant_replace-6caa3bf43261-7",
+          "constant_replace-717f97b49185-1",
+          "constant_replace-782d4beaf93a-0",
+          "constant_replace-8329b71d1987-0",
+          "constant_replace-b5efa0fe6783-3",
+          "constant_replace-b5efa0fe6783-4",
+          "constant_replace-d3b2b4997f63-0",
+          "constant_replace-dc9ae102b3c1-0",
+          "constant_replace-dc9ae102b3c1-1",
+          "constant_replace-dd038b7a78b8-0",
+          "negate_condition-0b4f6e5cbd77-0",
+          "negate_condition-1be08201737b-0",
+          "negate_condition-1e2586340a94-0",
+          "negate_condition-2bf00b084f67-0",
+          "negate_condition-2bf00b084f67-1",
+          "negate_condition-374d62aa2097-0",
+          "negate_condition-39f247bb2918-0",
+          "negate_condition-5c783db1f3f8-0",
+          "negate_condition-62e3d7d056d5-0",
+          "negate_condition-7612c17d44a3-0",
+          "negate_condition-9b325bbaed53-0",
+          "negate_condition-a0f0426fe29c-0",
+          "negate_condition-a2addf56e2c4-0",
+          "negate_condition-a77d94c6afdd-0",
+          "negate_condition-be23345e6a87-0",
+          "negate_condition-bead3d61ccea-0",
+          "negate_condition-c7486acffa81-0",
+          "negate_condition-e7f13d17c66e-0",
+          "negate_condition-f55577860736-0",
+          "return_value-0734cab322a0-0",
+          "return_value-282a689d3606-0",
+          "return_value-44a40cdb7b1f-0",
+          "return_value-59b078f4f01d-0",
+          "return_value-8f503a74d068-0",
+          "return_value-a2c8049c5715-0",
+          "return_value-a83f4a4f1185-0",
+          "return_value-cdae1fa547c9-0",
+          "zero_iteration_loop-02263ede5c35-0",
+          "zero_iteration_loop-0f2f1e442a2e-0",
+          "zero_iteration_loop-3e4c8fbf16bb-0",
+          "zero_iteration_loop-4f8eccc05497-0",
+          "zero_iteration_loop-8e3b2f3ffd03-0",
+          "zero_iteration_loop-aacca5547444-0",
+          "zero_iteration_loop-c077c75d3445-0"
+        ]
+      }
+    ]
+  },
+  "timed_out": 0,
+  "unviable": 0
+}

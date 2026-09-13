@@ -1,0 +1,2223 @@
+{
+  "adapter_sha256": "94ba82a0851d208c0fa62dc8b2942d969f7b18c781c17834c953bbf1a7f337b3",
+  "attribution": {
+    "attributed_mutants": 52,
+    "baseline_repetitions": 2,
+    "killed_mutants": 52,
+    "ranked_tests": 5,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.443702,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": ".....                                                                    [100%]\n5 passed in 0.17s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-timeouts/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_snapshot_worktree.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "forge-mutation-platform-gaps_snapshot_worktree_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "079a891de598d1db6bb3a596637f69720417a99aea7c5ca480b4779fe1694ab0",
+  "engine_result": {
+    "duration_seconds": 13.858617,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "place\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees\",\n        \"src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 252230303\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-9_sbbism/worktree/src/conductor/snapshot_worktree.py\",\n        \"line\": 189,\n        \"column\": 22,\n        \"byte_offset\": 6052,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"checkout\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees\",\n        \"src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 225108474\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-9_sbbism/worktree/src/conductor/snapshot_worktree.py\",\n        \"line\": 189,\n        \"column\": 34,\n        \"byte_offset\": 6064,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"--detach\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees\",\n        \"src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 222261208\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-9_sbbism/worktree/src/conductor/snapshot_worktree.py\",\n        \"line\": 189,\n        \"column\": 46,\n        \"byte_offset\": 6076,\n        \"byte_length\": 9,\n        \"original_text\": \"\\\"--quiet\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees\",\n        \"src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged\",\n        \"src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 217198009\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 13,\n    \"nanos\": 854592158\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 52,
+    "mutants_generated": 91,
+    "mutants_tested": 58,
+    "no_coverage": 33,
+    "survived": 6,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T04:21:12.756113+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-timeouts/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/forge-mutation-platform-gaps_snapshot_worktree_fest_20260913.json",
+  "manifest_sha256": "0988f59d1f0cecb6d4192f15e46b37458f406ef216c8c847e7b44016394daf6d",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 30,
+  "mutants": [
+    {
+      "byte_length": 82,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8fea2bae2c41-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Disposable git snapshots for autonomous mutation from a dirty host worktree.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 487,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8ef3c33b496d-0",
+      "line": 22,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".c\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 497,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-affe3f4d651e-0",
+      "line": 23,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".cc\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 508,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-361eda626404-0",
+      "line": 24,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".cpp\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 520,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-944b1800543a-0",
+      "line": 25,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".cu\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 531,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-1838a7c9b655-0",
+      "line": 26,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".h\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 541,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-eacb6ef7f41f-0",
+      "line": 27,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".hpp\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 553,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7bc1ec869aab-0",
+      "line": 28,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".js\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 564,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-de27c27542ec-0",
+      "line": 29,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".json\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 577,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-d17ad47726c4-0",
+      "line": 30,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".jsx\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 589,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f2fff89245ac-0",
+      "line": 31,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".md\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 600,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-045da229a821-0",
+      "line": 32,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".py\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 611,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-571355bc4798-0",
+      "line": 33,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".pyx\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 623,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7cc3cc3a9d94-0",
+      "line": 34,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".pxd\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 635,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-22aae7cc68ae-0",
+      "line": 35,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".rs\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 646,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-44dccb073fed-0",
+      "line": 36,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".sh\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 657,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-2ae68adf1ca4-0",
+      "line": 37,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".toml\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 670,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-396345deeee5-0",
+      "line": 38,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".ts\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 681,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8aaae92c4126-0",
+      "line": 39,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".tsx\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 693,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-3150b333baa8-0",
+      "line": 40,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".yaml\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 706,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-4da3c2adff0f-0",
+      "line": 41,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".yml\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 795,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a99a48761344-0",
+      "line": 45,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"research/reports/\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 820,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-95f5ebc5f28c-0",
+      "line": 46,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tasks/\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 1157,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-40c2a50625e2-0",
+      "line": 52,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tests\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 1166,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f7e1928d68ca-0",
+      "line": 52,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"fixtures\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 1201,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8636ae1a87ab-0",
+      "line": 53,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"test_\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 76,
+      "byte_offset": 1270,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7d2bd7f8a9a8-0",
+      "line": 57,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Exclusions for one repo: the fixed set plus its configured notes tree.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 48,
+      "byte_offset": 1358,
+      "duration_seconds": 0.258906,
+      "id": "return_value-65da85f72f41-0",
+      "line": 58,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "(*EXCLUDED_PREFIXES, f\"{notes_relative(repo)}/\")",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 75,
+      "byte_offset": 1451,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6bf96dafd962-0",
+      "line": 62,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"A path inside test material, where the suffix allowlist cannot apply.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 126,
+      "byte_offset": 1538,
+      "duration_seconds": 0.269859,
+      "id": "return_value-c2479dae796a-0",
+      "line": 63,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "any(\n        part in FIXTURE_PARTS or part.startswith(FIXTURE_PART_PREFIX)\n        for part in PurePosixPath(path).parts\n    )",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 347,
+      "byte_offset": 1733,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b871a396ea78-0",
+      "line": 70,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Snapshot suffixes the host added via ``[tool.conductor]``.\n\n    Fixture trees are admitted by path, not suffix, so this answers for the\n    host whose data files live outside any ``tests/``/``fixtures/`` tree yet\n    must still reach the snapshot -- the configuration point for the case the\n    path rule deliberately does not guess at.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 2117,
+      "duration_seconds": 0.22698,
+      "id": "constant_replace-29291b821a0b-0",
+      "line": 77,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"snapshot_extra_suffixes\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 2151,
+      "duration_seconds": 0.255594,
+      "id": "negate_condition-e72cf49e2378-0",
+      "line": 78,
+      "mutated_text": "not (raw is None)",
+      "operator": "negate_condition",
+      "original_text": "raw is None",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2155,
+      "duration_seconds": 0.24127,
+      "id": "comparison_op-7ffd21c75ad9-0",
+      "line": 78,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 2179,
+      "duration_seconds": 0.231343,
+      "id": "return_value-d882f14d4152-0",
+      "line": 79,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "frozenset()",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 42,
+      "byte_offset": 2204,
+      "duration_seconds": 0.229456,
+      "id": "constant_replace-2c3ea8b088bc-0",
+      "line": 80,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"[tool.conductor].snapshot_extra_suffixes\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2254,
+      "duration_seconds": 0.240587,
+      "id": "boolean_op-7840d0d6f2d0-0",
+      "line": 81,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 98,
+      "byte_offset": 2254,
+      "duration_seconds": 0.248599,
+      "id": "negate_condition-ac327e46d606-0",
+      "line": 81,
+      "mutated_text": "not (not isinstance(raw, (list, tuple)) or not all(\n        isinstance(item, str) for item in raw\n    ))",
+      "operator": "negate_condition",
+      "original_text": "not isinstance(raw, (list, tuple)) or not all(\n        isinstance(item, str) for item in raw\n    )",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2289,
+      "duration_seconds": 0.217823,
+      "id": "boolean_op-5e5409cbb0eb-0",
+      "line": 81,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2292,
+      "duration_seconds": 0.218724,
+      "id": "boolean_op-7840d0d6f2d0-1",
+      "line": 81,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2472,
+      "duration_seconds": 0.223574,
+      "id": "zero_iteration_loop-21785b8781a2-0",
+      "line": 86,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "raw",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2524,
+      "duration_seconds": 0.285758,
+      "id": "boolean_op-7840d0d6f2d0-2",
+      "line": 88,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 2524,
+      "duration_seconds": 0.26844,
+      "id": "negate_condition-149484bbe322-0",
+      "line": 88,
+      "mutated_text": "not (not text)",
+      "operator": "negate_condition",
+      "original_text": "not text",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2655,
+      "duration_seconds": 0.216952,
+      "id": "constant_replace-396e869956eb-0",
+      "line": 90,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 2688,
+      "duration_seconds": 0.222779,
+      "id": "return_value-dc9c1aed9eb3-0",
+      "line": 91,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "frozenset(out)",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ]
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 2705,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-5af394e19516-0",
+      "line": 94,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@dataclass(frozen=True, slots=True)\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 3117,
+      "duration_seconds": 0.256757,
+      "id": "negate_condition-53d657f99368-0",
+      "line": 112,
+      "mutated_text": "not (proc.returncode != 0)",
+      "operator": "negate_condition",
+      "original_text": "proc.returncode != 0",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3133,
+      "duration_seconds": 0.266771,
+      "id": "comparison_op-d55e2068e107-0",
+      "line": 112,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3136,
+      "duration_seconds": 0.226227,
+      "id": "constant_replace-b745d492ac9d-0",
+      "line": 112,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3303,
+      "duration_seconds": 0.217357,
+      "id": "return_value-f62c4fe83f1c-0",
+      "line": 115,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "proc",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 457,
+      "byte_offset": 3369,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a3b808d6b93f-0",
+      "line": 119,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Return source/config files needed by a snapshot, excluding generated artifacts.\n\n    Every file under a ``tests/``, ``fixtures/`` or ``test_*`` path rides\n    along regardless of suffix: a fixture tree keeps `.db` payloads, plain\n    text and extensionless symlinks, and dropping them sent otherwise green\n    campaigns home as BASELINE_FAILED. Everywhere else the suffix allowlist\n    (plus the host's ``snapshot_extra_suffixes``) still decides.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3983,
+      "duration_seconds": 0.221996,
+      "id": "bitwise_op-2f2e8bc5621a-0",
+      "line": 129,
+      "mutated_text": "&",
+      "operator": "bitwise_op",
+      "original_text": "|",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 198,
+      "byte_offset": 4029,
+      "duration_seconds": 0.217833,
+      "id": "return_value-6068ba887d6e-0",
+      "line": 130,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "sorted(\n        path\n        for path in output.splitlines()\n        if path\n        and not path.startswith(excluded)\n        and (_fixture_path(path) or Path(path).suffix.lower() in allowed)\n    )",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4351,
+      "duration_seconds": 0.217145,
+      "id": "arithmetic_op-aaf67e34fc89-0",
+      "line": 142,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 4353,
+      "duration_seconds": 0.234005,
+      "id": "constant_replace-7c013e82e0c9-0",
+      "line": 142,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"index\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 4427,
+      "duration_seconds": 0.280755,
+      "id": "constant_replace-77b9339d3eeb-0",
+      "line": 146,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"GIT_DIR\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 4458,
+      "duration_seconds": 0.219807,
+      "id": "constant_replace-325e142328ab-0",
+      "line": 146,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".git\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 4479,
+      "duration_seconds": 0.250512,
+      "id": "constant_replace-8d3964a9e477-0",
+      "line": 147,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"GIT_WORK_TREE\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 4519,
+      "duration_seconds": 0.235291,
+      "id": "constant_replace-d4dfbcaa9485-0",
+      "line": 148,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"GIT_INDEX_FILE\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 4561,
+      "duration_seconds": 0.259795,
+      "id": "constant_replace-f02fa060c4b7-0",
+      "line": 149,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"GIT_AUTHOR_NAME\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 4580,
+      "duration_seconds": 0.239918,
+      "id": "constant_replace-249f66aaeaf3-0",
+      "line": 149,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"Audit Orchestrator Snapshot\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 4623,
+      "duration_seconds": 0.233109,
+      "id": "constant_replace-7012816e5d33-0",
+      "line": 150,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"GIT_AUTHOR_EMAIL\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 4643,
+      "duration_seconds": 0.263166,
+      "id": "constant_replace-9144f9cab2cb-0",
+      "line": 150,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"orchestrator@localhost\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 4681,
+      "duration_seconds": 0.256731,
+      "id": "constant_replace-fbd3ad0c7efb-0",
+      "line": 151,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"GIT_COMMITTER_NAME\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 4703,
+      "duration_seconds": 0.236781,
+      "id": "constant_replace-249f66aaeaf3-1",
+      "line": 151,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"Audit Orchestrator Snapshot\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 21,
+      "byte_offset": 4746,
+      "duration_seconds": 0.238536,
+      "id": "constant_replace-7aab03355d43-0",
+      "line": 152,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"GIT_COMMITTER_EMAIL\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 4769,
+      "duration_seconds": 0.268563,
+      "id": "constant_replace-9144f9cab2cb-1",
+      "line": 152,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"orchestrator@localhost\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 4821,
+      "duration_seconds": 0.255829,
+      "id": "constant_replace-b426a9fdc8e4-0",
+      "line": 155,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"git\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 4828,
+      "duration_seconds": 0.237426,
+      "id": "constant_replace-fcd65dc3e791-0",
+      "line": 155,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"read-tree\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 4841,
+      "duration_seconds": 0.230257,
+      "id": "constant_replace-f7430c0b3d00-0",
+      "line": 155,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"HEAD\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 4875,
+      "duration_seconds": 0.236049,
+      "id": "constant_replace-b426a9fdc8e4-1",
+      "line": 156,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"git\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 4882,
+      "duration_seconds": 0.261798,
+      "id": "constant_replace-9daa66510ebb-0",
+      "line": 156,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"add\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 4889,
+      "duration_seconds": 0.2227,
+      "id": "constant_replace-1f6f7f47c63a-0",
+      "line": 156,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"-u\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 4982,
+      "duration_seconds": 0.264308,
+      "id": "zero_iteration_loop-edfa692b84f8-0",
+      "line": 158,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "range(0, len(untracked), 100)",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 5027,
+      "duration_seconds": 0.278106,
+      "id": "constant_replace-b426a9fdc8e4-2",
+      "line": 159,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"git\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 5034,
+      "duration_seconds": 0.222302,
+      "id": "constant_replace-9daa66510ebb-1",
+      "line": 159,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"add\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 5041,
+      "duration_seconds": 0.227501,
+      "id": "constant_replace-177b3ab7b0a0-0",
+      "line": 159,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 5399,
+      "duration_seconds": 0.227106,
+      "id": "return_value-953f2d0581e9-0",
+      "line": 167,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "commit, untracked",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 5419,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-29bf2d946bc8-0",
+      "line": 170,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@contextmanager\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 79,
+      "byte_offset": 5496,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a74b5b825fbe-0",
+      "line": 172,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Create a clean snapshot without writing objects into the host repository.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5667,
+      "duration_seconds": 0.219566,
+      "id": "arithmetic_op-aaf67e34fc89-1",
+      "line": 174,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 5669,
+      "duration_seconds": 0.255138,
+      "id": "constant_replace-6049030ad2fa-0",
+      "line": 174,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"worktree\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 5733,
+      "duration_seconds": 0.232444,
+      "id": "constant_replace-b426a9fdc8e4-3",
+      "line": 178,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"git\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 5756,
+      "duration_seconds": 0.222279,
+      "id": "constant_replace-dee310d054e4-0",
+      "line": 179,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"clone\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 5781,
+      "duration_seconds": 0.211772,
+      "id": "constant_replace-36a03d40006d-0",
+      "line": 180,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--shared\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 5809,
+      "duration_seconds": 0.21192,
+      "id": "constant_replace-cd9325ce7f20-0",
+      "line": 181,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--no-checkout\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 5842,
+      "duration_seconds": 0.22243,
+      "id": "constant_replace-fbdfbec307ba-0",
+      "line": 182,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--quiet\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 6045,
+      "duration_seconds": 0.25223,
+      "id": "constant_replace-b426a9fdc8e4-4",
+      "line": 189,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"git\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 6052,
+      "duration_seconds": 0.225108,
+      "id": "constant_replace-b44ae3701486-0",
+      "line": 189,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"checkout\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 6064,
+      "duration_seconds": 0.222261,
+      "id": "constant_replace-1ddef47504d1-0",
+      "line": 189,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--detach\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 6076,
+      "duration_seconds": 0.217198,
+      "id": "constant_replace-fbdfbec307ba-1",
+      "line": 189,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--quiet\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/snapshot_worktree.py",
+      "tests_run": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.896551724137931,
+  "new_survivors": [],
+  "no_coverage": 33,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 52,
+    "NO_COVERAGE": 33,
+    "SURVIVED": 6,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/forge-mutation-platform-gaps_snapshot_worktree_fest_20260913_20260913T042112Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "5743cd8973f377be22581505e52af44011da6e740c8a03d0208eed4cf76916c8",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "b75962e0c67452fec0dbdd6792f024dd88fef7d4238786f4de40edb96cad2bb9"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/snapshot_worktree.py": "5743cd8973f377be22581505e52af44011da6e740c8a03d0208eed4cf76916c8"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [
+    "constant_replace-6049030ad2fa-0",
+    "constant_replace-8d3964a9e477-0",
+    "constant_replace-9144f9cab2cb-0",
+    "constant_replace-9144f9cab2cb-1",
+    "constant_replace-f02fa060c4b7-0",
+    "constant_replace-fbd3ad0c7efb-0"
+  ],
+  "survivors": [
+    "constant_replace-6049030ad2fa-0",
+    "constant_replace-8d3964a9e477-0",
+    "constant_replace-9144f9cab2cb-0",
+    "constant_replace-9144f9cab2cb-1",
+    "constant_replace-f02fa060c4b7-0",
+    "constant_replace-fbd3ad0c7efb-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_snapshot_worktree.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_snapshot_worktree.py": "f54f9c068e1b7674d5315fe079be9ac5e7bfe80aaca6891c1e7b29ac7bbdf5e2"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 3,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 2
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-aaf67e34fc89-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "arithmetic_op-aaf67e34fc89-1": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "bitwise_op-2f2e8bc5621a-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "boolean_op-5e5409cbb0eb-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "boolean_op-7840d0d6f2d0-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "boolean_op-7840d0d6f2d0-1": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "boolean_op-7840d0d6f2d0-2": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "comparison_op-7ffd21c75ad9-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "comparison_op-d55e2068e107-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-177b3ab7b0a0-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-1ddef47504d1-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-1f6f7f47c63a-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-249f66aaeaf3-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-249f66aaeaf3-1": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-29291b821a0b-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "constant_replace-2c3ea8b088bc-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "constant_replace-325e142328ab-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-36a03d40006d-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-396e869956eb-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "constant_replace-7012816e5d33-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-77b9339d3eeb-0": [
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-7aab03355d43-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-7c013e82e0c9-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-9daa66510ebb-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-9daa66510ebb-1": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-b426a9fdc8e4-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-b426a9fdc8e4-1": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-b426a9fdc8e4-2": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-b426a9fdc8e4-3": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-b426a9fdc8e4-4": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-b44ae3701486-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-b745d492ac9d-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-cd9325ce7f20-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-d4dfbcaa9485-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-dee310d054e4-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-f7430c0b3d00-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-fbdfbec307ba-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-fbdfbec307ba-1": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "constant_replace-fcd65dc3e791-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "negate_condition-149484bbe322-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "negate_condition-53d657f99368-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "negate_condition-ac327e46d606-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "negate_condition-e72cf49e2378-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "return_value-6068ba887d6e-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "return_value-65da85f72f41-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "return_value-953f2d0581e9-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "return_value-c2479dae796a-0": [
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix"
+      ],
+      "return_value-d882f14d4152-0": [
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "return_value-dc9c1aed9eb3-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "return_value-f62c4fe83f1c-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ],
+      "zero_iteration_loop-21785b8781a2-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees"
+      ],
+      "zero_iteration_loop-edfa692b84f8-0": [
+        "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/conductor/snapshot_worktree.py"
+        ],
+        "criticality": "high",
+        "id": "forge-mutation-platform-gaps_snapshot_worktree_fest_20260913"
+      }
+    ],
+    "retained_core": [
+      "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+      "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+      "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-mutation-platform-gaps_snapshot_worktree_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-aaf67e34fc89-0",
+          "arithmetic_op-aaf67e34fc89-1",
+          "bitwise_op-2f2e8bc5621a-0",
+          "boolean_op-5e5409cbb0eb-0",
+          "boolean_op-7840d0d6f2d0-0",
+          "boolean_op-7840d0d6f2d0-1",
+          "boolean_op-7840d0d6f2d0-2",
+          "comparison_op-7ffd21c75ad9-0",
+          "comparison_op-d55e2068e107-0",
+          "constant_replace-177b3ab7b0a0-0",
+          "constant_replace-1ddef47504d1-0",
+          "constant_replace-1f6f7f47c63a-0",
+          "constant_replace-249f66aaeaf3-0",
+          "constant_replace-249f66aaeaf3-1",
+          "constant_replace-29291b821a0b-0",
+          "constant_replace-2c3ea8b088bc-0",
+          "constant_replace-325e142328ab-0",
+          "constant_replace-36a03d40006d-0",
+          "constant_replace-396e869956eb-0",
+          "constant_replace-7012816e5d33-0",
+          "constant_replace-7aab03355d43-0",
+          "constant_replace-7c013e82e0c9-0",
+          "constant_replace-9daa66510ebb-0",
+          "constant_replace-9daa66510ebb-1",
+          "constant_replace-b426a9fdc8e4-0",
+          "constant_replace-b426a9fdc8e4-1",
+          "constant_replace-b426a9fdc8e4-2",
+          "constant_replace-b426a9fdc8e4-3",
+          "constant_replace-b426a9fdc8e4-4",
+          "constant_replace-b44ae3701486-0",
+          "constant_replace-b745d492ac9d-0",
+          "constant_replace-cd9325ce7f20-0",
+          "constant_replace-d4dfbcaa9485-0",
+          "constant_replace-dee310d054e4-0",
+          "constant_replace-f7430c0b3d00-0",
+          "constant_replace-fbdfbec307ba-0",
+          "constant_replace-fbdfbec307ba-1",
+          "constant_replace-fcd65dc3e791-0",
+          "negate_condition-149484bbe322-0",
+          "negate_condition-53d657f99368-0",
+          "negate_condition-ac327e46d606-0",
+          "negate_condition-e72cf49e2378-0",
+          "return_value-6068ba887d6e-0",
+          "return_value-65da85f72f41-0",
+          "return_value-953f2d0581e9-0",
+          "return_value-dc9c1aed9eb3-0",
+          "return_value-f62c4fe83f1c-0",
+          "zero_iteration_loop-21785b8781a2-0",
+          "zero_iteration_loop-edfa692b84f8-0"
+        ],
+        "nodeid": "src/conductor/test_snapshot_worktree.py::test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees",
+        "runtime_seconds_median": 0.0155,
+        "unique_kills": [
+          "boolean_op-5e5409cbb0eb-0",
+          "boolean_op-7840d0d6f2d0-0",
+          "boolean_op-7840d0d6f2d0-1",
+          "boolean_op-7840d0d6f2d0-2",
+          "constant_replace-29291b821a0b-0",
+          "constant_replace-2c3ea8b088bc-0",
+          "constant_replace-396e869956eb-0",
+          "negate_condition-149484bbe322-0",
+          "negate_condition-ac327e46d606-0",
+          "return_value-dc9c1aed9eb3-0",
+          "zero_iteration_loop-21785b8781a2-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-mutation-platform-gaps_snapshot_worktree_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-aaf67e34fc89-0",
+          "arithmetic_op-aaf67e34fc89-1",
+          "bitwise_op-2f2e8bc5621a-0",
+          "comparison_op-7ffd21c75ad9-0",
+          "comparison_op-d55e2068e107-0",
+          "constant_replace-177b3ab7b0a0-0",
+          "constant_replace-1ddef47504d1-0",
+          "constant_replace-1f6f7f47c63a-0",
+          "constant_replace-249f66aaeaf3-0",
+          "constant_replace-249f66aaeaf3-1",
+          "constant_replace-325e142328ab-0",
+          "constant_replace-36a03d40006d-0",
+          "constant_replace-7012816e5d33-0",
+          "constant_replace-7aab03355d43-0",
+          "constant_replace-7c013e82e0c9-0",
+          "constant_replace-9daa66510ebb-0",
+          "constant_replace-9daa66510ebb-1",
+          "constant_replace-b426a9fdc8e4-0",
+          "constant_replace-b426a9fdc8e4-1",
+          "constant_replace-b426a9fdc8e4-2",
+          "constant_replace-b426a9fdc8e4-3",
+          "constant_replace-b426a9fdc8e4-4",
+          "constant_replace-b44ae3701486-0",
+          "constant_replace-b745d492ac9d-0",
+          "constant_replace-cd9325ce7f20-0",
+          "constant_replace-d4dfbcaa9485-0",
+          "constant_replace-dee310d054e4-0",
+          "constant_replace-f7430c0b3d00-0",
+          "constant_replace-fbdfbec307ba-0",
+          "constant_replace-fbdfbec307ba-1",
+          "constant_replace-fcd65dc3e791-0",
+          "negate_condition-53d657f99368-0",
+          "negate_condition-e72cf49e2378-0",
+          "return_value-6068ba887d6e-0",
+          "return_value-65da85f72f41-0",
+          "return_value-953f2d0581e9-0",
+          "return_value-c2479dae796a-0",
+          "return_value-d882f14d4152-0",
+          "return_value-f62c4fe83f1c-0",
+          "zero_iteration_loop-edfa692b84f8-0"
+        ],
+        "nodeid": "src/conductor/test_snapshot_worktree.py::test_fixture_trees_survive_a_snapshot_regardless_of_suffix",
+        "runtime_seconds_median": 0.0135,
+        "unique_kills": [
+          "return_value-c2479dae796a-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-mutation-platform-gaps_snapshot_worktree_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-aaf67e34fc89-0",
+          "arithmetic_op-aaf67e34fc89-1",
+          "comparison_op-7ffd21c75ad9-0",
+          "comparison_op-d55e2068e107-0",
+          "constant_replace-1ddef47504d1-0",
+          "constant_replace-1f6f7f47c63a-0",
+          "constant_replace-249f66aaeaf3-0",
+          "constant_replace-249f66aaeaf3-1",
+          "constant_replace-325e142328ab-0",
+          "constant_replace-36a03d40006d-0",
+          "constant_replace-7012816e5d33-0",
+          "constant_replace-77b9339d3eeb-0",
+          "constant_replace-7aab03355d43-0",
+          "constant_replace-7c013e82e0c9-0",
+          "constant_replace-9daa66510ebb-0",
+          "constant_replace-b426a9fdc8e4-0",
+          "constant_replace-b426a9fdc8e4-1",
+          "constant_replace-b426a9fdc8e4-3",
+          "constant_replace-b426a9fdc8e4-4",
+          "constant_replace-b44ae3701486-0",
+          "constant_replace-b745d492ac9d-0",
+          "constant_replace-cd9325ce7f20-0",
+          "constant_replace-dee310d054e4-0",
+          "constant_replace-f7430c0b3d00-0",
+          "constant_replace-fbdfbec307ba-0",
+          "constant_replace-fbdfbec307ba-1",
+          "constant_replace-fcd65dc3e791-0",
+          "negate_condition-53d657f99368-0",
+          "negate_condition-e72cf49e2378-0",
+          "return_value-6068ba887d6e-0",
+          "return_value-953f2d0581e9-0",
+          "return_value-d882f14d4152-0",
+          "return_value-f62c4fe83f1c-0"
+        ],
+        "nodeid": "src/conductor/test_snapshot_worktree.py::test_snapshot_exception_removes_temporary_repository",
+        "runtime_seconds_median": 0.015,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-mutation-platform-gaps_snapshot_worktree_fest_20260913",
+        "dominated_by": [
+          "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-aaf67e34fc89-0",
+          "arithmetic_op-aaf67e34fc89-1",
+          "comparison_op-7ffd21c75ad9-0",
+          "comparison_op-d55e2068e107-0",
+          "constant_replace-1ddef47504d1-0",
+          "constant_replace-1f6f7f47c63a-0",
+          "constant_replace-249f66aaeaf3-0",
+          "constant_replace-249f66aaeaf3-1",
+          "constant_replace-325e142328ab-0",
+          "constant_replace-36a03d40006d-0",
+          "constant_replace-7012816e5d33-0",
+          "constant_replace-77b9339d3eeb-0",
+          "constant_replace-7aab03355d43-0",
+          "constant_replace-7c013e82e0c9-0",
+          "constant_replace-9daa66510ebb-0",
+          "constant_replace-b426a9fdc8e4-0",
+          "constant_replace-b426a9fdc8e4-1",
+          "constant_replace-b426a9fdc8e4-3",
+          "constant_replace-b426a9fdc8e4-4",
+          "constant_replace-b44ae3701486-0",
+          "constant_replace-b745d492ac9d-0",
+          "constant_replace-cd9325ce7f20-0",
+          "constant_replace-d4dfbcaa9485-0",
+          "constant_replace-dee310d054e4-0",
+          "constant_replace-f7430c0b3d00-0",
+          "constant_replace-fbdfbec307ba-0",
+          "constant_replace-fbdfbec307ba-1",
+          "constant_replace-fcd65dc3e791-0",
+          "negate_condition-53d657f99368-0",
+          "negate_condition-e72cf49e2378-0",
+          "return_value-6068ba887d6e-0",
+          "return_value-953f2d0581e9-0",
+          "return_value-d882f14d4152-0",
+          "return_value-f62c4fe83f1c-0"
+        ],
+        "nodeid": "src/conductor/test_snapshot_worktree.py::test_snapshot_from_linked_worktree_leaves_shared_objects_unchanged",
+        "runtime_seconds_median": 0.019,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-mutation-platform-gaps_snapshot_worktree_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-aaf67e34fc89-0",
+          "arithmetic_op-aaf67e34fc89-1",
+          "bitwise_op-2f2e8bc5621a-0",
+          "comparison_op-7ffd21c75ad9-0",
+          "comparison_op-d55e2068e107-0",
+          "constant_replace-177b3ab7b0a0-0",
+          "constant_replace-1ddef47504d1-0",
+          "constant_replace-1f6f7f47c63a-0",
+          "constant_replace-249f66aaeaf3-0",
+          "constant_replace-249f66aaeaf3-1",
+          "constant_replace-325e142328ab-0",
+          "constant_replace-36a03d40006d-0",
+          "constant_replace-7012816e5d33-0",
+          "constant_replace-77b9339d3eeb-0",
+          "constant_replace-7aab03355d43-0",
+          "constant_replace-7c013e82e0c9-0",
+          "constant_replace-9daa66510ebb-0",
+          "constant_replace-9daa66510ebb-1",
+          "constant_replace-b426a9fdc8e4-0",
+          "constant_replace-b426a9fdc8e4-1",
+          "constant_replace-b426a9fdc8e4-2",
+          "constant_replace-b426a9fdc8e4-3",
+          "constant_replace-b426a9fdc8e4-4",
+          "constant_replace-b44ae3701486-0",
+          "constant_replace-b745d492ac9d-0",
+          "constant_replace-cd9325ce7f20-0",
+          "constant_replace-d4dfbcaa9485-0",
+          "constant_replace-dee310d054e4-0",
+          "constant_replace-f7430c0b3d00-0",
+          "constant_replace-fbdfbec307ba-0",
+          "constant_replace-fbdfbec307ba-1",
+          "constant_replace-fcd65dc3e791-0",
+          "negate_condition-53d657f99368-0",
+          "negate_condition-e72cf49e2378-0",
+          "return_value-6068ba887d6e-0",
+          "return_value-65da85f72f41-0",
+          "return_value-953f2d0581e9-0",
+          "return_value-d882f14d4152-0",
+          "return_value-f62c4fe83f1c-0",
+          "zero_iteration_loop-edfa692b84f8-0"
+        ],
+        "nodeid": "src/conductor/test_snapshot_worktree.py::test_snapshot_reproduces_dirty_tree_without_polluting_host_objects",
+        "runtime_seconds_median": 0.0165,
+        "unique_kills": []
+      }
+    ]
+  },
+  "timed_out": 0,
+  "unviable": 0
+}

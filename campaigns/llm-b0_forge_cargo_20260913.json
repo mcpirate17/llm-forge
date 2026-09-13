@@ -4,7 +4,6 @@
   "generator": {
     "exclude": [],
     "jobs": 4,
-    "mutant_timeout_seconds": 30,
     "operators": [],
     "options": {
       "manifest_path": "native/forge/Cargo.toml",
