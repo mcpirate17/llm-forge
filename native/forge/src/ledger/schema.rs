@@ -194,6 +194,15 @@ pub struct TranscriptSummary {
     /// empty for a file with no compaction). Step 2's `rollup.rs` primary
     /// compaction-count signal.
     pub compaction_markers: Vec<CompactionMarker>,
+    /// Sorted, deduplicated `session_[A-Za-z0-9]+` ids found by regex over
+    /// every `text`/`tool_result` block's string content while streaming
+    /// (`reader.rs::find_session_ids`, design step 4 join key). Only the
+    /// matched id substring is kept -- never the surrounding text -- so
+    /// this field does not weaken the "reader keeps shapes, never content"
+    /// rule the module doc comment states. A trailing `/` in a URL never
+    /// reaches the match since `/` is outside the id's character class, so
+    /// "with and without trailing slash" needs no separate handling here.
+    pub harness_session_ids: Vec<String>,
 }
 
 /// One `isCompactSummary` line: the harness-written marker for one

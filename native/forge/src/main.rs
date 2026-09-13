@@ -71,8 +71,12 @@ enum LedgerCommand {
     /// Parse transcript or telemetry JSONL file(s) into ledger summaries.
     Read(ledger::ReadArgs),
     /// Roll transcript/telemetry JSONL up into `turn_attribution`,
-    /// `session_rollup` and `hook_rollup` (design step 2).
+    /// `session_rollup` and `hook_rollup` (design step 2), and -- when
+    /// `--repo` is given -- `agent_rollup` (design step 4).
     Rollup(ledger::rollup::RollupArgs),
+    /// Scan a repo's `git log --first-parent main` into one JSONL row per
+    /// landed commit (design step 4).
+    Landed(ledger::landed::LandedArgs),
 }
 
 #[derive(Subcommand)]
@@ -114,6 +118,13 @@ fn main() -> ExitCode {
                 Ok(code) => ExitCode::from(code as u8),
                 Err(err) => {
                     eprintln!("forge ledger rollup: {err:#}");
+                    ExitCode::from(1)
+                }
+            },
+            LedgerCommand::Landed(args) => match ledger::landed::run(args) {
+                Ok(code) => ExitCode::from(code as u8),
+                Err(err) => {
+                    eprintln!("forge ledger landed: {err:#}");
                     ExitCode::from(1)
                 }
             },

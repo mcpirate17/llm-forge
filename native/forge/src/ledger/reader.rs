@@ -3,6 +3,7 @@
 //! `BufRead::lines` -- never `read_to_string` -- because transcripts reach
 //! 100 MB (design "Measured this session" table).
 
+use std::collections::BTreeSet;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -14,6 +15,7 @@ use super::schema::{
     BlockTypeCounts, CompactionMarker, ContentBlock, HookStats, InputKind, ReadStats, SkippedLine,
     TelemetrySummary, TranscriptLine, TranscriptSummary, TurnSummary,
 };
+use super::session_ids::find_session_ids;
 
 const SYSTEM_REMINDER_PREFIX: &str = "<system-reminder>";
 
@@ -70,7 +72,9 @@ pub fn read_transcript_file(path: &Path) -> Result<TranscriptSummary> {
         read_stats: ReadStats::default(),
         turns: Vec::new(),
         compaction_markers: Vec::new(),
+        harness_session_ids: Vec::new(),
     };
+    let mut harness_session_ids: BTreeSet<String> = BTreeSet::new();
 
     for (idx, line) in reader.lines().enumerate() {
         let line_number = idx + 1;
@@ -120,13 +124,18 @@ pub fn read_transcript_file(path: &Path) -> Result<TranscriptSummary> {
         if parsed.session_id.is_none() {
             parsed.session_id = session_id_fallback;
         }
-        accumulate_transcript_line(&mut summary, parsed);
+        accumulate_transcript_line(&mut summary, parsed, &mut harness_session_ids);
     }
 
+    summary.harness_session_ids = harness_session_ids.into_iter().collect();
     Ok(summary)
 }
 
-fn accumulate_transcript_line(summary: &mut TranscriptSummary, line: TranscriptLine) {
+fn accumulate_transcript_line(
+    summary: &mut TranscriptSummary,
+    line: TranscriptLine,
+    harness_session_ids: &mut BTreeSet<String>,
+) {
     if line.is_compact_summary {
         summary.compaction_markers.push(CompactionMarker {
             session_id: line.session_id.clone(),
@@ -136,7 +145,7 @@ fn accumulate_transcript_line(summary: &mut TranscriptSummary, line: TranscriptL
     let Some(message) = line.message else {
         return;
     };
-    let blocks = parse_content_blocks(&message.content);
+    let blocks = parse_content_blocks(&message.content, harness_session_ids);
     for block in &blocks {
         summary.chars_by_block_type.add(block);
     }
@@ -174,27 +183,34 @@ fn accumulate_transcript_line(summary: &mut TranscriptSummary, line: TranscriptL
 /// array of typed blocks (assistant turns, and most tool-result-bearing
 /// user turns). Handles both without panicking; anything else (missing,
 /// null, an unexpected shape) yields no blocks.
-fn parse_content_blocks(content: &Value) -> Vec<ContentBlock> {
+fn parse_content_blocks(
+    content: &Value,
+    harness_session_ids: &mut BTreeSet<String>,
+) -> Vec<ContentBlock> {
     match content {
-        Value::String(text) => vec![text_block(text)],
-        Value::Array(items) => items.iter().map(parse_one_block).collect(),
+        Value::String(text) => vec![text_block(text, harness_session_ids)],
+        Value::Array(items) => items
+            .iter()
+            .map(|item| parse_one_block(item, harness_session_ids))
+            .collect(),
         _ => Vec::new(),
     }
 }
 
-fn text_block(text: &str) -> ContentBlock {
+fn text_block(text: &str, harness_session_ids: &mut BTreeSet<String>) -> ContentBlock {
+    find_session_ids(text, harness_session_ids);
     ContentBlock::Text {
         char_len: text.chars().count(),
         is_system_reminder: text.starts_with(SYSTEM_REMINDER_PREFIX),
     }
 }
 
-fn parse_one_block(item: &Value) -> ContentBlock {
+fn parse_one_block(item: &Value, harness_session_ids: &mut BTreeSet<String>) -> ContentBlock {
     let block_type = item.get("type").and_then(Value::as_str).unwrap_or("");
     match block_type {
         "text" => {
             let text = item.get("text").and_then(Value::as_str).unwrap_or("");
-            text_block(text)
+            text_block(text, harness_session_ids)
         }
         "tool_use" => ContentBlock::ToolUse {
             name: item
@@ -204,7 +220,10 @@ fn parse_one_block(item: &Value) -> ContentBlock {
                 .to_string(),
         },
         "tool_result" => ContentBlock::ToolResult {
-            char_len: tool_result_char_len(item.get("content").unwrap_or(&Value::Null)),
+            char_len: tool_result_char_len(
+                item.get("content").unwrap_or(&Value::Null),
+                harness_session_ids,
+            ),
             tool_use_id: item
                 .get("tool_use_id")
                 .and_then(Value::as_str)
@@ -225,14 +244,20 @@ fn parse_one_block(item: &Value) -> ContentBlock {
 /// chars rather than being stringified, so an untyped or non-text sub-block
 /// (e.g. a nested `image`) is not silently counted as if it were text.
 /// Measured as chars, never retained.
-fn tool_result_char_len(content: &Value) -> usize {
+fn tool_result_char_len(content: &Value, harness_session_ids: &mut BTreeSet<String>) -> usize {
     match content {
-        Value::String(text) => text.chars().count(),
+        Value::String(text) => {
+            find_session_ids(text, harness_session_ids);
+            text.chars().count()
+        }
         Value::Array(items) => items
             .iter()
             .filter(|item| item.get("type").and_then(Value::as_str) == Some("text"))
             .filter_map(|item| item.get("text").and_then(Value::as_str))
-            .map(|text| text.chars().count())
+            .map(|text| {
+                find_session_ids(text, harness_session_ids);
+                text.chars().count()
+            })
             .sum(),
         _ => 0,
     }
