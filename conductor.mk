@@ -259,7 +259,20 @@ LEDGER_ARGS ?=
 # session's rows for that day instead of duplicating them, which is what
 # makes cost-budget-audit's dependency below safe -- the audit always reads
 # fresh rows, never a stale or empty root.
+CI_HISTORY_OUT ?= ledger/ci_history/$(shell git remote get-url origin 2>/dev/null | sed -e 's#.*github.com[:/]##' -e 's#\.git$$##' -e 's#/#_#g').json
+
+ci-history:  ## Fetch the ci_history cache the ledger's outcome join reads
+	$(PYTHON) -m conductor.ci_history_fetch --repo . --out "$(CI_HISTORY_OUT)" $(CI_HISTORY_ARGS)
+
+.PHONY: ci-history
+
 ledger-rollup:  ## Roll this project's harness transcripts into the ledger root
+	@if command -v gh >/dev/null 2>&1; then \
+		$(MAKE) --no-print-directory ci-history \
+			|| echo "ci_history fetch failed; rolling up with the cache as it stands"; \
+	else \
+		echo "gh not on PATH: skipping the ci_history fetch (outcome join columns stay as cached)"; \
+	fi
 	$(PYTHON) -m conductor.cost_ledger --repo-root "$(CONDUCTOR_HOST_ROOT)" \
 		--ledger-root "$(LEDGER_ROOT)" rollup $(LEDGER_ARGS)
 

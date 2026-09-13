@@ -36,6 +36,12 @@ from pathlib import Path
 # leave instead.
 _CACHE_OPTIMIZATIONS = ("", "1", "2")
 
+# Written into every scratch this module creates. The engines' pytest plugin
+# fails closed by deleting the whole scratch, so it deletes only directories
+# carrying this marker -- a directory the run did not create is not one its
+# failure handling may remove.
+RUN_MARKER_NAME = ".bytecode-isolation-run"
+
 
 def scratch_root_for(cwd: Path) -> Path:
     """The run-private isolation root for children launched in ``cwd``.
@@ -121,6 +127,10 @@ def isolated_python_env(
     recompile-everything cost this scheme removes. (A flag in the host's own
     ``os.environ`` still wins through the launch merge -- slower, never less
     isolated, because the prefix is what buys the stale-read immunity.)
+
+    The scratch is marked with ``RUN_MARKER_NAME`` the moment it is created:
+    the plugin that fails closed by deleting the scratch refuses any directory
+    without it.
     """
 
     prefix = scratch / "pycache"
@@ -128,6 +138,10 @@ def isolated_python_env(
         prefix.mkdir(parents=True, exist_ok=True)
         if not os.access(prefix, os.W_OK):
             raise OSError(f"not writable: {prefix}")
+        # `touch()`, not `write_text("")`: the marker is a license, never
+        # data -- an empty file by construction, with no string constant a
+        # mutation operator could rewrite into "content".
+        (scratch / RUN_MARKER_NAME).touch()
     except OSError as exc:
         raise RuntimeError(
             f"bytecode isolation scratch {scratch} is not usable: {exc}"

@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from conductor.bytecode_isolation import (
+    RUN_MARKER_NAME,
     cache_paths_for,
     evict_mutated_caches,
     isolated_python_env,
@@ -104,6 +105,22 @@ def test_the_env_carries_base_plus_the_run_private_prefix(tmp_path: Path) -> Non
     assert "PYTHONDONTWRITEBYTECODE" not in env
     assert env["PYTHONPYCACHEPREFIX"] == str(tmp_path / "scratch" / "pycache")
     assert base["PYTHONDONTWRITEBYTECODE"] == "1", "base must not be mutated"
+
+
+def test_the_scratch_is_marked_the_moment_it_is_created(tmp_path: Path) -> None:
+    """The fail-closed deletion in the engines' plugin refuses unmarked trees.
+
+    `isolated_python_env` is where every run scratch is born, so it is where
+    the marker lands -- a scratch that exists without one was not created by
+    this scheme, and the plugin that would delete it on eviction trouble
+    must refuse exactly that case.
+    """
+
+    isolated_python_env({}, tmp_path / "scratch")
+    marker = tmp_path / "scratch" / RUN_MARKER_NAME
+    assert marker.is_file()
+    # The marker is a license, never data: an empty file, and nothing else.
+    assert marker.read_text(encoding="utf-8") == ""
 
 
 def test_each_scratch_names_its_own_prefix(tmp_path: Path) -> None:
