@@ -1,0 +1,42 @@
+{
+  "campaign_id": "forge-integration-branch_workspace_hygiene_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/workspace_hygiene.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/workspace_hygiene.py": "bd8b5fbde38466e006e9dbb8663bc59f763920aae5b2ec970746f06d9fec928c"
+  },
+  "survivor_baseline": [
+    "constant_replace-170d674a899f-3",
+    "constant_replace-170d674a899f-4",
+    "constant_replace-4d5ffb3154d4-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:05:00.172880+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_checkout_sync.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_checkout_sync.py": "2f504ad078bcb2b8bc341f9beb4a7a0f3db40cd26ba61f81e1af3f0230c90f13"
+  },
+  "title": "Generated mutants for src/conductor/workspace_hygiene.py, scored on the survivor set"
+}

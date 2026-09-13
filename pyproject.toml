@@ -112,6 +112,14 @@ package_root = "src/conductor"
 # which this repository does not have; point it at the registered receipts
 # directory instead so an ad hoc run has somewhere real to write.
 mutation_receipt_root = "campaigns/receipts"
+# The integration line conductor.branch_policy, workspace_hygiene and
+# candidate_review.git_source resolve their "master"-shaped defaults through
+# (env override: $CONDUCTOR_INTEGRATION_BRANCH). The monorepo conductor was
+# extracted from names its own line "master"; this repository's is "main", which is
+# also the package's unconfigured default -- declared explicitly here so it survives
+# the monorepo's convention changing out from under it, the way the 2026-09-05
+# `master` lag once did.
+integration_branch = "main"
 
 # OS prerequisite for conductor.project_context's additive Linux resolver.
 # Informational package metadata: pip/uv do not install system executables.

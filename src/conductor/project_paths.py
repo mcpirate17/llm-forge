@@ -27,6 +27,11 @@ from typing import Any
 DEFAULT_CANDIDATE_POLICY = PurePosixPath("conductor/candidate_policy.toml")
 DEFAULT_MUTATION_REGISTRY = PurePosixPath("conductor/mutation_campaigns/registry.json")
 DEFAULT_PACKAGE_ROOT = PurePosixPath("conductor")
+# The monorepo `conductor` was extracted from keeps its integration line at `master`.
+# This package's own default is `main`; a host names its own line (or a retired one it
+# still must recognise) via `[tool.conductor]`, never by carrying the old literal here.
+DEFAULT_INTEGRATION_BRANCH = "main"
+DEFAULT_RETIRED_INTEGRATION_BRANCHES: tuple[str, ...] = ()
 # Where a freshly-run receipt lands when nothing named an explicit ``--receipt``. This
 # is scratch output, not the registered evidence directory (`receipts_relative`) --
 # the monorepo treats it as auto-pruned staging under `research/reports/`, which a
@@ -37,11 +42,14 @@ CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"
 MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
 PACKAGE_ROOT_ENV = "CONDUCTOR_PACKAGE_ROOT"
 MUTATION_RECEIPT_ROOT_ENV = "CONDUCTOR_MUTATION_RECEIPT_ROOT"
+INTEGRATION_BRANCH_ENV = "CONDUCTOR_INTEGRATION_BRANCH"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
 MUTATION_REGISTRY_KEY = "mutation_registry"
 PACKAGE_ROOT_KEY = "package_root"
 MUTATION_RECEIPT_ROOT_KEY = "mutation_receipt_root"
+INTEGRATION_BRANCH_KEY = "integration_branch"
+RETIRED_INTEGRATION_BRANCHES_KEY = "retired_integration_branches"
 DEFAULTS = {
     CANDIDATE_POLICY_KEY: DEFAULT_CANDIDATE_POLICY,
     MUTATION_REGISTRY_KEY: DEFAULT_MUTATION_REGISTRY,
@@ -65,6 +73,25 @@ def _relative(raw: object, source: str) -> PurePosixPath:
     if path.is_absolute() or ".." in path.parts or not path.parts:
         raise ProjectPathError(f"{source} must be repo-root-relative: {text!r}")
     return path
+
+
+def _branch_name(raw: object, source: str) -> str:
+    """A configured value as a non-empty branch name, or a loud refusal."""
+    if not isinstance(raw, str):
+        raise ProjectPathError(f"{source} must be a string, got {type(raw).__name__}")
+    text = raw.strip()
+    if not text:
+        raise ProjectPathError(f"{source} must not be empty")
+    return text
+
+
+def _branch_name_tuple(raw: object, source: str) -> tuple[str, ...]:
+    """A configured value as a tuple of non-empty branch names, or a loud refusal."""
+    if not isinstance(raw, (list, tuple)):
+        raise ProjectPathError(
+            f"{source} must be a list of strings, got {type(raw).__name__}"
+        )
+    return tuple(_branch_name(item, f"{source}[{i}]") for i, item in enumerate(raw))
 
 
 def conductor_table(root: Path) -> Mapping[str, Any]:
@@ -93,6 +120,43 @@ def _configured(root: Path, key: str, env: str) -> tuple[PurePosixPath, bool]:
         source = f"[tool.conductor].{key} in {Path(root) / 'pyproject.toml'}"
         return _relative(table[key], source), True
     return DEFAULTS[key], False
+
+
+def _configured_integration_branch(root: Path) -> tuple[str, bool]:
+    """(branch name, whether the host named it), env then ``[tool.conductor]``."""
+    raw = os.environ.get(INTEGRATION_BRANCH_ENV, "").strip()
+    if raw:
+        return raw, True
+    table = conductor_table(root)
+    if INTEGRATION_BRANCH_KEY in table:
+        source = (
+            f"[tool.conductor].{INTEGRATION_BRANCH_KEY} in "
+            f"{Path(root) / 'pyproject.toml'}"
+        )
+        return _branch_name(table[INTEGRATION_BRANCH_KEY], source), True
+    return DEFAULT_INTEGRATION_BRANCH, False
+
+
+def _configured_retired_integration_branches(
+    root: Path,
+) -> tuple[tuple[str, ...], bool]:
+    """(retired branch names, whether the host named them). No env override.
+
+    Unlike ``integration_branch``, a retired line is host history, not a single
+    current answer worth overriding per-invocation -- it belongs in the committed
+    ``pyproject.toml`` alongside the branch it retired.
+    """
+    table = conductor_table(root)
+    if RETIRED_INTEGRATION_BRANCHES_KEY in table:
+        source = (
+            f"[tool.conductor].{RETIRED_INTEGRATION_BRANCHES_KEY} in "
+            f"{Path(root) / 'pyproject.toml'}"
+        )
+        return (
+            _branch_name_tuple(table[RETIRED_INTEGRATION_BRANCHES_KEY], source),
+            True,
+        )
+    return DEFAULT_RETIRED_INTEGRATION_BRANCHES, False
 
 
 @dataclass(frozen=True)
@@ -211,6 +275,33 @@ def package_relative(root: Path | str) -> PurePosixPath:
 
 def package_path(root: Path | str) -> Path:
     return project_paths(root).package_path
+
+
+def integration_branch(root: Path | str) -> str:
+    """This host's integration line: env override, then ``[tool.conductor]``, else ``main``."""
+    return _configured_integration_branch(Path(root))[0]
+
+
+def retired_integration_branches(root: Path | str) -> tuple[str, ...]:
+    """Names that used to be this host's integration line but no longer are.
+
+    A name that was once the line must still be recognised as one -- never reclassified
+    as a deletable feature branch -- if it turns up on an old worktree or a stale
+    remote. Defaults to empty: that history is host-specific and belongs in the host's
+    own ``pyproject.toml``, never baked into the package.
+    """
+    return _configured_retired_integration_branches(Path(root))[0]
+
+
+def integration_branches(root: Path | str) -> tuple[str, ...]:
+    """Every name that counts as the integration line: current, then retired."""
+    return (integration_branch(root), *retired_integration_branches(root))
+
+
+def integration_refs(root: Path | str) -> tuple[str, ...]:
+    """Refs naming the integration line, most specific first: ``origin/<b>``, ``<b>``."""
+    branch = integration_branch(root)
+    return (f"origin/{branch}", branch)
 
 
 def package_tree_root(package_dir: Path) -> Path:

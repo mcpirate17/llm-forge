@@ -10,8 +10,10 @@ runs on demand instead of waiting for a hook that will not fire.
 
 Rules and where each is checked now:
 
-1. Exactly one integration branch (``master``; ``w7-trident-program`` is retired but
-   still recognised). It may not diverge from its remote -- ``audit_repo``.
+1. Exactly one integration branch, named by ``project_paths.integration_branch``
+   (``master`` in this monorepo; a host's retired lines, if any, stay recognised via
+   ``project_paths.retired_integration_branches``). It may not diverge from its
+   remote -- ``audit_repo``.
 2. Feature branches are named ``<agent>/<topic>-<yyyymmdd>`` -- ``audit_repo``, and
    ``bind_branch`` refuses an unparseable name.
 3. A feature branch is bound to one claim id; an agent may not fan out a second live
@@ -55,23 +57,16 @@ from conductor._native import (
     branch_policy_validate_bindings_native,
     branch_policy_validate_name_native,
 )
+from conductor import project_paths
 from conductor.candidate_review.git_source import git_common_dir
 from conductor.candidate_review.model import write_json_atomic
 
-# The integration line. `w7-trident-program` held this until 2026-08-30, when it was
-# retired and master became the line; the constant was not moved with it until
-# 2026-09-05, so every default-argument caller resolved a ref that no checkout had.
-INTEGRATION_BRANCH = "master"
-
-# Retired integration lines. They no longer exist as refs, but a name that was once the
-# integration line must never be classified as a deletable feature branch if it turns up
-# on an old worktree or a stale remote, so `is_integration_branch` still recognises it.
-RETIRED_INTEGRATION_BRANCHES: tuple[str, ...] = ("w7-trident-program",)
-
-INTEGRATION_BRANCHES: tuple[str, ...] = (
-    INTEGRATION_BRANCH,
-    *RETIRED_INTEGRATION_BRANCHES,
-)
+# The integration line used to be a fixed constant here (`master`, with the retired
+# `w7-trident-program` alongside it): a caller that defaulted to a stale copy of that
+# constant once resolved a ref no checkout had for four days after the line moved.
+# It is now resolved fresh from `project_paths` on every call instead of cached at
+# import time, so a host's own `[tool.conductor]` (or $CONDUCTOR_INTEGRATION_BRANCH)
+# is always the live answer -- see `is_integration_branch` below.
 
 BRANCH_BINDINGS_SCHEMA_VERSION = 1
 
@@ -89,7 +84,15 @@ class BranchPolicyError(RuntimeError):
 
 
 def is_integration_branch(name: str) -> bool:
-    return name in INTEGRATION_BRANCHES
+    """True for this host's current integration line or one of its retired lines.
+
+    Resolved against ``project_paths.host_root()`` (the enclosing repo, or the
+    current directory when there is none) on every call -- never cached -- so a
+    process that changes directory or sets $CONDUCTOR_INTEGRATION_BRANCH mid-run
+    gets the current answer.
+    """
+    root = project_paths.host_root()
+    return name in project_paths.integration_branches(root)
 
 
 @dataclass(frozen=True, slots=True)
