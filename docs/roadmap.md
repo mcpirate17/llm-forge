@@ -51,6 +51,14 @@ Exit criterion: per-tool-call fixed cost < 5 ms, measured by 0.1.
 ## Phase 2: bet B1, cost ledger (Claude opus design, Rust build)
 Rust JSONL reader over harness transcripts: tokens by category (cache read/write, output), resident-context attribution per turn (which attachment, which tool result, which reminder), per-session and per-agent totals, a budget ratchet in the gate (fail a PR that regresses median hook ms or resend bytes/session). Model-routing policy at the harness seam (cheap tier for Explore/clerical) follows from the ledger's numbers. Design doc landed: `docs/design/cost_ledger.md` (data model, attribution method with a declared error bound, gate ratchet, 6-step build plan).
 
+Build plan (design section 6):
+1. Reader + schema (`native/forge/src/ledger/{schema,reader}.rs`, `forge ledger read`). DONE PR #35: parses all 5 sessions measured in the design doc with zero panics and matches its cache_read/cache_creation/output sums exactly; unit tests on malformed/truncated/unknown-block lines.
+2. Turn/session/agent rollups (`forge ledger rollup`). Not started.
+3. Calibration harness (`forge ledger calibrate`, GLM). Not started.
+4. `agent_rollup` + `Agent:` trailer join to landed PRs. Not started.
+5. Gate phase `cost_budget_audit`. Not started.
+6. CLI plumbing + docs (GLM). Not started.
+
 ## Phase 3: bet B2, correct incremental verification (Claude)
 Transitive closure index (Rust) over imports and fixtures, per-test timing DB, flake ledger from the 1,494 receipts, content-addressed check cache keyed per file not per tree. Bound or de-scope the equivalence probe. Exit: gate time proportional to the diff, not the repo.
 

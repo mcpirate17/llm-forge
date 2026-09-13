@@ -19,6 +19,7 @@ mod handlers;
 mod identity;
 mod instant;
 mod interpreter;
+mod ledger;
 mod local_ai_policy;
 mod merge;
 mod mutation_plan;
@@ -55,6 +56,17 @@ enum Command {
         #[command(subcommand)]
         action: MutationCommand,
     },
+    /// Cost ledger commands (`docs/design/cost_ledger.md`).
+    Ledger {
+        #[command(subcommand)]
+        action: LedgerCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum LedgerCommand {
+    /// Parse transcript or telemetry JSONL file(s) into ledger summaries.
+    Read(ledger::ReadArgs),
 }
 
 #[derive(Subcommand)]
@@ -80,6 +92,15 @@ fn main() -> ExitCode {
                 Ok(code) => ExitCode::from(code as u8),
                 Err(err) => {
                     eprintln!("forge mutation plan: {err:#}");
+                    ExitCode::from(1)
+                }
+            },
+        },
+        Command::Ledger { action } => match action {
+            LedgerCommand::Read(args) => match ledger::run(args) {
+                Ok(code) => ExitCode::from(code as u8),
+                Err(err) => {
+                    eprintln!("forge ledger read: {err:#}");
                     ExitCode::from(1)
                 }
             },
