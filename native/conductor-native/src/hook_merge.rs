@@ -7,6 +7,11 @@ use serde_json::{json, Map, Value};
 
 const SEP: &str = "\n\n";
 const REWRITE: [&str; 2] = ["updatedToolOutput", "updatedMCPToolOutput"];
+/// Events whose Claude Code schema defines `hookSpecificOutput`. Everything
+/// else (SessionEnd, SubagentStop, Stop, unknown) must never carry one --
+/// Claude Code 2.1.268 logs a validation error on SessionEnd otherwise
+/// (`merge.py`'s module docstring is the contract).
+const SPECIFIC_SCHEMA_EVENTS: [&str; 3] = ["PreToolUse", "PostToolUse", "SessionStart"];
 
 #[derive(Deserialize)]
 struct Outcome {
@@ -152,7 +157,9 @@ fn hook_merge_native(event: &str, outcomes_json: &str) -> PyResult<String> {
     specific.extend(rewrites);
     specific.extend(extras);
     let mut result = Map::new();
-    result.insert("hookSpecificOutput".to_owned(), Value::Object(specific));
+    if SPECIFIC_SCHEMA_EVENTS.contains(&event) {
+        result.insert("hookSpecificOutput".to_owned(), Value::Object(specific));
+    }
     if !blocks.is_empty() {
         result.insert("decision".to_owned(), json!("block"));
         result.insert(
@@ -235,5 +242,68 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("HOOK CONFLICT [second]"));
+    }
+
+    /// Claude Code's schema has no `hookSpecificOutput` for SessionEnd
+    /// (2.1.268 logged a validation error on every session end), and none
+    /// for SubagentStop/Stop: those events fold to the top-level fields
+    /// only, a quiet session end to `{}`. The three schema events keep the
+    /// wrapper with `hookEventName` exactly as before.
+    #[test]
+    fn session_end_folds_to_top_level_fields_only() {
+        let quiet: Value = serde_json::from_str(
+            &hook_merge_native(
+                "SessionEnd",
+                r#"[{"name":"telemetry","output":null,"error":null,"fail_closed":false}]"#,
+            )
+            .expect("merge should succeed"),
+        )
+        .expect("result must be JSON");
+        assert_eq!(quiet, serde_json::json!({}));
+
+        let errored: Value = serde_json::from_str(
+            &hook_merge_native(
+                "SessionEnd",
+                r#"[{"name":"ledger","output":null,"error":"rollup failed","fail_closed":false}]"#,
+            )
+            .expect("merge should succeed"),
+        )
+        .expect("result must be JSON");
+        assert!(errored.get("hookSpecificOutput").is_none());
+        assert!(errored["systemMessage"]
+            .as_str()
+            .unwrap()
+            .contains("rollup failed"));
+
+        for event in ["SubagentStop", "Stop"] {
+            let result: Value = serde_json::from_str(
+                &hook_merge_native(
+                    event,
+                    r#"[{"name":"gate","output":{"hookSpecificOutput":{"permissionDecision":"deny"}},"error":null,"fail_closed":false}]"#,
+                )
+                .expect("merge should succeed"),
+            )
+            .expect("result must be JSON");
+            assert_eq!(
+                result,
+                serde_json::json!({}),
+                "{event} has no schema for it"
+            );
+        }
+
+        for event in ["PreToolUse", "PostToolUse", "SessionStart"] {
+            let result: Value = serde_json::from_str(
+                &hook_merge_native(
+                    event,
+                    r#"[{"name":"quiet","output":null,"error":null,"fail_closed":false}]"#,
+                )
+                .expect("merge should succeed"),
+            )
+            .expect("result must be JSON");
+            assert_eq!(
+                result["hookSpecificOutput"]["hookEventName"], event,
+                "schema events keep the wrapper exactly as before"
+            );
+        }
     }
 }

@@ -11,6 +11,11 @@ Rules (each is a mutation-campaign contract):
 - Top-level ``decision: block`` (PostToolUse) survives with its reasons joined;
   ``continue: false`` wins; ``suppressOutput`` ORs; ``updatedToolOutput`` (and
   the Codex ``updatedMCPToolOutput``) take the last writer and flag a conflict.
+- ``hookSpecificOutput`` is emitted only for events whose Claude Code schema
+  defines it: ``PreToolUse``/``PostToolUse``/``SessionStart``. ``SessionEnd``
+  (and ``SubagentStop``/``Stop``) have no such field -- Claude Code 2.1.268
+  logs a validation error on every session end otherwise -- so those events
+  fold to the top-level fields only, and a quiet session end prints ``{}``.
 """
 
 from __future__ import annotations
@@ -24,6 +29,9 @@ from conductor._native import hook_merge_native
 SEPARATOR: Final[str] = "\n\n"
 _RANK: Final[dict[str, int]] = {"allow": 1, "ask": 2, "deny": 3}
 _REWRITE_KEYS: Final[tuple[str, ...]] = ("updatedToolOutput", "updatedMCPToolOutput")
+_SPECIFIC_SCHEMA_EVENTS: Final[frozenset[str]] = frozenset(
+    {"PreToolUse", "PostToolUse", "SessionStart"}
+)
 
 
 @dataclass(frozen=True)
@@ -46,8 +54,12 @@ def _specific(output: dict[str, Any]) -> dict[str, Any]:
 
 def merge(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
     payload = [
-        {"name": outcome.name, "output": outcome.output, "error": outcome.error,
-         "fail_closed": outcome.fail_closed}
+        {
+            "name": outcome.name,
+            "output": outcome.output,
+            "error": outcome.error,
+            "fail_closed": outcome.fail_closed,
+        }
         for outcome in outcomes
     ]
     return json.loads(hook_merge_native(event, json.dumps(payload)))
@@ -131,8 +143,24 @@ def _merge_reference(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
         specific_out["additionalContext"] = SEPARATOR.join(contexts)
     specific_out.update(rewrites)
     specific_out.update(extra_specific)
+    return _assemble(
+        event, specific_out, block_reasons, stop, stop_reasons, suppress, system
+    )
 
-    result: dict[str, Any] = {"hookSpecificOutput": specific_out}
+
+def _assemble(
+    event: str,
+    specific_out: dict[str, Any],
+    block_reasons: list[str],
+    stop: bool,
+    stop_reasons: list[str],
+    suppress: bool,
+    system: list[str],
+) -> dict[str, Any]:
+    """Fold the collected votes into the top-level hook result."""
+    result: dict[str, Any] = {}
+    if event in _SPECIFIC_SCHEMA_EVENTS:
+        result["hookSpecificOutput"] = specific_out
     if block_reasons:
         result["decision"] = "block"
         result["reason"] = SEPARATOR.join(reason for reason in block_reasons if reason)

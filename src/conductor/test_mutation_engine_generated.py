@@ -9,6 +9,7 @@ survivor baseline to mean something across edits.
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -30,6 +31,12 @@ from conductor.mutation_engine_generated import (
 from conductor.mutation_scope import CampaignError
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _now() -> str:
+    """An ISO stamp for tests exercising ``resolve_receipt_path`` directly."""
+
+    return datetime.now(UTC).isoformat()
 
 
 def test_direct_run_refuses_unowned_sources_before_resolving_an_engine(
@@ -156,9 +163,14 @@ def test_the_per_mutant_bound_comes_from_the_manifest_or_the_baseline(
     """
 
     pinned_campaign = load_generated_campaign(
-        manifest(tmp_path, generator={"source": ["conductor/gate_rollout.py"],
-                                      "mutant_timeout_seconds": 300,
-                                      "run_timeout_seconds": 60})
+        manifest(
+            tmp_path,
+            generator={
+                "source": ["conductor/gate_rollout.py"],
+                "mutant_timeout_seconds": 300,
+                "run_timeout_seconds": 60,
+            },
+        )
     )
     assert pinned_campaign.mutant_timeout_seconds == 300
     assert resolve_mutant_timeout(pinned_campaign, 5.0) == 300
@@ -483,7 +495,9 @@ def test_resolve_receipt_path_defaults_to_the_configured_receipt_root(
         '[tool.conductor]\nmutation_receipt_root = "campaigns/receipts"\n',
         encoding="utf-8",
     )
-    output, relative = resolve_receipt_path(_campaign("gen_campaign"), None, tmp_path)
+    output, relative = resolve_receipt_path(
+        _campaign("gen_campaign"), None, tmp_path, generated_at=_now()
+    )
     assert output.parent == tmp_path / "campaigns" / "receipts"
     assert (tmp_path / "campaigns" / "receipts").is_dir()
     assert relative.startswith("campaigns/receipts/gen_campaign_")
@@ -492,7 +506,9 @@ def test_resolve_receipt_path_defaults_to_the_configured_receipt_root(
 def test_resolve_receipt_path_falls_back_to_the_monorepo_literal_unconfigured(
     tmp_path: Path,
 ) -> None:
-    output, relative = resolve_receipt_path(_campaign(), None, tmp_path)
+    output, relative = resolve_receipt_path(
+        _campaign(), None, tmp_path, generated_at=_now()
+    )
     assert output.parent == tmp_path / "research" / "reports" / "mutation_testing"
     assert relative.startswith("research/reports/mutation_testing/generated_fixture_")
 
@@ -505,14 +521,38 @@ def test_resolve_receipt_path_fails_loud_when_the_directory_cannot_be_created(
     )
     (tmp_path / "blocked").write_text("not a directory\n", encoding="utf-8")
     with pytest.raises(CampaignError, match="cannot create mutation receipt directory"):
-        resolve_receipt_path(_campaign(), None, tmp_path)
+        resolve_receipt_path(_campaign(), None, tmp_path, generated_at=_now())
 
 
 def test_resolve_receipt_path_still_honours_an_explicit_path(tmp_path: Path) -> None:
     explicit = tmp_path / "somewhere" / "receipt.json"
-    output, relative = resolve_receipt_path(_campaign(), explicit, tmp_path)
+    output, relative = resolve_receipt_path(
+        _campaign(), explicit, tmp_path, generated_at=_now()
+    )
     assert output == explicit.resolve()
     assert relative == "somewhere/receipt.json"
+
+
+def test_resolve_receipt_path_filename_stamp_is_the_receipts_own_generated_at(
+    tmp_path: Path,
+) -> None:
+    """The filename names the same moment the receipt claims -- not a second read.
+
+    A live campaign landed `..._20260913T999999Z.json`: two independent
+    `datetime.now(UTC)` reads a few lines apart (one for `generated_at`, one for
+    the filename) can disagree when the host clock steps between them. Passing
+    `generated_at` in removes the second read entirely, so the filename's stamp
+    is a pure function of the receipt's own timestamp, however wrong that
+    timestamp might separately be.
+    """
+    output, relative = resolve_receipt_path(
+        _campaign("stamped"),
+        None,
+        tmp_path,
+        generated_at="2026-09-13T21:17:08.126160+00:00",
+    )
+    assert output.name == "stamped_20260913T211708Z.json"
+    assert relative.endswith("stamped_20260913T211708Z.json")
 
 
 def test_a_baseline_that_died_for_want_of_python_says_so(
@@ -569,8 +609,11 @@ def test_a_baseline_that_died_for_want_of_python_says_so(
     # genuine red suite into an interpreter problem.
     with pytest.raises(CampaignError, match="^unmutated baseline failed"):
         note_baseline(
-            campaign, receipt, result("test result: FAILED. 3 passed; 2 failed"),
-            ["cargo", "test"], output,
+            campaign,
+            receipt,
+            result("test result: FAILED. 3 passed; 2 failed"),
+            ["cargo", "test"],
+            output,
         )
 
 

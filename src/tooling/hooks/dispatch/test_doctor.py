@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -101,15 +102,41 @@ def test_missing_empty_and_broken_scripts_are_dead(tmp_path):
     assert (
         _static(tmp_path, _declared("empty.py")).problems[0].startswith("empty file:")
     )
-    assert (
-        _static(tmp_path, _declared("noshebang.py"))
-        .problems[0]
-        .startswith("no shebang:")
-    )
+    # An executable with no shebang is a native binary as far as the static
+    # liveness rule is concerned (see the binary test below); only
+    # run_check actually executes it.
+    assert _static(tmp_path, _declared("noshebang.py")).problems == []
     assert (
         _static(tmp_path, _declared("syntax.py"))
         .problems[0]
         .startswith("does not compile:")
+    )
+
+
+def test_static_liveness_for_binaries_and_bad_shebangs(tmp_path):
+    # A cargo-installed `forge` is an ELF binary with no shebang: exec bit
+    # set means live. It used to be flagged "no shebang", failing every
+    # bootstrap on a machine with forge installed.
+    binary = _hook(tmp_path, "forge", "", executable=True)
+    binary.write_bytes(b"\x7fELF" + b"\x00" * 60)
+    assert _static(tmp_path, _declared("forge")).problems == []
+    # A real native executable the OS would run, copied in.
+    real = tmp_path / ".claude" / "hooks" / "true"
+    real.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy("/bin/true", real)
+    assert _static(tmp_path, _declared("true")).problems == []
+    # Dead stays dead: no exec bit, or a shebang whose interpreter is gone.
+    _hook(tmp_path, "flat.sh", "#!/usr/bin/env python3\nexit 0\n", executable=False)
+    assert (
+        _static(tmp_path, _declared("flat.sh"))
+        .problems[0]
+        .startswith("not executable")
+    )
+    _hook(tmp_path, "badinterp.sh", "#!/no/such/interp-9f1e\nexit 0\n")
+    assert (
+        _static(tmp_path, _declared("badinterp.sh"))
+        .problems[0]
+        .startswith("shebang interpreter not resolvable:")
     )
 
 
