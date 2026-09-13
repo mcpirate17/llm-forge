@@ -53,8 +53,18 @@ def main() -> int:
         )
         return 0
     if event == "PostToolUse":
+        import os
+
         sys.stderr.write("stub dispatcher: soft warning on stderr\n")
-        sys.stdout.write(json.dumps({"ok": True}))
+        sys.stdout.write(
+            json.dumps(
+                {
+                    "ok": True,
+                    "forge_native_hooks": os.environ.get("FORGE_NATIVE_HOOKS"),
+                    "forge_native_answers": os.environ.get("FORGE_NATIVE_ANSWERS"),
+                }
+            )
+        )
         return 0
     if event == "Deny":
         sys.stdout.write(json.dumps({"decision": "block", "reason": "stub deny"}))

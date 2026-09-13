@@ -42,10 +42,11 @@ Conclusion: cost = resident context × turns. Speed = process starts × tool cal
 3. Port `_bash_impact.py`. DONE PR #22 78344f0; no wall-clock win yet, three Python hooks still force one interpreter start.
 4. Port `crg_gate.py` reusing `branch_policy.rs` claim/path logic. DONE PR #28 5672ff6 (all Bash PreToolUse hooks native, 44 ms -> 1 ms).
 5. `forge hook PreToolUse` runs 2–4 natively; shells to Python only for unported hooks. DONE PR #28 5672ff6.
-6. Same for PostToolUse (`post_bash_graph`, `post_bash_quiet`, telemetry). DONE PR #31 25cd503 (`post_bash_quiet`/`post_tool_quiet` native via the splice; the matcher-`.*` hooks still start Python).
+6. Same for PostToolUse (`post_bash_graph`, `post_bash_quiet`, telemetry). DONE PR #31 25cd503 (`post_bash_quiet`/`post_tool_quiet` native via the splice); the matcher-`.*` remainder is step 9 below.
 7. Fix and port `workspace_hygiene`'s claim read (today: hardcoded `origin/master`, `ROOT` resolving into `src/`, and a second interpreter re-exec that dominates its 0.7 s). DONE PR #32.
-8. Extend `mutation_manifest.rs` to own `mutation_campaign_generate plan`. IN PROGRESS.
-9. Last: `candidate_review` checks/engine/verification.
+8. Extend `mutation_manifest.rs` to own `mutation_campaign_generate plan`. DONE PR #33 a5f3a62 (forge mutation plan 1.1 ms median, zero interpreter starts).
+9. PostToolUse fully native for every non-edit tool (`crg_refresh_report_post`, `read_budget`, `post_bash_graph`, `context_telemetry`; Read/Bash `ls`/Grep/MCP answered with zero interpreter starts). IN PROGRESS #TBD.
+10. Last: `candidate_review` checks/engine/verification.
 Exit criterion: per-tool-call fixed cost < 5 ms, measured by 0.1.
 
 ## Phase 2: bet B1, cost ledger (Claude opus design, Rust build)
@@ -95,3 +96,5 @@ Claude agents (≤150K each): anything Rust, anything that needs a design decisi
 | #29 | 47624e6 | fix(mutation): timed-out mutants are a status, not an engine error |
 | #30 | 494153a | fix(mutation): stale receipt hashes block the audit; snapshots reach the host interpreter |
 | #31 | 25cd503 | feat(forge): PostToolUse output bounding native, no Python start on PostToolUse |
+| #32 | ab153e2 | feat(forge): workspace_hygiene reads the configured integration branch, runs native at SessionStart |
+| #33 | a5f3a62 | feat(mutation): campaign plan is native, Python keeps only the CLI |

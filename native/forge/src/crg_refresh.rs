@@ -93,6 +93,20 @@ fn marker_path(store: &Path, name: &str) -> PathBuf {
     store.join(name)
 }
 
+/// `crg_refresh_state._flock`'s opener: `os.open(path, O_RDWR | O_CREAT,
+/// 0o644)` -- no truncation, ever, because these files exist to be flock
+/// targets, not to be read or rewritten through this handle. The `read`+
+/// `write` pair is what `O_RDWR` means; clippy's truncate heuristic cannot
+/// know that, hence the targeted allow.
+#[allow(clippy::suspicious_open_options)]
+fn open_flock_target(path: &Path) -> std::io::Result<std::fs::File> {
+    OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(path)
+}
+
 /// `crg_refresh_state.request`: append `paths` to `refresh.pending` under
 /// `refresh.queue.lock`, then spawn one detached worker if none holds
 /// `refresh.lock`. Returns `"spawned"` or `"queued"` (Python's return values,
@@ -103,11 +117,7 @@ pub fn request(
     worker_argv: &[String],
     cwd: &Path,
 ) -> std::io::Result<String> {
-    let queue_lock = OpenOptions::new()
-        .create(true)
-        .read(true)
-        .append(true)
-        .open(marker_path(store, "refresh.queue.lock"))?;
+    let queue_lock = open_flock_target(&marker_path(store, "refresh.queue.lock"))?;
     flock_exclusive(&queue_lock, false)?;
     let outcome = (|| {
         let mut pending = OpenOptions::new()
@@ -120,7 +130,7 @@ pub fn request(
         if worker_alive(store)? {
             return Ok("queued".to_string());
         }
-        spawn_worker(store, worker_argv, cwd);
+        spawn_worker(store, worker_argv, cwd)?;
         Ok("spawned".to_string())
     })();
     flock_unlock(&queue_lock);
@@ -129,11 +139,7 @@ pub fn request(
 
 /// `worker_alive`: true while some process holds the worker lock.
 fn worker_alive(store: &Path) -> std::io::Result<bool> {
-    let lock = OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .open(marker_path(store, "refresh.lock"))?;
+    let lock = open_flock_target(&marker_path(store, "refresh.lock"))?;
     Ok(!flock_exclusive(&lock, true)?)
 }
 
@@ -142,6 +148,7 @@ fn worker_alive(store: &Path) -> std::io::Result<bool> {
 /// caller's `request` outcome, not a hook failure: Python's `Popen` raises
 /// the same way.
 fn spawn_worker(store: &Path, worker_argv: &[String], cwd: &Path) -> std::io::Result<()> {
+    use std::os::unix::process::CommandExt;
     use std::process::{Command, Stdio};
     let log = OpenOptions::new()
         .create(true)
@@ -496,10 +503,7 @@ pub(crate) mod tests {
     /// refresh, and holding `refresh.lock` lets the queued-vs-spawned branch
     /// be pinned deterministically.
     fn sleeper_argv() -> Vec<String> {
-        vec![
-            "/bin/sleep".to_string(),
-            "30".to_string(),
-        ]
+        vec!["/bin/sleep".to_string(), "30".to_string()]
     }
 
     #[test]
@@ -507,8 +511,12 @@ pub(crate) mod tests {
         assert!(git_tree_rewrite_matches("git pull --rebase"));
         assert!(git_tree_rewrite_matches("cd /tmp && git\tcheckout -b wip"));
         assert!(git_tree_rewrite_matches("GIT_PAGER=cat git stash pop"));
+        // `search`, not `fullmatch`: a rewrite verb anywhere in the command
+        // counts -- including inside a quoted argument (Python agrees).
+        assert!(git_tree_rewrite_matches("git commit -m 'after git pull'"));
+        assert!(!git_tree_rewrite_matches("git commit -m 'bump version'"));
         assert!(!git_tree_rewrite_matches("gitx checkout"));
-        assert!(!git_tree_rewrite_matches("git commit -m 'git pull'"));
+        assert!(!git_tree_rewrite_matches("git status"));
         assert!(!git_tree_rewrite_matches("echo gitg"));
     }
 
@@ -526,15 +534,19 @@ pub(crate) mod tests {
             fs::read_to_string(store.join("refresh.pending")).unwrap(),
             "*\n"
         );
-        // The spawned sleeper holds refresh.lock: a second request queues.
+        // The detached worker's stderr file exists (spawn really happened).
+        assert!(store.join("refresh.log").is_file());
+        // Hold refresh.lock the way a live worker would (the sleeper does not
+        // take it itself): a second request must then queue, not spawn.
+        let worker_lock = open_flock_target(&store.join("refresh.lock")).unwrap();
+        assert!(flock_exclusive(&worker_lock, true).unwrap());
         let second = request(&store, &[FULL_UPDATE], &sleeper_argv(), tmp.path()).unwrap();
         assert_eq!(second, "queued");
         assert_eq!(
             fs::read_to_string(store.join("refresh.pending")).unwrap(),
             "*\n*\n"
         );
-        // The detached worker's stderr file exists (spawn really happened).
-        assert!(store.join("refresh.log").is_file());
+        flock_unlock(&worker_lock);
     }
 
     #[test]

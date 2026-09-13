@@ -64,9 +64,7 @@ pub fn telemetry_path(root: &Path) -> PathBuf {
 /// `context_telemetry.provider()`: which harness family is recording, by
 /// signature env vars, checked in the extension's fixed order.
 fn provider() -> String {
-    let present = |name: &str| {
-        std::env::var_os(name).is_some_and(|value| !value.is_empty())
-    };
+    let present = |name: &str| std::env::var_os(name).is_some_and(|value| !value.is_empty());
     let selected = if present("GROK_WORKSPACE_ROOT") || present("GROK_HOOK_EVENT") {
         "grok"
     } else if present("QWEN_PROJECT_DIR") {
@@ -150,7 +148,9 @@ fn json_byte_len(value: &Value) -> usize {
     if value.is_null() {
         return 0;
     }
-    serde_json::to_string(value).map(|text| text.len()).unwrap_or(0)
+    serde_json::to_string(value)
+        .map(|text| text.len())
+        .unwrap_or(0)
 }
 
 /// `bounded_output`: did the response say (or look like) it was cut down?
@@ -238,6 +238,59 @@ fn add_usage_field(
     }
 }
 
+/// The nested `*_details` objects: a second, deeper chance at
+/// `cached_input_tokens`/`reasoning_tokens` when the top-level field was
+/// absent, recorded under `<details-key>.<matched-field>` in `field_names`
+/// (Python's `usage_details` walk).
+fn add_detail_fields(
+    usage: &Value,
+    counts: &mut Vec<(&'static str, u64)>,
+    field_names: &mut Vec<String>,
+) {
+    for detail_key in [
+        "prompt_tokens_details",
+        "input_tokens_details",
+        "promptTokenDetails",
+    ] {
+        let Some(details) = usage.get(detail_key).filter(|v| v.is_object()) else {
+            continue;
+        };
+        if counts
+            .iter()
+            .any(|(name, _)| *name == "cached_input_tokens")
+        {
+            continue;
+        }
+        if let Some((value, matched)) = usage_value(
+            details,
+            &[
+                "cached_tokens",
+                "cache_read_input_tokens",
+                "cache_read_tokens",
+            ],
+        ) {
+            counts.push(("cached_input_tokens", value));
+            field_names.push(format!("{detail_key}.{matched}"));
+        }
+    }
+    for detail_key in [
+        "completion_tokens_details",
+        "output_tokens_details",
+        "completionTokenDetails",
+    ] {
+        let Some(details) = usage.get(detail_key).filter(|v| v.is_object()) else {
+            continue;
+        };
+        if counts.iter().any(|(name, _)| *name == "reasoning_tokens") {
+            continue;
+        }
+        if let Some((value, matched)) = usage_value(details, &["reasoning_tokens"]) {
+            counts.push(("reasoning_tokens", value));
+            field_names.push(format!("{detail_key}.{matched}"));
+        }
+    }
+}
+
 fn usage_fields(payload: &Value) -> UsageFields {
     for (usage, usage_path) in usage_mappings(payload) {
         let mut counts = Vec::new();
@@ -261,7 +314,11 @@ fn usage_fields(payload: &Value) -> UsageFields {
             &mut counts,
             &mut field_names,
             "cached_input_tokens",
-            &["cached_tokens", "cache_read_input_tokens", "cache_read_tokens"],
+            &[
+                "cached_tokens",
+                "cache_read_input_tokens",
+                "cache_read_tokens",
+            ],
         );
         add_usage_field(
             usage,
@@ -284,37 +341,7 @@ fn usage_fields(payload: &Value) -> UsageFields {
             "total_tokens",
             &["total_tokens"],
         );
-        for detail_key in ["prompt_tokens_details", "input_tokens_details", "promptTokenDetails"] {
-            let Some(details) = usage.get(detail_key).filter(|v| v.is_object()) else {
-                continue;
-            };
-            if counts.iter().any(|(name, _)| *name == "cached_input_tokens") {
-                continue;
-            }
-            if let Some((value, matched)) = usage_value(
-                details,
-                &["cached_tokens", "cache_read_input_tokens", "cache_read_tokens"],
-            ) {
-                counts.push(("cached_input_tokens", value));
-                field_names.push(format!("{detail_key}.{matched}"));
-            }
-        }
-        for detail_key in [
-            "completion_tokens_details",
-            "output_tokens_details",
-            "completionTokenDetails",
-        ] {
-            let Some(details) = usage.get(detail_key).filter(|v| v.is_object()) else {
-                continue;
-            };
-            if counts.iter().any(|(name, _)| *name == "reasoning_tokens") {
-                continue;
-            }
-            if let Some((value, matched)) = usage_value(details, &["reasoning_tokens"]) {
-                counts.push(("reasoning_tokens", value));
-                field_names.push(format!("{detail_key}.{matched}"));
-            }
-        }
+        add_detail_fields(usage, &mut counts, &mut field_names);
         if !counts.is_empty() {
             field_names.sort();
             return UsageFields {
@@ -346,7 +373,9 @@ struct LineBuilder {
 
 impl LineBuilder {
     fn new() -> Self {
-        LineBuilder { text: "{".to_string() }
+        LineBuilder {
+            text: "{".to_string(),
+        }
     }
 
     fn str_field(&mut self, key: &str, value: &str) {
@@ -380,7 +409,10 @@ impl LineBuilder {
     }
 
     fn strings_field(&mut self, key: &str, values: &[String]) {
-        let items: Vec<String> = values.iter().map(|v| serde_json::to_string(v).unwrap()).collect();
+        let items: Vec<String> = values
+            .iter()
+            .map(|v| serde_json::to_string(v).unwrap())
+            .collect();
         self.raw_field(key, &format!("[{}]", items.join(",")));
     }
 
@@ -415,7 +447,11 @@ pub fn event_record(payload: &Value, timestamp: &str, pid: u32) -> String {
     if tool_output.is_null() {
         tool_output = payload.get("output").cloned().unwrap_or(Value::Null);
     }
-    let event_name = field_string(payload, &["hook_event_name", "hookEventName"], "PostToolUse");
+    let event_name = field_string(
+        payload,
+        &["hook_event_name", "hookEventName"],
+        "PostToolUse",
+    );
     let tool_name = field_string(payload, &["tool_name", "toolName"], "unknown");
     let tool_output = model_visible_output(&tool_name, &tool_output);
     let input_bytes = json_byte_len(&tool_input);
@@ -467,6 +503,10 @@ pub fn event_record(payload: &Value, timestamp: &str, pid: u32) -> String {
 }
 
 /// The record `event()` encodes for a live call: real clock, own pid.
+/// Dead in `#[path]`-included test binaries that pull `context_telemetry.rs`
+/// in for the record builders alone (e.g. `post_tool_zero_start_parity.rs`) --
+/// the same pattern `instant.rs`'s `isoformat_millis_utc` established.
+#[allow(dead_code)]
 pub fn event_line(payload: &Value) -> Vec<u8> {
     let stamp = instant::isoformat_millis_utc(instant::now());
     let mut encoded = event_record(payload, &stamp, std::process::id());
@@ -485,6 +525,10 @@ fn py_str(value: &Value) -> String {
 }
 
 /// `_injected_context_text`: the text the byte count measures.
+/// Dead in `#[path]`-included test binaries that pull `context_telemetry.rs`
+/// in for the record builders alone (e.g. `post_tool_zero_start_parity.rs`) --
+/// the same pattern `instant.rs`'s `isoformat_millis_utc` established.
+#[allow(dead_code)]
 fn injected_context_text(hook_json: &Value) -> String {
     let Some(specific) = hook_json.get("hookSpecificOutput") else {
         return String::new();
@@ -515,7 +559,10 @@ pub fn hook_context_record(
 ) -> String {
     let mut context = String::new();
     let mut selected_event = event_name.to_string();
-    if let Some(specific) = hook_json.get("hookSpecificOutput").filter(|v| v.is_object()) {
+    if let Some(specific) = hook_json
+        .get("hookSpecificOutput")
+        .filter(|v| v.is_object())
+    {
         for key in ["additionalContext", "permissionDecisionReason"] {
             if let Some(value) = specific.get(key).filter(|v| truthy(v)) {
                 context = py_str(value);
@@ -537,7 +584,11 @@ pub fn hook_context_record(
     line.str_field(
         "hook_event",
         &truncate_chars(
-            if selected_event.is_empty() { "unknown" } else { &selected_event },
+            if selected_event.is_empty() {
+                "unknown"
+            } else {
+                &selected_event
+            },
             MAX_TOOL_CHARS,
         ),
     );
@@ -546,25 +597,41 @@ pub fn hook_context_record(
     line.int_field("output_bytes", output_bytes as u64);
     line.int_field("tool_input_tokens_estimate", 0);
     line.int_field("output_tokens_estimate", output_bytes.div_ceil(4) as u64);
-    line.str_field("output_tokens_estimate_scope", "hook-additional-context-bytes");
+    line.str_field(
+        "output_tokens_estimate_scope",
+        "hook-additional-context-bytes",
+    );
     line.bool_field("output_bounded", false);
     if !session_id.is_empty() {
         line.str_field("session_id", session_id);
     }
     if !context.is_empty() {
         let digest = Sha256::digest(context.as_bytes());
-        line.str_field(
-            "content_hash",
-            &format!("{:x}", digest)[..16],
-        );
+        line.str_field("content_hash", &format!("{:x}", digest)[..16]);
     }
     line.finish()
 }
 
 /// `hook_context_record` for a live call: real clock, own pid.
-pub fn hook_context_line(hook: &str, hook_json: &Value, event_name: &str, session_id: &str) -> Vec<u8> {
+/// Dead in `#[path]`-included test binaries that pull `context_telemetry.rs`
+/// in for the record builders alone (e.g. `post_tool_zero_start_parity.rs`) --
+/// the same pattern `instant.rs`'s `isoformat_millis_utc` established.
+#[allow(dead_code)]
+pub fn hook_context_line(
+    hook: &str,
+    hook_json: &Value,
+    event_name: &str,
+    session_id: &str,
+) -> Vec<u8> {
     let stamp = instant::isoformat_millis_utc(instant::now());
-    let mut encoded = hook_context_record(hook, hook_json, event_name, session_id, &stamp, std::process::id());
+    let mut encoded = hook_context_record(
+        hook,
+        hook_json,
+        event_name,
+        session_id,
+        &stamp,
+        std::process::id(),
+    );
     encoded.push('\n');
     encoded.into_bytes()
 }
@@ -592,15 +659,13 @@ fn flock_unlock(file: &std::fs::File) {
     unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_UN) };
 }
 
-use std::os::unix::io::AsRawFd;
-
 /// `append_bytes`: create the parent, open for append, and under an exclusive
 /// `flock` either append (true) or refuse past `MAX_LOG_BYTES` (false).
 fn append_bytes(path: &Path, encoded: &[u8]) -> io::Result<bool> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let file = OpenOptions::new()
+    let mut file = OpenOptions::new()
         .create(true)
         .read(true)
         .append(true)
@@ -639,7 +704,7 @@ fn rotated_name(path: &Path, stamp: &str) -> PathBuf {
 }
 
 /// `_unique_target`: a same-second collision disambiguates with `-2`, `-3`...
-fn unique_target(mut target: PathBuf) -> PathBuf {
+fn unique_target(target: PathBuf) -> PathBuf {
     if !target.exists() {
         return target;
     }
@@ -673,11 +738,6 @@ fn prune_rotated(path: &Path, keep: usize) {
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let pattern = if suffix.is_empty() {
-        format!("{stem}.*")
-    } else {
-        format!("{stem}.*{suffix}")
-    };
     let Ok(entries) = fs::read_dir(path.parent().unwrap_or(path)) else {
         return;
     };
@@ -696,10 +756,7 @@ fn prune_rotated(path: &Path, keep: usize) {
                 .unwrap_or(false)
         })
         .filter_map(|candidate| {
-            let mtime = candidate
-                .metadata()
-                .and_then(|meta| meta.modified())
-                .ok()?;
+            let mtime = candidate.metadata().and_then(|meta| meta.modified()).ok()?;
             Some((mtime, candidate))
         })
         .collect();
@@ -715,7 +772,10 @@ fn prune_rotated(path: &Path, keep: usize) {
 /// `_mark_disabled`'s two stderr signals, without the process latch (see
 /// module docs). Never raises, never writes to stdout.
 fn mark_disabled(path: &Path, exc: &dyn std::fmt::Display) {
-    eprintln!("context telemetry disabled for this process: {} unwritable ({exc})", path.display());
+    eprintln!(
+        "context telemetry disabled for this process: {} unwritable ({exc})",
+        path.display()
+    );
     let mut line = LineBuilder::new();
     let stamp = instant::isoformat_millis_utc(instant::now());
     line.str_field("timestamp", &stamp);
@@ -728,9 +788,7 @@ fn mark_disabled(path: &Path, exc: &dyn std::fmt::Display) {
     let mut encoded = line.finish();
     encoded.push('\n');
     if append_bytes(path, encoded.as_bytes()).is_err() {
-        eprintln!(
-            "context telemetry: could not record telemetry_disabled either: {exc}"
-        );
+        eprintln!("context telemetry: could not record telemetry_disabled either: {exc}");
     }
 }
 
@@ -739,7 +797,7 @@ fn mark_disabled(path: &Path, exc: &dyn std::fmt::Display) {
 /// I/O failure degrades to `mark_disabled` instead of raising into the hook.
 pub fn record_encoded(path: &Path, encoded: &[u8]) {
     match append_bytes(path, encoded) {
-        Ok(true) => return,
+        Ok(true) => {}
         Ok(false) => {
             let stamp = format!("{}Z", instant::format_compact_utc(instant::now()));
             let target = unique_target(rotated_name(path, &stamp));
@@ -750,7 +808,10 @@ pub fn record_encoded(path: &Path, encoded: &[u8]) {
             prune_rotated(path, MAX_ROTATED_LOGS);
             eprintln!(
                 "context telemetry log rotated to {}",
-                target.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
+                target
+                    .file_name()
+                    .map(|n| n.to_string_lossy())
+                    .unwrap_or_default()
             );
             if !append_bytes(path, encoded).unwrap_or(false) {
                 let err = io::Error::other(format!(
@@ -767,12 +828,20 @@ pub fn record_encoded(path: &Path, encoded: &[u8]) {
 /// One whole hook invocation's write: `record(telemetry.event(payload), path)`
 /// exactly as the Python adapter composes them. Errors are impossible by
 /// construction (`record_encoded` degrades to stderr).
+/// Dead in `#[path]`-included test binaries that pull `context_telemetry.rs`
+/// in for the record builders alone (e.g. `post_tool_zero_start_parity.rs`) --
+/// the same pattern `instant.rs`'s `isoformat_millis_utc` established.
+#[allow(dead_code)]
 pub fn record_event(payload: &Value, root: &Path) {
     record_encoded(&telemetry_path(root), &event_line(payload));
 }
 
 /// `adapters._telemetry`'s hook-context variant: record only when the hook
 /// injected something (`output_bytes > 0`), never raising on a broken sink.
+/// Dead in `#[path]`-included test binaries that pull `context_telemetry.rs`
+/// in for the record builders alone (e.g. `post_tool_zero_start_parity.rs`) --
+/// the same pattern `instant.rs`'s `isoformat_millis_utc` established.
+#[allow(dead_code)]
 pub fn record_hook_context(hook: &str, hook_json: &Value, session_id: &str, root: &Path) {
     if injected_context_text(hook_json).is_empty() {
         return;

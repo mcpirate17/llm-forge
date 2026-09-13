@@ -22,18 +22,26 @@ pub const DEFAULT_STEP: u64 = 30_000;
 const CHARS_PER_TOKEN: u64 = 4;
 const MAX_COUNTED_CHARS: usize = 4_000_000;
 
-pub const ADVICE: &str = "Prefer locate_tool / ast_context_tool / symbol_source_tool / query_graph, \
+pub const ADVICE: &str =
+    "Prefer locate_tool / ast_context_tool / symbol_source_tool / query_graph, \
      Read with offset+limit, or delegate bulk reading to a subagent.";
 
-/// `crg_gate._state_dir`: the gate's state directory, created 0o700.
+/// `crg_gate._state_dir`: the gate's state directory. Unlike `crg_gate.rs`'s
+/// read-only port of the same helper, the mkdir is load-bearing here --
+/// `tally` writes the ledger into the directory Python's `_state_dir` always
+/// creates (0o700, `parents=True`), so this port creates it too before
+/// returning, exactly as Python does for every caller.
+/// Dead in `#[path]`-included test binaries that pull `read_budget.rs` in for
+/// `hook_output` alone (e.g. `post_tool_zero_start_parity.rs`, whose cases
+/// pass the state dir explicitly) -- the same pattern `interpreter.rs`'s
+/// `project_root` established.
+#[allow(dead_code)]
 pub fn state_dir() -> PathBuf {
-    let configured = std::env::var("CRG_GATE_STATE_DIR").unwrap_or_default();
-    let path = if configured.trim().is_empty() {
-        PathBuf::from("/tmp/claude-crg-gate")
-    } else {
-        PathBuf::from(configured.trim())
-    };
+    let raw =
+        std::env::var("CRG_GATE_STATE_DIR").unwrap_or_else(|_| "/tmp/claude-crg-gate".to_string());
+    let path = PathBuf::from(raw);
     let mut builder = std::fs::DirBuilder::new();
+    use std::os::unix::fs::DirBuilderExt;
     builder.mode(0o700).recursive(true);
     let _ = builder.create(&path);
     #[cfg(unix)]
@@ -127,13 +135,20 @@ pub fn hook_output(payload: &Value, state_dir: &Path) -> Result<Value> {
     let Some(key) = state_key(payload) else {
         return Ok(quiet_post());
     };
-    let tokens = response_chars(payload.get("tool_response").unwrap_or(&Value::Null), MAX_COUNTED_CHARS) as u64
+    let tokens = response_chars(
+        payload.get("tool_response").unwrap_or(&Value::Null),
+        MAX_COUNTED_CHARS,
+    ) as u64
         / CHARS_PER_TOKEN;
     if tokens == 0 {
         return Ok(quiet_post());
     }
-    let (previous, total) = tally(state_dir, &key, tokens)
-        .with_context(|| format!("cannot update the read-token ledger in {}", state_dir.display()))?;
+    let (previous, total) = tally(state_dir, &key, tokens).with_context(|| {
+        format!(
+            "cannot update the read-token ledger in {}",
+            state_dir.display()
+        )
+    })?;
     let step = step_tokens()?;
     if total / step > previous / step {
         return Ok(json!({
@@ -200,21 +215,24 @@ pub(crate) mod tests {
         std::env::remove_var(STEP_ENV);
         let dir = scratch("crossing");
         let key = format!("{:x}", Sha256::digest("s-cross".as_bytes()));
-        // Seed 29,900 tokens: a 4,000-char response (1,000 tokens) crosses
-        // the default 30,000 step.
+        // Seed 29,900 tokens; the response carries 4,004 countable characters
+        // ("text" of the type field plus the 4,000-char text), i.e. 1,001
+        // tokens -- crossing the default 30,000 step.
         std::fs::write(dir.join(format!("{key}.read-tokens")), "29900\n").unwrap();
         let payload = json!({
             "session_id": "s-cross", "tool_name": "Read",
             "tool_response": {"type": "text", "text": "x".repeat(4000)},
         });
         let out = hook_output(&payload, &dir).unwrap();
-        let line = out["hookSpecificOutput"]["additionalContext"].as_str().unwrap();
-        assert!(line.starts_with("READ BUDGET: 30,900 tokens pulled into context via Read this session (crossed 30,000)."), "{line}");
+        let line = out["hookSpecificOutput"]["additionalContext"]
+            .as_str()
+            .unwrap();
+        assert!(line.starts_with("READ BUDGET: 30,901 tokens pulled into context via Read this session (crossed 30,000)."), "{line}");
         assert!(line.contains("query_graph"));
         // The ledger now holds the new total.
         assert_eq!(
             std::fs::read_to_string(dir.join(format!("{key}.read-tokens"))).unwrap(),
-            "30900\n"
+            "30901\n"
         );
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -240,8 +258,14 @@ pub(crate) mod tests {
         assert_eq!(response_chars(&json!("abc"), MAX_COUNTED_CHARS), 3);
         assert_eq!(response_chars(&json!(null), MAX_COUNTED_CHARS), 0);
         assert_eq!(response_chars(&json!(42), MAX_COUNTED_CHARS), 0);
-        assert_eq!(response_chars(&json!([null, "ab", ["cd"]]), MAX_COUNTED_CHARS), 4);
-        assert_eq!(response_chars(&json!({"a": "xyz", "b": 1}), MAX_COUNTED_CHARS), 3);
+        assert_eq!(
+            response_chars(&json!([null, "ab", ["cd"]]), MAX_COUNTED_CHARS),
+            4
+        );
+        assert_eq!(
+            response_chars(&json!({"a": "xyz", "b": 1}), MAX_COUNTED_CHARS),
+            3
+        );
         // The bound caps at exactly the limit, never past it.
         let big = json!({"deep": ["a".repeat(50), "b".repeat(50)]});
         assert_eq!(response_chars(&big, 60), 60);

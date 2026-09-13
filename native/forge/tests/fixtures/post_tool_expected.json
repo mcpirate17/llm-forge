@@ -1,0 +1,145 @@
+{
+ "pt-report-no-marker": {
+  "output": null,
+  "failed_after": null
+ },
+ "pt-report-failure": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['a.py', 'b.rs']. Graph reads are STALE until `code-review-graph update` succeeds."
+   },
+   "systemMessage": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['a.py', 'b.rs']. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "failed_after": null
+ },
+ "pt-report-warning": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "WARNING: background graph refresh: embeddings skipped"
+   },
+   "systemMessage": "WARNING: background graph refresh: embeddings skipped"
+  },
+  "failed_after": null
+ },
+ "pt-report-unparseable": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `code-review-graph update` succeeds."
+   },
+   "systemMessage": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `code-review-graph update` succeeds."
+  },
+  "failed_after": null
+ },
+ "pt-graph-no-command": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "pending": null
+ },
+ "pt-graph-non-git": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "pending": null
+ },
+ "pt-graph-pull-no-tool": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "WARNING: code-review-graph is not installed; graph NOT refreshed for *"
+   }
+  },
+  "pending": null
+ },
+ "pt-graph-checkout-queued": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "code-review-graph refresh queued after a git working-tree change."
+   }
+  },
+  "pending": "*\n"
+ },
+ "pt-budget-small": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "ledger_after": "4\n"
+ },
+ "pt-budget-cross": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "READ BUDGET: 30,901 tokens pulled into context via Read this session (crossed 30,000). Prefer locate_tool / ast_context_tool / symbol_source_tool / query_graph, Read with offset+limit, or delegate bulk reading to a subagent."
+   }
+  },
+  "ledger_after": "30901\n"
+ },
+ "pt-budget-no-session": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "ledger_after": null
+ },
+ "pt-budget-no-response": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse"
+   }
+  },
+  "ledger_after": "120000\n"
+ },
+ "pt-budget-step-env": {
+  "output": {
+   "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "READ BUDGET: 1,026 tokens pulled into context via Read this session (crossed 1,000). Prefer locate_tool / ast_context_tool / symbol_source_tool / query_graph, Read with offset+limit, or delegate bulk reading to a subagent."
+   }
+  },
+  "ledger_after": "1026\n"
+ },
+ "pt-tele-bash-basic": {
+  "line": "{\"timestamp\":\"2026-09-13T00:00:00.000+00:00\",\"pid\":3831796,\"provider\":\"qwen\",\"event\":\"PostToolUse\",\"tool\":\"Bash\",\"input_bytes\":16,\"output_bytes\":42,\"tool_input_tokens_estimate\":4,\"output_tokens_estimate\":11,\"output_tokens_estimate_scope\":\"tool-output-bytes\",\"output_bounded\":false,\"input_tokens\":null,\"output_tokens\":null,\"cached_input_tokens\":null,\"cache_creation_input_tokens\":null,\"reasoning_tokens\":null,\"total_tokens\":null,\"usage_source\":\"none\",\"native_usage_path\":null,\"native_usage_fields\":[],\"session_id\":\"s-1\"}\n"
+ },
+ "pt-tele-usage-native": {
+  "line": "{\"timestamp\":\"2026-09-13T00:00:00.000+00:00\",\"pid\":3831796,\"provider\":\"qwen\",\"event\":\"PostToolUse\",\"tool\":\"mcp__code_review_graph__query_graph\",\"input_bytes\":0,\"output_bytes\":11,\"tool_input_tokens_estimate\":0,\"output_tokens_estimate\":3,\"output_tokens_estimate_scope\":\"tool-output-bytes\",\"output_bounded\":false,\"input_tokens\":100,\"output_tokens\":7,\"usage_source\":\"native\",\"native_usage_path\":\"response.usage\",\"native_usage_fields\":[\"input_tokens\",\"output_tokens\"],\"session_id\":\"s-2\"}\n"
+ },
+ "pt-tele-usage-details": {
+  "line": "{\"timestamp\":\"2026-09-13T00:00:00.000+00:00\",\"pid\":3831796,\"provider\":\"qwen\",\"event\":\"PostToolUse\",\"tool\":\"Grep\",\"input_bytes\":0,\"output_bytes\":0,\"tool_input_tokens_estimate\":0,\"output_tokens_estimate\":0,\"output_tokens_estimate_scope\":\"tool-output-bytes\",\"output_bounded\":false,\"input_tokens\":50,\"output_tokens\":2,\"cached_input_tokens\":9,\"usage_source\":\"native\",\"native_usage_path\":\"response.usage\",\"native_usage_fields\":[\"completion_tokens\",\"prompt_tokens\",\"prompt_tokens_details.cached_tokens\"]}\n"
+ },
+ "pt-tele-edit-projection": {
+  "line": "{\"timestamp\":\"2026-09-13T00:00:00.000+00:00\",\"pid\":3831796,\"provider\":\"qwen\",\"event\":\"PostToolUse\",\"tool\":\"Edit\",\"input_bytes\":54,\"output_bytes\":63,\"tool_input_tokens_estimate\":14,\"output_tokens_estimate\":16,\"output_tokens_estimate_scope\":\"tool-output-bytes\",\"output_bounded\":false,\"input_tokens\":null,\"output_tokens\":null,\"cached_input_tokens\":null,\"cache_creation_input_tokens\":null,\"reasoning_tokens\":null,\"total_tokens\":null,\"usage_source\":\"none\",\"native_usage_path\":null,\"native_usage_fields\":[],\"session_id\":\"s-3\"}\n"
+ },
+ "pt-tele-write-projection": {
+  "line": "{\"timestamp\":\"2026-09-13T00:00:00.000+00:00\",\"pid\":3831796,\"provider\":\"qwen\",\"event\":\"PostToolUse\",\"tool\":\"Write\",\"input_bytes\":0,\"output_bytes\":33,\"tool_input_tokens_estimate\":0,\"output_tokens_estimate\":9,\"output_tokens_estimate_scope\":\"tool-output-bytes\",\"output_bounded\":false,\"input_tokens\":null,\"output_tokens\":null,\"cached_input_tokens\":null,\"cache_creation_input_tokens\":null,\"reasoning_tokens\":null,\"total_tokens\":null,\"usage_source\":\"none\",\"native_usage_path\":null,\"native_usage_fields\":[],\"session_id\":\"s-4\"}\n"
+ },
+ "pt-tele-no-session": {
+  "line": "{\"timestamp\":\"2026-09-13T00:00:00.000+00:00\",\"pid\":3831796,\"provider\":\"qwen\",\"event\":\"PostToolUse\",\"tool\":\"Glob\",\"input_bytes\":0,\"output_bytes\":18,\"tool_input_tokens_estimate\":0,\"output_tokens_estimate\":5,\"output_tokens_estimate_scope\":\"tool-output-bytes\",\"output_bounded\":false,\"input_tokens\":null,\"output_tokens\":null,\"cached_input_tokens\":null,\"cache_creation_input_tokens\":null,\"reasoning_tokens\":null,\"total_tokens\":null,\"usage_source\":\"none\",\"native_usage_path\":null,\"native_usage_fields\":[]}\n"
+ },
+ "pt-tele-long-tool-name": {
+  "line": "{\"timestamp\":\"2026-09-13T00:00:00.000+00:00\",\"pid\":3831796,\"provider\":\"qwen\",\"event\":\"PostToolUse\",\"tool\":\"mcp__nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\",\"input_bytes\":0,\"output_bytes\":2,\"tool_input_tokens_estimate\":0,\"output_tokens_estimate\":1,\"output_tokens_estimate_scope\":\"tool-output-bytes\",\"output_bounded\":false,\"input_tokens\":null,\"output_tokens\":null,\"cached_input_tokens\":null,\"cache_creation_input_tokens\":null,\"reasoning_tokens\":null,\"total_tokens\":null,\"usage_source\":\"none\",\"native_usage_path\":null,\"native_usage_fields\":[],\"session_id\":\"s-5\"}\n"
+ },
+ "pt-tele-bounded-marker": {
+  "line": "{\"timestamp\":\"2026-09-13T00:00:00.000+00:00\",\"pid\":3831796,\"provider\":\"qwen\",\"event\":\"PostToolUse\",\"tool\":\"Read\",\"input_bytes\":0,\"output_bytes\":49,\"tool_input_tokens_estimate\":0,\"output_tokens_estimate\":13,\"output_tokens_estimate_scope\":\"tool-output-bytes\",\"output_bounded\":true,\"input_tokens\":null,\"output_tokens\":null,\"cached_input_tokens\":null,\"cache_creation_input_tokens\":null,\"reasoning_tokens\":null,\"total_tokens\":null,\"usage_source\":\"none\",\"native_usage_path\":null,\"native_usage_fields\":[],\"session_id\":\"s-6\"}\n"
+ },
+ "pt-tele-hook-context": {
+  "line": "{\"timestamp\":\"2026-09-13T00:00:00.000+00:00\",\"pid\":3831796,\"provider\":\"qwen\",\"event\":\"HookContext\",\"hook_event\":\"PostToolUse\",\"tool\":\"post-bash-graph\",\"input_bytes\":0,\"output_bytes\":65,\"tool_input_tokens_estimate\":0,\"output_tokens_estimate\":17,\"output_tokens_estimate_scope\":\"hook-additional-context-bytes\",\"output_bounded\":false,\"session_id\":\"s-9\",\"content_hash\":\"33d7d019e7244457\"}\n"
+ },
+ "pt-tele-path-override": {
+  "path": "/tmp/pt-events-override.jsonl"
+ },
+ "pt-tele-path-default": {
+  "path_suffix": "src/research/tmp/context_telemetry/events.jsonl"
+ }
+}

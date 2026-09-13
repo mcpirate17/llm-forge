@@ -163,7 +163,10 @@ pub fn format_hm(instant: f64) -> String {
 /// `datetime.now(UTC).isoformat(timespec="milliseconds")`:
 /// `YYYY-MM-DDTHH:MM:SS.mmm+00:00`, milliseconds always shown (`.000` too)
 /// and truncated, never rounded -- the stamp `conductor.context_telemetry`
-/// puts at the front of every record it writes.
+/// puts at the front of every record it writes. Dead in `#[path]`-included
+/// test binaries that pull `instant.rs` in without `context_telemetry.rs`
+/// (same pattern as `format_compact_utc` below).
+#[allow(dead_code)]
 pub fn isoformat_millis_utc(instant: f64) -> String {
     let (y, mo, d, h, min, s, frac) = civil_hms(instant);
     let millis = (frac * 1000.0) as u32; // truncation, like isoformat's timespec

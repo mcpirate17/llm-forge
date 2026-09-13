@@ -315,10 +315,13 @@ def natively_served() -> frozenset[str]:
     (``native/forge/src/dispatch.rs``) sets this to the names it serves
     natively -- the Bash `PreToolUse` set as of the #28 port, the
     `PostToolUse` output-bounding pair (`post_bash_quiet`,
-    `post_tool_quiet`) as of #31, and ``workspace_exposure_session`` (the
+    `post_tool_quiet`) as of #31, ``workspace_exposure_session`` (the
     SessionStart EXPOSED line, ``workspace_hygiene.exposure_line``, served
     by `native/forge/src/workspace_hygiene.rs`) as of the workspace-hygiene
-    port -- so served names always come with a matching entry in
+    port, and the four remaining non-editing `PostToolUse` names
+    (`crg_refresh_report_post`, `read_budget`, `post_bash_graph`,
+    `context_telemetry`) as of the zero-interpreter-start port -- so served
+    names always come with a matching entry in
     `native_answers()`: `select()` dropping a served spec never drops a
     contribution, it is spliced back in by `runner.dispatch` instead. See
     `native/forge/src/handlers.rs`'s module doc for the full design.

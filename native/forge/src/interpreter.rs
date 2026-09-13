@@ -13,6 +13,13 @@ use std::path::{Path, PathBuf};
 /// fallback `os.getcwd()`-relative behavior the Python launcher's rendered script
 /// gets from its own `Path(__file__).resolve().parents[2]`, except forge has no
 /// fixed install location to derive one from.
+///
+/// Used by the main binary's handlers/dispatch; dead only in a
+/// `#[path]`-included test binary that pulls `interpreter.rs` in for
+/// `resolve_python` alone (e.g. `bash_pretooluse_hooks_parity.rs`, which
+/// needs it for `crg_refresh`'s worker command) -- the same pattern
+/// `instant.rs`'s `format_compact_utc` established.
+#[allow(dead_code)]
 pub fn project_root() -> PathBuf {
     match env::var("CLAUDE_PROJECT_DIR") {
         Ok(value) if !value.trim().is_empty() => PathBuf::from(value),
