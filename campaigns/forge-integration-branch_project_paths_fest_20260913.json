@@ -1,0 +1,42 @@
+{
+  "campaign_id": "forge-integration-branch_project_paths_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/project_paths.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/project_paths.py": "17748db5b6c230e67651072b620c933de4506b4c6fd38ddca057f327470e3fba"
+  },
+  "survivor_baseline": [
+    "break_continue-1aa122a468cc-0",
+    "constant_replace-09a5f8b6ffb2-0",
+    "return_value-c2eb5f70ca8f-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:03:32.365261+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_project_paths.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_project_paths.py": "554a08973f922c0d0bdfd9a9e55cfe678ee3ce58d3bd335bc45c216486b55c9e"
+  },
+  "title": "Generated mutants for src/conductor/project_paths.py, scored on the survivor set"
+}

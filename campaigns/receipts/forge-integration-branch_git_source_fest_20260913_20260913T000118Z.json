@@ -1,0 +1,4032 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 98,
+    "baseline_repetitions": 2,
+    "killed_mutants": 98,
+    "ranked_tests": 8,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.774136,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                                   [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m22 passed\u001b[0m\u001b[32m in 0.51s\u001b[0m\u001b[0m\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-integration-branch/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/candidate_review/test_value_waivers.py",
+    "--cov=src/conductor/candidate_review",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "forge-integration-branch_git_source_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "engine_result": {
+    "duration_seconds": 34.509909,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "ch moved destination path to the source path git paired it with.\\n\\n    A pathspec limited to destination paths hides the other half of a move, so\\n    git cannot pair the two and scores the whole file as new code. This pass\\n    runs unrestricted so the pairing exists before the line-level diff is\\n    scoped. ``--find-copies`` is needed as well as ``--find-renames`` because a\\n    move that leaves an alias shim behind keeps the source path alive, which is\\n    a copy to git, not a rename. ``--find-copies`` must come last: a later\\n    ``-M`` turns copy detection back off.\\n    \\\"\\\"\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nb4jh9_g/worktree/src/conductor/candidate_review/git_source.py\",\n        \"line\": 490,\n        \"column\": 12,\n        \"byte_offset\": 17722,\n        \"byte_length\": 155,\n        \"original_text\": \"{\\n        destination.decode(\\\"utf-8\\\", \\\"replace\\\"): source.decode(\\\"utf-8\\\", \\\"replace\\\")\\n        for source, destination in git_rename_sources_native(raw)\\n    }\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nb4jh9_g/worktree/src/conductor/candidate_review/git_source.py\",\n        \"line\": 501,\n        \"column\": 8,\n        \"byte_offset\": 18058,\n        \"byte_length\": 4,\n        \"original_text\": \"not \",\n        \"mutated_text\": \"\",\n        \"mutator_name\": \"boolean_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nb4jh9_g/worktree/src/conductor/candidate_review/git_source.py\",\n        \"line\": 501,\n        \"column\": 8,\n        \"byte_offset\": 18058,\n        \"byte_length\": 9,\n        \"original_text\": \"not paths\",\n        \"mutated_text\": \"not (not paths)\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nb4jh9_g/worktree/src/conductor/candidate_review/git_source.py\",\n        \"line\": 502,\n        \"column\": 16,\n        \"byte_offset\": 18084,\n        \"byte_length\": 2,\n        \"original_text\": \"{}\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nb4jh9_g/worktree/src/conductor/candidate_review/git_source.py\",\n        \"line\": 505,\n        \"column\": 27,\n        \"byte_offset\": 18184,\n        \"byte_length\": 1,\n        \"original_text\": \"|\",\n        \"mutated_text\": \"&\",\n        \"mutator_name\": \"bitwise_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nb4jh9_g/worktree/src/conductor/candidate_review/git_source.py\",\n        \"line\": 520,\n        \"column\": 12,\n        \"byte_offset\": 18556,\n        \"byte_length\": 74,\n        \"original_text\": \"{path: set(lines) for path, lines in git_changed_lines_native(raw, paths)}\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 34,\n    \"nanos\": 503908961\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 98,
+    "mutants_generated": 191,
+    "mutants_tested": 125,
+    "no_coverage": 66,
+    "survived": 27,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T00:03:32.480168+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-integration-branch/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/forge-integration-branch_git_source_fest_20260913.json",
+  "manifest_sha256": "389f20953f5830fcd095b735d24b2e11d11e424af2272fd7e86e177c00df1c60",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 71,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c48da0fa1d37-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Resolve and safely materialize exact candidates from Git objects.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 42,
+      "byte_offset": 489,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-965934e9ef12-0",
+      "line": 19,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"4b825dc642cb6eb9a060e54bf8d69288fbee4904\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 571,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c6334b52ecce-0",
+      "line": 20,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"0\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 575,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-21d263c2cd06-0",
+      "line": 20,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 577,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8d2bd5ddbaa7-0",
+      "line": 20,
+      "mutated_text": "41",
+      "operator": "constant_replace",
+      "original_text": "40",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 64,
+      "byte_offset": 622,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6b2b639daaae-0",
+      "line": 24,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Candidate identity or materialization could not be proven.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 817,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ad19c108c968-0",
+      "line": 31,
+      "mutated_text": "65",
+      "operator": "constant_replace",
+      "original_text": "64",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 820,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-21d263c2cd06-1",
+      "line": 31,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 822,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-521cf7844ef9-0",
+      "line": 31,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 827,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-21d263c2cd06-2",
+      "line": 31,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 829,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-521cf7844ef9-1",
+      "line": 31,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 864,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-20c68cb787f6-0",
+      "line": 32,
+      "mutated_text": "3",
+      "operator": "constant_replace",
+      "original_text": "2",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 866,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-21d263c2cd06-3",
+      "line": 32,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 868,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-521cf7844ef9-2",
+      "line": 32,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 873,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-21d263c2cd06-4",
+      "line": 32,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 875,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-521cf7844ef9-3",
+      "line": 32,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 880,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-21d263c2cd06-5",
+      "line": 32,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 882,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-521cf7844ef9-4",
+      "line": 32,
+      "mutated_text": "1025",
+      "operator": "constant_replace",
+      "original_text": "1024",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 27,
+      "byte_offset": 1195,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-89bf3156366e-0",
+      "line": 37,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"CONDUCTOR_INTEGRATION_REF\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 1430,
+      "duration_seconds": 0.267359,
+      "id": "constant_replace-50eda719198c-0",
+      "line": 48,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"git\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 30,
+      "byte_offset": 1553,
+      "duration_seconds": 0.241847,
+      "id": "negate_condition-feb2ff4e55c0-0",
+      "line": 54,
+      "mutated_text": "not (check and completed.returncode)",
+      "operator": "negate_condition",
+      "original_text": "check and completed.returncode",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 1559,
+      "duration_seconds": 0.250596,
+      "id": "boolean_op-8887d87af102-0",
+      "line": 54,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 1783,
+      "duration_seconds": 0.254749,
+      "id": "return_value-4f53c19ff95c-0",
+      "line": 59,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "completed",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 1867,
+      "duration_seconds": 0.264371,
+      "id": "constant_replace-6084b6ac2f25-0",
+      "line": 63,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"rev-parse\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 1880,
+      "duration_seconds": 0.268239,
+      "id": "constant_replace-f0b7994a1f97-0",
+      "line": 63,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--show-toplevel\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 49,
+      "byte_offset": 1911,
+      "duration_seconds": 0.285454,
+      "id": "return_value-9010a8a2d73c-0",
+      "line": 64,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "Path(completed.stdout.decode().strip()).resolve()",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 80,
+      "byte_offset": 2133,
+      "duration_seconds": 0.0,
+      "id": "return_value-836d367457ae-0",
+      "line": 71,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "candidate.resolve() if candidate.is_absolute() else (repo / candidate).resolve()",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2191,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-8916b7afaf0b-0",
+      "line": 71,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2278,
+      "duration_seconds": 0.290048,
+      "id": "boolean_op-05f894949486-0",
+      "line": 76,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 30,
+      "byte_offset": 2278,
+      "duration_seconds": 0.292483,
+      "id": "negate_condition-07417fbb12e2-0",
+      "line": 76,
+      "mutated_text": "not (not ref or ref.startswith(\"-\"))",
+      "operator": "negate_condition",
+      "original_text": "not ref or ref.startswith(\"-\")",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2286,
+      "duration_seconds": 0.264517,
+      "id": "boolean_op-bc693e09fb4e-0",
+      "line": 76,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2304,
+      "duration_seconds": 0.254627,
+      "id": "constant_replace-55ef1e2c6a0c-0",
+      "line": 76,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"-\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2421,
+      "duration_seconds": 0.248456,
+      "id": "boolean_op-05f894949486-1",
+      "line": 80,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 161,
+      "byte_offset": 2421,
+      "duration_seconds": 0.268207,
+      "id": "negate_condition-9466e9efdde4-0",
+      "line": 80,
+      "mutated_text": "not (not ref.startswith(\"refs/\")\n        and ref != \"HEAD\"\n        and re.fullmatch(r\"[A-Za-z0-9._/-]+\", ref)\n        and not re.fullmatch(r\"[0-9a-fA-F]{40,64}\", ref))",
+      "operator": "negate_condition",
+      "original_text": "not ref.startswith(\"refs/\")\n        and ref != \"HEAD\"\n        and re.fullmatch(r\"[A-Za-z0-9._/-]+\", ref)\n        and not re.fullmatch(r\"[0-9a-fA-F]{40,64}\", ref)",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 2440,
+      "duration_seconds": 0.26994,
+      "id": "constant_replace-d2050b3c438d-0",
+      "line": 80,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"refs/\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2457,
+      "duration_seconds": 0.267119,
+      "id": "boolean_op-8887d87af102-1",
+      "line": 81,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2465,
+      "duration_seconds": 0.248313,
+      "id": "comparison_op-82b591b23e2f-0",
+      "line": 81,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 2468,
+      "duration_seconds": 0.265607,
+      "id": "constant_replace-18178db9b47e-0",
+      "line": 81,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"HEAD\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2483,
+      "duration_seconds": 0.265779,
+      "id": "boolean_op-8887d87af102-2",
+      "line": 82,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 2500,
+      "duration_seconds": 0.251842,
+      "id": "constant_replace-607e0718e2ac-0",
+      "line": 82,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"[A-Za-z0-9._/-]+\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2534,
+      "duration_seconds": 0.281526,
+      "id": "boolean_op-8887d87af102-3",
+      "line": 83,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2538,
+      "duration_seconds": 0.269972,
+      "id": "boolean_op-05f894949486-2",
+      "line": 83,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 21,
+      "byte_offset": 2555,
+      "duration_seconds": 0.262461,
+      "id": "constant_replace-51cc18b7d217-0",
+      "line": 83,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "r\"[0-9a-fA-F]{40,64}\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 3001,
+      "duration_seconds": 0.300535,
+      "id": "negate_condition-53342f0153b7-0",
+      "line": 99,
+      "mutated_text": "not (len(matches) > 1)",
+      "operator": "negate_condition",
+      "original_text": "len(matches) > 1",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3014,
+      "duration_seconds": 0.282935,
+      "id": "comparison_op-b309b9c9d9bf-0",
+      "line": 99,
+      "mutated_text": "<=",
+      "operator": "comparison_op",
+      "original_text": ">",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3016,
+      "duration_seconds": 0.291051,
+      "id": "constant_replace-c6e7bbcf059d-0",
+      "line": 99,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 3170,
+      "duration_seconds": 0.244347,
+      "id": "negate_condition-d520cf3cedfc-0",
+      "line": 103,
+      "mutated_text": "not (matches)",
+      "operator": "negate_condition",
+      "original_text": "matches",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3214,
+      "duration_seconds": 0.260308,
+      "id": "constant_replace-405c403eaede-0",
+      "line": 104,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 3369,
+      "duration_seconds": 0.265973,
+      "id": "negate_condition-4cce4c7171d1-0",
+      "line": 109,
+      "mutated_text": "not (len(oid) < 40)",
+      "operator": "negate_condition",
+      "original_text": "len(oid) < 40",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3378,
+      "duration_seconds": 0.262931,
+      "id": "comparison_op-5e122c5e0946-0",
+      "line": 109,
+      "mutated_text": ">=",
+      "operator": "comparison_op",
+      "original_text": "<",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3380,
+      "duration_seconds": 0.266088,
+      "id": "constant_replace-8d2bd5ddbaa7-1",
+      "line": 109,
+      "mutated_text": "41",
+      "operator": "constant_replace",
+      "original_text": "40",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 3482,
+      "duration_seconds": 0.262076,
+      "id": "return_value-8abb02f2c7ad-0",
+      "line": 111,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "oid",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 78,
+      "byte_offset": 3562,
+      "duration_seconds": 0.278855,
+      "id": "return_value-002e3380b526-0",
+      "line": 116,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "run_git(repo, [\"rev-parse\", f\"{commit_oid}^{{tree}}\"]).stdout.decode().strip()",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 3733,
+      "duration_seconds": 0.253269,
+      "id": "constant_replace-6084b6ac2f25-1",
+      "line": 121,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"rev-parse\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3746,
+      "duration_seconds": 0.247074,
+      "id": "constant_replace-b2bacb9262df-0",
+      "line": 121,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--verify\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 3758,
+      "duration_seconds": 0.269906,
+      "id": "constant_replace-f2ad3b982eb1-0",
+      "line": 121,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"HEAD^{commit}\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 3796,
+      "duration_seconds": 0.280624,
+      "id": "negate_condition-78e68b1276bf-0",
+      "line": 122,
+      "mutated_text": "not (head.returncode)",
+      "operator": "negate_condition",
+      "original_text": "head.returncode",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 3828,
+      "duration_seconds": 0.0,
+      "id": "return_value-9aa31c864fa0-0",
+      "line": 123,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None, EMPTY_TREE_OID",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 41,
+      "byte_offset": 3906,
+      "duration_seconds": 0.275373,
+      "id": "return_value-7d4d34fc1db4-0",
+      "line": 125,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "commit_oid, commit_tree(repo, commit_oid)",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 394,
+      "byte_offset": 3997,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5f661ace2d54-0",
+      "line": 129,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Refs that name the integration line, most specific first.\n\n    $CONDUCTOR_INTEGRATION_REF, when set, wins outright as a single explicit ref.\n    Otherwise resolved fresh from the host's configured integration branch (never\n    cached), against ``project_paths.host_root()`` -- the enclosing repo of the\n    current directory, matching how this function is always invoked in practice.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 4463,
+      "duration_seconds": 0.276759,
+      "id": "negate_condition-2a062c8f90ad-0",
+      "line": 138,
+      "mutated_text": "not (override)",
+      "operator": "negate_condition",
+      "original_text": "override",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 4488,
+      "duration_seconds": 0.0,
+      "id": "return_value-823565557666-0",
+      "line": 139,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "(override,)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 57,
+      "byte_offset": 4511,
+      "duration_seconds": 0.250761,
+      "id": "return_value-9a55298da50b-0",
+      "line": 140,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "project_paths.integration_refs(project_paths.host_root())",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 667,
+      "byte_offset": 4697,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-bd84e6773b05-0",
+      "line": 146,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Merge base between `tip` and the integration line, with why when there is none.\n\n    This is the base a CI `range` review computes for the same branch, so a waiver\n    pinned to it is honoured identically by both. Resolution is fail-closed: an\n    unresolvable integration line yields None and a reason, never a guess, and the\n    caller falls back to the review base (which only makes waivers inert, never\n    active). The result is verified to be an ancestor of `tip` -- a base that is not\n    one describes a different history, and binding a waiver to it would carry an\n    exemption across a rebase, which is exactly what the pinning exists to prevent.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 48,
+      "byte_offset": 5407,
+      "duration_seconds": 0.256723,
+      "id": "zero_iteration_loop-a72a5ff7796d-0",
+      "line": 158,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "refs if refs is not None else integration_refs()",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 5504,
+      "duration_seconds": 0.285756,
+      "id": "constant_replace-6084b6ac2f25-2",
+      "line": 160,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"rev-parse\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 5517,
+      "duration_seconds": 0.316251,
+      "id": "constant_replace-b2bacb9262df-1",
+      "line": 160,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--verify\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 5529,
+      "duration_seconds": 0.266495,
+      "id": "constant_replace-478d6a1cf20e-0",
+      "line": 160,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--quiet\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 5595,
+      "duration_seconds": 0.257144,
+      "id": "negate_condition-2c113e30a3f1-0",
+      "line": 162,
+      "mutated_text": "not (resolved.returncode)",
+      "operator": "negate_condition",
+      "original_text": "resolved.returncode",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 5658,
+      "duration_seconds": 0.28088,
+      "id": "break_continue-949fb6776237-0",
+      "line": 164,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 5698,
+      "duration_seconds": 0.288334,
+      "id": "constant_replace-4e0b64e84bbf-0",
+      "line": 165,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"merge-base\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 27,
+      "byte_offset": 5791,
+      "duration_seconds": 0.262046,
+      "id": "negate_condition-a18621308fef-0",
+      "line": 167,
+      "mutated_text": "not (merge.returncode or not oid)",
+      "operator": "negate_condition",
+      "original_text": "merge.returncode or not oid",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5808,
+      "duration_seconds": 0.214523,
+      "id": "boolean_op-bc693e09fb4e-1",
+      "line": 167,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 5811,
+      "duration_seconds": 0.258132,
+      "id": "boolean_op-05f894949486-3",
+      "line": 167,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 51,
+      "byte_offset": 5839,
+      "duration_seconds": 0.0,
+      "id": "return_value-3eabb13220a9-0",
+      "line": 168,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None, f\"no merge base between {ref} and {tip[:12]}\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 69,
+      "byte_offset": 5906,
+      "duration_seconds": 0.276322,
+      "id": "return_value-1f1c04bb4af7-0",
+      "line": 169,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_verify_ancestor(repo, oid, tip=tip, detail=f\"merge base with {ref}\")",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 73,
+      "byte_offset": 5987,
+      "duration_seconds": 0.0,
+      "id": "return_value-91c68726d582-0",
+      "line": 170,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None, f\"no integration ref resolved (tried {', '.join(tried) or 'none'})\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 6195,
+      "duration_seconds": 0.29666,
+      "id": "constant_replace-4e0b64e84bbf-1",
+      "line": 176,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"merge-base\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 6209,
+      "duration_seconds": 0.27434,
+      "id": "constant_replace-0002b5fd4445-0",
+      "line": 176,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--is-ancestor\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 6257,
+      "duration_seconds": 0.295416,
+      "id": "negate_condition-a8497309c951-0",
+      "line": 177,
+      "mutated_text": "not (ancestor.returncode)",
+      "operator": "negate_condition",
+      "original_text": "ancestor.returncode",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 63,
+      "byte_offset": 6293,
+      "duration_seconds": 0.284575,
+      "id": "return_value-fec20f481124-0",
+      "line": 178,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None, f\"{oid[:12]} ({detail}) is not an ancestor of {tip[:12]}\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 6368,
+      "duration_seconds": 0.28964,
+      "id": "return_value-22c6951fca98-0",
+      "line": 179,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "oid, detail",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ]
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 6556,
+      "duration_seconds": 0.306667,
+      "id": "return_value-f0aef727e7c4-0",
+      "line": 186,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "raw.split() if raw else []",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 39,
+      "byte_offset": 6963,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-277d78b08dca-0",
+      "line": 201,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise GitSourceError(str(exc)) from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 608,
+      "byte_offset": 7014,
+      "duration_seconds": 0.334267,
+      "id": "return_value-f3bb672f1aed-0",
+      "line": 202,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "tuple(\n        Change(\n            status=status,\n            path=path_raw.decode(\"utf-8\", \"surrogateescape\"),\n            old_path=(\n                old_path_raw.decode(\"utf-8\", \"surrogateescape\")\n                if old_path_raw is not None\n                else None\n            ),\n            old_mode=old_mode,\n            new_mode=new_mode,\n            old_oid=old_oid,\n            new_oid=new_oid,\n        )\n        for (\n            status,\n            path_raw,\n            old_path_raw,\n            old_mode,\n            new_mode,\n            old_oid,\n            new_oid,\n        ) in decoded\n    )",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 7805,
+      "duration_seconds": 0.295249,
+      "id": "negate_condition-0f9d1015de7b-0",
+      "line": 236,
+      "mutated_text": "not (kind == \"index\")",
+      "operator": "negate_condition",
+      "original_text": "kind == \"index\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 7810,
+      "duration_seconds": 0.28221,
+      "id": "comparison_op-984b745fda50-0",
+      "line": 236,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 7813,
+      "duration_seconds": 0.322898,
+      "id": "constant_replace-69ae71cd61b3-0",
+      "line": 236,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"index\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 7887,
+      "duration_seconds": 0.256575,
+      "id": "negate_condition-a74963d6a7cc-0",
+      "line": 238,
+      "mutated_text": "not (base_ref is not None)",
+      "operator": "negate_condition",
+      "original_text": "base_ref is not None",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 7896,
+      "duration_seconds": 0.253792,
+      "id": "comparison_op-8d9cb82284c8-0",
+      "line": 238,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 8334,
+      "duration_seconds": 0.286102,
+      "id": "negate_condition-813cf9656c81-0",
+      "line": 246,
+      "mutated_text": "not (head_commit is None)",
+      "operator": "negate_condition",
+      "original_text": "head_commit is None",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 8346,
+      "duration_seconds": 0.27744,
+      "id": "comparison_op-9523bb9a06b9-0",
+      "line": 246,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 8411,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-2560ced1f423-0",
+      "line": 247,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"HEAD names no commit\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 8447,
+      "duration_seconds": 0.279151,
+      "id": "negate_condition-a74963d6a7cc-1",
+      "line": 248,
+      "mutated_text": "not (base_ref is not None)",
+      "operator": "negate_condition",
+      "original_text": "base_ref is not None",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 8456,
+      "duration_seconds": 0.295482,
+      "id": "comparison_op-8d9cb82284c8-1",
+      "line": 248,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 370,
+      "byte_offset": 8853,
+      "duration_seconds": 0.252906,
+      "id": "return_value-24a271ee2e3f-0",
+      "line": 259,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "Candidate(\n            kind=kind,\n            tree_oid=tree,\n            base_tree_oid=base_tree,\n            base_commit_oid=base_commit,\n            commit_oid=None,\n            target_ref=None,\n            changes=_diff_changes(repo, base_tree, tree),\n            integration_base_oid=integration_oid,\n            integration_base_detail=integration_detail,\n        )",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 9321,
+      "duration_seconds": 0.274393,
+      "id": "negate_condition-4c6386ed69ea-0",
+      "line": 272,
+      "mutated_text": "not (kind == \"commit\")",
+      "operator": "negate_condition",
+      "original_text": "kind == \"commit\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 9326,
+      "duration_seconds": 0.25987,
+      "id": "comparison_op-984b745fda50-1",
+      "line": 272,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 9329,
+      "duration_seconds": 0.265378,
+      "id": "constant_replace-330ca513d0bb-0",
+      "line": 272,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"commit\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 9350,
+      "duration_seconds": 0.282891,
+      "id": "negate_condition-641f1267c7de-0",
+      "line": 273,
+      "mutated_text": "not (base_ref)",
+      "operator": "negate_condition",
+      "original_text": "base_ref",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 9491,
+      "duration_seconds": 0.293995,
+      "id": "negate_condition-1c0a637b0ae0-0",
+      "line": 277,
+      "mutated_text": "not (len(parents) > 1)",
+      "operator": "negate_condition",
+      "original_text": "len(parents) > 1",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 9504,
+      "duration_seconds": 0.306052,
+      "id": "comparison_op-b309b9c9d9bf-1",
+      "line": 277,
+      "mutated_text": "<=",
+      "operator": "comparison_op",
+      "original_text": ">",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 9506,
+      "duration_seconds": 0.269066,
+      "id": "constant_replace-c6e7bbcf059d-1",
+      "line": 277,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 9628,
+      "duration_seconds": 0.263273,
+      "id": "constant_replace-405c403eaede-1",
+      "line": 279,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 9747,
+      "duration_seconds": 0.288141,
+      "id": "negate_condition-9de6da4f1d95-0",
+      "line": 281,
+      "mutated_text": "not (kind == \"range\")",
+      "operator": "negate_condition",
+      "original_text": "kind == \"range\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 9752,
+      "duration_seconds": 0.280106,
+      "id": "comparison_op-984b745fda50-2",
+      "line": 281,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 9755,
+      "duration_seconds": 0.291608,
+      "id": "constant_replace-6dda040521be-0",
+      "line": 281,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"range\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 9775,
+      "duration_seconds": 0.277372,
+      "id": "boolean_op-05f894949486-4",
+      "line": 282,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 9775,
+      "duration_seconds": 0.278954,
+      "id": "negate_condition-f89994b50aaa-0",
+      "line": 282,
+      "mutated_text": "not (not base_ref)",
+      "operator": "negate_condition",
+      "original_text": "not base_ref",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 10061,
+      "duration_seconds": 0.307061,
+      "id": "boolean_op-05f894949486-5",
+      "line": 288,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 10061,
+      "duration_seconds": 0.288822,
+      "id": "negate_condition-7a2a93bb1d33-0",
+      "line": 288,
+      "mutated_text": "not (not merge_base)",
+      "operator": "negate_condition",
+      "original_text": "not merge_base",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 10794,
+      "duration_seconds": 0.269031,
+      "id": "negate_condition-3a78b35b10d1-0",
+      "line": 301,
+      "mutated_text": "not (base_commit is None)",
+      "operator": "negate_condition",
+      "original_text": "base_commit is None",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 10806,
+      "duration_seconds": 0.277092,
+      "id": "comparison_op-9523bb9a06b9-1",
+      "line": 301,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 352,
+      "byte_offset": 11096,
+      "duration_seconds": 0.274814,
+      "id": "return_value-68af2a2f4a96-0",
+      "line": 308,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "Candidate(\n        kind=kind,\n        tree_oid=target_tree,\n        base_tree_oid=base_tree,\n        base_commit_oid=base_commit,\n        commit_oid=target,\n        target_ref=target_ref,\n        changes=_diff_changes(repo, base_tree, target_tree),\n        integration_base_oid=integration_oid,\n        integration_base_detail=integration_detail,\n    )",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ]
+    },
+    {
+      "byte_length": 97,
+      "byte_offset": 11600,
+      "duration_seconds": 0.0,
+      "id": "return_value-4d0721f022bc-0",
+      "line": 325,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "replace(\n        candidate, changes=tuple(classify(change) for change in candidate.changes)\n    )",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 39,
+      "byte_offset": 12007,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-277d78b08dca-1",
+      "line": 337,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise GitSourceError(str(exc)) from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 12131,
+      "duration_seconds": 0.254349,
+      "id": "zero_iteration_loop-e664bc0faa2c-0",
+      "line": 339,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "decoded",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 12171,
+      "duration_seconds": 0.303671,
+      "id": "constant_replace-1ce28f1271b3-0",
+      "line": 340,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"utf-8\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 12180,
+      "duration_seconds": 0.254044,
+      "id": "constant_replace-682efb155f57-0",
+      "line": 340,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"surrogateescape\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 12462,
+      "duration_seconds": 0.300036,
+      "id": "return_value-b844d106c0c7-0",
+      "line": 351,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "tuple(entries)",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 12561,
+      "duration_seconds": 0.262457,
+      "id": "boolean_op-05f894949486-6",
+      "line": 356,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 73,
+      "byte_offset": 12561,
+      "duration_seconds": 0.250459,
+      "id": "negate_condition-ebaf4c83c36e-0",
+      "line": 356,
+      "mutated_text": "not (not path or pure.is_absolute() or \"..\" in pure.parts or \".\" in pure.parts)",
+      "operator": "negate_condition",
+      "original_text": "not path or pure.is_absolute() or \"..\" in pure.parts or \".\" in pure.parts",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 12570,
+      "duration_seconds": 0.241884,
+      "id": "boolean_op-bc693e09fb4e-2",
+      "line": 356,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 12592,
+      "duration_seconds": 0.248133,
+      "id": "boolean_op-bc693e09fb4e-3",
+      "line": 356,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 12595,
+      "duration_seconds": 0.249438,
+      "id": "constant_replace-a522cf8e1bd8-0",
+      "line": 356,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"..\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 12600,
+      "duration_seconds": 0.302444,
+      "id": "comparison_op-ea5fc76874b9-0",
+      "line": 356,
+      "mutated_text": "not in",
+      "operator": "comparison_op",
+      "original_text": "in",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 12614,
+      "duration_seconds": 0.247885,
+      "id": "boolean_op-bc693e09fb4e-4",
+      "line": 356,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 12617,
+      "duration_seconds": 0.264867,
+      "id": "constant_replace-7fece26ee04e-0",
+      "line": 356,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".\"",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 12621,
+      "duration_seconds": 0.286754,
+      "id": "comparison_op-ea5fc76874b9-1",
+      "line": 356,
+      "mutated_text": "not in",
+      "operator": "comparison_op",
+      "original_text": "in",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 12864,
+      "duration_seconds": 0.303959,
+      "id": "boolean_op-05f894949486-7",
+      "line": 362,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 12864,
+      "duration_seconds": 0.280969,
+      "id": "negate_condition-23412ff083e4-0",
+      "line": 362,
+      "mutated_text": "not (not blobs)",
+      "operator": "negate_condition",
+      "original_text": "not blobs",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 12890,
+      "duration_seconds": 0.0,
+      "id": "return_value-38dd75ae1023-0",
+      "line": 363,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{}",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 12959,
+      "duration_seconds": 0.315562,
+      "id": "constant_replace-afd88a69413d-0",
+      "line": 364,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"ascii\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13061,
+      "duration_seconds": 0.260775,
+      "id": "constant_replace-405c403eaede-2",
+      "line": 366,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 13115,
+      "duration_seconds": 0.277867,
+      "id": "zero_iteration_loop-8ce3cf821447-0",
+      "line": 368,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "blobs",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 13179,
+      "duration_seconds": 0.368218,
+      "id": "negate_condition-ad349ff754c0-0",
+      "line": 370,
+      "mutated_text": "not (line_end < 0)",
+      "operator": "negate_condition",
+      "original_text": "line_end < 0",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13188,
+      "duration_seconds": 0.301985,
+      "id": "comparison_op-5e122c5e0946-1",
+      "line": 370,
+      "mutated_text": ">=",
+      "operator": "comparison_op",
+      "original_text": "<",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13190,
+      "duration_seconds": 0.268687,
+      "id": "constant_replace-405c403eaede-3",
+      "line": 370,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 65,
+      "byte_offset": 13367,
+      "duration_seconds": 0.310654,
+      "id": "negate_condition-3f57fccb04aa-0",
+      "line": 373,
+      "mutated_text": "not (len(header) != 3 or header[0] != entry.oid or header[1] != \"blob\")",
+      "operator": "negate_condition",
+      "original_text": "len(header) != 3 or header[0] != entry.oid or header[1] != \"blob\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 13379,
+      "duration_seconds": 0.268465,
+      "id": "comparison_op-82b591b23e2f-1",
+      "line": 373,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13382,
+      "duration_seconds": 0.281385,
+      "id": "constant_replace-60931d4192cb-0",
+      "line": 373,
+      "mutated_text": "4",
+      "operator": "constant_replace",
+      "original_text": "3",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 13384,
+      "duration_seconds": 0.291587,
+      "id": "boolean_op-bc693e09fb4e-5",
+      "line": 373,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13394,
+      "duration_seconds": 0.301198,
+      "id": "constant_replace-405c403eaede-4",
+      "line": 373,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 13397,
+      "duration_seconds": 0.281149,
+      "id": "comparison_op-82b591b23e2f-2",
+      "line": 373,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 13410,
+      "duration_seconds": 0.257543,
+      "id": "boolean_op-bc693e09fb4e-6",
+      "line": 373,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13420,
+      "duration_seconds": 0.29764,
+      "id": "constant_replace-c6e7bbcf059d-2",
+      "line": 373,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 13423,
+      "duration_seconds": 0.293491,
+      "id": "comparison_op-82b591b23e2f-3",
+      "line": 373,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 13426,
+      "duration_seconds": 0.283299,
+      "id": "constant_replace-5b82c9d26eff-0",
+      "line": 373,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"blob\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13547,
+      "duration_seconds": 0.31774,
+      "id": "constant_replace-20c68cb787f6-1",
+      "line": 375,
+      "mutated_text": "3",
+      "operator": "constant_replace",
+      "original_text": "2",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13576,
+      "duration_seconds": 0.256994,
+      "id": "arithmetic_op-2ef2d8de61ea-0",
+      "line": 376,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13578,
+      "duration_seconds": 0.256599,
+      "id": "constant_replace-c6e7bbcf059d-3",
+      "line": 376,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13600,
+      "duration_seconds": 0.268873,
+      "id": "arithmetic_op-2ef2d8de61ea-1",
+      "line": 377,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 13618,
+      "duration_seconds": 0.259836,
+      "id": "negate_condition-beb7f17a2c2b-0",
+      "line": 378,
+      "mutated_text": "not (end >= len(output))",
+      "operator": "negate_condition",
+      "original_text": "end >= len(output)",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 13622,
+      "duration_seconds": 0.282489,
+      "id": "comparison_op-4cc4342357aa-0",
+      "line": 378,
+      "mutated_text": "<",
+      "operator": "comparison_op",
+      "original_text": ">=",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13781,
+      "duration_seconds": 0.27239,
+      "id": "arithmetic_op-2ef2d8de61ea-2",
+      "line": 381,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 13783,
+      "duration_seconds": 0.260027,
+      "id": "constant_replace-c6e7bbcf059d-4",
+      "line": 381,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 13796,
+      "duration_seconds": 0.318981,
+      "id": "return_value-2e949179a0e7-0",
+      "line": 382,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "content",
+      "outcome": "KILLED",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 13976,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-b96be69cd08a-0",
+      "line": 389,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "entries",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 27,
+      "byte_offset": 13996,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-02828daee3cc-0",
+      "line": 390,
+      "mutated_text": "not (entry.object_type != \"blob\")",
+      "operator": "negate_condition",
+      "original_text": "entry.object_type != \"blob\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 14014,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-82b591b23e2f-4",
+      "line": 390,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 14017,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-5b82c9d26eff-1",
+      "line": 390,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"blob\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 14037,
+      "duration_seconds": 0.0,
+      "id": "break_continue-949fb6776237-1",
+      "line": 391,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 14057,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-45312ede1931-0",
+      "line": 392,
+      "mutated_text": "not (entry.size is None)",
+      "operator": "negate_condition",
+      "original_text": "entry.size is None",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 14068,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-9523bb9a06b9-2",
+      "line": 392,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 27,
+      "byte_offset": 14169,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-eee5aed3ef35-0",
+      "line": 394,
+      "mutated_text": "not (entry.size > max_blob_bytes)",
+      "operator": "negate_condition",
+      "original_text": "entry.size > max_blob_bytes",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 14180,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-b309b9c9d9bf-2",
+      "line": 394,
+      "mutated_text": "<=",
+      "operator": "comparison_op",
+      "original_text": ">",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 14449,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-8266d8b052c2-0",
+      "line": 401,
+      "mutated_text": "not (total > max_tree_bytes)",
+      "operator": "negate_condition",
+      "original_text": "total > max_tree_bytes",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 14455,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-b309b9c9d9bf-3",
+      "line": 401,
+      "mutated_text": "<=",
+      "operator": "comparison_op",
+      "original_text": ">",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 14728,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-1ce28f1271b3-1",
+      "line": 409,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"utf-8\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 14737,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-682efb155f57-1",
+      "line": 409,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"surrogateescape\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 14794,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-a06716a09654-0",
+      "line": 411,
+      "mutated_text": "not (target_path.is_absolute())",
+      "operator": "negate_condition",
+      "original_text": "target_path.is_absolute()",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 14979,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-8916b7afaf0b-1",
+      "line": 415,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 128,
+      "byte_offset": 15108,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-b0f991bab025-0",
+      "line": 419,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise GitSourceError(\n            f\"symlink escapes candidate snapshot: {path.relative_to(root)} -> {target}\"\n        ) from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 15248,
+      "duration_seconds": 0.0,
+      "id": "return_value-4416fafa206c-0",
+      "line": 422,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "target",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 15257,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-bbc5a5530fda-0",
+      "line": 425,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@contextmanager\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 15860,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-b96be69cd08a-1",
+      "line": 442,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "entries",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 15884,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-28862ddee1e8-0",
+      "line": 443,
+      "mutated_text": "not (entry.mode == \"160000\")",
+      "operator": "negate_condition",
+      "original_text": "entry.mode == \"160000\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 15924,
+      "duration_seconds": 0.0,
+      "id": "break_continue-949fb6776237-2",
+      "line": 444,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 15957,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-8916b7afaf0b-2",
+      "line": 445,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 16084,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-80fa69296266-0",
+      "line": 448,
+      "mutated_text": "not (data is None)",
+      "operator": "negate_condition",
+      "original_text": "data is None",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 16246,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-72e428143ab0-0",
+      "line": 452,
+      "mutated_text": "not (entry.mode == \"120000\")",
+      "operator": "negate_condition",
+      "original_text": "entry.mode == \"120000\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 16356,
+      "duration_seconds": 0.0,
+      "id": "break_continue-949fb6776237-3",
+      "line": 454,
+      "mutated_text": "break",
+      "operator": "break_continue",
+      "original_text": "continue",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 16499,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-39b5d98652ad-0",
+      "line": 457,
+      "mutated_text": "not (entry.mode == \"100755\")",
+      "operator": "negate_condition",
+      "original_text": "entry.mode == \"100755\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 16551,
+      "duration_seconds": 0.0,
+      "id": "augmented_assign-9682bb3c99fc-0",
+      "line": 458,
+      "mutated_text": "&=",
+      "operator": "augmented_assign",
+      "original_text": "|=",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 589,
+      "byte_offset": 16740,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9c3235cda0b0-0",
+      "line": 464,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Map each moved destination path to the source path git paired it with.\n\n    A pathspec limited to destination paths hides the other half of a move, so\n    git cannot pair the two and scores the whole file as new code. This pass\n    runs unrestricted so the pairing exists before the line-level diff is\n    scoped. ``--find-copies`` is needed as well as ``--find-renames`` because a\n    move that leaves an alias shim behind keeps the source path alive, which is\n    a copy to git, not a rename. ``--find-copies`` must come last: a later\n    ``-M`` turns copy detection back off.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 155,
+      "byte_offset": 17722,
+      "duration_seconds": 0.0,
+      "id": "return_value-616cfc661e28-0",
+      "line": 490,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{\n        destination.decode(\"utf-8\", \"replace\"): source.decode(\"utf-8\", \"replace\")\n        for source, destination in git_rename_sources_native(raw)\n    }",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 18058,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-05f894949486-8",
+      "line": 501,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 18058,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-536e63df2db9-0",
+      "line": 501,
+      "mutated_text": "not (not paths)",
+      "operator": "negate_condition",
+      "original_text": "not paths",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 18084,
+      "duration_seconds": 0.0,
+      "id": "return_value-38dd75ae1023-1",
+      "line": 502,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{}",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 18184,
+      "duration_seconds": 0.0,
+      "id": "bitwise_op-6957c6deebe5-0",
+      "line": 505,
+      "mutated_text": "&",
+      "operator": "bitwise_op",
+      "original_text": "|",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 18556,
+      "duration_seconds": 0.0,
+      "id": "return_value-dd30cbd4afe2-0",
+      "line": 520,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{path: set(lines) for path, lines in git_changed_lines_native(raw, paths)}",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/candidate_review/git_source.py",
+      "tests_run": []
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.784,
+  "new_survivors": [],
+  "no_coverage": 66,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 98,
+    "NO_COVERAGE": 66,
+    "SURVIVED": 27,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/forge-integration-branch_git_source_fest_20260913_20260913T000118Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "d3f6448839921567e1562d7237abaf62600d958339172afb7a12cab9a63dbe29"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/candidate_review/git_source.py": "d4513712539681f3ab2937eb319ccce6c85565c8358335843b7fe2bfce04ec73"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "arithmetic_op-2ef2d8de61ea-0",
+    "arithmetic_op-2ef2d8de61ea-2",
+    "boolean_op-05f894949486-1",
+    "boolean_op-05f894949486-2",
+    "boolean_op-8887d87af102-1",
+    "boolean_op-8887d87af102-2",
+    "boolean_op-8887d87af102-3",
+    "boolean_op-bc693e09fb4e-0",
+    "boolean_op-bc693e09fb4e-1",
+    "boolean_op-bc693e09fb4e-2",
+    "boolean_op-bc693e09fb4e-3",
+    "boolean_op-bc693e09fb4e-4",
+    "boolean_op-bc693e09fb4e-5",
+    "boolean_op-bc693e09fb4e-6",
+    "comparison_op-82b591b23e2f-0",
+    "constant_replace-18178db9b47e-0",
+    "constant_replace-405c403eaede-3",
+    "constant_replace-51cc18b7d217-0",
+    "constant_replace-607e0718e2ac-0",
+    "constant_replace-682efb155f57-0",
+    "constant_replace-7fece26ee04e-0",
+    "constant_replace-a522cf8e1bd8-0",
+    "constant_replace-c6e7bbcf059d-3",
+    "constant_replace-c6e7bbcf059d-4",
+    "constant_replace-d2050b3c438d-0",
+    "negate_condition-9466e9efdde4-0",
+    "negate_condition-d520cf3cedfc-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/candidate_review/test_value_waivers.py"
+  ],
+  "test_sha256": {
+    "src/conductor/candidate_review/test_value_waivers.py": "3bf1ac5660d7a3b2d56993305183d15b2f1f079e23f7213faa90be3abffe542e"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 4,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 4
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-2ef2d8de61ea-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "boolean_op-05f894949486-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "boolean_op-05f894949486-3": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "boolean_op-05f894949486-4": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "boolean_op-05f894949486-5": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "boolean_op-05f894949486-6": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "boolean_op-05f894949486-7": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "boolean_op-8887d87af102-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "break_continue-949fb6776237-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "comparison_op-4cc4342357aa-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "comparison_op-5e122c5e0946-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "comparison_op-5e122c5e0946-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "comparison_op-82b591b23e2f-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "comparison_op-82b591b23e2f-2": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "comparison_op-82b591b23e2f-3": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "comparison_op-8d9cb82284c8-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "comparison_op-8d9cb82284c8-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "comparison_op-9523bb9a06b9-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "comparison_op-9523bb9a06b9-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "comparison_op-984b745fda50-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "comparison_op-984b745fda50-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "comparison_op-984b745fda50-2": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "comparison_op-b309b9c9d9bf-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "comparison_op-b309b9c9d9bf-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "comparison_op-ea5fc76874b9-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "comparison_op-ea5fc76874b9-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-0002b5fd4445-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "constant_replace-1ce28f1271b3-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-20c68cb787f6-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-330ca513d0bb-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "constant_replace-405c403eaede-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "constant_replace-405c403eaede-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "constant_replace-405c403eaede-2": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-405c403eaede-4": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-478d6a1cf20e-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "constant_replace-4e0b64e84bbf-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "constant_replace-4e0b64e84bbf-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "constant_replace-50eda719198c-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-55ef1e2c6a0c-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "constant_replace-5b82c9d26eff-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-6084b6ac2f25-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "constant_replace-6084b6ac2f25-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "constant_replace-6084b6ac2f25-2": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "constant_replace-60931d4192cb-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-69ae71cd61b3-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "constant_replace-6dda040521be-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "constant_replace-8d2bd5ddbaa7-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "constant_replace-afd88a69413d-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-b2bacb9262df-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "constant_replace-b2bacb9262df-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "constant_replace-c6e7bbcf059d-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "constant_replace-c6e7bbcf059d-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "constant_replace-c6e7bbcf059d-2": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "constant_replace-f0b7994a1f97-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "constant_replace-f2ad3b982eb1-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "negate_condition-07417fbb12e2-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "negate_condition-0f9d1015de7b-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "negate_condition-1c0a637b0ae0-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "negate_condition-23412ff083e4-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "negate_condition-2a062c8f90ad-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "negate_condition-2c113e30a3f1-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "negate_condition-3a78b35b10d1-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "negate_condition-3f57fccb04aa-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "negate_condition-4c6386ed69ea-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "negate_condition-4cce4c7171d1-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "negate_condition-53342f0153b7-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "negate_condition-641f1267c7de-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "negate_condition-78e68b1276bf-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "negate_condition-7a2a93bb1d33-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "negate_condition-813cf9656c81-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "negate_condition-9de6da4f1d95-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "negate_condition-a18621308fef-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "negate_condition-a74963d6a7cc-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "negate_condition-a74963d6a7cc-1": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "negate_condition-a8497309c951-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "negate_condition-ad349ff754c0-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "negate_condition-beb7f17a2c2b-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "negate_condition-ebaf4c83c36e-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "negate_condition-f89994b50aaa-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "negate_condition-feb2ff4e55c0-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "return_value-002e3380b526-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "return_value-1f1c04bb4af7-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "return_value-22c6951fca98-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "return_value-24a271ee2e3f-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "return_value-2e949179a0e7-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "return_value-4f53c19ff95c-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "return_value-68af2a2f4a96-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "return_value-7d4d34fc1db4-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "return_value-8abb02f2c7ad-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "return_value-9010a8a2d73c-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "return_value-9a55298da50b-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "return_value-b844d106c0c7-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "return_value-f0aef727e7c4-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base"
+      ],
+      "return_value-f3bb672f1aed-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "return_value-fec20f481124-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+      ],
+      "zero_iteration_loop-8ce3cf821447-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ],
+      "zero_iteration_loop-a72a5ff7796d-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base"
+      ],
+      "zero_iteration_loop-e664bc0faa2c-0": [
+        "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/conductor/candidate_review/git_source.py"
+        ],
+        "criticality": "high",
+        "id": "forge-integration-branch_git_source_fest_20260913"
+      }
+    ],
+    "retained_core": [
+      "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+      "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head",
+      "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+      "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-integration-branch_git_source_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-05f894949486-0",
+          "boolean_op-8887d87af102-0",
+          "comparison_op-5e122c5e0946-0",
+          "comparison_op-9523bb9a06b9-1",
+          "comparison_op-984b745fda50-1",
+          "comparison_op-b309b9c9d9bf-0",
+          "constant_replace-330ca513d0bb-0",
+          "constant_replace-405c403eaede-0",
+          "constant_replace-50eda719198c-0",
+          "constant_replace-55ef1e2c6a0c-0",
+          "constant_replace-6084b6ac2f25-0",
+          "constant_replace-8d2bd5ddbaa7-1",
+          "constant_replace-c6e7bbcf059d-0",
+          "constant_replace-f0b7994a1f97-0",
+          "negate_condition-07417fbb12e2-0",
+          "negate_condition-3a78b35b10d1-0",
+          "negate_condition-4c6386ed69ea-0",
+          "negate_condition-4cce4c7171d1-0",
+          "negate_condition-53342f0153b7-0",
+          "negate_condition-641f1267c7de-0",
+          "negate_condition-a8497309c951-0",
+          "negate_condition-feb2ff4e55c0-0",
+          "return_value-002e3380b526-0",
+          "return_value-4f53c19ff95c-0",
+          "return_value-68af2a2f4a96-0",
+          "return_value-8abb02f2c7ad-0",
+          "return_value-9010a8a2d73c-0",
+          "return_value-fec20f481124-0"
+        ],
+        "nodeid": "src/conductor/candidate_review/test_value_waivers.py::test_a_commit_candidate_refuses_a_base_off_another_history",
+        "runtime_seconds_median": 0.024,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-integration-branch_git_source_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-05f894949486-0",
+          "boolean_op-05f894949486-4",
+          "boolean_op-05f894949486-5",
+          "boolean_op-8887d87af102-0",
+          "comparison_op-5e122c5e0946-0",
+          "comparison_op-9523bb9a06b9-1",
+          "comparison_op-984b745fda50-0",
+          "comparison_op-984b745fda50-1",
+          "comparison_op-984b745fda50-2",
+          "comparison_op-b309b9c9d9bf-0",
+          "comparison_op-b309b9c9d9bf-1",
+          "constant_replace-0002b5fd4445-0",
+          "constant_replace-330ca513d0bb-0",
+          "constant_replace-405c403eaede-0",
+          "constant_replace-405c403eaede-1",
+          "constant_replace-4e0b64e84bbf-1",
+          "constant_replace-50eda719198c-0",
+          "constant_replace-55ef1e2c6a0c-0",
+          "constant_replace-6084b6ac2f25-0",
+          "constant_replace-6dda040521be-0",
+          "constant_replace-8d2bd5ddbaa7-1",
+          "constant_replace-c6e7bbcf059d-0",
+          "constant_replace-c6e7bbcf059d-1",
+          "constant_replace-f0b7994a1f97-0",
+          "negate_condition-07417fbb12e2-0",
+          "negate_condition-0f9d1015de7b-0",
+          "negate_condition-1c0a637b0ae0-0",
+          "negate_condition-3a78b35b10d1-0",
+          "negate_condition-4c6386ed69ea-0",
+          "negate_condition-4cce4c7171d1-0",
+          "negate_condition-53342f0153b7-0",
+          "negate_condition-641f1267c7de-0",
+          "negate_condition-7a2a93bb1d33-0",
+          "negate_condition-9de6da4f1d95-0",
+          "negate_condition-a8497309c951-0",
+          "negate_condition-f89994b50aaa-0",
+          "negate_condition-feb2ff4e55c0-0",
+          "return_value-002e3380b526-0",
+          "return_value-22c6951fca98-0",
+          "return_value-4f53c19ff95c-0",
+          "return_value-68af2a2f4a96-0",
+          "return_value-8abb02f2c7ad-0",
+          "return_value-9010a8a2d73c-0",
+          "return_value-f0aef727e7c4-0"
+        ],
+        "nodeid": "src/conductor/candidate_review/test_value_waivers.py::test_a_range_candidate_keeps_its_merge_base_as_the_waiver_base",
+        "runtime_seconds_median": 0.025,
+        "unique_kills": [
+          "boolean_op-05f894949486-4",
+          "boolean_op-05f894949486-5",
+          "comparison_op-984b745fda50-2",
+          "comparison_op-b309b9c9d9bf-1",
+          "constant_replace-405c403eaede-1",
+          "constant_replace-6dda040521be-0",
+          "constant_replace-c6e7bbcf059d-1",
+          "negate_condition-1c0a637b0ae0-0",
+          "negate_condition-7a2a93bb1d33-0",
+          "negate_condition-9de6da4f1d95-0",
+          "negate_condition-f89994b50aaa-0",
+          "return_value-f0aef727e7c4-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-integration-branch_git_source_fest_20260913",
+        "dominated_by": [
+          "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+          "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+          "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-2ef2d8de61ea-1",
+          "boolean_op-05f894949486-6",
+          "boolean_op-05f894949486-7",
+          "boolean_op-8887d87af102-0",
+          "comparison_op-4cc4342357aa-0",
+          "comparison_op-5e122c5e0946-1",
+          "comparison_op-82b591b23e2f-1",
+          "comparison_op-82b591b23e2f-2",
+          "comparison_op-82b591b23e2f-3",
+          "comparison_op-ea5fc76874b9-0",
+          "comparison_op-ea5fc76874b9-1",
+          "constant_replace-1ce28f1271b3-0",
+          "constant_replace-20c68cb787f6-1",
+          "constant_replace-405c403eaede-2",
+          "constant_replace-405c403eaede-4",
+          "constant_replace-50eda719198c-0",
+          "constant_replace-5b82c9d26eff-0",
+          "constant_replace-60931d4192cb-0",
+          "constant_replace-afd88a69413d-0",
+          "constant_replace-c6e7bbcf059d-2",
+          "negate_condition-23412ff083e4-0",
+          "negate_condition-3f57fccb04aa-0",
+          "negate_condition-ad349ff754c0-0",
+          "negate_condition-beb7f17a2c2b-0",
+          "negate_condition-ebaf4c83c36e-0",
+          "negate_condition-feb2ff4e55c0-0",
+          "return_value-2e949179a0e7-0",
+          "return_value-4f53c19ff95c-0",
+          "return_value-b844d106c0c7-0",
+          "zero_iteration_loop-8ce3cf821447-0",
+          "zero_iteration_loop-e664bc0faa2c-0"
+        ],
+        "nodeid": "src/conductor/candidate_review/test_value_waivers.py::test_an_expired_waiver_is_inert_at_the_integration_base",
+        "runtime_seconds_median": 0.016,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-integration-branch_git_source_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-05f894949486-3",
+          "boolean_op-8887d87af102-0",
+          "break_continue-949fb6776237-0",
+          "comparison_op-8d9cb82284c8-0",
+          "comparison_op-8d9cb82284c8-1",
+          "comparison_op-9523bb9a06b9-0",
+          "comparison_op-984b745fda50-0",
+          "constant_replace-0002b5fd4445-0",
+          "constant_replace-478d6a1cf20e-0",
+          "constant_replace-4e0b64e84bbf-0",
+          "constant_replace-4e0b64e84bbf-1",
+          "constant_replace-50eda719198c-0",
+          "constant_replace-6084b6ac2f25-0",
+          "constant_replace-6084b6ac2f25-1",
+          "constant_replace-6084b6ac2f25-2",
+          "constant_replace-69ae71cd61b3-0",
+          "constant_replace-b2bacb9262df-0",
+          "constant_replace-b2bacb9262df-1",
+          "constant_replace-f0b7994a1f97-0",
+          "constant_replace-f2ad3b982eb1-0",
+          "negate_condition-0f9d1015de7b-0",
+          "negate_condition-2a062c8f90ad-0",
+          "negate_condition-2c113e30a3f1-0",
+          "negate_condition-78e68b1276bf-0",
+          "negate_condition-813cf9656c81-0",
+          "negate_condition-a18621308fef-0",
+          "negate_condition-a74963d6a7cc-0",
+          "negate_condition-a74963d6a7cc-1",
+          "negate_condition-a8497309c951-0",
+          "negate_condition-feb2ff4e55c0-0",
+          "return_value-002e3380b526-0",
+          "return_value-1f1c04bb4af7-0",
+          "return_value-22c6951fca98-0",
+          "return_value-24a271ee2e3f-0",
+          "return_value-4f53c19ff95c-0",
+          "return_value-7d4d34fc1db4-0",
+          "return_value-9010a8a2d73c-0",
+          "return_value-9a55298da50b-0",
+          "return_value-f3bb672f1aed-0",
+          "zero_iteration_loop-a72a5ff7796d-0"
+        ],
+        "nodeid": "src/conductor/candidate_review/test_value_waivers.py::test_an_index_candidate_binds_waivers_to_the_integration_base",
+        "runtime_seconds_median": 0.016,
+        "unique_kills": [
+          "boolean_op-05f894949486-3",
+          "break_continue-949fb6776237-0",
+          "constant_replace-478d6a1cf20e-0",
+          "constant_replace-4e0b64e84bbf-0",
+          "constant_replace-6084b6ac2f25-2",
+          "constant_replace-b2bacb9262df-1",
+          "negate_condition-2a062c8f90ad-0",
+          "negate_condition-2c113e30a3f1-0",
+          "negate_condition-a18621308fef-0",
+          "return_value-1f1c04bb4af7-0",
+          "return_value-9a55298da50b-0",
+          "return_value-f3bb672f1aed-0",
+          "zero_iteration_loop-a72a5ff7796d-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-integration-branch_git_source_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-05f894949486-0",
+          "boolean_op-8887d87af102-0",
+          "comparison_op-5e122c5e0946-0",
+          "comparison_op-8d9cb82284c8-0",
+          "comparison_op-8d9cb82284c8-1",
+          "comparison_op-9523bb9a06b9-0",
+          "comparison_op-984b745fda50-0",
+          "constant_replace-50eda719198c-0",
+          "constant_replace-55ef1e2c6a0c-0",
+          "constant_replace-6084b6ac2f25-0",
+          "constant_replace-6084b6ac2f25-1",
+          "constant_replace-69ae71cd61b3-0",
+          "constant_replace-8d2bd5ddbaa7-1",
+          "constant_replace-b2bacb9262df-0",
+          "constant_replace-f0b7994a1f97-0",
+          "constant_replace-f2ad3b982eb1-0",
+          "negate_condition-07417fbb12e2-0",
+          "negate_condition-0f9d1015de7b-0",
+          "negate_condition-4cce4c7171d1-0",
+          "negate_condition-78e68b1276bf-0",
+          "negate_condition-813cf9656c81-0",
+          "negate_condition-a74963d6a7cc-0",
+          "negate_condition-a74963d6a7cc-1",
+          "negate_condition-a8497309c951-0",
+          "negate_condition-feb2ff4e55c0-0",
+          "return_value-002e3380b526-0",
+          "return_value-24a271ee2e3f-0",
+          "return_value-4f53c19ff95c-0",
+          "return_value-7d4d34fc1db4-0",
+          "return_value-8abb02f2c7ad-0",
+          "return_value-9010a8a2d73c-0",
+          "return_value-fec20f481124-0"
+        ],
+        "nodeid": "src/conductor/candidate_review/test_value_waivers.py::test_an_integration_base_that_is_not_an_ancestor_is_refused",
+        "runtime_seconds_median": 0.019,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-integration-branch_git_source_fest_20260913",
+        "dominated_by": [
+          "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+          "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-2ef2d8de61ea-1",
+          "boolean_op-05f894949486-6",
+          "boolean_op-05f894949486-7",
+          "boolean_op-8887d87af102-0",
+          "comparison_op-4cc4342357aa-0",
+          "comparison_op-5e122c5e0946-1",
+          "comparison_op-82b591b23e2f-1",
+          "comparison_op-82b591b23e2f-2",
+          "comparison_op-82b591b23e2f-3",
+          "comparison_op-ea5fc76874b9-0",
+          "comparison_op-ea5fc76874b9-1",
+          "constant_replace-1ce28f1271b3-0",
+          "constant_replace-20c68cb787f6-1",
+          "constant_replace-405c403eaede-2",
+          "constant_replace-405c403eaede-4",
+          "constant_replace-50eda719198c-0",
+          "constant_replace-5b82c9d26eff-0",
+          "constant_replace-60931d4192cb-0",
+          "constant_replace-afd88a69413d-0",
+          "constant_replace-c6e7bbcf059d-2",
+          "negate_condition-23412ff083e4-0",
+          "negate_condition-3f57fccb04aa-0",
+          "negate_condition-ad349ff754c0-0",
+          "negate_condition-beb7f17a2c2b-0",
+          "negate_condition-ebaf4c83c36e-0",
+          "negate_condition-feb2ff4e55c0-0",
+          "return_value-2e949179a0e7-0",
+          "return_value-4f53c19ff95c-0",
+          "return_value-b844d106c0c7-0",
+          "zero_iteration_loop-8ce3cf821447-0",
+          "zero_iteration_loop-e664bc0faa2c-0"
+        ],
+        "nodeid": "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+        "runtime_seconds_median": 0.013,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "forge-integration-branch_git_source_fest_20260913",
+        "dominated_by": [
+          "src/conductor/candidate_review/test_value_waivers.py::test_the_admission_finding_names_the_test_nodeid",
+          "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-2ef2d8de61ea-1",
+          "boolean_op-05f894949486-6",
+          "boolean_op-05f894949486-7",
+          "boolean_op-8887d87af102-0",
+          "comparison_op-4cc4342357aa-0",
+          "comparison_op-5e122c5e0946-1",
+          "comparison_op-82b591b23e2f-1",
+          "comparison_op-82b591b23e2f-2",
+          "comparison_op-82b591b23e2f-3",
+          "comparison_op-ea5fc76874b9-0",
+          "comparison_op-ea5fc76874b9-1",
+          "constant_replace-1ce28f1271b3-0",
+          "constant_replace-20c68cb787f6-1",
+          "constant_replace-405c403eaede-2",
+          "constant_replace-405c403eaede-4",
+          "constant_replace-50eda719198c-0",
+          "constant_replace-5b82c9d26eff-0",
+          "constant_replace-60931d4192cb-0",
+          "constant_replace-afd88a69413d-0",
+          "constant_replace-c6e7bbcf059d-2",
+          "negate_condition-23412ff083e4-0",
+          "negate_condition-3f57fccb04aa-0",
+          "negate_condition-ad349ff754c0-0",
+          "negate_condition-beb7f17a2c2b-0",
+          "negate_condition-ebaf4c83c36e-0",
+          "negate_condition-feb2ff4e55c0-0",
+          "return_value-2e949179a0e7-0",
+          "return_value-4f53c19ff95c-0",
+          "return_value-b844d106c0c7-0",
+          "zero_iteration_loop-8ce3cf821447-0",
+          "zero_iteration_loop-e664bc0faa2c-0"
+        ],
+        "nodeid": "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_applies_an_active_policy_waiver",
+        "runtime_seconds_median": 0.013,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "forge-integration-branch_git_source_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-2ef2d8de61ea-1",
+          "boolean_op-05f894949486-6",
+          "boolean_op-05f894949486-7",
+          "boolean_op-8887d87af102-0",
+          "comparison_op-4cc4342357aa-0",
+          "comparison_op-5e122c5e0946-1",
+          "comparison_op-82b591b23e2f-1",
+          "comparison_op-82b591b23e2f-2",
+          "comparison_op-82b591b23e2f-3",
+          "comparison_op-ea5fc76874b9-0",
+          "comparison_op-ea5fc76874b9-1",
+          "constant_replace-1ce28f1271b3-0",
+          "constant_replace-20c68cb787f6-1",
+          "constant_replace-405c403eaede-2",
+          "constant_replace-405c403eaede-4",
+          "constant_replace-50eda719198c-0",
+          "constant_replace-5b82c9d26eff-0",
+          "constant_replace-60931d4192cb-0",
+          "constant_replace-afd88a69413d-0",
+          "constant_replace-c6e7bbcf059d-2",
+          "negate_condition-23412ff083e4-0",
+          "negate_condition-3f57fccb04aa-0",
+          "negate_condition-ad349ff754c0-0",
+          "negate_condition-beb7f17a2c2b-0",
+          "negate_condition-ebaf4c83c36e-0",
+          "negate_condition-feb2ff4e55c0-0",
+          "return_value-2e949179a0e7-0",
+          "return_value-4f53c19ff95c-0",
+          "return_value-b844d106c0c7-0",
+          "zero_iteration_loop-8ce3cf821447-0",
+          "zero_iteration_loop-e664bc0faa2c-0"
+        ],
+        "nodeid": "src/conductor/candidate_review/test_value_waivers.py::test_the_gate_binds_waivers_to_the_integration_base_not_head",
+        "runtime_seconds_median": 0.0125,
+        "unique_kills": []
+      }
+    ]
+  },
+  "unviable": 0
+}

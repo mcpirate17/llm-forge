@@ -7,7 +7,18 @@ from pathlib import Path
 
 import pytest
 
+from conductor import project_paths
 from conductor.checkout_sync import SNAPSHOT_NAMESPACE, SyncError, snapshot, sync
+
+
+@pytest.fixture(autouse=True)
+def _integration_branch_is_master(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These fixtures build repos on ``master`` with no pyproject.toml of their own,
+    so the unconfigured default ("main") would not match -- pin the branch this
+    suite actually creates.
+    """
+
+    monkeypatch.setenv(project_paths.INTEGRATION_BRANCH_ENV, "master")
 
 
 def _git(repo: Path, *args: str) -> str:

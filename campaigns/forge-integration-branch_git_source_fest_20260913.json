@@ -1,0 +1,66 @@
+{
+  "campaign_id": "forge-integration-branch_git_source_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/candidate_review/git_source.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/candidate_review/git_source.py": "d4513712539681f3ab2937eb319ccce6c85565c8358335843b7fe2bfce04ec73"
+  },
+  "survivor_baseline": [
+    "arithmetic_op-2ef2d8de61ea-0",
+    "arithmetic_op-2ef2d8de61ea-2",
+    "boolean_op-05f894949486-1",
+    "boolean_op-05f894949486-2",
+    "boolean_op-8887d87af102-1",
+    "boolean_op-8887d87af102-2",
+    "boolean_op-8887d87af102-3",
+    "boolean_op-bc693e09fb4e-0",
+    "boolean_op-bc693e09fb4e-1",
+    "boolean_op-bc693e09fb4e-2",
+    "boolean_op-bc693e09fb4e-3",
+    "boolean_op-bc693e09fb4e-4",
+    "boolean_op-bc693e09fb4e-5",
+    "boolean_op-bc693e09fb4e-6",
+    "comparison_op-82b591b23e2f-0",
+    "constant_replace-18178db9b47e-0",
+    "constant_replace-405c403eaede-3",
+    "constant_replace-51cc18b7d217-0",
+    "constant_replace-607e0718e2ac-0",
+    "constant_replace-682efb155f57-0",
+    "constant_replace-7fece26ee04e-0",
+    "constant_replace-a522cf8e1bd8-0",
+    "constant_replace-c6e7bbcf059d-3",
+    "constant_replace-c6e7bbcf059d-4",
+    "constant_replace-d2050b3c438d-0",
+    "negate_condition-9466e9efdde4-0",
+    "negate_condition-d520cf3cedfc-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:04:44.232738+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/candidate_review/test_value_waivers.py"
+  ],
+  "test_sha256": {
+    "src/conductor/candidate_review/test_value_waivers.py": "3bf1ac5660d7a3b2d56993305183d15b2f1f079e23f7213faa90be3abffe542e"
+  },
+  "title": "Generated mutants for src/conductor/candidate_review/git_source.py, scored on the survivor set"
+}

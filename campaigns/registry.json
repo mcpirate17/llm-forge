@@ -29,6 +29,18 @@
     },
     {
       "manifest": "campaigns/forge-evidence-hash_mutation_testing_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/forge-integration-branch_branch_policy_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-integration-branch_project_paths_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-integration-branch_git_source_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-integration-branch_workspace_hygiene_fest_20260913.json"
     }
   ],
   "enforcement": "changed_tests",

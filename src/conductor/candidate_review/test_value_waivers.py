@@ -176,10 +176,17 @@ def _branched_repo(tmp_path: Path) -> tuple[Path, str, str]:
 
 
 def test_an_index_candidate_binds_waivers_to_the_integration_base(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The staged diff is still taken against HEAD; the waiver base is the merge base."""
 
+    # _branched_repo's integration line is a local "master" with no origin remote;
+    # resolve_candidate(kind="index") with no explicit base_ref falls back to
+    # git_source.integration_refs(), which otherwise resolves this host's own
+    # configured line ("main") -- pin it to match the fixture.
+    from conductor import project_paths
+
+    monkeypatch.setenv(project_paths.INTEGRATION_BRANCH_ENV, "master")
     repo, integration, head = _branched_repo(tmp_path)
     assert integration != head
     candidate = resolve_candidate(repo, kind="index")

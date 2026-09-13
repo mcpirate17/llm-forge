@@ -1,0 +1,50 @@
+{
+  "campaign_id": "forge-integration-branch_branch_policy_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/branch_policy.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/branch_policy.py": "7b8a79ce6e392cadeeecc5d05b4a9c0052efbf2fac581b08b9046d1c7e1efb95"
+  },
+  "survivor_baseline": [
+    "break_continue-dccb760ad9cb-0",
+    "break_continue-dccb760ad9cb-1",
+    "comparison_op-23ec96017221-1",
+    "constant_replace-0de69b6fabe6-0",
+    "constant_replace-5163bb580cdb-0",
+    "constant_replace-a6bc6caf8fe8-0",
+    "constant_replace-b26cde1791ef-0",
+    "constant_replace-d67768fbe9ce-1",
+    "constant_replace-e1c0b2dde00b-0",
+    "negate_condition-5345d58ce12b-7",
+    "return_value-ca4dd95cb710-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:02:52.869176+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_branch_policy.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_branch_policy.py": "dbaee62a782fe5e9ee52d055954167cc9b7ced76bd5a910c9fd99056f4eaa91c"
+  },
+  "title": "Generated mutants for src/conductor/branch_policy.py, scored on the survivor set"
+}

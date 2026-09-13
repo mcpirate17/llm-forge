@@ -3,6 +3,13 @@
 Every repo is a throwaway ``git init`` under ``tmp_path`` -- never the real checkout.
 Boundary cases are paired (just-under / at / just-over; True-branch / False-branch) so
 that flipping a comparison or boolean operator in the module under test fails a test.
+
+``branch_policy.is_integration_branch`` (and everything built on it, like
+``audit_repo``) resolves the integration line fresh from ``project_paths`` against
+``project_paths.host_root()`` -- i.e. against the real checkout this test file runs
+in, not the throwaway ``tmp_path`` repos. This suite's repos all use the ``master``
+convention, so an autouse fixture pins $CONDUCTOR_INTEGRATION_BRANCH to ``master``
+for every test here regardless of what this checkout's own ``pyproject.toml`` names.
 """
 
 from __future__ import annotations
@@ -15,6 +22,13 @@ from pathlib import Path
 import pytest
 
 from conductor import branch_policy as bp
+from conductor import project_paths
+
+
+@pytest.fixture(autouse=True)
+def _integration_branch_is_master(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(project_paths.INTEGRATION_BRANCH_ENV, "master")
+
 
 # --------------------------------------------------------------------------- fixtures
 
@@ -162,20 +176,52 @@ class TestIsIntegrationBranch:
     def test_true_for_primary(self) -> None:
         assert bp.is_integration_branch("master") is True
 
-    def test_the_constant_names_the_current_line(self) -> None:
-        # The regression this guards: the constant lagged the integration line by four
-        # days, so every caller that defaulted to it resolved a ref no checkout had.
-        assert bp.INTEGRATION_BRANCH == "master"
-        assert bp.INTEGRATION_BRANCHES[0] == bp.INTEGRATION_BRANCH
+    def test_the_current_line_is_resolved_through_project_paths(self) -> None:
+        # The regression this guards: a fixed constant here once lagged the real
+        # integration line by four days, so every caller that defaulted to it
+        # resolved a ref no checkout had. It is now resolved fresh from
+        # project_paths on every call, never cached at import time.
+        root = project_paths.host_root()
+        assert bp.is_integration_branch(project_paths.integration_branch(root)) is True
 
-    def test_true_for_a_retired_integration_line(self) -> None:
-        # w7-trident-program stopped being the integration line on 2026-08-30. A name
-        # that was once the line must still never be classified as a deletable feature
-        # branch if it turns up on an old worktree or a stale remote.
-        assert bp.RETIRED_INTEGRATION_BRANCHES == ("w7-trident-program",)
-        for retired in bp.RETIRED_INTEGRATION_BRANCHES:
-            assert bp.is_integration_branch(retired) is True
-            assert retired in bp.INTEGRATION_BRANCHES
+    def test_a_host_pyproject_naming_master_still_gets_master(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Proves the [tool.conductor] path, not just this file's env-var fixture: a
+        # host whose own pyproject still names `master` -- like the monorepo this
+        # package was extracted from -- resolves it exactly as it always did.
+        monkeypatch.delenv(project_paths.INTEGRATION_BRANCH_ENV, raising=False)
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.conductor]\nintegration_branch = "master"\n', encoding="utf-8"
+        )
+        monkeypatch.chdir(tmp_path)
+        assert bp.is_integration_branch("master") is True
+        assert bp.is_integration_branch("main") is False
+
+    def test_true_for_a_retired_integration_line(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A name that was once the line must still never be classified as a
+        # deletable feature branch if it turns up on an old worktree or a stale
+        # remote. That history is host-specific, so it lives in a pyproject, not
+        # a package constant -- unlike the monorepo's retired w7-trident-program,
+        # which this package must not carry as a hardcoded default.
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.conductor]\n"
+            'integration_branch = "master"\n'
+            'retired_integration_branches = ["w7-trident-program"]\n',
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        assert bp.is_integration_branch("w7-trident-program") is True
+        assert bp.is_integration_branch("master") is True
+        assert project_paths.retired_integration_branches(tmp_path) == (
+            "w7-trident-program",
+        )
+
+    def test_no_retired_branches_by_default(self) -> None:
+        root = project_paths.host_root()
+        assert project_paths.retired_integration_branches(root) == ()
 
     def test_false_for_feature_branch(self) -> None:
         assert bp.is_integration_branch("claude/topic-20260829") is False
