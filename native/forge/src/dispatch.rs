@@ -93,16 +93,42 @@ fn run_pre_tool_use(event: &str) -> Result<u8> {
 
     let native_hooks = handlers::native_hook_names_from_env();
     let parsed: Option<Value> = serde_json::from_str(&input).ok();
-    let is_bash = parsed
+    let tool_name = parsed
         .as_ref()
         .and_then(|payload| payload.get("tool_name"))
-        .and_then(Value::as_str)
-        == Some("Bash");
+        .and_then(Value::as_str);
+    let is_bash = tool_name == Some("Bash");
+    let is_agent = tool_name == Some("Agent");
 
     if is_bash && handlers::bash_pretooluse_fully_native(&native_hooks) {
         let payload = parsed.as_ref().expect("is_bash implies parsed payload");
         let start = Instant::now();
         let answer = handlers::run_bash_pretooluse_fully_native(payload, &native_hooks);
+        let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+        telemetry::record_native(event, elapsed_ms);
+
+        let mut stdout = std::io::stdout();
+        stdout
+            .write_all(answer.to_string().as_bytes())
+            .context("failed to write the native hook verdict to stdout")?;
+        stdout
+            .write_all(b"\n")
+            .context("failed to write the native hook verdict to stdout")?;
+        return Ok(0);
+    }
+
+    // `Agent` `PreToolUse`: the routing policy (`docs/roadmap.md` Phase 3
+    // step 2) decides the dispatch's tier natively. `crg_refresh_report_pre`
+    // (matcher `.*`) is the only Python-registered `HookSpec` that also
+    // matches `Agent`; once it is opted in, forge has full native coverage
+    // for the call and never starts Python, exactly like the Bash fast path
+    // above. Short of that (the `FORGE_NATIVE_HOOKS` escape hatch), routing
+    // is silently skipped here and the call delegates to Python unchanged --
+    // same behaviour as an opted-out Bash call.
+    if is_agent && handlers::agent_pretooluse_fully_native(&native_hooks) {
+        let payload = parsed.as_ref().expect("is_agent implies parsed payload");
+        let start = Instant::now();
+        let answer = handlers::run_agent_pretooluse_fully_native(payload);
         let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
         telemetry::record_native(event, elapsed_ms);
 

@@ -327,6 +327,110 @@ pub fn route(policy: &Policy, input: &AgentInput) -> Decision {
     }
 }
 
+/// Merges `model` into a clone of `payload.tool_input`, for the
+/// `updatedInput` hook field -- confirmed by probe (`docs/routing.md`) to
+/// *replace* the whole tool_input rather than patch it, so every existing
+/// field (`subagent_type`, `description`, `prompt`, ...) must ride along or
+/// the Agent tool's own schema validation rejects the call.
+fn updated_input_with_model(payload: &Value, model: &str) -> Value {
+    let mut merged = payload
+        .get("tool_input")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    if let Some(map) = merged.as_object_mut() {
+        map.insert("model".to_string(), json!(model));
+    }
+    merged
+}
+
+/// The name `dispatch.rs` and `docs/routing.md` use for this hook's own
+/// contribution when merging it with `crg_refresh_report_pre`'s answer for
+/// an `Agent` `PreToolUse` call. Not a Python-recognized `HookSpec` name --
+/// same status as `handlers::BashWriteTargets`'s `"bash_write_targets"`.
+pub const AGENT_ROUTE_HOOK_NAME: &str = "forge_route_agent";
+
+/// Computes this hook's own, unmerged contribution to an `Agent`
+/// `PreToolUse` call: a `crate::merge::HookOutcome` ready to fold in
+/// alongside `crg_refresh_report_pre`'s via `crate::merge::merge`.
+/// `FORGE_ROUTE_DISABLE=1` skips routing entirely (bare allow, no
+/// `additionalContext`, no `updatedInput`). A malformed embedded policy
+/// becomes a `fail_closed` error outcome -- `merge` turns that into a deny,
+/// matching `route`'s own CLI exit code 2 in spirit (fail loud, never a
+/// silent allow).
+pub fn hook_outcome_for_agent(payload: &Value) -> crate::merge::HookOutcome {
+    use crate::merge::HookOutcome;
+
+    if std::env::var("FORGE_ROUTE_DISABLE").as_deref() == Ok("1") {
+        return HookOutcome {
+            name: AGENT_ROUTE_HOOK_NAME.to_string(),
+            output: json!({
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "allow",
+                }
+            }),
+            error: None,
+            fail_closed: false,
+        };
+    }
+
+    let policy = match Policy::embedded() {
+        Ok(policy) => policy,
+        Err(err) => {
+            return HookOutcome {
+                name: AGENT_ROUTE_HOOK_NAME.to_string(),
+                output: Value::Null,
+                error: Some(format!("{err:#}")),
+                fail_closed: true,
+            };
+        }
+    };
+
+    let input = AgentInput::from_payload(payload);
+    let decision = route(&policy, &input);
+    let context_line = format!(
+        "forge route: {} -> {} (policy {})",
+        decision.class,
+        decision.model.as_deref().unwrap_or("-"),
+        decision.policy_version,
+    );
+
+    let mut specific = serde_json::Map::new();
+    specific.insert("hookEventName".to_string(), json!("PreToolUse"));
+    match decision.decision {
+        Verdict::Deny => {
+            specific.insert("permissionDecision".to_string(), json!("deny"));
+            specific.insert(
+                "permissionDecisionReason".to_string(),
+                json!(decision.reason),
+            );
+        }
+        Verdict::Allow => {
+            specific.insert("permissionDecision".to_string(), json!("allow"));
+            specific.insert("additionalContext".to_string(), json!(context_line));
+            let already_had_model = payload
+                .get("tool_input")
+                .and_then(|ti| ti.get("model"))
+                .is_some();
+            if !already_had_model {
+                if let Some(model) = decision.model.as_deref() {
+                    specific.insert(
+                        "updatedInput".to_string(),
+                        updated_input_with_model(payload, model),
+                    );
+                }
+            }
+        }
+    }
+
+    HookOutcome {
+        name: AGENT_ROUTE_HOOK_NAME.to_string(),
+        output: json!({ "hookSpecificOutput": Value::Object(specific) }),
+        error: None,
+        fail_closed: false,
+    }
+}
+
 #[derive(Args)]
 pub struct RouteArgs {
     #[arg(long = "subagent-type")]

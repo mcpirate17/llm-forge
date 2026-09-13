@@ -357,6 +357,52 @@ pub fn bash_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
         .all(|name| native_hooks.contains(*name))
 }
 
+/// The exact hook name, in the Python registry's own order, that an `Agent`
+/// `PreToolUse` call matches: `crg_refresh_report_pre` (matcher `.*`, which
+/// also matches `Agent`). No other registered `HookSpec` matches `Agent` --
+/// `crate::route`'s own routing verdict needs no Python-recognized name of
+/// its own, exactly like `bash_write_targets` above (see
+/// `route::AGENT_ROUTE_HOOK_NAME`'s docs).
+pub const AGENT_PRETOOLUSE_HOOK_NAMES: [&str; 1] = ["crg_refresh_report_pre"];
+
+/// True once `crg_refresh_report_pre` is opted in: forge has full native
+/// coverage for an `Agent` `PreToolUse` call and `dispatch::run_hook` can
+/// answer it -- routing decision included -- without starting Python at all.
+pub fn agent_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
+    AGENT_PRETOOLUSE_HOOK_NAMES
+        .iter()
+        .all(|name| native_hooks.contains(*name))
+}
+
+/// The final, fully-merged answer for an `Agent` `PreToolUse` call once
+/// `agent_pretooluse_fully_native` is true: `crate::route::hook_outcome_for_agent`
+/// computes forge's own routing verdict, `crg_refresh_report_pre` runs
+/// exactly as it does for Bash, and `crate::merge` folds the two together
+/// exactly as Python's own `merge()` would -- so a caller can print this and
+/// never start Python for the call. A `crg_refresh_report_pre` failure
+/// becomes a `HookOutcome` error like every other handler here, not a panic.
+pub fn run_agent_pretooluse_fully_native(payload: &Value) -> Value {
+    let handlers = registry();
+    let crg = find_handler(&handlers, "crg_refresh_report_pre", "PreToolUse")
+        .expect("crg_refresh_report_pre always registered");
+    let crg_outcome = match crg.run(payload) {
+        Ok(output) => HookOutcome {
+            name: "crg_refresh_report_pre".to_string(),
+            output,
+            error: None,
+            fail_closed: false,
+        },
+        Err(err) => HookOutcome {
+            name: "crg_refresh_report_pre".to_string(),
+            output: Value::Null,
+            error: Some(format!("{err:#}")),
+            fail_closed: false,
+        },
+    };
+    let outcomes = vec![crate::route::hook_outcome_for_agent(payload), crg_outcome];
+    merge::merge("PreToolUse", &outcomes)
+}
+
 /// The hooks forge serves natively when the caller expresses no preference at
 /// all (`FORGE_NATIVE_HOOKS` unset) -- the native path is the *default* as of
 /// this PR, not an opt-in. The four `BASH_PRETOOLUSE_HOOK_NAMES`, the six
