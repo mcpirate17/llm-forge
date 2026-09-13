@@ -167,6 +167,21 @@ agent tokens. Stop porting; finish Phase 3, then install.
    `origin/{master,main}` (both is ambiguous), and the advertisement
    runs only in the reaper (`allow_network`). DONE PR #68 (450 ms ->
    16 ms median on LLM, same command, no network).
+
+2h. (Claude) `forge notes index|search` ports `conductor.index_notes`'s
+   FTS5 note index to Rust (`native/forge/src/notes_index.rs`), and fixes
+   the bug it was written to carry: `_source_roots()` returned EITHER the
+   Obsidian vault trees OR the repo's own `research/notes`+`tasks`, never
+   both, so a machine with the vault present indexed the repo's 622 notes
+   nowhere -- a rebuild silently dropped them and a search for a
+   just-written note came back empty. Both trees are now indexed always
+   (source tags `notes`/`tasks`/`vault_research`/`vault_dashboards`/
+   `vault_runbooks`, no dedupe). DONE PR #TBD (`docs/install.md`, "Prose
+   search of notes"); parity between the Python and Rust extraction/DDL
+   pinned by unit tests (`fts5_is_available`,
+   `rebuild_indexes_repo_and_vault_together`), a live Python-vs-Rust
+   byte-comparison harness on a larger fixture is debt for the follow-up
+   PR.
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"

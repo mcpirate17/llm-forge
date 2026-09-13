@@ -156,6 +156,25 @@ PASS hook-roundtrip: exit 0, stdout empty, 1 ms
 names — that line is the broken piece, not a suggestion to re-run install
 blind (`forge hooks status` remains the narrower settings-only check).
 
+## Prose search of notes
+
+```
+forge notes index --host /path/to/repo [--vault ~/Documents/CodexVault] [--db PATH]
+forge notes search --host /path/to/repo "binding wall semiring" [--limit N] [--json]
+```
+
+`index` rebuilds `HOST/research/runs.db`'s `notes_fts` (FTS5 prose) and
+`note_tables` (extracted markdown tables) from **both** trees always: the
+host's own `research/notes/**.md` (`source=notes`) and `tasks/**.md`
+(`source=tasks`, excluding `tasks/audit/`), plus -- when the Obsidian vault
+is present -- its `research/`, `dashboards/`, `runbooks/` trees
+(`source=vault_research`/`vault_dashboards`/`vault_runbooks`) *in addition
+to*, never instead of, the repo's own notes. `search` runs an FTS5 `MATCH`
+query over an already-built index. `python -m conductor.index_notes`
+(`src/conductor/index_notes.py`) is the reference implementation the schema
+and extraction rules are ported from byte-for-byte; it stays the source of
+truth if the two ever disagree.
+
 ## Known host issues fixed
 
 SessionEnd/SubagentStop/Stop no longer emit `hookSpecificOutput` (Claude

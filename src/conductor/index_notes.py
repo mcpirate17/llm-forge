@@ -10,10 +10,13 @@ Two complementary indexes, both queryable straight from `research/runs.db`:
 
 FTS5 ships with Python's stdlib sqlite3 — nothing to install.
 
-Sources: the Obsidian vault's research/dashboard notes when available, falling
-back to research/notes/**.md (source='notes'), plus tasks/**.md
-(source='tasks'), excluding generated audit outputs under tasks/audit/.
-Idempotent full rebuild each run.
+Sources: research/notes/**.md (source='notes') and tasks/**.md
+(source='tasks') always, plus the Obsidian vault's research/dashboards/
+runbooks trees (source='vault_research'/'vault_dashboards'/'vault_runbooks')
+additionally when the vault is present on this machine -- the vault never
+replaces the repo's own notes, since the two trees hold different notes and
+neither is a superset of the other. Excludes generated audit outputs under
+tasks/audit/. Idempotent full rebuild each run.
 
 Usage:
   python -m conductor.index_notes                 # rebuild both indexes
@@ -48,6 +51,7 @@ TASKS_SOURCE = ("tasks", os.path.join(REPO, "tasks"))
 def _fallback_notes_source() -> tuple[str, str]:
     """('notes', the configured notes tree of the workspace this runs in)."""
     return ("notes", str(notes_root(host_root())))
+
 
 EXCLUDED_REL_PREFIXES = ("tasks/audit/",)
 
@@ -128,10 +132,17 @@ def _should_index_path(rel_path: str) -> bool:
 
 
 def _source_roots() -> tuple[tuple[str, str], ...]:
+    """The repo's own notes + tasks always, the vault trees additionally.
+
+    The vault and the repo's ``research/notes`` hold different notes -- one
+    is never a superset of the other -- so a vault present on this machine
+    must never suppress the repo's own tree from being indexed.
+    """
+    roots = (_fallback_notes_source(), TASKS_SOURCE)
     vault_research = os.path.join(VAULT_ROOT, "research")
     if os.path.isdir(vault_research):
-        return (*VAULT_SOURCES, TASKS_SOURCE)
-    return (_fallback_notes_source(), TASKS_SOURCE)
+        roots = (*roots, *VAULT_SOURCES)
+    return roots
 
 
 def _fts_match_query(query: str) -> str:
