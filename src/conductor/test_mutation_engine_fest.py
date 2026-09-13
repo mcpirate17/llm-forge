@@ -7,6 +7,8 @@ and the coverage handling that a monorepo forces on it.
 
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -270,3 +272,28 @@ def test_a_campaigns_declared_addopts_survive_with_the_plugin_appended(
     env = _environment(campaign, tmp_path)
 
     assert env["PYTEST_ADDOPTS"] == f"--timeout 30 -p {PLUGIN_NAME}"
+
+
+def test_the_environment_binds_the_run_to_this_venv_and_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every binding the environment exists to make, asserted end to end.
+
+    The snapshot's import roots come first and a declared PYTHONPATH rides
+    behind them; VIRTUAL_ENV and PATH pin the venv so fest's bare-`python`
+    probe and the test command agree on one interpreter. Dropping PATH here
+    also pins the inheritance default, so nothing ambient leaks in.
+    """
+
+    (tmp_path / "src").mkdir()
+    campaign = _EnvironmentCampaign()
+    campaign.environment = {"PYTHONPATH": "declared/extra"}
+    monkeypatch.delenv("PATH", raising=False)
+
+    env = _environment(campaign, tmp_path)
+
+    assert env["PYTHONPATH"] == os.pathsep.join(
+        [str(tmp_path), str(tmp_path / "src"), "declared/extra"]
+    )
+    assert env["VIRTUAL_ENV"] == str(Path(sys.executable).parents[1])
+    assert env["PATH"] == str(Path(sys.executable).parent) + os.pathsep
