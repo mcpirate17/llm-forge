@@ -302,6 +302,12 @@ pub(crate) fn install(args: &InstallArgs) -> Result<u8> {
                 takeover::EventOutcome::Kept { missing } => {
                     format!("kept python: {event} (missing: {})", missing.join(", "))
                 }
+                takeover::EventOutcome::Narrowed { matcher } => {
+                    format!("narrowed python: {event} .* -> {matcher}")
+                }
+                takeover::EventOutcome::AlreadyNarrowed { matcher } => {
+                    format!("already narrowed: {event} (python: {matcher})")
+                }
                 takeover::EventOutcome::NoPythonEntry => {
                     format!("no python entry: {event}")
                 }
@@ -509,7 +515,7 @@ fn status(args: &StatusArgs) -> Result<u8> {
             })
             .unwrap_or_default();
         let python = takeover::python_status(&settings, &args.host, event);
-        status_line(event, &entries, python, &mut missing_binary);
+        status_line(event, &entries, &python, &mut missing_binary);
     }
     if missing_binary {
         eprintln!("forge hooks status: an installed entry points at a missing binary");
@@ -1057,125 +1063,8 @@ mod tests {
         assert!(!versions_match("forge 0.0.0 (git deadbee)"));
     }
 
-    /// A settings shape with the host's Python dispatcher wired for all
-    /// four events, matcher `.*` for Pre/PostToolUse and no matcher for
-    /// Session events -- the real shape (see `docs/routing.md`'s coverage
-    /// discussion), not any project's actual file.
-    fn dispatcher_settings() -> String {
-        r#"{
-  "hooks": {
-    "PreToolUse": [
-      { "matcher": ".*", "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py PreToolUse", "timeout": 30 } ] }
-    ],
-    "PostToolUse": [
-      { "matcher": ".*", "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py PostToolUse", "timeout": 30 } ] }
-    ],
-    "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py SessionStart", "timeout": 10 } ] }
-    ],
-    "SessionEnd": [
-      { "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py SessionEnd", "timeout": 10 } ] }
-    ],
-    "SomeoneElsesHook": [
-      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "/opt/other/tool.sh", "timeout": 5 } ] }
-    ]
-  },
-  "unrelatedTopLevelKey": true
-}"#
-        .to_string()
-    }
-
-    #[test]
-    fn takeover_removes_only_full_events_python_entries() {
-        let scratch = ScratchDir::new("takeover-full-only");
-        scratch.write_settings(&dispatcher_settings());
-        install(&takeover_args(scratch.path(), false)).unwrap();
-        let settings = scratch.settings_value();
-
-        // PostToolUse (Full): Python entry gone, forge entry present.
-        let post = commands_for(&settings, "PostToolUse");
-        assert!(!post.iter().any(|c| c.contains("dispatch.py")));
-        assert!(post
-            .iter()
-            .any(|c| c.contains("forge") && c.contains("hook PostToolUse")));
-
-        // PreToolUse (Partial: Read/Edit/mcp graph tools still need Python):
-        // the Python entry must survive.
-        let pre = commands_for(&settings, "PreToolUse");
-        assert!(pre.iter().any(|c| c.contains("dispatch.py PreToolUse")));
-
-        // SessionStart/SessionEnd (Partial): untouched.
-        for event in ["SessionStart", "SessionEnd"] {
-            let cmds = commands_for(&settings, event);
-            assert!(cmds
-                .iter()
-                .any(|c| c.contains(&format!("dispatch.py {event}"))));
-        }
-
-        // Unrelated entries preserved byte-for-byte in shape.
-        assert_eq!(settings["hooks"]["SomeoneElsesHook"][0]["matcher"], "Bash");
-        assert_eq!(settings["unrelatedTopLevelKey"], true);
-
-        // Exactly the removed entry was recorded, verbatim.
-        let record: Value = serde_json::from_str(
-            &std::fs::read_to_string(takeover::takeover_path(scratch.path())).unwrap(),
-        )
-        .unwrap();
-        assert!(record.get("PreToolUse").is_none());
-        assert!(record.get("SessionStart").is_none());
-        let recorded_post = &record["PostToolUse"];
-        assert_eq!(recorded_post["matcher"], ".*");
-        assert_eq!(
-            recorded_post["hooks"][0]["command"],
-            "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py PostToolUse"
-        );
-    }
-
-    #[test]
-    fn second_takeover_run_is_a_no_op() {
-        let scratch = ScratchDir::new("takeover-idempotent");
-        scratch.write_settings(&dispatcher_settings());
-        install(&takeover_args(scratch.path(), false)).unwrap();
-        let after_first = scratch.settings_text();
-        let record_after_first =
-            std::fs::read_to_string(takeover::takeover_path(scratch.path())).unwrap();
-
-        install(&takeover_args(scratch.path(), false)).unwrap();
-        assert_eq!(scratch.settings_text(), after_first);
-        assert_eq!(
-            std::fs::read_to_string(takeover::takeover_path(scratch.path())).unwrap(),
-            record_after_first
-        );
-    }
-
-    #[test]
-    fn uninstall_restores_the_exact_pre_takeover_python_entry() {
-        let scratch = ScratchDir::new("takeover-uninstall");
-        let original: Value = serde_json::from_str(&dispatcher_settings()).unwrap();
-        scratch.write_settings(&dispatcher_settings());
-        install(&takeover_args(scratch.path(), false)).unwrap();
-
-        run(HooksCommand::Uninstall(UninstallArgs {
-            host: scratch.path().to_path_buf(),
-            dry_run: false,
-        }))
-        .unwrap();
-
-        let restored = scratch.settings_value();
-        assert_eq!(
-            restored["hooks"]["PostToolUse"][0],
-            original["hooks"]["PostToolUse"][0]
-        );
-        assert!(!takeover::takeover_path(scratch.path()).is_file());
-    }
-
-    #[test]
-    fn takeover_dry_run_writes_nothing() {
-        let scratch = ScratchDir::new("takeover-dry-run");
-        scratch.write_settings(&dispatcher_settings());
-        let before = scratch.settings_text();
-        install(&takeover_args(scratch.path(), true)).unwrap();
-        assert_eq!(scratch.settings_text(), before);
-        assert!(!takeover::takeover_path(scratch.path()).is_file());
-    }
+    // Split out of this file to stay under the file-size ceiling; textually
+    // included (not a `mod`) so it shares `tests`'s own scope (`ScratchDir`,
+    // `install`, `run`, `takeover`, ...) without a second `use super::*`.
+    include!("hooks_install_takeover_tests.rs");
 }
