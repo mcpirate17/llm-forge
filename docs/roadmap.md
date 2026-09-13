@@ -125,7 +125,7 @@ agent tokens. Stop porting; finish Phase 3, then install.
    edit steps 2 and 2b assumed is one command now, and the warn ->
    enforce flip is the same command again; `forge --version` stamps the
    git rev so `status` can tell an installed binary from the running
-   one. DONE PR #59 (`docs/install.md`).
+   one. DONE PR #60 (`docs/install.md`).
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
