@@ -1,1141 +1,860 @@
 {
 	"_comment": "Baseline of known duplicate-code pairs, keyed by a content hash of the duplicated fragment (not line numbers). The staged gate only fails on pairs NOT in this file. Regenerate with `python conductor/run_duplicate_audit.py --tool <name> --save-baseline` after a deliberate refactor changes the known clone set; never hand-edit to hide a new duplicate.",
-	"count": 165,
+	"count": 127,
 	"entries": {
-		"native/conductor-native/src/a2a_compaction.rs::native/conductor-native/src/a2a_retention.rs::447295c2b252cba7": {
+		"native/conductor-native/src/a2a_compaction.rs::native/conductor-native/src/a2a_retention.rs::645b09f7f68aa1ea": {
 			"files": [
 				"native/conductor-native/src/a2a_compaction.rs",
 				"native/conductor-native/src/a2a_retention.rs"
 			],
 			"lines": 9
 		},
-		"native/conductor-native/src/branch_policy.rs::native/conductor-native/src/branch_policy.rs::83f3e2950fcbeecb": {
-			"files": [
-				"native/conductor-native/src/branch_policy.rs",
-				"native/conductor-native/src/branch_policy.rs"
-			],
-			"lines": 6
-		},
-		"native/conductor-native/src/candidate_structure.rs::native/conductor-native/src/candidate_structure.rs::f723daf5c16492ed": {
+		"native/conductor-native/src/candidate_structure.rs::native/conductor-native/src/candidate_structure.rs::923fd66dab648786": {
 			"files": [
 				"native/conductor-native/src/candidate_structure.rs",
 				"native/conductor-native/src/candidate_structure.rs"
 			],
 			"lines": 6
 		},
-		"native/conductor-native/src/candidate_structure.rs::native/conductor-native/src/tooling_boundary.rs::4e5ba688922d7b39": {
+		"native/conductor-native/src/candidate_structure.rs::native/conductor-native/src/candidate_structure.rs::fc2306491a0f43bc": {
+			"files": [
+				"native/conductor-native/src/candidate_structure.rs",
+				"native/conductor-native/src/candidate_structure.rs"
+			],
+			"lines": 6
+		},
+		"native/conductor-native/src/candidate_structure.rs::native/conductor-native/src/guardrail_ast.rs::183579510184d040": {
+			"files": [
+				"native/conductor-native/src/candidate_structure.rs",
+				"native/conductor-native/src/guardrail_ast.rs"
+			],
+			"lines": 6
+		},
+		"native/conductor-native/src/candidate_structure.rs::native/conductor-native/src/tooling_boundary.rs::2ca1c2b5a150f300": {
 			"files": [
 				"native/conductor-native/src/candidate_structure.rs",
 				"native/conductor-native/src/tooling_boundary.rs"
 			],
 			"lines": 26
 		},
-		"native/conductor-native/src/context_telemetry.rs::native/conductor-native/src/context_telemetry.rs::a7cf67d00dbf589d": {
+		"native/conductor-native/src/context_telemetry.rs::native/conductor-native/src/context_telemetry.rs::39b39be9562e2682": {
 			"files": [
 				"native/conductor-native/src/context_telemetry.rs",
 				"native/conductor-native/src/context_telemetry.rs"
-			],
-			"lines": 7
-		},
-		"native/conductor-native/src/context_telemetry.rs::native/conductor-native/src/context_telemetry.rs::c60dcf10c050d720": {
-			"files": [
-				"native/conductor-native/src/context_telemetry.rs",
-				"native/conductor-native/src/context_telemetry.rs"
-			],
-			"lines": 9
-		},
-		"native/conductor-native/src/dead_tests.rs::native/conductor-native/src/dead_tests.rs::1b91c68d0d131a38": {
-			"files": [
-				"native/conductor-native/src/dead_tests.rs",
-				"native/conductor-native/src/dead_tests.rs"
-			],
-			"lines": 9
-		},
-		"native/conductor-native/src/dead_tests.rs::native/conductor-native/src/dead_tests.rs::7a6a01102c26b9a1": {
-			"files": [
-				"native/conductor-native/src/dead_tests.rs",
-				"native/conductor-native/src/dead_tests.rs"
-			],
-			"lines": 10
-		},
-		"native/conductor-native/src/dead_tests.rs::native/conductor-native/src/dead_tests.rs::a5a9770a276373ff": {
-			"files": [
-				"native/conductor-native/src/dead_tests.rs",
-				"native/conductor-native/src/dead_tests.rs"
 			],
 			"lines": 6
 		},
-		"native/conductor-native/src/duplicate_bodies.rs::native/conductor-native/src/guardrail_ast.rs::098b7926f76883df": {
+		"native/conductor-native/src/context_telemetry.rs::native/conductor-native/src/context_telemetry.rs::da5d9f5645c70707": {
+			"files": [
+				"native/conductor-native/src/context_telemetry.rs",
+				"native/conductor-native/src/context_telemetry.rs"
+			],
+			"lines": 9
+		},
+		"native/conductor-native/src/duplicate_bodies.rs::native/conductor-native/src/guardrail_ast.rs::4bdaff5894e497d5": {
 			"files": [
 				"native/conductor-native/src/duplicate_bodies.rs",
 				"native/conductor-native/src/guardrail_ast.rs"
 			],
 			"lines": 39
 		},
-		"native/conductor-native/src/duplicate_bodies.rs::native/conductor-native/src/guardrail_ast.rs::c6bc1afb6a4bf310": {
+		"native/conductor-native/src/duplicate_bodies.rs::native/conductor-native/src/guardrail_ast.rs::50f7b7c3241cd3fc": {
 			"files": [
 				"native/conductor-native/src/duplicate_bodies.rs",
 				"native/conductor-native/src/guardrail_ast.rs"
 			],
-			"lines": 14
+			"lines": 15
 		},
-		"native/conductor-native/src/duplicate_bodies.rs::native/conductor-native/src/mutation_coverage.rs::c6dde8042977d8ab": {
+		"native/conductor-native/src/duplicate_bodies.rs::native/conductor-native/src/mutation_coverage.rs::c82ad9e4402a65aa": {
 			"files": [
 				"native/conductor-native/src/duplicate_bodies.rs",
 				"native/conductor-native/src/mutation_coverage.rs"
 			],
-			"lines": 14
+			"lines": 15
 		},
-		"native/conductor-native/src/memory_index.rs::native/conductor-native/src/memory_index.rs::19b496d8a4cc80ec": {
+		"native/conductor-native/src/memory_index.rs::native/conductor-native/src/memory_index.rs::b3e4f4ddfc088682": {
 			"files": [
 				"native/conductor-native/src/memory_index.rs",
 				"native/conductor-native/src/memory_index.rs"
 			],
-			"lines": 12
+			"lines": 13
 		},
-		"native/conductor-native/src/mutation_coverage.rs::native/conductor-native/src/mutation_manifest.rs::1140973a6b8b33da": {
+		"native/conductor-native/src/mutation_coverage.rs::native/conductor-native/src/mutation_coverage.rs::20b4fec421a07261": {
 			"files": [
 				"native/conductor-native/src/mutation_coverage.rs",
-				"native/conductor-native/src/mutation_manifest.rs"
+				"native/conductor-native/src/mutation_coverage.rs"
 			],
-			"lines": 22
+			"lines": 13
 		},
-		"native/conductor-native/src/mutation_coverage.rs::native/conductor-native/src/mutation_manifest.rs::940c557386235f7c": {
-			"files": [
-				"native/conductor-native/src/mutation_coverage.rs",
-				"native/conductor-native/src/mutation_manifest.rs"
-			],
-			"lines": 9
-		},
-		"native/conductor-native/src/mutation_evidence.rs::native/conductor-native/src/mutation_manifest.rs::7eccb16bcdaca1b9": {
-			"files": [
-				"native/conductor-native/src/mutation_evidence.rs",
-				"native/conductor-native/src/mutation_manifest.rs"
-			],
-			"lines": 12
-		},
-		"native/conductor-native/src/mutation_evidence.rs::native/conductor-native/src/mutation_receipt.rs::a2d22aa44e8b1cdb": {
-			"files": [
-				"native/conductor-native/src/mutation_evidence.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
-			],
-			"lines": 9
-		},
-		"native/conductor-native/src/mutation_evidence.rs::src/tooling/native/conductor-native/src/mutation_evidence.rs::f8669e0556b560e0": {
+		"native/conductor-native/src/mutation_evidence.rs::src/tooling/native/conductor-native/src/mutation_evidence.rs::4e00f1b3af01d1fd": {
 			"files": [
 				"native/conductor-native/src/mutation_evidence.rs",
 				"src/tooling/native/conductor-native/src/mutation_evidence.rs"
 			],
-			"lines": 208
+			"lines": 285
 		},
-		"native/conductor-native/src/mutation_manifest.rs::native/conductor-native/src/mutation_manifest.rs::157806d2399e6f2a": {
+		"native/conductor-native/src/mutation_plan.rs::native/conductor-native/src/receipt_auth.rs::85843d9be771eb95": {
 			"files": [
-				"native/conductor-native/src/mutation_manifest.rs",
-				"native/conductor-native/src/mutation_manifest.rs"
-			],
-			"lines": 11
-		},
-		"native/conductor-native/src/mutation_manifest.rs::native/conductor-native/src/mutation_manifest.rs::561b6f75f61ca274": {
-			"files": [
-				"native/conductor-native/src/mutation_manifest.rs",
-				"native/conductor-native/src/mutation_manifest.rs"
-			],
-			"lines": 10
-		},
-		"native/conductor-native/src/mutation_manifest.rs::native/conductor-native/src/mutation_manifest.rs::9f99bc587f9d30ed": {
-			"files": [
-				"native/conductor-native/src/mutation_manifest.rs",
-				"native/conductor-native/src/mutation_manifest.rs"
-			],
-			"lines": 9
-		},
-		"native/conductor-native/src/mutation_manifest.rs::native/conductor-native/src/mutation_manifest.rs::c12cd97c347f88ae": {
-			"files": [
-				"native/conductor-native/src/mutation_manifest.rs",
-				"native/conductor-native/src/mutation_manifest.rs"
+				"native/conductor-native/src/mutation_plan.rs",
+				"native/conductor-native/src/receipt_auth.rs"
 			],
 			"lines": 6
 		},
-		"native/conductor-native/src/mutation_manifest.rs::native/conductor-native/src/mutation_manifest.rs::f296f9384662a6ca": {
+		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/mutation_value.rs::155f09e599b580f8": {
 			"files": [
-				"native/conductor-native/src/mutation_manifest.rs",
-				"native/conductor-native/src/mutation_manifest.rs"
-			],
-			"lines": 7
-		},
-		"native/conductor-native/src/mutation_manifest.rs::native/conductor-native/src/mutation_receipt.rs::63536450b3b990c2": {
-			"files": [
-				"native/conductor-native/src/mutation_manifest.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
+				"native/conductor-native/src/mutation_value.rs",
+				"native/conductor-native/src/mutation_value.rs"
 			],
 			"lines": 13
 		},
-		"native/conductor-native/src/mutation_manifest.rs::native/conductor-native/src/mutation_value.rs::d5495fa6154afe9d": {
+		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/mutation_value.rs::50e577ace39f171b": {
 			"files": [
-				"native/conductor-native/src/mutation_manifest.rs",
+				"native/conductor-native/src/mutation_value.rs",
 				"native/conductor-native/src/mutation_value.rs"
 			],
-			"lines": 7
+			"lines": 8
 		},
-		"native/conductor-native/src/mutation_manifest.rs::src/tooling/native/conductor-native/src/mutation_manifest.rs::6c446d85c242bbf1": {
+		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/mutation_value.rs::9bb9e49849702e4d": {
 			"files": [
-				"native/conductor-native/src/mutation_manifest.rs",
-				"src/tooling/native/conductor-native/src/mutation_manifest.rs"
+				"native/conductor-native/src/mutation_value.rs",
+				"native/conductor-native/src/mutation_value.rs"
 			],
-			"lines": 3559
+			"lines": 15
 		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_receipt.rs::071a80e475816945": {
+		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/mutation_value.rs::a179d84367fc7026": {
 			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
-			],
-			"lines": 12
-		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_receipt.rs::341f0353b8d84cc9": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
-			],
-			"lines": 20
-		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_receipt.rs::44470d65dc09a517": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
-			],
-			"lines": 14
-		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_receipt.rs::b2dd65be8096b3c4": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
-			],
-			"lines": 10
-		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_receipt.rs::bcb4815a954b115f": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
+				"native/conductor-native/src/mutation_value.rs",
+				"native/conductor-native/src/mutation_value.rs"
 			],
 			"lines": 9
 		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_receipt.rs::ca44e96a1cef8cd6": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
-			],
-			"lines": 13
-		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_receipt.rs::cc25c721ef1898c4": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
-			],
-			"lines": 11
-		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_receipt.rs::ede6e7ee1a93a63a": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_receipt.rs"
-			],
-			"lines": 20
-		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_value.rs::6f4308a67229b0a8": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_value.rs"
-			],
-			"lines": 13
-		},
-		"native/conductor-native/src/mutation_receipt.rs::native/conductor-native/src/mutation_value.rs::d09a8c83f7c39962": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"native/conductor-native/src/mutation_value.rs"
-			],
-			"lines": 8
-		},
-		"native/conductor-native/src/mutation_receipt.rs::src/tooling/native/conductor-native/src/mutation_receipt.rs::b1469c3aa50a2ac5": {
-			"files": [
-				"native/conductor-native/src/mutation_receipt.rs",
-				"src/tooling/native/conductor-native/src/mutation_receipt.rs"
-			],
-			"lines": 1818
-		},
-		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/mutation_value.rs::1cab116c48a6ff5e": {
-			"files": [
-				"native/conductor-native/src/mutation_value.rs",
-				"native/conductor-native/src/mutation_value.rs"
-			],
-			"lines": 13
-		},
-		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/mutation_value.rs::3c918de69a78d1f4": {
-			"files": [
-				"native/conductor-native/src/mutation_value.rs",
-				"native/conductor-native/src/mutation_value.rs"
-			],
-			"lines": 8
-		},
-		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/mutation_value.rs::4b25c87bb2f0700e": {
-			"files": [
-				"native/conductor-native/src/mutation_value.rs",
-				"native/conductor-native/src/mutation_value.rs"
-			],
-			"lines": 13
-		},
-		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/mutation_value.rs::6849a841e9a855c2": {
-			"files": [
-				"native/conductor-native/src/mutation_value.rs",
-				"native/conductor-native/src/mutation_value.rs"
-			],
-			"lines": 7
-		},
-		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/receipt_auth.rs::22068cd01624e63e": {
+		"native/conductor-native/src/mutation_value.rs::native/conductor-native/src/receipt_auth.rs::d07ca0d5a1f7d486": {
 			"files": [
 				"native/conductor-native/src/mutation_value.rs",
 				"native/conductor-native/src/receipt_auth.rs"
 			],
 			"lines": 12
 		},
-		"native/slop-core/src/config_scan_tests.rs::native/slop-core/src/style_scan_tests.rs::6fbb6d5bc692cd06": {
+		"native/forge/src/cap_enforce.rs::native/forge/src/cap_enforce.rs::6f06e796c6eb7428": {
+			"files": [
+				"native/forge/src/cap_enforce.rs",
+				"native/forge/src/cap_enforce.rs"
+			],
+			"lines": 10
+		},
+		"native/forge/src/cap_enforce.rs::native/forge/src/ledger/agent_upsert.rs::0d280bd229d7489a": {
+			"files": [
+				"native/forge/src/cap_enforce.rs",
+				"native/forge/src/ledger/agent_upsert.rs"
+			],
+			"lines": 10
+		},
+		"native/forge/src/civil.rs::native/forge/src/ledger/audit.rs::b440caeae39f3a9b": {
+			"files": [
+				"native/forge/src/civil.rs",
+				"native/forge/src/ledger/audit.rs"
+			],
+			"lines": 14
+		},
+		"native/forge/src/crg_refresh.rs::native/forge/src/ownership.rs::432bfc26e4c4afbe": {
+			"files": [
+				"native/forge/src/crg_refresh.rs",
+				"native/forge/src/ownership.rs"
+			],
+			"lines": 6
+		},
+		"native/forge/src/current_work_guard.rs::native/forge/src/local_ai_policy.rs::3dbb0a9f7760cd6c": {
+			"files": [
+				"native/forge/src/current_work_guard.rs",
+				"native/forge/src/local_ai_policy.rs"
+			],
+			"lines": 12
+		},
+		"native/forge/src/dispatch.rs::native/forge/src/dispatch.rs::27ad2e4ce8100b12": {
+			"files": ["native/forge/src/dispatch.rs", "native/forge/src/dispatch.rs"],
+			"lines": 9
+		},
+		"native/forge/src/dispatch.rs::native/forge/src/dispatch.rs::30f49e58bc4aa2b4": {
+			"files": ["native/forge/src/dispatch.rs", "native/forge/src/dispatch.rs"],
+			"lines": 15
+		},
+		"native/forge/src/dispatch.rs::native/forge/src/dispatch.rs::43f3ebb2b041fac7": {
+			"files": ["native/forge/src/dispatch.rs", "native/forge/src/dispatch.rs"],
+			"lines": 8
+		},
+		"native/forge/src/dispatch.rs::native/forge/src/dispatch.rs::aa97e85944da4310": {
+			"files": ["native/forge/src/dispatch.rs", "native/forge/src/dispatch.rs"],
+			"lines": 8
+		},
+		"native/forge/src/handlers.rs::native/forge/src/handlers.rs::1f567b9ad3b5df75": {
+			"files": ["native/forge/src/handlers.rs", "native/forge/src/handlers.rs"],
+			"lines": 8
+		},
+		"native/forge/src/handlers.rs::native/forge/src/handlers.rs::bd58b317f5c7212a": {
+			"files": ["native/forge/src/handlers.rs", "native/forge/src/handlers.rs"],
+			"lines": 7
+		},
+		"native/forge/src/handlers.rs::native/forge/src/handlers.rs::fbcdc9e737b9629d": {
+			"files": ["native/forge/src/handlers.rs", "native/forge/src/handlers.rs"],
+			"lines": 12
+		},
+		"native/forge/src/identity.rs::native/forge/src/ownership.rs::1733435e7c6ad5ab": {
+			"files": [
+				"native/forge/src/identity.rs",
+				"native/forge/src/ownership.rs"
+			],
+			"lines": 8
+		},
+		"native/forge/src/identity.rs::native/forge/src/ownership.rs::b5bf73ed5408ad31": {
+			"files": [
+				"native/forge/src/identity.rs",
+				"native/forge/src/ownership.rs"
+			],
+			"lines": 7
+		},
+		"native/forge/src/ledger/agent.rs::native/forge/src/ledger/agent.rs::0bdd9fca29590e2d": {
+			"files": [
+				"native/forge/src/ledger/agent.rs",
+				"native/forge/src/ledger/agent.rs"
+			],
+			"lines": 9
+		},
+		"native/forge/src/ledger/agent.rs::native/forge/src/ledger/agent.rs::6ffcbd765f32e50b": {
+			"files": [
+				"native/forge/src/ledger/agent.rs",
+				"native/forge/src/ledger/agent.rs"
+			],
+			"lines": 8
+		},
+		"native/forge/src/ledger/agent.rs::native/forge/src/ledger/agent.rs::7b757f52ce5f6d0e": {
+			"files": [
+				"native/forge/src/ledger/agent.rs",
+				"native/forge/src/ledger/agent.rs"
+			],
+			"lines": 6
+		},
+		"native/forge/src/ledger/agent.rs::native/forge/src/ledger/agent.rs::b9b041c1089f85e9": {
+			"files": [
+				"native/forge/src/ledger/agent.rs",
+				"native/forge/src/ledger/agent.rs"
+			],
+			"lines": 6
+		},
+		"native/forge/src/ledger/audit.rs::native/forge/src/ledger/prune.rs::b9b20af0e82616c9": {
+			"files": [
+				"native/forge/src/ledger/audit.rs",
+				"native/forge/src/ledger/prune.rs"
+			],
+			"lines": 8
+		},
+		"native/forge/src/ledger/reader.rs::native/forge/src/ledger/reader.rs::330abd22cfc103c9": {
+			"files": [
+				"native/forge/src/ledger/reader.rs",
+				"native/forge/src/ledger/reader.rs"
+			],
+			"lines": 8
+		},
+		"native/forge/src/post_tool.rs::native/forge/src/post_tool.rs::a3a6da05c2b0b270": {
+			"files": [
+				"native/forge/src/post_tool.rs",
+				"native/forge/src/post_tool.rs"
+			],
+			"lines": 11
+		},
+		"native/forge/src/read_budget.rs::native/slop-core/src/index_tests.rs::af8d268824432dd9": {
+			"files": [
+				"native/forge/src/read_budget.rs",
+				"native/slop-core/src/index_tests.rs"
+			],
+			"lines": 12
+		},
+		"native/forge/src/route.rs::native/forge/src/route.rs::64df51588b720964": {
+			"files": ["native/forge/src/route.rs", "native/forge/src/route.rs"],
+			"lines": 12
+		},
+		"native/forge/src/session_end.rs::native/forge/src/subagent_stop.rs::4faeeb21104b502c": {
+			"files": [
+				"native/forge/src/session_end.rs",
+				"native/forge/src/subagent_stop.rs"
+			],
+			"lines": 9
+		},
+		"native/forge/src/tool_quiet.rs::native/forge/tests/workspace_exposure_parity.rs::c64122ac631eecee": {
+			"files": [
+				"native/forge/src/tool_quiet.rs",
+				"native/forge/tests/workspace_exposure_parity.rs"
+			],
+			"lines": 17
+		},
+		"native/forge/src/workspace_hygiene.rs::native/forge/tests/workspace_exposure_parity.rs::c958a0d2fac1deed": {
+			"files": [
+				"native/forge/src/workspace_hygiene.rs",
+				"native/forge/tests/workspace_exposure_parity.rs"
+			],
+			"lines": 17
+		},
+		"native/forge/src/workspace_hygiene.rs::native/slop-core/src/index_tests.rs::0e21666dbd4982db": {
+			"files": [
+				"native/forge/src/workspace_hygiene.rs",
+				"native/slop-core/src/index_tests.rs"
+			],
+			"lines": 8
+		},
+		"native/forge/tests/bash_pretooluse_hooks_parity.rs::native/forge/tests/workspace_exposure_parity.rs::b4c4a7b89ce6234c": {
+			"files": [
+				"native/forge/tests/bash_pretooluse_hooks_parity.rs",
+				"native/forge/tests/workspace_exposure_parity.rs"
+			],
+			"lines": 11
+		},
+		"native/forge/tests/bash_pretooluse_hooks_parity.rs::native/forge/tests/workspace_exposure_parity.rs::daf3d6f48822973a": {
+			"files": [
+				"native/forge/tests/bash_pretooluse_hooks_parity.rs",
+				"native/forge/tests/workspace_exposure_parity.rs"
+			],
+			"lines": 17
+		},
+		"native/forge/tests/hook_delegation.rs::native/forge/tests/hook_delegation.rs::18019896933d9629": {
+			"files": [
+				"native/forge/tests/hook_delegation.rs",
+				"native/forge/tests/hook_delegation.rs"
+			],
+			"lines": 10
+		},
+		"native/forge/tests/hook_delegation.rs::native/forge/tests/hook_delegation.rs::2d2b6d923adb6a72": {
+			"files": [
+				"native/forge/tests/hook_delegation.rs",
+				"native/forge/tests/hook_delegation.rs"
+			],
+			"lines": 14
+		},
+		"native/forge/tests/hook_delegation.rs::native/forge/tests/hook_delegation.rs::833917e3395af615": {
+			"files": [
+				"native/forge/tests/hook_delegation.rs",
+				"native/forge/tests/hook_delegation.rs"
+			],
+			"lines": 12
+		},
+		"native/forge/tests/hook_delegation.rs::native/forge/tests/hook_delegation.rs::9831fd4f979ddc6e": {
+			"files": [
+				"native/forge/tests/hook_delegation.rs",
+				"native/forge/tests/hook_delegation.rs"
+			],
+			"lines": 8
+		},
+		"native/forge/tests/hook_delegation.rs::native/forge/tests/hook_delegation.rs::a5761e0c7f256ded": {
+			"files": [
+				"native/forge/tests/hook_delegation.rs",
+				"native/forge/tests/hook_delegation.rs"
+			],
+			"lines": 7
+		},
+		"native/forge/tests/hook_delegation.rs::native/forge/tests/hook_delegation.rs::c62c9744cb8954b3": {
+			"files": [
+				"native/forge/tests/hook_delegation.rs",
+				"native/forge/tests/hook_delegation.rs"
+			],
+			"lines": 9
+		},
+		"native/forge/tests/hook_delegation.rs::native/forge/tests/hook_delegation.rs::d06b6864498982d5": {
+			"files": [
+				"native/forge/tests/hook_delegation.rs",
+				"native/forge/tests/hook_delegation.rs"
+			],
+			"lines": 7
+		},
+		"native/forge/tests/hook_delegation.rs::native/forge/tests/hook_delegation.rs::e5699bd34a9c354f": {
+			"files": [
+				"native/forge/tests/hook_delegation.rs",
+				"native/forge/tests/hook_delegation.rs"
+			],
+			"lines": 15
+		},
+		"native/forge/tests/ledger_rollup.rs::native/forge/tests/ledger_rollup.rs::45e4bfda3d57dfaf": {
+			"files": [
+				"native/forge/tests/ledger_rollup.rs",
+				"native/forge/tests/ledger_rollup.rs"
+			],
+			"lines": 15
+		},
+		"native/forge/tests/ledger_rollup.rs::native/forge/tests/ledger_rollup.rs::be2cb9dc600e9ae0": {
+			"files": [
+				"native/forge/tests/ledger_rollup.rs",
+				"native/forge/tests/ledger_rollup.rs"
+			],
+			"lines": 11
+		},
+		"native/forge/tests/ledger_rollup.rs::native/forge/tests/ledger_rollup.rs::cb40278b1a1644b3": {
+			"files": [
+				"native/forge/tests/ledger_rollup.rs",
+				"native/forge/tests/ledger_rollup.rs"
+			],
+			"lines": 15
+		},
+		"native/forge/tests/ledger_rollup.rs::native/forge/tests/ledger_rollup.rs::f834cce2d9ac739b": {
+			"files": [
+				"native/forge/tests/ledger_rollup.rs",
+				"native/forge/tests/ledger_rollup.rs"
+			],
+			"lines": 14
+		},
+		"native/forge/tests/post_tool_zero_start_parity.rs::native/forge/tests/post_tool_zero_start_parity.rs::e8110145faa41a00": {
+			"files": [
+				"native/forge/tests/post_tool_zero_start_parity.rs",
+				"native/forge/tests/post_tool_zero_start_parity.rs"
+			],
+			"lines": 11
+		},
+		"native/forge/tests/post_tool_zero_start_parity.rs::native/forge/tests/workspace_exposure_parity.rs::026cb8a42a300e04": {
+			"files": [
+				"native/forge/tests/post_tool_zero_start_parity.rs",
+				"native/forge/tests/workspace_exposure_parity.rs"
+			],
+			"lines": 11
+		},
+		"native/forge/tests/post_tool_zero_start_parity.rs::native/forge/tests/workspace_exposure_parity.rs::e346b9dfc2b5fb67": {
+			"files": [
+				"native/forge/tests/post_tool_zero_start_parity.rs",
+				"native/forge/tests/workspace_exposure_parity.rs"
+			],
+			"lines": 19
+		},
+		"native/forge/tests/tool_quiet_parity.rs::native/forge/tests/workspace_exposure_parity.rs::c2c46b9d7c6a2dfb": {
+			"files": [
+				"native/forge/tests/tool_quiet_parity.rs",
+				"native/forge/tests/workspace_exposure_parity.rs"
+			],
+			"lines": 7
+		},
+		"native/forge/tests/tool_quiet_parity.rs::native/forge/tests/workspace_exposure_parity.rs::f6be8c92fa6eeeac": {
+			"files": [
+				"native/forge/tests/tool_quiet_parity.rs",
+				"native/forge/tests/workspace_exposure_parity.rs"
+			],
+			"lines": 19
+		},
+		"native/slop-core/src/config_scan_tests.rs::native/slop-core/src/style_scan_tests.rs::8b9efe38a6fbe02c": {
 			"files": [
 				"native/slop-core/src/config_scan_tests.rs",
 				"native/slop-core/src/style_scan_tests.rs"
 			],
 			"lines": 14
 		},
-		"native/slop-core/src/consolidation.rs::native/slop-core/src/file_profiles.rs::4bc371079059954e": {
+		"native/slop-core/src/consolidation.rs::native/slop-core/src/file_profiles.rs::a6306e826663d8d5": {
 			"files": [
 				"native/slop-core/src/consolidation.rs",
 				"native/slop-core/src/file_profiles.rs"
 			],
 			"lines": 9
 		},
-		"native/slop-core/src/consolidation.rs::native/slop-core/src/file_profiles.rs::ddd9e1b809030c4a": {
+		"native/slop-core/src/consolidation.rs::native/slop-core/src/file_profiles.rs::e9768e37f35d5d66": {
 			"files": [
 				"native/slop-core/src/consolidation.rs",
 				"native/slop-core/src/file_profiles.rs"
 			],
 			"lines": 14
 		},
-		"native/slop-core/src/file_profiles.rs::native/slop-core/src/file_profiles.rs::4dfa64a1354628b6": {
+		"native/slop-core/src/file_profiles.rs::native/slop-core/src/file_profiles.rs::c6e0b91ba31f2cb9": {
 			"files": [
 				"native/slop-core/src/file_profiles.rs",
 				"native/slop-core/src/file_profiles.rs"
 			],
 			"lines": 9
 		},
-		"native/slop-core/src/lib.rs::native/slop-core/src/lib.rs::8aa7c48630db71db": {
+		"native/slop-core/src/lib.rs::native/slop-core/src/lib.rs::4683f2f00f3e6574": {
 			"files": ["native/slop-core/src/lib.rs", "native/slop-core/src/lib.rs"],
 			"lines": 7
 		},
-		"native/slop-core/src/rules.rs::native/slop-core/src/rules.rs::3f9b0111f000eb4c": {
-			"files": [
-				"native/slop-core/src/rules.rs",
-				"native/slop-core/src/rules.rs"
-			],
-			"lines": 9
-		},
-		"native/slop-core/src/rules.rs::native/slop-core/src/rules.rs::4bfd08359ba19d2f": {
+		"native/slop-core/src/rules.rs::native/slop-core/src/rules.rs::09b9a128235203b0": {
 			"files": [
 				"native/slop-core/src/rules.rs",
 				"native/slop-core/src/rules.rs"
 			],
 			"lines": 8
 		},
-		"native/slop-core/src/rules.rs::native/slop-core/src/rules.rs::5f74a72a9c28d628": {
+		"native/slop-core/src/rules.rs::native/slop-core/src/rules.rs::55ea3244c41a75c3": {
 			"files": [
 				"native/slop-core/src/rules.rs",
 				"native/slop-core/src/rules.rs"
 			],
-			"lines": 7
+			"lines": 11
 		},
-		"native/slop-core/src/rust_scan.rs::native/slop-core/src/style_scan.rs::17df26b8ff15198a": {
+		"native/slop-core/src/rules.rs::native/slop-core/src/rules.rs::b1178933fc600179": {
+			"files": [
+				"native/slop-core/src/rules.rs",
+				"native/slop-core/src/rules.rs"
+			],
+			"lines": 8
+		},
+		"native/slop-core/src/rules.rs::native/slop-core/src/rules.rs::be9322c2494b1181": {
+			"files": [
+				"native/slop-core/src/rules.rs",
+				"native/slop-core/src/rules.rs"
+			],
+			"lines": 8
+		},
+		"native/slop-core/src/rust_scan.rs::native/slop-core/src/style_scan.rs::2a7d84afa336ea03": {
 			"files": [
 				"native/slop-core/src/rust_scan.rs",
 				"native/slop-core/src/style_scan.rs"
 			],
 			"lines": 7
 		},
-		"native/slop-core/src/rust_scan.rs::native/slop-core/src/style_scan.rs::eb7a7a5ad9d6f34a": {
+		"native/slop-core/src/rust_scan.rs::native/slop-core/src/style_scan.rs::356b51a9255c14ca": {
 			"files": [
 				"native/slop-core/src/rust_scan.rs",
 				"native/slop-core/src/style_scan.rs"
 			],
 			"lines": 10
 		},
-		"native/slop-core/src/tests.rs::native/slop-core/src/tests.rs::eb44b350c2c867df": {
+		"native/slop-core/src/rust_scan.rs::native/slop-core/src/style_scan.rs::5d291d81c351f229": {
+			"files": [
+				"native/slop-core/src/rust_scan.rs",
+				"native/slop-core/src/style_scan.rs"
+			],
+			"lines": 12
+		},
+		"native/slop-core/src/tests.rs::native/slop-core/src/tests.rs::48264bbe6c4774f0": {
 			"files": [
 				"native/slop-core/src/tests.rs",
 				"native/slop-core/src/tests.rs"
 			],
 			"lines": 8
 		},
-		"src/conductor/a2a_cli.py::src/conductor/agent_a2a.py::befa030396ee8efa": {
-			"files": ["src/conductor/a2a_cli.py", "src/conductor/agent_a2a.py"],
-			"lines": 14
-		},
-		"src/conductor/agent_a2a.py::src/conductor/agent_a2a.py::705b3cf117289c8b": {
-			"files": ["src/conductor/agent_a2a.py", "src/conductor/agent_a2a.py"],
-			"lines": 11
-		},
-		"src/conductor/agent_a2a.py::src/conductor/test_a2a_retention.py::cd13974087d5cee4": {
-			"files": [
-				"src/conductor/agent_a2a.py",
-				"src/conductor/test_a2a_retention.py"
-			],
-			"lines": 12
-		},
-		"src/conductor/agent_a2a.py::src/conductor/test_a2a_retention.py::f095279929cc3f38": {
-			"files": [
-				"src/conductor/agent_a2a.py",
-				"src/conductor/test_a2a_retention.py"
-			],
-			"lines": 11
-		},
-		"src/conductor/atomic_json.py::src/conductor/kb_retrieve.py::1f382d76f316b6ba": {
-			"files": ["src/conductor/atomic_json.py", "src/conductor/kb_retrieve.py"],
-			"lines": 13
-		},
-		"src/conductor/audit_root.py::src/conductor/run_duplicate_audit.py::7fb15b0e4673ec2a": {
-			"files": [
-				"src/conductor/audit_root.py",
-				"src/conductor/run_duplicate_audit.py"
-			],
-			"lines": 13
-		},
-		"src/conductor/candidate_review/cargo_lint_files.py::src/conductor/candidate_review/clang_files.py::88348b94869105c2": {
+		"src/conductor/candidate_review/cargo_lint_files.py::src/conductor/candidate_review/clang_files.py::443526411e831689": {
 			"files": [
 				"src/conductor/candidate_review/cargo_lint_files.py",
 				"src/conductor/candidate_review/clang_files.py"
 			],
-			"lines": 8
+			"lines": 9
 		},
-		"src/conductor/candidate_review/import_declaration.py::src/conductor/candidate_review/import_declaration.py::24e814624f990091": {
+		"src/conductor/candidate_review/import_declaration.py::src/conductor/candidate_review/import_declaration.py::92520c188944162d": {
 			"files": [
 				"src/conductor/candidate_review/import_declaration.py",
 				"src/conductor/candidate_review/import_declaration.py"
 			],
 			"lines": 6
 		},
-		"src/conductor/candidate_review/import_declaration.py::src/conductor/candidate_review/import_declaration.py::d3579629c0a9e743": {
+		"src/conductor/candidate_review/import_declaration.py::src/conductor/candidate_review/import_declaration.py::dc885163e3ce7c7e": {
 			"files": [
 				"src/conductor/candidate_review/import_declaration.py",
 				"src/conductor/candidate_review/import_declaration.py"
 			],
-			"lines": 7
+			"lines": 12
 		},
-		"src/conductor/candidate_review/model.py::src/conductor/mutation_campaign_model.py::da8b1217bd788f9d": {
+		"src/conductor/candidate_review/model.py::src/conductor/mutation_campaign_model.py::1380f5ca50e96311": {
 			"files": [
 				"src/conductor/candidate_review/model.py",
 				"src/conductor/mutation_campaign_model.py"
 			],
 			"lines": 9
 		},
-		"src/conductor/candidate_review/test_cargo_audit_files.py::src/conductor/candidate_review/test_cargo_audit_files.py::3237c4932a1db287": {
+		"src/conductor/candidate_review/test_cargo_audit_files.py::src/conductor/candidate_review/test_cargo_audit_files.py::c1ba2e4e2b24a37c": {
 			"files": [
 				"src/conductor/candidate_review/test_cargo_audit_files.py",
 				"src/conductor/candidate_review/test_cargo_audit_files.py"
 			],
 			"lines": 12
 		},
-		"src/conductor/candidate_review/test_cargo_audit_files.py::src/conductor/candidate_review/test_cargo_audit_files.py::d43aa79fe92c3345": {
+		"src/conductor/candidate_review/test_cargo_audit_files.py::src/conductor/candidate_review/test_cargo_audit_files.py::f9b658b8c53264c4": {
 			"files": [
 				"src/conductor/candidate_review/test_cargo_audit_files.py",
 				"src/conductor/candidate_review/test_cargo_audit_files.py"
 			],
 			"lines": 14
 		},
-		"src/conductor/candidate_review/test_command_runner.py::src/conductor/candidate_review/test_graph_selection.py::fb9ba657ccbb5fda": {
+		"src/conductor/candidate_review/test_command_runner.py::src/conductor/candidate_review/test_graph_selection.py::eae15de56b99b1ce": {
 			"files": [
 				"src/conductor/candidate_review/test_command_runner.py",
 				"src/conductor/candidate_review/test_graph_selection.py"
 			],
 			"lines": 17
 		},
-		"src/conductor/candidate_review/test_value_waivers.py::src/conductor/candidate_review/test_value_waivers.py::013c10fa94e8066c": {
-			"files": [
-				"src/conductor/candidate_review/test_value_waivers.py",
-				"src/conductor/candidate_review/test_value_waivers.py"
-			],
-			"lines": 16
-		},
-		"src/conductor/candidate_review/test_value_waivers.py::src/conductor/candidate_review/test_value_waivers.py::3146a5a4dec94057": {
-			"files": [
-				"src/conductor/candidate_review/test_value_waivers.py",
-				"src/conductor/candidate_review/test_value_waivers.py"
-			],
-			"lines": 10
-		},
-		"src/conductor/cpu_embed.py::src/conductor/cpu_embed.py::079e781c4a499b11": {
+		"src/conductor/cpu_embed.py::src/conductor/cpu_embed.py::8518b9bab9670f0b": {
 			"files": ["src/conductor/cpu_embed.py", "src/conductor/cpu_embed.py"],
 			"lines": 13
 		},
-		"src/conductor/current_work_guard.py::src/conductor/local_ai_policy.py::39e7fcb8cad53a40": {
+		"src/conductor/current_work_guard.py::src/conductor/local_ai_policy.py::165dda03d5bb367e": {
 			"files": [
 				"src/conductor/current_work_guard.py",
 				"src/conductor/local_ai_policy.py"
 			],
 			"lines": 11
 		},
-		"src/conductor/graph_context.py::src/conductor/graph_context.py::45714037687e1512": {
+		"src/conductor/graph_context.py::src/conductor/graph_context.py::fa881bdbf0c74db7": {
 			"files": [
 				"src/conductor/graph_context.py",
 				"src/conductor/graph_context.py"
 			],
 			"lines": 9
 		},
-		"src/conductor/kb_retrieve.py::src/conductor/memory_index.py::3d93571bfc1e7430": {
-			"files": [
-				"src/conductor/kb_retrieve.py",
-				"src/conductor/memory_index.py"
-			],
-			"lines": 13
-		},
-		"src/conductor/memory_index.py::src/conductor/memory_index.py::58b2efa6caedc08e": {
-			"files": [
-				"src/conductor/memory_index.py",
-				"src/conductor/memory_index.py"
-			],
-			"lines": 8
-		},
-		"src/conductor/mutation_coverage.py::src/conductor/mutation_engine_generated.py::d10e9d2daf2d5d99": {
-			"files": [
-				"src/conductor/mutation_coverage.py",
-				"src/conductor/mutation_engine_generated.py"
-			],
-			"lines": 6
-		},
-		"src/conductor/mutation_coverage.py::src/conductor/mutation_scope.py::11e89ce65ce932dc": {
-			"files": [
-				"src/conductor/mutation_coverage.py",
-				"src/conductor/mutation_scope.py"
-			],
-			"lines": 7
-		},
-		"src/conductor/mutation_engine_cargo.py::src/conductor/mutation_engine_fest.py::a7ae7ca5d9e91f0f": {
-			"files": [
-				"src/conductor/mutation_engine_cargo.py",
-				"src/conductor/mutation_engine_fest.py"
-			],
-			"lines": 13
-		},
-		"src/conductor/mutation_engine_cargo.py::src/conductor/mutation_engine_mull.py::9273cc2776f5de1c": {
-			"files": [
-				"src/conductor/mutation_engine_cargo.py",
-				"src/conductor/mutation_engine_mull.py"
-			],
-			"lines": 10
-		},
-		"src/conductor/mutation_engine_cargo.py::src/conductor/mutation_engine_mull.py::ba5c27d0e26e78cb": {
-			"files": [
-				"src/conductor/mutation_engine_cargo.py",
-				"src/conductor/mutation_engine_mull.py"
-			],
-			"lines": 10
-		},
-		"src/conductor/mutation_value.py::src/conductor/mutation_value.py::24991d503086d5c1": {
+		"src/conductor/mutation_value.py::src/conductor/mutation_value.py::a174f4d0a2bcd42e": {
 			"files": [
 				"src/conductor/mutation_value.py",
 				"src/conductor/mutation_value.py"
 			],
 			"lines": 8
 		},
-		"src/conductor/reuse/consolidation.py::src/conductor/reuse/file_families.py::c78034778e00dbfd": {
+		"src/conductor/reuse/consolidation.py::src/conductor/reuse/file_families.py::27be054bd129ddf0": {
 			"files": [
 				"src/conductor/reuse/consolidation.py",
 				"src/conductor/reuse/file_families.py"
 			],
-			"lines": 8
+			"lines": 9
 		},
-		"src/conductor/reuse/consolidation.py::src/conductor/reuse/file_families.py::e8f1fd7941b5cc00": {
+		"src/conductor/reuse/consolidation.py::src/conductor/reuse/file_families.py::8a55b95740d626c5": {
 			"files": [
 				"src/conductor/reuse/consolidation.py",
 				"src/conductor/reuse/file_families.py"
 			],
 			"lines": 16
 		},
-		"src/conductor/reuse/detectors.py::src/conductor/reuse/file_families.py::e74a64410255dd87": {
-			"files": [
-				"src/conductor/reuse/detectors.py",
-				"src/conductor/reuse/file_families.py"
-			],
-			"lines": 6
-		},
-		"src/conductor/reuse/test_detector_scan_native.py::src/conductor/reuse/test_detector_scan_native.py::91199693c0fc7574": {
-			"files": [
-				"src/conductor/reuse/test_detector_scan_native.py",
-				"src/conductor/reuse/test_detector_scan_native.py"
-			],
-			"lines": 17
-		},
-		"src/conductor/reuse/test_detector_scan_native.py::src/conductor/reuse/test_detector_scan_native.py::ec210e1cc002a4e4": {
+		"src/conductor/reuse/test_detector_scan_native.py::src/conductor/reuse/test_detector_scan_native.py::3677092660af78fe": {
 			"files": [
 				"src/conductor/reuse/test_detector_scan_native.py",
 				"src/conductor/reuse/test_detector_scan_native.py"
 			],
 			"lines": 25
 		},
-		"src/conductor/run_duplicate_audit.py::src/conductor/run_duplicate_audit.py::63a8e024ad003e10": {
+		"src/conductor/reuse/test_detector_scan_native.py::src/conductor/reuse/test_detector_scan_native.py::5d7c32d262abfaff": {
 			"files": [
-				"src/conductor/run_duplicate_audit.py",
-				"src/conductor/run_duplicate_audit.py"
+				"src/conductor/reuse/test_detector_scan_native.py",
+				"src/conductor/reuse/test_detector_scan_native.py"
 			],
-			"lines": 10
+			"lines": 19
 		},
-		"src/conductor/slop_ledger.json::src/conductor/slop_ledger.json::8432f11edbd7051a": {
-			"files": [
-				"src/conductor/slop_ledger.json",
-				"src/conductor/slop_ledger.json"
-			],
-			"lines": 31
-		},
-		"src/conductor/slop_ledger.json::src/conductor/slop_ledger.json::880b58bf714696a8": {
-			"files": [
-				"src/conductor/slop_ledger.json",
-				"src/conductor/slop_ledger.json"
-			],
-			"lines": 26
-		},
-		"src/conductor/test_a2a_session_start.py::src/conductor/test_a2a_session_start.py::95478139d0d58e6f": {
+		"src/conductor/test_a2a_session_start.py::src/conductor/test_a2a_session_start.py::44e9cfecd3ce6ea2": {
 			"files": [
 				"src/conductor/test_a2a_session_start.py",
 				"src/conductor/test_a2a_session_start.py"
 			],
 			"lines": 6
 		},
-		"src/conductor/test_agent_a2a.py::src/conductor/test_agent_a2a.py::2da0e2ad689d92a0": {
-			"files": [
-				"src/conductor/test_agent_a2a.py",
-				"src/conductor/test_agent_a2a.py"
-			],
-			"lines": 11
-		},
-		"src/conductor/test_agent_a2a.py::src/conductor/test_agent_a2a.py::94994c871a2687ea": {
-			"files": [
-				"src/conductor/test_agent_a2a.py",
-				"src/conductor/test_agent_a2a.py"
-			],
-			"lines": 9
-		},
-		"src/conductor/test_agent_a2a.py::src/conductor/test_agent_a2a.py::fecd8fcec70c4b72": {
+		"src/conductor/test_agent_a2a.py::src/conductor/test_agent_a2a.py::7e8fd5eaed114357": {
 			"files": [
 				"src/conductor/test_agent_a2a.py",
 				"src/conductor/test_agent_a2a.py"
 			],
 			"lines": 6
 		},
-		"src/conductor/test_audit_root.py::src/conductor/test_check_protected_deletes.py::eac9be6857168313": {
+		"src/conductor/test_agent_a2a.py::src/conductor/test_agent_a2a.py::b7102f94ded097c8": {
+			"files": [
+				"src/conductor/test_agent_a2a.py",
+				"src/conductor/test_agent_a2a.py"
+			],
+			"lines": 11
+		},
+		"src/conductor/test_agent_a2a.py::src/conductor/test_agent_a2a.py::cbafc5d226b09aae": {
+			"files": [
+				"src/conductor/test_agent_a2a.py",
+				"src/conductor/test_agent_a2a.py"
+			],
+			"lines": 10
+		},
+		"src/conductor/test_audit_root.py::src/conductor/test_workspace_runtime_matrix.py::6cf134a4ef18dd89": {
 			"files": [
 				"src/conductor/test_audit_root.py",
-				"src/conductor/test_check_protected_deletes.py"
-			],
-			"lines": 9
-		},
-		"src/conductor/test_branch_policy.py::src/conductor/test_branch_policy.py::c55fe9e852aed44f": {
-			"files": [
-				"src/conductor/test_branch_policy.py",
-				"src/conductor/test_branch_policy.py"
-			],
-			"lines": 7
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::02f3953fc77b5345": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
+				"src/conductor/test_workspace_runtime_matrix.py"
 			],
 			"lines": 10
 		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::280064447ec72f3e": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 11
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::2a1feb9691e72fc3": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 11
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::5035985a679901ad": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 17
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::50a989200ce5887d": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 12
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::6232742b75be4899": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 12
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::6933e3c91b31c561": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 14
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::77f07f01cf8a39fa": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 18
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::79cfc3c71c89c2d8": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 14
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::932feac26fec6796": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 12
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::9d547bc86843023c": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 13
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::a754fc508384fd1c": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 26
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::ad62fe664f65e300": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 14
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::afb38dbe8758d974": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 11
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::b92fa6d68aee7f9c": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 20
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::bd17cde68db46c4d": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 25
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::d2ab027443e22289": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 15
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::dda00c8fef480643": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 14
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::e7a285093a0f68b4": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 6
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::eb70c65fa45e22b7": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 18
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review.py::fbfecabcd51e4ab9": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review.py"
-			],
-			"lines": 12
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review_cli_policy.py::5e82b7f0640e8aa3": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review_cli_policy.py"
-			],
-			"lines": 10
-		},
-		"src/conductor/test_candidate_review.py::src/conductor/test_candidate_review_hardening.py::4b315c46050a5e45": {
-			"files": [
-				"src/conductor/test_candidate_review.py",
-				"src/conductor/test_candidate_review_hardening.py"
-			],
-			"lines": 22
-		},
-		"src/conductor/test_candidate_review_call_and_evidence.py::src/conductor/test_candidate_review_call_and_evidence.py::2bcc624af9a67b44": {
+		"src/conductor/test_candidate_review_call_and_evidence.py::src/conductor/test_candidate_review_call_and_evidence.py::5d22c6323ab8747b": {
 			"files": [
 				"src/conductor/test_candidate_review_call_and_evidence.py",
 				"src/conductor/test_candidate_review_call_and_evidence.py"
 			],
-			"lines": 7
+			"lines": 9
 		},
-		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::292b9f998f6af7ef": {
+		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::a9d53c32b5f954a7": {
 			"files": [
 				"src/conductor/test_candidate_review_crate_version.py",
 				"src/conductor/test_candidate_review_crate_version.py"
 			],
-			"lines": 18
+			"lines": 21
 		},
-		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::383157d8bae45e59": {
+		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::b10a2d8dadff2bb9": {
 			"files": [
 				"src/conductor/test_candidate_review_crate_version.py",
 				"src/conductor/test_candidate_review_crate_version.py"
 			],
-			"lines": 20
+			"lines": 17
 		},
-		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::a49db786451e31ac": {
-			"files": [
-				"src/conductor/test_candidate_review_crate_version.py",
-				"src/conductor/test_candidate_review_crate_version.py"
-			],
-			"lines": 18
-		},
-		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::a7be4c64a157f06e": {
-			"files": [
-				"src/conductor/test_candidate_review_crate_version.py",
-				"src/conductor/test_candidate_review_crate_version.py"
-			],
-			"lines": 23
-		},
-		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::a8afae4622b743cd": {
-			"files": [
-				"src/conductor/test_candidate_review_crate_version.py",
-				"src/conductor/test_candidate_review_crate_version.py"
-			],
-			"lines": 19
-		},
-		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::c57f533cc6e5576a": {
-			"files": [
-				"src/conductor/test_candidate_review_crate_version.py",
-				"src/conductor/test_candidate_review_crate_version.py"
-			],
-			"lines": 16
-		},
-		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::deb6618d37c899cd": {
+		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::d903668d2790810d": {
 			"files": [
 				"src/conductor/test_candidate_review_crate_version.py",
 				"src/conductor/test_candidate_review_crate_version.py"
 			],
 			"lines": 15
 		},
-		"src/conductor/test_candidate_review_hardening.py::src/conductor/test_candidate_review_structure_audit.py::a2d0e6c3f3638471": {
+		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::de589b3dfab41152": {
+			"files": [
+				"src/conductor/test_candidate_review_crate_version.py",
+				"src/conductor/test_candidate_review_crate_version.py"
+			],
+			"lines": 15
+		},
+		"src/conductor/test_candidate_review_crate_version.py::src/conductor/test_candidate_review_crate_version.py::f6e4007f0c64d016": {
+			"files": [
+				"src/conductor/test_candidate_review_crate_version.py",
+				"src/conductor/test_candidate_review_crate_version.py"
+			],
+			"lines": 21
+		},
+		"src/conductor/test_candidate_review_hardening.py::src/conductor/test_candidate_review_structure_audit.py::23b116a7a97f6265": {
 			"files": [
 				"src/conductor/test_candidate_review_hardening.py",
 				"src/conductor/test_candidate_review_structure_audit.py"
 			],
 			"lines": 10
 		},
-		"src/conductor/test_candidate_review_scan_coverage.py::src/conductor/test_candidate_review_structure_audit.py::e7e09c5e5009b09f": {
+		"src/conductor/test_candidate_review_scan_coverage.py::src/conductor/test_candidate_review_structure_audit.py::1cbaaf0e5d87601e": {
 			"files": [
 				"src/conductor/test_candidate_review_scan_coverage.py",
 				"src/conductor/test_candidate_review_structure_audit.py"
 			],
 			"lines": 11
 		},
-		"src/conductor/test_candidate_review_structure_audit.py::src/conductor/test_candidate_review_structure_audit.py::38d81034b3612fe9": {
+		"src/conductor/test_candidate_review_structure_audit.py::src/conductor/test_candidate_review_structure_audit.py::48ce9373629d7de3": {
+			"files": [
+				"src/conductor/test_candidate_review_structure_audit.py",
+				"src/conductor/test_candidate_review_structure_audit.py"
+			],
+			"lines": 13
+		},
+		"src/conductor/test_candidate_review_structure_audit.py::src/conductor/test_candidate_review_structure_audit.py::cf4e4f93c8aa9ae8": {
 			"files": [
 				"src/conductor/test_candidate_review_structure_audit.py",
 				"src/conductor/test_candidate_review_structure_audit.py"
 			],
 			"lines": 12
 		},
-		"src/conductor/test_candidate_review_structure_audit.py::src/conductor/test_candidate_review_structure_audit.py::3ac1324e84a04a8d": {
-			"files": [
-				"src/conductor/test_candidate_review_structure_audit.py",
-				"src/conductor/test_candidate_review_structure_audit.py"
-			],
-			"lines": 12
-		},
-		"src/conductor/test_check_protected_deletes.py::src/conductor/test_dead_tests.py::92f23456fb23c165": {
+		"src/conductor/test_check_protected_deletes.py::src/conductor/test_dead_tests.py::4f0c1e9a22bca194": {
 			"files": [
 				"src/conductor/test_check_protected_deletes.py",
 				"src/conductor/test_dead_tests.py"
 			],
 			"lines": 11
 		},
-		"src/conductor/test_check_protected_deletes.py::src/conductor/test_workspace_runtime_matrix.py::c0259ac9db65413a": {
+		"src/conductor/test_check_protected_deletes.py::src/conductor/test_workspace_runtime_matrix.py::30ff1f9d5001f5bc": {
 			"files": [
 				"src/conductor/test_check_protected_deletes.py",
 				"src/conductor/test_workspace_runtime_matrix.py"
 			],
-			"lines": 10
+			"lines": 13
 		},
-		"src/conductor/test_check_protected_deletes.py::src/conductor/test_workspace_runtime_matrix.py::eea4b80ebaec1ec5": {
+		"src/conductor/test_check_protected_deletes.py::src/conductor/test_workspace_runtime_matrix.py::f96215c6b9535c5e": {
 			"files": [
 				"src/conductor/test_check_protected_deletes.py",
 				"src/conductor/test_workspace_runtime_matrix.py"
 			],
-			"lines": 12
-		},
-		"src/conductor/test_commit_snapshot.py::src/conductor/test_gate.py::0c5935b596173e8c": {
-			"files": [
-				"src/conductor/test_commit_snapshot.py",
-				"src/conductor/test_gate.py"
-			],
-			"lines": 14
-		},
-		"src/conductor/test_cpu_embed.py::src/conductor/test_cpu_embed.py::1b90503ad865e74b": {
-			"files": [
-				"src/conductor/test_cpu_embed.py",
-				"src/conductor/test_cpu_embed.py"
-			],
-			"lines": 6
-		},
-		"src/conductor/test_cpu_embed.py::src/conductor/test_cpu_embed.py::20297a616004421e": {
-			"files": [
-				"src/conductor/test_cpu_embed.py",
-				"src/conductor/test_cpu_embed.py"
-			],
-			"lines": 10
-		},
-		"src/conductor/test_cpu_embed.py::src/conductor/test_cpu_embed.py::4d1e976a9766b207": {
-			"files": [
-				"src/conductor/test_cpu_embed.py",
-				"src/conductor/test_cpu_embed.py"
-			],
 			"lines": 13
 		},
-		"src/conductor/test_cpu_embed.py::src/conductor/test_cpu_embed.py::8e75a4540f3a46bf": {
-			"files": [
-				"src/conductor/test_cpu_embed.py",
-				"src/conductor/test_cpu_embed.py"
-			],
-			"lines": 13
-		},
-		"src/conductor/test_cpu_embed.py::src/conductor/test_cpu_embed.py::a450594bdcfa9865": {
-			"files": [
-				"src/conductor/test_cpu_embed.py",
-				"src/conductor/test_cpu_embed.py"
-			],
-			"lines": 11
-		},
-		"src/conductor/test_cpu_embed.py::src/conductor/test_cpu_embed.py::f4474a602fc32e8a": {
-			"files": [
-				"src/conductor/test_cpu_embed.py",
-				"src/conductor/test_cpu_embed.py"
-			],
-			"lines": 8
-		},
-		"src/conductor/test_cpu_embed.py::src/conductor/test_kb_retrieve.py::5dab232334e11280": {
-			"files": [
-				"src/conductor/test_cpu_embed.py",
-				"src/conductor/test_kb_retrieve.py"
-			],
-			"lines": 10
-		},
-		"src/conductor/test_duplicate_bodies_native.py::src/conductor/test_duplicate_bodies_native.py::3127d30e9cdf3fb1": {
+		"src/conductor/test_duplicate_bodies_native.py::src/conductor/test_duplicate_bodies_native.py::70f007cf13c8f4eb": {
 			"files": [
 				"src/conductor/test_duplicate_bodies_native.py",
 				"src/conductor/test_duplicate_bodies_native.py"
 			],
-			"lines": 9
+			"lines": 11
 		},
-		"src/conductor/test_gate.py::src/conductor/test_value_gate_scope.py::d0be69ed78486e05": {
-			"files": [
-				"src/conductor/test_gate.py",
-				"src/conductor/test_value_gate_scope.py"
-			],
-			"lines": 8
-		},
-		"src/conductor/test_import_ablation.py::src/conductor/test_import_ablation.py::8f94a7f8b508f2f1": {
+		"src/conductor/test_import_ablation.py::src/conductor/test_import_ablation.py::fe9535a6544a75c4": {
 			"files": [
 				"src/conductor/test_import_ablation.py",
 				"src/conductor/test_import_ablation.py"
 			],
 			"lines": 6
 		},
-		"src/conductor/test_memory_auto_index.py::src/conductor/test_memory_auto_index.py::3e974050dee7fdf0": {
+		"src/conductor/test_memory_auto_index.py::src/conductor/test_memory_auto_index.py::a986fc545ba64bb8": {
 			"files": [
 				"src/conductor/test_memory_auto_index.py",
 				"src/conductor/test_memory_auto_index.py"
 			],
-			"lines": 13
+			"lines": 14
 		},
-		"src/conductor/test_memory_auto_index.py::src/conductor/test_memory_auto_index.py::92e73b67f5172c5d": {
+		"src/conductor/test_memory_auto_index.py::src/conductor/test_memory_auto_index.py::dc8a4217b2f14379": {
 			"files": [
 				"src/conductor/test_memory_auto_index.py",
 				"src/conductor/test_memory_auto_index.py"
-			],
-			"lines": 9
-		},
-		"src/conductor/test_mutation_coverage.py::src/conductor/test_mutation_coverage.py::424e3f96fb3ca9e4": {
-			"files": [
-				"src/conductor/test_mutation_coverage.py",
-				"src/conductor/test_mutation_coverage.py"
-			],
-			"lines": 6
-		},
-		"src/conductor/test_mutation_patch_audit.py::src/conductor/test_mutation_patch_audit.py::37e3a30bbaa9d237": {
-			"files": [
-				"src/conductor/test_mutation_patch_audit.py",
-				"src/conductor/test_mutation_patch_audit.py"
-			],
-			"lines": 6
-		},
-		"src/conductor/test_mutation_testing.py::src/conductor/test_mutation_testing.py::298500310a494441": {
-			"files": [
-				"src/conductor/test_mutation_testing.py",
-				"src/conductor/test_mutation_testing.py"
-			],
-			"lines": 11
-		},
-		"src/conductor/test_mutation_testing.py::src/conductor/test_mutation_testing.py::998142aac4f7170e": {
-			"files": [
-				"src/conductor/test_mutation_testing.py",
-				"src/conductor/test_mutation_testing.py"
-			],
-			"lines": 7
-		},
-		"src/conductor/test_mutation_value.py::src/conductor/test_mutation_value.py::af0935a46a29d7ec": {
-			"files": [
-				"src/conductor/test_mutation_value.py",
-				"src/conductor/test_mutation_value.py"
-			],
-			"lines": 12
-		},
-		"src/conductor/test_mutation_value_gate_edges.py::src/conductor/test_mutation_value_gate_edges.py::b8ce935554abd6c7": {
-			"files": [
-				"src/conductor/test_mutation_value_gate_edges.py",
-				"src/conductor/test_mutation_value_gate_edges.py"
 			],
 			"lines": 10
 		},
-		"src/conductor/test_package_resources.py::src/conductor/test_package_resources.py::500aff4c032b9308": {
+		"src/conductor/test_package_resources.py::src/conductor/test_package_resources.py::5f7b500728070427": {
 			"files": [
 				"src/conductor/test_package_resources.py",
 				"src/conductor/test_package_resources.py"
 			],
 			"lines": 8
 		},
-		"src/conductor/test_probe_budget.py::src/conductor/test_slop_gate.py::06941bdf507aebbd": {
+		"src/conductor/test_probe_budget.py::src/conductor/test_slop_gate.py::c19734c7d2306302": {
 			"files": [
 				"src/conductor/test_probe_budget.py",
 				"src/conductor/test_slop_gate.py"
 			],
 			"lines": 19
 		},
-		"src/conductor/test_run_duplicate_audit.py::src/conductor/test_run_duplicate_audit.py::1caf18495005f346": {
-			"files": [
-				"src/conductor/test_run_duplicate_audit.py",
-				"src/conductor/test_run_duplicate_audit.py"
-			],
-			"lines": 8
-		},
-		"src/conductor/test_run_duplicate_audit.py::src/conductor/test_run_duplicate_audit.py::2053c6b7b38973cb": {
-			"files": [
-				"src/conductor/test_run_duplicate_audit.py",
-				"src/conductor/test_run_duplicate_audit.py"
-			],
-			"lines": 10
-		},
-		"src/conductor/test_slop_ledger.py::src/conductor/test_slop_ledger.py::40688a7a3876d8e8": {
+		"src/conductor/test_slop_ledger.py::src/conductor/test_slop_ledger.py::df0de155dc63f53a": {
 			"files": [
 				"src/conductor/test_slop_ledger.py",
 				"src/conductor/test_slop_ledger.py"
 			],
 			"lines": 14
 		},
-		"src/conductor/test_vulture_audit.py::src/conductor/test_vulture_audit.py::9fbf1eac71609443": {
+		"src/conductor/test_vulture_audit.py::src/conductor/test_vulture_audit.py::3d5520331fd3025b": {
 			"files": [
 				"src/conductor/test_vulture_audit.py",
 				"src/conductor/test_vulture_audit.py"
 			],
-			"lines": 12
+			"lines": 11
 		},
-		"src/conductor/test_workspace_runtime_matrix.py::src/conductor/test_workspace_runtime_matrix.py::1baf9cd8ebfeea62": {
-			"files": [
-				"src/conductor/test_workspace_runtime_matrix.py",
-				"src/conductor/test_workspace_runtime_matrix.py"
-			],
-			"lines": 17
-		},
-		"src/conductor/test_workspace_runtime_matrix.py::src/conductor/test_workspace_runtime_matrix.py::519bcc7b28ab22b0": {
-			"files": [
-				"src/conductor/test_workspace_runtime_matrix.py",
-				"src/conductor/test_workspace_runtime_matrix.py"
-			],
-			"lines": 18
-		},
-		"src/conductor/test_workspace_runtime_matrix.py::src/conductor/test_workspace_runtime_matrix.py::61de0acbbfaa4890": {
-			"files": [
-				"src/conductor/test_workspace_runtime_matrix.py",
-				"src/conductor/test_workspace_runtime_matrix.py"
-			],
-			"lines": 15
-		},
-		"src/conductor/test_workspace_runtime_matrix.py::src/conductor/test_workspace_runtime_matrix.py::e0f50366b746c8e0": {
+		"src/conductor/test_workspace_runtime_matrix.py::src/conductor/test_workspace_runtime_matrix.py::0df7c204a7ec1836": {
 			"files": [
 				"src/conductor/test_workspace_runtime_matrix.py",
 				"src/conductor/test_workspace_runtime_matrix.py"
 			],
 			"lines": 11
 		},
-		"src/conductor/workspace_launcher_smokes.py::src/conductor/workspace_launcher_smokes.py::3879fbfecfb28166": {
+		"src/conductor/test_workspace_runtime_matrix.py::src/conductor/test_workspace_runtime_matrix.py::5ec422965e4a11e4": {
+			"files": [
+				"src/conductor/test_workspace_runtime_matrix.py",
+				"src/conductor/test_workspace_runtime_matrix.py"
+			],
+			"lines": 15
+		},
+		"src/conductor/test_workspace_runtime_matrix.py::src/conductor/test_workspace_runtime_matrix.py::910ab89ec82a1651": {
+			"files": [
+				"src/conductor/test_workspace_runtime_matrix.py",
+				"src/conductor/test_workspace_runtime_matrix.py"
+			],
+			"lines": 21
+		},
+		"src/conductor/test_workspace_runtime_matrix.py::src/conductor/test_workspace_runtime_matrix.py::eb007d9c4a41622a": {
+			"files": [
+				"src/conductor/test_workspace_runtime_matrix.py",
+				"src/conductor/test_workspace_runtime_matrix.py"
+			],
+			"lines": 19
+		},
+		"src/conductor/workspace_launcher_smokes.py::src/conductor/workspace_launcher_smokes.py::b3dc066ef3c37621": {
 			"files": [
 				"src/conductor/workspace_launcher_smokes.py",
 				"src/conductor/workspace_launcher_smokes.py"
 			],
-			"lines": 15
+			"lines": 17
 		},
-		"src/conductor/workspace_runtime_matrix.py::src/conductor/workspace_runtime_matrix.py::c454641ff00ba86e": {
-			"files": [
-				"src/conductor/workspace_runtime_matrix.py",
-				"src/conductor/workspace_runtime_matrix.py"
-			],
-			"lines": 14
-		},
-		"src/tooling/hooks/agent/test_crg_gate.py::src/tooling/hooks/agent/test_crg_gate.py::84c0b221c3b22748": {
+		"src/tooling/hooks/agent/test_crg_gate.py::src/tooling/hooks/agent/test_crg_gate.py::42ec53e87ccbabbb": {
 			"files": [
 				"src/tooling/hooks/agent/test_crg_gate.py",
 				"src/tooling/hooks/agent/test_crg_gate.py"
 			],
 			"lines": 14
 		},
-		"src/tooling/hooks/claude/_post_edit_audit.py::src/tooling/hooks/claude/_pre_read_skeleton.py::15a956c282b43021": {
+		"src/tooling/hooks/claude/_post_edit_audit.py::src/tooling/hooks/claude/_pre_read_skeleton.py::82f924c6ad493e22": {
 			"files": [
 				"src/tooling/hooks/claude/_post_edit_audit.py",
 				"src/tooling/hooks/claude/_pre_read_skeleton.py"
 			],
 			"lines": 18
 		},
-		"src/tooling/hooks/dispatch/bench.py::src/tooling/hooks/dispatch/doctor.py::2afee3447787a932": {
+		"src/tooling/hooks/dispatch/bench.py::src/tooling/hooks/dispatch/doctor.py::65932f18e26f6894": {
 			"files": [
 				"src/tooling/hooks/dispatch/bench.py",
 				"src/tooling/hooks/dispatch/doctor.py"
