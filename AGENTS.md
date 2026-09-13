@@ -46,6 +46,11 @@ landing. `RATCHET_HELD`, survivors, timeouts, baseline failures and hash drift a
 PASS evidence. Verify with `make mutation-evidence`; `make mutation-coverage` reports the
 inventory without executing anything.
 
+Engine child processes run with isolated bytecode caches (`conductor.bytecode_isolation`):
+a same-size edit within one mtime second would otherwise execute stale `__pycache__`
+bytes, which is exactly what applying a mutant is. Nothing to configure — see
+docs/mutation.md's "Bytecode isolation" for why and where.
+
 ## Repository data
 
 `candidate_policy.toml` and `campaigns/registry.json` are named by `[tool.conductor]` in
