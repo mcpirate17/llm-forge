@@ -3,9 +3,11 @@
 No `forge` binary is spawned here -- `run_forge_ledger_audit` is stubbed with a
 fixture `CompletedProcess`, the same boundary `audit.rs`'s own unit tests stop
 at from the other side. These tests cover the JSON-to-`PhaseResult` mapping
-only: ok/not-ok per status, and a synthetic `REGRESSION` fixture, exactly the
-three things `docs/design/cost_ledger.md` section 6 step 5 asks the gate-side
-tests to prove.
+only: `ok` is `False` only on a `REGRESSION` metric -- `PASS`, `RATCHET_HELD`,
+`NO_BASELINE` and `NO_DATA` (including the hard-empty exit-3 case) are all
+`ok` so a fresh clone or CI runner with no ledger data yet does not turn
+`make gate` permanently red, while `detail` still names every metric's status
+verbatim, never rounded up to `PASS`.
 """
 
 from __future__ import annotations
@@ -109,32 +111,56 @@ def test_regression_status_is_not_ok(
     assert result.evidence["metrics"]["tokens_per_landed_pr"]["status"] == "REGRESSION"
 
 
-def test_no_baseline_status_is_not_ok(
+def test_no_baseline_status_is_ok(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """No recorded baseline yet is not a regression -- nothing to regress against."""
+
     monkeypatch.setattr(
         cost_budget_audit,
         "run_forge_ledger_audit",
         lambda **kwargs: _completed(_payload("NO_BASELINE", "NO_BASELINE")),
     )
     result = cost_budget_audit.phase(tmp_path)
-    assert not result.ok
+    assert result.ok
+    assert "NO_BASELINE" in result.detail
 
 
-def test_no_data_exit_code_raises(
+def test_no_data_exit_code_is_ok_with_status_in_detail(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Exit 3 (empty window) is a refusal, not a failing verdict -- fail loud."""
+    """Exit 3 (every table empty, e.g. a fresh clone/CI runner) must not turn
+    `make gate` permanently red -- it is `ok`, but `NO_DATA` still shows up
+    verbatim in `detail` rather than being hidden or rounded up to `PASS`.
+    """
 
     monkeypatch.setattr(
         cost_budget_audit,
         "run_forge_ledger_audit",
         lambda **kwargs: _completed({}, returncode=3, stderr="window has zero rows"),
     )
-    with pytest.raises(
-        cost_budget_audit.CostBudgetAuditError, match="zero ledger rows"
-    ):
-        cost_budget_audit.phase(tmp_path)
+    result = cost_budget_audit.phase(tmp_path)
+    assert result.ok
+    assert "NO_DATA" in result.detail
+    assert result.evidence["status"] == "NO_DATA"
+
+
+def test_single_regression_metric_makes_phase_not_ok(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`ok` is decided per-metric, not off the overall status string alone."""
+
+    payload = _payload("REGRESSION", "PASS")
+    payload["metrics"]["resend_bytes_per_session"] = _metric(
+        "REGRESSION", value=20_000_000.0, baseline=8_800_000.0
+    )
+    monkeypatch.setattr(
+        cost_budget_audit,
+        "run_forge_ledger_audit",
+        lambda **kwargs: _completed(payload),
+    )
+    result = cost_budget_audit.phase(tmp_path)
+    assert not result.ok
 
 
 def test_missing_forge_binary_raises(

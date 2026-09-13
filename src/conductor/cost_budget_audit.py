@@ -16,6 +16,16 @@ up to `PASS` -- see `audit.rs`'s module doc for the per-metric status rules
 this module trusts the native side to have already applied; this module only
 maps that verdict onto a gate phase.
 
+That mapping is deliberately lenient: the gate phase's `ok` is `False` only
+when a metric is `REGRESSION`. `NO_BASELINE` and `NO_DATA` (including the
+hard-empty exit-3 case) are `ok`, because a fresh clone or CI runner with no
+recorded baseline and no ledger rows yet has nothing to regress against --
+`make gate` must not go permanently red before a first baseline exists. The
+non-PASS statuses still show up verbatim in the phase `detail` string so
+they stay visible; only the direct CLI (`make cost-budget-audit`, `forge
+ledger audit` run by a human) keeps failing loud on anything but `PASS`/
+`RATCHET_HELD`, exit 3 included.
+
 The design also names a `ledger/registry.d/<scope>.json` convention (mirroring
 `campaigns/registry.d/` -- `mutation_registry_split.py`) for concurrent-safe
 baseline pointers. That split is coupled to mutation-campaign manifests (a
@@ -47,9 +57,10 @@ DEFAULT_WINDOW_DAYS = 7
 DEFAULT_TIMEOUT_SECONDS = 60
 PHASE_NAME = "cost-budget-audit"
 
-# A phase is `ok` on either of these -- `RATCHET_HELD` is not `PASS`, but it
-# is not a blocker either, matching `mutation_corpus_audit`'s own
-# `PASSING_RECEIPT_STATUSES` split in `mutation_patch_audit.py`.
+# `make cost-budget-audit` / `forge ledger audit` themselves (the human-facing
+# CLI path, `main()` below) still fail loud on anything but these two -- a
+# person asking for the audit explicitly gets `RATCHET_HELD` as not-quite-PASS
+# but everything else as a real failure, unchanged from the original design.
 OK_STATUSES = frozenset({"PASS", "RATCHET_HELD"})
 
 MetricStatus = Literal["PASS", "RATCHET_HELD", "REGRESSION", "NO_BASELINE", "NO_DATA"]
@@ -148,10 +159,23 @@ def phase(
     it is read live from ``ledger_root`` (default resolution: `LEDGER_ROOT`
     env var, else the native default in `forge ledger rollup`'s own help).
 
-    Refuses loudly (raises `CostBudgetAuditError`, which `gate.py` turns into
-    a `GateRefusal`) rather than skip when the ledger data or the `forge`
-    binary is missing -- the design's explicit instruction (section 6 step
-    5), same shape as `mutation_corpus_audit`'s refusal on a missing
+    `ok` is `False` only when at least one metric's status is `REGRESSION`.
+    `PASS`, `RATCHET_HELD`, `NO_BASELINE` and `NO_DATA` -- including the
+    hard-empty case where every table is empty (`forge ledger audit` exits
+    3) -- are all `ok`: a fresh clone or CI runner with no ledger rows yet
+    must not turn `make gate` permanently red with no baseline to improve
+    against (there is nothing to regress against yet, so nothing here is a
+    gate-blocking finding). `detail` still names every metric's status
+    verbatim, never rounded up to `PASS`, so the non-PASS statuses stay
+    visible in gate output even though they do not fail the phase. A human
+    running `forge ledger audit` or `make cost-budget-audit` directly still
+    gets a real failure (exit 3, or a nonzero exit on anything but
+    `PASS`/`RATCHET_HELD`) -- only this gate phase's `ok` rule is lenient.
+
+    Still refuses loudly (raises `CostBudgetAuditError`, which `gate.py`
+    turns into a `GateRefusal`) when the `forge` binary itself is missing or
+    its output cannot be parsed at all -- those are tool failures, not
+    verdicts, same shape as `mutation_corpus_audit`'s refusal on a missing
     registry.
     """
 
@@ -169,9 +193,12 @@ def phase(
         window_days=window_days,
     )
     if completed.returncode == 3:
-        raise CostBudgetAuditError(
-            "forge ledger audit: window has zero ledger rows -- "
-            f"{completed.stderr.strip() or completed.stdout.strip()}"
+        message = completed.stderr.strip() or completed.stdout.strip()
+        return PhaseResult(
+            name=PHASE_NAME,
+            ok=True,
+            detail=f"NO_DATA: {message}",
+            evidence={"status": "NO_DATA", "metrics": {}, "message": message},
         )
     try:
         payload = json.loads(completed.stdout)
@@ -182,12 +209,13 @@ def phase(
         ) from exc
     result = AuditResult.model_validate(payload)
 
+    ok = not any(metric.status == "REGRESSION" for metric in result.metrics.values())
     detail = "; ".join(
         f"{name}={metric.status}" for name, metric in sorted(result.metrics.items())
     )
     return PhaseResult(
         name=PHASE_NAME,
-        ok=result.status in OK_STATUSES,
+        ok=ok,
         detail=f"{result.status}: {detail}",
         evidence=result.model_dump(by_alias=True),
     )

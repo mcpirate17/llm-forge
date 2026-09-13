@@ -326,12 +326,20 @@ exactly which rows it was computed from.
 `cost-budget-audit` (`conductor.gate.run_gate`): it resolves the `forge`
 binary the same way `project_init.py` already does, shells out with the
 export root's `ledger/cost_budget_baseline.json` as `--baseline`, and maps
-the JSON verdict onto a `PhaseResult` with `ok = status in {PASS,
-RATCHET_HELD}` -- `RATCHET_HELD` is not `PASS`, but it is not a blocker
-either, the same split `mutation_patch_audit` already draws for
-reproducibility receipts. Exit 3 (the whole window empty) and a missing
-`forge` binary both raise loud (`CostBudgetAuditError` -> `GateRefusal`)
-rather than skip the phase silently.
+the JSON verdict onto a `PhaseResult` with `ok = False` iff at least one
+metric's status is `REGRESSION`. `PASS`, `RATCHET_HELD`, `NO_BASELINE` and
+`NO_DATA` -- including the hard-empty exit-3 case where every table is
+empty -- are all `ok`: a fresh clone or CI runner has no recorded baseline
+and no ledger rows on its first run, and there is nothing to regress
+against yet, so that must not make `make gate` permanently red. `detail`
+still names every metric's status verbatim, never rounded up to `PASS`, so
+`RATCHET_HELD`/`NO_BASELINE`/`NO_DATA` stay visible in gate output even
+though they do not fail the phase. Only a missing `forge` binary or output
+that fails to parse at all raises loud (`CostBudgetAuditError` ->
+`GateRefusal`) -- those are tool failures, not verdicts. The direct CLI path
+(`make cost-budget-audit`, `forge ledger audit` run by a human) is
+unchanged and still fails loud: exit 3 on the hard-empty window, exit 1 on
+anything but `PASS`/`RATCHET_HELD`.
 
 The design also names a `ledger/registry.d/<scope>.json` convention
 (mirroring `campaigns/registry.d/`) for concurrency-safe baseline pointers.
