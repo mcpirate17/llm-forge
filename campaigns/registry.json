@@ -35,6 +35,18 @@
     },
     {
       "manifest": "campaigns/forge-evidence-hash_mutation_testing_fest_20260912.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_crg_gate_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_crg_refresh_state_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_read_budget_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/conductor-67_bash_guard_fest_20260913.json"
     }
   ],
   "enforcement": "changed_tests",
