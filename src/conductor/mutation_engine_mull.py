@@ -590,12 +590,7 @@ def execute(
         timeout_seconds=campaign.run_timeout_seconds,
         environment=environment,
     )
-    receipt["baseline_argv"] = baseline_argv
-    receipt["baseline"] = baseline.as_dict()
-    if baseline.timed_out or baseline.returncode != 0:
-        receipt["status"] = "BASELINE_FAILED"
-        _core.atomic_json(output_path, receipt)
-        raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+    _core.note_baseline(campaign, receipt, baseline, baseline_argv, output_path)
 
     reports = _engine_reports(
         campaign,
@@ -622,12 +617,7 @@ def execute(
         "mutants_in_scope": len(receipt["mutants"]),
         "files_mutated": sorted({row["path"] for row in every}),
     }
-    tested = sum(
-        1
-        for row in receipt["mutants"]
-        if row["outcome"] in (_core.KILLED, _core.SURVIVED)
-    )
-    _core.require_executed(len(receipt["mutants"]), tested, campaign.source)
+    _core.require_scored_rows(campaign, receipt)
 
 
 def main(argv: list[str] | None = None) -> int:

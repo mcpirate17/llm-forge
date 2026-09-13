@@ -615,7 +615,12 @@ fn generated_receipt_errors(
             errors.push("mutants must have unique non-empty IDs".to_owned());
         }
         match outcome {
-            Some(outcome @ ("KILLED" | "NO_COVERAGE" | "UNVIABLE")) => {
+            // TIMED_OUT rows score as neither killed nor surviving: the engine
+            // cut the mutant off at the bound the campaign asked for, so the
+            // run measured it as unknown rather than failed. It is counted and
+            // cross-checked through `outcome_counts` like every other
+            // non-scoring outcome.
+            Some(outcome @ ("KILLED" | "NO_COVERAGE" | "UNVIABLE" | "TIMED_OUT")) => {
                 *counts.entry(outcome).or_insert(0usize) += 1
             }
             _ => errors.push("PASS receipt has an invalid mutant outcome".to_owned()),
@@ -1115,6 +1120,26 @@ mod generated_receipt_tests {
             .iter()
             .any(|error| error.contains("outcome_counts do not match")));
         assert!(errors(json!({"survivors": [], "outcome_counts":counts, "mutants":[{"id":"a","outcome":"KILLED"},{"id":"b","outcome":"KILLED"}]})).is_empty());
+    }
+
+    #[test]
+    fn a_timed_out_mutant_is_a_measurement_not_an_invalid_outcome() {
+        // The engine cut the mutant off at the campaign's own per-mutant bound:
+        // unknown, neither killed nor surviving, counted like NO_COVERAGE.
+        assert!(errors(json!({
+            "survivors": [],
+            "mutants": [{"id":"a", "outcome":"KILLED"}, {"id":"b", "outcome":"TIMED_OUT"}],
+            "outcome_counts": {"KILLED":1,"NO_COVERAGE":0,"UNVIABLE":0,"ERROR":0,"SURVIVED":0,"TIMED_OUT":1}
+        }))
+        .is_empty());
+        // The count still has to agree with the rows it summarizes.
+        assert!(errors(json!({
+            "survivors": [],
+            "mutants": [{"id":"a", "outcome":"KILLED"}, {"id":"b", "outcome":"TIMED_OUT"}],
+            "outcome_counts": {"KILLED":1,"NO_COVERAGE":0,"UNVIABLE":0,"ERROR":0,"SURVIVED":0,"TIMED_OUT":0}
+        }))
+        .iter()
+        .any(|error| error.contains("outcome_counts do not match")));
     }
 
     #[test]

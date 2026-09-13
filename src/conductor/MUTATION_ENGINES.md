@@ -95,6 +95,14 @@ and folding it into the caught count -- which any plain kill-fraction does --
 credits the suite with detections it never made. cargo-mutants reported 24
 unviable mutants on the first crate measured.
 
+A `TIMED_OUT` mutant is a measurement, not a failure: the engine stopped it at
+exactly the per-mutant bound the campaign asked for, so the run knows nothing
+about it and says so -- counted beside `no_coverage` and `unviable` in the
+receipt, never entering the survivor set, never erroring the campaign. That
+bound is `mutant_timeout_seconds` when the manifest pins one, else three times
+the baseline suite's wall time with a 60 s floor, resolved after the baseline
+runs and recorded in the receipt as `mutant_timeout_seconds`.
+
 ### Statuses and exit codes
 
 | Status | Exit | Meaning |

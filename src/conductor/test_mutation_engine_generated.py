@@ -23,6 +23,7 @@ from conductor.mutation_engine_generated import (
     pinned,
     record_survivor_baseline,
     require_executed,
+    resolve_mutant_timeout,
     resolve_receipt_path,
     score,
 )
@@ -143,6 +144,40 @@ def test_a_run_that_executed_nothing_is_refused() -> None:
     require_executed(174, 1, ["x/*.py"])
 
 
+def test_the_per_mutant_bound_comes_from_the_manifest_or_the_baseline(
+    tmp_path: Path,
+) -> None:
+    """A pinned bound wins; an unpinned one is 3x the baseline, floored at 60 s.
+
+    The bound is resolved against the baseline suite's own wall time because
+    that is the one number every campaign already pays to know: a mutant that
+    runs the whole suite honestly needs at least the suite's cost, and a floor
+    keeps a two-second suite from handing every mutant two seconds.
+    """
+
+    pinned_campaign = load_generated_campaign(
+        manifest(tmp_path, generator={"source": ["conductor/gate_rollout.py"],
+                                      "mutant_timeout_seconds": 300,
+                                      "run_timeout_seconds": 60})
+    )
+    assert pinned_campaign.mutant_timeout_seconds == 300
+    assert resolve_mutant_timeout(pinned_campaign, 5.0) == 300
+    # A pinned bound is not re-derived, however slow or fast the baseline was.
+    assert pinned_campaign.mutant_timeout_seconds == 300
+
+    derived = load_generated_campaign(manifest(tmp_path))
+    assert derived.mutant_timeout_seconds is None
+    assert resolve_mutant_timeout(derived, 0.5) == 60  # the floor
+    assert derived.mutant_timeout_seconds == 60
+
+    slow = load_generated_campaign(manifest(tmp_path))
+    assert resolve_mutant_timeout(slow, 41.2) == 124  # ceil(3 x 41.2)
+    assert slow.mutant_timeout_seconds == 124
+
+    negative = load_generated_campaign(manifest(tmp_path))
+    assert resolve_mutant_timeout(negative, -7.0) == 60  # a nonsense clock still floors
+
+
 def test_a_new_survivor_fails_and_a_known_one_only_holds(tmp_path: Path) -> None:
     """The campaign fails on movement, and never reports PASS while gaps remain."""
 
@@ -165,10 +200,36 @@ def test_a_new_survivor_fails_and_a_known_one_only_holds(tmp_path: Path) -> None
 
 
 def test_a_timeout_is_never_scored_as_a_kill(tmp_path: Path) -> None:
-    """A mutant the tests merely outran was not detected."""
+    """A mutant the bound cut off is unknown -- not a kill, not a survivor.
+
+    The engine stopped it at exactly the per-mutant limit the campaign asked
+    for, so the run measured nothing about it. That used to read as a campaign
+    ERROR, which blocked the ratchet on a healthy run and forced debt notes in
+    every PR that carried one; it is a count beside `no_coverage` instead.
+    """
 
     receipt = scored([("t", "TIMED_OUT"), ("k", "KILLED")], [], tmp_path)
-    assert receipt["status"] == "ERROR"
+    assert receipt["status"] == "PASS"
+    assert receipt["timed_out"] == 1
+    # Excluded from the denominator as well as the numerator: a slow kill is
+    # not a kill, and a slow survivor has not been shown to survive.
+    assert receipt["mutation_score"] == 1.0
+    assert "t" not in receipt["survivors"]
+
+    held = scored(
+        [("t", "TIMED_OUT"), ("s", "SURVIVED"), ("k", "KILLED")], ["s"], tmp_path
+    )
+    assert held["status"] == "RATCHET_HELD"
+    assert held["timed_out"] == 1
+
+    regressed = scored(
+        [("t", "TIMED_OUT"), ("s", "SURVIVED"), ("k", "KILLED")], [], tmp_path
+    )
+    assert regressed["status"] == "FAIL"
+    assert regressed["new_survivors"] == ["s"]
+
+    errored = scored([("e", "ERROR"), ("k", "KILLED")], [], tmp_path)
+    assert errored["status"] == "ERROR"
 
 
 def test_uncovered_mutants_are_counted_but_never_scored(tmp_path: Path) -> None:
@@ -273,7 +334,7 @@ def test_the_optional_generator_keys_reach_the_campaign(tmp_path: Path) -> None:
 
     `exclude`, `operators` and `mutant_timeout_seconds` are all optional, so
     reading the wrong name raises nothing -- the campaign just runs with no
-    exclusions and the default timeout while the manifest says otherwise. That
+    exclusions and a derived timeout while the manifest says otherwise. That
     is invisible in the receipt, which records the campaign object rather than
     the file.
     """
@@ -324,7 +385,10 @@ def test_the_defaults_are_the_ones_the_manifests_were_written_against(
     assert campaign.options == {}
     assert campaign.seed == 0
     assert campaign.jobs == 1
-    assert campaign.mutant_timeout_seconds == 30
+    # No per-mutant bound until a run derives one from its baseline; the old
+    # silent 30 is gone, because a suite that needs 90 s read six honest kills
+    # as TIMED_OUT every run.
+    assert campaign.mutant_timeout_seconds is None
 
 
 def test_the_first_run_records_its_own_survivor_baseline(tmp_path: Path) -> None:

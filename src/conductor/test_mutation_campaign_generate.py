@@ -136,7 +136,11 @@ def test_fest_manifest_binds_its_generated_engine_contract(tmp_path: Path) -> No
     assert manifest["generator"]["exclude"] == ["**/test_*.py", "**/conftest.py"]
     assert manifest["generator"]["operators"] == []
     assert manifest["generator"]["seed"] == 0
-    assert manifest["generator"]["mutant_timeout_seconds"] == 30
+    # No per-mutant bound is written: the run derives it from the baseline
+    # suite's wall time (3x, floored at 60 s) and records the value it used.
+    # The old pinned 30 timed out six honest kills of native/forge on every
+    # run, each of them then read as a campaign ERROR.
+    assert "mutant_timeout_seconds" not in manifest["generator"]
     assert manifest["generator"]["run_timeout_seconds"] == 91
     assert manifest["environment"] == {}
     assert manifest["survivor_baseline"] == []
@@ -219,7 +223,8 @@ def test_cargo_manifest_preserves_the_exact_scoped_engine_contract(
         "package_root": "crate",
     }
     assert manifest["generator"]["seed"] == 0
-    assert manifest["generator"]["mutant_timeout_seconds"] == 30
+    # Derived per run from the baseline wall time; see the fest builder test.
+    assert "mutant_timeout_seconds" not in manifest["generator"]
     assert manifest["generator"]["run_timeout_seconds"] == 91
     assert manifest["test_argv"] == [
         "cargo",
@@ -363,6 +368,31 @@ def test_a_sole_unmirrored_same_basename_test_still_pairs(tmp_path: Path) -> Non
     paired, _unpaired = python_subjects(tmp_path)
     by_source = {subject["source"]: subject["tests"] for subject in paired}
     assert by_source["pkg/candidate_review/policy.py"] == ["pkg/test_policy.py"]
+
+
+def test_a_tests_mirror_beats_a_same_basename_stranger(tmp_path: Path) -> None:
+    """With a mirror present, the fallback must not get a vote.
+
+    A module with one test under its own ``tests/`` mirror and a stranger
+    elsewhere sharing the basename is exactly the case the mirror rule
+    exists for: the mirror says which test counts, where basename-counting
+    alone would see two candidates and refuse (or, before the rule, guess).
+    The fallback is for modules with NO mirror -- letting it fire here would
+    make the mirror branch unobservable.
+    """
+
+    tree(
+        tmp_path,
+        {
+            "pkg/deep/subject.py": "x = 1\n",
+            "pkg/tests/deep/test_subject.py": "def test_x(): pass\n",
+            "elsewhere/test_subject.py": "def test_y(): pass\n",
+        },
+    )
+    paired, unpaired = python_subjects(tmp_path)
+    by_source = {subject["source"]: subject["tests"] for subject in paired}
+    assert by_source["pkg/deep/subject.py"] == ["pkg/tests/deep/test_subject.py"]
+    assert unpaired == []
 
 
 def test_a_subject_a_committed_campaign_already_covers_is_skipped(

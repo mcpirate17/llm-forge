@@ -270,7 +270,9 @@ def fest_manifest(
             "exclude": ["**/test_*.py", "**/conftest.py"],
             "operators": [],
             "seed": 0,
-            "mutant_timeout_seconds": 30,
+            # No mutant_timeout_seconds: the run derives it from the baseline
+            # suite's wall time (3x, floored at 60 s) and records the value it
+            # used in the receipt. A manifest that pins one overrides that.
             "run_timeout_seconds": run_timeout_seconds,
         },
         # --rootdir=. pins pytest to the repo root. Without it a nested
@@ -383,7 +385,8 @@ def cargo_manifest(
             },
             "seed": 0,
             "jobs": jobs,
-            "mutant_timeout_seconds": 30,
+            # Derived per run from the baseline wall time (3x, floored at
+            # 60 s); see the fest builder above for why it is not pinned.
             "run_timeout_seconds": run_timeout_seconds,
         },
         "test_argv": [

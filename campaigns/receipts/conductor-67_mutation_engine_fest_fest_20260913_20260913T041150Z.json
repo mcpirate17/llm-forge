@@ -1,0 +1,2672 @@
+{
+  "adapter_sha256": "94ba82a0851d208c0fa62dc8b2942d969f7b18c781c17834c953bbf1a7f337b3",
+  "attribution": {
+    "attributed_mutants": 50,
+    "baseline_repetitions": 2,
+    "killed_mutants": 50,
+    "ranked_tests": 8,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.358197,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": ".........                                                                [100%]\n9 passed in 0.09s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-timeouts/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_engine_fest.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "conductor-67_mutation_engine_fest_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "079a891de598d1db6bb3a596637f69720417a99aea7c5ca480b4779fe1694ab0",
+  "engine_result": {
+    "duration_seconds": 11.524794,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "ant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-d230rwly/worktree/src/conductor/mutation_engine_fest.py\",\n        \"line\": 297,\n        \"column\": 24,\n        \"byte_offset\": 11238,\n        \"byte_length\": 16,\n        \"original_text\": \"\\\"mutants_tested\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-d230rwly/worktree/src/conductor/mutation_engine_fest.py\",\n        \"line\": 297,\n        \"column\": 42,\n        \"byte_offset\": 11256,\n        \"byte_length\": 2,\n        \"original_text\": \"or\",\n        \"mutated_text\": \"and\",\n        \"mutator_name\": \"boolean_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-d230rwly/worktree/src/conductor/mutation_engine_fest.py\",\n        \"line\": 297,\n        \"column\": 45,\n        \"byte_offset\": 11259,\n        \"byte_length\": 1,\n        \"original_text\": \"0\",\n        \"mutated_text\": \"1\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-d230rwly/worktree/src/conductor/mutation_engine_fest.py\",\n        \"line\": 313,\n        \"column\": 5,\n        \"byte_offset\": 11705,\n        \"byte_length\": 63,\n        \"original_text\": \"\\\"\\\"\\\"Run a fest campaign; the shared CLI dispatches by engine.\\\"\\\"\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-d230rwly/worktree/src/conductor/mutation_engine_fest.py\",\n        \"line\": 315,\n        \"column\": 12,\n        \"byte_offset\": 11781,\n        \"byte_length\": 16,\n        \"original_text\": \"_core.main(argv)\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-d230rwly/worktree/src/conductor/mutation_engine_fest.py\",\n        \"line\": 318,\n        \"column\": 4,\n        \"byte_offset\": 11803,\n        \"byte_length\": 22,\n        \"original_text\": \"__name__ == \\\"__main__\\\"\",\n        \"mutated_text\": \"not (__name__ == \\\"__main__\\\")\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-d230rwly/worktree/src/conductor/mutation_engine_fest.py\",\n        \"line\": 318,\n        \"column\": 13,\n        \"byte_offset\": 11812,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-d230rwly/worktree/src/conductor/mutation_engine_fest.py\",\n        \"line\": 318,\n        \"column\": 16,\n        \"byte_offset\": 11815,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"__main__\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 11,\n    \"nanos\": 520360810\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 50,
+    "mutants_generated": 134,
+    "mutants_tested": 52,
+    "no_coverage": 82,
+    "survived": 2,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T04:11:50.509982+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-timeouts/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/conductor-67_mutation_engine_fest_fest_20260913.json",
+  "manifest_sha256": "7b7cd9a28e0ba803d41c5c6c7f92d93f04777f5ef96d405c45707cc05a7126e9",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 60,
+  "mutants": [
+    {
+      "byte_length": 1015,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9b17f06fb48c-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Generated mutants for the Python lanes, via fest.\n\nfest (Rust, ruff's parser, coverage-guided) walks the source tree and emits its\nown mutants, so nobody chooses which ones get written and the score stops being\na statement about the author's taste. The shared core in\n`mutation_engine_generated` owns the manifest model, the receipt and the\nsurvivor-set verdict; this module owns the two things that are fest's alone --\nwhere its binary is, and how one run becomes receipt rows.\n\nThe awkward part is coverage. fest's coverage phase does not use the configured\ntest command: `run_pytest_cov` in its own source runs `python -m pytest --cov`\nwith no path arguments, which in a monorepo means collecting and running every\ntest in the tree, and makes a campaign scoped to one module depend on the whole\nrepository being green. So the adapter collects the map itself, from exactly the\ntests the campaign names, and hands it over with `--coverage-from`. That costs\none run -- the same run that records the baseline.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 1372,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-3381496df8d7-0",
+      "line": 33,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"fest\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 1608,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-4f14b2955001-0",
+      "line": 39,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"Killed\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 1636,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6a638606b179-0",
+      "line": 40,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"Survived\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 1668,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b1704fba7dde-0",
+      "line": 41,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"Timeout\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 1700,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-85e4fce9fdb3-0",
+      "line": 42,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"NoCoverage\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 1737,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-19d4a12606fe-0",
+      "line": 43,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"Error\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 1783,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-53888bbc9267-0",
+      "line": 47,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"files_scanned\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 1804,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9e5bd4895bc9-0",
+      "line": 48,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutants_generated\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 1829,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-aff5e6c8a7db-0",
+      "line": 49,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutants_tested\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 1851,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c60d02c1a5b7-0",
+      "line": 50,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"no_coverage\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 1870,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c8c2bc5d0067-0",
+      "line": 51,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"killed\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 1884,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0847c072c285-0",
+      "line": 52,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"survived\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 1900,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e5a438c8f338-0",
+      "line": 53,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"timeouts\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 1916,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-59cc19dafb63-0",
+      "line": 54,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"errors\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 69,
+      "byte_offset": 1955,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-09e3618c4d27-0",
+      "line": 59,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The fest executable beside the running interpreter, or on PATH.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2070,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-ab772334aa17-0",
+      "line": 61,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 2072,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-3381496df8d7-1",
+      "line": 61,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"fest\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 53,
+      "byte_offset": 2086,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-ae13e79405d7-0",
+      "line": 62,
+      "mutated_text": "not (candidate.is_file() and os.access(candidate, os.X_OK))",
+      "operator": "negate_condition",
+      "original_text": "candidate.is_file() and os.access(candidate, os.X_OK)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 2106,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-f23a8407e171-0",
+      "line": 62,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 2156,
+      "duration_seconds": 0.0,
+      "id": "return_value-b80370ce9804-0",
+      "line": 63,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "str(candidate)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 2196,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-3381496df8d7-2",
+      "line": 64,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"fest\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 2211,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-5d2a22d0a126-0",
+      "line": 65,
+      "mutated_text": "not (found is None)",
+      "operator": "negate_condition",
+      "original_text": "found is None",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2217,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-9d6057666349-0",
+      "line": 65,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 2413,
+      "duration_seconds": 0.0,
+      "id": "return_value-d730e373dccb-0",
+      "line": 70,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "found",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 2498,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b434c959dc08-0",
+      "line": 74,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The fest.toml written into the snapshot, pinned to this interpreter.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 2661,
+      "duration_seconds": 0.218903,
+      "id": "constant_replace-b41cb1471fc1-0",
+      "line": 78,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"[fest]\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 3359,
+      "duration_seconds": 0.21341,
+      "id": "constant_replace-b04d9b671995-0",
+      "line": 90,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "'output = \"json\"'",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 3386,
+      "duration_seconds": 0.254388,
+      "id": "constant_replace-d0ccb6729e35-0",
+      "line": 91,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "'backend = \"subprocess\"'",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3420,
+      "duration_seconds": 0.224367,
+      "id": "constant_replace-500b5849f600-0",
+      "line": 92,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 3441,
+      "duration_seconds": 0.214645,
+      "id": "return_value-c57cd991b464-0",
+      "line": 94,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "\"\\n\".join(lines)",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 3578,
+      "duration_seconds": 0.218953,
+      "id": "constant_replace-265e173d0384-0",
+      "line": 100,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutant\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3614,
+      "duration_seconds": 0.213979,
+      "id": "constant_replace-d1626e351651-0",
+      "line": 101,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"duration\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3626,
+      "duration_seconds": 0.211306,
+      "id": "boolean_op-d22c09ee387d-0",
+      "line": 101,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 3659,
+      "duration_seconds": 0.212354,
+      "id": "constant_replace-e51a790324d6-0",
+      "line": 102,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"secs\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3667,
+      "duration_seconds": 0.215057,
+      "id": "constant_replace-234bebcf8ad2-0",
+      "line": 102,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3670,
+      "duration_seconds": 0.226068,
+      "id": "arithmetic_op-ea902220adbb-0",
+      "line": 102,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 3685,
+      "duration_seconds": 0.217342,
+      "id": "constant_replace-733f964e3064-0",
+      "line": 102,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"nanos\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3694,
+      "duration_seconds": 0.179443,
+      "id": "constant_replace-234bebcf8ad2-1",
+      "line": 102,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3697,
+      "duration_seconds": 0.215932,
+      "id": "arithmetic_op-ab772334aa17-1",
+      "line": 102,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 3699,
+      "duration_seconds": 0.178752,
+      "id": "constant_replace-ae7b429ec0dd-0",
+      "line": 102,
+      "mutated_text": "1000000001",
+      "operator": "constant_replace",
+      "original_text": "1e9",
+      "outcome": "SURVIVED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 3731,
+      "duration_seconds": 0.226848,
+      "id": "constant_replace-fba795539b7d-0",
+      "line": 103,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"status\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3741,
+      "duration_seconds": 0.247588,
+      "id": "constant_replace-500b5849f600-1",
+      "line": 103,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 23,
+      "byte_offset": 3753,
+      "duration_seconds": 0.232541,
+      "id": "negate_condition-1857ee3810c7-0",
+      "line": 104,
+      "mutated_text": "not (status not in _OUTCOMES)",
+      "operator": "negate_condition",
+      "original_text": "status not in _OUTCOMES",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 3760,
+      "duration_seconds": 0.230883,
+      "id": "comparison_op-876ccb542635-0",
+      "line": 104,
+      "mutated_text": "in",
+      "operator": "comparison_op",
+      "original_text": "not in",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 655,
+      "byte_offset": 3861,
+      "duration_seconds": 0.223615,
+      "id": "return_value-b442c6d137a5-0",
+      "line": 106,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{\n        \"id\": identifier,\n        \"outcome\": _OUTCOMES[status],\n        \"path\": relative_path,\n        \"line\": mutant[\"line\"],\n        # Byte span, not just the line: attribution re-applies the mutation\n        # after the run, and a line number cannot locate two mutants that sit\n        # on the same line.\n        \"byte_offset\": mutant[\"byte_offset\"],\n        \"byte_length\": mutant[\"byte_length\"],\n        \"operator\": mutant[\"mutator_name\"],\n        \"original_text\": mutant[\"original_text\"],\n        \"mutated_text\": mutant[\"mutated_text\"],\n        \"tests_run\": list(result.get(\"tests_run\") or ()),\n        \"duration_seconds\": round(seconds, 6),\n    }",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3871,
+      "duration_seconds": 0.224901,
+      "id": "constant_replace-adaae9bda544-0",
+      "line": 107,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"id\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 3897,
+      "duration_seconds": 0.218881,
+      "id": "constant_replace-af676d51f2c0-0",
+      "line": 108,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"outcome\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 3935,
+      "duration_seconds": 0.230208,
+      "id": "constant_replace-bfc4f2d98084-0",
+      "line": 109,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"path\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 3966,
+      "duration_seconds": 0.213195,
+      "id": "constant_replace-4664f70d0be0-0",
+      "line": 110,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"line\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 3981,
+      "duration_seconds": 0.218419,
+      "id": "constant_replace-4664f70d0be0-1",
+      "line": 110,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"line\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 4180,
+      "duration_seconds": 0.227484,
+      "id": "constant_replace-4dbc2dd0f4f0-0",
+      "line": 114,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"byte_offset\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 4202,
+      "duration_seconds": 0.219634,
+      "id": "constant_replace-4dbc2dd0f4f0-1",
+      "line": 114,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"byte_offset\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 4226,
+      "duration_seconds": 0.213757,
+      "id": "constant_replace-6e966e761492-0",
+      "line": 115,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"byte_length\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 4248,
+      "duration_seconds": 0.217997,
+      "id": "constant_replace-6e966e761492-1",
+      "line": 115,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"byte_length\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 4272,
+      "duration_seconds": 0.275036,
+      "id": "constant_replace-4066eab98c69-0",
+      "line": 116,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"operator\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 4291,
+      "duration_seconds": 0.222386,
+      "id": "constant_replace-55081866c6d2-0",
+      "line": 116,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutator_name\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 4316,
+      "duration_seconds": 0.218267,
+      "id": "constant_replace-8b8b19d8fe1f-0",
+      "line": 117,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"original_text\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 4340,
+      "duration_seconds": 0.212237,
+      "id": "constant_replace-8b8b19d8fe1f-1",
+      "line": 117,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"original_text\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 4366,
+      "duration_seconds": 0.236156,
+      "id": "constant_replace-d8d2f0a45732-0",
+      "line": 118,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutated_text\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 4389,
+      "duration_seconds": 0.217615,
+      "id": "constant_replace-d8d2f0a45732-1",
+      "line": 118,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutated_text\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 4414,
+      "duration_seconds": 0.22023,
+      "id": "constant_replace-15b7b672a0e9-0",
+      "line": 119,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tests_run\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 4443,
+      "duration_seconds": 0.228092,
+      "id": "constant_replace-15b7b672a0e9-1",
+      "line": 119,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tests_run\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 4472,
+      "duration_seconds": 0.216675,
+      "id": "constant_replace-697949a577a4-0",
+      "line": 120,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"duration_seconds\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4507,
+      "duration_seconds": 0.229884,
+      "id": "constant_replace-58750af87cda-0",
+      "line": 120,
+      "mutated_text": "7",
+      "operator": "constant_replace",
+      "original_text": "6",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 41,
+      "byte_offset": 4597,
+      "duration_seconds": 0.234921,
+      "id": "return_value-cad666039460-0",
+      "line": 126,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "absolute.relative_to(worktree).as_posix()",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 4670,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-d49b81dbe917-0",
+      "line": 128,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "return absolute.name",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 4677,
+      "duration_seconds": 0.0,
+      "id": "return_value-1e8993d5a3c4-0",
+      "line": 128,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "absolute.name",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 68,
+      "byte_offset": 4775,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a7b5c094973c-0",
+      "line": 132,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Name every generated mutant, in file order, deterministically.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 4886,
+      "duration_seconds": 0.229,
+      "id": "constant_replace-8ba22af31f07-0",
+      "line": 135,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"results\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 126,
+      "byte_offset": 5424,
+      "duration_seconds": 0.21543,
+      "id": "return_value-37ee51101f93-0",
+      "line": 150,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[\n        _row(path, result, identifier)\n        for path, result, identifier in zip(paths, results, names, strict=True)\n    ]",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ]
+    },
+    {
+      "byte_length": 64,
+      "byte_offset": 5618,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0ab9af871712-0",
+      "line": 157,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The `--cov=` roots implied by the campaign's source globs.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 5731,
+      "duration_seconds": 0.217448,
+      "id": "zero_iteration_loop-38dc0f9ecac4-0",
+      "line": 160,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "patterns",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5933,
+      "duration_seconds": 0.261985,
+      "id": "constant_replace-4ad550487bf6-0",
+      "line": 163,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"/\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 5969,
+      "duration_seconds": 0.218366,
+      "id": "constant_replace-4ad550487bf6-1",
+      "line": 164,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"/\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5974,
+      "duration_seconds": 0.210977,
+      "id": "constant_replace-234bebcf8ad2-2",
+      "line": 164,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 5994,
+      "duration_seconds": 0.212687,
+      "id": "constant_replace-94183938888e-0",
+      "line": 164,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".py\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 6022,
+      "duration_seconds": 0.215837,
+      "id": "negate_condition-bc02ef7eee5b-0",
+      "line": 165,
+      "mutated_text": "not (root not in targets)",
+      "operator": "negate_condition",
+      "original_text": "root not in targets",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 6027,
+      "duration_seconds": 0.214621,
+      "id": "comparison_op-876ccb542635-1",
+      "line": 165,
+      "mutated_text": "in",
+      "operator": "comparison_op",
+      "original_text": "not in",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6075,
+      "duration_seconds": 0.218455,
+      "id": "boolean_op-d22c09ee387d-1",
+      "line": 166,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 6078,
+      "duration_seconds": 0.214435,
+      "id": "constant_replace-008d43569c09-0",
+      "line": 166,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".\"",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 6094,
+      "duration_seconds": 0.217924,
+      "id": "return_value-5807380a6223-0",
+      "line": 167,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "targets",
+      "outcome": "KILLED",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 6194,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e08d42701b48-0",
+      "line": 171,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The campaign's own test command, instrumented for per-test coverage.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 186,
+      "byte_offset": 6338,
+      "duration_seconds": 0.0,
+      "id": "return_value-767151c82b25-0",
+      "line": 174,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[\n        *argv,\n        *(f\"--cov={target}\" for target in _coverage_targets(campaign.source)),\n        \"--cov-context=test\",\n        \"--cov-fail-under=0\",\n        \"--cov-report=\",\n    ]",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 6442,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-04caac2ec65e-0",
+      "line": 177,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--cov-context=test\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 6472,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f8b4603d2c67-0",
+      "line": 178,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--cov-fail-under=0\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 6502,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-8e1454ee9195-0",
+      "line": 179,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--cov-report=\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 714,
+      "byte_offset": 6579,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-b93b34e15512-0",
+      "line": 184,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The snapshot's own import roots, ahead of anything site-packages injects.\n\n    An editable install writes a .pth naming the ORIGINAL checkout, and site\n    processing appends it to sys.path regardless of where the interpreter is run\n    from. Under a flat layout the snapshot still won, because `python -m pytest`\n    puts cwd first and the package sits at the repository root. Under a src\n    layout it does not: `import conductor` resolves through the .pth to the\n    unmutated checkout, every mutant is reported unreached, and the campaign\n    scores nothing while reporting success. PYTHONPATH entries are placed ahead\n    of site-packages, so naming them here is what binds the run to the snapshot.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 69,
+      "byte_offset": 7306,
+      "duration_seconds": 0.0,
+      "id": "return_value-88a2904e192b-0",
+      "line": 196,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[str(path) for path in (worktree, worktree / \"src\") if path.is_dir()]",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 418,
+      "byte_offset": 7475,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c1d1654a8f56-0",
+      "line": 202,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The environment fest runs under, bound to this venv and this snapshot.\n\n    fest probes for pytest-cov by spawning a bare `python`, so a runner started\n    from a venv that carries pytest-cov still fails when PATH resolves `python`\n    somewhere else. Binding PATH and VIRTUAL_ENV to the interpreter that is\n    already pinned in the receipt keeps the probe and the test command in the\n    same environment.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 238,
+      "byte_offset": 8079,
+      "duration_seconds": 0.0,
+      "id": "return_value-ea78b3c914bc-0",
+      "line": 214,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "{\n        **campaign.environment,\n        \"PYTHONPATH\": os.pathsep.join(root for root in roots if root),\n        \"VIRTUAL_ENV\": str(Path(sys.executable).parents[1]),\n        \"PATH\": bin_dir + os.pathsep + os.environ.get(\"PATH\", \"\"),\n    }",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 8121,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-2dd8e745de36-0",
+      "line": 216,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"PYTHONPATH\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 13,
+      "byte_offset": 8192,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-d51b5b519dfe-0",
+      "line": 217,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"VIRTUAL_ENV\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 8240,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-266c441ee733-0",
+      "line": 217,
+      "mutated_text": "0",
+      "operator": "constant_replace",
+      "original_text": "1",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 8253,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7ac94172e9e1-0",
+      "line": 218,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"PATH\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 8299,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7ac94172e9e1-1",
+      "line": 218,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"PATH\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 8307,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-500b5849f600-2",
+      "line": 218,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 77,
+      "byte_offset": 8430,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-933c06fa41e9-0",
+      "line": 225,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The fest invocation: JSON on stdout, and our coverage map, not its own.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 8534,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e4f09c3a496c-0",
+      "line": 227,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"run\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 8541,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ace3d3fbb593-0",
+      "line": 227,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--progress\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 8555,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-e4b765a57534-0",
+      "line": 227,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"quiet\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 8564,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-ca8f7b2ad1eb-0",
+      "line": 227,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--output\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 8576,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-020668f23971-0",
+      "line": 227,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"json\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 8603,
+      "duration_seconds": 0.0,
+      "id": "zero_iteration_loop-f3c953fcab10-0",
+      "line": 228,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "campaign.operators",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 8636,
+      "duration_seconds": 0.0,
+      "id": "augmented_assign-448bb0dca2e3-0",
+      "line": 229,
+      "mutated_text": "-=",
+      "operator": "augmented_assign",
+      "original_text": "+=",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 8640,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-6374115d6113-0",
+      "line": 229,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--filter-operators\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 41,
+      "byte_offset": 8682,
+      "duration_seconds": 0.0,
+      "id": "return_value-49db32955a8b-0",
+      "line": 230,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "[*argv, \"--coverage-from\", str(coverage)]",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 8690,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-f29044bc280d-0",
+      "line": 230,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"--coverage-from\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 8889,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-59bc17ea4423-0",
+      "line": 241,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Collect coverage, generate and run the mutants, fill in the receipt.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 42,
+      "byte_offset": 8972,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-64699ab2b0a6-0",
+      "line": 243,
+      "mutated_text": "not (drifted := _core.drift(campaign, worktree))",
+      "operator": "negate_condition",
+      "original_text": "drifted := _core.drift(campaign, worktree)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 9119,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-ab772334aa17-2",
+      "line": 245,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 9121,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c6a4aa8a71a9-0",
+      "line": 245,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".coverage\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 9205,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-07ee31cb29ce-0",
+      "line": 248,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"COVERAGE_FILE\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 46,
+      "byte_offset": 9573,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-ef0bda9ee461-0",
+      "line": 259,
+      "mutated_text": "not (baseline.timed_out or baseline.returncode != 0)",
+      "operator": "negate_condition",
+      "original_text": "baseline.timed_out or baseline.returncode != 0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 9592,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-d22c09ee387d-2",
+      "line": 259,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 9615,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-2c36df1a5a55-0",
+      "line": 259,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 9618,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-234bebcf8ad2-3",
+      "line": 259,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 9649,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-66012a3bcbf0-0",
+      "line": 260,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"BASELINE_FAILED\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 9803,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-29febdd7908c-0",
+      "line": 263,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 27,
+      "byte_offset": 9803,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-e29923318684-0",
+      "line": 263,
+      "mutated_text": "not (not coverage_path.is_file())",
+      "operator": "negate_condition",
+      "original_text": "not coverage_path.is_file()",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 10302,
+      "duration_seconds": 0.0,
+      "id": "arithmetic_op-ab772334aa17-3",
+      "line": 273,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 10653,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-537a99c333cd-0",
+      "line": 284,
+      "mutated_text": "not (result.timed_out)",
+      "operator": "negate_condition",
+      "original_text": "result.timed_out",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 153,
+      "byte_offset": 10849,
+      "duration_seconds": 0.0,
+      "id": "exception_swallow-7c88f20c4f3b-0",
+      "line": 289,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "raise CampaignError(\n            f\"fest produced no JSON report (rc={result.returncode}): \"\n            f\"{result.stderr_tail[-800:]}\"\n        ) from exc",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 11187,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-9e5bd4895bc9-1",
+      "line": 296,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutants_generated\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 11208,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-d22c09ee387d-3",
+      "line": 296,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 11211,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-234bebcf8ad2-4",
+      "line": 296,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 11238,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-aff5e6c8a7db-1",
+      "line": 297,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"mutants_tested\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 11256,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-d22c09ee387d-4",
+      "line": 297,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 11259,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-234bebcf8ad2-5",
+      "line": 297,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 63,
+      "byte_offset": 11705,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-d6125de23c48-0",
+      "line": 313,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Run a fest campaign; the shared CLI dispatches by engine.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 11781,
+      "duration_seconds": 0.0,
+      "id": "return_value-be453be4ecdd-0",
+      "line": 315,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "_core.main(argv)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 11803,
+      "duration_seconds": 0.0,
+      "id": "negate_condition-b9a845f31957-0",
+      "line": 318,
+      "mutated_text": "not (__name__ == \"__main__\")",
+      "operator": "negate_condition",
+      "original_text": "__name__ == \"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 11812,
+      "duration_seconds": 0.0,
+      "id": "comparison_op-697be3289564-0",
+      "line": 318,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 11815,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-587312f60199-0",
+      "line": 318,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"__main__\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/conductor/mutation_engine_fest.py",
+      "tests_run": []
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.9615384615384616,
+  "new_survivors": [],
+  "no_coverage": 82,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 50,
+    "NO_COVERAGE": 82,
+    "SURVIVED": 2,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/conductor-67_mutation_engine_fest_fest_20260913_20260913T041150Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "5743cd8973f377be22581505e52af44011da6e740c8a03d0208eed4cf76916c8",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "b75962e0c67452fec0dbdd6792f024dd88fef7d4238786f4de40edb96cad2bb9"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/mutation_engine_fest.py": "94ba82a0851d208c0fa62dc8b2942d969f7b18c781c17834c953bbf1a7f337b3"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [
+    "constant_replace-234bebcf8ad2-1",
+    "constant_replace-ae7b429ec0dd-0"
+  ],
+  "survivors": [
+    "constant_replace-234bebcf8ad2-1",
+    "constant_replace-ae7b429ec0dd-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_engine_fest.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_engine_fest.py": "b336883dbfbba8d7e53ab1928df84efd4109060e6fa21af4b3cb3a12e9ab307f"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 7,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 1
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-ab772334aa17-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second"
+      ],
+      "arithmetic_op-ea902220adbb-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second"
+      ],
+      "boolean_op-d22c09ee387d-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second"
+      ],
+      "boolean_op-d22c09ee387d-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ],
+      "comparison_op-876ccb542635-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "comparison_op-876ccb542635-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ],
+      "constant_replace-008d43569c09-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ],
+      "constant_replace-15b7b672a0e9-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned"
+      ],
+      "constant_replace-15b7b672a0e9-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields"
+      ],
+      "constant_replace-234bebcf8ad2-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second"
+      ],
+      "constant_replace-234bebcf8ad2-2": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ],
+      "constant_replace-265e173d0384-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-4066eab98c69-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned"
+      ],
+      "constant_replace-4664f70d0be0-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned"
+      ],
+      "constant_replace-4664f70d0be0-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-4ad550487bf6-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ],
+      "constant_replace-4ad550487bf6-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ],
+      "constant_replace-4dbc2dd0f4f0-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned"
+      ],
+      "constant_replace-4dbc2dd0f4f0-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-500b5849f600-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ],
+      "constant_replace-500b5849f600-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed"
+      ],
+      "constant_replace-55081866c6d2-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-58750af87cda-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds"
+      ],
+      "constant_replace-697949a577a4-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned"
+      ],
+      "constant_replace-6e966e761492-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned"
+      ],
+      "constant_replace-6e966e761492-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-733f964e3064-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second"
+      ],
+      "constant_replace-8b8b19d8fe1f-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned"
+      ],
+      "constant_replace-8b8b19d8fe1f-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-8ba22af31f07-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-94183938888e-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ],
+      "constant_replace-adaae9bda544-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-af676d51f2c0-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-b04d9b671995-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ],
+      "constant_replace-b41cb1471fc1-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ],
+      "constant_replace-bfc4f2d98084-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-d0ccb6729e35-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ],
+      "constant_replace-d1626e351651-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second"
+      ],
+      "constant_replace-d8d2f0a45732-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned"
+      ],
+      "constant_replace-d8d2f0a45732-1": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "constant_replace-e51a790324d6-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds"
+      ],
+      "constant_replace-fba795539b7d-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "negate_condition-1857ee3810c7-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "negate_condition-bc02ef7eee5b-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ],
+      "return_value-37ee51101f93-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "return_value-5807380a6223-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ],
+      "return_value-b442c6d137a5-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "return_value-c57cd991b464-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved"
+      ],
+      "return_value-cad666039460-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably"
+      ],
+      "zero_iteration_loop-38dc0f9ecac4-0": [
+        "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/conductor/mutation_engine_fest.py"
+        ],
+        "criticality": "high",
+        "id": "conductor-67_mutation_engine_fest_fest_20260913"
+      }
+    ],
+    "retained_core": [
+      "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+      "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file",
+      "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+      "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved",
+      "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+      "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+      "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_engine_fest_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-ab772334aa17-1",
+          "arithmetic_op-ea902220adbb-0",
+          "boolean_op-d22c09ee387d-0",
+          "comparison_op-876ccb542635-0",
+          "constant_replace-15b7b672a0e9-0",
+          "constant_replace-15b7b672a0e9-1",
+          "constant_replace-265e173d0384-0",
+          "constant_replace-4664f70d0be0-1",
+          "constant_replace-4dbc2dd0f4f0-1",
+          "constant_replace-55081866c6d2-0",
+          "constant_replace-697949a577a4-0",
+          "constant_replace-6e966e761492-1",
+          "constant_replace-733f964e3064-0",
+          "constant_replace-8b8b19d8fe1f-1",
+          "constant_replace-8ba22af31f07-0",
+          "constant_replace-d1626e351651-0",
+          "constant_replace-d8d2f0a45732-1",
+          "constant_replace-e51a790324d6-0",
+          "constant_replace-fba795539b7d-0",
+          "negate_condition-1857ee3810c7-0",
+          "return_value-37ee51101f93-0",
+          "return_value-b442c6d137a5-0",
+          "return_value-cad666039460-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_in_seconds_not_in_fests_two_fields",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-15b7b672a0e9-1"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_engine_fest_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-ab772334aa17-1",
+          "arithmetic_op-ea902220adbb-0",
+          "boolean_op-d22c09ee387d-0",
+          "comparison_op-876ccb542635-0",
+          "constant_replace-265e173d0384-0",
+          "constant_replace-4664f70d0be0-1",
+          "constant_replace-4dbc2dd0f4f0-1",
+          "constant_replace-55081866c6d2-0",
+          "constant_replace-58750af87cda-0",
+          "constant_replace-697949a577a4-0",
+          "constant_replace-6e966e761492-1",
+          "constant_replace-733f964e3064-0",
+          "constant_replace-8b8b19d8fe1f-1",
+          "constant_replace-8ba22af31f07-0",
+          "constant_replace-d1626e351651-0",
+          "constant_replace-d8d2f0a45732-1",
+          "constant_replace-e51a790324d6-0",
+          "constant_replace-fba795539b7d-0",
+          "negate_condition-1857ee3810c7-0",
+          "return_value-37ee51101f93-0",
+          "return_value-b442c6d137a5-0",
+          "return_value-cad666039460-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_engine_fest.py::test_a_duration_is_recorded_to_microseconds",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-58750af87cda-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_engine_fest_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-ab772334aa17-1",
+          "arithmetic_op-ea902220adbb-0",
+          "boolean_op-d22c09ee387d-0",
+          "comparison_op-876ccb542635-0",
+          "constant_replace-234bebcf8ad2-0",
+          "constant_replace-265e173d0384-0",
+          "constant_replace-4664f70d0be0-1",
+          "constant_replace-4dbc2dd0f4f0-1",
+          "constant_replace-55081866c6d2-0",
+          "constant_replace-697949a577a4-0",
+          "constant_replace-6e966e761492-1",
+          "constant_replace-733f964e3064-0",
+          "constant_replace-8b8b19d8fe1f-1",
+          "constant_replace-8ba22af31f07-0",
+          "constant_replace-d1626e351651-0",
+          "constant_replace-d8d2f0a45732-1",
+          "constant_replace-fba795539b7d-0",
+          "negate_condition-1857ee3810c7-0",
+          "return_value-37ee51101f93-0",
+          "return_value-b442c6d137a5-0",
+          "return_value-cad666039460-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_engine_fest.py::test_a_duration_missing_a_field_is_read_as_zero_not_as_one_second",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-234bebcf8ad2-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_engine_fest_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "comparison_op-876ccb542635-0",
+          "constant_replace-265e173d0384-0",
+          "constant_replace-500b5849f600-1",
+          "constant_replace-8ba22af31f07-0",
+          "negate_condition-1857ee3810c7-0",
+          "return_value-37ee51101f93-0",
+          "return_value-cad666039460-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_engine_fest.py::test_an_unknown_engine_status_is_refused_not_guessed",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-500b5849f600-1"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_engine_fest_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-d22c09ee387d-1",
+          "comparison_op-876ccb542635-1",
+          "constant_replace-008d43569c09-0",
+          "constant_replace-234bebcf8ad2-2",
+          "constant_replace-4ad550487bf6-0",
+          "constant_replace-4ad550487bf6-1",
+          "constant_replace-94183938888e-0",
+          "negate_condition-bc02ef7eee5b-0",
+          "return_value-5807380a6223-0",
+          "zero_iteration_loop-38dc0f9ecac4-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_engine_fest.py::test_coverage_is_measured_over_directories_never_a_single_file",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "boolean_op-d22c09ee387d-1",
+          "comparison_op-876ccb542635-1",
+          "constant_replace-008d43569c09-0",
+          "constant_replace-234bebcf8ad2-2",
+          "constant_replace-4ad550487bf6-0",
+          "constant_replace-4ad550487bf6-1",
+          "constant_replace-94183938888e-0",
+          "negate_condition-bc02ef7eee5b-0",
+          "return_value-5807380a6223-0",
+          "zero_iteration_loop-38dc0f9ecac4-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_engine_fest_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "comparison_op-876ccb542635-0",
+          "constant_replace-15b7b672a0e9-0",
+          "constant_replace-265e173d0384-0",
+          "constant_replace-4066eab98c69-0",
+          "constant_replace-4664f70d0be0-0",
+          "constant_replace-4664f70d0be0-1",
+          "constant_replace-4dbc2dd0f4f0-0",
+          "constant_replace-4dbc2dd0f4f0-1",
+          "constant_replace-55081866c6d2-0",
+          "constant_replace-697949a577a4-0",
+          "constant_replace-6e966e761492-0",
+          "constant_replace-6e966e761492-1",
+          "constant_replace-8b8b19d8fe1f-0",
+          "constant_replace-8b8b19d8fe1f-1",
+          "constant_replace-8ba22af31f07-0",
+          "constant_replace-adaae9bda544-0",
+          "constant_replace-af676d51f2c0-0",
+          "constant_replace-bfc4f2d98084-0",
+          "constant_replace-d8d2f0a45732-0",
+          "constant_replace-d8d2f0a45732-1",
+          "constant_replace-fba795539b7d-0",
+          "negate_condition-1857ee3810c7-0",
+          "return_value-37ee51101f93-0",
+          "return_value-b442c6d137a5-0",
+          "return_value-cad666039460-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-4066eab98c69-0",
+          "constant_replace-4664f70d0be0-0",
+          "constant_replace-4dbc2dd0f4f0-0",
+          "constant_replace-6e966e761492-0",
+          "constant_replace-8b8b19d8fe1f-0",
+          "constant_replace-d8d2f0a45732-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_mutation_engine_fest_fest_20260913",
+        "dominated_by": [
+          "src/conductor/test_mutation_engine_fest.py::test_every_receipt_field_a_row_carries_is_pinned"
+        ],
+        "killed_mutants": [
+          "comparison_op-876ccb542635-0",
+          "constant_replace-265e173d0384-0",
+          "constant_replace-4664f70d0be0-1",
+          "constant_replace-4dbc2dd0f4f0-1",
+          "constant_replace-55081866c6d2-0",
+          "constant_replace-6e966e761492-1",
+          "constant_replace-8b8b19d8fe1f-1",
+          "constant_replace-8ba22af31f07-0",
+          "constant_replace-adaae9bda544-0",
+          "constant_replace-af676d51f2c0-0",
+          "constant_replace-bfc4f2d98084-0",
+          "constant_replace-d8d2f0a45732-1",
+          "constant_replace-fba795539b7d-0",
+          "negate_condition-1857ee3810c7-0",
+          "return_value-37ee51101f93-0",
+          "return_value-b442c6d137a5-0",
+          "return_value-cad666039460-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_engine_fest.py::test_rows_are_ordered_by_position_so_repeats_name_stably",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_mutation_engine_fest_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "constant_replace-500b5849f600-0",
+          "constant_replace-b04d9b671995-0",
+          "constant_replace-b41cb1471fc1-0",
+          "constant_replace-d0ccb6729e35-0",
+          "return_value-c57cd991b464-0"
+        ],
+        "nodeid": "src/conductor/test_mutation_engine_fest.py::test_the_config_carries_the_bound_the_run_resolved",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "constant_replace-500b5849f600-0",
+          "constant_replace-b04d9b671995-0",
+          "constant_replace-b41cb1471fc1-0",
+          "constant_replace-d0ccb6729e35-0",
+          "return_value-c57cd991b464-0"
+        ]
+      }
+    ]
+  },
+  "timed_out": 0,
+  "unviable": 0
+}

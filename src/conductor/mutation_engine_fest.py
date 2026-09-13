@@ -242,9 +242,6 @@ def execute(
 
     if drifted := _core.drift(campaign, worktree):
         raise CampaignError(f"snapshot source hashes drifted: {drifted}")
-    (worktree / "fest.toml").write_text(
-        _config(campaign, sys.executable), encoding="utf-8"
-    )
     coverage_path = worktree / ".coverage"
     environment = {
         **_environment(campaign, worktree),
@@ -257,16 +254,17 @@ def execute(
         timeout_seconds=campaign.run_timeout_seconds,
         environment=environment,
     )
-    receipt["baseline_argv"] = baseline_argv
-    receipt["baseline"] = baseline.as_dict()
-    if baseline.timed_out or baseline.returncode != 0:
-        receipt["status"] = "BASELINE_FAILED"
-        _core.atomic_json(output_path, receipt)
-        raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+    _core.note_baseline(campaign, receipt, baseline, baseline_argv, output_path)
     if not coverage_path.is_file():
         raise CampaignError(
             f"baseline produced no coverage database at {coverage_path}"
         )
+    # fest.toml is written after the baseline on purpose: the per-mutant
+    # timeout it pins is derived from that baseline's wall time when the
+    # manifest does not pin one, and the coverage run above does not read it.
+    (worktree / "fest.toml").write_text(
+        _config(campaign, sys.executable), encoding="utf-8"
+    )
 
     result, stdout = _core.run(
         _engine_argv(campaign, binary, coverage_path),
