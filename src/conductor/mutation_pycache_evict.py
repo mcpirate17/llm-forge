@@ -76,8 +76,8 @@ def evict_now() -> list[Path]:
     sources = os.environ.get(SOURCES_ENV)
     if not scratch or not sources:
         return []
-    prefix = (Path(scratch) / "pycache").resolve()
     try:
+        prefix = (Path(scratch) / "pycache").resolve()
         caches = [
             cache
             for source in sources.split(os.pathsep)
@@ -90,10 +90,12 @@ def evict_now() -> list[Path]:
     except Exception:
         # Never take the child down at startup: an engine that grades by exit
         # code reads a startup crash as a kill, with no test having run. The
-        # prefix tree dies instead, and every child of the run recompiles.
-        # A deletion failure here still raises -- that cache is out of
-        # control, and grading against it would be a verdict of luck.
-        shutil.rmtree(prefix)
+        # run's whole scratch dies instead, and every child of the run
+        # recompiles. `scratch` is a checked non-empty string, so the handler
+        # itself has nothing left to get wrong before the deletion; a
+        # deletion failure still raises -- a cache this process cannot
+        # control is not one it can grade against.
+        shutil.rmtree(scratch)
         return []
 
 

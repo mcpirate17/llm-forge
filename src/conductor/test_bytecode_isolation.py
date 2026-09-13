@@ -219,3 +219,33 @@ def test_eviction_refuses_to_leave_the_runs_own_scratch(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="not under the run's cache prefix"):
         evict_mutated_caches([source], scratch_root_for(run))
     assert victim.is_file(), "a refused eviction must not delete anything"
+
+
+def test_the_runs_scratch_root_is_one_pinned_name(tmp_path: Path) -> None:
+    """The launcher, the plugin and attribution must agree on where caches live.
+
+    A renamed scratch silently forks a run's caches: whoever computes the old
+    name stops finding them, whoever computes the new one starts from an
+    empty prefix. One literal, shared by every consumer.
+    """
+
+    assert scratch_root_for(tmp_path) == tmp_path / ".bytecode-isolation"
+
+
+def test_eviction_reports_exactly_the_files_it_removed(tmp_path: Path) -> None:
+    """The return value is the receipt of what died, nothing more.
+
+    Callers (the plugin's fault accounting among them) read this list to know
+    a cache was actually dropped -- a lie here reads as immunity.
+    """
+
+    source = tmp_path / "m.py"
+    source.write_text("x = 1\n", encoding="utf-8")
+    scratch = tmp_path / "scratch"
+    caches = cache_paths_for(source, scratch / "pycache")
+    for cache in caches:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(b"stale")
+
+    assert evict_mutated_caches([source], scratch) == caches
+    assert not any(cache.exists() for cache in caches)

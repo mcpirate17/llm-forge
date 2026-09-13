@@ -258,10 +258,10 @@ def test_the_environment_loads_the_eviction_plugin_for_every_child(
     assert env[SOURCES_ENV] == str(tmp_path / "src/conductor/mutated.py")
 
 
-def test_an_inherited_addopts_survives_with_the_plugin_appended(
+def test_a_campaigns_declared_addopts_survive_with_the_plugin_appended(
     tmp_path: Path,
 ) -> None:
-    """A campaign (or host) that set PYTEST_ADDOPTS keeps it, plugin and all."""
+    """A campaign that declared PYTEST_ADDOPTS keeps it, plugin and all."""
 
     (tmp_path / "src").mkdir()
     campaign = _EnvironmentCampaign()

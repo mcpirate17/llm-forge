@@ -224,9 +224,10 @@ def _environment(
     bin_dir = str(Path(sys.executable).parent)
     declared = campaign.environment.get("PYTHONPATH", "").split(os.pathsep)
     roots = [*_import_roots(worktree), *declared]
-    inherited_addopts = campaign.environment.get(
-        "PYTEST_ADDOPTS", os.environ.get("PYTEST_ADDOPTS", "")
-    )
+    # Only what the campaign declares: this environment is built inside
+    # children that already carry our own PYTEST_ADDOPTS, so inheriting from
+    # the ambient os.environ would append the plugin to itself.
+    declared_addopts = campaign.environment.get("PYTEST_ADDOPTS", "")
     return {
         **campaign.environment,
         "PYTHONPATH": os.pathsep.join(root for root in roots if root),
@@ -234,7 +235,7 @@ def _environment(
         "PATH": bin_dir + os.pathsep + os.environ.get("PATH", ""),
         "PYTEST_ADDOPTS": " ".join(
             part
-            for part in (inherited_addopts.strip(), f"-p {PLUGIN_NAME}")
+            for part in (declared_addopts.strip(), f"-p {PLUGIN_NAME}")
             if part
         ),
         SCRATCH_ENV: str(scratch_root_for(worktree)),
