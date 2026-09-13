@@ -143,7 +143,12 @@ to tell which path ran: the Python path logs exactly one stderr line,
 `forge session preamble --host <root> --a2a-name <id> --text` prints the
 inject body directly, so a manual run shows what the binary would inject.
 Set `FORGE_BIN=` (empty) to force the Python stages — the same convention
-as `FORGE_NATIVE_HOOKS`.
+as `FORGE_NATIVE_HOOKS`. The integration line the landed-worktrees count
+judges against resolves **offline** (configured branch, bound symref, or
+the one conventional `origin/{master,main}` ref): session start never
+opens a network connection — `ls-remote` is the reaper's, not the hook's.
+To pin the line explicitly, set `CONDUCTOR_INTEGRATION_BRANCH` or bind the
+symref once with `git remote set-head origin -a`.
 
 ## Verify the install
 
