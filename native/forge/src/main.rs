@@ -8,6 +8,7 @@
 //! time into `handlers::registry()` and `dispatch::run_hook` stops shelling out for
 //! whatever is covered.
 
+mod active_state;
 mod bash_guard;
 mod bash_impact;
 mod bounded_child;
@@ -36,10 +37,9 @@ mod post_tool;
 mod read_budget;
 mod receipt_show;
 mod route;
-mod active_state;
 mod session_end;
-mod session_preamble;
 mod session_policy;
+mod session_preamble;
 mod subagent_stop;
 mod subagent_transcript;
 mod takeover;

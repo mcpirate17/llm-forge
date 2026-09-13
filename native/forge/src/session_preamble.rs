@@ -241,7 +241,8 @@ mod tests {
         assert_eq!(&lines[6..], &["- Heading A", "- Heading B"]);
         let payload = hook_payload(&body);
         assert_eq!(
-            payload["hookSpecificOutput"]["hookEventName"], "SessionStart"
+            payload["hookSpecificOutput"]["hookEventName"],
+            "SessionStart"
         );
         assert_eq!(payload["hookSpecificOutput"]["additionalContext"], body);
     }
@@ -267,21 +268,15 @@ mod tests {
     #[test]
     fn the_a2a_block_needs_both_parts_and_clips_the_summary() {
         let scratch = fixture_repo("a2a");
-        let both = render_text(
-            &empty_state(),
-            "fable-5",
-            &"s".repeat(1300),
-            scratch.path(),
-        )
-        .unwrap();
+        let both =
+            render_text(&empty_state(), "fable-5", &"s".repeat(1300), scratch.path()).unwrap();
         assert!(both.contains("A2A compact (fable-5); retrieve only when needed"));
         let summary_line = both.lines().last().unwrap();
         assert_eq!(summary_line.chars().count(), MAX_A2A_CHARS);
 
         let name_only = render_text(&empty_state(), "fable-5", "", scratch.path()).unwrap();
         assert!(!name_only.contains("A2A compact"));
-        let summary_only =
-            render_text(&empty_state(), "", "some summary", scratch.path()).unwrap();
+        let summary_only = render_text(&empty_state(), "", "some summary", scratch.path()).unwrap();
         assert!(!summary_only.contains("A2A compact"));
 
         // A claim in the state is counted, not just headings and mandates.

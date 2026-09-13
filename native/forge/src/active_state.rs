@@ -109,8 +109,12 @@ pub fn validate_active_state(state: &ActiveState, now: f64) -> Result<(), String
             state.schema_version
         ));
     }
-    let updated = instant::parse(&state.last_updated)
-        .ok_or_else(|| format!("active-state last_updated is invalid: '{}'", state.last_updated))?;
+    let updated = instant::parse(&state.last_updated).ok_or_else(|| {
+        format!(
+            "active-state last_updated is invalid: '{}'",
+            state.last_updated
+        )
+    })?;
     if updated > now + 60.0 {
         return Err("active-state last_updated is implausibly in the future".to_string());
     }
@@ -145,7 +149,9 @@ pub fn write_state_atomic(path: &Path, state: &ActiveState) -> std::io::Result<(
     payload.push('\n');
     let temp = path.parent().unwrap_or(Path::new(".")).join(format!(
         ".{}.{}.tmp",
-        path.file_name().map(|name| name.to_string_lossy()).unwrap_or_default(),
+        path.file_name()
+            .map(|name| name.to_string_lossy())
+            .unwrap_or_default(),
         std::process::id()
     ));
     let outcome = (|| -> std::io::Result<()> {
@@ -172,8 +178,7 @@ pub fn save_active_state(repo: &Path) -> Result<ActiveState> {
     let state = generate_active_state(repo)?;
     validate_active_state(&state, instant::now()).map_err(anyhow::Error::msg)?;
     let path = repo.join("conductor").join("active_state.json");
-    write_state_atomic(&path, &state)
-        .with_context(|| format!("writing {}", path.display()))?;
+    write_state_atomic(&path, &state).with_context(|| format!("writing {}", path.display()))?;
     Ok(state)
 }
 
@@ -297,9 +302,17 @@ mod tests {
         let state = save_active_state(scratch.path()).unwrap();
         let path = scratch.path().join("conductor").join("active_state.json");
         let text = std::fs::read_to_string(&path).unwrap();
-        assert!(text.ends_with("}\n"), "the Python writes a trailing newline");
+        assert!(
+            text.ends_with("}\n"),
+            "the Python writes a trailing newline"
+        );
         let value: Value = serde_json::from_str(&text).unwrap();
-        let keys: Vec<&str> = value.as_object().unwrap().keys().map(String::as_str).collect();
+        let keys: Vec<&str> = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
         assert_eq!(
             keys,
             vec![
