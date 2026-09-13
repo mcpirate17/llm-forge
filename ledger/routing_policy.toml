@@ -1,0 +1,47 @@
+# Routing policy for the `Agent` dispatch seam (docs/design/cost_ledger.md
+# section 5, docs/roadmap.md Phase 3 step 2). Approved by Tim 2026-09-13.
+#
+# `tier_order` ranks the four model tiers cheapest-to-priciest; a requested
+# model above a class's own tier is denied unless the description contains
+# `justify:`. `policy_version` is bumped by hand whenever this table changes
+# -- it is not derived from the file's mtime or a hash.
+
+policy_version = "2026-09-13.1"
+tier_order = ["haiku", "sonnet", "opus", "fable"]
+justify_marker = "justify:"
+
+[[class]]
+name = "explore"
+subagent_types = ["Explore", "claude-code-guide", "statusline-setup"]
+description_prefixes = ["clerical:"]
+tier = "haiku"
+cap_tokens = 150000
+
+[[class]]
+name = "general"
+subagent_types = ["general-purpose", "claude"]
+description_prefixes = []
+tier = "sonnet"
+cap_tokens = 150000
+
+[[class]]
+name = "design"
+subagent_types = ["Plan"]
+description_prefixes = ["design:", "rust:"]
+tier = "opus"
+cap_tokens = 150000
+
+# `inherit` has no real tier of its own: any dispatch it matches is denied
+# outright unless the description carries the justify escape. `tier` is the
+# literal string "deny" (not a member of `tier_order`) so `route.rs` can
+# recognize the row without a second boolean field.
+[[class]]
+name = "inherit"
+subagent_types = ["fork"]
+description_prefixes = []
+requested_models = ["fable", "inherit"]
+tier = "deny"
+cap_tokens = 150000
+
+[deny]
+default_class = "general"
