@@ -39,6 +39,7 @@ mod route;
 mod session_end;
 mod subagent_stop;
 mod subagent_transcript;
+mod takeover;
 mod telemetry;
 mod tool_quiet;
 mod workspace_hygiene;

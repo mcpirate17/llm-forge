@@ -13,6 +13,7 @@
 //! preserved (serde_json `preserve_order` keeps the object key order both
 //! on load and on write).
 
+use crate::takeover;
 use anyhow::{bail, Context, Result};
 use clap::{Args, Subcommand};
 use serde_json::{json, Value};
@@ -74,6 +75,12 @@ pub struct InstallArgs {
     /// Print the unified diff and write nothing.
     #[arg(long)]
     pub(crate) dry_run: bool,
+    /// Remove the host's Python dispatcher entry for every event
+    /// `takeover::coverage` reports `Full` for, recording each one into
+    /// `.claude/settings.forge-takeover.json`; `Partial` events keep their
+    /// Python entry untouched. Implies `--standalone`.
+    #[arg(long)]
+    pub(crate) takeover: bool,
 }
 
 #[derive(Args)]
@@ -121,7 +128,7 @@ fn timeout_for(event: &str) -> u64 {
 
 /// The hook command exactly as the hand install wrote it: env prefix, then
 /// the binary, then `hook <Event>`.
-fn hook_command(binary: &str, mode: &str, standalone: bool, event: &str) -> String {
+pub(crate) fn hook_command(binary: &str, mode: &str, standalone: bool, event: &str) -> String {
     let mut command = format!("FORGE_MODE={mode}");
     if standalone {
         command.push_str(" FORGE_HOOK_STANDALONE=1");
@@ -133,7 +140,7 @@ fn hook_command(binary: &str, mode: &str, standalone: bool, event: &str) -> Stri
 /// One settings `hooks.<Event>` entry for forge. PreToolUse gets the `.*`
 /// matcher (forge sees every call, not just `Agent`); the other events have
 /// no matcher field at all, matching the hand-installed shape.
-fn forge_entry(event: &str, command: &str) -> Value {
+pub(crate) fn forge_entry(event: &str, command: &str) -> Value {
     let hook = json!({
         "type": "command",
         "command": command,
@@ -227,7 +234,7 @@ pub(crate) fn load_settings(host: &Path) -> Result<(Option<String>, Value)> {
     Ok((Some(text), value))
 }
 
-fn serialize(settings: &Value) -> String {
+pub(crate) fn serialize(settings: &Value) -> String {
     let mut text = serde_json::to_string_pretty(settings).expect("Value serializes");
     text.push('\n');
     text
@@ -253,7 +260,7 @@ fn backup_once(host: &Path) -> Result<()> {
 
 /// Temp file + rename in the target directory: a half-written
 /// settings.json must never be what the harness reads.
-fn write_atomic(path: &Path, text: &str) -> Result<()> {
+pub(crate) fn write_atomic(path: &Path, text: &str) -> Result<()> {
     let parent = path.parent().context("path always has a parent")?;
     std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     let tmp = parent.join(format!(
@@ -275,15 +282,41 @@ pub(crate) fn install(args: &InstallArgs) -> Result<u8> {
     if mode != "warn" && mode != "enforce" {
         bail!("--mode must be warn or enforce, got {mode:?}");
     }
+    let standalone = args.standalone || args.takeover;
     let binary = resolve_binary(&args.binary)?;
     let (old_text, mut settings) = load_settings(&args.host)?;
-    let new_text = install_into(&mut settings, &binary, mode, args.standalone)?;
+    install_into(&mut settings, &binary, mode, standalone)?;
+    let mut takeover_lines = Vec::new();
+    if args.takeover {
+        let binary_str = binary.display().to_string();
+        let (outcomes, _record) =
+            takeover::apply(&mut settings, &args.host, &binary_str, mode, args.dry_run)?;
+        for (event, outcome) in outcomes {
+            takeover_lines.push(match outcome {
+                takeover::EventOutcome::TakenOver => {
+                    format!("took over: {event} (python entry removed, recorded)")
+                }
+                takeover::EventOutcome::AlreadyTakenOver => {
+                    format!("already taken over: {event}")
+                }
+                takeover::EventOutcome::Kept { missing } => {
+                    format!("kept python: {event} (missing: {})", missing.join(", "))
+                }
+                takeover::EventOutcome::NoPythonEntry => {
+                    format!("no python entry: {event}")
+                }
+            });
+        }
+    }
+    let new_text = serialize(&settings);
     if old_text.as_deref() == Some(new_text.as_str()) {
         println!(
-            "forge hooks: already installed (mode={mode}, standalone={}, binary={}); nothing to do",
-            args.standalone,
+            "forge hooks: already installed (mode={mode}, standalone={standalone}, binary={}); nothing to do",
             binary.display()
         );
+        for line in &takeover_lines {
+            println!("{line}");
+        }
         return Ok(0);
     }
     if args.dry_run {
@@ -291,17 +324,22 @@ pub(crate) fn install(args: &InstallArgs) -> Result<u8> {
             "{}",
             unified_diff(old_text.as_deref().unwrap_or(""), &new_text)
         );
+        for line in &takeover_lines {
+            println!("{line}");
+        }
         return Ok(0);
     }
     backup_once(&args.host)?;
     write_atomic(&settings_path(&args.host), &new_text)?;
     println!(
-        "forge hooks: installed {} entries (mode={mode}, standalone={}, binary={}) in {}",
-        events_for(args.standalone).len(),
-        args.standalone,
+        "forge hooks: installed {} entries (mode={mode}, standalone={standalone}, binary={}) in {}",
+        events_for(standalone).len(),
         binary.display(),
         settings_path(&args.host).display()
     );
+    for line in &takeover_lines {
+        println!("{line}");
+    }
     Ok(0)
 }
 
@@ -371,7 +409,15 @@ fn install_into(
 
 fn uninstall(args: &UninstallArgs) -> Result<u8> {
     let (old_text, mut settings) = load_settings(&args.host)?;
-    let removed = uninstall_from(&mut settings)?;
+    let mut removed = uninstall_from(&mut settings)?;
+    let restored = if args.dry_run {
+        Vec::new()
+    } else {
+        takeover::restore(&mut settings, &args.host)?
+    };
+    for event in &restored {
+        removed.push(format!("(restored python entry for {event})"));
+    }
     if removed.is_empty() {
         println!("forge hooks: no forge hook entries found; nothing to do");
         return Ok(0);
@@ -462,7 +508,8 @@ fn status(args: &StatusArgs) -> Result<u8> {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        status_line(event, &entries, &mut missing_binary);
+        let python = takeover::python_status(&settings, &args.host, event);
+        status_line(event, &entries, python, &mut missing_binary);
     }
     if missing_binary {
         eprintln!("forge hooks status: an installed entry points at a missing binary");
@@ -474,9 +521,9 @@ fn status(args: &StatusArgs) -> Result<u8> {
 /// One line per event; flips `missing_binary` when an installed hook's
 /// binary is gone (that is the one condition worth failing on -- the hook
 /// would silently do nothing).
-fn status_line(event: &str, installed: &[ParsedHook], missing_binary: &mut bool) {
+fn status_line(event: &str, installed: &[ParsedHook], python: &str, missing_binary: &mut bool) {
     let Some(parsed) = installed.first() else {
-        println!("{event}: not installed");
+        println!("{event}: not installed python={python}");
         return;
     };
     let exists = Path::new(&parsed.binary).is_file();
@@ -489,7 +536,7 @@ fn status_line(event: &str, installed: &[ParsedHook], missing_binary: &mut bool)
         "n/a (binary missing)".to_string()
     };
     println!(
-        "{event}: installed mode={} standalone={} binary={} exists={} version={}",
+        "{event}: installed mode={} standalone={} binary={} exists={} version={} python={python}",
         parsed.mode, parsed.standalone, parsed.binary, exists, version
     );
     if installed.len() > 1 {
@@ -630,6 +677,7 @@ fn hunk_range(start: usize, count: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::takeover;
 
     struct ScratchDir(PathBuf);
     impl ScratchDir {
@@ -694,6 +742,18 @@ mod tests {
             standalone,
             binary: Some(PathBuf::from(BIN)),
             dry_run: false,
+            takeover: false,
+        }
+    }
+
+    fn takeover_args(host: &Path, dry_run: bool) -> InstallArgs {
+        InstallArgs {
+            host: host.to_path_buf(),
+            mode: "warn".to_string(),
+            standalone: false,
+            binary: Some(PathBuf::from(BIN)),
+            dry_run,
+            takeover: true,
         }
     }
 
@@ -995,5 +1055,127 @@ mod tests {
         assert!(versions_match(&format!("forge {VERSION_LINE}")));
         assert!(versions_match(VERSION_LINE));
         assert!(!versions_match("forge 0.0.0 (git deadbee)"));
+    }
+
+    /// A settings shape with the host's Python dispatcher wired for all
+    /// four events, matcher `.*` for Pre/PostToolUse and no matcher for
+    /// Session events -- the real shape (see `docs/routing.md`'s coverage
+    /// discussion), not any project's actual file.
+    fn dispatcher_settings() -> String {
+        r#"{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": ".*", "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py PreToolUse", "timeout": 30 } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": ".*", "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py PostToolUse", "timeout": 30 } ] }
+    ],
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py SessionStart", "timeout": 10 } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py SessionEnd", "timeout": 10 } ] }
+    ],
+    "SomeoneElsesHook": [
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "/opt/other/tool.sh", "timeout": 5 } ] }
+    ]
+  },
+  "unrelatedTopLevelKey": true
+}"#
+        .to_string()
+    }
+
+    #[test]
+    fn takeover_removes_only_full_events_python_entries() {
+        let scratch = ScratchDir::new("takeover-full-only");
+        scratch.write_settings(&dispatcher_settings());
+        install(&takeover_args(scratch.path(), false)).unwrap();
+        let settings = scratch.settings_value();
+
+        // PostToolUse (Full): Python entry gone, forge entry present.
+        let post = commands_for(&settings, "PostToolUse");
+        assert!(!post.iter().any(|c| c.contains("dispatch.py")));
+        assert!(post
+            .iter()
+            .any(|c| c.contains("forge") && c.contains("hook PostToolUse")));
+
+        // PreToolUse (Partial: Read/Edit/mcp graph tools still need Python):
+        // the Python entry must survive.
+        let pre = commands_for(&settings, "PreToolUse");
+        assert!(pre.iter().any(|c| c.contains("dispatch.py PreToolUse")));
+
+        // SessionStart/SessionEnd (Partial): untouched.
+        for event in ["SessionStart", "SessionEnd"] {
+            let cmds = commands_for(&settings, event);
+            assert!(cmds
+                .iter()
+                .any(|c| c.contains(&format!("dispatch.py {event}"))));
+        }
+
+        // Unrelated entries preserved byte-for-byte in shape.
+        assert_eq!(settings["hooks"]["SomeoneElsesHook"][0]["matcher"], "Bash");
+        assert_eq!(settings["unrelatedTopLevelKey"], true);
+
+        // Exactly the removed entry was recorded, verbatim.
+        let record: Value = serde_json::from_str(
+            &std::fs::read_to_string(takeover::takeover_path(scratch.path())).unwrap(),
+        )
+        .unwrap();
+        assert!(record.get("PreToolUse").is_none());
+        assert!(record.get("SessionStart").is_none());
+        let recorded_post = &record["PostToolUse"];
+        assert_eq!(recorded_post["matcher"], ".*");
+        assert_eq!(
+            recorded_post["hooks"][0]["command"],
+            "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py PostToolUse"
+        );
+    }
+
+    #[test]
+    fn second_takeover_run_is_a_no_op() {
+        let scratch = ScratchDir::new("takeover-idempotent");
+        scratch.write_settings(&dispatcher_settings());
+        install(&takeover_args(scratch.path(), false)).unwrap();
+        let after_first = scratch.settings_text();
+        let record_after_first =
+            std::fs::read_to_string(takeover::takeover_path(scratch.path())).unwrap();
+
+        install(&takeover_args(scratch.path(), false)).unwrap();
+        assert_eq!(scratch.settings_text(), after_first);
+        assert_eq!(
+            std::fs::read_to_string(takeover::takeover_path(scratch.path())).unwrap(),
+            record_after_first
+        );
+    }
+
+    #[test]
+    fn uninstall_restores_the_exact_pre_takeover_python_entry() {
+        let scratch = ScratchDir::new("takeover-uninstall");
+        let original: Value = serde_json::from_str(&dispatcher_settings()).unwrap();
+        scratch.write_settings(&dispatcher_settings());
+        install(&takeover_args(scratch.path(), false)).unwrap();
+
+        run(HooksCommand::Uninstall(UninstallArgs {
+            host: scratch.path().to_path_buf(),
+            dry_run: false,
+        }))
+        .unwrap();
+
+        let restored = scratch.settings_value();
+        assert_eq!(
+            restored["hooks"]["PostToolUse"][0],
+            original["hooks"]["PostToolUse"][0]
+        );
+        assert!(!takeover::takeover_path(scratch.path()).is_file());
+    }
+
+    #[test]
+    fn takeover_dry_run_writes_nothing() {
+        let scratch = ScratchDir::new("takeover-dry-run");
+        scratch.write_settings(&dispatcher_settings());
+        let before = scratch.settings_text();
+        install(&takeover_args(scratch.path(), true)).unwrap();
+        assert_eq!(scratch.settings_text(), before);
+        assert!(!takeover::takeover_path(scratch.path()).is_file());
     }
 }

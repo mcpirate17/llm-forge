@@ -132,6 +132,17 @@ agent tokens. Stop porting; finish Phase 3, then install.
    root, the embedded routing policy, and a live hook roundtrip that
    writes nothing. One line per check, exit 1 names the broken piece.
    DONE PR #61 (`docs/install.md`, "Verify the install").
+2e. (Claude) `forge hooks install --takeover`: one command retires the
+   host's Python dispatcher entry for every event forge fully covers
+   natively (`native/forge/src/takeover.rs::coverage`), records what it
+   removed for `uninstall` to restore, and leaves every partially-covered
+   event's Python entry untouched. Measured on a synthetic Bash payload:
+   `PostToolUse` (today Python-only, ~45 ms) drops to forge alone
+   (~3 ms) after takeover; `PreToolUse` stays Partial (both dispatch.py
+   and forge run today, ~49 ms combined vs. ~2 ms for forge alone --
+   quantifying the double-run cost, not yet realized since Python stays
+   wired there) -- see the coverage table and proof in the PR. DONE
+   PR #64 (`docs/install.md`, "Take over from the Python dispatcher").
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
