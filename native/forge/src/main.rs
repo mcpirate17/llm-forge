@@ -30,6 +30,7 @@ mod post_edit_audit;
 mod post_tool;
 mod read_budget;
 mod receipt_show;
+mod session_end;
 mod telemetry;
 mod tool_quiet;
 mod workspace_hygiene;
@@ -89,6 +90,9 @@ enum LedgerCommand {
     /// compare (or, with `--record`, replace) the baseline receipt (design
     /// step 5).
     Audit(ledger::audit::AuditArgs),
+    /// Retire day files older than the retention window: archive the
+    /// aggregates, drop the raw tables (design section 2 "Storage").
+    Prune(ledger::prune::PruneArgs),
     /// Calibration harness (design step 3): sample turns for the Python
     /// shim that measures the byte-proportional split's error bound.
     Calibrate {
@@ -165,6 +169,13 @@ fn main() -> ExitCode {
                 Ok(code) => ExitCode::from(code as u8),
                 Err(err) => {
                     eprintln!("forge ledger audit: {err:#}");
+                    ExitCode::from(1)
+                }
+            },
+            LedgerCommand::Prune(args) => match ledger::prune::run(args) {
+                Ok(code) => ExitCode::from(code as u8),
+                Err(err) => {
+                    eprintln!("forge ledger prune: {err:#}");
                     ExitCode::from(1)
                 }
             },

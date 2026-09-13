@@ -535,8 +535,7 @@ fn run_case(case: &Value, tmp_root: &Path) -> Vec<(&'static str, Value)> {
             vec![("line", Value::String(line))]
         }
         "telemetry_path" => {
-            let repo = make_repo(id);
-            let path = context_telemetry::telemetry_path(repo.path());
+            let path = context_telemetry::telemetry_path();
             if case
                 .get("env")
                 .is_some_and(|env| env.get("CONTEXT_TELEMETRY_PATH").is_some())
@@ -544,12 +543,13 @@ fn run_case(case: &Value, tmp_root: &Path) -> Vec<(&'static str, Value)> {
                 // The override case pins the absolute path verbatim.
                 vec![("path", Value::String(path.display().to_string()))]
             } else {
-                // The default case pins the repo-relative suffix (the
-                // checkout root differs per machine), so the inherited
-                // `<root>/src/research/tmp/...` shape is what is frozen.
-                let suffix = path
-                    .strip_prefix(repo.path())
-                    .expect("default telemetry path lives under the checkout root");
+                // The default case pins the suffix under the ledger root:
+                // `LEDGER_ROOT`, else `/mnt/data/llm/ledger`, both per
+                // machine -- so the last three components (telemetry/
+                // context_telemetry/events.jsonl) are what is frozen, the
+                // same shape the Python twin pins with its own parts[-3:].
+                let parts: Vec<_> = path.components().collect();
+                let suffix: std::path::PathBuf = parts[parts.len() - 3..].iter().collect();
                 vec![("path_suffix", Value::String(suffix.display().to_string()))]
             }
         }

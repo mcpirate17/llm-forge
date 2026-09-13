@@ -2,7 +2,6 @@
 //! `CONTEXT_TELEMETRY_PATH` is set.
 
 use serde::Serialize;
-use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
@@ -43,10 +42,15 @@ pub fn record_native(event: &str, elapsed_ms: f64) {
 }
 
 fn record(event: &str, elapsed_ms: f64, delegated: bool) {
-    let Ok(path) = env::var("CONTEXT_TELEMETRY_PATH") else {
-        return;
-    };
-    if path.trim().is_empty() {
+    // Same resolution as `context_telemetry::telemetry_path` (the env var,
+    // else the ledger-root default) -- forge used to stay silent without the
+    // env var because the old default lived inside the Python package's
+    // checkout, a location this binary refused to hardcode; the default now
+    // lives under the ledger root, outside every checkout, so the native
+    // hook-ms records land by default and `forge ledger audit`'s
+    // `median_hook_ms` stops being NO_DATA on a default install.
+    let path = crate::context_telemetry::telemetry_path();
+    if path.as_os_str().is_empty() {
         return;
     }
     let record = DelegationEvent {
@@ -55,7 +59,7 @@ fn record(event: &str, elapsed_ms: f64, delegated: bool) {
         delegated,
         ts: iso8601_utc_millis(SystemTime::now()),
     };
-    if let Err(err) = append_line(Path::new(&path), &record) {
+    if let Err(err) = append_line(&path, &record) {
         eprintln!("forge: context telemetry unavailable: {err}");
     }
 }

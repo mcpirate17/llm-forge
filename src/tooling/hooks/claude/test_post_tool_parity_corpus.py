@@ -403,8 +403,8 @@ def _run_read_budget(tmp: Path, label: str, payload: dict, seed: dict) -> dict:
 
 def _run_telemetry_path(case: dict) -> dict:
     # `adapters._telemetry_path` verbatim: the env override, else the
-    # module's own DEFAULT_PATH (derived from the module file's location
-    # -- the inherited `<checkout>/src/research` quirk).
+    # module's own DEFAULT_PATH (under the ledger root -- `LEDGER_ROOT`,
+    # else /mnt/data/llm/ledger).
     path = Path(
         os.environ.get("CONTEXT_TELEMETRY_PATH", str(telemetry.DEFAULT_PATH))
     )
@@ -413,12 +413,11 @@ def _run_telemetry_path(case: dict) -> dict:
     try:
         suffix = str(path.relative_to(_REPO))
     except ValueError:
-        # A conductor already imported from elsewhere (site-packages)
-        # pins DEFAULT_PATH under its own root; the inherited suffix
-        # shape -- src/research/tmp/context_telemetry/events.jsonl -- is
-        # what both twins freeze, and the Rust one asserts it under its
-        # own scratch root via strip_prefix.
-        suffix = str(Path(*path.parts[-5:]))
+        # The default lives outside the checkout, under a per-machine
+        # ledger root; the shape both twins freeze is the three
+        # components under that root (telemetry/context_telemetry/
+        # events.jsonl) -- the Rust twin pins the same last three.
+        suffix = str(Path(*path.parts[-3:]))
     return {"path_suffix": suffix}
 
 
