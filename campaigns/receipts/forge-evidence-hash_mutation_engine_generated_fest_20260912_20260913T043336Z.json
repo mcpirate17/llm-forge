@@ -3,6 +3,10 @@
   "baseline": null,
   "campaign_id": "forge-evidence-hash_mutation_engine_generated_fest_20260912",
   "core_sha256": "5844c55e1769a5c2b7e87772347c8d9854bc39e35a4791d6d3ed3a5044ef0ba9",
+  "detail": {
+    "encoding": "superseded",
+    "superseded_by": "forge-evidence-hash_mutation_engine_generated_fest_20260912_20260913T052217Z.json"
+  },
   "generated_at": "2026-09-13T04:33:36.548675+00:00",
   "interpreter": "/mnt/data/llm/scratch/forge-glm-timeouts/.venv/bin/python3",
   "killer_enforcement": null,
@@ -10,7 +14,6 @@
   "manifest": "campaigns/forge-evidence-hash_mutation_engine_generated_fest_20260912.json",
   "manifest_sha256": "57ff3083b295a84d3388db2424eb57b7bacdf60576a9e83ee52314901cb799b1",
   "memory_cap_bytes": 8589934592,
-  "mutants": [],
   "mutants_are_generated": true,
   "mutation_engine": "fest",
   "mutation_score": null,
@@ -53,6 +56,5 @@
   ],
   "test_sha256": {
     "src/conductor/test_mutation_engine_generated.py": "b8ea61015225c018987a9ee100981c83569355729944beb278439ed34e774e48"
-  },
-  "test_value": null
+  }
 }

@@ -21,6 +21,11 @@
   ],
   "campaign_id": "forge-rust-bash-guard_registry_fest_20260913",
   "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "detail": {
+    "encoding": "json",
+    "mutants": [],
+    "test_value": null
+  },
   "generated_at": "2026-09-13T01:24:12.050340+00:00",
   "interpreter": "/mnt/data/llm/scratch/forge-rust-guard/.venv/bin/python3",
   "killer_enforcement": null,
@@ -28,7 +33,6 @@
   "manifest": "campaigns/forge-rust-bash-guard_registry_fest_20260913.json",
   "manifest_sha256": "36c0254587b49250c96b838581e922a299b93730cea7db431df703508fe160da",
   "memory_cap_bytes": 8589934592,
-  "mutants": [],
   "mutants_are_generated": true,
   "mutation_engine": "fest",
   "mutation_score": null,
@@ -68,6 +72,5 @@
   ],
   "test_sha256": {
     "src/tooling/hooks/dispatch/test_registry.py": "15346ac4b128c970fbdae61f6a2639032a585313c2c1000d4e905d908e8e9be1"
-  },
-  "test_value": null
+  }
 }

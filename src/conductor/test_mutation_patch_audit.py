@@ -1255,3 +1255,44 @@ def test_unpinned_changed_files_fail_the_whole_audit(
     assert delta["new_uncovered_changed_files"] == ["sibling.py"]
     assert delta["status"] == "REGRESSED"
     assert reported["reproducibility"]["uncovered_changed_files"] == 1
+
+
+def test_value_verdicts_read_slim_receipts_the_same_as_legacy(
+    tmp_path: Path,
+) -> None:
+    """The value-analysis reader decodes detail lazily; verdicts do not move.
+
+    A compacted tree hands this reader receipts whose `test_value` lives under
+    the `detail` block (inline for small campaigns, one zstd+base64 blob for
+    big ones). Either way the unmeasured/inert verdicts must be exactly the
+    legacy ones -- the summary never moved.
+    """
+
+    from conductor.mutation_receipt_slim import slim_receipt
+
+    current = {"conductor/mutation_testing.py": "a" * 64}
+    measured = _measured(_campaign(tmp_path, "measured", ()))
+    value = {
+        "tests": [
+            {"nodeid": "t.py::test_kills", "classification": "CORE"},
+            {"nodeid": "t.py::test_inert", "classification": "DELETE_CANDIDATE"},
+        ]
+    }
+    small = _value_receipt(current, value, "20260905T000000Z")
+    small["mutants"] = [{"id": f"m{i}", "outcome": "KILLED"} for i in range(5)]
+    big = _value_receipt(current, value, "20260908T000000Z")
+    big["mutants"] = [{"id": f"m{i}", "outcome": "KILLED"} for i in range(80)]
+
+    for payload in (small, big):
+        slim = slim_receipt(payload)
+        assert "test_value" not in slim  # it moved under detail
+        unmeasured, inert = mutation_patch_audit._value_verdicts(
+            [measured],
+            {"measured": [slim]},
+            current,
+            tmp_path,
+            _tree(tmp_path),
+        )
+        assert unmeasured == []
+        assert [row["nodeid"] for row in inert] == ["t.py::test_inert"]
+        assert inert[0]["reason"] == "KILLS_NOTHING"

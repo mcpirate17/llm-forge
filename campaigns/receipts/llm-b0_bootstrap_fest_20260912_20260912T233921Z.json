@@ -32,6 +32,167 @@
   "campaign_id": "llm-b0_bootstrap_fest_20260912",
   "classification_required": [],
   "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "detail": {
+    "encoding": "json",
+    "mutants": [
+      {
+        "byte_length": 1336,
+        "byte_offset": 0,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-089c7b0a8288-0",
+        "line": 1,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"``python -m conductor.bootstrap <host-root>``: the platform's host bootstrap entry.\n\nThis is an alias onto :mod:`conductor.project_init` (``conductor init``), not a second\nscaffolding engine. ``project_init`` already writes, idempotently and fail-loud,\neverything a foreign project needs: the dispatcher's ``hooks`` block merged into\n``.claude/settings.json``, the ``.claude/hooks/dispatch.py`` launcher (its shebang\npinned to the interpreter that has this package installed, so it never depends on an\nin-tree ``tooling/`` directory), the code-review-graph MCP entry, a starter candidate\npolicy and mutation registry, a ``.github/workflows/weekly-audit.yml`` running this\npackage's own audits, a ``.claude/hooks/project/env.sh`` stub for repo-specific hook\ndefaults, and a warning (never a write) when the host's ``pyproject.toml`` is missing\nthe ``[tool.conductor]`` keys ``conductor.project_paths`` needs.\n\n``conductor.bootstrap`` exists only so a host can invoke the platform's onboarding\ncommand by the name this project advertises for it; a second implementation here would\nduplicate ``project_init``'s settings/MCP merge, conflict handling and doctor run for\nno behavioral difference. See ``conductor/project_init.py`` for the full contract,\n``conductor/test_bootstrap.py`` for the alias and shim contract this module owns.\n\"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/bootstrap.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 16,
+        "byte_offset": 1531,
+        "duration_seconds": 0.283362,
+        "id": "return_value-703586add361-0",
+        "line": 29,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "_init_main(argv)",
+        "outcome": "KILLED",
+        "path": "src/conductor/bootstrap.py",
+        "tests_run": [
+          "src/conductor/test_bootstrap.py::test_bootstrap_cli_scaffolds_a_real_working_dispatcher",
+          "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main",
+          "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code"
+        ]
+      },
+      {
+        "byte_length": 22,
+        "byte_offset": 1553,
+        "duration_seconds": 0.0,
+        "id": "negate_condition-d3e7eb3a2302-0",
+        "line": 32,
+        "mutated_text": "not (__name__ == \"__main__\")",
+        "operator": "negate_condition",
+        "original_text": "__name__ == \"__main__\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/bootstrap.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 1562,
+        "duration_seconds": 0.0,
+        "id": "comparison_op-db17ac7db45a-0",
+        "line": 32,
+        "mutated_text": "!=",
+        "operator": "comparison_op",
+        "original_text": "==",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/bootstrap.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 10,
+        "byte_offset": 1565,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-ef42ee4b215d-0",
+        "line": 32,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"__main__\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/bootstrap.py",
+        "tests_run": []
+      }
+    ],
+    "test_value": {
+      "adapter": "pytest-junit",
+      "baseline_repetitions": 2,
+      "classification_counts": {
+        "CORE": 1,
+        "DELETE_CANDIDATE": 0,
+        "INTENTIONAL_REDUNDANCY": 0,
+        "MERGE": 2
+      },
+      "errors": [],
+      "killers_by_mutant": {
+        "return_value-703586add361-0": [
+          "src/conductor/test_bootstrap.py::test_bootstrap_cli_scaffolds_a_real_working_dispatcher",
+          "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main",
+          "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code"
+        ]
+      },
+      "required_contracts": [
+        {
+          "active_paths": [
+            "src/conductor/bootstrap.py"
+          ],
+          "criticality": "high",
+          "id": "llm-b0_bootstrap_fest_20260912"
+        }
+      ],
+      "retained_core": [
+        "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main"
+      ],
+      "schema_version": "llm.mutation-testing.test-value.v1",
+      "status": "PASS",
+      "subprocess_scaling": "baseline_repetitions + mutants",
+      "tests": [
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "llm-b0_bootstrap_fest_20260912",
+          "dominated_by": [
+            "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main",
+            "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code"
+          ],
+          "killed_mutants": [
+            "return_value-703586add361-0"
+          ],
+          "nodeid": "src/conductor/test_bootstrap.py::test_bootstrap_cli_scaffolds_a_real_working_dispatcher",
+          "runtime_seconds_median": 0.278,
+          "unique_kills": []
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "llm-b0_bootstrap_fest_20260912",
+          "dominated_by": [
+            "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code"
+          ],
+          "killed_mutants": [
+            "return_value-703586add361-0"
+          ],
+          "nodeid": "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": []
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "llm-b0_bootstrap_fest_20260912",
+          "dominated_by": [
+            "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main"
+          ],
+          "killed_mutants": [
+            "return_value-703586add361-0"
+          ],
+          "nodeid": "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": []
+        }
+      ]
+    }
+  },
   "engine_result": {
     "duration_seconds": 0.287056,
     "returncode": 0,
@@ -56,77 +217,6 @@
   "manifest": "campaigns/llm-b0_bootstrap_fest_20260912.json",
   "manifest_sha256": "41367e19462ae5f71219a044ff119481ad03ddb9904b21c37d85c34b812cf5b4",
   "memory_cap_bytes": 8589934592,
-  "mutants": [
-    {
-      "byte_length": 1336,
-      "byte_offset": 0,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-089c7b0a8288-0",
-      "line": 1,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"\"\"``python -m conductor.bootstrap <host-root>``: the platform's host bootstrap entry.\n\nThis is an alias onto :mod:`conductor.project_init` (``conductor init``), not a second\nscaffolding engine. ``project_init`` already writes, idempotently and fail-loud,\neverything a foreign project needs: the dispatcher's ``hooks`` block merged into\n``.claude/settings.json``, the ``.claude/hooks/dispatch.py`` launcher (its shebang\npinned to the interpreter that has this package installed, so it never depends on an\nin-tree ``tooling/`` directory), the code-review-graph MCP entry, a starter candidate\npolicy and mutation registry, a ``.github/workflows/weekly-audit.yml`` running this\npackage's own audits, a ``.claude/hooks/project/env.sh`` stub for repo-specific hook\ndefaults, and a warning (never a write) when the host's ``pyproject.toml`` is missing\nthe ``[tool.conductor]`` keys ``conductor.project_paths`` needs.\n\n``conductor.bootstrap`` exists only so a host can invoke the platform's onboarding\ncommand by the name this project advertises for it; a second implementation here would\nduplicate ``project_init``'s settings/MCP merge, conflict handling and doctor run for\nno behavioral difference. See ``conductor/project_init.py`` for the full contract,\n``conductor/test_bootstrap.py`` for the alias and shim contract this module owns.\n\"\"\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/bootstrap.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 16,
-      "byte_offset": 1531,
-      "duration_seconds": 0.283362,
-      "id": "return_value-703586add361-0",
-      "line": 29,
-      "mutated_text": "None",
-      "operator": "return_value",
-      "original_text": "_init_main(argv)",
-      "outcome": "KILLED",
-      "path": "src/conductor/bootstrap.py",
-      "tests_run": [
-        "src/conductor/test_bootstrap.py::test_bootstrap_cli_scaffolds_a_real_working_dispatcher",
-        "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main",
-        "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code"
-      ]
-    },
-    {
-      "byte_length": 22,
-      "byte_offset": 1553,
-      "duration_seconds": 0.0,
-      "id": "negate_condition-d3e7eb3a2302-0",
-      "line": 32,
-      "mutated_text": "not (__name__ == \"__main__\")",
-      "operator": "negate_condition",
-      "original_text": "__name__ == \"__main__\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/bootstrap.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 2,
-      "byte_offset": 1562,
-      "duration_seconds": 0.0,
-      "id": "comparison_op-db17ac7db45a-0",
-      "line": 32,
-      "mutated_text": "!=",
-      "operator": "comparison_op",
-      "original_text": "==",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/bootstrap.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 10,
-      "byte_offset": 1565,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-ef42ee4b215d-0",
-      "line": 32,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"__main__\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/bootstrap.py",
-      "tests_run": []
-    }
-  ],
   "mutants_are_generated": true,
   "mutation_engine": "fest",
   "mutation_score": 1.0,
@@ -176,93 +266,6 @@
   ],
   "test_sha256": {
     "src/conductor/test_bootstrap.py": "336ad262f0e86597a704a472730dd9a7083869d0b35ddeb638699cd29d8e7c46"
-  },
-  "test_value": {
-    "adapter": "pytest-junit",
-    "baseline_repetitions": 2,
-    "classification_counts": {
-      "CORE": 1,
-      "DELETE_CANDIDATE": 0,
-      "INTENTIONAL_REDUNDANCY": 0,
-      "MERGE": 2
-    },
-    "errors": [],
-    "killers_by_mutant": {
-      "return_value-703586add361-0": [
-        "src/conductor/test_bootstrap.py::test_bootstrap_cli_scaffolds_a_real_working_dispatcher",
-        "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main",
-        "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code"
-      ]
-    },
-    "required_contracts": [
-      {
-        "active_paths": [
-          "src/conductor/bootstrap.py"
-        ],
-        "criticality": "high",
-        "id": "llm-b0_bootstrap_fest_20260912"
-      }
-    ],
-    "retained_core": [
-      "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main"
-    ],
-    "schema_version": "llm.mutation-testing.test-value.v1",
-    "status": "PASS",
-    "subprocess_scaling": "baseline_repetitions + mutants",
-    "tests": [
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "MERGE",
-        "contract_id": "llm-b0_bootstrap_fest_20260912",
-        "dominated_by": [
-          "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main",
-          "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code"
-        ],
-        "killed_mutants": [
-          "return_value-703586add361-0"
-        ],
-        "nodeid": "src/conductor/test_bootstrap.py::test_bootstrap_cli_scaffolds_a_real_working_dispatcher",
-        "runtime_seconds_median": 0.278,
-        "unique_kills": []
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "CORE",
-        "contract_id": "llm-b0_bootstrap_fest_20260912",
-        "dominated_by": [
-          "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code"
-        ],
-        "killed_mutants": [
-          "return_value-703586add361-0"
-        ],
-        "nodeid": "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main",
-        "runtime_seconds_median": 0.0,
-        "unique_kills": []
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "MERGE",
-        "contract_id": "llm-b0_bootstrap_fest_20260912",
-        "dominated_by": [
-          "src/conductor/test_bootstrap.py::test_bootstrap_main_delegates_argv_to_project_init_main"
-        ],
-        "killed_mutants": [
-          "return_value-703586add361-0"
-        ],
-        "nodeid": "src/conductor/test_bootstrap.py::test_bootstrap_main_returns_project_init_exit_code",
-        "runtime_seconds_median": 0.0,
-        "unique_kills": []
-      }
-    ]
   },
   "unviable": 0
 }

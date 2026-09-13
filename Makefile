@@ -91,12 +91,30 @@ mutation-generate:  ## Write campaigns for THIS BRANCH's changed files (nothing 
 	$(UV) run python -m conductor.mutation_campaign_generate write \
 		$(MUTATION_LANGUAGE) --base "$(MUTATION_BASE)" $(MUTATION_GENERATE_ARGS)
 
+# Ratchet iterations write their receipts under `.iterations/` (gitignored):
+# every run of a campaign grows a ~350 KB receipt and the tracked tree only
+# ever needs the final one, so a loop that commits each iteration was paying
+# for all of them in every clone. `mutation-receipt-promote` copies the newest
+# iteration receipt into the tracked directory when the loop settles.
+MUTATION_RECEIPT_ITERATIONS ?= $(MUTATION_RECEIPT)/.iterations
+
 mutation-engine-run:  ## Run a generated campaign through its engine in a disposable snapshot
 	@test -n "$(MUTATION_CAMPAIGN)" || { echo "Set MUTATION_CAMPAIGN=campaigns/<id>.json"; exit 2; }
+	@mkdir -p "$(MUTATION_RECEIPT_ITERATIONS)"
 	$(UV) run python -m conductor.mutation_engine_generated run "$(MUTATION_CAMPAIGN)" \
 		--allow-mutations --base "$(MUTATION_BASE)" \
-		$(if $(MUTATION_RECEIPT),--receipt "$(MUTATION_RECEIPT)/$(notdir $(basename $(MUTATION_CAMPAIGN)))_$(RUN_STAMP).json") \
+		$(if $(MUTATION_RECEIPT),--receipt "$(MUTATION_RECEIPT_ITERATIONS)/$(notdir $(basename $(MUTATION_CAMPAIGN)))_$(RUN_STAMP).json") \
 		$(MUTATION_ENGINE_ARGS)
+	@echo "iteration receipt: $(MUTATION_RECEIPT_ITERATIONS)/$(notdir $(basename $(MUTATION_CAMPAIGN)))_$(RUN_STAMP).json (gitignored)"
+	@echo "tracked receipts stay at $(MUTATION_RECEIPT)/ -- promote with 'make mutation-receipt-promote'"
+
+mutation-receipt-promote:  ## Copy the newest .iterations receipt of MUTATION_CAMPAIGN into the tracked receipt dir
+	@test -n "$(MUTATION_CAMPAIGN)" || { echo "Set MUTATION_CAMPAIGN=campaigns/<id>.json"; exit 2; }
+	@id=$(notdir $(basename $(MUTATION_CAMPAIGN))); \
+	newest=$$(ls -t "$(MUTATION_RECEIPT_ITERATIONS)/$${id}_"*.json 2>/dev/null | head -1); \
+	test -n "$$newest" || { echo "no iteration receipts for $$id under $(MUTATION_RECEIPT_ITERATIONS)/"; exit 2; }; \
+	cp "$$newest" "$(MUTATION_RECEIPT)/"; \
+	echo "promoted $$newest -> $(MUTATION_RECEIPT)/$$(basename $$newest) -- git add it with the PR"
 
 mutation-evidence:  ## Verify PASS receipts for MUTATION_PATHS, or for git-changed tests
 	@if [ -n "$(MUTATION_PATHS)" ]; then \

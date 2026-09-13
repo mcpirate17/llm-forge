@@ -32,6 +32,550 @@
   "campaign_id": "forge-notes-root_check_json_in_notes_fest_20260913",
   "classification_required": [],
   "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "detail": {
+    "encoding": "json",
+    "mutants": [
+      {
+        "byte_length": 651,
+        "byte_offset": 23,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-18d8ecfd45a1-0",
+        "line": 2,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"Repo guard: keep data files out of the top level of the notes root.\n\nThe notes root is the knowledge tree -- the host's ``[tool.conductor]``\n``notes_root``, the monorepo default being ``research/notes/`` -- where the KB\ncards and durable findings live, and the Laws table points at it by path. What\ndoes not belong there is bulk data: persistent JSON/CSV inputs belong under\nresearch/data/, and disposable tool output belongs under research/reports/ or\ntasks/audit/.\n\nOnly the top level is guarded. Subdirectories are exempt by design -- they are\ncurated collections, not loose data drops. Contract recorded in\ntasks/cleanup/cleanup_summary.md.\n\"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 7,
+        "byte_offset": 863,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-d486f779ddc7-0",
+        "line": 23,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\".json\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 8,
+        "byte_offset": 872,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-c5baac514b11-0",
+        "line": 23,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\".jsonl\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 6,
+        "byte_offset": 882,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-9ffddff4f356-0",
+        "line": 23,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\".csv\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 71,
+        "byte_offset": 981,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-b6b2d3f29160-0",
+        "line": 27,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"True when ``path`` is a data file directly inside the notes root.\"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 30,
+        "byte_offset": 1096,
+        "duration_seconds": 0.209011,
+        "id": "negate_condition-36f43a334a06-0",
+        "line": 29,
+        "mutated_text": "not (candidate.parent != notes_root)",
+        "operator": "negate_condition",
+        "original_text": "candidate.parent != notes_root",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
+          "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
+          "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
+          "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 1113,
+        "duration_seconds": 0.205609,
+        "id": "comparison_op-9936f2ee44c5-0",
+        "line": 29,
+        "mutated_text": "==",
+        "operator": "comparison_op",
+        "original_text": "!=",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
+          "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
+          "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
+          "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
+        ]
+      },
+      {
+        "byte_length": 5,
+        "byte_offset": 1143,
+        "duration_seconds": 0.207214,
+        "id": "return_value-272308f13fd4-0",
+        "line": 30,
+        "mutated_text": "True",
+        "operator": "return_value",
+        "original_text": "False",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
+          "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ]
+      },
+      {
+        "byte_length": 5,
+        "byte_offset": 1143,
+        "duration_seconds": 0.212015,
+        "id": "constant_replace-42b2f4a1d1e0-0",
+        "line": 30,
+        "mutated_text": "True",
+        "operator": "constant_replace",
+        "original_text": "False",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
+          "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ]
+      },
+      {
+        "byte_length": 38,
+        "byte_offset": 1160,
+        "duration_seconds": 0.209525,
+        "id": "return_value-754c3b1bc3f4-0",
+        "line": 31,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "candidate.suffix in FORBIDDEN_SUFFIXES",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 1177,
+        "duration_seconds": 0.214208,
+        "id": "comparison_op-f660a22c3cdd-0",
+        "line": 31,
+        "mutated_text": "not in",
+        "operator": "comparison_op",
+        "original_text": "in",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
+        ]
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 1339,
+        "duration_seconds": 0.217067,
+        "id": "boolean_op-90d053f796e0-0",
+        "line": 37,
+        "mutated_text": "",
+        "operator": "boolean_op",
+        "original_text": "not ",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ]
+      },
+      {
+        "byte_length": 7,
+        "byte_offset": 1339,
+        "duration_seconds": 0.201124,
+        "id": "negate_condition-597cdeb37d4a-0",
+        "line": 37,
+        "mutated_text": "not (not bad)",
+        "operator": "negate_condition",
+        "original_text": "not bad",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 1363,
+        "duration_seconds": 0.212912,
+        "id": "return_value-e9b389d32723-0",
+        "line": 38,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "0",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 1363,
+        "duration_seconds": 0.199112,
+        "id": "constant_replace-46584087c5be-0",
+        "line": 38,
+        "mutated_text": "1",
+        "operator": "constant_replace",
+        "original_text": "0",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ]
+      },
+      {
+        "byte_length": 3,
+        "byte_offset": 1381,
+        "duration_seconds": 0.213374,
+        "id": "zero_iteration_loop-93caa67ebcd0-0",
+        "line": 39,
+        "mutated_text": "[]",
+        "operator": "zero_iteration_loop",
+        "original_text": "bad",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 1624,
+        "duration_seconds": 0.220503,
+        "id": "return_value-bd4c4b152fd6-0",
+        "line": 45,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "1",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 1624,
+        "duration_seconds": 0.205366,
+        "id": "constant_replace-b62a2a8d3014-0",
+        "line": 45,
+        "mutated_text": "0",
+        "operator": "constant_replace",
+        "original_text": "1",
+        "outcome": "KILLED",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
+        ]
+      },
+      {
+        "byte_length": 22,
+        "byte_offset": 1631,
+        "duration_seconds": 0.0,
+        "id": "negate_condition-a38d59c16c44-0",
+        "line": 48,
+        "mutated_text": "not (__name__ == \"__main__\")",
+        "operator": "negate_condition",
+        "original_text": "__name__ == \"__main__\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 1640,
+        "duration_seconds": 0.0,
+        "id": "comparison_op-3533a051616d-0",
+        "line": 48,
+        "mutated_text": "!=",
+        "operator": "comparison_op",
+        "original_text": "==",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 10,
+        "byte_offset": 1643,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-7e020592e11f-0",
+        "line": 48,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"__main__\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/check_json_in_notes.py",
+        "tests_run": []
+      }
+    ],
+    "test_value": {
+      "adapter": "pytest-junit",
+      "baseline_repetitions": 2,
+      "classification_counts": {
+        "CORE": 2,
+        "DELETE_CANDIDATE": 0,
+        "INTENTIONAL_REDUNDANCY": 0,
+        "MERGE": 4
+      },
+      "errors": [],
+      "killers_by_mutant": {
+        "boolean_op-90d053f796e0-0": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ],
+        "comparison_op-9936f2ee44c5-0": [
+          "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
+          "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
+          "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
+        ],
+        "comparison_op-f660a22c3cdd-0": [
+          "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
+        ],
+        "constant_replace-42b2f4a1d1e0-0": [
+          "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
+          "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ],
+        "constant_replace-46584087c5be-0": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ],
+        "constant_replace-b62a2a8d3014-0": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
+        ],
+        "negate_condition-36f43a334a06-0": [
+          "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
+          "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
+          "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
+        ],
+        "negate_condition-597cdeb37d4a-0": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ],
+        "return_value-272308f13fd4-0": [
+          "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
+          "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ],
+        "return_value-754c3b1bc3f4-0": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
+        ],
+        "return_value-bd4c4b152fd6-0": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
+        ],
+        "return_value-e9b389d32723-0": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+        ],
+        "zero_iteration_loop-93caa67ebcd0-0": [
+          "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
+        ]
+      },
+      "required_contracts": [
+        {
+          "active_paths": [
+            "src/conductor/check_json_in_notes.py"
+          ],
+          "criticality": "high",
+          "id": "forge-notes-root_check_json_in_notes_fest_20260913"
+        }
+      ],
+      "retained_core": [
+        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
+      ],
+      "schema_version": "llm.mutation-testing.test-value.v1",
+      "status": "PASS",
+      "subprocess_scaling": "baseline_repetitions + mutants",
+      "tests": [
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
+          "dominated_by": [
+            "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree"
+          ],
+          "killed_mutants": [
+            "comparison_op-9936f2ee44c5-0",
+            "constant_replace-42b2f4a1d1e0-0",
+            "negate_condition-36f43a334a06-0",
+            "return_value-272308f13fd4-0"
+          ],
+          "nodeid": "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": []
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
+          "dominated_by": [
+            "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories"
+          ],
+          "killed_mutants": [
+            "comparison_op-9936f2ee44c5-0",
+            "constant_replace-42b2f4a1d1e0-0",
+            "negate_condition-36f43a334a06-0",
+            "return_value-272308f13fd4-0"
+          ],
+          "nodeid": "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": []
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
+          "dominated_by": [
+            "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
+          ],
+          "killed_mutants": [
+            "comparison_op-f660a22c3cdd-0"
+          ],
+          "nodeid": "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": []
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "boolean_op-90d053f796e0-0",
+            "comparison_op-9936f2ee44c5-0",
+            "comparison_op-f660a22c3cdd-0",
+            "constant_replace-42b2f4a1d1e0-0",
+            "constant_replace-b62a2a8d3014-0",
+            "negate_condition-36f43a334a06-0",
+            "negate_condition-597cdeb37d4a-0",
+            "return_value-272308f13fd4-0",
+            "return_value-754c3b1bc3f4-0",
+            "return_value-bd4c4b152fd6-0",
+            "zero_iteration_loop-93caa67ebcd0-0"
+          ],
+          "nodeid": "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
+          "runtime_seconds_median": 0.001,
+          "unique_kills": [
+            "constant_replace-b62a2a8d3014-0",
+            "return_value-bd4c4b152fd6-0",
+            "zero_iteration_loop-93caa67ebcd0-0"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "boolean_op-90d053f796e0-0",
+            "comparison_op-9936f2ee44c5-0",
+            "constant_replace-42b2f4a1d1e0-0",
+            "constant_replace-46584087c5be-0",
+            "negate_condition-36f43a334a06-0",
+            "negate_condition-597cdeb37d4a-0",
+            "return_value-272308f13fd4-0",
+            "return_value-e9b389d32723-0"
+          ],
+          "nodeid": "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
+          "runtime_seconds_median": 0.002,
+          "unique_kills": [
+            "constant_replace-46584087c5be-0",
+            "return_value-e9b389d32723-0"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "comparison_op-9936f2ee44c5-0",
+            "comparison_op-f660a22c3cdd-0",
+            "negate_condition-36f43a334a06-0",
+            "return_value-754c3b1bc3f4-0"
+          ],
+          "nodeid": "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": []
+        }
+      ]
+    }
+  },
   "engine_result": {
     "duration_seconds": 2.73112,
     "returncode": 0,
@@ -56,329 +600,6 @@
   "manifest": "campaigns/forge-notes-root_check_json_in_notes_fest_20260913.json",
   "manifest_sha256": "38b966af7ed380adab224eaa6c4ad2a14b9e821bfeb82b81a71cbb6d5c77c2fd",
   "memory_cap_bytes": 8589934592,
-  "mutants": [
-    {
-      "byte_length": 651,
-      "byte_offset": 23,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-18d8ecfd45a1-0",
-      "line": 2,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"\"\"Repo guard: keep data files out of the top level of the notes root.\n\nThe notes root is the knowledge tree -- the host's ``[tool.conductor]``\n``notes_root``, the monorepo default being ``research/notes/`` -- where the KB\ncards and durable findings live, and the Laws table points at it by path. What\ndoes not belong there is bulk data: persistent JSON/CSV inputs belong under\nresearch/data/, and disposable tool output belongs under research/reports/ or\ntasks/audit/.\n\nOnly the top level is guarded. Subdirectories are exempt by design -- they are\ncurated collections, not loose data drops. Contract recorded in\ntasks/cleanup/cleanup_summary.md.\n\"\"\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 7,
-      "byte_offset": 863,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-d486f779ddc7-0",
-      "line": 23,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\".json\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 8,
-      "byte_offset": 872,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-c5baac514b11-0",
-      "line": 23,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\".jsonl\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 6,
-      "byte_offset": 882,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-9ffddff4f356-0",
-      "line": 23,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\".csv\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 71,
-      "byte_offset": 981,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-b6b2d3f29160-0",
-      "line": 27,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"\"\"True when ``path`` is a data file directly inside the notes root.\"\"\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 30,
-      "byte_offset": 1096,
-      "duration_seconds": 0.209011,
-      "id": "negate_condition-36f43a334a06-0",
-      "line": 29,
-      "mutated_text": "not (candidate.parent != notes_root)",
-      "operator": "negate_condition",
-      "original_text": "candidate.parent != notes_root",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
-        "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
-        "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
-        "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
-      ]
-    },
-    {
-      "byte_length": 2,
-      "byte_offset": 1113,
-      "duration_seconds": 0.205609,
-      "id": "comparison_op-9936f2ee44c5-0",
-      "line": 29,
-      "mutated_text": "==",
-      "operator": "comparison_op",
-      "original_text": "!=",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
-        "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
-        "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
-        "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
-      ]
-    },
-    {
-      "byte_length": 5,
-      "byte_offset": 1143,
-      "duration_seconds": 0.207214,
-      "id": "return_value-272308f13fd4-0",
-      "line": 30,
-      "mutated_text": "True",
-      "operator": "return_value",
-      "original_text": "False",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
-        "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ]
-    },
-    {
-      "byte_length": 5,
-      "byte_offset": 1143,
-      "duration_seconds": 0.212015,
-      "id": "constant_replace-42b2f4a1d1e0-0",
-      "line": 30,
-      "mutated_text": "True",
-      "operator": "constant_replace",
-      "original_text": "False",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
-        "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ]
-    },
-    {
-      "byte_length": 38,
-      "byte_offset": 1160,
-      "duration_seconds": 0.209525,
-      "id": "return_value-754c3b1bc3f4-0",
-      "line": 31,
-      "mutated_text": "None",
-      "operator": "return_value",
-      "original_text": "candidate.suffix in FORBIDDEN_SUFFIXES",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
-      ]
-    },
-    {
-      "byte_length": 2,
-      "byte_offset": 1177,
-      "duration_seconds": 0.214208,
-      "id": "comparison_op-f660a22c3cdd-0",
-      "line": 31,
-      "mutated_text": "not in",
-      "operator": "comparison_op",
-      "original_text": "in",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
-      ]
-    },
-    {
-      "byte_length": 4,
-      "byte_offset": 1339,
-      "duration_seconds": 0.217067,
-      "id": "boolean_op-90d053f796e0-0",
-      "line": 37,
-      "mutated_text": "",
-      "operator": "boolean_op",
-      "original_text": "not ",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ]
-    },
-    {
-      "byte_length": 7,
-      "byte_offset": 1339,
-      "duration_seconds": 0.201124,
-      "id": "negate_condition-597cdeb37d4a-0",
-      "line": 37,
-      "mutated_text": "not (not bad)",
-      "operator": "negate_condition",
-      "original_text": "not bad",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 1363,
-      "duration_seconds": 0.212912,
-      "id": "return_value-e9b389d32723-0",
-      "line": 38,
-      "mutated_text": "None",
-      "operator": "return_value",
-      "original_text": "0",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 1363,
-      "duration_seconds": 0.199112,
-      "id": "constant_replace-46584087c5be-0",
-      "line": 38,
-      "mutated_text": "1",
-      "operator": "constant_replace",
-      "original_text": "0",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ]
-    },
-    {
-      "byte_length": 3,
-      "byte_offset": 1381,
-      "duration_seconds": 0.213374,
-      "id": "zero_iteration_loop-93caa67ebcd0-0",
-      "line": 39,
-      "mutated_text": "[]",
-      "operator": "zero_iteration_loop",
-      "original_text": "bad",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 1624,
-      "duration_seconds": 0.220503,
-      "id": "return_value-bd4c4b152fd6-0",
-      "line": 45,
-      "mutated_text": "None",
-      "operator": "return_value",
-      "original_text": "1",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 1624,
-      "duration_seconds": 0.205366,
-      "id": "constant_replace-b62a2a8d3014-0",
-      "line": 45,
-      "mutated_text": "0",
-      "operator": "constant_replace",
-      "original_text": "1",
-      "outcome": "KILLED",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
-      ]
-    },
-    {
-      "byte_length": 22,
-      "byte_offset": 1631,
-      "duration_seconds": 0.0,
-      "id": "negate_condition-a38d59c16c44-0",
-      "line": 48,
-      "mutated_text": "not (__name__ == \"__main__\")",
-      "operator": "negate_condition",
-      "original_text": "__name__ == \"__main__\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 2,
-      "byte_offset": 1640,
-      "duration_seconds": 0.0,
-      "id": "comparison_op-3533a051616d-0",
-      "line": 48,
-      "mutated_text": "!=",
-      "operator": "comparison_op",
-      "original_text": "==",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 10,
-      "byte_offset": 1643,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-7e020592e11f-0",
-      "line": 48,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"__main__\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/check_json_in_notes.py",
-      "tests_run": []
-    }
-  ],
   "mutants_are_generated": true,
   "mutation_engine": "fest",
   "mutation_score": 1.0,
@@ -428,224 +649,6 @@
   ],
   "test_sha256": {
     "src/conductor/test_check_json_in_notes.py": "fab334f9e46c81166b651e1c4fbe5e534f5a0593ee6c6f9c9c0a2b7f55b8e769"
-  },
-  "test_value": {
-    "adapter": "pytest-junit",
-    "baseline_repetitions": 2,
-    "classification_counts": {
-      "CORE": 2,
-      "DELETE_CANDIDATE": 0,
-      "INTENTIONAL_REDUNDANCY": 0,
-      "MERGE": 4
-    },
-    "errors": [],
-    "killers_by_mutant": {
-      "boolean_op-90d053f796e0-0": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ],
-      "comparison_op-9936f2ee44c5-0": [
-        "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
-        "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
-        "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
-      ],
-      "comparison_op-f660a22c3cdd-0": [
-        "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
-      ],
-      "constant_replace-42b2f4a1d1e0-0": [
-        "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
-        "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ],
-      "constant_replace-46584087c5be-0": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ],
-      "constant_replace-b62a2a8d3014-0": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
-      ],
-      "negate_condition-36f43a334a06-0": [
-        "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
-        "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
-        "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
-      ],
-      "negate_condition-597cdeb37d4a-0": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ],
-      "return_value-272308f13fd4-0": [
-        "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
-        "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ],
-      "return_value-754c3b1bc3f4-0": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
-      ],
-      "return_value-bd4c4b152fd6-0": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
-      ],
-      "return_value-e9b389d32723-0": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-      ],
-      "zero_iteration_loop-93caa67ebcd0-0": [
-        "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender"
-      ]
-    },
-    "required_contracts": [
-      {
-        "active_paths": [
-          "src/conductor/check_json_in_notes.py"
-        ],
-        "criticality": "high",
-        "id": "forge-notes-root_check_json_in_notes_fest_20260913"
-      }
-    ],
-    "retained_core": [
-      "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-      "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden"
-    ],
-    "schema_version": "llm.mutation-testing.test-value.v1",
-    "status": "PASS",
-    "subprocess_scaling": "baseline_repetitions + mutants",
-    "tests": [
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "MERGE",
-        "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
-        "dominated_by": [
-          "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree"
-        ],
-        "killed_mutants": [
-          "comparison_op-9936f2ee44c5-0",
-          "constant_replace-42b2f4a1d1e0-0",
-          "negate_condition-36f43a334a06-0",
-          "return_value-272308f13fd4-0"
-        ],
-        "nodeid": "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories",
-        "runtime_seconds_median": 0.0,
-        "unique_kills": []
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "MERGE",
-        "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
-        "dominated_by": [
-          "src/conductor/test_check_json_in_notes.py::test_exempts_subdirectories"
-        ],
-        "killed_mutants": [
-          "comparison_op-9936f2ee44c5-0",
-          "constant_replace-42b2f4a1d1e0-0",
-          "negate_condition-36f43a334a06-0",
-          "return_value-272308f13fd4-0"
-        ],
-        "nodeid": "src/conductor/test_check_json_in_notes.py::test_ignores_data_outside_the_notes_tree",
-        "runtime_seconds_median": 0.0,
-        "unique_kills": []
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "MERGE",
-        "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
-        "dominated_by": [
-          "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level"
-        ],
-        "killed_mutants": [
-          "comparison_op-f660a22c3cdd-0"
-        ],
-        "nodeid": "src/conductor/test_check_json_in_notes.py::test_keeps_the_knowledge_tree_writable",
-        "runtime_seconds_median": 0.0,
-        "unique_kills": []
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "CORE",
-        "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
-        "dominated_by": [],
-        "killed_mutants": [
-          "boolean_op-90d053f796e0-0",
-          "comparison_op-9936f2ee44c5-0",
-          "comparison_op-f660a22c3cdd-0",
-          "constant_replace-42b2f4a1d1e0-0",
-          "constant_replace-b62a2a8d3014-0",
-          "negate_condition-36f43a334a06-0",
-          "negate_condition-597cdeb37d4a-0",
-          "return_value-272308f13fd4-0",
-          "return_value-754c3b1bc3f4-0",
-          "return_value-bd4c4b152fd6-0",
-          "zero_iteration_loop-93caa67ebcd0-0"
-        ],
-        "nodeid": "src/conductor/test_check_json_in_notes.py::test_main_exits_one_and_names_only_the_offender",
-        "runtime_seconds_median": 0.001,
-        "unique_kills": [
-          "constant_replace-b62a2a8d3014-0",
-          "return_value-bd4c4b152fd6-0",
-          "zero_iteration_loop-93caa67ebcd0-0"
-        ]
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "CORE",
-        "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
-        "dominated_by": [],
-        "killed_mutants": [
-          "boolean_op-90d053f796e0-0",
-          "comparison_op-9936f2ee44c5-0",
-          "constant_replace-42b2f4a1d1e0-0",
-          "constant_replace-46584087c5be-0",
-          "negate_condition-36f43a334a06-0",
-          "negate_condition-597cdeb37d4a-0",
-          "return_value-272308f13fd4-0",
-          "return_value-e9b389d32723-0"
-        ],
-        "nodeid": "src/conductor/test_check_json_in_notes.py::test_main_exits_zero_when_nothing_is_forbidden",
-        "runtime_seconds_median": 0.002,
-        "unique_kills": [
-          "constant_replace-46584087c5be-0",
-          "return_value-e9b389d32723-0"
-        ]
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "MERGE",
-        "contract_id": "forge-notes-root_check_json_in_notes_fest_20260913",
-        "dominated_by": [],
-        "killed_mutants": [
-          "comparison_op-9936f2ee44c5-0",
-          "comparison_op-f660a22c3cdd-0",
-          "negate_condition-36f43a334a06-0",
-          "return_value-754c3b1bc3f4-0"
-        ],
-        "nodeid": "src/conductor/test_check_json_in_notes.py::test_rejects_data_at_the_top_level",
-        "runtime_seconds_median": 0.0,
-        "unique_kills": []
-      }
-    ]
   },
   "unviable": 0
 }

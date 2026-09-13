@@ -33,6 +33,717 @@
   "campaign_id": "forge-harness-doctor_main_fest_20260913",
   "classification_required": [],
   "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "detail": {
+    "encoding": "json",
+    "mutants": [
+      {
+        "byte_length": 160,
+        "byte_offset": 0,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-dafb427d07a7-0",
+        "line": 1,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"``python -m conductor <subcommand>``: the platform's entry point.\n\nSubcommands are thin: each delegates to one module's ``main`` with the remaining argv.\n\"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 6,
+        "byte_offset": 293,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-1e7b9717e289-0",
+        "line": 12,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"init\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 24,
+        "byte_offset": 301,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-7561658e0d6a-0",
+        "line": 12,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"conductor.project_init\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 11,
+        "byte_offset": 331,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-7c3591b9c68f-0",
+        "line": 13,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"bootstrap\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 21,
+        "byte_offset": 344,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-e64cbe649bde-0",
+        "line": 13,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"conductor.bootstrap\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 8,
+        "byte_offset": 371,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-10b80e03058d-0",
+        "line": 14,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"doctor\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 18,
+        "byte_offset": 381,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-94e7f5a991dd-0",
+        "line": 14,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"conductor.doctor\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 36,
+        "byte_offset": 503,
+        "duration_seconds": 0.202216,
+        "id": "return_value-8e71c43b2b1d-0",
+        "line": 21,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "importlib.import_module(module).main",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 631,
+        "duration_seconds": 0.207006,
+        "id": "comparison_op-678cab49036e-0",
+        "line": 25,
+        "mutated_text": "is not",
+        "operator": "comparison_op",
+        "original_text": "is",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 657,
+        "duration_seconds": 0.203709,
+        "id": "boolean_op-15dbd25b7062-0",
+        "line": 26,
+        "mutated_text": "",
+        "operator": "boolean_op",
+        "original_text": "not ",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 39,
+        "byte_offset": 657,
+        "duration_seconds": 0.20579,
+        "id": "negate_condition-8fae9d63abe5-0",
+        "line": 26,
+        "mutated_text": "not (not args or args[0] in {\"-h\", \"--help\"})",
+        "operator": "negate_condition",
+        "original_text": "not args or args[0] in {\"-h\", \"--help\"}",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 666,
+        "duration_seconds": 0.2067,
+        "id": "boolean_op-66ef8301ebc7-0",
+        "line": 26,
+        "mutated_text": "and",
+        "operator": "boolean_op",
+        "original_text": "or",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 674,
+        "duration_seconds": 0.208881,
+        "id": "constant_replace-b91fa0fd487b-0",
+        "line": 26,
+        "mutated_text": "1",
+        "operator": "constant_replace",
+        "original_text": "0",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 677,
+        "duration_seconds": 0.213789,
+        "id": "comparison_op-45515b9cefa8-0",
+        "line": 26,
+        "mutated_text": "not in",
+        "operator": "comparison_op",
+        "original_text": "in",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 681,
+        "duration_seconds": 0.215099,
+        "id": "constant_replace-cdb2efd5f048-0",
+        "line": 26,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"-h\"",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 8,
+        "byte_offset": 687,
+        "duration_seconds": 0.169162,
+        "id": "constant_replace-1ac10786f789-0",
+        "line": 26,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"--help\"",
+        "outcome": "SURVIVED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 30,
+        "byte_offset": 712,
+        "duration_seconds": 0.203542,
+        "id": "constant_replace-80446a472c63-0",
+        "line": 27,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"usage: python -m conductor <\"",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 743,
+        "duration_seconds": 0.205767,
+        "id": "arithmetic_op-518ae04d320c-0",
+        "line": 27,
+        "mutated_text": "-",
+        "operator": "arithmetic_op",
+        "original_text": "+",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 767,
+        "duration_seconds": 0.203054,
+        "id": "arithmetic_op-518ae04d320c-1",
+        "line": 27,
+        "mutated_text": "-",
+        "operator": "arithmetic_op",
+        "original_text": "+",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ]
+      },
+      {
+        "byte_length": 13,
+        "byte_offset": 769,
+        "duration_seconds": 0.164359,
+        "id": "constant_replace-59cf04f4326b-0",
+        "line": 27,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"> [args...]\"",
+        "outcome": "SURVIVED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ]
+      },
+      {
+        "byte_length": 16,
+        "byte_offset": 799,
+        "duration_seconds": 0.207308,
+        "id": "return_value-f19a1b1873d3-0",
+        "line": 28,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "0 if args else 2",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 799,
+        "duration_seconds": 0.207197,
+        "id": "constant_replace-b91fa0fd487b-1",
+        "line": 28,
+        "mutated_text": "1",
+        "operator": "constant_replace",
+        "original_text": "0",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 814,
+        "duration_seconds": 0.203572,
+        "id": "constant_replace-14cc04d9d807-0",
+        "line": 28,
+        "mutated_text": "3",
+        "operator": "constant_replace",
+        "original_text": "2",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 838,
+        "duration_seconds": 0.205213,
+        "id": "constant_replace-b91fa0fd487b-2",
+        "line": 29,
+        "mutated_text": "1",
+        "operator": "constant_replace",
+        "original_text": "0",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 14,
+        "byte_offset": 893,
+        "duration_seconds": 0.200361,
+        "id": "negate_condition-ca9975d1efc8-0",
+        "line": 31,
+        "mutated_text": "not (module is None)",
+        "operator": "negate_condition",
+        "original_text": "module is None",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 900,
+        "duration_seconds": 0.203545,
+        "id": "comparison_op-678cab49036e-1",
+        "line": 31,
+        "mutated_text": "is not",
+        "operator": "comparison_op",
+        "original_text": "is",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 998,
+        "duration_seconds": 0.205263,
+        "id": "return_value-4b45ca0b323e-0",
+        "line": 33,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "2",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 1,
+        "byte_offset": 998,
+        "duration_seconds": 0.206673,
+        "id": "constant_replace-14cc04d9d807-1",
+        "line": 33,
+        "mutated_text": "3",
+        "operator": "constant_replace",
+        "original_text": "2",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ]
+      },
+      {
+        "byte_length": 19,
+        "byte_offset": 1011,
+        "duration_seconds": 0.20878,
+        "id": "return_value-944d4e8c7af9-0",
+        "line": 34,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "_load(module)(rest)",
+        "outcome": "KILLED",
+        "path": "src/conductor/__main__.py",
+        "tests_run": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point"
+        ]
+      },
+      {
+        "byte_length": 22,
+        "byte_offset": 1036,
+        "duration_seconds": 0.0,
+        "id": "negate_condition-ddb3b5b1b72b-0",
+        "line": 37,
+        "mutated_text": "not (__name__ == \"__main__\")",
+        "operator": "negate_condition",
+        "original_text": "__name__ == \"__main__\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 1045,
+        "duration_seconds": 0.0,
+        "id": "comparison_op-55551281a701-0",
+        "line": 37,
+        "mutated_text": "!=",
+        "operator": "comparison_op",
+        "original_text": "==",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 10,
+        "byte_offset": 1048,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-1736f3af8503-0",
+        "line": 37,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"__main__\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/__main__.py",
+        "tests_run": []
+      }
+    ],
+    "test_value": {
+      "adapter": "pytest-junit",
+      "baseline_repetitions": 2,
+      "classification_counts": {
+        "CORE": 4,
+        "DELETE_CANDIDATE": 0,
+        "INTENTIONAL_REDUNDANCY": 0,
+        "MERGE": 0
+      },
+      "errors": [],
+      "killers_by_mutant": {
+        "arithmetic_op-518ae04d320c-0": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ],
+        "arithmetic_op-518ae04d320c-1": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ],
+        "boolean_op-15dbd25b7062-0": [
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "boolean_op-66ef8301ebc7-0": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ],
+        "comparison_op-45515b9cefa8-0": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "comparison_op-678cab49036e-0": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "comparison_op-678cab49036e-1": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "constant_replace-14cc04d9d807-0": [
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ],
+        "constant_replace-14cc04d9d807-1": [
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "constant_replace-80446a472c63-0": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ],
+        "constant_replace-b91fa0fd487b-0": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "constant_replace-b91fa0fd487b-1": [
+          "src/conductor/test___main__.py::test_help_exits_zero"
+        ],
+        "constant_replace-b91fa0fd487b-2": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "constant_replace-cdb2efd5f048-0": [
+          "src/conductor/test___main__.py::test_help_exits_zero"
+        ],
+        "negate_condition-8fae9d63abe5-0": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "negate_condition-ca9975d1efc8-0": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "return_value-4b45ca0b323e-0": [
+          "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
+        ],
+        "return_value-8e71c43b2b1d-0": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point"
+        ],
+        "return_value-944d4e8c7af9-0": [
+          "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point"
+        ],
+        "return_value-f19a1b1873d3-0": [
+          "src/conductor/test___main__.py::test_help_exits_zero",
+          "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+        ]
+      },
+      "required_contracts": [
+        {
+          "active_paths": [
+            "src/conductor/__main__.py"
+          ],
+          "criticality": "high",
+          "id": "forge-harness-doctor_main_fest_20260913"
+        }
+      ],
+      "retained_core": [
+        "src/conductor/test___main__.py::test_help_exits_zero",
+        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two",
+        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
+      ],
+      "schema_version": "llm.mutation-testing.test-value.v1",
+      "status": "PASS",
+      "subprocess_scaling": "baseline_repetitions + mutants",
+      "tests": [
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "forge-harness-doctor_main_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "comparison_op-678cab49036e-0",
+            "comparison_op-678cab49036e-1",
+            "constant_replace-b91fa0fd487b-2",
+            "negate_condition-ca9975d1efc8-0",
+            "return_value-8e71c43b2b1d-0",
+            "return_value-944d4e8c7af9-0"
+          ],
+          "nodeid": "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
+          "runtime_seconds_median": 0.003,
+          "unique_kills": [
+            "return_value-8e71c43b2b1d-0",
+            "return_value-944d4e8c7af9-0"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "forge-harness-doctor_main_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "arithmetic_op-518ae04d320c-0",
+            "arithmetic_op-518ae04d320c-1",
+            "boolean_op-66ef8301ebc7-0",
+            "comparison_op-45515b9cefa8-0",
+            "comparison_op-678cab49036e-0",
+            "constant_replace-80446a472c63-0",
+            "constant_replace-b91fa0fd487b-0",
+            "constant_replace-b91fa0fd487b-1",
+            "constant_replace-cdb2efd5f048-0",
+            "negate_condition-8fae9d63abe5-0",
+            "return_value-f19a1b1873d3-0"
+          ],
+          "nodeid": "src/conductor/test___main__.py::test_help_exits_zero",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": [
+            "constant_replace-b91fa0fd487b-1",
+            "constant_replace-cdb2efd5f048-0"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "forge-harness-doctor_main_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "arithmetic_op-518ae04d320c-0",
+            "arithmetic_op-518ae04d320c-1",
+            "boolean_op-15dbd25b7062-0",
+            "boolean_op-66ef8301ebc7-0",
+            "comparison_op-678cab49036e-0",
+            "constant_replace-14cc04d9d807-0",
+            "constant_replace-80446a472c63-0",
+            "negate_condition-8fae9d63abe5-0",
+            "return_value-f19a1b1873d3-0"
+          ],
+          "nodeid": "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": [
+            "constant_replace-14cc04d9d807-0"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "forge-harness-doctor_main_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "boolean_op-15dbd25b7062-0",
+            "comparison_op-45515b9cefa8-0",
+            "comparison_op-678cab49036e-0",
+            "comparison_op-678cab49036e-1",
+            "constant_replace-14cc04d9d807-1",
+            "constant_replace-b91fa0fd487b-0",
+            "constant_replace-b91fa0fd487b-2",
+            "negate_condition-8fae9d63abe5-0",
+            "negate_condition-ca9975d1efc8-0",
+            "return_value-4b45ca0b323e-0"
+          ],
+          "nodeid": "src/conductor/test___main__.py::test_unknown_subcommand_exits_two",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": [
+            "constant_replace-14cc04d9d807-1",
+            "return_value-4b45ca0b323e-0"
+          ]
+        }
+      ]
+    }
+  },
   "engine_result": {
     "duration_seconds": 4.461045,
     "returncode": 0,
@@ -57,502 +768,6 @@
   "manifest": "campaigns/forge-harness-doctor_main_fest_20260913.json",
   "manifest_sha256": "a6925a83bb1a25d1d2e1e08b6397ac7bbb2b6d9fcc6750beaca9a94f735a378b",
   "memory_cap_bytes": 8589934592,
-  "mutants": [
-    {
-      "byte_length": 160,
-      "byte_offset": 0,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-dafb427d07a7-0",
-      "line": 1,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"\"\"``python -m conductor <subcommand>``: the platform's entry point.\n\nSubcommands are thin: each delegates to one module's ``main`` with the remaining argv.\n\"\"\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 6,
-      "byte_offset": 293,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-1e7b9717e289-0",
-      "line": 12,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"init\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 24,
-      "byte_offset": 301,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-7561658e0d6a-0",
-      "line": 12,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"conductor.project_init\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 11,
-      "byte_offset": 331,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-7c3591b9c68f-0",
-      "line": 13,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"bootstrap\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 21,
-      "byte_offset": 344,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-e64cbe649bde-0",
-      "line": 13,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"conductor.bootstrap\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 8,
-      "byte_offset": 371,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-10b80e03058d-0",
-      "line": 14,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"doctor\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 18,
-      "byte_offset": 381,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-94e7f5a991dd-0",
-      "line": 14,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"conductor.doctor\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 36,
-      "byte_offset": 503,
-      "duration_seconds": 0.202216,
-      "id": "return_value-8e71c43b2b1d-0",
-      "line": 21,
-      "mutated_text": "None",
-      "operator": "return_value",
-      "original_text": "importlib.import_module(module).main",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point"
-      ]
-    },
-    {
-      "byte_length": 2,
-      "byte_offset": 631,
-      "duration_seconds": 0.207006,
-      "id": "comparison_op-678cab49036e-0",
-      "line": 25,
-      "mutated_text": "is not",
-      "operator": "comparison_op",
-      "original_text": "is",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 4,
-      "byte_offset": 657,
-      "duration_seconds": 0.203709,
-      "id": "boolean_op-15dbd25b7062-0",
-      "line": 26,
-      "mutated_text": "",
-      "operator": "boolean_op",
-      "original_text": "not ",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 39,
-      "byte_offset": 657,
-      "duration_seconds": 0.20579,
-      "id": "negate_condition-8fae9d63abe5-0",
-      "line": 26,
-      "mutated_text": "not (not args or args[0] in {\"-h\", \"--help\"})",
-      "operator": "negate_condition",
-      "original_text": "not args or args[0] in {\"-h\", \"--help\"}",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 2,
-      "byte_offset": 666,
-      "duration_seconds": 0.2067,
-      "id": "boolean_op-66ef8301ebc7-0",
-      "line": 26,
-      "mutated_text": "and",
-      "operator": "boolean_op",
-      "original_text": "or",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 674,
-      "duration_seconds": 0.208881,
-      "id": "constant_replace-b91fa0fd487b-0",
-      "line": 26,
-      "mutated_text": "1",
-      "operator": "constant_replace",
-      "original_text": "0",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 2,
-      "byte_offset": 677,
-      "duration_seconds": 0.213789,
-      "id": "comparison_op-45515b9cefa8-0",
-      "line": 26,
-      "mutated_text": "not in",
-      "operator": "comparison_op",
-      "original_text": "in",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 4,
-      "byte_offset": 681,
-      "duration_seconds": 0.215099,
-      "id": "constant_replace-cdb2efd5f048-0",
-      "line": 26,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"-h\"",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 8,
-      "byte_offset": 687,
-      "duration_seconds": 0.169162,
-      "id": "constant_replace-1ac10786f789-0",
-      "line": 26,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"--help\"",
-      "outcome": "SURVIVED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 30,
-      "byte_offset": 712,
-      "duration_seconds": 0.203542,
-      "id": "constant_replace-80446a472c63-0",
-      "line": 27,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"usage: python -m conductor <\"",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 743,
-      "duration_seconds": 0.205767,
-      "id": "arithmetic_op-518ae04d320c-0",
-      "line": 27,
-      "mutated_text": "-",
-      "operator": "arithmetic_op",
-      "original_text": "+",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 767,
-      "duration_seconds": 0.203054,
-      "id": "arithmetic_op-518ae04d320c-1",
-      "line": 27,
-      "mutated_text": "-",
-      "operator": "arithmetic_op",
-      "original_text": "+",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ]
-    },
-    {
-      "byte_length": 13,
-      "byte_offset": 769,
-      "duration_seconds": 0.164359,
-      "id": "constant_replace-59cf04f4326b-0",
-      "line": 27,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"> [args...]\"",
-      "outcome": "SURVIVED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ]
-    },
-    {
-      "byte_length": 16,
-      "byte_offset": 799,
-      "duration_seconds": 0.207308,
-      "id": "return_value-f19a1b1873d3-0",
-      "line": 28,
-      "mutated_text": "None",
-      "operator": "return_value",
-      "original_text": "0 if args else 2",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 799,
-      "duration_seconds": 0.207197,
-      "id": "constant_replace-b91fa0fd487b-1",
-      "line": 28,
-      "mutated_text": "1",
-      "operator": "constant_replace",
-      "original_text": "0",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 814,
-      "duration_seconds": 0.203572,
-      "id": "constant_replace-14cc04d9d807-0",
-      "line": 28,
-      "mutated_text": "3",
-      "operator": "constant_replace",
-      "original_text": "2",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 838,
-      "duration_seconds": 0.205213,
-      "id": "constant_replace-b91fa0fd487b-2",
-      "line": 29,
-      "mutated_text": "1",
-      "operator": "constant_replace",
-      "original_text": "0",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 14,
-      "byte_offset": 893,
-      "duration_seconds": 0.200361,
-      "id": "negate_condition-ca9975d1efc8-0",
-      "line": 31,
-      "mutated_text": "not (module is None)",
-      "operator": "negate_condition",
-      "original_text": "module is None",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 2,
-      "byte_offset": 900,
-      "duration_seconds": 0.203545,
-      "id": "comparison_op-678cab49036e-1",
-      "line": 31,
-      "mutated_text": "is not",
-      "operator": "comparison_op",
-      "original_text": "is",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 998,
-      "duration_seconds": 0.205263,
-      "id": "return_value-4b45ca0b323e-0",
-      "line": 33,
-      "mutated_text": "None",
-      "operator": "return_value",
-      "original_text": "2",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 1,
-      "byte_offset": 998,
-      "duration_seconds": 0.206673,
-      "id": "constant_replace-14cc04d9d807-1",
-      "line": 33,
-      "mutated_text": "3",
-      "operator": "constant_replace",
-      "original_text": "2",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ]
-    },
-    {
-      "byte_length": 19,
-      "byte_offset": 1011,
-      "duration_seconds": 0.20878,
-      "id": "return_value-944d4e8c7af9-0",
-      "line": 34,
-      "mutated_text": "None",
-      "operator": "return_value",
-      "original_text": "_load(module)(rest)",
-      "outcome": "KILLED",
-      "path": "src/conductor/__main__.py",
-      "tests_run": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point"
-      ]
-    },
-    {
-      "byte_length": 22,
-      "byte_offset": 1036,
-      "duration_seconds": 0.0,
-      "id": "negate_condition-ddb3b5b1b72b-0",
-      "line": 37,
-      "mutated_text": "not (__name__ == \"__main__\")",
-      "operator": "negate_condition",
-      "original_text": "__name__ == \"__main__\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 2,
-      "byte_offset": 1045,
-      "duration_seconds": 0.0,
-      "id": "comparison_op-55551281a701-0",
-      "line": 37,
-      "mutated_text": "!=",
-      "operator": "comparison_op",
-      "original_text": "==",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    },
-    {
-      "byte_length": 10,
-      "byte_offset": 1048,
-      "duration_seconds": 0.0,
-      "id": "constant_replace-1736f3af8503-0",
-      "line": 37,
-      "mutated_text": "\"\"",
-      "operator": "constant_replace",
-      "original_text": "\"__main__\"",
-      "outcome": "NO_COVERAGE",
-      "path": "src/conductor/__main__.py",
-      "tests_run": []
-    }
-  ],
   "mutants_are_generated": true,
   "mutation_engine": "fest",
   "mutation_score": 0.9090909090909091,
@@ -607,218 +822,6 @@
   "test_sha256": {
     "src/conductor/test___main__.py": "91850f126e3542019299dc50aaeb55d6077562b999fabbe7827f1fe9b907580f",
     "src/tooling/hooks/dispatch/test___main__.py": "ccd5bae85bc255cc8802bf5a957de00e2859bc9f871acc34b2718a179aec5757"
-  },
-  "test_value": {
-    "adapter": "pytest-junit",
-    "baseline_repetitions": 2,
-    "classification_counts": {
-      "CORE": 4,
-      "DELETE_CANDIDATE": 0,
-      "INTENTIONAL_REDUNDANCY": 0,
-      "MERGE": 0
-    },
-    "errors": [],
-    "killers_by_mutant": {
-      "arithmetic_op-518ae04d320c-0": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ],
-      "arithmetic_op-518ae04d320c-1": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ],
-      "boolean_op-15dbd25b7062-0": [
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "boolean_op-66ef8301ebc7-0": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ],
-      "comparison_op-45515b9cefa8-0": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "comparison_op-678cab49036e-0": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "comparison_op-678cab49036e-1": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "constant_replace-14cc04d9d807-0": [
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ],
-      "constant_replace-14cc04d9d807-1": [
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "constant_replace-80446a472c63-0": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ],
-      "constant_replace-b91fa0fd487b-0": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "constant_replace-b91fa0fd487b-1": [
-        "src/conductor/test___main__.py::test_help_exits_zero"
-      ],
-      "constant_replace-b91fa0fd487b-2": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "constant_replace-cdb2efd5f048-0": [
-        "src/conductor/test___main__.py::test_help_exits_zero"
-      ],
-      "negate_condition-8fae9d63abe5-0": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "negate_condition-ca9975d1efc8-0": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "return_value-4b45ca0b323e-0": [
-        "src/conductor/test___main__.py::test_unknown_subcommand_exits_two"
-      ],
-      "return_value-8e71c43b2b1d-0": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point"
-      ],
-      "return_value-944d4e8c7af9-0": [
-        "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point"
-      ],
-      "return_value-f19a1b1873d3-0": [
-        "src/conductor/test___main__.py::test_help_exits_zero",
-        "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-      ]
-    },
-    "required_contracts": [
-      {
-        "active_paths": [
-          "src/conductor/__main__.py"
-        ],
-        "criticality": "high",
-        "id": "forge-harness-doctor_main_fest_20260913"
-      }
-    ],
-    "retained_core": [
-      "src/conductor/test___main__.py::test_help_exits_zero",
-      "src/conductor/test___main__.py::test_unknown_subcommand_exits_two",
-      "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-      "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two"
-    ],
-    "schema_version": "llm.mutation-testing.test-value.v1",
-    "status": "PASS",
-    "subprocess_scaling": "baseline_repetitions + mutants",
-    "tests": [
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "CORE",
-        "contract_id": "forge-harness-doctor_main_fest_20260913",
-        "dominated_by": [],
-        "killed_mutants": [
-          "comparison_op-678cab49036e-0",
-          "comparison_op-678cab49036e-1",
-          "constant_replace-b91fa0fd487b-2",
-          "negate_condition-ca9975d1efc8-0",
-          "return_value-8e71c43b2b1d-0",
-          "return_value-944d4e8c7af9-0"
-        ],
-        "nodeid": "src/conductor/test___main__.py::test_doctor_is_reachable_through_the_entry_point",
-        "runtime_seconds_median": 0.003,
-        "unique_kills": [
-          "return_value-8e71c43b2b1d-0",
-          "return_value-944d4e8c7af9-0"
-        ]
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "CORE",
-        "contract_id": "forge-harness-doctor_main_fest_20260913",
-        "dominated_by": [],
-        "killed_mutants": [
-          "arithmetic_op-518ae04d320c-0",
-          "arithmetic_op-518ae04d320c-1",
-          "boolean_op-66ef8301ebc7-0",
-          "comparison_op-45515b9cefa8-0",
-          "comparison_op-678cab49036e-0",
-          "constant_replace-80446a472c63-0",
-          "constant_replace-b91fa0fd487b-0",
-          "constant_replace-b91fa0fd487b-1",
-          "constant_replace-cdb2efd5f048-0",
-          "negate_condition-8fae9d63abe5-0",
-          "return_value-f19a1b1873d3-0"
-        ],
-        "nodeid": "src/conductor/test___main__.py::test_help_exits_zero",
-        "runtime_seconds_median": 0.0,
-        "unique_kills": [
-          "constant_replace-b91fa0fd487b-1",
-          "constant_replace-cdb2efd5f048-0"
-        ]
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "CORE",
-        "contract_id": "forge-harness-doctor_main_fest_20260913",
-        "dominated_by": [],
-        "killed_mutants": [
-          "arithmetic_op-518ae04d320c-0",
-          "arithmetic_op-518ae04d320c-1",
-          "boolean_op-15dbd25b7062-0",
-          "boolean_op-66ef8301ebc7-0",
-          "comparison_op-678cab49036e-0",
-          "constant_replace-14cc04d9d807-0",
-          "constant_replace-80446a472c63-0",
-          "negate_condition-8fae9d63abe5-0",
-          "return_value-f19a1b1873d3-0"
-        ],
-        "nodeid": "src/conductor/test___main__.py::test_no_arguments_prints_usage_and_exits_two",
-        "runtime_seconds_median": 0.0,
-        "unique_kills": [
-          "constant_replace-14cc04d9d807-0"
-        ]
-      },
-      {
-        "baseline_outcomes": [
-          "PASSED",
-          "PASSED"
-        ],
-        "classification": "CORE",
-        "contract_id": "forge-harness-doctor_main_fest_20260913",
-        "dominated_by": [],
-        "killed_mutants": [
-          "boolean_op-15dbd25b7062-0",
-          "comparison_op-45515b9cefa8-0",
-          "comparison_op-678cab49036e-0",
-          "comparison_op-678cab49036e-1",
-          "constant_replace-14cc04d9d807-1",
-          "constant_replace-b91fa0fd487b-0",
-          "constant_replace-b91fa0fd487b-2",
-          "negate_condition-8fae9d63abe5-0",
-          "negate_condition-ca9975d1efc8-0",
-          "return_value-4b45ca0b323e-0"
-        ],
-        "nodeid": "src/conductor/test___main__.py::test_unknown_subcommand_exits_two",
-        "runtime_seconds_median": 0.0,
-        "unique_kills": [
-          "constant_replace-14cc04d9d807-1",
-          "return_value-4b45ca0b323e-0"
-        ]
-      }
-    ]
   },
   "unviable": 0
 }

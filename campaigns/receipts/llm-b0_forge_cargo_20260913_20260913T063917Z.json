@@ -17,6 +17,10 @@
   ],
   "campaign_id": "llm-b0_forge_cargo_20260913",
   "core_sha256": "e969ce2e9fc4224b088fe01998010aeed83e8103ba9cc3c89ae5557fe7535ecd",
+  "detail": {
+    "encoding": "superseded",
+    "superseded_by": "llm-b0_forge_cargo_20260913_20260913T070520Z.json"
+  },
   "generated_at": "2026-09-13T06:39:17.614277+00:00",
   "interpreter": "/mnt/data/llm/scratch/forge-rust-hygiene/.venv/bin/python3",
   "killer_enforcement": null,
@@ -24,7 +28,6 @@
   "manifest": "campaigns/llm-b0_forge_cargo_20260913.json",
   "manifest_sha256": "c20e64855ff6e7f5b96e2ea99571f4998f20afc580ee7a32da7a97af197dd6f6",
   "memory_cap_bytes": 8589934592,
-  "mutants": [],
   "mutants_are_generated": true,
   "mutation_engine": "cargo-mutants",
   "mutation_score": null,
@@ -159,6 +162,5 @@
     "native/forge/src/main.rs": "052bfdeef1edfb404a552898ebe55573b8edd2d1d9e31e9e4e7edfaa88f5db2d",
     "native/forge/src/tool_quiet.rs": "299777e8fa1d82261c0cd0f31aa688f04ef2231102e6a13bedaae4d8d77da7d8",
     "native/forge/src/workspace_hygiene.rs": "db18ecf80fff9dd67f5d27fcc93f57e495da667782296be9bcbcb513254fc410"
-  },
-  "test_value": null
+  }
 }

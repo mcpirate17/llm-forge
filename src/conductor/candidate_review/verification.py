@@ -18,6 +18,7 @@ from conductor.candidate_review.checks import (
     _result,
 )
 from conductor.candidate_review import external_invariants
+from conductor.mutation_receipt_slim import expand_receipt_field
 from conductor.project_paths import registry_path, registry_relative
 from conductor.candidate_review.value_waivers import (
     WAIVED_RULE,
@@ -876,7 +877,11 @@ def _new_test_value_findings(
         )
         findings.extend(waiver_findings)
         for error in admission_errors(
-            receipt.get("test_value") if isinstance(receipt, dict) else None,
+            # Slim receipts carry `test_value` under the detail block; the
+            # field reader decompresses it only when it is actually there.
+            expand_receipt_field(receipt, "test_value")
+            if isinstance(receipt, dict)
+            else None,
             [nodeid for nodeid in nodeids if nodeid not in waived],
         ):
             # admission_errors names the nodeid with repr(); carry it as evidence so

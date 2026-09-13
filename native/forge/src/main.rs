@@ -29,6 +29,7 @@ mod ownership;
 mod post_edit_audit;
 mod post_tool;
 mod read_budget;
+mod receipt_show;
 mod telemetry;
 mod tool_quiet;
 mod workspace_hygiene;
@@ -60,6 +61,11 @@ enum Command {
     Mutation {
         #[command(subcommand)]
         action: MutationCommand,
+    },
+    /// Receipt inspection: the human window into the slim-receipt format.
+    Receipt {
+        #[command(subcommand)]
+        action: ReceiptCommand,
     },
     /// Cost ledger commands (`docs/design/cost_ledger.md`).
     Ledger {
@@ -93,6 +99,12 @@ enum MutationCommand {
     Plan(mutation_plan::PlanArgs),
 }
 
+#[derive(Subcommand)]
+enum ReceiptCommand {
+    /// Print a receipt with its slim detail block expanded back to full rows.
+    Show(receipt_show::ShowArgs),
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
@@ -108,6 +120,15 @@ fn main() -> ExitCode {
                 Ok(code) => ExitCode::from(code as u8),
                 Err(err) => {
                     eprintln!("forge mutation plan: {err:#}");
+                    ExitCode::from(1)
+                }
+            },
+        },
+        Command::Receipt { action } => match action {
+            ReceiptCommand::Show(args) => match receipt_show::run(&args) {
+                Ok(code) => ExitCode::from(code),
+                Err(err) => {
+                    eprintln!("forge receipt show: {err:#}");
                     ExitCode::from(1)
                 }
             },

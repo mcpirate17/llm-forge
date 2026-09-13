@@ -3,6 +3,10 @@
   "baseline": null,
   "campaign_id": "conductor-67_mutation_engine_cargo_fest_20260913",
   "core_sha256": "5844c55e1769a5c2b7e87772347c8d9854bc39e35a4791d6d3ed3a5044ef0ba9",
+  "detail": {
+    "encoding": "superseded",
+    "superseded_by": "conductor-67_mutation_engine_cargo_fest_20260913_20260913T052326Z.json"
+  },
   "generated_at": "2026-09-13T04:36:30.780268+00:00",
   "interpreter": "/mnt/data/llm/scratch/forge-glm-timeouts/.venv/bin/python3",
   "killer_enforcement": null,
@@ -10,7 +14,6 @@
   "manifest": "campaigns/conductor-67_mutation_engine_cargo_fest_20260913.json",
   "manifest_sha256": "e2e47a271b30cb078f1ad64b7fc74641a8c0d6e3e3c098bf53a967dbb625a96f",
   "memory_cap_bytes": 8589934592,
-  "mutants": [],
   "mutants_are_generated": true,
   "mutation_engine": "fest",
   "mutation_score": null,
@@ -53,6 +56,5 @@
   ],
   "test_sha256": {
     "src/conductor/test_mutation_engine_cargo.py": "46bdc4c09a73e312bd6697bb2a7232ec2db65414203efb3a1c56214bda987ce9"
-  },
-  "test_value": null
+  }
 }
