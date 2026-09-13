@@ -1,6 +1,597 @@
 {
-  "fetched_utc": "2026-09-13T20:04:27Z",
+  "fetched_utc": "2026-09-13T20:11:16Z",
   "prs": {
+    "1": {
+      "branch": "forge/project-paths",
+      "commits": [
+        {
+          "sha": "c349808d47a4eb828927a7e7072823f22902514e",
+          "subject": "feat(paths): resolve the host policy and mutation registry through on\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "1b77ff52ed948072b1937e7445dae7eafe263215",
+          "subject": "feat(native): take the anchored registry path from the request, not a\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "ed72d63de9e749f81495c5958e200ff1b4997c98",
+          "subject": "refactor(paths): compact the resolution module",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "ae99735580321d1fad3126fea656737f5389ddd9",
+          "subject": "feat(project): give llm-forge its own candidate policy and campaign r\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "c349808d47a4eb828927a7e7072823f22902514e"
+    },
+    "10": {
+      "branch": "forge/makefile-port",
+      "commits": [
+        {
+          "sha": "db8b432b8bfdf86b8f1c1b9a54ddf099975a966a",
+          "subject": "feat(makefile): port platform Makefile targets from the LLM monorepo",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "green",
+      "first_push_sha": "db8b432b8bfdf86b8f1c1b9a54ddf099975a966a"
+    },
+    "11": {
+      "branch": "forge/bootstrap",
+      "commits": [
+        {
+          "sha": "706b31c11029faa00288dcd618ca87b278b6ba94",
+          "subject": "feat(bootstrap): add python -m conductor.bootstrap host onboarding co\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "6010789d7c9e4f47b358125acc21f851d2688f0a",
+          "subject": "test(mutation): record PASS receipt for the bootstrap.py fest campaign",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "0df589511318344da2492a961a9a95a69561b80a",
+          "subject": "test(bootstrap): pair the new project_init tests with their mutation \u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "d89c97d24799553a16361cb6a682fc0651edd1bd",
+          "subject": "test(mutation): regenerate the project_init.py fest campaign manifest",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "9e3633d55d520d4fe3427cc3ec8492414317d1b6",
+          "subject": "test(mutation): record RATCHET_HELD receipt for project_init.py and r\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "5b50e5e5f35d3d9a4673d9000cae6b97b7f40355",
+          "subject": "test(mutation): regenerate the bootstrap.py fest campaign manifest",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "b38230e223d450c4510e4cb564a43a579ea0e4c5",
+          "subject": "test(mutation): record PASS receipt for the repinned bootstrap.py cam\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "251be134e33668c1161fb678c2e0010cc4676004",
+          "subject": "merge: bring forge/bootstrap current with main (README sections)",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "e2ec8f14b0b480fbe2d4265379fc69e6cd7839a3",
+          "subject": "fix(test): drop unused quiet_doctor binding flagged by CI vulture",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "706b31c11029faa00288dcd618ca87b278b6ba94"
+    },
+    "12": {
+      "branch": "forge/integration-branch",
+      "commits": [
+        {
+          "sha": "bdfabf71807202a7da8570bc30adc497d6834c69",
+          "subject": "feat(paths): configurable integration branch, default main",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "569795f2d91d69720a6ec5ce485cfa05a784e1e5",
+          "subject": "fix(tests): dedupe repeated blocks flagged by CI jscpd gate",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "red",
+      "first_push_sha": "bdfabf71807202a7da8570bc30adc497d6834c69"
+    },
+    "13": {
+      "branch": "forge/campaigns-batch-1",
+      "commits": [
+        {
+          "sha": "4cc1e6ab312ee25e45d16ea86f46b893d5cb0ac5",
+          "subject": "test(mutation): dogfood campaigns batch 1 (candidate_review engine/gr\u2026",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        },
+        {
+          "sha": "fa13ce9219d7554bfd8ccdead91e47036885a7c0",
+          "subject": "merge: bring batch 1 current with main after PR #12",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        }
+      ],
+      "first_push_ci": "green",
+      "first_push_sha": "4cc1e6ab312ee25e45d16ea86f46b893d5cb0ac5"
+    },
+    "14": {
+      "branch": "forge/forge-bin",
+      "commits": [
+        {
+          "sha": "2c7c269f462c07a77d9ae86dd99370e384805173",
+          "subject": "feat(forge): native hook launcher binary, step 1 of the Rust hook path",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "6d9ce6682bfefc5510aa56e27751493f02917f34",
+          "subject": "fix(test): dedupe the forge-binary fixture setup jscpd flagged in PR #14",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "7a85a6a8e556d0b0d601252ec9c1facc70ddda86",
+          "subject": "fix(test): drop unused quiet_doctor param, use usefixtures instead",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "red",
+      "first_push_sha": "2c7c269f462c07a77d9ae86dd99370e384805173"
+    },
+    "15": {
+      "branch": "forge/telemetry",
+      "commits": [
+        {
+          "sha": "5c2552a25c124781789e941432e05bac7f965613",
+          "subject": "feat(telemetry): rotate at cap, record hook ms and instructions resen\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "fae5939a895ccb11b855db00cfe07849129f3b1c",
+          "subject": "chore(mutation): generate campaigns for telemetry changes",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "4cd31f4bee30acec0410c0e5fb48e4b7317530bc",
+          "subject": "chore(mutation): record context_telemetry survivor baseline and receipt",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "6a982be695c432e6d6b9ae5ea1b317638559a59a",
+          "subject": "chore(mutation): record dispatch __main__ survivor baseline and receipt",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "5c2552a25c124781789e941432e05bac7f965613"
+    },
+    "16": {
+      "branch": "forge/campaigns-batch-2",
+      "commits": [
+        {
+          "sha": "31d7592df7da53163423dff7d56a779110563e62",
+          "subject": "test(mutation): dogfood campaigns batch 2 (hooks _bash_quiet, dispatc\u2026",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        },
+        {
+          "sha": "4f272522980993797621e15a41693ee5ab3fd083",
+          "subject": "merge: bring batch 2 current with main after PR #15",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        },
+        {
+          "sha": "2c006ff586882b3760ec005cb25c031679319d16",
+          "subject": "test(mutation): record batch 2 receipts, baselines and registry entries",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "31d7592df7da53163423dff7d56a779110563e62"
+    },
+    "17": {
+      "branch": "forge/campaigns-batch-3",
+      "commits": [
+        {
+          "sha": "61d65763fa3b0c7b20c09fbc55a8f6f890efdc7c",
+          "subject": "test(mutation): dogfood campaigns batch 3 (mutation_coverage/engine_c\u2026",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        },
+        {
+          "sha": "43dea517586c30adc7109f448154e5a3d127f413",
+          "subject": "test(mutation): record batch 3 receipts, baselines and registry rows",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "61d65763fa3b0c7b20c09fbc55a8f6f890efdc7c"
+    },
+    "18": {
+      "branch": "forge/dispatch-launcher",
+      "commits": [
+        {
+          "sha": "dbee2c20841d0d9067375f420f1e15ba96ca2da4",
+          "subject": "fix(hooks): port the dispatch launcher and repair the two layout-boun\u2026",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        },
+        {
+          "sha": "d893ba235073e80fcd053dd12627fc9f661a4f1f",
+          "subject": "test(mutation): record the registry campaign receipt after the launch\u2026",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "dbee2c20841d0d9067375f420f1e15ba96ca2da4"
+    },
+    "19": {
+      "branch": "forge/tool-output-quiet",
+      "commits": [
+        {
+          "sha": "b70780edc3c0bff601936792985bfa68d5d4b7db",
+          "subject": "feat(hooks): bound Read, Grep and MCP tool output with head/tail and \u2026",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        },
+        {
+          "sha": "fc3d2e41c898e2247b590b0546a9a720a5d089e5",
+          "subject": "test(mutation): post_tool_quiet campaign, refreshed bash_quiet and re\u2026",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        },
+        {
+          "sha": "648ef334c8a626b8490c89beb75803e7529cbb19",
+          "subject": "refactor(hooks): share the PostToolUse rewrite envelope between the q\u2026",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        },
+        {
+          "sha": "614c3bca1d3fb8cdf5e64a7740797d78609e915b",
+          "subject": "test(mutation): refresh campaigns for the shared rewrite envelope",
+          "trailers": {
+            "Agent": "conductor-67"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "b70780edc3c0bff601936792985bfa68d5d4b7db"
+    },
+    "2": {
+      "branch": "forge/ci-and-standalone-tests",
+      "commits": [
+        {
+          "sha": "db6a13201633806aa904f85ea3801d75cbf10522",
+          "subject": "deps(pyproject): declare vulture as a runtime dependency, pytest-time\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "2c2a93659b08cb0aaccfc0e54201386679d857e3",
+          "subject": "test(session): decouple preamble/policy tests from monorepo-specific \u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "babdaf6473f15b5b0b2d9dd64c34ac9f123e7e32",
+          "subject": "test(gate): resolve the pytest-config check's interpreter via sys.exe\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "64e0838b99285ae95056df8d7f59877f286ad5e7",
+          "subject": "test(repo_index): derive the degeneracy floor from the tree under test",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "7a717edb3e433a8155e5bc9a8d67fa4291469be7",
+          "subject": "test(candidate_review): build a self-contained governance fixture for\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "a36b6e878cc42594e8d6c4edac482c464825218a",
+          "subject": "fix(slop-core): resolve the crate's own repo-root test at the new src\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "1512ac51212f93e36f26884bd562bed2d834e0cb",
+          "subject": "ci: add GitHub Actions workflow and CODEOWNERS",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "db6a13201633806aa904f85ea3801d75cbf10522"
+    },
+    "20": {
+      "branch": "forge/rust-bash-guard",
+      "commits": [
+        {
+          "sha": "f3e6e6c26ab10d5d6a87935731e4cd287ee89f9d",
+          "subject": "feat(forge): port pre_bash and write-target extraction to native Rust",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "110e84c2ee1502c20c8b5a136ea26801d79bd2ce",
+          "subject": "feat(hooks): add a dormant FORGE_NATIVE_HOOKS skip filter to select()",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "fe491a3569a4238363aa944ebc7d31731297abed",
+          "subject": "chore(mutation): generate the Rust campaign for native/forge's ported\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "283d170e82aa4bda8974f96dbc09f7dc6ef6f8bd",
+          "subject": "chore(mutation): generate the Python campaigns for the FORGE_NATIVE_H\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "d729dd1a11a24609fb5ad20d928d29f38fcd545d",
+          "subject": "chore(mutation): register this branch's three generated campaigns",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "d582d6b8cda17fa4e51984e208d6378a135baac1",
+          "subject": "chore(mutation): record BASELINE_FAILED receipt for the registry fest\u2026",
+          "trailers": {
+            "Agent": "llm-b0"
+          }
+        },
+        {
+          "sha": "d2a638615850b9ef9942106d94bff8eb85036d29",
+          "subject": "chore(mutation): record RATCHET_HELD receipt for the runner fest camp\u2026",
+          "trailers": {
+            "Agent": "llm-b0"
+          }
+        },
+        {
+          "sha": "15855eccdb74225d490dab9f1612ea901fd86387",
+          "subject": "chore(mutation): record the engine-written survivor baseline for runn\u2026",
+          "trailers": {
+            "Agent": "llm-b0"
+          }
+        },
+        {
+          "sha": "18c88f7385a461bb8db188328b41f46a9a347c87",
+          "subject": "chore(mutation): record first cargo-mutants attempt for native/forge \u2026",
+          "trailers": {
+            "Agent": "llm-b0"
+          }
+        },
+        {
+          "sha": "52d4e71e3e1b70fb646e79ced0cc887db2d7f7b1",
+          "subject": "chore(mutation): confirm the 6 cargo-mutants timeouts are deterministic",
+          "trailers": {
+            "Agent": "llm-b0"
+          }
+        },
+        {
+          "sha": "73a1fe3d2e326f58f052574074ba6e5fb35f2092",
+          "subject": "Merge origin/main into forge/rust-bash-guard",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "f3e6e6c26ab10d5d6a87935731e4cd287ee89f9d"
+    },
+    "21": {
+      "branch": "forge/notes-root",
+      "commits": [
+        {
+          "sha": "0e8888a33e49d080323b184e89736a3431b3502d",
+          "subject": "feat(paths): configurable notes root resolved at call time",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "811a953b3bce8645cf42a817913ca44fed942878",
+          "subject": "docs: targets reference, bootstrap page, notes-root wiring",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "e1f5cbce0e78de2937bba76d6c9e874f6e0c994b",
+          "subject": "Merge origin/main: keep the rust agent's three registry rows",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "802a4c6fe90fdf3005e1241f80e5f946cc97572b",
+          "subject": "test(mutation): six campaigns for the notes-root change",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "5d068d78e0cac1ecfb8915a7022709b18c1faa99",
+          "subject": "refactor(conductor): share the atomic-write and urlopen scaffolds jsc\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        },
+        {
+          "sha": "5b73550b89446147b97da5bca9866d0654056fc8",
+          "subject": "test(mutation): refresh the memory_index and kb_retrieve rows after t\u2026",
+          "trailers": {
+            "Agent": "glm"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "0e8888a33e49d080323b184e89736a3431b3502d"
+    },
+    "22": {
+      "branch": "forge/rust-bash-impact",
+      "commits": [
+        {
+          "sha": "8a6b61927bd13c5feefabcf853a16ac714e365be",
+          "subject": "feat(forge): native _bash_impact, Bash PreToolUse native by default",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "3cb7378dc080d6b7044836a3bb81a2699bcfb154",
+          "subject": "Merge origin/main into forge/rust-bash-impact",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "green",
+      "first_push_sha": "8a6b61927bd13c5feefabcf853a16ac714e365be"
+    },
+    "23": {
+      "branch": "forge/ci-cache",
+      "commits": [
+        {
+          "sha": "0c73231c796b80bc5b924dff5a9385a39e22d63c",
+          "subject": "ci: cache the python job's uv, npm and PMD downloads",
+          "trailers": {
+            "Agent": "glm"
+          }
+        }
+      ],
+      "first_push_ci": "green",
+      "first_push_sha": "0c73231c796b80bc5b924dff5a9385a39e22d63c"
+    },
     "24": {
       "branch": "forge/harness-doctor",
       "commits": [
@@ -202,6 +793,133 @@
       ],
       "first_push_ci": "unknown",
       "first_push_sha": "1944cfe0b529481d5523551c81d35e9e4c762839"
+    },
+    "3": {
+      "branch": "forge/makefile-and-first-campaign",
+      "commits": [
+        {
+          "sha": "50f11eba7b3b6a57af236d1365e00128071f5600",
+          "subject": "chore(routine): add the Makefile quality routine and the agent workin\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "ae77f4037bfee2d2d7e9fec6db89d57fa44e3a15",
+          "subject": "test(paths): pair project_paths with a test that covers every precede\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "50b62360f1613e63b483023735a0f5baf2769bdd",
+          "subject": "fix(mutation): resolve REPO_ROOT to the git root, not the package's p\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "370aae9ac624e1c62f045e540b6c62ad9400c725",
+          "subject": "fix(deps): declare fest-mutate, the engine the mutation routine shell\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "42e6bf05f0bc535efaf1ce39826a292d826ccbd8",
+          "subject": "chore(campaigns): generate the fest manifests for this branch's chang\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "2d56341b5e96127f58cb90f87ab6e27e169715ce",
+          "subject": "fix(mutation): bind the fest run to the snapshot's own sources",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "c7b382e88ba41f71cd630ebe1cb7be2c06de14f7",
+          "subject": "fix(routine): write receipts where campaigns/registry.json says they \u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "87fab4ac2d7b89fc659824c16bb7b0416264db84",
+          "subject": "chore(campaigns): record the project_paths survivor baseline the firs\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "9328f8193675e8366ae85ad4634cbb62a20006b2",
+          "subject": "chore(campaigns): register the generated campaigns and the canonical \u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "e27f76c7c2bec39b59cc5244f9e0bf18e1c570b1",
+          "subject": "docs(routine): say why make test fails loud without pytest-timeout",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "23ee679deb328b4526e9a8611d6ffc22705cd462",
+          "subject": "merge(main): fold main into forge/makefile-and-first-campaign",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "db10e53d6075ffb289992c4b16d32827d2f3cbe7",
+          "subject": "refactor(tests): relocate project_paths test to repo convention, reti\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "55d529df2f2ed90507d0c61a8d9bf82ae8cbc78b",
+          "subject": "chore(campaigns): regenerate and register the project_paths campaign",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "df61688998984b2928f98f18b7a4e8096b47b763",
+          "subject": "chore(campaigns): record the project_paths survivor baseline (run 1)",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "f5bc5b971d0eee9f0759a78cf7bae72c1d637934",
+          "subject": "chore(campaigns): reproduce the project_paths mutation run (run 2)",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "50f11eba7b3b6a57af236d1365e00128071f5600"
     },
     "30": {
       "branch": "forge/audit-stale-evidence",
@@ -548,6 +1266,69 @@
       ],
       "first_push_ci": "unknown",
       "first_push_sha": "4cfd94f196cafbac55651425dad8e0ea5b95905d"
+    },
+    "4": {
+      "branch": "forge/campaign-shaped-tests",
+      "commits": [
+        {
+          "sha": "e995904a98654d0df3f063e5f161a110cb065ec6",
+          "subject": "test(mutation_mull): load a checked-in fixture copy of the aria_core \u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "27760973665b32da6167c22db9739ec9b0bebb10",
+          "subject": "test(mutation_engines): self-contained cargo-mutants and fest fixture\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "07271fdc9e3a1be8d1ae7fb3fb53a07112f06f88",
+          "subject": "test(mutation_testing): conductor-scoped campaign fixture replaces th\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "8f01f521b836fd48d2ea2e9c0c660e75a6c7dec4",
+          "subject": "test(mutation_coverage): fixture campaign and registry for the CLI in\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "dff79bf182fc05481a627c1acaf340d0d29c5d42",
+          "subject": "test(mutation_campaign_generate): plan against this repo's own crates",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "e0e8863127b8712a78b4f6cf359bc43ee4a16331",
+          "subject": "test(candidate_review_hardening): derive value-inventory campaigns fr\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "a9938ab534fcec686057324d48d571ca6ca2aaa6",
+          "subject": "test(conftest): drop HOST_PROJECT_TESTS entries that no longer reach \u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "e995904a98654d0df3f063e5f161a110cb065ec6"
     },
     "40": {
       "branch": "forge/rust-post-tool-edit-zero",
@@ -960,6 +1741,117 @@
       "first_push_ci": "unknown",
       "first_push_sha": "85bcc0029dc2c1dab869348011323da615b81e7a"
     },
+    "5": {
+      "branch": "forge/candidate-review-src-layout",
+      "commits": [
+        {
+          "sha": "a2619c0b86fe5a44aa38edf2c1118a99f6a6955d",
+          "subject": "fix(paths): resolve the conductor package location instead of hardcod\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "a51c76068f96954eda36a9cf746a30244173f19f",
+          "subject": "test(paths): pair every rerouted lookup with a test, and stop hashing\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "ee0fea347cefb9f9b805025a5c4d0d5337f918c2",
+          "subject": "chore(mutation): register the four generated campaigns for this branc\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "3e2c22ed9fade1a2f1c20f5e7e68e33f50f91b36",
+          "subject": "chore(mutation): receipt for llm-b0_project_paths_fest_20260912",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "891a76d0577e29e5b92482b6d1c63d8b44d02592",
+          "subject": "chore(mutation): receipt for forge-candidate-review-src-layout_toolin\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "bd4cd22c9ab18279389272692f2261e062cc274e",
+          "subject": "chore(mutation): engine run for forge-candidate-review-src-layout_too\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "2a8a065408c7f60e93ee157f3fd79787b6050ec1",
+          "subject": "chore(mutation): engine run for forge-candidate-review-src-layout_gra\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "0975ac0714184d643ad6368b0ff0fdc19c4a44b5",
+          "subject": "chore(mutation): engine run for forge-candidate-review-src-layout_imp\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "450d901f626665d6211082db4175fe77243fef03",
+          "subject": "chore(mutation): engine run for forge-candidate-review-src-layout_eng\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "6fe253e735c0ee240874ef67a30ca64bead9dd84",
+          "subject": "chore(mutation): engine run for the four generated campaigns, second run",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "b06c7528d9c333bc0d9dc0bccc80f0f766a9779c",
+          "subject": "chore(mutation): engine run for graph_selection second run",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "99191584226983fbd878a8c8ce34852000ea1c00",
+          "subject": "chore(mutation): engine run for import_declaration second run",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "6cb879e0dec2b56c4a74b81303fad2877e8ee5e5",
+          "subject": "chore(mutation): engine run for engine second run",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "a2619c0b86fe5a44aa38edf2c1118a99f6a6955d"
+    },
     "50": {
       "branch": "forge/routing-policy",
       "commits": [
@@ -1248,6 +2140,138 @@
       ],
       "first_push_ci": "unknown",
       "first_push_sha": "f6dcbc8de78ca5b6367991f985aeec62e0a980e5"
+    },
+    "6": {
+      "branch": "forge/test-layout",
+      "commits": [
+        {
+          "sha": "1b03fc9cc6df0d7653b3aa6faf59473b92756523",
+          "subject": "refactor(tests): flatten conductor/tests/test_codex_journal.py to the\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "green",
+      "first_push_sha": "1b03fc9cc6df0d7653b3aa6faf59473b92756523"
+    },
+    "7": {
+      "branch": "forge/baselines",
+      "commits": [
+        {
+          "sha": "0b7faec86c16d954a531f009923074b1d452d1d5",
+          "subject": "fix(candidate-review): generate the four missing baselines and fix sr\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "4c1095156a8a4fcfb7945a6f1b73efe2adb130e6",
+          "subject": "test(mutation): generate campaigns for the baseline-fix Python changes",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "dd9befc1e97c6cc579821f1f26337bf152c5405e",
+          "subject": "test(candidate-review): kill vulture-baseline-init mutation survivors",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "d31f3e26c519ecef879ed30a765dd8fe738630e3",
+          "subject": "test(mutation): PASS receipt for vulture_baseline_init after killer t\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "7a7e266976cd70d57a4a7ee986e7d2ef49113cb3",
+          "subject": "test(mutation): record RATCHET_HELD receipt for run_duplicate_audit",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "9c8ae7c32fbdeebb9a2547f1f20f47199def3a26",
+          "subject": "test(mutation): record REFUSED receipt for duplicate_audit_config",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "5c14c4a3709d8e33d30fde34b464f6e64b655f2d",
+          "subject": "ci(python): install pinned jscpd/pmd and re-check the four baselines;\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "e3d9cec0b2d8f85fbf99da4dc92f225935267056",
+          "subject": "ci(python): fix shallow-checkout merge-base failure in baseline diff \u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "382a98896af9337e51cd2ba5148b6cc8186eb00f",
+          "subject": "Merge origin/main into forge/baselines",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "0b7faec86c16d954a531f009923074b1d452d1d5"
+    },
+    "8": {
+      "branch": "forge/evidence-hash",
+      "commits": [
+        {
+          "sha": "038d689293f43d9073a29057a6e23052d50662e6",
+          "subject": "fix(mutation): resolve runner-component and receipt paths through pac\u2026",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "green",
+      "first_push_sha": "038d689293f43d9073a29057a6e23052d50662e6"
+    },
+    "9": {
+      "branch": "forge/docs",
+      "commits": [
+        {
+          "sha": "bf282a795bbf3c58ad0e55f1527edeb5be89daf5",
+          "subject": "docs(platform): add host-facing pages for the seven platform law cards",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        },
+        {
+          "sha": "c16e2cc767e1f1b0811cc6eedae65737765bded5",
+          "subject": "merge(main): bring main into forge/docs",
+          "trailers": {
+            "Agent": "llm-b0",
+            "Claude-Session": "https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX"
+          }
+        }
+      ],
+      "first_push_ci": "unknown",
+      "first_push_sha": "bf282a795bbf3c58ad0e55f1527edeb5be89daf5"
     }
   }
 }
