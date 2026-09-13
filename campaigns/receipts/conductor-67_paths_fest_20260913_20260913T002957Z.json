@@ -1,0 +1,780 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 17,
+    "baseline_repetitions": 2,
+    "killed_mutants": 17,
+    "ranked_tests": 8,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.301178,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": ".........                                                                [100%]\n9 passed in 0.04s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-campaigns/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test_paths.py",
+    "--cov=src/tooling/hooks/dispatch",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "conductor-67_paths_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "engine_result": {
+    "duration_seconds": 3.704496,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "n_for_a_foreign_caller\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 203973613\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-kn4xp6uc/worktree/src/tooling/hooks/dispatch/paths.py\",\n        \"line\": 61,\n        \"column\": 16,\n        \"byte_offset\": 2924,\n        \"byte_length\": 4,\n        \"original_text\": \"None\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Survived\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 154798998\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-kn4xp6uc/worktree/src/tooling/hooks/dispatch/paths.py\",\n        \"line\": 62,\n        \"column\": 8,\n        \"byte_offset\": 2936,\n        \"byte_length\": 54,\n        \"original_text\": \"Path(current).parent.resolve() == own.parent.resolve()\",\n        \"mutated_text\": \"not (Path(current).parent.resolve() == own.parent.resolve())\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters\",\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it\",\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 206514459\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-kn4xp6uc/worktree/src/tooling/hooks/dispatch/paths.py\",\n        \"line\": 62,\n        \"column\": 39,\n        \"byte_offset\": 2967,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters\",\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it\",\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 197821342\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-kn4xp6uc/worktree/src/tooling/hooks/dispatch/paths.py\",\n        \"line\": 63,\n        \"column\": 16,\n        \"byte_offset\": 3007,\n        \"byte_length\": 4,\n        \"original_text\": \"None\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Survived\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters\",\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 159224327\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-kn4xp6uc/worktree/src/tooling/hooks/dispatch/paths.py\",\n        \"line\": 64,\n        \"column\": 12,\n        \"byte_offset\": 3023,\n        \"byte_length\": 3,\n        \"original_text\": \"own\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters\",\n        \"src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 201194500\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 3,\n    \"nanos\": 700673843\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 17,
+    "mutants_generated": 24,
+    "mutants_tested": 19,
+    "no_coverage": 5,
+    "survived": 2,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T00:29:57.779029+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-campaigns/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/conductor-67_paths_fest_20260913.json",
+  "manifest_sha256": "2d83d1d64d3bd3b71a6447d44699d34ed14e4adc9f8e168b0f5d4343965422ae",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 501,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0a3b68ed934a-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Where hook bodies live: this checkout of the tooling, or the installed package.\n\n``registry.py`` names every body by its tooling-relative path\n(``tooling/hooks/agent/crg_gate.py``). In the monorepo that path exists under the\nproject root; in a foreign project scaffolded by ``conductor init`` the project has\nno ``tooling/`` tree and the bodies ship inside the installed ``tooling`` package.\nThe project copy wins when both exist, so a checkout of the tooling itself always\nruns its own bodies.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 774,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-68793e61dae8-0",
+      "line": 18,
+      "mutated_text": "4",
+      "operator": "constant_replace",
+      "original_text": "3",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 80,
+      "byte_offset": 841,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-c063906fd04a-0",
+      "line": 22,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The file for a registry body path: the project's copy, else the package's.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 951,
+      "duration_seconds": 0.190084,
+      "id": "arithmetic_op-0ccd5f35ffeb-0",
+      "line": 23,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_a_directory_is_not_a_body",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_projects_own_copy_wins"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 969,
+      "duration_seconds": 0.199804,
+      "id": "negate_condition-e4518fba8137-0",
+      "line": 24,
+      "mutated_text": "not (candidate.is_file())",
+      "operator": "negate_condition",
+      "original_text": "candidate.is_file()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_a_directory_is_not_a_body",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_projects_own_copy_wins"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 1005,
+      "duration_seconds": 0.199432,
+      "id": "return_value-887d23d58cca-0",
+      "line": 25,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "candidate",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_projects_own_copy_wins"
+      ]
+    },
+    {
+      "byte_length": 23,
+      "byte_offset": 1026,
+      "duration_seconds": 0.191086,
+      "id": "return_value-098e40546425-0",
+      "line": 26,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "TOOLING_ROOT / relative",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_a_directory_is_not_a_body",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 1039,
+      "duration_seconds": 0.199205,
+      "id": "arithmetic_op-0ccd5f35ffeb-1",
+      "line": 26,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_a_directory_is_not_a_body",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none"
+      ]
+    },
+    {
+      "byte_length": 138,
+      "byte_offset": 1086,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-d192b9cf714b-0",
+      "line": 30,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The directory of the running interpreter, so ``python3`` in a shell body\n    resolves to the environment that carries ``conductor``.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 1393,
+      "duration_seconds": 0.189515,
+      "id": "return_value-b19feae585f3-0",
+      "line": 34,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "str(Path(sys.executable).parent)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_interpreter_bin_does_not_follow_the_venv_symlink"
+      ]
+    },
+    {
+      "byte_length": 1328,
+      "byte_offset": 1502,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-839bc22ee1cd-0",
+      "line": 38,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"The checkout's own interpreter, when the caller is not already running it.\n\n    The launcher's shebang is ``#!/usr/bin/env python3``, which resolves against\n    PATH -- whatever venv the agent happened to activate, not this checkout's. Hook\n    bodies import ``conductor._native``, so a foreign interpreter dies on the next\n    crate bump with an ImportError the agent reads as a hook fault rather than as an\n    environment fault.\n\n    Resolved from ``project_root`` and never hardcoded, so a worktree re-execs into\n    its own ``.venv`` and never the main checkout's. Returns ``None`` when there is\n    nothing to switch to -- either the caller already runs it, or the checkout has\n    no ``.venv`` -- and the caller decides what to say about that.\n\n    The comparison is between the two interpreters' *directories*, resolved, and never\n    between the interpreter files themselves. A venv's ``bin/python`` is a symlink to\n    the base interpreter it was created from, so resolving both files collapses\n    ``/usr/bin/python3`` onto ``.venv/bin/python`` and this returns ``None`` for exactly\n    the caller it exists to redirect. That is how a second, unmaintained venv stayed\n    load-bearing here for weeks without appearing in any config: every hook ran under\n    whichever interpreter ``PATH`` happened to give.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2854,
+      "duration_seconds": 0.19891,
+      "id": "arithmetic_op-0ccd5f35ffeb-2",
+      "line": 59,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 2856,
+      "duration_seconds": 0.202548,
+      "id": "constant_replace-0b0598956904-0",
+      "line": 59,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".venv\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2864,
+      "duration_seconds": 0.203609,
+      "id": "arithmetic_op-0ccd5f35ffeb-3",
+      "line": 59,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 2866,
+      "duration_seconds": 0.190548,
+      "id": "constant_replace-46fcc84a22f5-0",
+      "line": 59,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"bin\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 2872,
+      "duration_seconds": 0.216325,
+      "id": "arithmetic_op-0ccd5f35ffeb-4",
+      "line": 59,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 2874,
+      "duration_seconds": 0.200361,
+      "id": "constant_replace-a4665e862305-0",
+      "line": 59,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"python\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2890,
+      "duration_seconds": 0.195293,
+      "id": "boolean_op-188898ef652a-0",
+      "line": 60,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 17,
+      "byte_offset": 2890,
+      "duration_seconds": 0.203974,
+      "id": "negate_condition-794eb67946a2-0",
+      "line": 60,
+      "mutated_text": "not (not own.is_file())",
+      "operator": "negate_condition",
+      "original_text": "not own.is_file()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 2924,
+      "duration_seconds": 0.154799,
+      "id": "return_value-d3be6f372e6d-0",
+      "line": 61,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv"
+      ]
+    },
+    {
+      "byte_length": 54,
+      "byte_offset": 2936,
+      "duration_seconds": 0.206514,
+      "id": "negate_condition-ee91bf487aa0-0",
+      "line": 62,
+      "mutated_text": "not (Path(current).parent.resolve() == own.parent.resolve())",
+      "operator": "negate_condition",
+      "original_text": "Path(current).parent.resolve() == own.parent.resolve()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 2967,
+      "duration_seconds": 0.197821,
+      "id": "comparison_op-0a0fca5bba6f-0",
+      "line": 62,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3007,
+      "duration_seconds": 0.159224,
+      "id": "return_value-d3be6f372e6d-1",
+      "line": 63,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 3023,
+      "duration_seconds": 0.201194,
+      "id": "return_value-6b92c51c64ec-0",
+      "line": 64,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "own",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/paths.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ]
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.8947368421052632,
+  "new_survivors": [],
+  "no_coverage": 5,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 17,
+    "NO_COVERAGE": 5,
+    "SURVIVED": 2,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/conductor-67_paths_fest_20260913_20260913T002957Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "d3f6448839921567e1562d7237abaf62600d958339172afb7a12cab9a63dbe29"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/paths.py": "605c6d811e55f4d7fae1fc7732b736581875db4df63f488620c923c02d44f4f5"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "return_value-d3be6f372e6d-0",
+    "return_value-d3be6f372e6d-1"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test_paths.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test_paths.py": "9ff126a1ed87988dd188ef18a10031a0b913ba3fa1821fb7cadbe426e94b609e"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 4,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 4
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-0ccd5f35ffeb-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_a_directory_is_not_a_body",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_projects_own_copy_wins"
+      ],
+      "arithmetic_op-0ccd5f35ffeb-1": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_a_directory_is_not_a_body",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none"
+      ],
+      "arithmetic_op-0ccd5f35ffeb-2": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "arithmetic_op-0ccd5f35ffeb-3": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "arithmetic_op-0ccd5f35ffeb-4": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "boolean_op-188898ef652a-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "comparison_op-0a0fca5bba6f-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "constant_replace-0b0598956904-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "constant_replace-46fcc84a22f5-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "constant_replace-a4665e862305-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "negate_condition-794eb67946a2-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "negate_condition-e4518fba8137-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_a_directory_is_not_a_body",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_projects_own_copy_wins"
+      ],
+      "negate_condition-ee91bf487aa0-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "return_value-098e40546425-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_a_directory_is_not_a_body",
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none"
+      ],
+      "return_value-6b92c51c64ec-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+      ],
+      "return_value-887d23d58cca-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_projects_own_copy_wins"
+      ],
+      "return_value-b19feae585f3-0": [
+        "src/tooling/hooks/dispatch/test_paths.py::test_the_interpreter_bin_does_not_follow_the_venv_symlink"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/tooling/hooks/dispatch/paths.py"
+        ],
+        "criticality": "high",
+        "id": "conductor-67_paths_fest_20260913"
+      }
+    ],
+    "retained_core": [
+      "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller",
+      "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none",
+      "src/tooling/hooks/dispatch/test_paths.py::test_the_interpreter_bin_does_not_follow_the_venv_symlink",
+      "src/tooling/hooks/dispatch/test_paths.py::test_the_projects_own_copy_wins"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_paths_fest_20260913",
+        "dominated_by": [
+          "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-0ccd5f35ffeb-0",
+          "arithmetic_op-0ccd5f35ffeb-1",
+          "negate_condition-e4518fba8137-0",
+          "return_value-098e40546425-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_paths.py::test_a_directory_is_not_a_body",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_paths_fest_20260913",
+        "dominated_by": [
+          "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-0ccd5f35ffeb-2",
+          "arithmetic_op-0ccd5f35ffeb-3",
+          "arithmetic_op-0ccd5f35ffeb-4",
+          "boolean_op-188898ef652a-0",
+          "comparison_op-0a0fca5bba6f-0",
+          "constant_replace-0b0598956904-0",
+          "constant_replace-46fcc84a22f5-0",
+          "constant_replace-a4665e862305-0",
+          "negate_condition-794eb67946a2-0",
+          "negate_condition-ee91bf487aa0-0",
+          "return_value-6b92c51c64ec-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_compares_directories_not_resolved_interpreters",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_paths_fest_20260913",
+        "dominated_by": [
+          "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-0ccd5f35ffeb-2",
+          "arithmetic_op-0ccd5f35ffeb-3",
+          "arithmetic_op-0ccd5f35ffeb-4",
+          "comparison_op-0a0fca5bba6f-0",
+          "negate_condition-ee91bf487aa0-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_caller_already_runs_it",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_paths_fest_20260913",
+        "dominated_by": [
+          "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-0ccd5f35ffeb-2",
+          "arithmetic_op-0ccd5f35ffeb-3",
+          "arithmetic_op-0ccd5f35ffeb-4",
+          "boolean_op-188898ef652a-0",
+          "negate_condition-794eb67946a2-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_is_none_when_the_checkout_has_no_venv",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_paths_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-0ccd5f35ffeb-2",
+          "arithmetic_op-0ccd5f35ffeb-3",
+          "arithmetic_op-0ccd5f35ffeb-4",
+          "boolean_op-188898ef652a-0",
+          "comparison_op-0a0fca5bba6f-0",
+          "constant_replace-0b0598956904-0",
+          "constant_replace-46fcc84a22f5-0",
+          "constant_replace-a4665e862305-0",
+          "negate_condition-794eb67946a2-0",
+          "negate_condition-ee91bf487aa0-0",
+          "return_value-6b92c51c64ec-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_paths.py::test_own_interpreter_names_the_checkouts_python_for_a_foreign_caller",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_paths_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-0ccd5f35ffeb-0",
+          "arithmetic_op-0ccd5f35ffeb-1",
+          "negate_condition-e4518fba8137-0",
+          "return_value-098e40546425-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_paths.py::test_the_installed_package_answers_when_the_project_has_none",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_paths_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "return_value-b19feae585f3-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_paths.py::test_the_interpreter_bin_does_not_follow_the_venv_symlink",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "return_value-b19feae585f3-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_paths_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-0ccd5f35ffeb-0",
+          "negate_condition-e4518fba8137-0",
+          "return_value-887d23d58cca-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_paths.py::test_the_projects_own_copy_wins",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "return_value-887d23d58cca-0"
+        ]
+      }
+    ]
+  },
+  "unviable": 0
+}

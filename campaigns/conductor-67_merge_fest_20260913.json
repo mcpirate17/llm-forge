@@ -21,8 +21,8 @@
     "src/tooling/hooks/dispatch/merge.py": "ecfdc9d78eb5b1db2dbda2888ed0e22d72f270a9fdbc18e069edce7d43aa8f54"
   },
   "survivor_baseline": [],
-  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": false,
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:29:10.619464+00:00",
   "test_argv": [
     "python",
     "-m",

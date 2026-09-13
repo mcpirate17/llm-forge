@@ -20,9 +20,12 @@
   "source_sha256": {
     "src/tooling/hooks/dispatch/paths.py": "605c6d811e55f4d7fae1fc7732b736581875db4df63f488620c923c02d44f4f5"
   },
-  "survivor_baseline": [],
-  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": false,
+  "survivor_baseline": [
+    "return_value-d3be6f372e6d-0",
+    "return_value-d3be6f372e6d-1"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:30:05.806128+00:00",
   "test_argv": [
     "python",
     "-m",

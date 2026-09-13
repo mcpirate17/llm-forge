@@ -1,0 +1,2686 @@
+{
+  "adapter_sha256": "1d227214dce8dda78ecbd7a9f4c85df8929634f84b811052829fdae5902f3f0d",
+  "attribution": {
+    "attributed_mutants": 66,
+    "baseline_repetitions": 2,
+    "killed_mutants": 66,
+    "ranked_tests": 13,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 2.427274,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": ".............                                                            [100%]\n13 passed in 2.10s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-campaigns/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test_runner.py",
+    "--cov=src/tooling/hooks/dispatch",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "conductor-67_runner_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "81561868db732a8628026a62b7f203e0fdf72afece8f0699f11bfdc28d9237d9",
+  "engine_result": {
+    "duration_seconds": 35.069062,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\"byte_offset\": 7349,\n        \"byte_length\": 20,\n        \"original_text\": \"\\\"CLAUDE_PROJECT_DIR\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Survived\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error\"\n      ],\n      \"duration\": {\n        \"secs\": 2,\n        \"nanos\": 210788258\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-h18mpoya/worktree/src/tooling/hooks/dispatch/runner.py\",\n        \"line\": 238,\n        \"column\": 12,\n        \"byte_offset\": 7675,\n        \"byte_length\": 39,\n        \"original_text\": \"Context(root, event, payload, raw, env)\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 227990040\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-h18mpoya/worktree/src/tooling/hooks/dispatch/runner.py\",\n        \"line\": 246,\n        \"column\": 12,\n        \"byte_offset\": 7926,\n        \"byte_length\": 32,\n        \"original_text\": \"merge(event, outcomes), outcomes\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors\",\n        \"src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 200878992\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 35,\n    \"nanos\": 64325153\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 66,
+    "mutants_generated": 108,
+    "mutants_tested": 91,
+    "no_coverage": 17,
+    "survived": 25,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T00:30:06.829030+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-campaigns/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/conductor-67_runner_fest_20260913.json",
+  "manifest_sha256": "a02116e8f0c2d926c0729de7b03ac2e049ca3dc5b9b7318d3bcda446e3e31f6a",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 469,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-035eea4a5386-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Execution engine: run every matching hook once, in parallel, bounded, captured.\n\nIn-process adapters run on daemon threads with thread-local stdin/stdout so a\nbody that ``print``s its JSON or ``json.load(sys.stdin)``s the payload works\nunchanged; a subprocess body gets the raw payload on its stdin. Each hook has\nits own timeout; a hook that raises, times out, exits non-zero or writes\nnon-JSON becomes a ``HookOutcome`` with ``error`` set, never a silent skip.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 925,
+      "duration_seconds": 0.0,
+      "id": "remove_decorator-dc5c899641ea-0",
+      "line": 29,
+      "mutated_text": "",
+      "operator": "remove_decorator",
+      "original_text": "@dataclass\n",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 74,
+      "byte_offset": 1102,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-7f62f9eb20ea-0",
+      "line": 39,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"``sys.stdout`` stand-in: each bound thread writes to its own buffer.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 1378,
+      "duration_seconds": 0.245948,
+      "id": "return_value-8260a08ca597-0",
+      "line": 47,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "self._local.buffer",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 1475,
+      "duration_seconds": 0.20392,
+      "id": "constant_replace-1b7b6f317f7f-0",
+      "line": 50,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"buffer\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 1502,
+      "duration_seconds": 0.19715,
+      "id": "negate_condition-642b6b541b06-0",
+      "line": 51,
+      "mutated_text": "not (buffer is not None)",
+      "operator": "negate_condition",
+      "original_text": "buffer is not None",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 1509,
+      "duration_seconds": 0.246029,
+      "id": "comparison_op-160752f38640-0",
+      "line": 51,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 18,
+      "byte_offset": 1541,
+      "duration_seconds": 0.234865,
+      "id": "return_value-f185389af044-0",
+      "line": 52,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "buffer.write(text)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 95,
+      "byte_offset": 1585,
+      "duration_seconds": 0.235159,
+      "id": "negate_condition-3461d92741e4-0",
+      "line": 54,
+      "mutated_text": "not (self.fallback is not None\n            and threading.current_thread() is threading.main_thread())",
+      "operator": "negate_condition",
+      "original_text": "self.fallback is not None\n            and threading.current_thread() is threading.main_thread()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 1599,
+      "duration_seconds": 0.185943,
+      "id": "comparison_op-160752f38640-1",
+      "line": 54,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 1623,
+      "duration_seconds": 0.20546,
+      "id": "boolean_op-5630275341fe-0",
+      "line": 55,
+      "mutated_text": "or",
+      "operator": "boolean_op",
+      "original_text": "and",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 1654,
+      "duration_seconds": 0.219981,
+      "id": "comparison_op-203cd539152b-0",
+      "line": 55,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises"
+      ]
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 1711,
+      "duration_seconds": 0.0,
+      "id": "return_value-3b50a74023a0-0",
+      "line": 57,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "self.fallback.write(text)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 1963,
+      "duration_seconds": 0.0,
+      "id": "return_value-ae67150d190b-0",
+      "line": 64,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 2014,
+      "duration_seconds": 0.0,
+      "id": "return_value-3aa5162db7dd-0",
+      "line": 67,
+      "mutated_text": "True",
+      "operator": "return_value",
+      "original_text": "False",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 2014,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-42774abdf40c-0",
+      "line": 67,
+      "mutated_text": "True",
+      "operator": "constant_replace",
+      "original_text": "False",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 75,
+      "byte_offset": 2043,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-a3a918f861e6-0",
+      "line": 71,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"``sys.stdin`` stand-in: each bound thread reads its own payload once.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 2356,
+      "duration_seconds": 0.198754,
+      "id": "constant_replace-d94c96a0f931-0",
+      "line": 80,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"stream\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 47,
+      "byte_offset": 2387,
+      "duration_seconds": 0.215208,
+      "id": "return_value-c0218a49e7f1-0",
+      "line": 81,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "stream if stream is not None else io.StringIO()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 2404,
+      "duration_seconds": 0.202448,
+      "id": "comparison_op-160752f38640-2",
+      "line": 81,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 2494,
+      "duration_seconds": 0.219845,
+      "id": "return_value-f4627e0c1d9a-0",
+      "line": 84,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "self._stream().read(size)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 2583,
+      "duration_seconds": 0.0,
+      "id": "return_value-8152d8c4d596-0",
+      "line": 87,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "self._stream().readline(size)",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 2659,
+      "duration_seconds": 0.0,
+      "id": "return_value-3aa5162db7dd-1",
+      "line": 90,
+      "mutated_text": "True",
+      "operator": "return_value",
+      "original_text": "False",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 2659,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-42774abdf40c-1",
+      "line": 90,
+      "mutated_text": "True",
+      "operator": "constant_replace",
+      "original_text": "False",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 91,
+      "byte_offset": 2744,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-65d84becabd7-0",
+      "line": 98,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Route stdout/stdin through per-thread buffers; the main thread keeps the real stdout.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 22,
+      "byte_offset": 2843,
+      "duration_seconds": 0.211029,
+      "id": "negate_condition-3be2dec28245-0",
+      "line": 99,
+      "mutated_text": "not (sys.stdout is not _OUT)",
+      "operator": "negate_condition",
+      "original_text": "sys.stdout is not _OUT",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 2854,
+      "duration_seconds": 0.208357,
+      "id": "comparison_op-160752f38640-3",
+      "line": 99,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 2963,
+      "duration_seconds": 0.210361,
+      "id": "negate_condition-bd0d69e1d6c4-0",
+      "line": 102,
+      "mutated_text": "not (sys.stdin is not _IN)",
+      "operator": "negate_condition",
+      "original_text": "sys.stdin is not _IN",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 2973,
+      "duration_seconds": 0.216536,
+      "id": "comparison_op-160752f38640-4",
+      "line": 102,
+      "mutated_text": "is",
+      "operator": "comparison_op",
+      "original_text": "is not",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 23,
+      "byte_offset": 3106,
+      "duration_seconds": 0.242791,
+      "id": "negate_condition-9f90612e6c95-0",
+      "line": 107,
+      "mutated_text": "not (event == \"SessionStart\")",
+      "operator": "negate_condition",
+      "original_text": "event == \"SessionStart\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3112,
+      "duration_seconds": 0.204414,
+      "id": "comparison_op-bc95fa496b5e-0",
+      "line": 107,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 3115,
+      "duration_seconds": 0.169208,
+      "id": "constant_replace-fb3ee6edf31a-0",
+      "line": 107,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"SessionStart\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 3146,
+      "duration_seconds": 0.176866,
+      "id": "return_value-f7c0ee36aef4-0",
+      "line": 108,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "str(payload.get(\"source\") or \"\")",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 3162,
+      "duration_seconds": 0.163027,
+      "id": "constant_replace-7f670421e827-0",
+      "line": 108,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"source\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3172,
+      "duration_seconds": 0.160037,
+      "id": "boolean_op-091edbe7142a-0",
+      "line": 108,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3175,
+      "duration_seconds": 0.17612,
+      "id": "constant_replace-53b06adea51d-0",
+      "line": 108,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 21,
+      "byte_offset": 3186,
+      "duration_seconds": 0.229957,
+      "id": "negate_condition-a0fb40c090d3-0",
+      "line": 109,
+      "mutated_text": "not (event == \"SessionEnd\")",
+      "operator": "negate_condition",
+      "original_text": "event == \"SessionEnd\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3192,
+      "duration_seconds": 0.222776,
+      "id": "comparison_op-bc95fa496b5e-1",
+      "line": 109,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 3195,
+      "duration_seconds": 0.168711,
+      "id": "constant_replace-c5d8ab6891f7-0",
+      "line": 109,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"SessionEnd\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 3224,
+      "duration_seconds": 0.0,
+      "id": "return_value-aeac8408ea90-0",
+      "line": 110,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "str(payload.get(\"reason\") or \"\")",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 3240,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-dff33a3ef070-0",
+      "line": 110,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"reason\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3250,
+      "duration_seconds": 0.0,
+      "id": "boolean_op-091edbe7142a-1",
+      "line": 110,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3253,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-53b06adea51d-1",
+      "line": 110,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 62,
+      "byte_offset": 3268,
+      "duration_seconds": 0.220103,
+      "id": "return_value-156a5fdf2e5e-0",
+      "line": 111,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "str(payload.get(\"tool_name\") or payload.get(\"toolName\") or \"\")",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 11,
+      "byte_offset": 3284,
+      "duration_seconds": 0.195813,
+      "id": "constant_replace-0698ce622ee4-0",
+      "line": 111,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"tool_name\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3297,
+      "duration_seconds": 0.210483,
+      "id": "boolean_op-091edbe7142a-2",
+      "line": 111,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3312,
+      "duration_seconds": 0.173451,
+      "id": "constant_replace-d3db2cdc3f21-0",
+      "line": 111,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"toolName\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3324,
+      "duration_seconds": 0.171911,
+      "id": "boolean_op-091edbe7142a-3",
+      "line": 111,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 3327,
+      "duration_seconds": 0.166913,
+      "id": "constant_replace-53b06adea51d-2",
+      "line": 111,
+      "mutated_text": "\"mutant\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 65,
+      "byte_offset": 3458,
+      "duration_seconds": 0.215815,
+      "id": "return_value-92d1ff86fbee-0",
+      "line": 116,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "tuple(spec for spec in hooks_for(event) if spec.matches(subject))",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3606,
+      "duration_seconds": 0.217759,
+      "id": "boolean_op-2deeb0fb238b-0",
+      "line": 120,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 16,
+      "byte_offset": 3606,
+      "duration_seconds": 0.217835,
+      "id": "negate_condition-825797a4ad7b-0",
+      "line": 120,
+      "mutated_text": "not (not text.strip())",
+      "operator": "negate_condition",
+      "original_text": "not text.strip()",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3639,
+      "duration_seconds": 0.214519,
+      "id": "return_value-0e219467fc81-0",
+      "line": 121,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None, None",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ]
+    },
+    {
+      "byte_length": 58,
+      "byte_offset": 3722,
+      "duration_seconds": 0.232315,
+      "id": "exception_swallow-d35cce17bb88-0",
+      "line": 125,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "return None, f\"stdout is not JSON: {text.strip()[:200]!r}\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 51,
+      "byte_offset": 3729,
+      "duration_seconds": 0.222669,
+      "id": "return_value-78df9d88c8f1-0",
+      "line": 125,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None, f\"stdout is not JSON: {text.strip()[:200]!r}\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 3788,
+      "duration_seconds": 0.239538,
+      "id": "boolean_op-2deeb0fb238b-1",
+      "line": 126,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 3788,
+      "duration_seconds": 0.241166,
+      "id": "negate_condition-a549516a4754-0",
+      "line": 126,
+      "mutated_text": "not (not isinstance(data, dict))",
+      "operator": "negate_condition",
+      "original_text": "not isinstance(data, dict)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 61,
+      "byte_offset": 3831,
+      "duration_seconds": 0.0,
+      "id": "return_value-fcf6fa48bd71-0",
+      "line": 127,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None, f\"stdout JSON is not an object: {text.strip()[:200]!r}\"",
+      "outcome": "NO_COVERAGE",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 10,
+      "byte_offset": 3904,
+      "duration_seconds": 0.25286,
+      "id": "return_value-958bef53ee49-0",
+      "line": 128,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "data, None",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4059,
+      "duration_seconds": 0.225534,
+      "id": "constant_replace-c27995f26048-0",
+      "line": 134,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 4117,
+      "duration_seconds": 0.232834,
+      "id": "comparison_op-bc95fa496b5e-2",
+      "line": 135,
+      "mutated_text": "!=",
+      "operator": "comparison_op",
+      "original_text": "==",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 4120,
+      "duration_seconds": 0.229667,
+      "id": "constant_replace-b765569aba51-0",
+      "line": 135,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\".py\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 4399,
+      "duration_seconds": 0.223141,
+      "id": "constant_replace-479c272701b6-0",
+      "line": 146,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"utf-8\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 4408,
+      "duration_seconds": 0.182541,
+      "id": "constant_replace-9d68ac2cc54e-0",
+      "line": 146,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"replace\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 4451,
+      "duration_seconds": 0.228664,
+      "id": "constant_replace-479c272701b6-1",
+      "line": 147,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"utf-8\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 4460,
+      "duration_seconds": 0.199181,
+      "id": "constant_replace-9d68ac2cc54e-1",
+      "line": 147,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"replace\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 14,
+      "byte_offset": 4478,
+      "duration_seconds": 0.188006,
+      "id": "negate_condition-f746e403674f-0",
+      "line": 148,
+      "mutated_text": "not (stderr.strip())",
+      "operator": "negate_condition",
+      "original_text": "stderr.strip()",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 4534,
+      "duration_seconds": 0.229567,
+      "id": "negate_condition-4b4bf985ca10-0",
+      "line": 150,
+      "mutated_text": "not (proc.returncode != 0)",
+      "operator": "negate_condition",
+      "original_text": "proc.returncode != 0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 4550,
+      "duration_seconds": 0.232451,
+      "id": "comparison_op-54f4e6f720b4-0",
+      "line": 150,
+      "mutated_text": "==",
+      "operator": "comparison_op",
+      "original_text": "!=",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4553,
+      "duration_seconds": 0.253588,
+      "id": "constant_replace-c27995f26048-1",
+      "line": 150,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 73,
+      "byte_offset": 4571,
+      "duration_seconds": 0.205166,
+      "id": "return_value-29815b487ec5-0",
+      "line": 151,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "None, f\"exit {proc.returncode}: {stderr.strip()[-300:] or '<no stderr>'}\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 4656,
+      "duration_seconds": 0.222517,
+      "id": "return_value-f9cedacbc971-0",
+      "line": 152,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "parse_output(stdout)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 4854,
+      "duration_seconds": 0.224113,
+      "id": "constant_replace-479c272701b6-2",
+      "line": 160,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"utf-8\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 4863,
+      "duration_seconds": 1.178483,
+      "id": "constant_replace-9d68ac2cc54e-2",
+      "line": 160,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"replace\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 75,
+      "byte_offset": 5044,
+      "duration_seconds": 0.199006,
+      "id": "exception_swallow-91ea1fef631a-0",
+      "line": 167,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "if exc.code not in (None, 0):\n            error = f\"SystemExit({exc.code})\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ]
+    },
+    {
+      "byte_length": 25,
+      "byte_offset": 5047,
+      "duration_seconds": 0.205179,
+      "id": "negate_condition-e0933eeda46b-0",
+      "line": 167,
+      "mutated_text": "not (exc.code not in (None, 0))",
+      "operator": "negate_condition",
+      "original_text": "exc.code not in (None, 0)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ]
+    },
+    {
+      "byte_length": 6,
+      "byte_offset": 5056,
+      "duration_seconds": 0.208523,
+      "id": "comparison_op-a12a97a5fb09-0",
+      "line": 167,
+      "mutated_text": "in",
+      "operator": "comparison_op",
+      "original_text": "not in",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5070,
+      "duration_seconds": 0.242048,
+      "id": "constant_replace-c27995f26048-2",
+      "line": 167,
+      "mutated_text": "1",
+      "operator": "constant_replace",
+      "original_text": "0",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ]
+    },
+    {
+      "byte_length": 26,
+      "byte_offset": 5127,
+      "duration_seconds": 0.20425,
+      "id": "negate_condition-9d32eef7b7c8-0",
+      "line": 169,
+      "mutated_text": "not (isinstance(returned, dict))",
+      "operator": "negate_condition",
+      "original_text": "isinstance(returned, dict)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 5170,
+      "duration_seconds": 0.206635,
+      "id": "return_value-14fa78791850-0",
+      "line": 170,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "returned, error",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 28,
+      "byte_offset": 5255,
+      "duration_seconds": 0.208479,
+      "id": "return_value-cb2874a6260b-0",
+      "line": 172,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "output, error or parse_error",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 5269,
+      "duration_seconds": 0.199458,
+      "id": "boolean_op-091edbe7142a-4",
+      "line": 172,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 5398,
+      "duration_seconds": 0.220519,
+      "id": "negate_condition-e6f2d8101cf1-0",
+      "line": 178,
+      "mutated_text": "not (spec.adapter)",
+      "operator": "negate_condition",
+      "original_text": "spec.adapter",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 56,
+      "byte_offset": 5579,
+      "duration_seconds": 1.229356,
+      "id": "exception_swallow-fbb52d4522ba-0",
+      "line": 183,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "output, error = None, f\"timed out after {spec.timeout}s\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 52,
+      "byte_offset": 5722,
+      "duration_seconds": 0.239487,
+      "id": "exception_swallow-b3c93570940e-0",
+      "line": 185,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "output, error = None, f\"{type(exc).__name__}: {exc}\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error"
+      ]
+    },
+    {
+      "byte_length": 142,
+      "byte_offset": 5786,
+      "duration_seconds": 0.222848,
+      "id": "return_value-931be8cf499f-0",
+      "line": 186,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "HookOutcome(\n        spec.name,\n        output,\n        error,\n        spec.fail_closed,\n        (time.perf_counter() - started) * 1000,\n    )",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5904,
+      "duration_seconds": 2.204288,
+      "id": "arithmetic_op-d5a95470c447-0",
+      "line": 191,
+      "mutated_text": "+",
+      "operator": "arithmetic_op",
+      "original_text": "-",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 5915,
+      "duration_seconds": 2.199277,
+      "id": "arithmetic_op-0e293ddda530-0",
+      "line": 191,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 5917,
+      "duration_seconds": 2.212327,
+      "id": "constant_replace-973572857a5a-0",
+      "line": 191,
+      "mutated_text": "1001",
+      "operator": "constant_replace",
+      "original_text": "1000",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 30,
+      "byte_offset": 6190,
+      "duration_seconds": 0.212669,
+      "id": "zero_iteration_loop-fbbff36f8e36-0",
+      "line": 200,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "zip(specs, boxes, strict=True)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 39,
+      "byte_offset": 6556,
+      "duration_seconds": 0.207828,
+      "id": "zero_iteration_loop-de50ce584a2f-0",
+      "line": 209,
+      "mutated_text": "[]",
+      "operator": "zero_iteration_loop",
+      "original_text": "zip(specs, threads, boxes, strict=True)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 6621,
+      "duration_seconds": 1.178337,
+      "id": "constant_replace-c2da4e9571aa-0",
+      "line": 210,
+      "mutated_text": "1.0",
+      "operator": "constant_replace",
+      "original_text": "0.0",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6639,
+      "duration_seconds": 1.174412,
+      "id": "arithmetic_op-d5a95470c447-1",
+      "line": 210,
+      "mutated_text": "+",
+      "operator": "arithmetic_op",
+      "original_text": "-",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6662,
+      "duration_seconds": 0.178446,
+      "id": "arithmetic_op-d5a95470c447-2",
+      "line": 210,
+      "mutated_text": "+",
+      "operator": "arithmetic_op",
+      "original_text": "-",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 9,
+      "byte_offset": 6701,
+      "duration_seconds": 0.199875,
+      "id": "constant_replace-8fd1f55f9971-0",
+      "line": 211,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"outcome\"",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 36,
+      "byte_offset": 6723,
+      "duration_seconds": 0.223727,
+      "id": "negate_condition-835fedc3af55-0",
+      "line": 212,
+      "mutated_text": "not (thread.is_alive() or outcome is None)",
+      "operator": "negate_condition",
+      "original_text": "thread.is_alive() or outcome is None",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6741,
+      "duration_seconds": 1.185784,
+      "id": "boolean_op-091edbe7142a-5",
+      "line": 212,
+      "mutated_text": "and",
+      "operator": "boolean_op",
+      "original_text": "or",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 6752,
+      "duration_seconds": 0.240228,
+      "id": "comparison_op-203cd539152b-1",
+      "line": 212,
+      "mutated_text": "is not",
+      "operator": "comparison_op",
+      "original_text": "is",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6968,
+      "duration_seconds": 1.172361,
+      "id": "arithmetic_op-d5a95470c447-3",
+      "line": 218,
+      "mutated_text": "+",
+      "operator": "arithmetic_op",
+      "original_text": "-",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 6979,
+      "duration_seconds": 1.16535,
+      "id": "arithmetic_op-0e293ddda530-1",
+      "line": 218,
+      "mutated_text": "/",
+      "operator": "arithmetic_op",
+      "original_text": "*",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 6981,
+      "duration_seconds": 1.164416,
+      "id": "constant_replace-973572857a5a-1",
+      "line": 218,
+      "mutated_text": "1001",
+      "operator": "constant_replace",
+      "original_text": "1000",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 8,
+      "byte_offset": 7045,
+      "duration_seconds": 0.208376,
+      "id": "return_value-641990417cf2-0",
+      "line": 221,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "outcomes",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    {
+      "byte_length": 12,
+      "byte_offset": 7196,
+      "duration_seconds": 0.243372,
+      "id": "exception_swallow-d6a0205d2c1d-0",
+      "line": 228,
+      "mutated_text": "pass",
+      "operator": "exception_swallow",
+      "original_text": "payload = {}",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload"
+      ]
+    },
+    {
+      "byte_length": 4,
+      "byte_offset": 7216,
+      "duration_seconds": 0.21997,
+      "id": "boolean_op-2deeb0fb238b-2",
+      "line": 229,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not ",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 29,
+      "byte_offset": 7216,
+      "duration_seconds": 0.225815,
+      "id": "negate_condition-6f9faefe6185-0",
+      "line": 229,
+      "mutated_text": "not (not isinstance(payload, dict))",
+      "operator": "negate_condition",
+      "original_text": "not isinstance(payload, dict)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 20,
+      "byte_offset": 7349,
+      "duration_seconds": 2.210788,
+      "id": "constant_replace-26e4236d93ad-0",
+      "line": 233,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"CLAUDE_PROJECT_DIR\"",
+      "outcome": "SURVIVED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 39,
+      "byte_offset": 7675,
+      "duration_seconds": 0.22799,
+      "id": "return_value-dd48912773db-0",
+      "line": 238,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "Context(root, event, payload, raw, env)",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ]
+    },
+    {
+      "byte_length": 32,
+      "byte_offset": 7926,
+      "duration_seconds": 0.200879,
+      "id": "return_value-287ec1fb46ef-0",
+      "line": 246,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "merge(event, outcomes), outcomes",
+      "outcome": "KILLED",
+      "path": "src/tooling/hooks/dispatch/runner.py",
+      "tests_run": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload"
+      ]
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.7252747252747253,
+  "new_survivors": [],
+  "no_coverage": 17,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 66,
+    "NO_COVERAGE": 17,
+    "SURVIVED": 25,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/conductor-67_runner_fest_20260913_20260913T003006Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fdb701451fec906073109e22f4758a654dc45dcba667568fee5e9327633666f6",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "d3f6448839921567e1562d7237abaf62600d958339172afb7a12cab9a63dbe29"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/runner.py": "bab189f470e567b0cb8aa20f6cc6fdb40829d54be473dc29f7bc63136dcc23c3"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "arithmetic_op-0e293ddda530-0",
+    "arithmetic_op-0e293ddda530-1",
+    "arithmetic_op-d5a95470c447-0",
+    "arithmetic_op-d5a95470c447-1",
+    "arithmetic_op-d5a95470c447-2",
+    "arithmetic_op-d5a95470c447-3",
+    "boolean_op-091edbe7142a-0",
+    "boolean_op-091edbe7142a-3",
+    "boolean_op-091edbe7142a-5",
+    "comparison_op-160752f38640-1",
+    "constant_replace-26e4236d93ad-0",
+    "constant_replace-53b06adea51d-0",
+    "constant_replace-53b06adea51d-2",
+    "constant_replace-7f670421e827-0",
+    "constant_replace-973572857a5a-0",
+    "constant_replace-973572857a5a-1",
+    "constant_replace-9d68ac2cc54e-0",
+    "constant_replace-9d68ac2cc54e-1",
+    "constant_replace-9d68ac2cc54e-2",
+    "constant_replace-c2da4e9571aa-0",
+    "constant_replace-c5d8ab6891f7-0",
+    "constant_replace-d3db2cdc3f21-0",
+    "constant_replace-fb3ee6edf31a-0",
+    "negate_condition-f746e403674f-0",
+    "return_value-f7c0ee36aef4-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test_runner.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test_runner.py": "e7551f22bc9f8b9b26d7edfba0db4fa78fc089df4ab0984a73b1c5ff507e71bb"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 9,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 4
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "boolean_op-091edbe7142a-2": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ],
+      "boolean_op-091edbe7142a-4": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ],
+      "boolean_op-2deeb0fb238b-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "boolean_op-2deeb0fb238b-1": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "boolean_op-2deeb0fb238b-2": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors"
+      ],
+      "boolean_op-5630275341fe-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises"
+      ],
+      "comparison_op-160752f38640-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "comparison_op-160752f38640-2": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "comparison_op-160752f38640-3": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "comparison_op-160752f38640-4": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "comparison_op-203cd539152b-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises"
+      ],
+      "comparison_op-203cd539152b-1": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ],
+      "comparison_op-54f4e6f720b4-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "comparison_op-a12a97a5fb09-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ],
+      "comparison_op-bc95fa496b5e-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ],
+      "comparison_op-bc95fa496b5e-1": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ],
+      "comparison_op-bc95fa496b5e-2": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ],
+      "constant_replace-0698ce622ee4-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ],
+      "constant_replace-1b7b6f317f7f-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "constant_replace-479c272701b6-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "constant_replace-479c272701b6-1": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error"
+      ],
+      "constant_replace-479c272701b6-2": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ],
+      "constant_replace-8fd1f55f9971-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ],
+      "constant_replace-b765569aba51-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "constant_replace-c27995f26048-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ],
+      "constant_replace-c27995f26048-1": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "constant_replace-c27995f26048-2": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ],
+      "constant_replace-d94c96a0f931-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "exception_swallow-91ea1fef631a-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ],
+      "exception_swallow-b3c93570940e-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error"
+      ],
+      "exception_swallow-d35cce17bb88-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error"
+      ],
+      "exception_swallow-d6a0205d2c1d-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload"
+      ],
+      "exception_swallow-fbb52d4522ba-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ],
+      "negate_condition-3461d92741e4-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises"
+      ],
+      "negate_condition-3be2dec28245-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "negate_condition-4b4bf985ca10-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "negate_condition-642b6b541b06-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "negate_condition-6f9faefe6185-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors"
+      ],
+      "negate_condition-825797a4ad7b-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "negate_condition-835fedc3af55-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ],
+      "negate_condition-9d32eef7b7c8-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ],
+      "negate_condition-9f90612e6c95-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ],
+      "negate_condition-a0fb40c090d3-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ],
+      "negate_condition-a549516a4754-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "negate_condition-bd0d69e1d6c4-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "negate_condition-e0933eeda46b-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ],
+      "negate_condition-e6f2d8101cf1-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ],
+      "return_value-0e219467fc81-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not"
+      ],
+      "return_value-14fa78791850-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ],
+      "return_value-156a5fdf2e5e-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ],
+      "return_value-287ec1fb46ef-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload"
+      ],
+      "return_value-29815b487ec5-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error"
+      ],
+      "return_value-641990417cf2-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ],
+      "return_value-78df9d88c8f1-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error"
+      ],
+      "return_value-8260a08ca597-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "return_value-92d1ff86fbee-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers"
+      ],
+      "return_value-931be8cf499f-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ],
+      "return_value-958bef53ee49-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "return_value-c0218a49e7f1-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "return_value-cb2874a6260b-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "return_value-dd48912773db-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+      ],
+      "return_value-f185389af044-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "return_value-f4627e0c1d9a-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread"
+      ],
+      "return_value-f9cedacbc971-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env"
+      ],
+      "zero_iteration_loop-de50ce584a2f-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ],
+      "zero_iteration_loop-fbbff36f8e36-0": [
+        "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "src/tooling/hooks/dispatch/runner.py"
+        ],
+        "criticality": "high",
+        "id": "conductor-67_runner_fest_20260913"
+      }
+    ],
+    "retained_core": [
+      "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+      "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+      "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+      "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+      "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+      "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+      "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+      "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+      "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [
+          "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors"
+        ],
+        "killed_mutants": [
+          "constant_replace-479c272701b6-2",
+          "negate_condition-9d32eef7b7c8-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-14fa78791850-0",
+          "return_value-931be8cf499f-0",
+          "return_value-dd48912773db-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_adapter_dict_return_is_used_verbatim",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-091edbe7142a-2",
+          "boolean_op-2deeb0fb238b-2",
+          "comparison_op-203cd539152b-1",
+          "comparison_op-bc95fa496b5e-0",
+          "comparison_op-bc95fa496b5e-1",
+          "constant_replace-0698ce622ee4-0",
+          "constant_replace-479c272701b6-2",
+          "constant_replace-8fd1f55f9971-0",
+          "exception_swallow-b3c93570940e-0",
+          "negate_condition-6f9faefe6185-0",
+          "negate_condition-835fedc3af55-0",
+          "negate_condition-9d32eef7b7c8-0",
+          "negate_condition-9f90612e6c95-0",
+          "negate_condition-a0fb40c090d3-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-14fa78791850-0",
+          "return_value-156a5fdf2e5e-0",
+          "return_value-287ec1fb46ef-0",
+          "return_value-641990417cf2-0",
+          "return_value-92d1ff86fbee-0",
+          "return_value-931be8cf499f-0",
+          "return_value-dd48912773db-0",
+          "zero_iteration_loop-de50ce584a2f-0",
+          "zero_iteration_loop-fbbff36f8e36-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": [
+          "boolean_op-2deeb0fb238b-2",
+          "negate_condition-6f9faefe6185-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "exception_swallow-d6a0205d2c1d-0",
+          "return_value-287ec1fb46ef-0",
+          "return_value-641990417cf2-0",
+          "return_value-92d1ff86fbee-0",
+          "return_value-dd48912773db-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_malformed_payload_dispatches_with_empty_payload",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "exception_swallow-d6a0205d2c1d-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-091edbe7142a-4",
+          "boolean_op-2deeb0fb238b-0",
+          "comparison_op-160752f38640-0",
+          "comparison_op-160752f38640-3",
+          "constant_replace-1b7b6f317f7f-0",
+          "constant_replace-479c272701b6-2",
+          "exception_swallow-d35cce17bb88-0",
+          "negate_condition-3be2dec28245-0",
+          "negate_condition-642b6b541b06-0",
+          "negate_condition-825797a4ad7b-0",
+          "negate_condition-9d32eef7b7c8-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-78df9d88c8f1-0",
+          "return_value-8260a08ca597-0",
+          "return_value-931be8cf499f-0",
+          "return_value-cb2874a6260b-0",
+          "return_value-dd48912773db-0",
+          "return_value-f185389af044-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_non_json_stdout_is_an_error",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "exception_swallow-d35cce17bb88-0",
+          "return_value-78df9d88c8f1-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-091edbe7142a-4",
+          "boolean_op-2deeb0fb238b-0",
+          "comparison_op-a12a97a5fb09-0",
+          "constant_replace-479c272701b6-2",
+          "constant_replace-c27995f26048-2",
+          "exception_swallow-91ea1fef631a-0",
+          "negate_condition-825797a4ad7b-0",
+          "negate_condition-e0933eeda46b-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-0e219467fc81-0",
+          "return_value-8260a08ca597-0",
+          "return_value-931be8cf499f-0",
+          "return_value-cb2874a6260b-0",
+          "return_value-dd48912773db-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_nonzero_system_exit_is_an_error_but_zero_is_not",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "comparison_op-a12a97a5fb09-0",
+          "constant_replace-c27995f26048-2",
+          "exception_swallow-91ea1fef631a-0",
+          "negate_condition-e0933eeda46b-0",
+          "return_value-0e219467fc81-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-5630275341fe-0",
+          "comparison_op-160752f38640-0",
+          "comparison_op-160752f38640-3",
+          "comparison_op-203cd539152b-0",
+          "constant_replace-479c272701b6-2",
+          "negate_condition-3461d92741e4-0",
+          "negate_condition-3be2dec28245-0",
+          "negate_condition-642b6b541b06-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-14fa78791850-0",
+          "return_value-931be8cf499f-0",
+          "return_value-dd48912773db-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_print_from_unbound_helper_thread_raises",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "boolean_op-5630275341fe-0",
+          "comparison_op-203cd539152b-0",
+          "negate_condition-3461d92741e4-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-2deeb0fb238b-0",
+          "boolean_op-2deeb0fb238b-1",
+          "comparison_op-160752f38640-0",
+          "comparison_op-160752f38640-2",
+          "comparison_op-160752f38640-3",
+          "comparison_op-160752f38640-4",
+          "comparison_op-203cd539152b-1",
+          "constant_replace-1b7b6f317f7f-0",
+          "constant_replace-479c272701b6-2",
+          "constant_replace-8fd1f55f9971-0",
+          "constant_replace-d94c96a0f931-0",
+          "negate_condition-3be2dec28245-0",
+          "negate_condition-642b6b541b06-0",
+          "negate_condition-825797a4ad7b-0",
+          "negate_condition-835fedc3af55-0",
+          "negate_condition-9d32eef7b7c8-0",
+          "negate_condition-a549516a4754-0",
+          "negate_condition-bd0d69e1d6c4-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-641990417cf2-0",
+          "return_value-8260a08ca597-0",
+          "return_value-931be8cf499f-0",
+          "return_value-958bef53ee49-0",
+          "return_value-c0218a49e7f1-0",
+          "return_value-cb2874a6260b-0",
+          "return_value-dd48912773db-0",
+          "return_value-f185389af044-0",
+          "return_value-f4627e0c1d9a-0",
+          "zero_iteration_loop-de50ce584a2f-0",
+          "zero_iteration_loop-fbbff36f8e36-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_printing_adapter_stdout_is_captured_per_thread",
+        "runtime_seconds_median": 0.0005,
+        "unique_kills": [
+          "comparison_op-160752f38640-2",
+          "comparison_op-160752f38640-4",
+          "constant_replace-d94c96a0f931-0",
+          "negate_condition-bd0d69e1d6c4-0",
+          "return_value-c0218a49e7f1-0",
+          "return_value-f4627e0c1d9a-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "constant_replace-479c272701b6-2",
+          "exception_swallow-b3c93570940e-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-931be8cf499f-0",
+          "return_value-dd48912773db-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_raising_adapter_is_a_visible_error",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-091edbe7142a-2",
+          "comparison_op-bc95fa496b5e-0",
+          "comparison_op-bc95fa496b5e-1",
+          "constant_replace-0698ce622ee4-0",
+          "negate_condition-9f90612e6c95-0",
+          "negate_condition-a0fb40c090d3-0",
+          "return_value-156a5fdf2e5e-0",
+          "return_value-92d1ff86fbee-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_select_uses_registry_matchers",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [
+          "src/tooling/hooks/dispatch/test_runner.py::test_dispatch_merges_and_reports_errors"
+        ],
+        "killed_mutants": [
+          "comparison_op-203cd539152b-1",
+          "constant_replace-479c272701b6-2",
+          "constant_replace-8fd1f55f9971-0",
+          "negate_condition-835fedc3af55-0",
+          "negate_condition-9d32eef7b7c8-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-14fa78791850-0",
+          "return_value-641990417cf2-0",
+          "return_value-931be8cf499f-0",
+          "return_value-dd48912773db-0",
+          "zero_iteration_loop-de50ce584a2f-0",
+          "zero_iteration_loop-fbbff36f8e36-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_slow_adapter_times_out_without_blocking_the_event",
+        "runtime_seconds_median": 1.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "comparison_op-54f4e6f720b4-0",
+          "comparison_op-bc95fa496b5e-2",
+          "constant_replace-479c272701b6-1",
+          "constant_replace-c27995f26048-0",
+          "negate_condition-4b4bf985ca10-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-29815b487ec5-0",
+          "return_value-931be8cf499f-0",
+          "return_value-dd48912773db-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_nonzero_exit_is_an_error",
+        "runtime_seconds_median": 0.0015,
+        "unique_kills": [
+          "constant_replace-479c272701b6-1",
+          "return_value-29815b487ec5-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "boolean_op-2deeb0fb238b-0",
+          "boolean_op-2deeb0fb238b-1",
+          "comparison_op-54f4e6f720b4-0",
+          "comparison_op-bc95fa496b5e-2",
+          "constant_replace-479c272701b6-0",
+          "constant_replace-b765569aba51-0",
+          "constant_replace-c27995f26048-0",
+          "constant_replace-c27995f26048-1",
+          "negate_condition-4b4bf985ca10-0",
+          "negate_condition-825797a4ad7b-0",
+          "negate_condition-a549516a4754-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-931be8cf499f-0",
+          "return_value-958bef53ee49-0",
+          "return_value-dd48912773db-0",
+          "return_value-f9cedacbc971-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_python_body_gets_payload_and_env",
+        "runtime_seconds_median": 0.012,
+        "unique_kills": [
+          "constant_replace-479c272701b6-0",
+          "constant_replace-b765569aba51-0",
+          "constant_replace-c27995f26048-1",
+          "return_value-f9cedacbc971-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "conductor-67_runner_fest_20260913",
+        "dominated_by": [],
+        "killed_mutants": [
+          "comparison_op-bc95fa496b5e-2",
+          "constant_replace-c27995f26048-0",
+          "exception_swallow-fbb52d4522ba-0",
+          "negate_condition-e6f2d8101cf1-0",
+          "return_value-931be8cf499f-0",
+          "return_value-dd48912773db-0"
+        ],
+        "nodeid": "src/tooling/hooks/dispatch/test_runner.py::test_subprocess_timeout_is_an_error",
+        "runtime_seconds_median": 1.002,
+        "unique_kills": [
+          "exception_swallow-fbb52d4522ba-0"
+        ]
+      }
+    ]
+  },
+  "unviable": 0
+}

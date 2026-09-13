@@ -21,8 +21,8 @@
     "src/conductor/mutation_campaign_generate.py": "bcfd149f5988c76c6c6de28130f75843edd737bab32c3a1b7c1ae0acdd7f16b4"
   },
   "survivor_baseline": [],
-  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": false,
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T00:36:27.384848+00:00",
   "test_argv": [
     "python",
     "-m",
