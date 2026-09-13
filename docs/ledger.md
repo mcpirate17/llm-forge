@@ -559,36 +559,44 @@ Field derivation in `apply()`:
   The first commit is treated as the dispatch's own work; the cache has no
   other way to say which commit was whose.
 
-### `ci_history` fetcher, not yet built (GLM slice)
+### `ci_history` fetcher (built)
 
-This file is never written by `native/forge` -- a separate GLM-owned CLI
-slice fetches it. Requirements for that fetcher:
+This file is never written by `native/forge` -- `conductor.ci_history_fetch`
+(Python glue over `gh` and local `git`, per `CLAUDE.md`'s language
+hierarchy) is the writer, and `make ci-history` is the entry point:
 
-1. Python CLI/glue only (per `CLAUDE.md`'s language hierarchy); no Rust,
-   no compute-heavy logic here.
-2. One invocation per repo: `python -m conductor.ci_history_fetch --repo
-   <path> --out ledger/ci_history/<owner>_<name>.json`.
-3. Uses `gh pr list --state merged --json number,headRefName` then, per
-   PR, `gh api repos/{o}/{r}/pulls/{n}/commits` for the commit list and
-   `gh api repos/{o}/{r}/commits/{sha}/check-runs` (first commit only) for
-   `first_push_ci`.
-4. Parses `Agent:`/`Claude-Session:` trailers out of each commit's message
-   into `trailers` exactly as shown above; missing trailers serialize as
-   absent keys, never empty strings.
-5. Merges into the existing file rather than overwriting it wholesale --
-   PRs already cached and unchanged (same `first_push_sha`) are left alone,
-   so re-runs are cheap and idempotent.
-6. Writes `fetched_utc` as the run's own UTC timestamp (RFC 3339).
-7. Rate-limit aware: backs off on `gh`'s own 403/secondary-rate-limit exit
-   codes rather than treating them as a real per-PR failure.
-8. Exits non-zero (loud) on any PR it could not resolve, but keeps every
-   already-written PR in the output file -- a partial fetch must still be
-   the best data available, not thrown away.
-9. Scheduled periodically (a cron/CI job), not run inline by `forge ledger
-   rollup` -- the join always reads whatever is on disk *now*.
-10. Ships its own test fixture and a dry-run mode (`--dry-run` prints what
-    it would fetch/write without calling `gh`) so it can be verified without
-    live API credits.
+```
+python -m conductor.ci_history_fetch --repo <path> --out ledger/ci_history/<owner>_<name>.json \
+    [--since-days N] [--max-prs N] [--dry-run]
+```
+
+One `gh pr list --state merged --json number,headRefName,mergedAt` names the
+PRs (always with an explicit `--limit` -- gh's own default of 30 is not
+"all merged PRs", and a PR missing from the cache reads as unknown to the
+join); per uncached PR, `gh pr view --json commits,headRefName,number` for
+the pre-squash commit list, `gh api .../commits/<first-sha>/check-runs`
+for `first_push_ci` (green iff every completed run succeeded, red iff any
+failed, else unknown), and one `git fetch origin refs/pull/<n>/head` so each
+commit's full message can be read locally. Trailers come from
+`git interpret-trailers --parse` on those messages -- never a regex -- and
+absent trailers serialize as absent keys, never empty strings.
+
+**Incremental rule:** a PR already in the cache whose `mergedAt` is no later
+than the file's `fetched_utc` is left verbatim alone, so a re-run costs one
+`pr list` plus whatever is new; everything fetched lands on top under a
+fresh `fetched_utc`, written atomically (temp file + rename). Failures are
+graded: an unusable environment (no `gh`, unauthenticated, an unreadable
+existing file) exits 2 having written nothing; a PR that could not be
+resolved is named on stderr while every resolvable PR is still written, and
+the run exits 1. `make ledger-rollup` refreshes this cache first when `gh`
+is on PATH (a failed fetch never fails the rollup) because the join always
+reads whatever is on disk *now*; `--dry-run` prints the plan -- cached PRs
+left alone and the calls it would make -- without touching `gh`.
+
+A verdict will be `unknown` whenever the PR's oldest commit was never a
+branch tip on GitHub: check runs attach to the tip at push time, so a PR
+opened by pushing two or more commits at once has no check runs for its
+first commit, whatever CI did later.
 
 ### `decision`/`mode`/`applied`, and `forge ledger report`'s warn-only columns
 

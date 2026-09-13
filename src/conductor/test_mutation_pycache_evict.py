@@ -82,7 +82,8 @@ def test_a_broken_eviction_fails_closed_on_the_whole_prefix(
     failure a shared helper would import into this child). The plugin must
     not raise: it deletes the run's whole prefix tree instead, so every child
     of the run recompiles and the tests still grade the mutant honestly --
-    slower, never wrong.
+    slower, never wrong. The scratch is a real one, marked the way the
+    launcher marks it, which is what licenses the deletion.
     """
 
     source = tmp_path / "m.py"
@@ -91,6 +92,7 @@ def test_a_broken_eviction_fails_closed_on_the_whole_prefix(
     stale = cache_paths_for(source, scratch / "pycache")[0]
     stale.parent.mkdir(parents=True)
     stale.write_bytes(b"stale")
+    (scratch / eviction._RUN_MARKER).write_text("", encoding="utf-8")
     monkeypatch.setenv(SCRATCH_ENV, str(scratch))
     monkeypatch.setenv(SOURCES_ENV, str(source))
 
@@ -100,7 +102,142 @@ def test_a_broken_eviction_fails_closed_on_the_whole_prefix(
     monkeypatch.setattr(eviction, "_cache_paths", broken)
 
     assert evict_now() == []
-    assert not (scratch / "pycache").exists()
+    assert not scratch.exists()
+
+
+def _broken_cache_paths(source: str, prefix: Path) -> list[Path]:
+    """A cache mapping that raises -- the failure the fail-closed path answers."""
+
+    raise TypeError("mutated away")
+
+
+def test_the_fail_closed_deletion_requires_the_run_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A scratch without the launcher's marker is not this run's to delete.
+
+    The marker is the only thing distinguishing "a directory the run
+    created" from "a directory someone pointed the env var at"; without it
+    the deletion raises, the directory survives whole, and the failure is
+    loud with the path in the message.
+    """
+
+    scratch = scratch_root_for(tmp_path)
+    (scratch / "pycache").mkdir(parents=True)
+    monkeypatch.setenv(SCRATCH_ENV, str(scratch))
+    monkeypatch.setenv(SOURCES_ENV, str(tmp_path / "m.py"))
+    monkeypatch.setattr(eviction, "_cache_paths", _broken_cache_paths)
+
+    with pytest.raises(RuntimeError, match="is absent"):
+        evict_now()
+    assert (scratch / "pycache").is_dir(), "a refused deletion must not delete anything"
+
+
+def test_the_fail_closed_deletion_requires_a_pycache_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Marker or not, a directory with no `pycache/` is not a run scratch."""
+
+    scratch = tmp_path / "marked-empty"
+    scratch.mkdir()
+    (scratch / eviction._RUN_MARKER).write_text("", encoding="utf-8")
+    monkeypatch.setenv(SCRATCH_ENV, str(scratch))
+    monkeypatch.setenv(SOURCES_ENV, str(tmp_path / "m.py"))
+    monkeypatch.setattr(eviction, "_cache_paths", _broken_cache_paths)
+
+    with pytest.raises(RuntimeError, match="pycache does not exist"):
+        evict_now()
+    assert scratch.is_dir()
+
+
+def test_the_fail_closed_deletion_refuses_the_four_forbidden_places(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Root, home, the repo checkout and any parent of cwd never die, marker or not.
+
+    The identity checks run before the contents checks, so each forbidden
+    place is refused for what it is even when a `pycache/` and marker sit
+    inside it -- which is exactly how this test can plant them on a fake
+    repository root without touching anything real. `/` needs nothing
+    planted: refusing it must not depend on what it contains.
+    """
+
+    forbidden = tmp_path / "forbidden"
+    forbidden.mkdir()
+    (forbidden / "pycache").mkdir()
+    (forbidden / eviction._RUN_MARKER).write_text("", encoding="utf-8")
+
+    # A fake repository root with the process cwd inside a workdir under it.
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "pycache").mkdir()
+    (repo / eviction._RUN_MARKER).write_text("", encoding="utf-8")
+    workdir = repo / "work"
+    workdir.mkdir()
+    monkeypatch.chdir(workdir)
+
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "pycache").mkdir()
+    (home / eviction._RUN_MARKER).write_text("", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    places = {
+        "/": "filesystem root",
+        str(home): "home directory",
+        str(repo): "repository root",
+        str(tmp_path): "parent of the working directory",
+    }
+    for place, why in places.items():
+        with pytest.raises(RuntimeError, match=why):
+            eviction._fail_closed_delete(place)
+    for victim in (home, repo, workdir):
+        assert victim.is_dir(), f"{victim} must survive every refusal"
+    # The refused places keep their planted contents, and the same planted
+    # shape in an ordinary directory still dies: the bound refuses the four
+    # places, not the deletion.
+    assert (repo / "pycache").is_dir() and (repo / eviction._RUN_MARKER).is_file()
+    eviction._fail_closed_delete(str(forbidden))
+    assert not forbidden.exists()
+
+
+def test_the_fail_closed_deletion_refuses_the_working_directory_itself(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """cwd is the one forbidden place the four-places test cannot plant on.
+
+    That test chdirs into a workdir to make a parent-of-cwd case; the cwd
+    itself is refused before any contents check, so a planted scratch at
+    exactly the process cwd must raise and survive whole. This is the
+    deletion's cheapest catastrophic failure -- without this refusal the
+    `parent of cwd` rule is one `resolve()` short of deleting the checkout
+    the run is happening in.
+    """
+
+    scratch = tmp_path / "here"
+    scratch.mkdir()
+    (scratch / "pycache").mkdir()
+    (scratch / eviction._RUN_MARKER).write_text("", encoding="utf-8")
+    monkeypatch.chdir(scratch)
+
+    with pytest.raises(RuntimeError, match="is the working directory itself"):
+        eviction._fail_closed_delete(str(scratch))
+
+    assert scratch.is_dir() and (scratch / "pycache").is_dir()
+
+
+def test_the_deletion_marker_literal_matches_the_one_the_launcher_writes() -> None:
+    """Two literals, one name: the launcher writes it, the plugin demands it.
+
+    The plugin cannot import `bytecode_isolation` (it runs inside the
+    children whose modules are mutated), so the marker name exists twice on
+    purpose. If one side renames it, every real fail-closed deletion starts
+    refusing -- this test is where that surfaces first.
+    """
+
+    from conductor.bytecode_isolation import RUN_MARKER_NAME
+
+    assert eviction._RUN_MARKER == RUN_MARKER_NAME
 
 
 def test_the_plugin_imports_nothing_of_the_module_under_mutation() -> None:
