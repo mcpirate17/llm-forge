@@ -16,6 +16,7 @@ anyhow = "1"
 regex = "1"
 walkdir = "2"
 sha2 = "0.10"
+libc = "0.2"
 toml = "0.8"
 # `forge mutation plan` calls `compute_plan` directly -- no pyo3 boundary, no
 # Python interpreter. conductor-native's default build (no `extension-module`
