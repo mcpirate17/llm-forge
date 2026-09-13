@@ -127,8 +127,8 @@ run's `--project`.
 One row per `Agent` tool_use in a *top-level* transcript (nested dispatches
 -- a subagent dispatching its own subagent -- are out of scope until a
 consumer needs their parent linkage): `parent_session_id` (the dispatching
-line's session), `dispatch_ts`, `tool_use_id` (the day-file key), `agent_id`
-(from the matching `tool_result`'s `agentId: <17 hex>` line, `null` when the
+line's session), `dispatch_ts`, `tool_use_id`, `agent_id` (the day-file key --
+from the matching `tool_result`'s `agentId: <17 hex>` line, `null` when the
 result never arrived or named no id), `subagent_type`, `description` (the
 only text stored -- `prompt` and block content never cross the reader
 boundary), `model_requested` (`null` when the call set no model), then the
@@ -136,10 +136,23 @@ transcript-side fields, all `null` when unjoined: `model_used` (distinct
 model values in the subagent's file, sorted), `tier` (the same tier table as
 `agent_rollup`), `n_turns`, `billed_tokens` (`billed_noncache`: input +
 output + cache_creation), `total_cache_read`, `over_cap` (billed >
-`--cap`), `first_ts`, `last_ts`. An unjoined row keeps its dispatch fields
-and nulls the rest -- an honest null, never a zero that reads like a
-measured empty session. Filed under the day of `dispatch_ts`; a dispatch
-with no timestamp is a loud error, not a guessed day.
+`--cap`), `first_ts`, `last_ts`, and (`docs/routing.md`'s warn-only mode)
+`decision` (the routing policy's own `"allow"`/`"deny"` verdict for this
+dispatch, `route::Decision::decision`), `mode` (`"warn"` or `"enforce"`,
+whichever `FORGE_MODE` the writer resolved), `applied` (whether that
+verdict actually changed the live call -- always `true` in `enforce` mode;
+in `warn` mode, `true` only for a plain allow with nothing to override,
+`false` whenever warn mode downgraded a would-be deny or left a would-be
+reroute unapplied). All three are `null` on a row an offline
+`forge ledger rollup --repo` sweep builds from a bare transcript, which has
+no routing verdict of its own to report; only the `SubagentStop`-triggered
+`rollup-agent` upsert (below) ever populates them. `decision`/`applied` are
+independent of `over_cap` -- one is the routing verdict, the other the cap
+fact, and warn mode can downgrade either without touching the other. An
+unjoined row keeps its dispatch fields and nulls the rest -- an honest
+null, never a zero that reads like a measured empty session. Filed under
+the day of `dispatch_ts`; a dispatch with no timestamp is a loud error, not
+a guessed day.
 
 This is the routing evidence Phase 3 (model routing) decides on: which tier
 a dispatch *asked for* (`model_requested`) vs. which actually ran
@@ -576,6 +589,20 @@ slice fetches it. Requirements for that fetcher:
 10. Ships its own test fixture and a dry-run mode (`--dry-run` prints what
     it would fetch/write without calling `gh`) so it can be verified without
     live API credits.
+
+### `decision`/`mode`/`applied`, and `forge ledger report`'s warn-only columns
+
+`forge ledger report`'s per-tier table (`docs/routing.md`) reads these three
+fields to report two more rates, each `null` unless the tier has at least
+one `mode == "warn"` row (same "unmeasured is null" rule as `rework_rate`/
+`ci_red_rate`):
+
+- `would_deny`: share of a tier's warn-mode rows where `decision == "deny"`
+  and `applied == false` -- dispatches warn mode let through that enforce
+  mode would have denied.
+- `would_route`: share of a tier's warn-mode rows where `decision ==
+  "allow"` and `applied == false` -- dispatches the policy had a model
+  opinion on that warn mode left unapplied.
 
 ### Row identity: `task_dispatch` is keyed by `agent_id` (fixed, was debt from PR #52)
 
