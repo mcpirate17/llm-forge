@@ -665,6 +665,44 @@ def test_audited_receipts_runs_end_to_end_without_patching_the_predicate(
     assert drifted.resolve() not in read
 
 
+def test_an_orphan_campaign_does_not_stop_the_audit_later_receipts_still_are(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A receipt whose campaign has no manifest is skipped, not terminal.
+
+    The orphan sorts first by filename, so a loop that stopped at it instead
+    of stepping over it would never audit the good receipt behind it.
+    """
+
+    _campaign(repo, "alpha")
+    _receipt(repo, "aaa_ghost", "ghost", "PASS", "2026-09-01T00:00:00+00:00")
+    good = _receipt(repo, "alpha_good", "alpha", "PASS", "2026-09-02T00:00:00+00:00")
+    _audit_accepts(monkeypatch, "alpha_good")
+
+    receipts, _unreadable = mutation_retention._load_receipts(
+        repo / mutation_retention.RECEIPT_DIRECTORY
+    )
+    read = mutation_retention.audited_receipts(receipts, repo)
+
+    assert read == {good.resolve()}
+
+
+def test_the_report_counts_what_protection_saved(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The `protected` count is the receipts the flag actually sheltered."""
+
+    _campaign(repo, "alpha")
+    old = _receipt(repo, "alpha_old", "alpha", "PASS", "2026-09-01T00:00:00+00:00")
+    _receipt(repo, "alpha_new", "alpha", "PASS", "2026-09-05T00:00:00+00:00")
+    _no_citations(monkeypatch)
+
+    assert mutation_retention.main(["--repo-root", str(repo), "--protect", old.name]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["protected"] == 1
+    assert report["deleted"] == 0
+
+
 def test_compacted_receipts_are_judged_by_their_summary_alone(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

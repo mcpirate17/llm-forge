@@ -42,7 +42,7 @@
     "src/conductor/test_mutation_retention.py"
   ],
   "test_sha256": {
-    "src/conductor/test_mutation_retention.py": "b55e296dc0f20512a30b4714af31ff42cf50e60f6607541937fe5b8474d4855b"
+    "src/conductor/test_mutation_retention.py": "42fc65274407d05ef1d7c72d69232b86871077878107c2c28a1620c1ae955a10"
   },
   "title": "Generated mutants for src/conductor/mutation_retention.py, scored on the survivor set"
 }
