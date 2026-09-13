@@ -198,23 +198,22 @@ fn parse_one_block(item: &Value) -> ContentBlock {
     }
 }
 
-/// A `tool_result` block's `content` is itself either a string, an array of
-/// text-typed sub-blocks, or (rarely) something else entirely; measured the
-/// same way in each case -- chars, never retained.
+/// A `tool_result` block's `content` is itself either a plain string (the
+/// overwhelmingly common shape in real transcripts) or an array of
+/// `{"type":"text","text":...}` sub-blocks; anything else contributes no
+/// chars rather than being stringified, so an untyped or non-text sub-block
+/// (e.g. a nested `image`) is not silently counted as if it were text.
+/// Measured as chars, never retained.
 fn tool_result_char_len(content: &Value) -> usize {
     match content {
         Value::String(text) => text.chars().count(),
         Value::Array(items) => items
             .iter()
-            .map(|item| {
-                item.get("text")
-                    .and_then(Value::as_str)
-                    .map(|text| text.chars().count())
-                    .unwrap_or_else(|| item.to_string().chars().count())
-            })
+            .filter(|item| item.get("type").and_then(Value::as_str) == Some("text"))
+            .filter_map(|item| item.get("text").and_then(Value::as_str))
+            .map(|text| text.chars().count())
             .sum(),
-        Value::Null => 0,
-        other => other.to_string().chars().count(),
+        _ => 0,
     }
 }
 

@@ -77,6 +77,27 @@ fn non_json_line_is_skipped_not_panicked() {
     );
 }
 
+/// Regression for the `ToolResult.char_len` fix: real transcripts store
+/// `tool_result.content` overwhelmingly as a plain string (not the array-of-
+/// text-blocks shape), and an array-form `content` can carry a non-text
+/// sub-block (e.g. `image`) that must contribute 0 chars, not be
+/// stringified and counted as if it were text.
+#[test]
+fn tool_result_string_and_mixed_array_content_are_measured_correctly() {
+    let summary = ledger::reader::read_transcript_file(Path::new(&fixture(
+        "transcript_tool_result_mixed.jsonl",
+    )))
+    .expect("mixed tool_result fixture parses");
+    // "running the string-form tool result, forty-two chars" (52 chars)
+    // + "array-form text sub-block" (25 chars) from the array-form block's
+    // text sub-block; the array-form block's image sub-block contributes 0.
+    assert_eq!(summary.chars_by_block_type.tool_result, 77);
+    assert_matches_frozen(
+        serde_json::to_string(&summary).unwrap(),
+        "expected_transcript_tool_result_mixed.json",
+    );
+}
+
 #[test]
 fn telemetry_file_matches_frozen_summary() {
     let summary =
