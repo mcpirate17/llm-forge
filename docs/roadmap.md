@@ -49,7 +49,7 @@ Conclusion: cost = resident context × turns. Speed = process starts × tool cal
 Exit criterion: per-tool-call fixed cost < 5 ms, measured by 0.1.
 
 ## Phase 2: bet B1, cost ledger (Claude opus design, Rust build)
-Rust JSONL reader over harness transcripts: tokens by category (cache read/write, output), resident-context attribution per turn (which attachment, which tool result, which reminder), per-session and per-agent totals, a budget ratchet in the gate (fail a PR that regresses median hook ms or resend bytes/session). Model-routing policy at the harness seam (cheap tier for Explore/clerical) follows from the ledger's numbers.
+Rust JSONL reader over harness transcripts: tokens by category (cache read/write, output), resident-context attribution per turn (which attachment, which tool result, which reminder), per-session and per-agent totals, a budget ratchet in the gate (fail a PR that regresses median hook ms or resend bytes/session). Model-routing policy at the harness seam (cheap tier for Explore/clerical) follows from the ledger's numbers. Design doc landed: `docs/design/cost_ledger.md` (data model, attribution method with a declared error bound, gate ratchet, 6-step build plan).
 
 ## Phase 3: bet B2, correct incremental verification (Claude)
 Transitive closure index (Rust) over imports and fixtures, per-test timing DB, flake ledger from the 1,494 receipts, content-addressed check cache keyed per file not per tree. Bound or de-scope the equivalence probe. Exit: gate time proportional to the diff, not the repo.
