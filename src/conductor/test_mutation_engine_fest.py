@@ -281,19 +281,24 @@ def test_the_environment_binds_the_run_to_this_venv_and_snapshot(
 
     The snapshot's import roots come first and a declared PYTHONPATH rides
     behind them; VIRTUAL_ENV and PATH pin the venv so fest's bare-`python`
-    probe and the test command agree on one interpreter. Dropping PATH here
-    also pins the inheritance default, so nothing ambient leaks in.
+    probe and the test command agree on one interpreter. PATH is asserted
+    both set and unset: set pins that the ambient value is inherited through
+    the right key, unset pins the empty default.
     """
 
     (tmp_path / "src").mkdir()
     campaign = _EnvironmentCampaign()
     campaign.environment = {"PYTHONPATH": "declared/extra"}
-    monkeypatch.delenv("PATH", raising=False)
 
+    monkeypatch.setenv("PATH", "/usr/bin")
     env = _environment(campaign, tmp_path)
 
     assert env["PYTHONPATH"] == os.pathsep.join(
         [str(tmp_path), str(tmp_path / "src"), "declared/extra"]
     )
     assert env["VIRTUAL_ENV"] == str(Path(sys.executable).parents[1])
-    assert env["PATH"] == str(Path(sys.executable).parent) + os.pathsep
+    assert env["PATH"] == os.pathsep.join([str(Path(sys.executable).parent), "/usr/bin"])
+
+    monkeypatch.delenv("PATH", raising=False)
+    again = _environment(campaign, tmp_path)
+    assert again["PATH"] == str(Path(sys.executable).parent) + os.pathsep
