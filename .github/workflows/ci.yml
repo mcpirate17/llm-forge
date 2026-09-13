@@ -117,6 +117,64 @@ jobs:
             --baseline src/conductor/vulture_baseline.json \
             --changed-files-from /tmp/changed-python-files.txt src
 
+  # The evidence check nothing ran until now: `verify-evidence` regressed for a
+  # week (#41 to #46) with no CI job any the wiser. Two steps, two different
+  # questions. The first asks whether the tests THIS PR changed have receipts:
+  # missing evidence is debt for the PR body (exit 6, warned, job passes), a
+  # receipt the validator cannot read is a defect (exit 5, job fails). The
+  # second ignores the PR entirely and asks whether every receipt in the tree
+  # still decodes -- whoever's tests it covers.
+  mutation-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Same reason as the python job: a real merge base needs ancestry.
+          fetch-depth: 0
+      - name: Cache uv artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - run: uv sync --extra test
+      - name: Mutation evidence on changed tests
+        run: |
+          # merge_base derivation reused verbatim from the baselines step in
+          # the python job: same fallback chain, same loud error -- the two
+          # jobs must never disagree about which files a PR changed.
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          base="${base:-HEAD~1}"
+          if ! merge_base="$(git merge-base "$base" HEAD)"; then
+            echo "::error::no merge base between '$base' and HEAD -- checkout fetch-depth is probably too shallow again" >&2
+            exit 1
+          fi
+          # --github emits ::warning per missing path, ::error per
+          # validator-side rejection and a step-summary table. The report
+          # itself is JSON on stdout after the annotation lines; tee keeps it
+          # in the log, the strip keeps the annotations out of the parse.
+          set +e
+          uv run python -m conductor.mutation_coverage changed \
+            --base "$merge_base" --github | tee /tmp/changed-evidence.json
+          rc=${PIPESTATUS[0]}
+          set -e
+          # 0 = every changed test has evidence; 6 = evidence missing but all
+          # of it debt (no campaign yet, a held ratchet, a superseded pointer,
+          # an older runner era) -- a warning and the count, never a pass
+          # pretending nothing is owed; anything else fails the job.
+          if [ "$rc" -eq 6 ]; then
+            n="$(uv run python -c 'import json; print(len(json.loads("".join(l for l in open("/tmp/changed-evidence.json") if not l.startswith("::")))["missing_evidence"]))')"
+            echo "::warning::mutation evidence missing for $n changed test file(s): debt, record it in the PR body"
+            exit 0
+          fi
+          exit "$rc"
+      - name: Repo-wide receipt decode canary
+        run: uv run python -m conductor.mutation_coverage canary
+
   rust:
     runs-on: ubuntu-latest
     strategy:

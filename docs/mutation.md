@@ -63,8 +63,48 @@ and a blob that does not decode is rejected with its own decode error rather
 than judged on the summary alone. Between slice L landing the format and this
 seam being added, every tracked receipt was slim and the gate rejected them all
 with `mutants must be a non-empty list` — a real engine PASS unreadable as
-evidence; no CI job runs `verify-evidence` yet, which is why the gap went
-unnoticed (tracked as debt).
+evidence; no CI job ran `verify-evidence` at the time, which is why the gap
+went unnoticed for a week (the job below exists because of it).
+
+Every rejection is classified where it is produced, never parsed back out of
+its message: each `receipt_rejections` entry is `{receipt, kind, detail}` with
+`kind` one of `no_campaign`, `scope_error`, `not_pass` (any status other than
+PASS, `RATCHET_HELD` included — one verdict, not a wall of follow-on schema
+noise), `superseded`, `runner_map_mismatch` (the component map and the
+core/adapter/scope-guard era bindings: same debt, the campaign re-runs),
+`decode_error`, `schema_error` (the validator refuses the receipt's claim —
+including survivors outside the baseline, which contradict the PASS it
+asserts), `manifest_load_error`. The old free text survives verbatim as
+`detail`, and the result carries a top-level `rejection_counts` aggregate
+(schema `llm.mutation-testing.evidence-check.v2`; a receipt the loader cannot
+parse at all counts as `decode_error`).
+
+### CI
+
+The `mutation-evidence` job asks two questions of every PR. First, the tests
+the PR changed: `uv run python -m conductor.mutation_coverage changed --base
+"$merge_base" --github` inventories them (merge-base diff, ACMR), checks each
+against current receipts, emits `::warning` per missing path, `::error` per
+validator-side rejection and a step-summary table, and exits:
+
+- **0** — every changed test file has evidence;
+- **6** — evidence is missing but every rejection is debt (`no_campaign`,
+  `not_pass`, `superseded`, `scope_error`, `runner_map_mismatch`): the job
+  prints `mutation evidence missing for N changed test file(s): debt, record
+  it in the PR body` and passes. Exit 6 is an acknowledgement, not a pass —
+  the debt goes in the PR body, per AGENTS.md;
+- **5** — any rejection is validator-side (`decode_error`, `schema_error`,
+  `manifest_load_error`): a receipt the validator cannot read or refuses, and
+  the job fails;
+- **4** — REFUSED (registry/campaign errors), the job fails.
+
+Second, the repo-wide canary: `uv run python -m conductor.mutation_coverage
+canary` (locally `make mutation-canary`) re-checks every receipt in the tree
+and exits 5 when any of them is unreadable, whoever's tests it covers, and 0
+otherwise — however much evidence is missing. That is the check that would
+have caught the #41–#46 gap on day one. Locally, `make mutation-evidence
+MUTATION_BASE=<ref>` drives the changed-test check against any ref
+(`origin/main` by default).
 
 ### Ratchet iterations
 

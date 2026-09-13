@@ -266,14 +266,35 @@ def evidence_result(
     missing: Sequence[Mapping[str, Any]],
     malformed: Sequence[str],
 ) -> dict[str, Any]:
-    """Build the stable machine-readable evidence-check result."""
+    """Build the stable machine-readable evidence-check result.
+
+    The native verifier owns this shape; this twin exists so the Python-side
+    reader of a recorded result never has to guess at the envelope. v2 carries
+    classified rejections (``kind`` beside every ``detail``) and the aggregate
+    ``rejection_counts``, matching ``verify_mutation_evidence_native``.
+    """
+    counts: dict[str, int] = {}
+    for row in missing:
+        reason_kind = row.get("reason_kind", "not_pass")
+        counts[reason_kind] = counts.get(reason_kind, 0) + 1
+        for rejection in row.get("receipt_rejections", []):
+            kind = (
+                rejection.get("kind", "schema_error")
+                if isinstance(rejection, Mapping)
+                else "schema_error"
+            )
+            counts[kind] = counts.get(kind, 0) + 1
+    # A receipt the loader could not parse at all is the same defect class as
+    # one whose detail does not decode.
+    counts["decode_error"] = counts.get("decode_error", 0) + len(malformed)
     return {
-        "schema_version": "llm.mutation-testing.evidence-check.v1",
+        "schema_version": "llm.mutation-testing.evidence-check.v2",
         "status": "PASS" if not missing else "FAIL",
         "enforcement": "changed_tests",
         "checked_test_paths": list(sorted(set(normalized))),
         "evidence": list(evidence),
         "missing_evidence": list(missing),
+        "rejection_counts": dict(sorted(counts.items())),
         "malformed_receipts": list(malformed),
     }
 

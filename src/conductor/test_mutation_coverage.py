@@ -212,9 +212,12 @@ def test_coverage_report_uses_verify_evidence(
                 {
                     "path": "research/tests/test_tracked.py",
                     "reason": "no registered campaign ranks this test file",
+                    "reason_kind": "no_campaign",
+                    "campaigns": [],
                     "receipt_rejections": [],
                 }
             ],
+            "rejection_counts": {"no_campaign": 1},
             "malformed_receipts": [],
         }
 
@@ -224,6 +227,8 @@ def test_coverage_report_uses_verify_evidence(
     assert result["total_test_files"] == 1
     assert result["missing_test_files"] == 1
     assert result["enforcement"] == "repository_inventory"
+    assert result["schema_version"] == "llm.mutation-testing.coverage.v2"
+    assert result["rejection_counts"] == {"no_campaign": 1}
 
 
 def test_safe_relative_path_and_registry_errors(tmp_path: Path) -> None:
@@ -261,6 +266,212 @@ def test_git_failure_and_cache_skip(tmp_path: Path) -> None:
         _git_paths(not_git, ["status"])
     assert mutation_coverage._should_skip(Path("research/cache/foo/test_x.py"))
     assert mutation_coverage._should_skip(Path(".venv/lib/test_x.py"))
+
+
+def _changed_result(
+    *, missing: list[dict], rejection_counts: dict[str, int]
+) -> dict[str, object]:
+    return {
+        "schema_version": "llm.mutation-testing.changed-evidence.v2",
+        "status": "FAIL" if missing else "PASS",
+        "enforcement": "changed_tests",
+        "checked_test_paths": [row["path"] for row in missing] or ["covered.py"],
+        "evidence": [] if missing else [{"path": "covered.py"}],
+        "missing_evidence": missing,
+        "rejection_counts": rejection_counts,
+        "malformed_receipts": [],
+    }
+
+
+def test_changed_exit_codes_split_debt_from_defects(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    debt = _changed_result(
+        missing=[
+            {
+                "path": "src/conductor/test_new.py",
+                "reason": "no registered campaign ranks this test file",
+                "reason_kind": "no_campaign",
+                "campaigns": [],
+                "receipt_rejections": [],
+            },
+            {
+                "path": "src/conductor/test_old.py",
+                "reason": "no current complete PASS receipt",
+                "reason_kind": "not_pass",
+                "campaigns": ["c1"],
+                "receipt_rejections": [
+                    {"receipt": "r1.json", "kind": "superseded",
+                     "detail": "receipt superseded by r2.json"},
+                    {"receipt": "r0.json", "kind": "runner_map_mismatch",
+                     "detail": "runner component hash map mismatch"},
+                ],
+            },
+        ],
+        rejection_counts={"no_campaign": 1, "not_pass": 1, "superseded": 1,
+                          "runner_map_mismatch": 1},
+    )
+    defect = _changed_result(
+        missing=[
+            {
+                "path": "src/conductor/test_new.py",
+                "reason": "no current complete PASS receipt",
+                "reason_kind": "not_pass",
+                "campaigns": ["c1"],
+                "receipt_rejections": [
+                    {"receipt": "r1.json", "kind": "decode_error",
+                     "detail": "detail blob is not valid base64: oops"},
+                ],
+            }
+        ],
+        rejection_counts={"not_pass": 1, "decode_error": 1},
+    )
+    covered = _changed_result(missing=[], rejection_counts={})
+    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *a, **k: debt)
+    assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 6
+    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *a, **k: defect)
+    assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 5
+    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *a, **k: covered)
+    assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 0
+    capsys.readouterr()
+
+
+def test_changed_defect_bites_even_when_the_path_has_evidence(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A corrupt sibling receipt counts even though another receipt covers the
+    # path: the canary's rule, applied to the changed set too.
+    result = _changed_result(missing=[], rejection_counts={"superseded": 2})
+    assert mutation_coverage.evidence_exit_code(result) == 0
+    result["rejection_counts"] = {"schema_error": 1}
+    assert mutation_coverage.evidence_exit_code(result) == 5
+    capsys.readouterr()
+
+
+def test_changed_github_annotations_and_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    result = _changed_result(
+        missing=[
+            {
+                "path": "src/conductor/test_new.py",
+                "reason": "no current complete PASS receipt",
+                "reason_kind": "not_pass",
+                "campaigns": ["c1", "c2"],
+                "receipt_rejections": [
+                    {"receipt": "r1.json", "kind": "decode_error",
+                     "detail": "detail blob is not valid base64: oops"},
+                    {"receipt": "r0.json", "kind": "superseded",
+                     "detail": "receipt superseded by r1.json"},
+                ],
+            }
+        ],
+        rejection_counts={"not_pass": 1, "decode_error": 1, "superseded": 1},
+    )
+    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *a, **k: result)
+    assert mutation_coverage.main(
+        ["changed", "--registry", "r.json", "--github"]
+    ) == 5
+    out = capsys.readouterr().out
+    assert "::warning file=src/conductor/test_new.py::" in out
+    assert "::error::src/conductor/test_new.py: r1.json:" in out
+    table = summary.read_text(encoding="utf-8")
+    assert "| path | campaign | status | kind |" in table
+    assert "| `src/conductor/test_new.py` | c1, c2 |" in table
+    assert "not_pass (decode_error, superseded)" in table
+
+
+def test_changed_base_reaches_the_merge_base_inventory(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    registry = _registry(repo)
+    tests = repo / "research/tests"
+    tests.mkdir(parents=True)
+    (tests / "test_base_only.py").write_text(
+        "def test_base():\n    assert True\n", encoding="utf-8"
+    )
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=repo, check=True)
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    subprocess.run(["git", "checkout", "-qb", "branch"], cwd=repo, check=True)
+    (tests / "test_branch_only.py").write_text(
+        "def test_branch():\n    assert True\n", encoding="utf-8"
+    )
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "branch"], cwd=repo, check=True)
+
+    # The native path end to end on a temp repo: only the branch's file is in
+    # the merge-base diff, so only it needs evidence in CI.
+    changed = mutation_coverage.git_changed_test_paths(
+        registry, repo_root=repo, base=base
+    )
+    assert changed == ("research/tests/test_branch_only.py",)
+    # The local shape still diffs the working tree.
+    assert mutation_coverage.git_changed_test_paths(registry, repo_root=repo) == ()
+    # A base that does not resolve refuses loudly rather than diffing nothing.
+    with pytest.raises(CampaignError, match="no-such-ref"):
+        mutation_coverage.git_changed_test_paths(
+            registry, repo_root=repo, base="no-such-ref"
+        )
+
+
+def test_canary_exit_paths(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    clean = {
+        "schema_version": "llm.mutation-testing.coverage.v2",
+        "status": "FAIL",
+        "enforcement": "repository_inventory",
+        "total_test_files": 9,
+        "covered_test_files": 0,
+        "missing_test_files": 9,
+        "evidence": [],
+        "missing_evidence": [
+            {
+                "path": "src/conductor/test_debt.py",
+                "reason": "no registered campaign ranks this test file",
+                "reason_kind": "no_campaign",
+                "campaigns": [],
+                "receipt_rejections": [],
+            }
+        ],
+        "rejection_counts": {"no_campaign": 9, "not_pass": 3, "superseded": 5},
+        "malformed_receipts": [],
+    }
+    monkeypatch.setattr(mutation_coverage, "coverage_report", lambda *a, **k: clean)
+    assert mutation_coverage.main(["canary", "--registry", "r.json"]) == 0
+    out = capsys.readouterr().out
+    assert '"canary"' in out
+    assert '"offending_kinds": []' in out
+
+    unreadable = {
+        **clean,
+        "rejection_counts": {"no_campaign": 9, "decode_error": 1},
+        "missing_evidence": [
+            {
+                "path": "src/conductor/test_broken.py",
+                "reason": "no current complete PASS receipt",
+                "reason_kind": "not_pass",
+                "campaigns": ["c1"],
+                "receipt_rejections": [
+                    {"receipt": "r1.json", "kind": "decode_error",
+                     "detail": "detail blob does not decompress: frame error"}
+                ],
+            }
+        ],
+        "malformed_receipts": ["receipts/gone.json: Expecting value"],
+    }
+    monkeypatch.setattr(mutation_coverage, "coverage_report", lambda *a, **k: unreadable)
+    assert mutation_coverage.main(["canary", "--registry", "r.json"]) == 5
+    out = capsys.readouterr().out
+    assert '"offending_kinds": [' in out
+    assert '"decode_error"' in out
+    assert "receipts/gone.json" in out
 
 
 def test_mutation_testing_cli_inspect_verify_and_refuse(

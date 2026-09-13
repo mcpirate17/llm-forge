@@ -53,8 +53,8 @@ BASELINE_EXPIRES ?= $(shell $(UV) run python -c \
 
 .PHONY: test native gate candidate-review \
 	mutation-plan mutation-generate mutation-engine-run mutation-evidence \
-	mutation-coverage baselines baseline-jscpd baseline-pmd baseline-complexity \
-	baseline-vulture help
+	mutation-canary mutation-coverage baselines baseline-jscpd baseline-pmd \
+	baseline-complexity baseline-vulture help
 
 test:  ## Run the conductor test suite
 	@# --timeout needs pytest-timeout, which nothing in pyproject declares yet, so
@@ -116,12 +116,15 @@ mutation-receipt-promote:  ## Copy the newest .iterations receipt of MUTATION_CA
 	cp "$$newest" "$(MUTATION_RECEIPT)/"; \
 	echo "promoted $$newest -> $(MUTATION_RECEIPT)/$$(basename $$newest) -- git add it with the PR"
 
-mutation-evidence:  ## Verify PASS receipts for MUTATION_PATHS, or for git-changed tests
+mutation-evidence:  ## Verify PASS receipts for MUTATION_PATHS, or changed-since-MUTATION_BASE tests
 	@if [ -n "$(MUTATION_PATHS)" ]; then \
 		$(UV) run python -m conductor.mutation_testing verify-evidence $(MUTATION_PATHS); \
 	else \
-		$(UV) run python -m conductor.mutation_coverage changed; \
+		$(UV) run python -m conductor.mutation_coverage changed --base "$(MUTATION_BASE)"; \
 	fi
+
+mutation-canary:  ## Repo-wide receipt decode canary; fails only on unreadable receipts
+	$(UV) run python -m conductor.mutation_coverage canary
 
 mutation-coverage:  ## Read-only inventory of test evidence; never executes mutants
 	$(UV) run python -m conductor.mutation_coverage coverage

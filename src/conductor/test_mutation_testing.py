@@ -759,7 +759,9 @@ def test_mandatory_evidence_rejects_runner_provenance_drift(
     )
 
     assert result["status"] == "FAIL"
-    assert expected_error in result["missing_evidence"][0]["receipt_rejections"][0]
+    assert (
+        expected_error in result["missing_evidence"][0]["receipt_rejections"][0]["detail"]
+    )
 
 
 def test_mandatory_evidence_rejects_legacy_file_scope(
@@ -780,7 +782,11 @@ def test_mandatory_evidence_rejects_legacy_file_scope(
         "no current complete PASS receipt"
     )
     assert result["missing_evidence"][0]["receipt_rejections"] == [
-        "temporary_campaign: campaign lacks explicit test scope"
+        {
+            "receipt": "temporary_campaign",
+            "kind": "scope_error",
+            "detail": "campaign lacks explicit test scope",
+        }
     ]
 
 
@@ -801,6 +807,8 @@ def test_mandatory_evidence_rejects_unregistered_changed_test(
         {
             "path": "example/tests/test_unregistered.py",
             "reason": "no registered campaign ranks this test file",
+            "reason_kind": "no_campaign",
+            "campaigns": [],
             "receipt_rejections": [],
         }
     ]

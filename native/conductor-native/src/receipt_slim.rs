@@ -556,7 +556,8 @@ mod evidence_gate_tests {
     use super::{slim_receipt, supersede_detail, DETAIL_KEY};
     use crate::mutation_manifest::CampaignContract;
     use crate::mutation_receipt::{
-        receipt_errors, AnchorConfig, Receipt, RunnerState, ValidationContext,
+        receipt_errors, rejection_details, AnchorConfig, Receipt, Rejection, RunnerState,
+        ValidationContext,
     };
 
     const MANIFEST: &str = "conductor/mutation_campaigns/subject_fest_20260906.json";
@@ -659,7 +660,7 @@ mod evidence_gate_tests {
     /// Validate a receipt value through the gate's own seam, exactly as
     /// `verify_mutation_evidence_native` and `validate_mutation_receipt_native`
     /// do; no runner components on disk isolates these tests to the shapes.
-    fn gate_errors(root: &Path, value: Value) -> Vec<String> {
+    fn gate_rejections(root: &Path, value: Value) -> Vec<Rejection> {
         let runner = RunnerState {
             components: None,
             error: None,
@@ -688,6 +689,10 @@ mod evidence_gate_tests {
             parsed_bytes_available: false,
         };
         receipt_errors(&receipt, &campaign(), &context)
+    }
+
+    fn gate_errors(root: &Path, value: Value) -> Vec<String> {
+        rejection_details(gate_rejections(root, value))
     }
 
     #[test]
@@ -726,11 +731,15 @@ mod evidence_gate_tests {
         superseded[DETAIL_KEY] = supersede_detail(newer);
         // The summary block still says PASS; the pointer is the only honest
         // verdict, and exactly it -- never a PASS, never a noise of follow-on
-        // errors from judging the summary without its detail.
+        // errors from judging the summary without its detail. The kind is the
+        // pointer's own encoding, pinned here so a decoder change cannot
+        // silently reclassify it.
+        let found = gate_rejections(&root, superseded);
         assert_eq!(
-            gate_errors(&root, superseded),
+            rejection_details(found.clone()),
             vec![format!("receipt superseded by {newer}")]
         );
+        assert_eq!(found[0].kind.as_str(), "superseded");
     }
 
     #[test]
@@ -741,21 +750,23 @@ mod evidence_gate_tests {
         // Not base64 at all.
         let mut broken = basis();
         broken[DETAIL_KEY]["blob"] = json!("%%% not base64 %%%");
-        let found = gate_errors(&root, broken);
+        let found = gate_rejections(&root, broken);
         assert_eq!(found.len(), 1, "{found:?}");
         assert!(
-            found[0].contains("detail blob is not valid base64"),
+            found[0].detail.contains("detail blob is not valid base64"),
             "{found:?}"
         );
+        assert_eq!(found[0].kind.as_str(), "decode_error");
         // Valid base64 that is not a zstd frame.
         let mut garbage = basis();
         garbage[DETAIL_KEY]["blob"] =
             json!(base64::engine::general_purpose::STANDARD.encode(b"not a zstd frame"));
-        let found = gate_errors(&root, garbage);
+        let found = gate_rejections(&root, garbage);
         assert_eq!(found.len(), 1, "{found:?}");
         assert!(
-            found[0].contains("detail blob does not decompress"),
+            found[0].detail.contains("detail blob does not decompress"),
             "{found:?}"
         );
+        assert_eq!(found[0].kind.as_str(), "decode_error");
     }
 }

@@ -20,6 +20,65 @@ use crate::receipt_slim::expand_receipt;
 const RECEIPT_SCHEMA: &str = "llm.mutation-testing.receipt.v3";
 const LEGACY_RECEIPT_SCHEMA: &str = "llm.mutation-testing.receipt.v2";
 const VALUE_SCHEMA: &str = "llm.mutation-testing.test-value.v1";
+
+/// Why a receipt (or a campaign around it) cannot be evidence, named where the
+/// failure is produced rather than parsed back out of a message.
+///
+/// The split that matters to callers: `not_pass`/`no_campaign`/`scope_error`/
+/// `superseded`/`runner_map_mismatch` are debt -- a campaign that has not run,
+/// a ratchet held, a receipt from an older runner era -- while `decode_error`,
+/// `schema_error` and `manifest_load_error` mean the validator could not read
+/// what sits on disk, which is a defect. The producers below push the kind at
+/// the site that knows the rule; the evidence layer maps its own campaign-level
+/// failures onto the same enum.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RejectionKind {
+    NoCampaign,
+    ScopeError,
+    NotPass,
+    Superseded,
+    RunnerMapMismatch,
+    DecodeError,
+    SchemaError,
+    ManifestLoadError,
+}
+
+impl RejectionKind {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            RejectionKind::NoCampaign => "no_campaign",
+            RejectionKind::ScopeError => "scope_error",
+            RejectionKind::NotPass => "not_pass",
+            RejectionKind::Superseded => "superseded",
+            RejectionKind::RunnerMapMismatch => "runner_map_mismatch",
+            RejectionKind::DecodeError => "decode_error",
+            RejectionKind::SchemaError => "schema_error",
+            RejectionKind::ManifestLoadError => "manifest_load_error",
+        }
+    }
+}
+
+/// One classified rejection. `detail` keeps the exact free text the rules
+/// always produced, so nothing that reads the old message breaks.
+#[derive(Clone, Debug)]
+pub(crate) struct Rejection {
+    pub(crate) kind: RejectionKind,
+    pub(crate) detail: String,
+}
+
+fn reject(kind: RejectionKind, detail: impl Into<String>) -> Rejection {
+    Rejection {
+        kind,
+        detail: detail.into(),
+    }
+}
+
+/// The old `Vec<String>` shape, for the seams that still speak it
+/// (`validate_mutation_receipt_native`'s stable output, and tests asserting on
+/// message text).
+pub(crate) fn rejection_details(errors: Vec<Rejection>) -> Vec<String> {
+    errors.into_iter().map(|error| error.detail).collect()
+}
 /// The registry as it stood in the anchor commit. A host may keep its registry
 /// elsewhere today, so Python names the anchored spelling in the request; this is
 /// the value the monorepo anchor was written against.
@@ -247,16 +306,26 @@ fn legacy_receipt_anchor_errors(
     anchor_repo: &Path,
     anchor: &AnchorConfig,
     campaign: &CampaignContract,
-) -> Vec<String> {
+) -> Vec<Rejection> {
+    // Every anchor rule is a provenance check on the receipt itself, so every
+    // failure here is the validator refusing the shape -- schema_error.
     if receipt.path.as_os_str().is_empty() || !receipt.parsed_bytes_available {
-        return vec!["legacy receipt path or parsed bytes are unavailable".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt path or parsed bytes are unavailable",
+        )];
     }
     let relative = match lexical_regular_file(&receipt.path, repo_root, "legacy receipt") {
         Ok(relative) => relative,
-        Err(error) => return vec![error],
+        Err(error) => {
+            return vec![reject(RejectionKind::SchemaError, error)];
+        }
     };
     if !relative.starts_with(&anchor.receipt_prefix) || !relative.ends_with(".json") {
-        return vec!["legacy receipt path is outside the anchored receipt directory".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt path is outside the anchored receipt directory",
+        )];
     }
 
     let top = git_bytes(
@@ -269,7 +338,10 @@ fn legacy_receipt_anchor_errors(
     if !successful(&top)
         || String::from_utf8_lossy(&top.as_ref().expect("checked").stdout).trim() != expected_top
     {
-        return vec!["legacy receipt anchor repository is unavailable".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt anchor repository is unavailable",
+        )];
     }
     let commit_type = git_bytes(
         anchor_repo,
@@ -282,7 +354,10 @@ fn legacy_receipt_anchor_errors(
     if !successful(&commit_type)
         || commit_type.as_ref().expect("checked").stdout.as_slice() != b"commit\n"
     {
-        return vec!["legacy receipt anchor commit is unavailable".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt anchor commit is unavailable",
+        )];
     }
     let tree = git_bytes(
         anchor_repo,
@@ -294,7 +369,10 @@ fn legacy_receipt_anchor_errors(
     if !successful(&tree)
         || String::from_utf8_lossy(&tree.as_ref().expect("checked").stdout).trim() != anchor.tree
     {
-        return vec!["legacy receipt anchor tree mismatch".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt anchor tree mismatch",
+        )];
     }
 
     let registry = git_bytes(
@@ -306,7 +384,10 @@ fn legacy_receipt_anchor_errors(
         ],
     );
     if !successful(&registry) {
-        return vec!["legacy receipt anchor registry is unavailable".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt anchor registry is unavailable",
+        )];
     }
     let registered = registry
         .as_ref()
@@ -318,10 +399,16 @@ fn legacy_receipt_anchor_errors(
             })
         });
     let Some(registered) = registered else {
-        return vec!["legacy receipt anchor registry is malformed".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt anchor registry is malformed",
+        )];
     };
     if !registered {
-        return vec!["legacy receipt campaign was not registered at the anchor".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt campaign was not registered at the anchor",
+        )];
     }
     let manifest = git_bytes(
         anchor_repo,
@@ -332,14 +419,20 @@ fn legacy_receipt_anchor_errors(
         ],
     );
     if !successful(&manifest) {
-        return vec!["legacy receipt anchor manifest is unavailable".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt anchor manifest is unavailable",
+        )];
     }
     let digest = format!(
         "{:x}",
         Sha256::digest(&manifest.as_ref().expect("checked").stdout)
     );
     if digest != campaign.manifest_sha256 {
-        return vec!["legacy receipt anchor manifest hash mismatch".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt anchor manifest hash mismatch",
+        )];
     }
 
     let entry = git_bytes(
@@ -364,7 +457,10 @@ fn legacy_receipt_anchor_errors(
             .stdout
             .ends_with(expected_suffix.as_bytes())
     {
-        return vec!["legacy receipt is absent or unsafe at the anchor".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt is absent or unsafe at the anchor",
+        )];
     }
     let blob = git_bytes(
         anchor_repo,
@@ -375,7 +471,10 @@ fn legacy_receipt_anchor_errors(
         ],
     );
     if !successful(&blob) || blob.as_ref().expect("checked").stdout != receipt.bytes {
-        return vec!["legacy receipt parsed bytes differ from the anchor".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "legacy receipt parsed bytes differ from the anchor",
+        )];
     }
     Vec::new()
 }
@@ -408,18 +507,24 @@ fn lineage_accepts(recorded: Option<&Value>, package_root: &Path) -> bool {
     false
 }
 
-fn value_receipt_errors(value: Option<&Value>, contract: &ValueContract) -> Vec<String> {
+fn value_receipt_errors(value: Option<&Value>, contract: &ValueContract) -> Vec<Rejection> {
     let Some(Value::Object(payload)) = value else {
-        return vec!["test_value evidence is missing".to_owned()];
+        return vec![reject(
+            RejectionKind::SchemaError,
+            "test_value evidence is missing",
+        )];
     };
     let mut errors = Vec::new();
     if payload.get("schema_version").and_then(Value::as_str) != Some(VALUE_SCHEMA) {
-        errors.push("test_value schema is not current".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "test_value schema is not current",
+        ));
     }
     if payload.get("status").and_then(Value::as_str) != Some("PASS") {
-        errors.push(format!(
-            "test_value status={}",
-            python_repr(payload.get("status"))
+        errors.push(reject(
+            RejectionKind::NotPass,
+            format!("test_value status={}", python_repr(payload.get("status"))),
         ));
     }
     let actual_nodeids: Vec<Value> = payload
@@ -439,12 +544,18 @@ fn value_receipt_errors(value: Option<&Value>, contract: &ValueContract) -> Vec<
         .map(Value::String)
         .collect();
     if actual_nodeids != expected_nodeids {
-        errors.push("test_value nodeids do not match ranked tests".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "test_value nodeids do not match ranked tests",
+        ));
     }
     if payload.get("baseline_repetitions").and_then(Value::as_u64)
         != Some(contract.expected_repetitions)
     {
-        errors.push("test_value baseline repetitions mismatch".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "test_value baseline repetitions mismatch",
+        ));
     }
     errors
 }
@@ -452,20 +563,28 @@ fn value_receipt_errors(value: Option<&Value>, contract: &ValueContract) -> Vec<
 /// Check the runner that produced a receipt is the runner on disk, or a recorded ancestor.
 ///
 /// Shared by both acceptance rules: whichever kind of campaign a receipt belongs to, evidence
-/// produced by a runner nobody can reconstruct is not evidence.
-fn runner_errors(payload: &Map<String, Value>, context: &ValidationContext<'_>) -> Vec<String> {
+/// produced by a runner nobody can reconstruct is not evidence. Every failure here is the
+/// same debt class: the receipt pins a runner era that is neither current nor recorded,
+/// so the campaign needs a re-run, not a repair.
+fn runner_errors(payload: &Map<String, Value>, context: &ValidationContext<'_>) -> Vec<Rejection> {
     let mut errors = Vec::new();
     if let Some(error) = &context.runner.error {
-        errors.push(error.clone());
+        errors.push(reject(RejectionKind::RunnerMapMismatch, error.clone()));
     } else if let Some(components) = &context.runner.components {
         let recorded = payload.get("runner_components_sha256");
         if recorded != Some(components) && !lineage_accepts(recorded, context.package_root) {
-            errors.push("runner component hash map mismatch".to_owned());
+            errors.push(reject(
+                RejectionKind::RunnerMapMismatch,
+                "runner component hash map mismatch",
+            ));
         } else if recorded == Some(components)
             && payload.get("runner_sha256").and_then(Value::as_str)
                 != context.runner.mutation_testing_sha256.as_deref()
         {
-            errors.push("runner hash mismatch".to_owned());
+            errors.push(reject(
+                RejectionKind::RunnerMapMismatch,
+                "runner hash mismatch",
+            ));
         }
     }
     errors
@@ -490,45 +609,74 @@ fn generated_receipt_errors(
     payload: &Map<String, Value>,
     campaign: &CampaignContract,
     context: &ValidationContext<'_>,
-) -> Vec<String> {
+) -> Vec<Rejection> {
     let mut errors = Vec::new();
     if payload.get("schema_version").and_then(Value::as_str) != Some(RECEIPT_SCHEMA) {
-        errors.push("receipt schema is not current".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "receipt schema is not current",
+        ));
     }
     // A patch receipt carries the same campaign fields, so without this a hand-authored receipt
     // could be offered as evidence for a generated campaign and skip the ratchet entirely.
     if payload.get("mutants_are_generated") != Some(&Value::Bool(true)) {
-        errors.push("receipt does not record engine-generated mutants".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "receipt does not record engine-generated mutants",
+        ));
     }
     match payload.get("status").and_then(Value::as_str) {
         Some("PASS") => {}
-        other => errors.push(format!(
-            "status={}",
-            python_repr(other.map(Value::from).as_ref())
-        )),
+        other => {
+            // A receipt that did not pass is not evidence for one reason: it
+            // did not pass. RATCHET_HELD lands here too, by design -- a held
+            // ratchet is honest debt to re-run, not a receipt the validator
+            // cannot read. Everything below (survivor rows, score, outcome
+            // accounting) presumes a PASS claim; judged on a held run it
+            // fragments one debt verdict into a wall of defect-class noise,
+            // which is exactly what the kinds exist to prevent. The two shape
+            // checks above still fire alongside: a wrong schema or a
+            // hand-authored patch offered to a generated campaign is a broken
+            // receipt whichever way its status reads.
+            return vec![reject(
+                RejectionKind::NotPass,
+                format!("status={}", python_repr(other.map(Value::from).as_ref())),
+            )];
+        }
     }
     if payload.get("campaign_id").and_then(Value::as_str) != Some(&campaign.campaign_id) {
-        errors.push("campaign_id mismatch".to_owned());
+        errors.push(reject(RejectionKind::SchemaError, "campaign_id mismatch"));
     }
     if payload.get("manifest").and_then(Value::as_str) != Some(&campaign.manifest) {
-        errors.push("manifest path mismatch".to_owned());
+        errors.push(reject(RejectionKind::SchemaError, "manifest path mismatch"));
     }
     if payload.get("manifest_sha256").and_then(Value::as_str) != Some(&campaign.manifest_sha256) {
-        errors.push("manifest hash mismatch".to_owned());
+        errors.push(reject(RejectionKind::SchemaError, "manifest hash mismatch"));
     }
     if payload.get("source_sha256") != Some(&campaign.source_sha256) {
-        errors.push("source hash map mismatch".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "source hash map mismatch",
+        ));
     }
     if payload.get("test_sha256") != Some(&campaign.test_sha256) {
-        errors.push("test hash map mismatch".to_owned());
+        errors.push(reject(RejectionKind::SchemaError, "test hash map mismatch"));
     }
     if campaign.source_drifted {
-        errors.push("current source or test hashes drifted".to_owned());
+        errors.push(reject(
+            // A stale PASS is not a current PASS -- the missing-evidence reason
+            // for a drifted campaign is literally "no current complete PASS
+            // receipt", so the debt class is not_pass: the campaign re-runs.
+            RejectionKind::NotPass,
+            "current source or test hashes drifted",
+        ));
     }
     errors.extend(runner_errors(payload, context));
     // The core, adapter and scope guard all affect what a generated campaign measures, and
     // live outside the generic runner component map. Presence alone is insufficient: an old
-    // receipt must not survive an edit to any of these files.
+    // receipt must not survive an edit to any of these files. Their failures share the
+    // runner map's debt class: the receipt was written by another era of the runner, and
+    // the campaign re-runs -- nothing here says the validator misread the file.
     let bindings = [
         ("core_sha256", "conductor/mutation_engine_generated.py"),
         ("scope_guard_sha256", "conductor/mutation_run_scope.py"),
@@ -537,9 +685,15 @@ fn generated_receipt_errors(
         let recorded = payload.get(key).and_then(Value::as_str);
         let current = sha256_file(&context.package_root.join(relative));
         if recorded.is_none_or(|value| value.trim().is_empty()) {
-            errors.push(format!("{key} is missing"));
+            errors.push(reject(
+                RejectionKind::RunnerMapMismatch,
+                format!("{key} is missing"),
+            ));
         } else if current.as_deref() != recorded {
-            errors.push(format!("{key} hash mismatch"));
+            errors.push(reject(
+                RejectionKind::RunnerMapMismatch,
+                format!("{key} hash mismatch"),
+            ));
         }
     }
     let adapter_path = match campaign.mutation_engine.as_str() {
@@ -553,24 +707,42 @@ fn generated_receipt_errors(
         Some(relative) => {
             let current_adapter = sha256_file(&context.package_root.join(relative));
             if recorded_adapter.is_none_or(|value| value.trim().is_empty()) {
-                errors.push("adapter_sha256 is missing".to_owned());
+                errors.push(reject(
+                    RejectionKind::RunnerMapMismatch,
+                    "adapter_sha256 is missing",
+                ));
             } else if current_adapter.as_deref() != recorded_adapter {
-                errors.push("adapter_sha256 hash mismatch".to_owned());
+                errors.push(reject(
+                    RejectionKind::RunnerMapMismatch,
+                    "adapter_sha256 hash mismatch",
+                ));
             }
         }
-        None => errors.push(format!(
-            "unsupported generated mutation engine: {}",
-            campaign.mutation_engine
+        None => errors.push(reject(
+            RejectionKind::SchemaError,
+            format!(
+                "unsupported generated mutation engine: {}",
+                campaign.mutation_engine
+            ),
         )),
     }
     match payload.get("survivors").and_then(Value::as_array) {
-        None => errors.push("survivors must be a list".to_owned()),
+        None => errors.push(reject(
+            RejectionKind::SchemaError,
+            "survivors must be a list",
+        )),
         Some(rows) => {
             if rows.iter().any(|row| !row.is_string()) {
-                errors.push("survivors must contain only mutation IDs".to_owned());
+                errors.push(reject(
+                    RejectionKind::SchemaError,
+                    "survivors must contain only mutation IDs",
+                ));
             }
             if !rows.is_empty() {
-                errors.push("PASS receipt reports surviving mutants".to_owned());
+                errors.push(reject(
+                    RejectionKind::SchemaError,
+                    "PASS receipt reports surviving mutants",
+                ));
             }
             let baseline: BTreeSet<&str> = campaign
                 .survivor_baseline
@@ -585,10 +757,17 @@ fn generated_receipt_errors(
             escaped.sort_unstable();
             escaped.dedup();
             if !escaped.is_empty() {
-                errors.push(format!(
-                    "{} survivor(s) outside the recorded baseline: {}",
-                    escaped.len(),
-                    escaped.join(", ")
+                // A survivor outside the baseline contradicts the PASS the
+                // receipt claims -- the validator refuses the claim. It is not
+                // `not_pass` debt: status says PASS, and CI must not wave a
+                // genuinely regressed ratchet through as re-runnable debt.
+                errors.push(reject(
+                    RejectionKind::SchemaError,
+                    format!(
+                        "{} survivor(s) outside the recorded baseline: {}",
+                        escaped.len(),
+                        escaped.join(", ")
+                    ),
                 ));
             }
         }
@@ -601,10 +780,16 @@ fn generated_receipt_errors(
                 && baseline.get("timed_out") == Some(&Value::Bool(false))
         });
     if !baseline_ok {
-        errors.push("baseline must pass without timeout".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "baseline must pass without timeout",
+        ));
     }
     let Some(mutants) = payload.get("mutants").and_then(Value::as_array) else {
-        errors.push("mutants must be a non-empty list".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "mutants must be a non-empty list",
+        ));
         return errors;
     };
     let mut ids = BTreeSet::new();
@@ -613,7 +798,10 @@ fn generated_receipt_errors(
         let id = mutant.get("id").and_then(Value::as_str);
         let outcome = mutant.get("outcome").and_then(Value::as_str);
         if id.is_none_or(str::is_empty) || !ids.insert(id.unwrap_or_default()) {
-            errors.push("mutants must have unique non-empty IDs".to_owned());
+            errors.push(reject(
+                RejectionKind::SchemaError,
+                "mutants must have unique non-empty IDs",
+            ));
         }
         match outcome {
             // TIMED_OUT rows score as neither killed nor surviving: the engine
@@ -624,11 +812,17 @@ fn generated_receipt_errors(
             Some(outcome @ ("KILLED" | "NO_COVERAGE" | "UNVIABLE" | "TIMED_OUT")) => {
                 *counts.entry(outcome).or_insert(0usize) += 1
             }
-            _ => errors.push("PASS receipt has an invalid mutant outcome".to_owned()),
+            _ => errors.push(reject(
+                RejectionKind::SchemaError,
+                "PASS receipt has an invalid mutant outcome",
+            )),
         }
     }
     if !counts.contains_key("KILLED") {
-        errors.push("PASS receipt requires at least one killed mutant".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "PASS receipt requires at least one killed mutant",
+        ));
     }
     let declared = payload.get("outcome_counts").and_then(Value::as_object);
     for outcome in [
@@ -644,12 +838,18 @@ fn generated_receipt_errors(
             .and_then(Value::as_u64)
             != Some(*counts.get(outcome).unwrap_or(&0) as u64)
         {
-            errors.push("outcome_counts do not match mutant rows".to_owned());
+            errors.push(reject(
+                RejectionKind::SchemaError,
+                "outcome_counts do not match mutant rows",
+            ));
             break;
         }
     }
     if payload.get("mutation_score").and_then(Value::as_f64) != Some(1.0) {
-        errors.push("mutation score is not 1.0".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "mutation score is not 1.0",
+        ));
     }
     errors
 }
@@ -660,7 +860,10 @@ fn generated_receipt_errors(
 fn reviewed_mutant_errors(
     payload: &Map<String, Value>,
     campaign: &CampaignContract,
-) -> Vec<String> {
+) -> Vec<Rejection> {
+    // Every row cross-check is the manifest's chosen mutations being refused as
+    // evidence: a mutant that survived contradicts the complete-PASS the
+    // receipt claims, so it is a rejected claim (schema_error), not debt.
     let mut errors = Vec::new();
     let expected_ids: Vec<Value> = campaign
         .mutations
@@ -668,10 +871,13 @@ fn reviewed_mutant_errors(
         .map(|mutation| Value::String(mutation.id.clone()))
         .collect();
     if payload.get("selected_mutations").and_then(Value::as_array) != Some(&expected_ids) {
-        errors.push("selected mutation ids mismatch".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "selected mutation ids mismatch",
+        ));
     }
     match payload.get("mutants").and_then(Value::as_array) {
-        None => errors.push("mutants must be a list".to_owned()),
+        None => errors.push(reject(RejectionKind::SchemaError, "mutants must be a list")),
         Some(rows) => {
             let mut ordered_ids = Vec::new();
             let mut actual: HashMap<String, &Map<String, Value>> = HashMap::new();
@@ -684,7 +890,10 @@ fn reviewed_mutant_errors(
                 }
             }
             if ordered_ids != expected_ids {
-                errors.push("mutant result ids mismatch".to_owned());
+                errors.push(reject(
+                    RejectionKind::SchemaError,
+                    "mutant result ids mismatch",
+                ));
             }
             for mutation in &campaign.mutations {
                 let row = actual.get(&mutation.id);
@@ -693,14 +902,20 @@ fn reviewed_mutant_errors(
                     .and_then(Value::as_str)
                     != Some("KILLED")
                 {
-                    errors.push(format!("mutant {} was not killed", mutation.id));
+                    errors.push(reject(
+                        RejectionKind::SchemaError,
+                        format!("mutant {} was not killed", mutation.id),
+                    ));
                 }
                 if row
                     .and_then(|row| row.get("patch_sha256"))
                     .and_then(Value::as_str)
                     != Some(mutation.patch_sha256.as_str())
                 {
-                    errors.push(format!("mutant {} patch hash mismatch", mutation.id));
+                    errors.push(reject(
+                        RejectionKind::SchemaError,
+                        format!("mutant {} patch hash mismatch", mutation.id),
+                    ));
                 }
             }
         }
@@ -715,7 +930,7 @@ fn reviewed_receipt_errors(
     payload: &Map<String, Value>,
     campaign: &CampaignContract,
     context: &ValidationContext<'_>,
-) -> Vec<String> {
+) -> Vec<Rejection> {
     let mut errors = Vec::new();
     let schema = payload.get("schema_version").and_then(Value::as_str);
     let anchored_legacy = schema == Some(LEGACY_RECEIPT_SCHEMA);
@@ -728,52 +943,81 @@ fn reviewed_receipt_errors(
             campaign,
         ));
     } else if schema != Some(RECEIPT_SCHEMA) {
-        errors.push("receipt schema is not current".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "receipt schema is not current",
+        ));
     }
     if payload.get("status").and_then(Value::as_str) != Some("PASS") {
-        errors.push(format!("status={}", python_repr(payload.get("status"))));
+        // Same verdict shape as the generated rule: a run that did not pass is
+        // rejected as not passing, once, without the PASS-rule noise a held or
+        // failed run would otherwise accumulate.
+        return vec![reject(
+            RejectionKind::NotPass,
+            format!("status={}", python_repr(payload.get("status"))),
+        )];
     }
     if payload.get("campaign_id").and_then(Value::as_str) != Some(&campaign.campaign_id) {
-        errors.push("campaign_id mismatch".to_owned());
+        errors.push(reject(RejectionKind::SchemaError, "campaign_id mismatch"));
     }
     if payload.get("manifest").and_then(Value::as_str) != Some(&campaign.manifest) {
-        errors.push("manifest path mismatch".to_owned());
+        errors.push(reject(RejectionKind::SchemaError, "manifest path mismatch"));
     }
     if payload.get("manifest_sha256").and_then(Value::as_str) != Some(&campaign.manifest_sha256) {
-        errors.push("manifest hash mismatch".to_owned());
+        errors.push(reject(RejectionKind::SchemaError, "manifest hash mismatch"));
     }
     if !anchored_legacy {
         errors.extend(runner_errors(payload, context));
     }
     if payload.get("source_sha256") != Some(&campaign.source_sha256) {
-        errors.push("source hash map mismatch".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "source hash map mismatch",
+        ));
     }
     if payload
         .get("source_symbols")
         .unwrap_or(&Value::Object(Map::new()))
         != &campaign.source_symbols
     {
-        errors.push("source symbol map mismatch".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "source symbol map mismatch",
+        ));
     }
     if payload
         .get("test_scopes")
         .unwrap_or(&Value::Object(Map::new()))
         != &Value::Object(campaign.test_scopes.clone())
     {
-        errors.push("test scope map mismatch".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "test scope map mismatch",
+        ));
     }
     if payload.get("complete_campaign") != Some(&Value::Bool(true)) {
-        errors.push("partial campaign receipt".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "partial campaign receipt",
+        ));
     }
     errors.extend(reviewed_mutant_errors(payload, campaign));
     if payload.get("mutation_score").and_then(Value::as_f64) != Some(1.0) {
-        errors.push("mutation score is not 1.0".to_owned());
+        errors.push(reject(
+            RejectionKind::SchemaError,
+            "mutation score is not 1.0",
+        ));
     }
     if let Some(contract) = &campaign.value_analysis {
         errors.extend(value_receipt_errors(payload.get("test_value"), contract));
     }
     if campaign.source_drifted {
-        errors.push("current source hashes drifted".to_owned());
+        errors.push(reject(
+            // Stale PASS, same as the generated rule: not a current PASS, so
+            // the debt class is not_pass.
+            RejectionKind::NotPass,
+            "current source hashes drifted",
+        ));
     }
     errors
 }
@@ -782,7 +1026,7 @@ pub(crate) fn receipt_errors(
     receipt: &Receipt,
     campaign: &CampaignContract,
     context: &ValidationContext<'_>,
-) -> Vec<String> {
+) -> Vec<Rejection> {
     // A slim receipt (PR #41) keeps the summary block plain but moves the bulky
     // lists -- `mutants`, `test_value` -- under one `detail` value, and the rules
     // below read those keys. Expand first: a plain receipt has no `detail` key
@@ -791,10 +1035,25 @@ pub(crate) fn receipt_errors(
     // summary alone: a `superseded` pointer names the receipt that replaced this
     // one, a corrupt blob names its own decode error, and a slim receipt read
     // without its detail would look like a plain one that mysteriously lost its
-    // lists.
+    // lists. The kind comes from the pointer's own encoding field -- the same
+    // value the decoder branches on -- not from matching the message text.
     let expanded = match expand_receipt(&receipt.value) {
         Ok(value) => value,
-        Err(error) => return vec![error],
+        Err(error) => {
+            let superseded = receipt
+                .value
+                .get("detail")
+                .and_then(Value::as_object)
+                .is_some_and(|detail| {
+                    detail.get("encoding") == Some(&Value::String("superseded".to_owned()))
+                });
+            let kind = if superseded {
+                RejectionKind::Superseded
+            } else {
+                RejectionKind::DecodeError
+            };
+            return vec![reject(kind, error)];
+        }
     };
     let payload = expanded
         .as_object()
@@ -883,8 +1142,14 @@ pub fn validate_mutation_receipt_native(request_json: &str) -> PyResult<String> 
         runner: &request.runner,
         anchor: &request.anchor,
     };
-    serde_json::to_string(&receipt_errors(&receipt, &request.campaign, &context))
-        .map_err(|error| value_error(error.to_string()))
+    // This seam keeps its stable string-array output: the kinds travel with the
+    // evidence layer's result, not the single-receipt validator.
+    serde_json::to_string(&rejection_details(receipt_errors(
+        &receipt,
+        &request.campaign,
+        &context,
+    )))
+    .map_err(|error| value_error(error.to_string()))
 }
 
 #[pyfunction]
@@ -913,8 +1178,9 @@ mod generated_receipt_tests {
     use super::{
         campaign_scope_error, default_anchor_registry_path, exact_parse_error,
         generated_receipt_errors, legacy_receipt_anchor_errors, lineage_accepts, load_receipts,
-        receipt_errors, runner_errors, scope_error, sha256_file, value_receipt_errors,
-        AnchorConfig, Receipt, RunnerState, ValidationContext,
+        receipt_errors, rejection_details, runner_errors, scope_error, sha256_file,
+        value_receipt_errors, AnchorConfig, Receipt, Rejection, RejectionKind, RunnerState,
+        ValidationContext,
     };
     use crate::mutation_manifest::{CampaignContract, ValueContract};
 
@@ -1018,7 +1284,7 @@ mod generated_receipt_tests {
         object.clone()
     }
 
-    fn errors(overrides: Value) -> Vec<String> {
+    fn rejections(overrides: Value) -> Vec<Rejection> {
         // No runner components on disk means the runner check has nothing to compare against,
         // which isolates these tests to the generated-campaign rule they are about.
         let runner = RunnerState {
@@ -1043,6 +1309,10 @@ mod generated_receipt_tests {
             anchor: &anchor,
         };
         generated_receipt_errors(&receipt(overrides), &campaign(), &context)
+    }
+
+    fn errors(overrides: Value) -> Vec<String> {
+        rejection_details(rejections(overrides))
     }
 
     fn manual_errors(overrides: Value) -> Vec<String> {
@@ -1094,7 +1364,7 @@ mod generated_receipt_tests {
             bytes: Vec::new(),
             parsed_bytes_available: false,
         };
-        receipt_errors(&receipt, &campaign, &context)
+        rejection_details(receipt_errors(&receipt, &campaign, &context))
     }
 
     #[test]
@@ -1475,7 +1745,7 @@ mod generated_receipt_tests {
                 "test_value baseline repetitions mismatch",
             ),
         ] {
-            let found = value_receipt_errors(Some(&value), &contract);
+            let found = rejection_details(value_receipt_errors(Some(&value), &contract));
             assert!(
                 found.iter().any(|error| error.contains(expected)),
                 "{found:?}"
@@ -1504,22 +1774,30 @@ mod generated_receipt_tests {
             anchor: &anchor,
         };
         assert!(runner_errors(json!({"runner_components_sha256": components.clone(), "runner_sha256": "b".repeat(64)}).as_object().expect("object"), &context).is_empty());
-        assert!(runner_errors(
+        let stale_map = runner_errors(
             json!({"runner_components_sha256": {}, "runner_sha256": "b".repeat(64)})
                 .as_object()
                 .expect("object"),
-            &context
-        )
-        .iter()
-        .any(|error| error.contains("component hash map mismatch")));
-        assert!(runner_errors(
+            &context,
+        );
+        assert!(stale_map
+            .iter()
+            .any(|error| error.detail.contains("component hash map mismatch")));
+        assert!(stale_map
+            .iter()
+            .any(|error| error.kind == RejectionKind::RunnerMapMismatch));
+        let stale_hash = runner_errors(
             json!({"runner_components_sha256": components, "runner_sha256": "c".repeat(64)})
                 .as_object()
                 .expect("object"),
-            &context
-        )
-        .iter()
-        .any(|error| error.contains("runner hash mismatch")));
+            &context,
+        );
+        assert!(stale_hash
+            .iter()
+            .any(|error| error.detail.contains("runner hash mismatch")));
+        assert!(stale_hash
+            .iter()
+            .any(|error| error.kind == RejectionKind::RunnerMapMismatch));
         let mut legacy = campaign();
         legacy.generated = false;
         let current = Receipt {
@@ -1530,9 +1808,11 @@ mod generated_receipt_tests {
             bytes: Vec::new(),
             parsed_bytes_available: false,
         };
-        assert!(receipt_errors(&current, &legacy, &context)
-            .iter()
-            .any(|error| error.contains("component hash map mismatch")));
+        assert!(
+            rejection_details(receipt_errors(&current, &legacy, &context))
+                .iter()
+                .any(|error| error.contains("component hash map mismatch"))
+        );
     }
 
     #[test]
@@ -1632,13 +1912,13 @@ mod generated_receipt_tests {
         assert!(
             legacy_receipt_anchor_errors(&receipt, &root, &root, &anchor, &campaign,).is_empty()
         );
-        let bad_tree = legacy_receipt_anchor_errors(
+        let bad_tree = rejection_details(legacy_receipt_anchor_errors(
             &receipt,
             &root,
             &root,
             &rebound(&anchor, &anchor.commit, "0"),
             &campaign,
-        );
+        ));
         assert!(bad_tree.iter().any(|error| error.contains("tree mismatch")));
         for (anchor_root, commit, tree, expected) in [
             (
@@ -1655,13 +1935,13 @@ mod generated_receipt_tests {
             ),
         ] {
             assert_eq!(
-                legacy_receipt_anchor_errors(
+                rejection_details(legacy_receipt_anchor_errors(
                     &receipt,
                     &root,
                     &anchor_root,
                     &rebound(&anchor, commit, tree),
                     &campaign
-                ),
+                )),
                 vec![expected.to_owned()]
             );
         }
@@ -1682,11 +1962,23 @@ mod generated_receipt_tests {
             parsed_bytes_available: true,
         };
         assert_eq!(
-            legacy_receipt_anchor_errors(&outside_directory, &root, &root, &anchor, &campaign),
+            rejection_details(legacy_receipt_anchor_errors(
+                &outside_directory,
+                &root,
+                &root,
+                &anchor,
+                &campaign
+            )),
             vec!["legacy receipt path is outside the anchored receipt directory".to_owned()]
         );
         assert_eq!(
-            legacy_receipt_anchor_errors(&changed_bytes, &root, &root, &anchor, &campaign),
+            rejection_details(legacy_receipt_anchor_errors(
+                &changed_bytes,
+                &root,
+                &root,
+                &anchor,
+                &campaign
+            )),
             vec!["legacy receipt parsed bytes differ from the anchor".to_owned()]
         );
         for args in [
@@ -1714,24 +2006,28 @@ mod generated_receipt_tests {
             .to_owned()
         };
         assert_eq!(
-            legacy_receipt_anchor_errors(
+            rejection_details(legacy_receipt_anchor_errors(
                 &receipt,
                 &root,
                 &root,
                 &rebound(&anchor, &revision("HEAD"), &revision("HEAD^{tree}")),
                 &campaign
-            ),
+            )),
             vec!["legacy receipt is absent or unsafe at the anchor".to_owned()]
         );
         let unavailable = Receipt {
             parsed_bytes_available: false,
             ..receipt
         };
-        assert!(
-            legacy_receipt_anchor_errors(&unavailable, &root, &root, &anchor, &campaign,)
-                .iter()
-                .any(|error| error.contains("path or parsed bytes"))
-        );
+        assert!(rejection_details(legacy_receipt_anchor_errors(
+            &unavailable,
+            &root,
+            &root,
+            &anchor,
+            &campaign,
+        ))
+        .iter()
+        .any(|error| error.contains("path or parsed bytes")));
         std::fs::remove_dir_all(root).expect("fixture cleanup");
     }
 
@@ -1760,7 +2056,11 @@ mod generated_receipt_tests {
             runner: &runner,
             anchor: &anchor,
         };
-        let found = generated_receipt_errors(&receipt(json!({})), &campaign, &context);
+        let found = rejection_details(generated_receipt_errors(
+            &receipt(json!({})),
+            &campaign,
+            &context,
+        ));
         assert!(
             found
                 .iter()
@@ -1809,14 +2109,14 @@ mod generated_receipt_tests {
             );
             let bad = receipt(json!({"survivors": [], "adapter_sha256": "f".repeat(64)}));
             assert!(
-                generated_receipt_errors(&bad, &campaign, &context)
+                rejection_details(generated_receipt_errors(&bad, &campaign, &context))
                     .iter()
                     .any(|error| error.contains("adapter_sha256 hash mismatch")),
                 "{engine}"
             );
             let missing = receipt(json!({"survivors": [], "adapter_sha256": ""}));
             assert!(
-                generated_receipt_errors(&missing, &campaign, &context)
+                rejection_details(generated_receipt_errors(&missing, &campaign, &context))
                     .iter()
                     .any(|error| error.contains("adapter_sha256 is missing")),
                 "{engine}"
@@ -1862,7 +2162,7 @@ mod generated_receipt_tests {
             "scope_guard_sha256": sha256_file(&package_root.join("conductor/mutation_run_scope.py")),
             "adapter_sha256": sha256_file(&package_root.join(adapter)),
         }));
-        let found = generated_receipt_errors(&good, &campaign, &context);
+        let found = rejection_details(generated_receipt_errors(&good, &campaign, &context));
         assert!(
             !found
                 .iter()
@@ -1878,7 +2178,7 @@ mod generated_receipt_tests {
             "scope_guard_sha256": "f".repeat(64),
             "adapter_sha256": "f".repeat(64),
         }));
-        let stale_found = generated_receipt_errors(&stale, &campaign, &context);
+        let stale_found = rejection_details(generated_receipt_errors(&stale, &campaign, &context));
         assert!(
             stale_found
                 .iter()
@@ -1911,13 +2211,56 @@ mod generated_receipt_tests {
             runner: &runner,
             anchor: &anchor,
         };
-        let found = generated_receipt_errors(&receipt(json!({})), &campaign, &context);
+        let found = rejection_details(generated_receipt_errors(
+            &receipt(json!({})),
+            &campaign,
+            &context,
+        ));
         assert!(
             found
                 .iter()
                 .any(|error| error == "current source or test hashes drifted"),
             "{found:?}"
         );
+    }
+
+    #[test]
+    fn rejections_carry_the_kind_of_the_rule_that_produced_them() {
+        // A held ratchet is debt, not a defect: status lands as not_pass.
+        assert!(
+            rejections(json!({"status": "RATCHET_HELD", "survivors": []}))
+                .iter()
+                .any(|error| error.kind == RejectionKind::NotPass
+                    && error.detail.starts_with("status="))
+        );
+        // The class PR #46 lived through: a mutants list the validator cannot
+        // accept is a schema_error, never silently debt.
+        assert!(rejections(json!({"mutants": json!({}), "survivors": []}))
+            .iter()
+            .any(|error| error.kind == RejectionKind::SchemaError
+                && error.detail == "mutants must be a non-empty list"));
+        // Identity bindings are schema errors...
+        assert!(rejections(json!({"campaign_id": "other", "survivors": []}))
+            .iter()
+            .any(|error| error.kind == RejectionKind::SchemaError
+                && error.detail == "campaign_id mismatch"));
+        // ...while the runner-era bindings share the map's debt class.
+        assert!(
+            rejections(json!({"core_sha256": "f".repeat(64), "survivors": []}))
+                .iter()
+                .any(|error| error.kind == RejectionKind::RunnerMapMismatch
+                    && error.detail == "core_sha256 hash mismatch")
+        );
+        // A survivor outside the baseline contradicts the claimed PASS: the
+        // validator refuses the claim rather than filing it as re-run debt.
+        assert!(rejections(json!({
+            "survivors": ["operator_swap-0123456789ab-2"],
+            "mutants": [{"id": "operator_swap-0123456789ab-2", "outcome": "SURVIVED"}],
+            "outcome_counts": {"KILLED":0,"NO_COVERAGE":0,"UNVIABLE":0,"ERROR":0,"SURVIVED":1,"TIMED_OUT":0}
+        }))
+        .iter()
+        .any(|error| error.kind == RejectionKind::SchemaError
+            && error.detail.starts_with("1 survivor(s) outside the recorded baseline")));
     }
 
     #[test]
