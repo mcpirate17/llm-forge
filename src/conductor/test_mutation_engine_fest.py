@@ -203,13 +203,25 @@ def test_the_config_carries_the_bound_the_run_resolved() -> None:
     The config is written after the baseline on purpose: a manifest that pins
     no bound has one derived from that baseline's wall time, and the config is
     where the engine would otherwise silently fall back to its own default.
+    Pinned as the exact document -- every line in it is a bound the engine
+    reads, and a dropped or renamed one silently changes what ran.
     """
 
     loaded = load_generated_campaign(FEST_FIXTURE_MANIFEST)
     loaded.mutant_timeout_seconds = None
     resolve_mutant_timeout(loaded, 0.4)  # a fast suite still gets the floor
-    config = _config(loaded, "/v/bin/python")
-    timeout_lines = [
-        line for line in config.splitlines() if line.startswith("timeout =")
-    ]
-    assert timeout_lines == ["timeout = 60"]
+    assert _config(loaded, "/v/bin/python") == "\n".join(
+        [
+            "[fest]",
+            'source = ["src/conductor/gate_rollout.py"]',
+            'exclude = ["**/test_*.py", "**/conftest.py"]',
+            "timeout = 60",
+            "seed = 0",
+            "workers = 1",
+            'test_command = ["/v/bin/python", "-m", "pytest", "-q", '
+            '"src/conductor/test_gate_rollout.py"]',
+            'output = "json"',
+            'backend = "subprocess"',
+            "",
+        ]
+    )

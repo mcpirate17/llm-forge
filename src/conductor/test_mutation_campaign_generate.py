@@ -370,6 +370,31 @@ def test_a_sole_unmirrored_same_basename_test_still_pairs(tmp_path: Path) -> Non
     assert by_source["pkg/candidate_review/policy.py"] == ["pkg/test_policy.py"]
 
 
+def test_a_tests_mirror_beats_a_same_basename_stranger(tmp_path: Path) -> None:
+    """With a mirror present, the fallback must not get a vote.
+
+    A module with one test under its own ``tests/`` mirror and a stranger
+    elsewhere sharing the basename is exactly the case the mirror rule
+    exists for: the mirror says which test counts, where basename-counting
+    alone would see two candidates and refuse (or, before the rule, guess).
+    The fallback is for modules with NO mirror -- letting it fire here would
+    make the mirror branch unobservable.
+    """
+
+    tree(
+        tmp_path,
+        {
+            "pkg/deep/subject.py": "x = 1\n",
+            "pkg/tests/deep/test_subject.py": "def test_x(): pass\n",
+            "elsewhere/test_subject.py": "def test_y(): pass\n",
+        },
+    )
+    paired, unpaired = python_subjects(tmp_path)
+    by_source = {subject["source"]: subject["tests"] for subject in paired}
+    assert by_source["pkg/deep/subject.py"] == ["pkg/tests/deep/test_subject.py"]
+    assert unpaired == []
+
+
 def test_a_subject_a_committed_campaign_already_covers_is_skipped(
     tmp_path: Path,
 ) -> None:

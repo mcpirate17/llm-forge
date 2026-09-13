@@ -360,9 +360,7 @@ def resolve_mutant_timeout(
         return campaign.mutant_timeout_seconds
     derived = max(
         MUTANT_TIMEOUT_FLOOR_SECONDS,
-        math.ceil(
-            MUTANT_TIMEOUT_BASELINE_MULTIPLIER * max(0.0, baseline_duration_seconds)
-        ),
+        math.ceil(MUTANT_TIMEOUT_BASELINE_MULTIPLIER * baseline_duration_seconds),
     )
     campaign.mutant_timeout_seconds = derived
     return derived
