@@ -245,8 +245,7 @@ fn backup_once(host: &Path) -> Result<()> {
     let parent = backup
         .parent()
         .context("the backup path always has a parent")?;
-    std::fs::create_dir_all(parent)
-        .with_context(|| format!("creating {}", parent.display()))?;
+    std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     std::fs::copy(&settings, &backup)
         .with_context(|| format!("copying {} to {}", settings.display(), backup.display()))?;
     Ok(())
@@ -256,11 +255,12 @@ fn backup_once(host: &Path) -> Result<()> {
 /// settings.json must never be what the harness reads.
 fn write_atomic(path: &Path, text: &str) -> Result<()> {
     let parent = path.parent().context("path always has a parent")?;
-    std::fs::create_dir_all(parent)
-        .with_context(|| format!("creating {}", parent.display()))?;
+    std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     let tmp = parent.join(format!(
         ".{}.tmp-{}",
-        path.file_name().and_then(|n| n.to_str()).unwrap_or("settings"),
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("settings"),
         std::process::id()
     ));
     std::fs::write(&tmp, text).with_context(|| format!("writing {}", tmp.display()))?;
@@ -287,7 +287,10 @@ fn install(args: &InstallArgs) -> Result<u8> {
         return Ok(0);
     }
     if args.dry_run {
-        print!("{}", unified_diff(old_text.as_deref().unwrap_or(""), &new_text));
+        print!(
+            "{}",
+            unified_diff(old_text.as_deref().unwrap_or(""), &new_text)
+        );
         return Ok(0);
     }
     backup_once(&args.host)?;
@@ -317,7 +320,12 @@ fn resolve_binary(binary: &Option<PathBuf>) -> Result<PathBuf> {
 
 /// Upserts exactly one forge entry per event into `settings`, preserving
 /// everything else, and returns the serialized result.
-fn install_into(settings: &mut Value, binary: &Path, mode: &str, standalone: bool) -> Result<String> {
+fn install_into(
+    settings: &mut Value,
+    binary: &Path,
+    mode: &str,
+    standalone: bool,
+) -> Result<String> {
     let binary = binary.display().to_string();
     let root = settings
         .as_object_mut()
@@ -370,7 +378,10 @@ fn uninstall(args: &UninstallArgs) -> Result<u8> {
     }
     let new_text = serialize(&settings);
     if args.dry_run {
-        print!("{}", unified_diff(old_text.as_deref().unwrap_or(""), &new_text));
+        print!(
+            "{}",
+            unified_diff(old_text.as_deref().unwrap_or(""), &new_text)
+        );
         for line in &removed {
             println!("would remove {line}");
         }
@@ -584,8 +595,14 @@ fn render_hunks(ops: &[(char, &str)]) -> String {
         let end_idx = (changes[last] + 1 + CONTEXT).min(ops.len());
         let old_start = ops[..first_idx].iter().filter(|op| op.0 != '+').count();
         let new_start = ops[..first_idx].iter().filter(|op| op.0 != '-').count();
-        let old_count = ops[first_idx..end_idx].iter().filter(|op| op.0 != '+').count();
-        let new_count = ops[first_idx..end_idx].iter().filter(|op| op.0 != '-').count();
+        let old_count = ops[first_idx..end_idx]
+            .iter()
+            .filter(|op| op.0 != '+')
+            .count();
+        let new_count = ops[first_idx..end_idx]
+            .iter()
+            .filter(|op| op.0 != '-')
+            .count();
         out.push_str(&format!(
             "@@ -{} +{} @@\n",
             hunk_range(old_start, old_count),
@@ -731,7 +748,13 @@ mod tests {
         events.sort();
         assert_eq!(
             events,
-            vec!["PostToolUse", "PreToolUse", "SessionEnd", "SessionStart", "SubagentStop"]
+            vec![
+                "PostToolUse",
+                "PreToolUse",
+                "SessionEnd",
+                "SessionStart",
+                "SubagentStop"
+            ]
         );
         for event in EVENTS {
             assert_eq!(
@@ -763,11 +786,13 @@ mod tests {
         let settings = scratch.settings_value();
         // Unrelated entries untouched, forge appended after them.
         assert_eq!(
-            settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"], "lint.sh"
+            settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
+            "lint.sh"
         );
         assert_eq!(settings["hooks"]["PreToolUse"].as_array().unwrap().len(), 2);
         assert_eq!(
-            settings["hooks"]["PostToolUse"][0]["hooks"][0]["command"], "notify.sh"
+            settings["hooks"]["PostToolUse"][0]["hooks"][0]["command"],
+            "notify.sh"
         );
         // Top-level keys preserved, order included.
         let keys: Vec<&String> = settings.as_object().unwrap().keys().collect();
@@ -828,7 +853,11 @@ mod tests {
             + "\n";
         scratch.write_settings(&original);
         install(&install_args(scratch.path(), "warn", false)).unwrap();
-        uninstall(&UninstallArgs { host: scratch.path().to_path_buf(), dry_run: false }).unwrap();
+        uninstall(&UninstallArgs {
+            host: scratch.path().to_path_buf(),
+            dry_run: false,
+        })
+        .unwrap();
         assert_eq!(scratch.settings_text(), original);
     }
 
@@ -839,7 +868,11 @@ mod tests {
     fn uninstall_of_a_fresh_install_leaves_an_empty_object() {
         let scratch = ScratchDir::new("uninstall-fresh");
         install(&install_args(scratch.path(), "warn", true)).unwrap();
-        uninstall(&UninstallArgs { host: scratch.path().to_path_buf(), dry_run: false }).unwrap();
+        uninstall(&UninstallArgs {
+            host: scratch.path().to_path_buf(),
+            dry_run: false,
+        })
+        .unwrap();
         assert_eq!(scratch.settings_text(), "{}\n");
         assert!(!backup_path(scratch.path()).exists());
     }
@@ -864,8 +897,11 @@ mod tests {
     fn dry_run_writes_nothing_not_even_a_backup() {
         let scratch = ScratchDir::new("dry");
         scratch.write_settings(r#"{"model": "opus"}"#);
-        install(&InstallArgs { dry_run: true, ..install_args(scratch.path(), "warn", true) })
-            .unwrap();
+        install(&InstallArgs {
+            dry_run: true,
+            ..install_args(scratch.path(), "warn", true)
+        })
+        .unwrap();
         assert_eq!(scratch.settings_text(), "{\"model\": \"opus\"}");
         assert!(!backup_path(scratch.path()).exists());
     }
@@ -895,11 +931,16 @@ mod tests {
         install(&install_args(scratch.path(), "warn", true)).unwrap();
         let settings = scratch.settings_value();
         assert_eq!(settings["hooks"]["PreToolUse"].as_array().unwrap().len(), 1);
-        assert_eq!(settings["hooks"]["SubagentStop"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            settings["hooks"]["SubagentStop"].as_array().unwrap().len(),
+            1
+        );
         assert_eq!(settings["hooks"]["PreToolUse"][0]["matcher"], ".*");
         assert_eq!(
             commands_for(&settings, "PreToolUse"),
-            vec![format!("FORGE_MODE=warn FORGE_HOOK_STANDALONE=1 {BIN} hook PreToolUse")]
+            vec![format!(
+                "FORGE_MODE=warn FORGE_HOOK_STANDALONE=1 {BIN} hook PreToolUse"
+            )]
         );
     }
 
@@ -908,14 +949,20 @@ mod tests {
         let scratch = ScratchDir::new("status");
         install(&install_args(scratch.path(), "warn", true)).unwrap();
         // The fake binary path does not exist: status must say so and fail.
-        let code = status(&StatusArgs { host: scratch.path().to_path_buf() }).unwrap();
+        let code = status(&StatusArgs {
+            host: scratch.path().to_path_buf(),
+        })
+        .unwrap();
         assert_eq!(code, 1);
     }
 
     #[test]
     fn status_on_a_host_without_settings_reports_not_installed() {
         let scratch = ScratchDir::new("status-empty");
-        let code = status(&StatusArgs { host: scratch.path().to_path_buf() }).unwrap();
+        let code = status(&StatusArgs {
+            host: scratch.path().to_path_buf(),
+        })
+        .unwrap();
         assert_eq!(code, 0);
     }
 
