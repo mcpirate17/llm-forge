@@ -34,6 +34,7 @@ import argparse
 import difflib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -45,7 +46,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from tooling.hooks.dispatch.paths import TOOLING_ROOT
-from tooling.hooks.dispatch.registry import LAUNCHER, settings_block
+from tooling.hooks.dispatch.registry import EVENTS, LAUNCHER, settings_block
 
 SETTINGS = ".claude/settings.json"
 MCP = ".mcp.json"
@@ -205,8 +206,42 @@ def _render_merged(
     return _dump_json(merged)
 
 
-def render_settings(existing: str | None, force: bool) -> str:
-    return _render_merged(SETTINGS, existing, "hooks", settings_block()["hooks"], force)
+def resolve_forge_binary(project_dir: Path) -> Path | None:
+    """A ``forge`` binary this project can wire hooks to, or ``None``.
+
+    Checked project-local build first (``.tools/bin/forge``, what ``make
+    forge-build``/``cargo install --path native/forge --root .tools`` produces),
+    then an ambient ``forge`` on ``PATH``. The project-local build wins when both
+    exist: it is guaranteed to match this checkout's ``native/forge`` source, an
+    ambient one on PATH is not. Neither existing means every hook still runs
+    through the Python dispatcher -- native hook handling is opt-in by presence,
+    never required.
+    """
+    local = project_dir / ".tools" / "bin" / "forge"
+    if local.is_file() and os.access(local, os.X_OK):
+        return local
+    found = shutil.which("forge")
+    return Path(found) if found else None
+
+
+def _hooks_block(forge_binary: Path | None) -> dict[str, Any]:
+    """``settings_block()``'s hooks, with each event's command swapped to
+    ``<forge_binary> hook <Event>`` when a forge binary was found -- the Python
+    launcher command otherwise."""
+    block = settings_block()["hooks"]
+    if forge_binary is None:
+        return block
+    for event in EVENTS:
+        block[event][0]["hooks"][0]["command"] = f"{forge_binary} hook {event}"
+    return block
+
+
+def render_settings(
+    existing: str | None, force: bool, forge_binary: Path | None = None
+) -> str:
+    return _render_merged(
+        SETTINGS, existing, "hooks", _hooks_block(forge_binary), force
+    )
 
 
 def mcp_entry(project_dir: Path, python: Path) -> dict[str, Any]:
@@ -516,11 +551,12 @@ def _pyproject_conductor_warnings(project_dir: Path) -> list[str]:
 
 def plan(config: InitConfig, *, today: date | None = None) -> InitPlan:
     root = config.project_dir
+    forge_binary = resolve_forge_binary(root)
     actions = [
         _action(
             SETTINGS,
             _read(root, SETTINGS),
-            render_settings(_read(root, SETTINGS), config.force),
+            render_settings(_read(root, SETTINGS), config.force, forge_binary),
         ),
         _action(
             LAUNCHER,

@@ -128,6 +128,103 @@ def test_an_absent_settings_file_is_created_not_preserved() -> None:
     }
 
 
+# ── forge binary detection and the hook-command switch ──────────────────────
+
+
+def test_resolve_forge_binary_prefers_project_local_tools_bin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _repo(tmp_path)
+    local = project / ".tools" / "bin" / "forge"
+    local.parent.mkdir(parents=True)
+    local.write_text("#!/bin/sh\n")
+    local.chmod(local.stat().st_mode | stat.S_IEXEC)
+    # An ambient PATH forge exists too -- the project-local build must still win.
+    monkeypatch.setattr(pi.shutil, "which", lambda name: "/usr/bin/forge")
+    assert pi.resolve_forge_binary(project) == local
+
+
+def test_resolve_forge_binary_falls_back_to_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _repo(tmp_path)
+    monkeypatch.setattr(pi.shutil, "which", lambda name: "/usr/local/bin/forge")
+    assert pi.resolve_forge_binary(project) == Path("/usr/local/bin/forge")
+
+
+def test_resolve_forge_binary_is_none_when_absent_everywhere(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _repo(tmp_path)
+    monkeypatch.setattr(pi.shutil, "which", lambda name: None)
+    assert pi.resolve_forge_binary(project) is None
+
+
+def test_resolve_forge_binary_ignores_a_non_executable_local_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _repo(tmp_path)
+    local = project / ".tools" / "bin" / "forge"
+    local.parent.mkdir(parents=True)
+    local.write_text("not executable")
+    monkeypatch.setattr(pi.shutil, "which", lambda name: None)
+    assert pi.resolve_forge_binary(project) is None
+
+
+def test_render_settings_without_a_forge_binary_keeps_the_python_launcher() -> None:
+    rendered = json.loads(pi.render_settings(None, force=False, forge_binary=None))
+    for event in EVENTS:
+        command = rendered["hooks"][event][0]["hooks"][0]["command"]
+        assert command == TEMPLATE_HOOKS[event][0]["hooks"][0]["command"]
+        assert "forge hook" not in command
+
+
+def test_render_settings_with_a_forge_binary_switches_every_event_command() -> None:
+    forge = Path("/opt/forge/bin/forge")
+    rendered = json.loads(pi.render_settings(None, force=False, forge_binary=forge))
+    for event in EVENTS:
+        command = rendered["hooks"][event][0]["hooks"][0]["command"]
+        assert command == f"{forge} hook {event}"
+        # Everything else about the entry (matcher, timeout) is untouched.
+        assert (
+            rendered["hooks"][event][0]["matcher"]
+            == TEMPLATE_HOOKS[event][0]["matcher"]
+        )
+        assert (
+            rendered["hooks"][event][0]["hooks"][0]["timeout"]
+            == TEMPLATE_HOOKS[event][0]["hooks"][0]["timeout"]
+        )
+
+
+def test_plan_wires_settings_to_a_detected_project_local_forge_binary(
+    tmp_path: Path, quiet_doctor: None
+) -> None:
+    project = _repo(tmp_path)
+    local = project / ".tools" / "bin" / "forge"
+    local.parent.mkdir(parents=True)
+    local.write_text("#!/bin/sh\n")
+    local.chmod(local.stat().st_mode | stat.S_IEXEC)
+    plan_ = pi.plan(_config(project), today=date(2026, 1, 1))
+    settings_action = next(a for a in plan_.actions if a.path == pi.SETTINGS)
+    rendered = json.loads(settings_action.after)
+    for event in EVENTS:
+        assert (
+            rendered["hooks"][event][0]["hooks"][0]["command"]
+            == f"{local} hook {event}"
+        )
+
+
+def test_plan_keeps_the_python_launcher_when_no_forge_binary_is_found(
+    tmp_path: Path, quiet_doctor: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _repo(tmp_path)
+    monkeypatch.setattr(pi.shutil, "which", lambda name: None)
+    plan_ = pi.plan(_config(project), today=date(2026, 1, 1))
+    settings_action = next(a for a in plan_.actions if a.path == pi.SETTINGS)
+    rendered = json.loads(settings_action.after)
+    assert rendered["hooks"] == TEMPLATE_HOOKS
+
+
 # ── mcp merge ───────────────────────────────────────────────────────────────
 
 
