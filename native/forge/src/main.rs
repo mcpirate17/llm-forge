@@ -18,6 +18,7 @@ mod crg_gate;
 mod crg_refresh;
 mod current_work_guard;
 mod dispatch;
+mod doctor;
 mod handlers;
 mod hooks_install;
 mod identity;
@@ -91,6 +92,10 @@ enum Command {
         #[command(subcommand)]
         action: hooks_install::HooksCommand,
     },
+    /// Verify a host install end to end: settings, binaries, Python,
+    /// ledger, policy, and a live hook roundtrip (`docs/roadmap.md`
+    /// Phase 4 item 2c).
+    Doctor(doctor::DoctorArgs),
 }
 
 #[derive(Subcommand)]
@@ -217,6 +222,13 @@ fn main() -> ExitCode {
             Ok(code) => ExitCode::from(code),
             Err(err) => {
                 eprintln!("forge hooks: {err:#}");
+                ExitCode::from(1)
+            }
+        },
+        Command::Doctor(args) => match doctor::run(&args) {
+            Ok(code) => ExitCode::from(code),
+            Err(err) => {
+                eprintln!("forge doctor: {err:#}");
                 ExitCode::from(1)
             }
         },
