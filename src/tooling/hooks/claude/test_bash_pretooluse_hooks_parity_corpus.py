@@ -50,15 +50,17 @@ _MANAGED_ENV_VARS = (
 )
 
 
-def _load(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
+def _load_driver():
+    spec = importlib.util.spec_from_file_location(
+        "bash_pretooluse_parity_driver_under_test", _DRIVER_PATH
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-driver = _load("bash_pretooluse_parity_driver_under_test", _DRIVER_PATH)
+driver = _load_driver()
 
 
 def _reset_env() -> None:
