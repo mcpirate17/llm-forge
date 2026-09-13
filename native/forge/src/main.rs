@@ -29,6 +29,7 @@ mod ledger;
 mod local_ai_policy;
 mod merge;
 mod mutation_plan;
+mod notes_index;
 mod obsidian_sync;
 mod ownership;
 mod post_edit_audit;
@@ -97,6 +98,12 @@ enum Command {
     /// ledger, policy, and a live hook roundtrip (`docs/roadmap.md`
     /// Phase 4 item 2c).
     Doctor(doctor::DoctorArgs),
+    /// FTS5 note index: `forge notes index|search` (`docs/roadmap.md`
+    /// Phase 4 item 2h).
+    Notes {
+        #[command(subcommand)]
+        action: notes_index::NotesCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -230,6 +237,13 @@ fn main() -> ExitCode {
             Ok(code) => ExitCode::from(code),
             Err(err) => {
                 eprintln!("forge doctor: {err:#}");
+                ExitCode::from(1)
+            }
+        },
+        Command::Notes { action } => match notes_index::run(action) {
+            Ok(code) => ExitCode::from(code),
+            Err(err) => {
+                eprintln!("forge notes: {err:#}");
                 ExitCode::from(1)
             }
         },
