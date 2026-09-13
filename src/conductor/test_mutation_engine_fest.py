@@ -11,11 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from conductor.mutation_engine_fest import _config, _coverage_targets, _rows
+from conductor.bytecode_isolation import scratch_root_for
+from conductor.mutation_engine_fest import _config, _coverage_targets, _environment, _rows
 from conductor.mutation_engine_generated import (
     load_generated_campaign,
     resolve_mutant_timeout,
 )
+from conductor.mutation_pycache_evict import PLUGIN_NAME, SCRATCH_ENV, SOURCES_ENV
 from conductor.mutation_scope import CampaignError
 
 WORKTREE = Path("/snap/worktree")
@@ -225,3 +227,46 @@ def test_the_config_carries_the_bound_the_run_resolved() -> None:
             "",
         ]
     )
+
+
+class _EnvironmentCampaign:
+    """The two fields `_environment` reads: a declared env and mutated sources."""
+
+    environment: dict[str, str] = {}
+    source_sha256: dict[str, str] = {}
+
+
+def test_the_environment_loads_the_eviction_plugin_for_every_child(
+    tmp_path: Path,
+) -> None:
+    """fest launches its own per-mutant pytest commands; the plugin is the hook.
+
+    No launcher of the adapter's sits between a mutant's rewrite and the child
+    that imports it, so `PYTEST_ADDOPTS` must load the eviction plugin inside
+    every pytest child this environment reaches, and the two CONDUCTOR
+    variables must name this run's scratch and this campaign's mutated files.
+    """
+
+    (tmp_path / "src").mkdir()
+    campaign = _EnvironmentCampaign()
+    campaign.source_sha256 = {"src/conductor/mutated.py": "0" * 64}
+
+    env = _environment(campaign, tmp_path)
+
+    assert env["PYTEST_ADDOPTS"] == f"-p {PLUGIN_NAME}"
+    assert env[SCRATCH_ENV] == str(scratch_root_for(tmp_path))
+    assert env[SOURCES_ENV] == str(tmp_path / "src/conductor/mutated.py")
+
+
+def test_an_inherited_addopts_survives_with_the_plugin_appended(
+    tmp_path: Path,
+) -> None:
+    """A campaign (or host) that set PYTEST_ADDOPTS keeps it, plugin and all."""
+
+    (tmp_path / "src").mkdir()
+    campaign = _EnvironmentCampaign()
+    campaign.environment = {"PYTEST_ADDOPTS": "--timeout 30"}
+
+    env = _environment(campaign, tmp_path)
+
+    assert env["PYTEST_ADDOPTS"] == f"--timeout 30 -p {PLUGIN_NAME}"

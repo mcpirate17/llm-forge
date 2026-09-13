@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from conductor import mutation_testing_support as _support
-from conductor.bytecode_isolation import isolated_python_env
+from conductor.bytecode_isolation import isolated_python_env, scratch_root_for
 from conductor.mutation_campaign_model import (
     RECEIPT_SCHEMA,
     REPO_ROOT,
@@ -333,6 +333,7 @@ def run(
     cwd: Path,
     timeout_seconds: int,
     environment: Mapping[str, str],
+    mutated_paths: Sequence[Path | str] = (),
 ) -> tuple[CommandResult, str]:
     """Run one bounded command, keeping full stdout for the caller to parse.
 
@@ -340,10 +341,14 @@ def run(
     suite, the engine binary (whose own per-mutant children inherit this
     environment), attribution's re-applied mutants -- and the engines' whole
     method is same-size, same-second rewrites of the files under test. The
-    child environment is therefore always bytecode-isolated into a scratch
-    beside `cwd`, which the snapshot destroys with the run: without it a
-    mutant can be graded against the unmutated baseline's cached bytecode and
-    report a survivor (or a kill) that no source diff explains.
+    child environment is therefore always bound to a cache prefix private to
+    this run (a scratch beside `cwd`, destroyed with the snapshot), and every
+    file in `mutated_paths` has its cached bytecode under that prefix evicted
+    before this launch: without that, a mutant can be graded against the
+    unmutated baseline's cached bytecode and report a survivor (or a kill)
+    that no source diff explains. The Python adapter passes the campaign's
+    mutated sources; the C++ and Rust adapters mutate files with no bytecode
+    to cache, so theirs stay empty.
     """
 
     captured: list[str] = []
@@ -351,7 +356,9 @@ def run(
         argv,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
-        environment=isolated_python_env(environment, cwd / ".bytecode-isolation"),
+        environment=isolated_python_env(
+            environment, scratch_root_for(cwd), mutated_paths=mutated_paths
+        ),
         pin_argv=list,
         result_factory=CommandResult,
         output_tail_chars=OUTPUT_TAIL_CHARS,
