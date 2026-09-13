@@ -111,6 +111,8 @@ fn build_row(
     let billed = summary.total_input_tokens
         + summary.total_output_tokens
         + summary.total_cache_creation_input_tokens;
+    let over_cap = billed > cap_tokens;
+    let mode = resolve_mode();
     let (first_ts, last_ts) = ts_range(summary);
 
     TaskDispatchRow {
@@ -126,12 +128,33 @@ fn build_row(
         n_turns: Some(summary.turns_with_usage),
         billed_tokens: Some(billed),
         total_cache_read: Some(summary.total_cache_read_input_tokens),
-        over_cap: Some(billed > cap_tokens),
+        over_cap: Some(over_cap),
         first_ts,
         last_ts,
         landed: None,
         required_rework: None,
         ci_red_on_first_push: None,
+        decision: Some(if over_cap { "deny" } else { "allow" }.to_string()),
+        mode: Some(mode.to_string()),
+        // Enforce mode always applies its own verdict. Warn mode applies
+        // only when there was nothing to override -- an over-cap verdict in
+        // warn mode is advisory (`cap_enforce.rs`'s `deny_warned` path:
+        // allow + a warning), never actually blocking.
+        applied: Some(mode == "enforce" || !over_cap),
+    }
+}
+
+/// `FORGE_MODE`, duplicated from `route::resolve_mode` (this module cannot
+/// `use crate::route` -- see the module doc comment above): `"warn"` opts
+/// in, anything else (including unset or an unrecognized value) is
+/// `"enforce"`. Unlike `route::resolve_mode`, this narrow upsert path does
+/// not print the malformed-value warning -- `forge hook`'s own call into
+/// `route::resolve_mode` already does, once per hook invocation, and this
+/// command runs from the very same `SubagentStop` hook process.
+fn resolve_mode() -> &'static str {
+    match std::env::var("FORGE_MODE").ok().as_deref() {
+        Some("warn") => "warn",
+        _ => "enforce",
     }
 }
 
@@ -226,6 +249,61 @@ mod tests {
         let parsed: Value = serde_json::from_str(rows[0]).unwrap();
         assert_eq!(parsed["agent_id"], "abc123");
         assert_eq!(parsed["billed_tokens"], 430); // 100+50+200+75+5, cache_read excluded
+    }
+
+    #[test]
+    fn the_row_carries_decision_mode_and_applied() {
+        // `resolve_mode` reads `FORGE_MODE` fresh, same as `route::
+        // resolve_mode`; serialize against the same convention used
+        // elsewhere in this crate (e.g. `cap_enforce::tests::ENV_LOCK`).
+        static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+
+        let scratch = ScratchDir::new("modeapplied");
+        let transcript_path = scratch.path().join("agent-modefield.jsonl");
+        write_fixture_transcript(&transcript_path);
+
+        // Enforce mode (unset FORGE_MODE): a cap of 1 forces over_cap, and
+        // enforce mode always applies its own verdict.
+        std::env::remove_var("FORGE_MODE");
+        let ledger_root_enforce = scratch.path().join("ledger-enforce");
+        let args = AgentUpsertArgs {
+            transcript: transcript_path.clone(),
+            agent_id: "modefield".to_string(),
+            subagent_type: Some("general-purpose".to_string()),
+            out: Some(ledger_root_enforce.clone()),
+        };
+        run(args, |_| 1).unwrap();
+        let day_file = ledger_root_enforce
+            .join("task_dispatch")
+            .join("2026-09-13.jsonl");
+        let row: Value =
+            serde_json::from_str(std::fs::read_to_string(&day_file).unwrap().trim()).unwrap();
+        assert_eq!(row["decision"], "deny");
+        assert_eq!(row["mode"], "enforce");
+        assert_eq!(row["applied"], true);
+
+        // Warn mode, same over-cap fixture: decision is still computed, but
+        // applied flips to false since the over-cap verdict is advisory.
+        std::env::set_var("FORGE_MODE", "warn");
+        let ledger_root_warn = scratch.path().join("ledger-warn");
+        let args = AgentUpsertArgs {
+            transcript: transcript_path,
+            agent_id: "modefield".to_string(),
+            subagent_type: Some("general-purpose".to_string()),
+            out: Some(ledger_root_warn.clone()),
+        };
+        run(args, |_| 1).unwrap();
+        let day_file = ledger_root_warn
+            .join("task_dispatch")
+            .join("2026-09-13.jsonl");
+        let row: Value =
+            serde_json::from_str(std::fs::read_to_string(&day_file).unwrap().trim()).unwrap();
+        assert_eq!(row["decision"], "deny");
+        assert_eq!(row["mode"], "warn");
+        assert_eq!(row["applied"], false);
+
+        std::env::remove_var("FORGE_MODE");
     }
 
     #[test]

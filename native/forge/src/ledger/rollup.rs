@@ -236,6 +236,18 @@ pub struct TaskDispatchRow {
     pub landed: Option<bool>,
     pub required_rework: Option<bool>,
     pub ci_red_on_first_push: Option<bool>,
+    /// The routing policy's own verdict for this dispatch (`"allow"` |
+    /// `"deny"`, `route::Decision::decision`), `mode` (`"warn"` |
+    /// `"enforce"`) and `applied` (whether that verdict actually changed the
+    /// call -- `false` in warn mode, `true` in enforce mode). All three are
+    /// `null` on a row this offline sweep builds from a bare transcript: the
+    /// live `FORGE_MODE` at dispatch time cannot be recovered after the
+    /// fact, so this is an honest null, not a guessed `"enforce"`. The
+    /// `SubagentStop`-triggered upsert (`agent_upsert.rs`) is the row that
+    /// fills all three, since it runs while the mode is still known.
+    pub decision: Option<String>,
+    pub mode: Option<String>,
+    pub applied: Option<bool>,
 }
 
 struct RollupOutput {
@@ -798,6 +810,12 @@ fn task_dispatch_row(
         landed: None,
         required_rework: None,
         ci_red_on_first_push: None,
+        // Honest null: see `TaskDispatchRow::decision`'s doc comment -- this
+        // offline sweep cannot recover the live `FORGE_MODE` from a bare
+        // transcript, so `mode`/`applied` stay unset rather than guessed.
+        decision: None,
+        mode: None,
+        applied: None,
     };
     let Some(sub) = joined else {
         return row;

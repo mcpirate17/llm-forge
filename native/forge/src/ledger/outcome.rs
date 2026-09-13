@@ -370,6 +370,9 @@ mod tests {
             landed: None,
             required_rework: None,
             ci_red_on_first_push: None,
+            decision: None,
+            mode: None,
+            applied: None,
         }
     }
 }

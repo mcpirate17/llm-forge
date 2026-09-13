@@ -71,7 +71,17 @@ use std::process::{Command, Stdio};
 use std::time::Instant;
 
 /// Runs one hook event and returns the exit code to propagate to the caller.
+/// `FORGE_HOOK_STANDALONE=1` (the LLM monorepo's install, `docs/routing.md`)
+/// routes to `run_hook_standalone` instead: forge never delegates to Python
+/// and never runs the native Bash-guard/`crg_refresh_report_pre` branches --
+/// only its own decisions (routing, live cap check, the `SubagentStop`
+/// rollup, telemetry) -- because standalone means "installed as an
+/// additional hook entry beside another project's own dispatcher," which
+/// must never see forge second-guess a call it has no opinion on.
 pub fn run_hook(event: &str) -> Result<u8> {
+    if standalone_mode() {
+        return run_hook_standalone(event);
+    }
     match event {
         "PreToolUse" => run_pre_tool_use(event),
         "PostToolUse" => run_post_tool_use(event),
@@ -84,6 +94,90 @@ pub fn run_hook(event: &str) -> Result<u8> {
             delegate(event, None, &no_native_env())
         }
     }
+}
+
+fn standalone_mode() -> bool {
+    std::env::var("FORGE_HOOK_STANDALONE").as_deref() == Ok("1")
+}
+
+/// `FORGE_HOOK_STANDALONE=1`: only `PreToolUse` (routing + live cap check)
+/// and `SubagentStop` (the ledger rollup) have anything forge wants to say;
+/// every other event -- and any `PreToolUse` call neither check has an
+/// opinion on -- prints nothing and exits 0, a bare allow. No Python child
+/// is ever spawned on this path.
+fn run_hook_standalone(event: &str) -> Result<u8> {
+    match event {
+        "PreToolUse" => run_pre_tool_use_standalone(event),
+        "SubagentStop" => run_subagent_stop_standalone(event),
+        _ => Ok(0),
+    }
+}
+
+/// Standalone `PreToolUse`: the live cap check runs first, exactly as in the
+/// non-standalone path (`Warn`/`Deny` short-circuit with their own verdict);
+/// an `Agent` call gets forge's routing verdict alone (`route::
+/// hook_outcome_for_agent`, run through `merge::merge` on its own so a
+/// malformed embedded policy still fails closed the same way the merged,
+/// non-standalone path does); anything else -- Bash included -- has nothing
+/// native to say under standalone and prints nothing.
+fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
+    let start = Instant::now();
+    let mut input = String::new();
+    std::io::stdin()
+        .read_to_string(&mut input)
+        .context("failed to read hook payload from stdin")?;
+    let parsed: Option<Value> = serde_json::from_str(&input).ok();
+
+    if let Some(payload) = parsed.as_ref() {
+        match crate::cap_enforce::check(payload) {
+            crate::cap_enforce::CapCheck::NoOp => {}
+            crate::cap_enforce::CapCheck::Warn(context_line) => {
+                telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+                return print_cap_verdict("allow", None, Some(&context_line));
+            }
+            crate::cap_enforce::CapCheck::Deny(reason) => {
+                telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+                return print_cap_verdict("deny", Some(&reason), None);
+            }
+        }
+    }
+
+    let tool_name = parsed
+        .as_ref()
+        .and_then(|payload| payload.get("tool_name"))
+        .and_then(Value::as_str);
+    if tool_name == Some("Agent") {
+        let payload = parsed.as_ref().expect("tool_name implies parsed payload");
+        let answer = crate::merge::merge(
+            "PreToolUse",
+            &[crate::route::hook_outcome_for_agent(payload)],
+        );
+        telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+        let mut stdout = std::io::stdout();
+        stdout
+            .write_all(answer.to_string().as_bytes())
+            .context("failed to write the standalone hook verdict to stdout")?;
+        stdout
+            .write_all(b"\n")
+            .context("failed to write the standalone hook verdict to stdout")?;
+        return Ok(0);
+    }
+
+    telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+    Ok(0)
+}
+
+/// Standalone `SubagentStop`: the same narrow rollup the non-standalone path
+/// runs, minus the Python delegation it would otherwise fall through to.
+fn run_subagent_stop_standalone(event: &str) -> Result<u8> {
+    let start = Instant::now();
+    let mut input = String::new();
+    std::io::stdin()
+        .read_to_string(&mut input)
+        .context("failed to read hook payload from stdin")?;
+    crate::subagent_stop::rollup_ending_agent(&input);
+    telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+    Ok(0)
 }
 
 fn run_pre_tool_use(event: &str) -> Result<u8> {
