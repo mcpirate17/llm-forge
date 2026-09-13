@@ -218,6 +218,21 @@ fn parse_one_block(item: &Value, harness_session_ids: &mut BTreeSet<String>) -> 
                 .and_then(Value::as_str)
                 .unwrap_or("")
                 .to_string(),
+            // The calibration step's unit fix: the block's structural JSON
+            // (serialized `input`) plus the tool name, in chars -- the same
+            // unit as every other block type in the proportional split. An
+            // absent `input` contributes 0 rather than counting the four
+            // chars of JSON `null`, which the block never actually sent.
+            char_len: item
+                .get("input")
+                .map(|input| input.to_string().chars().count())
+                .unwrap_or(0)
+                + item
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .chars()
+                    .count(),
         },
         "tool_result" => ContentBlock::ToolResult {
             char_len: tool_result_char_len(
@@ -231,7 +246,23 @@ fn parse_one_block(item: &Value, harness_session_ids: &mut BTreeSet<String>) -> 
                 .to_string(),
         },
         "thinking" => ContentBlock::Thinking,
-        "image" => ContentBlock::Image,
+        // `image.source` is either `{"type":"base64","data":...}` (chars of
+        // the base64 payload -- what the API actually bills) or a URL source
+        // (the payload is fetched server-side and never transits the request
+        // the way bytes do, so it contributes 0, not the URL's length).
+        "image" => ContentBlock::Image {
+            char_len: match item.get("source") {
+                Some(source) if source.get("type").and_then(Value::as_str) == Some("base64") => {
+                    source
+                        .get("data")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .chars()
+                        .count()
+                }
+                _ => 0,
+            },
+        },
         _ => ContentBlock::Other {
             char_len: item.to_string().chars().count(),
         },

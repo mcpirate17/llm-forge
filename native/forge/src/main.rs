@@ -89,6 +89,12 @@ enum LedgerCommand {
     /// compare (or, with `--record`, replace) the baseline receipt (design
     /// step 5).
     Audit(ledger::audit::AuditArgs),
+    /// Calibration harness (design step 3): sample turns for the Python
+    /// shim that measures the byte-proportional split's error bound.
+    Calibrate {
+        #[command(subcommand)]
+        action: ledger::calibrate::CalibrateCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -160,6 +166,17 @@ fn main() -> ExitCode {
                 Err(err) => {
                     eprintln!("forge ledger audit: {err:#}");
                     ExitCode::from(1)
+                }
+            },
+            LedgerCommand::Calibrate { action } => match action {
+                ledger::calibrate::CalibrateCommand::Sample(args) => {
+                    match ledger::calibrate::run_sample(args) {
+                        Ok(code) => ExitCode::from(code as u8),
+                        Err(err) => {
+                            eprintln!("forge ledger calibrate sample: {err:#}");
+                            ExitCode::from(1)
+                        }
+                    }
                 }
             },
         },

@@ -1,0 +1,12 @@
+{
+  "chars_per_token": {
+    "median": 0.771596729265882,
+    "p10": 0.21247460867487156,
+    "p90": 1.058955483646396
+  },
+  "generated_utc": "2026-09-13T11:49:13Z",
+  "model": "claude-opus-5",
+  "n_turns": 45,
+  "per_block_type": null,
+  "whole_input_mape": null
+}

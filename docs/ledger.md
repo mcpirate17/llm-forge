@@ -77,13 +77,19 @@ is left untouched.
 `session_id`, `turn_index`, `turn_uuid`, `timestamp`, `model`,
 `input_tokens`, `output_tokens`, `cache_read_input_tokens`,
 `cache_creation_input_tokens`, `bytes_by_block_type` (the reader's own
-per-turn counts), `estimated_tokens_by_block_type` (this turn's billed
-input tokens redistributed across blocks by byte share, `thinking`
-excluded per section 3), `estimate_method` (always
-`byte_proportional_uncalibrated_cpt4` at this step -- the byte-to-token
-constant used only where a token count must convert back to an
-approximate byte count, e.g. `resend_bytes` below; the ratio split itself
-does not need it).
+per-turn char counts -- every split field is chars since step 3's reader
+fix: `tool_use` counts the serialized `input` JSON plus the tool name,
+`image` counts base64 payload chars with URL sources at 0; `thinking`
+stays the one count-shaped field, excluded from the split per section 3),
+`estimated_tokens_by_block_type` (this turn's billed input tokens
+redistributed across blocks by byte share, `thinking` excluded per
+section 3), `estimate_method` (`byte_proportional_uncalibrated_cpt4`
+while the committed calibration fixture carries no measured bound;
+`byte_proportional_calibrated_<date>` once it does -- see
+`forge ledger calibrate` below), `estimate_error_pct` (the measured
+per-block-type MAPE from that fixture, `null` while uncalibrated: design
+section 3.4's rule is that an estimate never travels without its error
+*or* its named absence).
 
 ### `session_rollup` fields
 
@@ -109,6 +115,121 @@ identity), not a measurement.
 (the reader's own per-hook aggregate, one row per hook name per telemetry
 file). Filed under the day the rollup command ran, not a per-call
 timestamp -- `HookStats` carries none to derive one from.
+
+## `forge ledger calibrate` (step 3)
+
+The rollup's split assumes uniform chars-per-token across block types;
+this step measures how wrong that is and ships the bound beside every
+estimate. Two halves, split along the network boundary:
+
+```
+forge ledger calibrate sample <transcript>... --per-session N --seed S
+uv run python -m conductor.ledger_calibrate <sample.jsonl> <transcript>... \
+    [--model M] [--sleep-ms 200] [--offline] [--out F] [--cache C]
+```
+
+The Rust sampler (`forge ledger calibrate sample`) picks turns
+deterministically -- stratified per *declared* `session_id` (a subagent
+transcript is its own session; the file's name is irrelevant), `min(N,
+population)` turns each, seeded by an xorshift64\* stream keyed on the
+session id so adding a session never reshuffles another's picks. One JSON
+line per turn: `session_id`, `turn_uuid`, `turn_index`,
+`bytes_by_block_type`, `billed_input` (= `input_tokens +
+cache_read_input_tokens + cache_creation_input_tokens`). Shapes only --
+the sampler never emits block text.
+
+The Python shim re-reads each sampled turn's API-visible window (the
+messages since the last compaction marker, marker summary included, up to
+the turn's own line) and either:
+
+- **online**: calls `client.messages.count_tokens` once per block-type
+  group in isolation (tool_use blocks ride an assistant message as in the
+  real transcript; every other group a user message) plus once for the
+  whole input, and reports per-block-type MAPE against the proportional
+  estimate the rollup would produce for the same window. Responses are
+  cached in a job-local JSON keyed by the request payload, so a rerun
+  costs zero calls. Without `ANTHROPIC_API_KEY` and without `--offline`
+  it prints exactly what is missing and exits 2 -- it never fabricates a
+  bound.
+- **offline** (`--offline`): `chars_per_token = window chars / billed
+  input`, median and p10/p90 per session and overall -- the calibration
+  of the rollup's `cpt4` constant -- with no network, no SDK and no key.
+
+The result lands in `native/forge/tests/fixtures/ledger/calibration.json`
+(`{generated_utc, model, n_turns, per_block_type | null,
+whole_input_mape | null, chars_per_token {median, p10, p90}}`), which
+`rollup.rs` embeds at build time (`include_str!`): a measured
+`per_block_type` renames every `turn_attribution` row's
+`estimate_method` to `byte_proportional_calibrated_<date>` and stamps the
+per-block error into `estimate_error_pct`; a `null` one keeps the
+uncalibrated label and a `null` error. A corrupt fixture fails the build
+rather than silently downgrading. Docs and reports quote the bound as
+`± N%` (the MAPE), never a bare figure.
+
+### First real run (this PR, offline debt path)
+
+Inputs are the five top-level design-table session files, one per session
+(a resume file and a subagent transcript are different populations from
+the sessions the design table measured). Exact commands, so the fixture
+reproduces byte-for-byte:
+
+```
+forge ledger calibrate sample \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/206702fb-97d8-444b-97c3-5d12c6eeb6a8.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/3c0c3659-9c0a-43c6-8826-cbba537595f1.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/5e93df87-d437-4c17-adaa-75357a1dc0c5.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/65f84759-e8ac-47fa-a82c-d67624da005d.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/c38ffd05-637b-4717-bf6d-2bf44203793a.jsonl \
+  --per-session 10 --seed 20260913 > /tmp/calibration_sample.jsonl
+
+uv run python -m conductor.ledger_calibrate /tmp/calibration_sample.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/206702fb-97d8-444b-97c3-5d12c6eeb6a8.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/3c0c3659-9c0a-43c6-8826-cbba537595f1.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/5e93df87-d437-4c17-adaa-75357a1dc0c5.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/65f84759-e8ac-47fa-a82c-d67624da005d.jsonl \
+  /home/tim/.claude/projects/-home-tim-Projects-LLM/c38ffd05-637b-4717-bf6d-2bf44203793a.jsonl \
+  --offline \
+  --out native/forge/tests/fixtures/ledger/calibration.json \
+  --cache /tmp/.ledger-calibrate-cache.json
+```
+
+45 turns, 5 sessions (10/session; `c38ffd05` holds only 5 usage-bearing
+turns), billed input 38,701–164,794, **0 API calls** --
+`ANTHROPIC_API_KEY` is not set on this machine, so `per_block_type` ships
+`null` and the bound is recorded as debt, not guessed.
+
+| session | cpt median | p10 | p90 |
+|---|---|---|---|
+| `206702fb…` | 0.871 | 0.416 | 0.957 |
+| `3c0c3659…` | 0.776 | 0.402 | 1.101 |
+| `5e93df87…` | 0.954 | 0.651 | 1.064 |
+| `65f84759…` | 0.663 | 0.320 | 0.900 |
+| `c38ffd05…` | 0.008 | 0.001 | 0.212 |
+| **overall** | **0.772** | **0.212** | **1.059** |
+
+Read the numbers knowing what the window holds: transcripts do not carry
+the system prompt, tool definitions, or attachment records
+(`hook_success` outputs, skill listings, file pastes -- 298 of 730 window
+lines in one sampled `3c0c3659` window, 0.28 of 1.02 MB), yet all of it
+is billed as input. The measured ratio therefore calibrates
+*transcript-chars per billed input token* including that overhead --
+which is exactly the constant the rollup's `cpt4` resend heuristic wants,
+and why the overall median is 0.77 rather than the naive ~4.
+`c38ffd05`'s 0.008 is the same effect at the extreme: 8 message lines
+(11.7K content chars) against 69K billed cache-read tokens of
+non-transcript overhead. These are honest calibration findings, not
+sampler bugs; the per-block-type bound, once measured with a key, rests
+on the same window definition.
+
+### Frozen fixtures this step moved
+
+The reader's unit fix (tool_use and image now counted in chars, above)
+moved three frozen expectations, each regenerated from the binary's real
+output: `expected_transcript_wellformed.json` and
+`expected_transcript_tool_result_mixed.json` (`tool_use` 1→6: `"{}"` +
+`"Bash"`; `image` 1→4: a 4-char base64 payload), and
+`expected_rollup_scenario_dry_run.jsonl` (rows gained
+`"estimate_error_pct":null` ahead of `estimate_method`).
 
 ## `forge ledger landed`
 
