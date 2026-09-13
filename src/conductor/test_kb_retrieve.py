@@ -172,7 +172,7 @@ def test_broker_client_auto_starts_once_after_connection_refused(
 
 def test_load_cards_requires_kb_glob(tmp_path: Path) -> None:
     (tmp_path / "readme.md").write_text("nope", encoding="utf-8")
-    with pytest.raises(kb_retrieve.RetrieveError, match="no kb_"):
+    with pytest.raises(kb_retrieve.RetrieveError, match="no card files"):
         kb_retrieve.load_cards(tmp_path)
 
 
@@ -494,3 +494,34 @@ def test_native_l2_normalize_matches_builtin_sum_reference() -> None:
         norm = math.sqrt(sum(x * x for x in vector))
         expected = [x / norm for x in vector]
         assert kb_retrieve._l2_normalize(vector) == expected
+
+
+def test_default_notes_dir_reads_the_workspace_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nnotes_root = "cards"\n', encoding="utf-8"
+    )
+    (tmp_path / "cards").mkdir()
+    (tmp_path / "cards" / "kb_one.md").write_text("# one\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert kb_retrieve.default_notes_dir() == tmp_path / "cards"
+    assert [card["name"] for card in kb_retrieve.load_cards()] == ["kb_one.md"]
+
+
+def test_default_notes_dir_resolves_research_notes_for_a_host_so_configured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nnotes_root = "research/notes"\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    assert kb_retrieve.default_notes_dir() == tmp_path / "research/notes"
+
+
+def test_default_notes_dir_environment_overrides_the_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CONDUCTOR_NOTES_ROOT", "envnotes")
+    assert kb_retrieve.default_notes_dir() == tmp_path / "envnotes"

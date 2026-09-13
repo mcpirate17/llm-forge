@@ -120,6 +120,11 @@ mutation_receipt_root = "campaigns/receipts"
 # the monorepo's convention changing out from under it, the way the 2026-09-05
 # `master` lag once did.
 integration_branch = "main"
+# The knowledge tree kb_retrieve, memory_index's catalog and the notes guards
+# read (env override: $CONDUCTOR_NOTES_ROOT). The unconfigured default is the
+# monorepo's `research/notes/`, which this repository does not have; this
+# repository's own docs are its knowledge base.
+notes_root = "docs"
 
 # OS prerequisite for conductor.project_context's additive Linux resolver.
 # Informational package metadata: pip/uv do not install system executables.

@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import chain
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
 from conductor._native import (
@@ -38,6 +38,7 @@ from conductor.kb_retrieve import (
     embed_batch,
     embed_text,
 )
+from conductor.project_paths import DEFAULT_NOTES_ROOT, host_root, notes_root
 
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 SOURCES_PATH: Final[Path] = ROOT / "conductor" / "memory_sources.toml"
@@ -89,11 +90,26 @@ def load_catalog(path: Path = SOURCES_PATH) -> dict[str, Any]:
     return payload
 
 
+def _expand_relative(text: str) -> Path:
+    """Resolve a catalog's repo-relative root against the workspace, not the package.
+
+    ``ROOT`` is the package's ``src/`` here, which never held the workspace's
+    ``research/`` tree; the monorepo only worked because its package sat at the
+    root. The notes spelling is the DEFAULT_NOTES_ROOT literal: a host that
+    repointed ``notes_root`` means that tree, so it resolves through the
+    configured path instead of the default location.
+    """
+    workspace = host_root()
+    if PurePosixPath(text) == DEFAULT_NOTES_ROOT:
+        return notes_root(workspace)
+    return (workspace / text).resolve()
+
+
 def _expand_root(entry: dict[str, Any]) -> Path:
     if "absolute_root" in entry:
         return Path(entry["absolute_root"]).expanduser()
     if "root" in entry:
-        return (ROOT / str(entry["root"])).resolve()
+        return _expand_relative(str(entry["root"]))
     raise RetrieveError(f"source {entry.get('id')!r} missing root")
 
 
@@ -101,12 +117,12 @@ def _iter_roots(entry: dict[str, Any]) -> list[Path]:
     if "absolute_root" in entry or "root" in entry:
         roots = [_expand_root(entry)]
     else:
-        roots = [(ROOT / str(r)).resolve() for r in entry.get("roots", [])]
+        roots = [_expand_relative(str(r)) for r in entry.get("roots", [])]
         if "include_dirs" in entry:
             base = (
                 Path(entry["absolute_root"]).expanduser()
                 if "absolute_root" in entry
-                else ROOT
+                else host_root()
             )
             roots = [base / d for d in entry["include_dirs"]]
     return [p for p in roots if p.exists()]

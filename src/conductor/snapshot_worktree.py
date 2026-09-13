@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from conductor.project_paths import DEFAULT_MUTATION_REGISTRY
+from conductor.project_paths import DEFAULT_MUTATION_REGISTRY, notes_relative
 
 SOURCE_SUFFIXES = {
     ".c",
@@ -38,9 +38,13 @@ SOURCE_SUFFIXES = {
 EXCLUDED_PREFIXES = (
     f"{DEFAULT_MUTATION_REGISTRY.parent}/receipts/",
     "research/reports/",
-    "research/notes/",
     "tasks/",
 )
+
+
+def _excluded_prefixes(repo: Path) -> tuple[str, ...]:
+    """Exclusions for one repo: the fixed set plus its configured notes tree."""
+    return (*EXCLUDED_PREFIXES, f"{notes_relative(repo)}/")
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,11 +74,12 @@ def _run(
 def snapshot_untracked_paths(repo: Path) -> list[str]:
     """Return source/config files needed by a snapshot, excluding generated artifacts."""
     output = _run(["git", "ls-files", "--others", "--exclude-standard"], repo).stdout
+    excluded = _excluded_prefixes(repo)
     return sorted(
         path
         for path in output.splitlines()
         if path
-        and not path.startswith(EXCLUDED_PREFIXES)
+        and not path.startswith(excluded)
         and Path(path).suffix.lower() in SOURCE_SUFFIXES
     )
 
