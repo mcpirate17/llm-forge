@@ -1,0 +1,118 @@
+{
+  "adapter_sha256": "a92c6a615a7f3bd0ad5702c3bc5b32fe7f06b7828269b8732127acce300854c2",
+  "attribution": {
+    "attributed_mutants": 25,
+    "baseline_repetitions": 2,
+    "killed_mutants": 25,
+    "ranked_tests": 12,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.955521,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                                             [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m12 passed\u001b[0m\u001b[32m in 0.26s\u001b[0m\u001b[0m\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-routing-gate/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_cost_budget_audit.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "forge-routing-gate_cost_budget_audit_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "ea45fccd07714449833e9fa408e32741b79d510d0ac5f6de8566263b394e9311",
+  "detail": {
+    "blob": "KLUv/QBY7d8AmiaRMzLAaIhmGziKi3WKFimgcq0xJREcSJopl3dfwtaVtAP/rk0K+LtCx7Au+0XMbpuiKIoOBAMDHwMnAw/WVml11bgAlsS0th54b+mtVbkNlxzHEV0547afG5PjzamH5nMNiC01juPtCc52fv3a0X+namsd3do9f6XNbWcPZzxgbXddRVkLAoKhgbXzl+ucih29m7Tyxk6woCGBKqIhAQQRDA/WLiRgZ3B5sbkPG8PaKd7Km7zcGumETZVLah23ffY263pnjq1OJVg+awOLylJsaxLb2BKQ6fMyEphFiVhAAeWAAyicemgP+UFvlcFnrtoqnZTKbdulxklYZdwDrEU/NxZ0PuyiT2gt73yX+1BG2hNOu9+qNTOxUL5zfDTY7KVjHRhAGGDry61dKXObNFxS6aAT2wdll9davDW6xJx6RG6q8VoPbvHSZfWwG5iUs/bBju2Na4JV6UJBAdKqoGA5lSj2O26bcOfvd3OrpnVWnXq5isI+s380qHKrzCKcWtR+pr113kvnIhRCbe04YaScbdPOtuEy++lrwEPz6VRrElPapdaVr46yKj0hn3274ZzBfe8m3OWddZP6dHJNndrtBp2YtbQn+jlz7OPa2I+WWMuBApvQrww8lNFal6xxTvFWuVZdvNbVfngZOwZrFWUxrevLxeY+nPenb+0Zt7Uuzs2pKrOIXUjQ6Wha0ZZfcdwZtDY6r9XPtMogN70qjqG1jI6ybsPld5NuZ++Uz206t52O39gx8iZYcVtwvEWeVLG7eGiwsaOz5i0x36novIlPWWvXpc1t7X9cG71r002sulWxK8daWysxZ7bOMva2jFqbNpruQ3tvTVanaE+079du2+fst9K+ts63m2a/tTf2ddanfNh1rbgtaDdia9XXCRUUKpzRcsqpRYLTbFfOGjiVPMv11/WGrB0V+53BZ7oLJf3elJ6Q2Hb2y7Bexo6V70bsLuXrhBZCaeyyIelEEoTOZ9rcRBIEoRAKYSD/oL+K/cljIO1SQxJkUaDDONCBIuyRLqUha1zT6p2/+oQIA4kSSZbFwkBq9Am7Vj7lM+0ikiwM5Lti2EweSGIYSPYNb63qf1wIBAYYSH3n7zYEQjy1B3NV1RMSSxCtaVVllT1zldYx1pHBqL72J2hYsEDBARAKoVZhf05aTa5p+3R4HZtFmpqm4RKV7jSeqJx23zRiFuaJpOVZWAwYjPapzFfa5yYHEAqhludw5ECGWrrie5yo4bJWuS1dd8ytB6zacXTChssMPm+bWBrXDuuHfkagStocx9Sx9YD14KxdJHzHfTdjb3RiGm+bOGZ06eDnmExXdFTrJlxtzmcG7zYptg9dfpUJdnc1jfeZN8q4nUUgFEJFUcQiP8g0S09S1DQRXu1E/UApxqWJIsY0fBAub4LPax7zMGQuvuADPW+JXvMeqXlRxExTJHV0otQ8qIGcBwHB0OBF0YOwp4FX80AMQc8Vo+Qw7+FHiphoegv0IIeZdtrh63ouCXqYSGogp68maqJFiiAkMUzzkggOGGAg3tGqfu1HEuTBKUBaEQaSPXNIgjQgwPDQgAAGCCoGDggD6W3C7yinFi/XNW3CrQ8NMLnf1/pUHFPTJuYUGyAB21v7n9fy/K7Sqd7kL+/zPjT4Ord93tqwi5NyO7mm0XnbJlyNm+6D9kSDU4vsmduOE259udHmnOJNIvdXl127B2X68qK8zjt/ewFSY9rejZdrQEJznNUNwHP2Adhu0HbMzKnqmC5BO/LUdjuN2/feGkyxtSIsFotlIBRCQbCcYsXWr41J522Vnb+xNa6bcKvcfab9LifnVGNclfemtIM+YYLG1cqq3pDMbQwtpxouFd4TPuESoLkJ6wAU4uJBv8pG0+WdVePdjr3NJk4pfHc9nNfnxm5q23CpSca2ct0Sm+C8ddnyPq71jq5TiWIVLECwD5vKaEBrl6xyYh/8dR+zbsMl/bqWJvk7Wi53k88X7YnlunXMrK6mya9bGwKCoYHi053qLGIX9at80F+ppBPra6PzRpvb2diflgRvllOKsl9dcoN3fuVsvx9bHZNOb6em03bv6CpAsHRu+9TgZrUptrxdO4Z9bdKUN6Erw22Ulw96H89trUTKmVOd/TZcxk6DLhVrMUQwJKgYODQ4KFjQAMFwQMXAwdqF5cBAAQREwwMCDQGQoWV5OLogxmmiRlpitESpo+hFZZqch5kipqqWiRvji7meyEAYPe81U7Qwlbc3hjJ2ndmvomzsayudVSZkUGaOTSw6KW044OtEYCn2odWGqFKBzk0axfLW78ZDWzq9owy70CRjM27W6Gb26z3R63IfvJomFwkNl9ElBqd2Kf3c4Id8xcSk3CZ3/vR12j1D01hRNqGpVW47tivD3d1VlCSpB7i1fU7gtM5cdtV6E8oTO+FtRTBg8FA9NCCQoGGBtQyf8jtt1qYbuenuvmw8ZS6hPjjuezfYshQsrtO0SSuJOTNLMd0Z7svYG/tfbtuE3q1D7ygnHlBqkztg9XOj8o4yGN1Ugk7H9oTUtrNPErrpbz9HGZ3hxt7OXrGW9XRyD9qyIvfDQwOFTR7Q+1mrj4RBztIwDnZh2AJN0UtYSBa+m73JB/2bdEcjFqqm3XMMN9ldhXd0IWHRgdEy8TQ9rDjvkZ5JiZyLeSDUNNGDMCZqIChaoOXpK0pYtyNdiiQ9kfJIMGqYy2m+Yoyc5j3QixYEsKA475qkXiIoalrxhqyVq9gdMwvzIqbKa4meBoomaGmFm5XPKilz2/OeyYkaCXoS2qfDz6nYn+7wgz0ONkkTT4pP+TL6hFU/N9qbJ5Je1DD1wVF5zvRMDDGOJDkOM0+zOBH0IEABAh4WgFCUqXnwgTBmai5pmhZHgpboeaQmPpf0rkiCUyNBT4Ke5nmeqIr9sLkHXXX2VY2a7K6qqirvaNS8qXEc6Gmex6d8ruGDXq/NMay9Ca1d/B3sB93ZNxatWDop7bWurlrLtWmnScaSqnVYw6Vzb9nPS/npiqa1Y1mxb18+6ARtZo5EoSiT9gJ8ukOtDSflNva35mC6m2haZxAR80CMRb1c0HMx856ncSDJiSYGYpgnRc/URA4jRcyLJumBGOZBMFquiXkaqZsnTY7TSAoBeBwvZpqwuEiSws0Kyu8te0nZkRqnid6TnKq2BG+tNVzWnz69+u6KWmdVrcxVVVaUdvxaeWeO6rsZv1bzKwnIV1U1jbHKO05YvXzQFT/HanrtKplWPmsDlcSsqpxeZS8dVQwRIjiI4EDTpETVnQKkd0jylqo3+d7RjtORxMGCLAwwqvi4XG4zIkmFJAzEAQQEQ4MVwDKQhkuNYa0ShIEkyJtYLBouv/Yrm6YhDMSnrLQnKt46gxVJHDR1yRGQ5k0LxCxM9bWxSlGQrCEzhIE8XmoM5Uv64BZ1Qj5kyPSdyk4BTZEkQuLgJclLlupxVZW2pkkJJHHAAAOpSBIhYiANCDw0KJAABA4MCRwWSNDwUC1gcGCgIMKhIcJBQUMEQwIFCRwYEFQNEQ0LGhIgycNAGh4YIEAgMJAKJSZrZQ0iCcNA6jfXtEIS5KV3DShf+x8cwkBoP8eREQgMxIGzPH4arJEmdhiGQaiqcslbVSHULixsVfXGXlWOxMTl9WuaKGEM8x6Iec/l/vSHiRMTLc8DpcdhGELXwnTjXE5c3nMenCQIwiaCD0QDxAIRDBEQ1QEYrMtNUHw3FovJXR70mmi64ruYKD1GchZ4NRFDZ1kYhmGaBzLOww8Tn/Te0rmLFC1PYhbm9bQo0WsgBoIQxEQHixfk8BM90XOe5TFP9JrmcaIHpQdy3mOHsWdZ3qI2KDMdQRHDRMuETW+J3uRI2GsmLIrSa5QJepC0vIkXqJkeFEFIahIQyikKoRTZS0eN3ovFT/9uTtBjpgaLjEm9RNLynvccpoEi6bokR4qkqDDSExkIXc3SwOdF71leQgIRDA2WznV5KVRtzl8oNno3sd3py3geBnsuSOLlQS82y4Pe5DQP8xoGYpa3MG9Z3tMsz8QwDvMcSZom15RZ4uVEUvQwrHuy+iV1KIqlYCmKtfWA5ZK3Be/XroFNvDmOs3W0nHg6uZ+u8O7hQd976wFLgWkYJ75+sKYn6GJJap7TVJYaV49LwW1drCAsIwKFIDEXJGbDNN3ddIzOs0hPtDhT9KZnf/r0mOWKkhOvqImKAzVRNEnwQSdEgA8SFJykXxcItYyECBCmb0QobJvHTNIzTUzDXM3sqNUkNcsjNZEURYCAUJsg1DIQCqEgLCBUhG5wrb1BWAa2IDGTBgUYHKoGCIYEGiz0xs7CQMyXE1uSMKlxJihaHEeaHp3RuVkYCGMkB4sOFE0MtzbntUxNNDlLP8/TjvQ0khNNzXvewgIAFuc5kvSWqR/lmaTIkZxGYppdWFgwCzM1HIW9qGMImhwFGTIGIWhkZqRN0gHzEkhAODQWFc6mopH5E4AAyebhUCQQCoVBkSwHUgjEQAyCIAiDGEIIERBkGXIOXgcXQjU9xNGC1GqHh0BGSlU+n1TFSM6CveMb/dmpjn2xqnBE90qQjS4l9dOq9IZWhrGTvpJ60cHZkILscazoXFvD85TSfn9VvFHBqFl58TaREWqPb8FVqb2sw3RALn+05O8Bbq8njsjU3u3kxFx+zICop7qoe+vBwL5KPWOmcj5aPr2zJgvzwiChH/SqCG33wgMg7UIYtb5poalCanDoFQvLUJCiCZkNXVaxh+4K8Fj9CR4shcSFzW69xIUyL4Zgzhk0xf8BVll8cH2gD10oZFWahsqPTFMkjU+JXqxUBpGX89lFYgqsqcGNKoN7m9b3BWdwQzuRQI0oTtEGYTLFKkRAAKBeC3AYFgQpr1EmXezqjzykTjBcHqsAbvbdWGqjbRFjLFEUOroOm5BhuSsneCDp0WUOuUoaZm0K0hWV1gmDUUCdubcDVl/PwlVEQ4KIYo1/splwm2VazEqoj0HCxFIICk5/mWnwZgEiodTlqhWD5FacTbfyrds4c+YJzhV5RCoJFR3uhAfMv4M4EZLzKzLRLRhAkyNIO3eH+/0elxxzo9pFroXO1WTTjki4+fBBJMSAA55UCgSgWXnI2bgEmgK9/SHYgRk+vg8nM/GcxSrOl2XyGB+guD4+OdUCYaCWLroXyeJEPc5F80fT6jfnj2XsGB+FG+rhpHzPLq3o8fCbxAGRVkJa3OLH4r9iiHQ0kTNIi41uSacTILMbtI3XWeBViBLFEyQk2jrwbqQaa+QDYjg1LY8Y6OBTPOQNj5iaq6S5rWtyJdAkhxfphLZsXDFgdMZCuu07M0Tg6igZppEvGpsa5Unwxvw2ekNheBmA0LxchK4vYEyHvTOkP5BDpUZw/j5zSAzSeulvSETjMnBZrMqs/p+7wCEaNGKlwPfVKbK9ZVheM6gU9qCG4KLIpXGlURC+gxkHoFREk14VHNRB4auHImZQl93eqYBi6cSQnCoHWwCPhZERaYVsEqxyU7shJIiOcCtEuYrVbdkIWwFuQTGyVu7aZquVdCmz7LBHbRkMQu7H2D24omHMjcdqqVlQAbCOSJLAisJMj81Czi52TwF7hQlw+OfhgnCnEMX0AScbu/ZrRPhcMbjGj66LaDEW0UcddTG5qme1UIcWKlc/tjTnkEVuWC7aTPrxOxFFo+WY/OZGcqdeDWqJcsLBoRmyqT47as0+a0CURUknLZ5t6L2dz4pv7NcAxVg3qo1XGIFWAw7KrsZ+ZtowCgXIb9qTP5D8bGW/6nB81VGHHav05FxpPp4prug+RCi0yERD2fSWJgLsXNAyx4oOUBrIcAYSZ92rgAUJhzPV4zDCZrc12tJ4b+Pax4XGDbyAeHxZO8WvOGLpOH2wkauWQGPk2feup4kqujb7AeeR4s6YtV1DCcswEvw2dgDMDWyEZ6HBOBYdHXEPwI4gAql4C5J5pJzpPCmg0AxhI+qeUpP6tnJ1ZwM5AeKWgNt30MP0eAF4TC7YGQOkiIKIepSl/o7ZBCMXFwMpaG2BoiHspCyMvRSkyCsD45KEzdgDkYaE6a3zaFZZFJUZeBPuGqzhce4YDGb8amRo+nBuRrvJt4crlTNXgVFVrEUNnYDxY8cEeWuZtWOaBTSyWfiKNCpg+9qH5CfABHn+dGcbwqGJL0deTweByJnI31KnvysPAqiirfqJ16lnR6y3oj6ARGENKtHO7sLK+Df3BKsvTCVyt/yQmcNs8Yo3ZsgWi0EICwM+i9aB5pG3c2uVYvXbJRmLyAEaJri0tMEl0PpiHkQp9FbqH1yOjt+ojOAzlE+JNBQGyk14OMEFLqgnKDPrdkU1/1OlIMXdPrmod13VtfnKzcKiCnmsXOOtFy3ZGoaL8VhYE2KhwDfugqXvq50sIDnevor2UniHes6Y70GFsSStj5InNpftBsTpJuomJatSUPexkdSrpzIaKm537fw5a5jgyTAP8WCSJmyidWCbMWz60D2m0bYQj7To8HZsnsLCOsQ7FCKL0eTlhvSN/4iNtyCS+GCRmp0W2AoX8qvwF7g5tbmvj0PrsDTzNoaDFAe+lOzfJNumEZ73l2M8fwqvOtr7KuWkO1+Urpl/1tjJHPNamSHKnBJb0UGGectUE8bUbW40yXRXrYvcTinpgzNbEZA1tkXC0DnzTJL68Eid6WaHImXKxRFxO2LFvvfT7QzGaHO97M1EVWQ1d4C7jYV/k3SEMigtuL+5d0uB3ndSJjyi3w0f+QGl3PM1kJRSpl4w/6N9syaKGVfetldk3B5P6HfLj29x1MNyzpPJrib4SR8KdwAU+jePihYb8wcUHzc4E3VJGLvgn40LkVBpsrjEKrdSwJjlzGwyYawi4VJMrp80SnJa8C4g1pNVVMk1uUFHdQ5EyeI+Bgmymeq2mZAWWWpTL9e1GjT7ItURISw8FMHQQG5M+1ML1lxuBtivDJEFH5wFCP7xdMbv9WsuUC8aTM5nEgWcbU/jgIC1Wv3y9BkqkO8902Vo4WMXwwdfBelQtX6fnn4jOJWPj6n8smi+UL2E2ynaYWHWRbyni4hFxEAHA6OVjKYJgPrfOWdAhmMgQK1BRE3mrogdG+Wg7n9WcD7B51yOng0p/18Gn2LOgbBNycOcg7vgRR+kWUHoMj9D1IMKOTIKbFV8hjVWhhBPVZ2yfuZ7lDRomYbsJ5LApWdLh7DQujhlJQCNWXD1nOXmfKuCc4nOlo+E8IMWQtdHFviMkyMH0T1SaFnAoYmQAVfWezGPKnYKsBVxyfNiGkyv3lvXd7jArmg0SMgkImk2zc9EbiQ4MLQ6eA3aiub99GmZwHBNjOsrQFpiq54kCxPl2CCU53g8g6bqEZ8nQ5Nm6SKrKzEdaBMQsLvbg7i6mjvzn9B5iwVTCoJ6Bw6A2/WSq2/0szJ8wHPkDiyBmhL/C4xSm8b8bJEEmsSErwzU9PhcOHQvJI8vMOoDCiw6V7uSoK/2TXduAOUWeOcaEqypqsCOwRw8fgi07wufzX0ARS3c2RjZoWUDgEhkALT+f9YDVgog/MJtagjYDvo7HgEByzAVa0C3A+XyShWZgI/wNbkQIIkGYDQTgB73AACTsGAEI+jnQVH/1rP1jJWHC78263gzf/3ZUhB0L5vMN+SDFKoh1CUGKD/72ZpPNeBgGB/kllLFgUt60ePFAwUfqIPMjpGYSBrjr7SPTquFOO49lpOGhkub7e+DXx8lEYDxANNUPF6LggoelUFv9DNQsqPR5CzM9fINvuI1pp4tTO4ATv3jG9MK5J2zKa6SCJtsQZQv+JtH677UJl0gwesL/tsBRrALen4OdGuW9Zmy6Byqj14QX3Qv/i23lMz3dwc6nZxhU6qrBVCDmgzWlfYwaLIDkH03f7vH3nksNbBTG7RB7NIfvJwJypOjdJtZ/R7bzqtOfC/bJKhPA++5eFecHTn5zah3JCMpHa7BlOoVTsSGhgI6aHQNtYDinkSAB5EJsh7l/7GFA0ebx4LbJFOpYUegP0Tu5u2FpDgVvzWQuUTwtcfkmD+vaeJ4rU8MMWNgTgk3NPPzfBcjNDhHq04IfHMy6q3GkfTQHpAs6x1LXZT8wdP+GMwNhLdSzpNUlFc/uCUUpnbI8QMLaWCP5zuJcJBwMWdGT+5hHMyZ/vg+BN/EjlgOD6CJLK6YQqDxMCszFZDS0pQd41BiT1cg+gZS6iPyTYPqSN+BE48yz8STlrhuNIXLSSNWdrxVa0LyRJPQVjFNqSxN8EDC2woJdD1otHwlybHbSwRjaqA99WMMWGd5fDTJVatM6YsMrC3yKUXEJ9VvLSexzAyPeCOkUqRJsLdLjveEy+ISaZGh8HCc7U4fBWlG8KsMxDlOxCZfsCD2i0OArGh/e9ZvYuQppOxjDQ8w0Fi0tgseLhWPM4Mn4RN4ow61LKgXTlWgjWC3h5ALAHkPpJ7UYfde8AFW+Ke86O3bUcBN/JMuWWP+fDzahAs7fmAXxkptAnEzgDXETkqURY+VX0sxhuA2OlzNqK4jK0M7cHji8vIcRZ0zq6QEM8GSDh7FcoBh0wZMtn8EUjj/79LFDFqa4gtD8b7mHyIDaoX/1I3Xq/fHQE7A3qGztPsWALDJ3p658qCxIKQknuY1pWBXGAp4NyIcdXUw7tYE+g+kvIAXZAzW1lo05GETE3Z+tJs9n3+KiQx5VOaiRchhLAwgAuektkoHYk+W8dBLEZm2mShLVBCkv6RgCgZeA4MqDQ8oh0ijYn6ICxXPyla5wJOd6UxPcO6eiF6EHsmZqJWz/yj4aiUveTHpzFoXkQqGU2/jXiSPPEZb8wCJxq1SP1wSLp0xoy4Bym1nCcCN02HDLMdOXHFfqyLB8DCk5ZoaVSxBNtZ8gWY3MQOEyya9QCFEIjj8ICHxgEiWhJPQTwAnAGu6zp+TM+eruPMFbEF40IWCDSbAYrRVlotnSCB4lm90FjnG2UUgjljuxoWC4tgsU1fJ5qp192iUc9kIiSUEal+oKGsi4g1s8UBzcmzqJAK6+FeeKWfu3gbhnOnXRvHsYWqGMbF6I01betFUXi2tyWiTyP1TbYjLEcuVvXBC3YrMjYK6VDjhvz0laPyzUFMX0UGyCKdTA+RBFlB6pQlonYkWvBTKkiFauGt0VxUx1xnp88CsW3oWvAREF2L05KKS5GnQIHAgyh5Yo3dznUDWCcnBfYNmG+P1TCmSI7TcAuGnaCK2jT8YhdhmwoE5Qek5vVpUIkhp8QPqf7+qiU5XpURJKh6MeEyXUdUSpyCHuIm4HTFeF8QgrkxGE+Dx0kGqOBDcPElwNOLiQv5B/KvijFqeFYO0304VAUxnUza03+wTQUOF2Z4qys8IoERtix2gnuQyLog7QQUyRrJI6mZS1QwjCvBswdqBMVlEzBxFHJwo/wWa0lMAG+jM/cw/EOUQQChChPjk5TegGFYroY8IaOLjqOuBbNF4KICx0mNhuIuLpda5BUEpjgSkvKRlYPCOj655bcDCb4qzxRX68NLYkbHYR3yA3W7LAAK6XG5rO+Szhgh1ukBSAjQzkOxcPClSyrRwNJxfwBLVAFOBIScQSbJAuFW3cSEKQR19UWQUy2L5XBdFOR1dWBhkdA==",
+    "encoding": "zstd+base64"
+  },
+  "engine_result": {
+    "duration_seconds": 19.357076,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "   \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-zquhhdod/worktree/src/conductor/cost_budget_audit.py\",\n        \"line\": 281,\n        \"column\": 12,\n        \"byte_offset\": 11218,\n        \"byte_length\": 48,\n        \"original_text\": \"0 if payload.get(\\\"status\\\") in OK_STATUSES else 1\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-zquhhdod/worktree/src/conductor/cost_budget_audit.py\",\n        \"line\": 281,\n        \"column\": 12,\n        \"byte_offset\": 11218,\n        \"byte_length\": 1,\n        \"original_text\": \"0\",\n        \"mutated_text\": \"1\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-zquhhdod/worktree/src/conductor/cost_budget_audit.py\",\n        \"line\": 281,\n        \"column\": 29,\n        \"byte_offset\": 11235,\n        \"byte_length\": 8,\n        \"original_text\": \"\\\"status\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-zquhhdod/worktree/src/conductor/cost_budget_audit.py\",\n        \"line\": 281,\n        \"column\": 39,\n        \"byte_offset\": 11245,\n        \"byte_length\": 2,\n        \"original_text\": \"in\",\n        \"mutated_text\": \"not in\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-zquhhdod/worktree/src/conductor/cost_budget_audit.py\",\n        \"line\": 281,\n        \"column\": 59,\n        \"byte_offset\": 11265,\n        \"byte_length\": 1,\n        \"original_text\": \"1\",\n        \"mutated_text\": \"0\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-zquhhdod/worktree/src/conductor/cost_budget_audit.py\",\n        \"line\": 284,\n        \"column\": 4,\n        \"byte_offset\": 11272,\n        \"byte_length\": 22,\n        \"original_text\": \"__name__ == \\\"__main__\\\"\",\n        \"mutated_text\": \"not (__name__ == \\\"__main__\\\")\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-zquhhdod/worktree/src/conductor/cost_budget_audit.py\",\n        \"line\": 284,\n        \"column\": 13,\n        \"byte_offset\": 11281,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-zquhhdod/worktree/src/conductor/cost_budget_audit.py\",\n        \"line\": 284,\n        \"column\": 16,\n        \"byte_offset\": 11284,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"__main__\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 19,\n    \"nanos\": 350878398\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 25,
+    "mutants_generated": 77,
+    "mutants_tested": 26,
+    "no_coverage": 51,
+    "survived": 1,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T20:07:51.593491+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-routing-gate/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/forge-routing-gate_cost_budget_audit_fest_20260913.json",
+  "manifest_sha256": "dad4ea408efb7ea564cad6f991374e54284cce90fc34f61eb9c95d60f7c25a6f",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 60,
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.9615384615384616,
+  "new_survivors": [],
+  "no_coverage": 51,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 25,
+    "NO_COVERAGE": 51,
+    "SURVIVED": 1,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/.iterations/forge-routing-gate_cost_budget_audit_fest_20260913_20260913T200751Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "8547341a8ab0448e586620da3adbdced0c6add1444645d79cc7cc73d9e1a3173",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fbaf4781cb73027fb336508b3fc8ec082497ced9edb6a3344e09fb40f58f37ad",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "699ab1e78eccea669c833105b32982e8fc15f53f13fa404d20e55246a0ce5488",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "98412200e5a9b7ed93e5c2b14a70f73bab207e2e49ce8441863c7c6136336b30"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/cost_budget_audit.py": "f3e9ce585bd8a901a94a5df81d40231040b7ac6a715b20fd42870fcfd76903e7"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "constant_replace-98b392f65c77-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_cost_budget_audit.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_cost_budget_audit.py": "598fee19ff01fde1e100dfa107969bc225e9ca05ead4a6841028ab274e8f9774"
+  },
+  "timed_out": 0,
+  "unviable": 0
+}
