@@ -50,6 +50,7 @@ def _config(tmp_path: Path) -> cost_ledger.LedgerConfig:
         repo_path=tmp_path / "repo",
         project=transcripts.name,
         transcripts_dir=transcripts,
+        baseline=tmp_path / "repo" / "ledger" / "cost_budget_baseline.json",
     )
 
 
@@ -121,6 +122,7 @@ def test_rollup_defaults_refuse_a_missing_transcript_directory(
         repo_path=tmp_path / "repo",
         project="-nowhere",
         transcripts_dir=tmp_path / "nowhere",
+        baseline=tmp_path / "repo" / "ledger" / "cost_budget_baseline.json",
     )
     monkeypatch.setattr(cost_ledger, "resolve_config", lambda **kwargs: config)
     assert cost_ledger.main(["rollup"]) == 2
@@ -157,6 +159,10 @@ def test_report_prints_one_line_per_metric_with_status(
     script = fake_forge.parent / "stub-forge.sh"
     script.write_text(
         "#!/bin/sh\n"
+        '# forge ledger audit refuses to run without --baseline; so must the\n'
+        '# stub, or this test cannot see the shim forgetting to pass one.\n'
+        'case " $* " in *" --baseline "*) ;; *) echo "--baseline required" >&2;'
+        " exit 2 ;; esac\n"
         f"printf '{json.dumps(payload)}\\n'\n",
         encoding="utf-8",
     )
@@ -175,6 +181,23 @@ def test_report_prints_one_line_per_metric_with_status(
         "resend_bytes_per_session" in line and "RATCHET_HELD" in line
         for line in lines
     ), lines
+
+
+def test_report_with_unparseable_audit_output_is_a_clean_exit_2(
+    fake_forge: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    script = fake_forge.parent / "stub-forge.sh"
+    script.write_text(
+        '#!/bin/sh\necho "not json" >&2\nexit 2\n', encoding="utf-8"
+    )
+    script.chmod(stat.S_IRWXU)
+    config = _config(tmp_path)
+    monkeypatch.setattr(cost_ledger, "resolve_config", lambda **kwargs: config)
+    assert cost_ledger.main(["report"]) == 2
+    assert "cost_ledger:" in capsys.readouterr().err
 
 
 def test_report_propagates_the_hard_empty_window(

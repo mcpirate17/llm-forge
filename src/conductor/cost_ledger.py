@@ -35,6 +35,7 @@ from conductor.cost_budget_audit import (
     OK_STATUSES,
     AuditResult,
 )
+from conductor import cost_budget_audit
 from conductor.project_init import resolve_forge_binary
 from conductor.project_paths import host_root
 
@@ -61,6 +62,7 @@ class LedgerConfig(BaseModel):
     repo_path: Path
     project: str
     transcripts_dir: Path
+    baseline: Path
 
 
 def munged_project_name(repo_path: Path) -> str:
@@ -105,6 +107,7 @@ def resolve_config(
         repo_path=repo,
         project=Path(transcripts).name,
         transcripts_dir=Path(transcripts),
+        baseline=cost_budget_audit.default_baseline_path(repo),
     )
 
 
@@ -138,7 +141,7 @@ def run_report(
     about whether the same window passes.
     """
 
-    command = [str(forge_binary), "ledger", "audit"]
+    command = [str(forge_binary), "ledger", "audit", "--baseline", str(config.baseline)]
     if config.ledger_root is not None:
         command += ["--ledger-root", str(config.ledger_root)]
     completed = subprocess.run(
@@ -244,9 +247,15 @@ def main(argv: list[str] | None = None) -> int:
             ledger_root=parsed.ledger_root,
             transcripts_dir=parsed.transcripts,
         )
-        return run_report(
-            forge_binary=forge_binary, config=config, window_days=parsed.window_days
-        )
+        try:
+            return run_report(
+                forge_binary=forge_binary,
+                config=config,
+                window_days=parsed.window_days,
+            )
+        except CostLedgerError as exc:
+            print(f"cost_ledger: {exc}", file=sys.stderr)
+            return 2
 
     command: list[str] = [str(forge_binary), "ledger"]
     if parsed.subcommand == "record":
