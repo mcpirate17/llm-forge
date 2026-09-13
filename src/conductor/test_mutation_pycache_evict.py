@@ -201,6 +201,31 @@ def test_the_fail_closed_deletion_refuses_the_four_forbidden_places(
     assert not forbidden.exists()
 
 
+def test_the_fail_closed_deletion_refuses_the_working_directory_itself(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """cwd is the one forbidden place the four-places test cannot plant on.
+
+    That test chdirs into a workdir to make a parent-of-cwd case; the cwd
+    itself is refused before any contents check, so a planted scratch at
+    exactly the process cwd must raise and survive whole. This is the
+    deletion's cheapest catastrophic failure -- without this refusal the
+    `parent of cwd` rule is one `resolve()` short of deleting the checkout
+    the run is happening in.
+    """
+
+    scratch = tmp_path / "here"
+    scratch.mkdir()
+    (scratch / "pycache").mkdir()
+    (scratch / eviction._RUN_MARKER).write_text("", encoding="utf-8")
+    monkeypatch.chdir(scratch)
+
+    with pytest.raises(RuntimeError, match="is the working directory itself"):
+        eviction._fail_closed_delete(str(scratch))
+
+    assert scratch.is_dir() and (scratch / "pycache").is_dir()
+
+
 def test_the_deletion_marker_literal_matches_the_one_the_launcher_writes() -> None:
     """Two literals, one name: the launcher writes it, the plugin demands it.
 
