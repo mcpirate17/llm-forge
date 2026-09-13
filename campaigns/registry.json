@@ -119,6 +119,9 @@
     },
     {
       "manifest": "campaigns/conductor-67_post_tool_quiet_fest_20260913.json"
+    },
+    {
+      "manifest": "campaigns/forge-tool-output-quiet_bash_quiet_fest_20260913.json"
     }
   ],
   "enforcement": "changed_tests",
