@@ -1,6 +1,6 @@
 //! Native orchestration for Conductor mutation evidence.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
 use pyo3::exceptions::PyValueError;
@@ -10,11 +10,11 @@ use serde_json::{json, Value};
 
 use crate::mutation_manifest::{
     lexical_absolute, load_campaigns, load_registry_manifest_paths, python_str_or_empty,
-    read_json_object, safe_relative, string_list, CampaignContract,
+    read_json_object, safe_relative, string_list, BrokenCampaign, CampaignContract,
 };
 use crate::mutation_receipt::{
-    campaign_scope_error, load_receipts, receipt_errors, AnchorConfig, Receipt, RunnerState,
-    ValidationContext,
+    campaign_scope_error, load_receipts, receipt_errors, AnchorConfig, Receipt, RejectionKind,
+    RunnerState, ValidationContext,
 };
 
 #[derive(Debug, Deserialize)]
@@ -86,6 +86,119 @@ pub fn plan_mutation_evidence_native(request_json: &str) -> PyResult<String> {
     .map_err(|error| value_error(error.to_string()))
 }
 
+/// One test path's verdict: the best receipt that validates as evidence, or a
+/// missing row naming every rejection with the kind produced where it arose.
+/// Counts are bumped as rejections are observed -- not only on paths that end
+/// up missing -- so a decode failure on a sibling receipt registers even when
+/// another receipt covers the path.
+fn evaluate_test_path<'a>(
+    test_path: &str,
+    campaigns: &'a [CampaignContract],
+    receipt_index: &HashMap<&str, Vec<&'a Receipt>>,
+    context: &ValidationContext<'_>,
+    broken: &[BrokenCampaign],
+    counts: &mut BTreeMap<String, usize>,
+) -> (Option<Value>, Option<Value>) {
+    let matching: Vec<&CampaignContract> = campaigns
+        .iter()
+        .filter(|campaign| campaign.covers_test(test_path))
+        .collect();
+    let mut candidates: Vec<(String, String, &CampaignContract, &Receipt)> = Vec::new();
+    let mut rejections: Vec<Value> = Vec::new();
+    for campaign in &matching {
+        if let Some(error) = campaign_scope_error(campaign, test_path) {
+            *counts
+                .entry(RejectionKind::ScopeError.as_str().to_owned())
+                .or_insert(0) += 1;
+            rejections.push(json!({
+                "receipt": campaign.campaign_id,
+                "kind": RejectionKind::ScopeError.as_str(),
+                "detail": error,
+            }));
+            continue;
+        }
+        for receipt in receipt_index
+            .get(campaign.campaign_id.as_str())
+            .into_iter()
+            .flatten()
+        {
+            let errors = receipt_errors(receipt, campaign, context);
+            if errors.is_empty() {
+                candidates.push((
+                    python_str_or_empty(receipt.value.get("generated_at")),
+                    receipt.name.clone(),
+                    campaign,
+                    receipt,
+                ));
+            } else {
+                for error in errors {
+                    *counts.entry(error.kind.as_str().to_owned()).or_insert(0) += 1;
+                    rejections.push(json!({
+                        "receipt": receipt.name,
+                        "kind": error.kind.as_str(),
+                        "detail": error.detail,
+                    }));
+                }
+            }
+        }
+    }
+    candidates.sort_by(|left, right| {
+        (left.0.as_str(), left.1.as_str()).cmp(&(right.0.as_str(), right.1.as_str()))
+    });
+    if let Some((_, _, campaign, receipt)) = candidates.last() {
+        return (
+            Some(json!({
+                "path": test_path,
+                "campaign_id": campaign.campaign_id,
+                "receipt": receipt.relative,
+                "scope": campaign.test_scopes.get(test_path).cloned().unwrap_or(Value::Null),
+            })),
+            None,
+        );
+    }
+    // Only surface unloadable manifests when nothing ranked this path at all: one of
+    // them may be the campaign that was meant to cover it. When a campaign did match,
+    // the receipt errors are the real reason and broken siblings are noise.
+    if matching.is_empty() {
+        for entry in broken {
+            *counts
+                .entry(RejectionKind::ManifestLoadError.as_str().to_owned())
+                .or_insert(0) += 1;
+            rejections.push(json!({
+                "receipt": entry.manifest,
+                "kind": RejectionKind::ManifestLoadError.as_str(),
+                "detail": format!(
+                    "{} (registered campaign failed to load): {}",
+                    entry.manifest, entry.error
+                ),
+            }));
+        }
+    }
+    let reason_kind = if matching.is_empty() {
+        RejectionKind::NoCampaign
+    } else {
+        RejectionKind::NotPass
+    };
+    *counts.entry(reason_kind.as_str().to_owned()).or_insert(0) += 1;
+    (
+        None,
+        Some(json!({
+            "path": test_path,
+            "reason": if matching.is_empty() {
+                "no registered campaign ranks this test file"
+            } else {
+                "no current complete PASS receipt"
+            },
+            "reason_kind": reason_kind.as_str(),
+            "campaigns": matching
+                .iter()
+                .map(|campaign| campaign.campaign_id.clone())
+                .collect::<Vec<_>>(),
+            "receipt_rejections": rejections,
+        })),
+    )
+}
+
 #[pyfunction]
 pub fn verify_mutation_evidence_native(py: Python<'_>, request_json: &str) -> PyResult<String> {
     let request: VerificationRequest = parse_json(request_json, "verification request")?;
@@ -125,77 +238,38 @@ pub fn verify_mutation_evidence_native(py: Python<'_>, request_json: &str) -> Py
     let normalized = candidate_paths;
     let mut evidence = Vec::new();
     let mut missing = Vec::new();
+    let mut rejection_counts: BTreeMap<String, usize> = BTreeMap::new();
     for test_path in &normalized {
-        let matching: Vec<&CampaignContract> = campaigns
-            .iter()
-            .filter(|campaign| campaign.covers_test(test_path))
-            .collect();
-        let mut candidates: Vec<(String, String, &CampaignContract, &Receipt)> = Vec::new();
-        let mut rejection_reasons = Vec::new();
-        for campaign in &matching {
-            if let Some(error) = campaign_scope_error(campaign, test_path) {
-                rejection_reasons.push(format!("{}: {error}", campaign.campaign_id));
-                continue;
-            }
-            for receipt in receipt_index
-                .get(campaign.campaign_id.as_str())
-                .into_iter()
-                .flatten()
-            {
-                let errors = receipt_errors(receipt, campaign, &context);
-                if errors.is_empty() {
-                    candidates.push((
-                        python_str_or_empty(receipt.value.get("generated_at")),
-                        receipt.name.clone(),
-                        campaign,
-                        receipt,
-                    ));
-                } else {
-                    rejection_reasons.push(format!("{}: {}", receipt.name, errors.join(", ")));
-                }
-            }
+        match evaluate_test_path(
+            test_path,
+            &campaigns,
+            &receipt_index,
+            &context,
+            &broken,
+            &mut rejection_counts,
+        ) {
+            (Some(row), None) => evidence.push(row),
+            (None, Some(row)) => missing.push(row),
+            _ => unreachable!("every test path yields evidence or a missing row"),
         }
-        candidates.sort_by(|left, right| {
-            (left.0.as_str(), left.1.as_str()).cmp(&(right.0.as_str(), right.1.as_str()))
-        });
-        if let Some((_, _, campaign, receipt)) = candidates.last() {
-            evidence.push(json!({
-                "path": test_path,
-                "campaign_id": campaign.campaign_id,
-                "receipt": receipt.relative,
-                "scope": campaign.test_scopes.get(test_path).cloned().unwrap_or(Value::Null),
-            }));
-        } else {
-            // Only surface unloadable manifests when nothing ranked this path at all: one of
-            // them may be the campaign that was meant to cover it. When a campaign did match,
-            // the receipt errors are the real reason and broken siblings are noise.
-            if matching.is_empty() {
-                for entry in &broken {
-                    rejection_reasons.push(format!(
-                        "{} (registered campaign failed to load): {}",
-                        entry.manifest, entry.error
-                    ));
-                }
-            }
-            missing.push(json!({
-                "path": test_path,
-                "reason": if matching.is_empty() {
-                    "no registered campaign ranks this test file"
-                } else {
-                    "no current complete PASS receipt"
-                },
-                "receipt_rejections": rejection_reasons,
-            }));
-        }
+    }
+    // A receipt the loader could not parse at all belongs to the same defect
+    // class as one whose detail does not decode. Zero stays absent: a kind is
+    // listed only when it happened, so presence stays signal for the caller.
+    if !malformed.is_empty() {
+        *rejection_counts
+            .entry(RejectionKind::DecodeError.as_str().to_owned())
+            .or_insert(0) += malformed.len();
     }
 
     let result = json!({
-        "schema_version": "llm.mutation-testing.evidence-check.v1",
+        "schema_version": "llm.mutation-testing.evidence-check.v2",
         "status": if missing.is_empty() { "PASS" } else { "FAIL" },
         "enforcement": "changed_tests",
         "checked_test_paths": normalized.into_iter().collect::<Vec<_>>(),
         "evidence": evidence,
         "missing_evidence": missing,
+        "rejection_counts": rejection_counts,
         "malformed_receipts": malformed,
         "broken_campaigns": broken,
     });

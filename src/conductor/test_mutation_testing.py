@@ -368,6 +368,49 @@ def _write_pass_receipt(tmp_path: Path, campaign: mutation_testing.Campaign) -> 
     (receipts / "pass.json").write_text(json.dumps(receipt), encoding="utf-8")
 
 
+def _evidence_with_pass_receipt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    campaign: mutation_testing.Campaign | None = None,
+    test_path: str = "test_one.py",
+    mutate: Callable[[Path], None] | None = None,
+) -> dict[str, object]:
+    """Patch a campaign in, write its PASS receipt, verify one test path.
+
+    ``mutate`` runs between the receipt write and the verification, so a test
+    can corrupt or edit the receipt the validator is about to read.
+    """
+
+    if campaign is None:
+        campaign = _temporary_campaign(tmp_path)
+    registry = _write_registry(tmp_path)
+    monkeypatch.setattr(mutation_testing, "load_campaign", lambda *_a, **_k: campaign)
+    _write_pass_receipt(tmp_path, campaign)
+    receipt_path = tmp_path / "receipts/pass.json"
+    if mutate is not None:
+        mutate(receipt_path)
+    return mutation_testing.verify_evidence(
+        registry,
+        [test_path],
+        repo_root=tmp_path,
+    )
+
+
+def _rewrite_receipt_as_utf16(receipt_path: Path) -> None:
+    payload = receipt_path.read_text(encoding="utf-8")
+    receipt_path.write_bytes(payload.encode("utf-16"))
+
+
+def _patch_receipt_field(receipt_path: Path, field: str, replacement: object) -> None:
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if replacement is None:
+        receipt.pop(field)
+    else:
+        receipt[field] = replacement
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+
 def _anchored_v2_receipt(
     tmp_path: Path,
     campaign: mutation_testing.Campaign,
@@ -548,15 +591,7 @@ def test_manifest_rejects_patch_path_escape(tmp_path: Path) -> None:
 def test_mandatory_evidence_accepts_current_complete_receipts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    campaign = _temporary_campaign(tmp_path)
-    registry = _write_registry(tmp_path)
-    monkeypatch.setattr(mutation_testing, "load_campaign", lambda *_a, **_k: campaign)
-    _write_pass_receipt(tmp_path, campaign)
-    result = mutation_testing.verify_evidence(
-        registry,
-        ["test_one.py"],
-        repo_root=tmp_path,
-    )
+    result = _evidence_with_pass_receipt(monkeypatch, tmp_path)
 
     assert result["status"] == "PASS"
     assert len(result["evidence"]) == 1
@@ -566,18 +601,8 @@ def test_mandatory_evidence_accepts_current_complete_receipts(
 def test_mandatory_evidence_rejects_non_utf8_receipts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    campaign = _temporary_campaign(tmp_path)
-    registry = _write_registry(tmp_path)
-    monkeypatch.setattr(mutation_testing, "load_campaign", lambda *_a, **_k: campaign)
-    _write_pass_receipt(tmp_path, campaign)
-    receipt = tmp_path / "receipts/pass.json"
-    payload = receipt.read_text(encoding="utf-8")
-    receipt.write_bytes(payload.encode("utf-16"))
-
-    result = mutation_testing.verify_evidence(
-        registry,
-        ["test_one.py"],
-        repo_root=tmp_path,
+    result = _evidence_with_pass_receipt(
+        monkeypatch, tmp_path, mutate=_rewrite_receipt_as_utf16
     )
 
     assert result["status"] == "FAIL"
@@ -740,39 +765,27 @@ def test_mandatory_evidence_rejects_runner_provenance_drift(
     replacement: object,
     expected_error: str,
 ) -> None:
-    campaign = _temporary_campaign(tmp_path)
-    registry = _write_registry(tmp_path)
-    monkeypatch.setattr(mutation_testing, "load_campaign", lambda *_a, **_k: campaign)
-    _write_pass_receipt(tmp_path, campaign)
-    receipt_path = tmp_path / "receipts/pass.json"
-    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    if replacement is None:
-        receipt.pop(field)
-    else:
-        receipt[field] = replacement
-    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
-
-    result = mutation_testing.verify_evidence(
-        registry,
-        ["test_one.py"],
-        repo_root=tmp_path,
+    result = _evidence_with_pass_receipt(
+        monkeypatch,
+        tmp_path,
+        mutate=lambda receipt_path: _patch_receipt_field(
+            receipt_path, field, replacement
+        ),
     )
 
     assert result["status"] == "FAIL"
-    assert expected_error in result["missing_evidence"][0]["receipt_rejections"][0]
+    assert (
+        expected_error in result["missing_evidence"][0]["receipt_rejections"][0]["detail"]
+    )
 
 
 def test_mandatory_evidence_rejects_legacy_file_scope(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    campaign = replace(_temporary_campaign(tmp_path), test_scopes={})
-    registry = _write_registry(tmp_path)
-    monkeypatch.setattr(mutation_testing, "load_campaign", lambda *_a, **_k: campaign)
-    _write_pass_receipt(tmp_path, campaign)
-    result = mutation_testing.verify_evidence(
-        registry,
-        ["test_one.py"],
-        repo_root=tmp_path,
+    result = _evidence_with_pass_receipt(
+        monkeypatch,
+        tmp_path,
+        campaign=replace(_temporary_campaign(tmp_path), test_scopes={}),
     )
 
     assert result["status"] == "FAIL"
@@ -780,7 +793,11 @@ def test_mandatory_evidence_rejects_legacy_file_scope(
         "no current complete PASS receipt"
     )
     assert result["missing_evidence"][0]["receipt_rejections"] == [
-        "temporary_campaign: campaign lacks explicit test scope"
+        {
+            "receipt": "temporary_campaign",
+            "kind": "scope_error",
+            "detail": "campaign lacks explicit test scope",
+        }
     ]
 
 
@@ -801,6 +818,8 @@ def test_mandatory_evidence_rejects_unregistered_changed_test(
         {
             "path": "example/tests/test_unregistered.py",
             "reason": "no registered campaign ranks this test file",
+            "reason_kind": "no_campaign",
+            "campaigns": [],
             "receipt_rejections": [],
         }
     ]
