@@ -413,6 +413,15 @@ fn an_empty_project_dir_falls_back_to_the_working_directory() {
     let stdout: serde_json::Value =
         serde_json::from_slice(&out.stdout).expect("stub dispatcher ran");
     assert_eq!(stdout["event"], "SessionEnd");
+    // The dispatcher must also see the fallback root: forge re-exports
+    // CLAUDE_PROJECT_DIR from project_root(), so an empty-variable bug would
+    // arrive here as the empty string.
+    let echoed = stdout["claude_project_dir"].as_str().unwrap_or_default();
+    assert_eq!(
+        std::fs::canonicalize(echoed).ok(),
+        std::fs::canonicalize(project.path()).ok(),
+        "project_root must fall back to the working directory"
+    );
 }
 
 /// A set-but-empty `CONDUCTOR_SNAPSHOT_PYTHON` is not an export: the filter in

@@ -44,6 +44,7 @@ def main() -> int:
             json.dumps(
                 {
                     "event": event,
+                    "claude_project_dir": os.environ.get("CLAUDE_PROJECT_DIR"),
                     "echoed": json.loads(stdin_payload or "{}"),
                     "forge_native_hooks": os.environ.get("FORGE_NATIVE_HOOKS"),
                     "forge_native_answers": os.environ.get("FORGE_NATIVE_ANSWERS"),
