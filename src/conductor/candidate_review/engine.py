@@ -208,6 +208,9 @@ def _package_hash(root: Path) -> tuple[str, dict[str, str]]:
 def _engine_integrity(ctx: ReviewContext) -> tuple[dict[str, object], CheckResult]:
     started = time.perf_counter()
     candidate_hash, candidate_files = _package_hash(ctx.snapshot)
+    # The running engine's own source tree, not the host root: this answers "is the
+    # engine reviewing you the engine in your tree", a question about the installed
+    # package's bytes, never the host's layout.
     runtime_root = package_tree_root(Path(__file__).resolve().parents[1])
     runtime_hash, runtime_files = _package_hash(runtime_root)
     findings: list[Finding] = []
