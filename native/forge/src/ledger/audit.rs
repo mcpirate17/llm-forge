@@ -1,10 +1,13 @@
 //! `forge ledger audit`: design step 5 (`docs/design/cost_ledger.md`
-//! section 4, section 6 step 5). Computes the three budget-ratchet metrics
-//! over a trailing window of `hook_rollup`/`session_rollup`/`agent_rollup`
-//! day files and compares them to a recorded baseline receipt, in the same
-//! held/not-passed idiom `mutation_patch_audit.py` already uses for a
-//! generated campaign: `RATCHET_HELD` is a real status, never rounded up to
-//! `PASS`.
+//! section 4, section 6 step 5). Computes the five budget-ratchet metrics
+//! over a trailing window of `hook_rollup`/`session_rollup`/`agent_rollup`/
+//! `task_dispatch` day files and compares them to a recorded baseline
+//! receipt, in the same held/not-passed idiom `mutation_patch_audit.py`
+//! already uses for a generated campaign: `RATCHET_HELD` is a real status,
+//! never rounded up to `PASS`. Phase 3 step 4 (`docs/roadmap.md`) added the
+//! last two, `cap_breach_rate` and `cheap_tier_rework_rate`, on top of the
+//! original three (`median_hook_ms`, `resend_bytes_per_session`,
+//! `tokens_per_landed_pr`) from step 3.
 //!
 //! Status per metric (design section 4's three prose rules, reconciled
 //! against its own worked example -- `docs/design/cost_ledger.md` section 6
@@ -12,16 +15,33 @@
 //! which only holds if a value exactly equal to a freshly recorded baseline
 //! is *not* `PASS`; `PASS` therefore means a strict improvement, not merely
 //! "inside tolerance"):
-//!   - no recorded baseline for this metric -> `NO_BASELINE`
+//!   - no recorded baseline for this metric, and no data this window either
+//!     (a metric that cannot yet exist, e.g. `cheap_tier_rework_rate` before
+//!     the `ci_history` fetcher ever runs) -> `NO_BASELINE`
+//!   - a recorded baseline exists, but no data this window -> `NO_DATA`
+//!   - a recorded baseline exists, but this window has no data and the
+//!     baseline itself is `null` (see below) -> `NO_BASELINE`, same as never
+//!     having recorded one
 //!   - value strictly better (lower) than baseline -> `PASS`
 //!   - baseline <= value <= baseline * (1 + tolerance) -> `RATCHET_HELD`
 //!   - value > baseline * (1 + tolerance) -> `REGRESSION`
-//!   - the metric's table contributed zero rows in the window -> `NO_DATA`
 //!
-//! A window with zero rows across all three tables is a harder failure
-//! (misconfigured `--ledger-root`, or `forge ledger rollup` never ran) than
-//! one metric alone having no data: that case fails loud as the whole
-//! command's `NO_DATA`, exit 3, never a silent pass.
+//! `NO_BASELINE` and a null-valued current metric are deliberately the same
+//! status: a metric with a recorded baseline of `null` (`--record` wrote one
+//! because the window it recorded from had no data either) has, for gate
+//! purposes, never been baselined -- treating it as `NO_DATA` instead would
+//! read as an established metric silently regressing, which it cannot be
+//! if it has never produced a real value.
+//!
+//! A window with zero rows across all three original tables (hook/session/
+//! agent) is a harder failure (misconfigured `--ledger-root`, or `forge
+//! ledger rollup` never ran) than one metric alone having no data: that case
+//! fails loud as the whole command's `NO_DATA`, exit 3, never a silent pass.
+//! `task_dispatch` is deliberately not part of that three-table check: a
+//! ledger root can have hook/session/agent rows from a window before
+//! `task_dispatch` rollup existed (or before any `Agent` tool dispatches
+//! happened at all), and that is not the same failure as a misconfigured
+//! root.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -38,11 +58,21 @@ const DEFAULT_LEDGER_ROOT: &str = "/mnt/data/llm/ledger/";
 const DEFAULT_WINDOW_DAYS: u32 = 7;
 const DEFAULT_TOLERANCE_PCT: f64 = 5.0;
 
-const METRIC_NAMES: [&str; 3] = [
+const METRIC_NAMES: [&str; 5] = [
     "median_hook_ms",
     "resend_bytes_per_session",
     "tokens_per_landed_pr",
+    "cap_breach_rate",
+    "cheap_tier_rework_rate",
 ];
+
+/// Tiers `cheap_tier_rework_rate` counts over -- `agent::infer_tier`'s two
+/// cheapest classifications. Anything else (`sonnet`, `opus`, `fable`,
+/// `unknown`, `mixed`) is out of scope for this metric: it exists to ratchet
+/// down rework specifically on the routing decisions the cost gate is meant
+/// to encourage, not on the expensive tiers nobody is trying to push traffic
+/// toward.
+const CHEAP_TIERS: [&str; 2] = ["haiku", "glm"];
 
 #[derive(Args)]
 pub struct AuditArgs {
@@ -92,6 +122,19 @@ struct AgentRow {
     join_method: String,
 }
 
+/// Narrow subset of `rollup::TaskDispatchRow`, same "immune to unrelated
+/// fields" reasoning as the three row shapes above. `required_rework` is
+/// `None` for every row until a `ledger/ci_history/<owner>_<repo>.json`
+/// cache exists for the outcome join (`outcome.rs`); `cheap_tier_rework_rate`
+/// reads that as "no data yet", never as "no rework happened".
+#[derive(Debug, Clone, Deserialize)]
+struct TaskDispatchRow {
+    billed_tokens: Option<u64>,
+    over_cap: Option<bool>,
+    tier: Option<String>,
+    required_rework: Option<bool>,
+}
+
 // ---------------------------------------------------------------------------
 // Output shapes.
 
@@ -129,11 +172,18 @@ struct BaselineMetric {
     tolerance_pct: f64,
 }
 
+/// `metrics` maps every name in `METRIC_NAMES` to `Some(..)` when `--record`
+/// had real data for it, or explicit `null` when it did not (Phase 3 step 4:
+/// `cheap_tier_rework_rate` is `null` until the `ci_history` fetcher exists).
+/// A key holding `null` and a key that is simply absent are treated
+/// identically by every reader (`.and_then(|opt| opt.as_ref())`); `--record`
+/// always writes every name so a missing key can only mean "recorded before
+/// this metric existed", never "this window had no data for it".
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct BaselineFile {
     recorded_utc: String,
     window: Window,
-    metrics: BTreeMap<String, BaselineMetric>,
+    metrics: BTreeMap<String, Option<BaselineMetric>>,
     ledger_root_sha: String,
 }
 
@@ -155,6 +205,8 @@ pub fn run(args: AuditArgs) -> Result<i32> {
     let (sessions, session_files) =
         read_table::<SessionRow>(&ledger_root, "session_rollup", &days)?;
     let (agents, agent_files) = read_table::<AgentRow>(&ledger_root, "agent_rollup", &days)?;
+    let (dispatches, dispatch_files) =
+        read_table::<TaskDispatchRow>(&ledger_root, "task_dispatch", &days)?;
 
     if hooks.is_empty() && sessions.is_empty() && agents.is_empty() {
         eprintln!(
@@ -167,30 +219,43 @@ session_rollup and agent_rollup under {} -- run `forge ledger rollup` first",
         return Ok(3);
     }
 
-    let raw = compute_raw_metrics(&hooks, &sessions, &agents);
+    let raw = compute_raw_metrics(&hooks, &sessions, &agents, &dispatches);
+    if matches!(raw.get("cheap_tier_rework_rate"), Some(&(None, _))) {
+        eprintln!(
+            "forge ledger audit: cheap_tier_rework_rate has no data in this window -- \
+no task_dispatch row with tier in {{haiku, glm}} carries a non-null required_rework; \
+the outcome join (ledger/ci_history/<owner>_<repo>.json, see docs/ledger.md) has no \
+cache file yet, so every row's required_rework stays null"
+        );
+    }
 
     if args.record {
         let mut files: Vec<PathBuf> = Vec::new();
         files.extend(hook_files);
         files.extend(session_files);
         files.extend(agent_files);
+        files.extend(dispatch_files);
         let ledger_root_sha = sha256_of_files(&files)?;
         let mut metrics = BTreeMap::new();
         for name in METRIC_NAMES {
-            if let Some((value, n)) = raw.get(name).copied().flatten_pair() {
-                metrics.insert(
-                    name.to_string(),
-                    BaselineMetric {
-                        value,
-                        n,
-                        tolerance_pct: DEFAULT_TOLERANCE_PCT,
-                    },
-                );
-            } else {
-                eprintln!(
-                    "forge ledger audit --record: {name} has no data in this window, \
-omitted from the recorded baseline (debt, not a failure)"
-                );
+            match raw.get(name).copied().flatten_pair() {
+                Some((value, n)) => {
+                    metrics.insert(
+                        name.to_string(),
+                        Some(BaselineMetric {
+                            value,
+                            n,
+                            tolerance_pct: DEFAULT_TOLERANCE_PCT,
+                        }),
+                    );
+                }
+                None => {
+                    eprintln!(
+                        "forge ledger audit --record: {name} has no data in this window, \
+recorded as a null baseline (debt, not a failure)"
+                    );
+                    metrics.insert(name.to_string(), None);
+                }
             }
         }
         let baseline_file = BaselineFile {
@@ -213,7 +278,10 @@ omitted from the recorded baseline (debt, not a failure)"
     let mut metrics = BTreeMap::new();
     for name in METRIC_NAMES {
         let (value, n) = raw.get(name).copied().unwrap_or((None, 0));
-        let baseline_metric = recorded.as_ref().and_then(|b| b.metrics.get(name));
+        let baseline_metric = recorded
+            .as_ref()
+            .and_then(|b| b.metrics.get(name))
+            .and_then(|opt| opt.as_ref());
         metrics.insert(name.to_string(), metric_result(value, n, baseline_metric));
     }
     let status = overall_status(&metrics);
@@ -251,7 +319,8 @@ fn metric_result(
 ) -> MetricResult {
     let baseline = baseline_metric.map(|b| b.value);
     let (status, delta_pct) = match (value, baseline_metric) {
-        (None, _) => ("NO_DATA".to_string(), None),
+        (None, None) => ("NO_BASELINE".to_string(), None),
+        (None, Some(_)) => ("NO_DATA".to_string(), None),
         (Some(_), None) => ("NO_BASELINE".to_string(), None),
         (Some(value), Some(b)) => {
             let delta_pct = if b.value == 0.0 {
@@ -311,6 +380,7 @@ fn compute_raw_metrics(
     hooks: &[HookRow],
     sessions: &[SessionRow],
     agents: &[AgentRow],
+    dispatches: &[TaskDispatchRow],
 ) -> BTreeMap<&'static str, (Option<f64>, u64)> {
     let mut out = BTreeMap::new();
 
@@ -342,6 +412,48 @@ fn compute_raw_metrics(
         Some(total_tokens as f64 / landed_n as f64)
     };
     out.insert("tokens_per_landed_pr", (tokens_value, landed_n));
+
+    // `cap_breach_rate`: over_cap rows / rows with a non-null billed_tokens.
+    // A row without billed_tokens never got far enough to be judged either
+    // way, so it is excluded from both halves of the ratio rather than
+    // counted as "not a breach".
+    let billed: Vec<&TaskDispatchRow> = dispatches
+        .iter()
+        .filter(|d| d.billed_tokens.is_some())
+        .collect();
+    let cap_n = billed.len() as u64;
+    let cap_breach_value = if billed.is_empty() {
+        None
+    } else {
+        let breaches = billed.iter().filter(|d| d.over_cap == Some(true)).count();
+        Some(breaches as f64 / billed.len() as f64)
+    };
+    out.insert("cap_breach_rate", (cap_breach_value, cap_n));
+
+    // `cheap_tier_rework_rate`: of the dispatches routed to a cheap tier
+    // (`haiku`/`glm`), how many required rework -- both the tier filter and
+    // the `required_rework.is_some()` filter must hold for a row to count in
+    // the denominator; `required_rework` is null for every row until the
+    // `ci_history` outcome join has a cache file (`outcome.rs`), so a run
+    // before that file exists reports `None` here, not zero.
+    let cheap_tier_judged: Vec<&TaskDispatchRow> = dispatches
+        .iter()
+        .filter(|d| {
+            d.tier.as_deref().is_some_and(|t| CHEAP_TIERS.contains(&t))
+                && d.required_rework.is_some()
+        })
+        .collect();
+    let rework_n = cheap_tier_judged.len() as u64;
+    let rework_value = if cheap_tier_judged.is_empty() {
+        None
+    } else {
+        let reworked = cheap_tier_judged
+            .iter()
+            .filter(|d| d.required_rework == Some(true))
+            .count();
+        Some(reworked as f64 / cheap_tier_judged.len() as f64)
+    };
+    out.insert("cheap_tier_rework_rate", (rework_value, rework_n));
 
     out
 }
@@ -519,6 +631,20 @@ mod tests {
         }
     }
 
+    fn dispatch(
+        billed_tokens: Option<u64>,
+        over_cap: Option<bool>,
+        tier: Option<&str>,
+        required_rework: Option<bool>,
+    ) -> TaskDispatchRow {
+        TaskDispatchRow {
+            billed_tokens,
+            over_cap,
+            tier: tier.map(str::to_string),
+            required_rework,
+        }
+    }
+
     #[test]
     fn weighted_median_favors_the_heavier_call_count() {
         // One hook called 100 times at 2ms, another called once at 50ms: the
@@ -535,10 +661,61 @@ mod tests {
             agent(300_000, 2, "session_url"),
             agent(999_999, 5, "unjoined"),
         ];
-        let raw = compute_raw_metrics(&hooks, &sessions, &agents);
+        let raw = compute_raw_metrics(&hooks, &sessions, &agents, &[]);
         let (value, n) = raw["tokens_per_landed_pr"];
         assert_eq!(value, Some(150_000.0));
         assert_eq!(n, 2);
+    }
+
+    #[test]
+    fn cap_breach_rate_excludes_rows_without_billed_tokens() {
+        let dispatches = vec![
+            dispatch(Some(100), Some(true), Some("sonnet"), None), // breach
+            dispatch(Some(100), Some(false), Some("haiku"), None), // clean
+            dispatch(None, None, Some("opus"), None),              // no billed_tokens: excluded
+        ];
+        let raw = compute_raw_metrics(&[], &[], &[], &dispatches);
+        let (value, n) = raw["cap_breach_rate"];
+        assert_eq!(value, Some(0.5));
+        assert_eq!(n, 2);
+    }
+
+    #[test]
+    fn cap_breach_rate_is_none_when_no_row_has_billed_tokens() {
+        let dispatches = vec![dispatch(None, None, Some("haiku"), None)];
+        let raw = compute_raw_metrics(&[], &[], &[], &dispatches);
+        let (value, n) = raw["cap_breach_rate"];
+        assert_eq!(value, None);
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn cheap_tier_rework_rate_only_counts_haiku_and_glm() {
+        let dispatches = vec![
+            dispatch(Some(1), None, Some("haiku"), Some(true)), // reworked
+            dispatch(Some(1), None, Some("glm"), Some(false)),  // clean
+            dispatch(Some(1), None, Some("sonnet"), Some(true)), // wrong tier: excluded
+            dispatch(Some(1), None, Some("haiku"), None),       // required_rework unset: excluded
+        ];
+        let raw = compute_raw_metrics(&[], &[], &[], &dispatches);
+        let (value, n) = raw["cheap_tier_rework_rate"];
+        assert_eq!(value, Some(0.5));
+        assert_eq!(n, 2);
+    }
+
+    #[test]
+    fn cheap_tier_rework_rate_is_none_without_the_ci_history_join() {
+        // Every row's `required_rework` stays null until `outcome.rs` has a
+        // `ci_history` cache file to join against -- the metric must read
+        // that as "no data", never as "zero rework".
+        let dispatches = vec![
+            dispatch(Some(1), None, Some("haiku"), None),
+            dispatch(Some(1), None, Some("glm"), None),
+        ];
+        let raw = compute_raw_metrics(&[], &[], &[], &dispatches);
+        let (value, n) = raw["cheap_tier_rework_rate"];
+        assert_eq!(value, None);
+        assert_eq!(n, 0);
     }
 
     fn baseline_metric(value: f64) -> BaselineMetric {
@@ -586,6 +763,18 @@ mod tests {
     fn missing_value_is_no_data() {
         let result = metric_result(None, 0, Some(&baseline_metric(10.0)));
         assert_eq!(result.status, "NO_DATA");
+    }
+
+    #[test]
+    fn missing_value_and_missing_baseline_is_no_baseline_not_no_data() {
+        // A metric that has never been recorded (e.g. `cheap_tier_rework_rate`
+        // before the `ci_history` fetcher exists) and has no data this
+        // window either must never read as an established metric's
+        // measurement gap -- it cannot regress if it has never produced a
+        // real value.
+        let result = metric_result(None, 0, None);
+        assert_eq!(result.status, "NO_BASELINE");
+        assert_eq!(result.baseline, None);
     }
 
     #[test]

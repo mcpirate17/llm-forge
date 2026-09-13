@@ -298,31 +298,56 @@ measured with a key, rests on the same window definition.
 forge ledger audit --ledger-root <dir> --baseline <file> [--window-days N] [--record]
 ```
 
-Three metrics over a trailing `N`-day window (default 7), recorded or
-checked: **`median_hook_ms`** (weighted median of `hook_rollup.p50_ms`,
-weighted by `n_calls`), **`resend_bytes_per_session`** (mean of
-`session_rollup.resend_bytes`), **`tokens_per_landed_pr`**
-(`sum(total_tokens) / sum(n_landed_prs)` over `agent_rollup` rows whose
-`join_method` is not `unjoined`). Never rounds a tie up to `PASS`; never
-invents a value for a metric with no rows.
+Five metrics over a trailing `N`-day window (default 7), recorded or
+checked -- the original three (design step 5) plus two more from Phase 3
+step 4's routing gate:
+
+| Metric | Direction | Definition |
+|---|---|---|
+| `median_hook_ms` | lower is better | weighted median of `hook_rollup.p50_ms`, weighted by `n_calls`. |
+| `resend_bytes_per_session` | lower is better | mean of `session_rollup.resend_bytes`. |
+| `tokens_per_landed_pr` | lower is better | `sum(total_tokens) / sum(n_landed_prs)` over `agent_rollup` rows whose `join_method` is not `unjoined`. |
+| `cap_breach_rate` | lower is better | `task_dispatch` rows with `over_cap == true` / rows with a non-null `billed_tokens`. |
+| `cheap_tier_rework_rate` | lower is better | `task_dispatch` rows with `tier` in `{haiku, glm}` and `required_rework == true` / rows with `tier` in `{haiku, glm}` and `required_rework` non-null. |
+
+Never rounds a tie up to `PASS`; never invents a value for a metric with no
+rows. `cheap_tier_rework_rate`'s denominator is zero for every window until
+a `ledger/ci_history/<owner>_<repo>.json` cache file exists (the outcome
+join, below) -- `required_rework` stays `null` on every row until then, and
+the command names that specifically on stderr rather than leaving a bare
+"no data" line.
 
 | Status | Meaning |
 |---|---|
 | `PASS` | `value` strictly improved on the baseline. |
 | `RATCHET_HELD` | within tolerance (5% at record time) but not improved; a tie is `RATCHET_HELD`, never `PASS`. |
 | `REGRESSION` | `value` exceeds `baseline * (1 + tolerance_pct / 100)`. |
-| `NO_BASELINE` | a value this window but no recorded baseline entry. |
-| `NO_DATA` | no rows in this window (`value` is `null`), whatever the baseline says. |
+| `NO_BASELINE` | no recorded baseline entry for this metric (including a baseline entry recorded as explicit `null`) -- a metric that has never produced a real value, whether or not this window has data either. |
+| `NO_DATA` | a recorded (non-null) baseline exists, but no rows in this window (`value` is `null`) -- an established metric's live measurement gap. |
 
-Overall status is the worst of the three, ranked
-`REGRESSION > NO_DATA > NO_BASELINE > RATCHET_HELD > PASS`. If *every* metric
-has zero rows the command fails loud: exit `3`, nothing written, `--record`
-included. `--record` is the only way the baseline file
+`NO_BASELINE` and `NO_DATA` are deliberately distinct this way: a metric
+recorded once with real data and then hitting a data gap is `NO_DATA` (a
+live break worth noticing), while a metric that has *never* had a real
+baseline -- because `--record` wrote `null` for it, or because the baseline
+file predates it -- is `NO_BASELINE` every time, even on a window with no
+data either. `cheap_tier_rework_rate` is the running example: its baseline
+is `null` until the `ci_history` fetcher exists, so every check reports it
+as `NO_BASELINE`, never as a `NO_DATA` regression from an established metric
+that never actually existed.
+
+Overall status is the worst of the five, ranked
+`REGRESSION > NO_DATA > NO_BASELINE > RATCHET_HELD > PASS`. If *every* row
+across `hook_rollup`, `session_rollup` and `agent_rollup` (the three
+original tables; `task_dispatch` is not part of this check, see
+`audit.rs`'s module doc) is zero, the command fails loud: exit `3`, nothing
+written, `--record` included. `--record` is the only way the baseline file
 (`ledger/cost_budget_baseline.json`, tracked) changes; a metric with no data
-at record time is omitted (one stderr line naming it as debt) rather than
-recorded as `0`. The file also carries `recorded_utc` and `ledger_root_sha`
-(sha256 over every day file read), so a receipt names exactly which rows it
-was computed from.
+at record time is written as an explicit `null` (one stderr line naming it
+as debt) rather than recorded as `0` or omitted -- every one of the five
+names is always a key in `metrics`, whether the value is a real receipt or
+`null`. The file also carries `recorded_utc` and `ledger_root_sha` (sha256
+over every day file read, `task_dispatch` files included now), so a receipt
+names exactly which rows it was computed from.
 
 ### Gate wiring: `cost-budget-audit`
 
@@ -552,16 +577,18 @@ slice fetches it. Requirements for that fetcher:
     it would fetch/write without calling `gh`) so it can be verified without
     live API credits.
 
-### Known debt: `agent_upsert`'s synthetic key
+### Row identity: `task_dispatch` is keyed by `agent_id` (fixed, was debt from PR #52)
 
 `native/forge/src/ledger/agent_upsert.rs` (`forge ledger rollup-agent`, the
 `SubagentStop`-triggered upsert, `docs/routing.md`'s enforcement section)
 has no access to the parent transcript, so it never learns the real
-`tool_use_id` a later full `forge ledger rollup --repo` sweep uses to key
-that same dispatch's `task_dispatch` row. It upserts under a synthetic key
-`agent-<agent_id>` instead -- stable and idempotent across repeated
-`SubagentStop` calls for the same agent, but a **separate row** from the
-one a subsequent full sweep writes for the same dispatch, until something
-reconciles the two keys (a follow-up that teaches the full sweep to look up
-an existing `agent-<agent_id>` row by `agent_id` and merge into it, rather
-than always writing a fresh `tool_use_id`-keyed row).
+`tool_use_id` a later full `forge ledger rollup --repo` sweep would use to
+key that same dispatch's `task_dispatch` row. It writes a synthetic
+`tool_use_id` (`agent-<agent_id>`) into the row as a plain field, but both
+this live path and the full sweep (`rollup.rs::build_task_dispatch`, which
+learns `agent_id` from the dispatch's `tool_result` `agentId:` line) key
+their `task_dispatch` day-file upsert by `agent_id` -- the one field they
+always agree on. A live row followed by a full sweep of the same dispatch
+therefore collapses to exactly one row (`write_day_file`'s existing
+supersede-by-key behavior does the merge; no reconciliation pass is
+needed), instead of the two rows the mismatched keys used to produce.

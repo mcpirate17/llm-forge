@@ -1,8 +1,15 @@
-"""`cost-budget-audit`: the three-metric budget ratchet (design step 5).
+"""`cost-budget-audit`: the five-metric budget ratchet (design step 5,
+Phase 3 step 4).
 
 `docs/design/cost_ledger.md` section 4 names three numbers that must never
 silently regress: median hook `elapsed_ms`, resend bytes per session, and
-tokens per landed PR. This module is the Python side of that ratchet -- it
+tokens per landed PR. Phase 3 step 4 (`docs/roadmap.md`) added two more on
+the routing side: `cap_breach_rate` and `cheap_tier_rework_rate`. This
+module does not name any of the five itself -- `AuditResult.metrics` is a
+plain `dict[str, MetricResult]` keyed by whatever `forge ledger audit`
+reports, so a metric count change is a native-side and baseline-file
+change only; nothing here hardcodes "three" or enumerates metric names.
+This module is the Python side of that ratchet -- it
 shells out to the native computation (`forge ledger audit`,
 `native/forge/src/ledger/audit.rs`) the same way `project_init.py` already
 finds a `forge` binary for hook wiring, parses its JSON with Pydantic v2

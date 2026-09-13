@@ -1,26 +1,32 @@
 {
-  "recorded_utc": "2026-09-13T13:44:36Z",
+  "recorded_utc": "2026-09-13T19:51:59Z",
   "window": {
     "from": "2026-09-07",
     "to": "2026-09-13",
     "days": 7
   },
   "metrics": {
+    "cap_breach_rate": {
+      "value": 0.7738693467336684,
+      "n": 199,
+      "tolerance_pct": 5.0
+    },
+    "cheap_tier_rework_rate": null,
     "median_hook_ms": {
-      "value": 6.334064000000001,
-      "n": 288,
+      "value": 15.359,
+      "n": 986,
       "tolerance_pct": 5.0
     },
     "resend_bytes_per_session": {
-      "value": 937440.1191489361,
-      "n": 235,
+      "value": 953761.55,
+      "n": 240,
       "tolerance_pct": 5.0
     },
     "tokens_per_landed_pr": {
-      "value": 10246491.488636363,
-      "n": 88,
+      "value": 8206833.6867469875,
+      "n": 83,
       "tolerance_pct": 5.0
     }
   },
-  "ledger_root_sha": "2c7b242fdaa2e1b90db405482ab22f91fccb794783b5acfd69467465bfa5f2ba"
+  "ledger_root_sha": "42fef24426bca7a91a2d5880e6e9d6bf2f6067cb9959fc71429cece73f3ab285"
 }
