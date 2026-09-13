@@ -174,6 +174,15 @@ jobs:
           exit "$rc"
       - name: Repo-wide receipt decode canary
         run: uv run python -m conductor.mutation_coverage canary
+      # Third question: is the retention sweep still runnable? It crashed on
+      # main for a week (the patch-audit predicate grew two arguments) and
+      # nothing noticed, because nothing ran it. Dry-run only -- the report is
+      # the point. Exit 0 means the sweep ran, however many receipts it would
+      # delete (they are supposed to accumulate between sweeps); exit 2 means
+      # it could not decide and the job fails; any other exit is a crash and
+      # the job fails. Sweeping itself stays a local, human-reviewed act.
+      - name: Receipt retention report
+        run: make mutation-retention
 
   rust:
     runs-on: ubuntu-latest
