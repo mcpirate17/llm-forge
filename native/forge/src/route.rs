@@ -394,29 +394,61 @@ pub fn hook_outcome_for_agent(payload: &Value) -> crate::merge::HookOutcome {
         decision.model.as_deref().unwrap_or("-"),
         decision.policy_version,
     );
+    let already_had_model = payload
+        .get("tool_input")
+        .and_then(|ti| ti.get("model"))
+        .is_some();
+    // A "re-route": enforce mode would set `updatedInput.model` (no model was
+    // already on the call, and the policy has one to add). Not a re-route
+    // when the call already named its own model -- enforce mode never
+    // overrides an explicit request.
+    let would_reroute = !already_had_model && decision.model.is_some();
+    let mode = resolve_mode();
 
     let mut specific = serde_json::Map::new();
     specific.insert("hookEventName".to_string(), json!("PreToolUse"));
     match decision.decision {
         Verdict::Deny => {
-            specific.insert("permissionDecision".to_string(), json!("deny"));
-            specific.insert(
-                "permissionDecisionReason".to_string(),
-                json!(decision.reason),
-            );
+            if mode == "warn" {
+                specific.insert("permissionDecision".to_string(), json!("allow"));
+                specific.insert(
+                    "additionalContext".to_string(),
+                    json!(format!(
+                        "forge warn-only: would deny -- {}",
+                        decision.reason
+                    )),
+                );
+            } else {
+                specific.insert("permissionDecision".to_string(), json!("deny"));
+                specific.insert(
+                    "permissionDecisionReason".to_string(),
+                    json!(decision.reason),
+                );
+            }
         }
         Verdict::Allow => {
             specific.insert("permissionDecision".to_string(), json!("allow"));
-            specific.insert("additionalContext".to_string(), json!(context_line));
-            let already_had_model = payload
-                .get("tool_input")
-                .and_then(|ti| ti.get("model"))
-                .is_some();
-            if !already_had_model {
-                if let Some(model) = decision.model.as_deref() {
+            if mode == "warn" {
+                // An allow with no change stays silent -- no
+                // `additionalContext`, no `updatedInput`. Only a would-be
+                // re-route is worth telling the caller about.
+                if would_reroute {
+                    specific.insert(
+                        "additionalContext".to_string(),
+                        json!(format!(
+                            "forge warn-only: would route {} to {} (class {})",
+                            input.subagent_type.as_deref().unwrap_or("-"),
+                            decision.model.as_deref().unwrap_or("-"),
+                            decision.class,
+                        )),
+                    );
+                }
+            } else {
+                specific.insert("additionalContext".to_string(), json!(context_line));
+                if would_reroute {
                     specific.insert(
                         "updatedInput".to_string(),
-                        updated_input_with_model(payload, model),
+                        updated_input_with_model(payload, decision.model.as_deref().unwrap()),
                     );
                 }
             }
@@ -428,6 +460,24 @@ pub fn hook_outcome_for_agent(payload: &Value) -> crate::merge::HookOutcome {
         output: json!({ "hookSpecificOutput": Value::Object(specific) }),
         error: None,
         fail_closed: false,
+    }
+}
+
+/// `FORGE_MODE`: `"warn"` or the default `"enforce"`. Any other value is a
+/// loud stderr line and behaves as `"enforce"` -- an unrecognized mode must
+/// never silently soften enforcement. Read fresh on every call (no caching):
+/// this is a per-process env var, not a hot loop.
+pub fn resolve_mode() -> &'static str {
+    match std::env::var("FORGE_MODE") {
+        Ok(v) if v == "warn" => "warn",
+        Ok(v) if v == "enforce" => "enforce",
+        Ok(v) => {
+            eprintln!(
+                "forge: FORGE_MODE={v:?} is neither \"warn\" nor \"enforce\"; behaving as enforce"
+            );
+            "enforce"
+        }
+        Err(_) => "enforce",
     }
 }
 
@@ -484,6 +534,12 @@ pub fn run(args: RouteArgs) -> Result<i32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `FORGE_MODE` is a per-process env var read fresh by `resolve_mode`
+    /// on every call; any test that sets it must serialize against every
+    /// other test in this module touching it, or a parallel `cargo test`
+    /// run races (codebase convention -- see `handlers::tests::ENV_LOCK`).
+    pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn policy() -> Policy {
         Policy::embedded().expect("embedded policy parses")
@@ -664,6 +720,85 @@ mod tests {
         "#;
         let err = Policy::parse(bad_default_class).unwrap_err();
         assert!(format!("{err:#}").contains("default_class"));
+    }
+
+    fn agent_payload(subagent_type: &str, model: Option<&str>) -> Value {
+        let mut tool_input = serde_json::json!({ "subagent_type": subagent_type });
+        if let Some(m) = model {
+            tool_input["model"] = json!(m);
+        }
+        json!({ "tool_name": "Agent", "tool_input": tool_input })
+    }
+
+    #[test]
+    fn warn_mode_deny_becomes_allow_with_would_deny_context() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::set_var("FORGE_MODE", "warn");
+
+        // "fork" with no requested model and no justify: is an inherit-class
+        // deny in enforce mode (see `inherit_row_fork_denied_without_justify`).
+        let payload = agent_payload("fork", None);
+        let outcome = hook_outcome_for_agent(&payload);
+        let specific = &outcome.output["hookSpecificOutput"];
+
+        assert_eq!(specific["permissionDecision"], "allow");
+        let context = specific["additionalContext"]
+            .as_str()
+            .expect("warn-mode deny must carry additionalContext");
+        assert!(
+            context.starts_with("forge warn-only: would deny -- "),
+            "got {context:?}"
+        );
+        assert!(specific.get("updatedInput").is_none());
+
+        std::env::remove_var("FORGE_MODE");
+    }
+
+    #[test]
+    fn warn_mode_reroute_becomes_allow_with_context_and_no_updated_input() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::set_var("FORGE_MODE", "warn");
+
+        // "Explore" with no model on the call is a would-be reroute to
+        // haiku in enforce mode (see `explore_row_haiku_default`).
+        let payload = agent_payload("Explore", None);
+        let outcome = hook_outcome_for_agent(&payload);
+        let specific = &outcome.output["hookSpecificOutput"];
+
+        assert_eq!(specific["permissionDecision"], "allow");
+        let context = specific["additionalContext"]
+            .as_str()
+            .expect("warn-mode reroute must carry additionalContext");
+        assert!(
+            context.starts_with("forge warn-only: would route "),
+            "got {context:?}"
+        );
+        assert!(
+            specific.get("updatedInput").is_none(),
+            "warn mode must never apply updatedInput: {specific}"
+        );
+
+        std::env::remove_var("FORGE_MODE");
+    }
+
+    #[test]
+    fn enforce_mode_reroute_is_unchanged_by_warn_mode_support() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::remove_var("FORGE_MODE");
+
+        let payload = agent_payload("Explore", None);
+        let outcome = hook_outcome_for_agent(&payload);
+        let specific = &outcome.output["hookSpecificOutput"];
+
+        assert_eq!(specific["permissionDecision"], "allow");
+        let context = specific["additionalContext"]
+            .as_str()
+            .expect("enforce mode must still carry its own context line");
+        assert!(!context.starts_with("forge warn-only"), "got {context:?}");
+        assert_eq!(
+            specific["updatedInput"]["model"], "haiku",
+            "enforce mode must still apply the reroute: {specific}"
+        );
     }
 
     #[test]

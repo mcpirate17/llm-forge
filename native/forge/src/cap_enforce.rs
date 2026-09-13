@@ -68,6 +68,13 @@ struct LiveState {
     /// Set once the 80%-of-cap warning has fired, so it is appended at most
     /// once per agent for the whole live check's lifetime.
     warned: bool,
+    /// `FORGE_MODE=warn` only: set once the over-cap warn-only notice has
+    /// fired, so a deny that would have fired in enforce mode is reported to
+    /// the caller exactly once per agent, then silent -- same shape as
+    /// `warned` above. `#[serde(default)]` so a live-state file written
+    /// before this field existed still loads (missing key, not corrupt).
+    #[serde(default)]
+    deny_warned: bool,
 }
 
 /// Production entry point: `dispatch.rs` calls this first, unconditionally,
@@ -311,13 +318,30 @@ fn find_task_dispatch_hint(
 /// The actual over/under-cap decision, given the now-current `billed_total`.
 /// Mutates and re-persists `state.warned` when the 80% warning fires for the
 /// first time -- a second call past 80% (but still under cap) is then a
-/// silent `NoOp`.
+/// silent `NoOp`. `FORGE_MODE=warn` downgrades an over-cap deny to a
+/// once-per-agent warn-only allow (`state.deny_warned`); every later
+/// over-cap call for that agent is then a silent `NoOp` -- same shape as the
+/// 80% warning below, one flag apiece.
 fn verdict_for(state: &mut LiveState, state_path: &Path, class: &str, cap_tokens: u64) -> CapCheck {
     if state.billed_total > cap_tokens {
-        return CapCheck::Deny(format!(
+        let reason = format!(
             "over the {cap_tokens} token cap for class {class} ({} billed): stop, write your final report now; the parent will re-dispatch what is left",
             state.billed_total
-        ));
+        );
+        if route::resolve_mode() == "warn" {
+            if state.deny_warned {
+                return CapCheck::NoOp;
+            }
+            state.deny_warned = true;
+            if let Err(err) = save_state(state_path, state) {
+                eprintln!(
+                    "forge: cap_enforce could not persist the deny_warned flag for {}: {err:#}",
+                    state_path.display()
+                );
+            }
+            return CapCheck::Warn(format!("forge warn-only: {reason}"));
+        }
+        return CapCheck::Deny(reason);
     }
     let warn_threshold = (cap_tokens as f64 * WARN_FRACTION) as u64;
     if state.billed_total >= warn_threshold && !state.warned {
@@ -342,12 +366,14 @@ mod tests {
     use super::*;
     use std::io::Write;
 
-    /// `FORGE_CAP_DISABLE` is process-wide state; every test in this module
-    /// that calls `check_with_deadline` (which now consults it) holds this
-    /// lock for its duration so `disable_env_skips_the_check_entirely`
-    /// setting the var cannot make a concurrently-running test see a
-    /// spurious `NoOp`. Same convention as `read_budget::tests::ENV_LOCK`.
-    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// `FORGE_CAP_DISABLE` and `FORGE_MODE` are both process-wide state read
+    /// fresh by `check_with_deadline`/`route::resolve_mode` on every call;
+    /// every test in this module that sets either one holds this lock for
+    /// its duration so a concurrently-running test can never observe a
+    /// spurious `NoOp` (from `FORGE_CAP_DISABLE`) or a spurious warn-mode
+    /// verdict (from `FORGE_MODE`) it did not itself set. Same convention as
+    /// `handlers::tests::ENV_LOCK` and friends.
+    pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     struct ScratchDir(PathBuf);
     impl ScratchDir {
@@ -496,6 +522,58 @@ mod tests {
             assert!(reason.contains("token cap for class"));
             assert!(reason.contains("stop, write your final report now"));
         }
+    }
+
+    #[test]
+    fn over_cap_in_warn_mode_warns_once_then_is_silent_across_three_calls() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::set_var("FORGE_MODE", "warn");
+        let scratch = ScratchDir::new("warnmode");
+        let ledger_root = scratch.0.join("ledger");
+        let agent_id = "agentwarnmode";
+        let transcript_path = subagent_transcript_path(&scratch.0, agent_id);
+        let payload = payload_for(agent_id, &scratch.0);
+
+        let policy = route::Policy::embedded().unwrap();
+        let decision = route::route(
+            &policy,
+            &AgentInput {
+                subagent_type: Some("general-purpose".to_string()),
+                requested_model: None,
+                description: None,
+            },
+        );
+        let cap = decision.cap_tokens;
+
+        // Straight past the cap on the very first call -- warn mode never
+        // gets the 80% warning path involved here, only the over-cap one.
+        std::fs::write(&transcript_path, line_with_usage(cap * 2, 0, 0)).unwrap();
+
+        let v1 = check_with_deadline(&payload, far_future_deadline(), &ledger_root);
+        match v1 {
+            CapCheck::Warn(context) => {
+                assert!(
+                    context.starts_with("forge warn-only: "),
+                    "warn-mode over-cap context must be prefixed for the caller: {context}"
+                );
+                assert!(context.contains("token cap for class"));
+            }
+            other => panic!("call 1 over cap in warn mode must warn once, got {other:?}"),
+        }
+
+        // Two further calls with no new bytes: `deny_warned` makes both a
+        // silent NoOp, never a repeat of the warning and never a Deny --
+        // warn mode must not fall back to enforcing after the first notice.
+        for n in 2..=3 {
+            let v = check_with_deadline(&payload, far_future_deadline(), &ledger_root);
+            assert_eq!(
+                v,
+                CapCheck::NoOp,
+                "call {n} must be silent once warn mode has already warned once"
+            );
+        }
+
+        std::env::remove_var("FORGE_MODE");
     }
 
     #[test]

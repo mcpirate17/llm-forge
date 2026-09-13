@@ -128,21 +128,28 @@ enum ReceiptCommand {
     Show(receipt_show::ShowArgs),
 }
 
-/// `forge route`'s cap for one subagent_type, for `ledger rollup-agent`
-/// (Phase 3 step 3, item 1): lives here, not in `ledger::agent_upsert`,
-/// because `route` is a top-level module the `ledger` tree cannot `use`
-/// when compiled standalone by the `tests/ledger_*.rs` integration
-/// binaries -- see `agent_upsert::run`'s doc comment. Falls back to the
-/// crate's `DEFAULT_CAP` if the embedded policy ever fails to parse, same
-/// as `dispatch.rs`/`cap_enforce.rs` do for the live `PreToolUse` seam.
-fn resolve_agent_cap(subagent_type: Option<&str>) -> u64 {
+/// `forge route`'s cap and routing verdict for one subagent_type, for
+/// `ledger rollup-agent` (Phase 3 step 3, items 1 and 3): lives here, not
+/// in `ledger::agent_upsert`, because `route` is a top-level module the
+/// `ledger` tree cannot `use` when compiled standalone by the
+/// `tests/ledger_*.rs` integration binaries -- see `agent_upsert::run`'s
+/// doc comment. Falls back to the crate's `DEFAULT_CAP` and a bare
+/// `"allow"`/no-model verdict if the embedded policy ever fails to parse,
+/// same as `dispatch.rs`/`cap_enforce.rs` do for the live `PreToolUse`
+/// seam -- an unparseable policy must never manufacture a false `"deny"`
+/// on this row any more than it would on the live cap check.
+fn resolve_agent_route(subagent_type: Option<&str>) -> ledger::agent_upsert::AgentRouteResolution {
     let policy = match route::Policy::embedded() {
         Ok(policy) => policy,
         Err(err) => {
             eprintln!(
-                "forge ledger rollup-agent: embedded routing policy failed to parse ({err:#}); over_cap left unresolved against the crate default"
+                "forge ledger rollup-agent: embedded routing policy failed to parse ({err:#}); over_cap/decision left unresolved against the crate default"
             );
-            return ledger::agent::DEFAULT_CAP;
+            return ledger::agent_upsert::AgentRouteResolution {
+                cap_tokens: ledger::agent::DEFAULT_CAP,
+                decision: "allow".to_string(),
+                would_assign_model: false,
+            };
         }
     };
     let input = route::AgentInput {
@@ -150,7 +157,15 @@ fn resolve_agent_cap(subagent_type: Option<&str>) -> u64 {
         requested_model: None,
         description: None,
     };
-    route::route(&policy, &input).cap_tokens
+    let decision = route::route(&policy, &input);
+    ledger::agent_upsert::AgentRouteResolution {
+        cap_tokens: decision.cap_tokens,
+        decision: match decision.decision {
+            route::Verdict::Allow => "allow".to_string(),
+            route::Verdict::Deny => "deny".to_string(),
+        },
+        would_assign_model: decision.model.is_some(),
+    }
 }
 
 fn main() -> ExitCode {
@@ -236,7 +251,7 @@ fn main() -> ExitCode {
                 }
             },
             LedgerCommand::RollupAgent(args) => {
-                match ledger::agent_upsert::run(args, resolve_agent_cap) {
+                match ledger::agent_upsert::run(args, resolve_agent_route) {
                     Ok(code) => ExitCode::from(code as u8),
                     Err(err) => {
                         eprintln!("forge ledger rollup-agent: {err:#}");

@@ -12,7 +12,7 @@
 #[allow(dead_code)]
 mod ledger;
 
-use ledger::agent_upsert::{run as agent_upsert_run, AgentUpsertArgs};
+use ledger::agent_upsert::{run as agent_upsert_run, AgentRouteResolution, AgentUpsertArgs};
 use ledger::rollup::{run, today_utc_date, RollupArgs};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -204,11 +204,11 @@ fn subagent_walk_keys_rows_by_agent_id_and_joins_dispatches() {
     );
     assert_eq!(
         dispatch_lines[0],
-        "{\"agent_id\":\"7fa9c1b0123456789\",\"billed_tokens\":350,\"ci_red_on_first_push\":null,\"description\":\"search the repo\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":\"2026-04-01T00:03:00Z\",\"landed\":null,\"last_ts\":\"2026-04-01T00:03:00Z\",\"model_requested\":\"sonnet\",\"model_used\":[\"claude-sonnet-5\"],\"n_turns\":1,\"over_cap\":false,\"parent_session_id\":\"parent-1\",\"required_rework\":null,\"subagent_type\":\"general-purpose\",\"tier\":\"sonnet\",\"tool_use_id\":\"toolu_dispatch1\",\"total_cache_read\":5000}"
+        "{\"agent_id\":\"7fa9c1b0123456789\",\"applied\":null,\"billed_tokens\":350,\"ci_red_on_first_push\":null,\"decision\":null,\"description\":\"search the repo\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":\"2026-04-01T00:03:00Z\",\"landed\":null,\"last_ts\":\"2026-04-01T00:03:00Z\",\"mode\":null,\"model_requested\":\"sonnet\",\"model_used\":[\"claude-sonnet-5\"],\"n_turns\":1,\"over_cap\":false,\"parent_session_id\":\"parent-1\",\"required_rework\":null,\"subagent_type\":\"general-purpose\",\"tier\":\"sonnet\",\"tool_use_id\":\"toolu_dispatch1\",\"total_cache_read\":5000}"
     );
     assert_eq!(
         dispatch_lines[1],
-        "{\"agent_id\":null,\"billed_tokens\":null,\"ci_red_on_first_push\":null,\"description\":\"never answered\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":null,\"landed\":null,\"last_ts\":null,\"model_requested\":null,\"model_used\":null,\"n_turns\":null,\"over_cap\":null,\"parent_session_id\":\"parent-1\",\"required_rework\":null,\"subagent_type\":\"general-purpose\",\"tier\":null,\"tool_use_id\":\"toolu_dispatch2\",\"total_cache_read\":null}"
+        "{\"agent_id\":null,\"applied\":null,\"billed_tokens\":null,\"ci_red_on_first_push\":null,\"decision\":null,\"description\":\"never answered\",\"dispatch_ts\":\"2026-04-01T00:02:00Z\",\"first_ts\":null,\"landed\":null,\"last_ts\":null,\"mode\":null,\"model_requested\":null,\"model_used\":null,\"n_turns\":null,\"over_cap\":null,\"parent_session_id\":\"parent-1\",\"required_rework\":null,\"subagent_type\":\"general-purpose\",\"tier\":null,\"tool_use_id\":\"toolu_dispatch2\",\"total_cache_read\":null}"
     );
 
     // The one sanctioned piece of dispatch text is `description`; the
@@ -398,7 +398,11 @@ fn live_upsert_then_full_sweep_yields_one_row_per_agent() {
             subagent_type: Some("general-purpose".to_string()),
             out: Some(root.clone()),
         },
-        |_| ledger::agent::DEFAULT_CAP,
+        |_| AgentRouteResolution {
+            cap_tokens: ledger::agent::DEFAULT_CAP,
+            decision: "allow".to_string(),
+            would_assign_model: false,
+        },
     )
     .expect("live SubagentStop upsert succeeds");
 

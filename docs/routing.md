@@ -324,3 +324,80 @@ that would actually deny those calls (`forge hook PreToolUse`, matcher
 `Agent`) is not installed in the LLM monorepo's own `.claude/settings.json`
 yet (`docs/roadmap.md` step 2b, still TODO). This baseline is the honest
 "before" number the gate will ratchet down from once that hook is live.
+
+## Warn-only mode and standalone install
+
+Two independent env-var levers, both read fresh per process (no config
+file), for installing `forge` somewhere that has no Python dispatcher to
+delegate to and/or wants to see what routing/cap enforcement *would* do
+before it starts actually changing behavior:
+
+### `FORGE_HOOK_STANDALONE=1`: no Python, no native Bash-guard branches
+
+`dispatch.rs::run_hook` checks this first, before anything else. Set, a
+hook call answers using only forge's own native decisions -- `PreToolUse`
+routing (`route::hook_outcome_for_agent`) and the live cap check
+(`cap_enforce`) for an `Agent` payload, and the `SubagentStop` rollup
+(`ledger::agent_upsert` plus telemetry) -- and never shells out to
+`python -m tooling.hooks.dispatch`, never runs a native Bash-guard branch
+(`bash_guard.rs`, `bash_impact.rs`, etc.) either. A payload forge has no
+native opinion on (a bare `Bash` call, any event other than `PreToolUse`/
+`SubagentStop`) prints nothing and exits 0 -- silence, not an error, since
+there is nothing left to delegate to.
+
+### `FORGE_MODE=warn` (default `enforce`)
+
+Any value other than `"warn"` or `"enforce"` prints one stderr line
+(`FORGE_MODE=<value> is neither "warn" nor "enforce"; behaving as enforce`)
+and behaves as `enforce` -- an unrecognized value must never silently
+relax enforcement.
+
+**Routing** (`route::hook_outcome_for_agent`): a verdict that would have
+denied the dispatch instead allows it, with
+`additionalContext: "forge warn-only: would deny -- <reason>"` and no
+`updatedInput`; a verdict that would have rerouted the model instead
+allows it unchanged (no `updatedInput`), with
+`additionalContext: "forge warn-only: would route <subagent_type> to
+<model> (class <class>)"`; a verdict that was already a plain allow with
+no model opinion stays silent -- warn mode has nothing to report. The
+`task_dispatch` row for that dispatch still carries the *computed* routing
+`decision` (`"allow"`/`"deny"`), plus the new `mode` and `applied` fields
+(`docs/ledger.md`) -- `applied` is `false` whenever warn mode changed
+nothing about the live call.
+
+**Live cap enforcement** (`cap_enforce.rs`): an over-cap verdict that would
+have denied the call instead allows it, once per agent, with
+`additionalContext: "forge warn-only: <original deny reason>"` (a new
+`deny_warned` flag on `LiveState`, persisted next to the existing `warned`
+flag, silences every call after the first). The 80%-of-cap warning and the
+`over_cap` fact recorded on the `SubagentStop` row are unchanged and
+independent of `FORGE_MODE` -- warn mode only ever downgrades what would
+have been a hard *deny*.
+
+### Installing `forge` standalone (no LLM monorepo, no Python dispatcher)
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [{"type": "command", "command": "forge hook PreToolUse"}]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [{"type": "command", "command": "forge hook SubagentStop"}]
+      }
+    ]
+  }
+}
+```
+
+Set `FORGE_HOOK_STANDALONE=1` (and, to try warn-only first, `FORGE_MODE=warn`)
+in the environment the hook command runs in. Install the binary itself with:
+
+```
+cargo install --git https://github.com/mcpirate17/llm-forge --locked forge
+```
+

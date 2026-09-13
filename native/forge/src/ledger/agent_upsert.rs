@@ -53,25 +53,53 @@ pub struct AgentUpsertArgs {
     pub out: Option<PathBuf>,
 }
 
-/// `resolve_cap` is injected by the caller (`main.rs`) rather than called
-/// here directly: `forge route`'s `Policy`/`AgentInput` live in the
+/// The routing verdict `main.rs` recomputes for a `subagent_type` alone
+/// (no requested model, no description -- the same narrowed `AgentInput`
+/// `resolve_agent_route`'s cap-only predecessor already used): everything
+/// this row's `decision`/`applied` and `over_cap` need from `forge route`'s
+/// embedded policy, without this module ever depending on the `route`
+/// module directly (see `run`'s doc comment below).
+#[derive(Debug, Clone)]
+pub struct AgentRouteResolution {
+    /// `route::Decision::cap_tokens` for this class -- unrelated to
+    /// `decision` below; feeds only `over_cap` (unchanged fact, cap bullet).
+    pub cap_tokens: u64,
+    /// `route::Decision::decision` as `"allow"` or `"deny"` -- the routing
+    /// bullet's "computed decision", recomputed retrospectively from
+    /// `subagent_type` alone since the live `PreToolUse` call's own
+    /// requested-model/description/justify context is never persisted for
+    /// this upsert to join against. Documented approximation, same status
+    /// as `resolve_agent_cap`'s own subagent_type-only cap resolution.
+    pub decision: String,
+    /// Whether the policy would assign this class a model at all
+    /// (`route::Decision::model.is_some()`) -- an inherit-class allow (or
+    /// any deny) never does. Together with `decision`, this is enough to
+    /// derive `applied` without ever seeing `route::Verdict` here.
+    pub would_assign_model: bool,
+}
+
+/// `resolve` is injected by the caller (`main.rs`) rather than called here
+/// directly: `forge route`'s `Policy`/`AgentInput`/`Verdict` live in the
 /// top-level `route` module, which this file cannot `use crate::route::..`
 /// from -- `ledger/mod.rs` is compiled standalone via `#[path]` in the
 /// `tests/ledger_*.rs` integration binaries, none of which have a `route`
-/// module at their crate root. Injecting the resolved cap keeps this file
+/// module at their crate root. Injecting the resolution keeps this file
 /// buildable in both contexts while still letting the real binary compute
-/// the cap from the embedded routing policy, same as `dispatch.rs`/
+/// it from the embedded routing policy, same as `dispatch.rs`/
 /// `cap_enforce.rs` do for the live `PreToolUse` seam.
-pub fn run(args: AgentUpsertArgs, resolve_cap: impl Fn(Option<&str>) -> u64) -> Result<i32> {
+pub fn run(
+    args: AgentUpsertArgs,
+    resolve: impl Fn(Option<&str>) -> AgentRouteResolution,
+) -> Result<i32> {
     let ledger_root = super::resolve_ledger_root(args.out);
     let summary = super::reader::read_transcript_file(&args.transcript)
         .with_context(|| format!("reading subagent transcript {}", args.transcript.display()))?;
 
-    let cap_tokens = resolve_cap(args.subagent_type.as_deref());
+    let resolution = resolve(args.subagent_type.as_deref());
     let row = build_row(
         &args.agent_id,
         args.subagent_type.as_deref(),
-        cap_tokens,
+        &resolution,
         &summary,
     );
     let day = row
@@ -99,7 +127,7 @@ pub fn run(args: AgentUpsertArgs, resolve_cap: impl Fn(Option<&str>) -> u64) -> 
 fn build_row(
     agent_id: &str,
     subagent_type: Option<&str>,
-    cap_tokens: u64,
+    resolution: &AgentRouteResolution,
     summary: &super::schema::TranscriptSummary,
 ) -> TaskDispatchRow {
     let models: BTreeSet<&str> = summary
@@ -111,6 +139,19 @@ fn build_row(
     let billed = summary.total_input_tokens
         + summary.total_output_tokens
         + summary.total_cache_creation_input_tokens;
+    let over_cap = billed > resolution.cap_tokens;
+    let mode = resolve_mode();
+    // `model_requested` is always `None` on this row (see field below), so
+    // -- same equivalence `route::hook_outcome_for_agent`'s own
+    // `already_had_model` check reduces to -- "would reroute" is exactly
+    // "the policy has a model opinion for this class".
+    let would_reroute = resolution.would_assign_model;
+    // In enforce mode nothing this upsert can see was ever overridden: both
+    // a real deny and a real reroute already happened for real. In warn
+    // mode, a deny or a reroute would both have been advisory only --
+    // never applied -- while a bare allow-with-no-change has nothing to
+    // apply/not-apply, so it counts as applied.
+    let applied = mode == "enforce" || (resolution.decision != "deny" && !would_reroute);
     let (first_ts, last_ts) = ts_range(summary);
 
     TaskDispatchRow {
@@ -126,12 +167,31 @@ fn build_row(
         n_turns: Some(summary.turns_with_usage),
         billed_tokens: Some(billed),
         total_cache_read: Some(summary.total_cache_read_input_tokens),
-        over_cap: Some(billed > cap_tokens),
+        // Unchanged fact (cap bullet): the live cap breach, independent of
+        // routing's own `decision`/`applied` below.
+        over_cap: Some(over_cap),
         first_ts,
         last_ts,
         landed: None,
         required_rework: None,
         ci_red_on_first_push: None,
+        decision: Some(resolution.decision.clone()),
+        mode: Some(mode.to_string()),
+        applied: Some(applied),
+    }
+}
+
+/// `FORGE_MODE`, duplicated from `route::resolve_mode` (this module cannot
+/// `use crate::route` -- see the module doc comment above): `"warn"` opts
+/// in, anything else (including unset or an unrecognized value) is
+/// `"enforce"`. Unlike `route::resolve_mode`, this narrow upsert path does
+/// not print the malformed-value warning -- `forge hook`'s own call into
+/// `route::resolve_mode` already does, once per hook invocation, and this
+/// command runs from the very same `SubagentStop` hook process.
+fn resolve_mode() -> &'static str {
+    match std::env::var("FORGE_MODE").ok().as_deref() {
+        Some("warn") => "warn",
+        _ => "enforce",
     }
 }
 
@@ -205,7 +265,7 @@ mod tests {
             subagent_type: Some("general-purpose".to_string()),
             out: Some(ledger_root.clone()),
         };
-        run(args1, |_| DEFAULT_CAP).unwrap();
+        run(args1, |_| allow_resolution(DEFAULT_CAP)).unwrap();
 
         let args2 = AgentUpsertArgs {
             transcript: transcript_path.clone(),
@@ -213,7 +273,7 @@ mod tests {
             subagent_type: Some("general-purpose".to_string()),
             out: Some(ledger_root.clone()),
         };
-        run(args2, |_| DEFAULT_CAP).unwrap();
+        run(args2, |_| allow_resolution(DEFAULT_CAP)).unwrap();
 
         let day_file = ledger_root.join("task_dispatch").join("2026-09-13.jsonl");
         let contents = std::fs::read_to_string(&day_file).unwrap();
@@ -226,6 +286,117 @@ mod tests {
         let parsed: Value = serde_json::from_str(rows[0]).unwrap();
         assert_eq!(parsed["agent_id"], "abc123");
         assert_eq!(parsed["billed_tokens"], 430); // 100+50+200+75+5, cache_read excluded
+    }
+
+    /// A neutral resolution: high cap (never over), routed as `"allow"`
+    /// with no model opinion -- the injected closure's return value for
+    /// tests that only care about a different field on the row.
+    fn allow_resolution(cap_tokens: u64) -> AgentRouteResolution {
+        AgentRouteResolution {
+            cap_tokens,
+            decision: "allow".to_string(),
+            would_assign_model: false,
+        }
+    }
+
+    fn row_from(
+        ledger_root: &std::path::Path,
+        transcript: std::path::PathBuf,
+        agent_id: &str,
+        resolution: AgentRouteResolution,
+    ) -> Value {
+        let args = AgentUpsertArgs {
+            transcript,
+            agent_id: agent_id.to_string(),
+            subagent_type: Some("general-purpose".to_string()),
+            out: Some(ledger_root.to_path_buf()),
+        };
+        run(args, move |_| resolution.clone()).unwrap();
+        let day_file = ledger_root.join("task_dispatch").join("2026-09-13.jsonl");
+        serde_json::from_str(std::fs::read_to_string(&day_file).unwrap().trim()).unwrap()
+    }
+
+    #[test]
+    fn the_row_carries_decision_mode_and_applied() {
+        // `resolve_mode` reads `FORGE_MODE` fresh, same as `route::
+        // resolve_mode`; serialize against the same convention used
+        // elsewhere in this crate (e.g. `cap_enforce::tests::ENV_LOCK`).
+        static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+
+        let scratch = ScratchDir::new("modeapplied");
+        let transcript_path = scratch.path().join("agent-modefield.jsonl");
+        write_fixture_transcript(&transcript_path);
+
+        // A deny resolution, cap kept out of the way (high) so `over_cap`
+        // stays false throughout -- proves `decision`/`applied` are their
+        // own routing-only fact, independent of the cap bullet's `over_cap`.
+        let deny = AgentRouteResolution {
+            cap_tokens: 1_000_000,
+            decision: "deny".to_string(),
+            would_assign_model: false,
+        };
+
+        std::env::remove_var("FORGE_MODE");
+        let row = row_from(
+            &scratch.path().join("ledger-enforce"),
+            transcript_path.clone(),
+            "modefield",
+            deny.clone(),
+        );
+        assert_eq!(row["decision"], "deny");
+        assert_eq!(row["mode"], "enforce");
+        assert_eq!(row["applied"], true, "enforce mode always applies: {row}");
+        assert_eq!(row["over_cap"], false);
+
+        std::env::set_var("FORGE_MODE", "warn");
+        let row = row_from(
+            &scratch.path().join("ledger-warn-deny"),
+            transcript_path.clone(),
+            "modefield",
+            deny,
+        );
+        assert_eq!(row["decision"], "deny");
+        assert_eq!(row["mode"], "warn");
+        assert_eq!(
+            row["applied"], false,
+            "warn mode's would-be deny is advisory, never applied: {row}"
+        );
+
+        // An allow-with-reroute resolution in warn mode: also unapplied --
+        // this is the fact `report.rs`'s `would_route` column reads.
+        let reroute = AgentRouteResolution {
+            cap_tokens: 1_000_000,
+            decision: "allow".to_string(),
+            would_assign_model: true,
+        };
+        let row = row_from(
+            &scratch.path().join("ledger-warn-reroute"),
+            transcript_path.clone(),
+            "modefield",
+            reroute,
+        );
+        assert_eq!(row["decision"], "allow");
+        assert_eq!(
+            row["applied"], false,
+            "warn mode's would-be reroute is also unapplied: {row}"
+        );
+
+        // A plain allow-with-no-change resolution: nothing to override, so
+        // it counts as applied even in warn mode.
+        let row = row_from(
+            &scratch.path().join("ledger-warn-noop"),
+            transcript_path,
+            "modefield",
+            allow_resolution(1_000_000),
+        );
+        assert_eq!(row["decision"], "allow");
+        assert_eq!(
+            row["applied"], true,
+            "an allow with nothing to change is applied in every mode: {row}"
+        );
+
+        std::env::remove_var("FORGE_MODE");
     }
 
     #[test]
@@ -244,7 +415,7 @@ mod tests {
             subagent_type: Some("some-type-the-policy-has-never-heard-of".to_string()),
             out: Some(ledger_root.clone()),
         };
-        run(args, |_| 1).unwrap();
+        run(args, |_| allow_resolution(1)).unwrap();
 
         let day_file = ledger_root.join("task_dispatch").join("2026-09-13.jsonl");
         let contents = std::fs::read_to_string(&day_file).unwrap();
