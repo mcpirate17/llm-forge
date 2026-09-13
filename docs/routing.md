@@ -249,11 +249,14 @@ and must never block the harness):
 5. Delegates to the Python dispatcher exactly as before -- `SubagentStop`
    owns no verdict of its own, same posture as `SessionEnd`.
 
-**Known debt** (also in `docs/ledger.md`): `rollup-agent` has no access to
-the parent transcript, so it never learns the real `tool_use_id` a later
-full `forge ledger rollup --repo` sweep will key that same dispatch's row
-under. It is a *separate* row from the one a subsequent full sweep writes
-for the same dispatch until something reconciles the two keys.
+**Row identity** (fixed, was debt from PR #52; also in `docs/ledger.md`):
+`rollup-agent` has no access to the parent transcript, so it never learns
+the real `tool_use_id` a later full `forge ledger rollup --repo` sweep
+would key that same dispatch's row under. It writes that synthetic id into
+the row's `tool_use_id` field only; the day-file upsert itself is keyed by
+`agent_id`, the one field both this live path and the full sweep agree on.
+A live row followed by a full sweep of the same dispatch therefore
+collapses to one row, not two.
 
 ### Installing the hook
 

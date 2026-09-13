@@ -9,14 +9,16 @@
 //! pipeline on a lone subagent file would collide with, not complement,
 //! the parent's own eventual rollup.
 //!
-//! **Known debt** (documented here and in `docs/ledger.md`): this command
+//! **Row identity** (fixed 2026-09-13, was debt from PR #52): this command
 //! has no access to the parent transcript, so it never learns the real
-//! `tool_use_id` a later full `forge ledger rollup --repo` sweep will use
-//! to key that same dispatch's row. It upserts under a synthetic key
-//! `agent-<agent_id>` instead -- stable and idempotent across repeated
-//! `SubagentStop` calls for the same agent (the brief's explicit
-//! requirement), but a *separate* row from the one a subsequent full sweep
-//! writes for the same dispatch until something reconciles the two keys.
+//! `tool_use_id` a later full `forge ledger rollup --repo` sweep would use
+//! to key that same dispatch's row. It writes a synthetic `tool_use_id`
+//! (`agent-<agent_id>`) into the row as a plain field, but keys the
+//! `task_dispatch` day-file upsert by `agent_id` instead -- the one field
+//! both this live path and the full sweep (`rollup.rs::build_task_dispatch`,
+//! from the dispatch's `tool_result` `agentId:` line) agree on. A later full
+//! sweep for the same dispatch therefore supersedes this live row instead of
+//! sitting beside it as a second one; the two identities never diverge.
 
 use std::path::PathBuf;
 
@@ -80,7 +82,14 @@ pub fn run(args: AgentUpsertArgs, resolve_cap: impl Fn(Option<&str>) -> u64) -> 
         .unwrap_or_else(super::rollup::today_utc_date);
 
     let value = serde_json::to_value(&row)?;
-    super::writer::write_day_file(&ledger_root, "task_dispatch", &day, "tool_use_id", &[value])
+    // Keyed by `agent_id`, the same identity `rollup.rs`'s full sweep now
+    // uses for `task_dispatch` (PR #52 debt item 0a) -- not `tool_use_id`,
+    // whose value here is only ever the synthetic `agent-<agent_id>`
+    // placeholder (see the module doc above), never the real dispatch-side
+    // id a later sweep would key by. Keying both paths by `agent_id` lets a
+    // subsequent full sweep's row for this same dispatch supersede this
+    // live row instead of becoming a second one.
+    super::writer::write_day_file(&ledger_root, "task_dispatch", &day, "agent_id", &[value])
         .with_context(|| format!("upserting task_dispatch row for agent_id {}", args.agent_id))?;
     Ok(0)
 }

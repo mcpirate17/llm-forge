@@ -12,6 +12,7 @@
 #[allow(dead_code)]
 mod ledger;
 
+use ledger::agent_upsert::{run as agent_upsert_run, AgentUpsertArgs};
 use ledger::rollup::{run, today_utc_date, RollupArgs};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -366,6 +367,65 @@ fn rerunning_rollup_is_idempotent() {
         read_day_file(&root, "hook_rollup", &hook_day),
         first_hook,
         "hook_rollup changed on rerun"
+    );
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// PR #52 debt item 0a: a `SubagentStop` live upsert (`forge ledger
+/// rollup-agent`, keyed synthetically as `agent-<agent_id>` in its
+/// `tool_use_id` field) followed by a full `forge ledger rollup` sweep of
+/// the same transcripts (which learns the same `agent_id` from the parent's
+/// `tool_result`) must collapse to exactly one `task_dispatch` row for that
+/// agent, not two -- both paths key their day-file upsert by `agent_id` now.
+#[test]
+fn live_upsert_then_full_sweep_yields_one_row_per_agent() {
+    let root = std::env::temp_dir().join(format!(
+        "forge-ledger-rollup-live-then-sweep-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&root);
+
+    let subagent_transcript = subagent_scenario_dir()
+        .join("parent-1-session")
+        .join("subagents")
+        .join("agent-7fa9c1b0123456789.jsonl");
+
+    agent_upsert_run(
+        AgentUpsertArgs {
+            transcript: subagent_transcript,
+            agent_id: "7fa9c1b0123456789".to_string(),
+            subagent_type: Some("general-purpose".to_string()),
+            out: Some(root.clone()),
+        },
+        |_| ledger::agent::DEFAULT_CAP,
+    )
+    .expect("live SubagentStop upsert succeeds");
+
+    let code = run(RollupArgs {
+        paths: vec![subagent_scenario_dir()],
+        out: Some(root.clone()),
+        dry_run: false,
+        repo: None,
+        project: None,
+        cap: ledger::agent::DEFAULT_CAP,
+        since: None,
+        last: None,
+        no_subagents: false,
+        branch: None,
+    })
+    .expect("full sweep rollup succeeds");
+    assert_eq!(code, 0);
+
+    let dispatches = read_day_file(&root, "task_dispatch", "2026-04-01");
+    let agent_rows: Vec<&str> = dispatches
+        .lines()
+        .filter(|l| l.contains(r#""agent_id":"7fa9c1b0123456789""#))
+        .collect();
+    assert_eq!(
+        agent_rows.len(),
+        1,
+        "live upsert + full sweep of the same dispatch must collapse to one row, not two: {dispatches}"
     );
 
     let _ = fs::remove_dir_all(&root);

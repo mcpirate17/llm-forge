@@ -917,10 +917,16 @@ fn write_all(ledger_root: &Path, output: &RollupOutput) -> Result<()> {
         &output.session_rollup,
     )?;
     write_table(ledger_root, "hook_rollup", "hook_name", &output.hook_rollup)?;
+    // Keyed by `agent_id`, not `tool_use_id` (PR #52 debt item 0a): the
+    // `rollup-agent` live path (`agent_upsert.rs`) has no access to the
+    // parent transcript and cannot learn the real `tool_use_id`, so it
+    // upserts under `agent_id` instead. Keying this sweep's write the same
+    // way lets a later full sweep's row for the same dispatch supersede the
+    // live row instead of sitting beside it as a second one.
     write_table(
         ledger_root,
         "task_dispatch",
-        "tool_use_id",
+        "agent_id",
         &output.task_dispatch,
     )?;
     write_table(

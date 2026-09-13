@@ -552,16 +552,18 @@ slice fetches it. Requirements for that fetcher:
     it would fetch/write without calling `gh`) so it can be verified without
     live API credits.
 
-### Known debt: `agent_upsert`'s synthetic key
+### Row identity: `task_dispatch` is keyed by `agent_id` (fixed, was debt from PR #52)
 
 `native/forge/src/ledger/agent_upsert.rs` (`forge ledger rollup-agent`, the
 `SubagentStop`-triggered upsert, `docs/routing.md`'s enforcement section)
 has no access to the parent transcript, so it never learns the real
-`tool_use_id` a later full `forge ledger rollup --repo` sweep uses to key
-that same dispatch's `task_dispatch` row. It upserts under a synthetic key
-`agent-<agent_id>` instead -- stable and idempotent across repeated
-`SubagentStop` calls for the same agent, but a **separate row** from the
-one a subsequent full sweep writes for the same dispatch, until something
-reconciles the two keys (a follow-up that teaches the full sweep to look up
-an existing `agent-<agent_id>` row by `agent_id` and merge into it, rather
-than always writing a fresh `tool_use_id`-keyed row).
+`tool_use_id` a later full `forge ledger rollup --repo` sweep would use to
+key that same dispatch's `task_dispatch` row. It writes a synthetic
+`tool_use_id` (`agent-<agent_id>`) into the row as a plain field, but both
+this live path and the full sweep (`rollup.rs::build_task_dispatch`, which
+learns `agent_id` from the dispatch's `tool_result` `agentId:` line) key
+their `task_dispatch` day-file upsert by `agent_id` -- the one field they
+always agree on. A live row followed by a full sweep of the same dispatch
+therefore collapses to exactly one row (`write_day_file`'s existing
+supersede-by-key behavior does the merge; no reconciliation pass is
+needed), instead of the two rows the mismatched keys used to produce.
