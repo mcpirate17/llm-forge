@@ -139,17 +139,11 @@ does, so none of that is shipped here — `native/forge/src/dispatch.rs`'s
 
 ## Installing the hook in a project
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Agent",
-        "hooks": [{"type": "command", "command": "<path-to>/forge hook PreToolUse"}]
-      }
-    ]
-  }
-}
+One command (`docs/install.md` has the full story, including status and
+uninstall):
+
+```
+forge hooks install --host <project-root> --standalone
 ```
 
 `FORGE_ROUTE_DISABLE=1` skips routing entirely (bare allow, no
@@ -259,23 +253,21 @@ collapses to one row, not two.
 
 ### Installing the hook
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Agent",
-        "hooks": [{"type": "command", "command": "<path-to>/forge hook PreToolUse"}]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [{"type": "command", "command": "<path-to>/forge hook SubagentStop"}]
-      }
-    ]
-  }
-}
+One command, not a hand edit (`docs/install.md` has the full story):
+
 ```
+forge hooks install --host <project-root> --standalone
+```
+
+It writes the `PreToolUse` (matcher `.*`) and `SubagentStop` entries
+pointing at the running binary, with `FORGE_MODE` and
+`FORGE_HOOK_STANDALONE=1` in each command's env prefix, backs the current
+settings up once at `.claude/settings.pre-forge.bak.json`, and is
+idempotent — re-running rewrites forge's own entries in place, so a mode
+or binary change is one command. `forge hooks status` reports what is
+installed (and exits 1 on an entry whose binary is gone);
+`forge hooks uninstall` removes exactly those entries and keeps the
+backup.
 
 `FORGE_LEDGER_DISABLE=1` skips the `SubagentStop` rollup entirely (the
 escape hatch for a broken ledger root); it does not affect the live
@@ -375,28 +367,17 @@ have been a hard *deny*.
 
 ### Installing `forge` standalone (no LLM monorepo, no Python dispatcher)
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Agent",
-        "hooks": [{"type": "command", "command": "forge hook PreToolUse"}]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [{"type": "command", "command": "forge hook SubagentStop"}]
-      }
-    ]
-  }
-}
-```
-
-Set `FORGE_HOOK_STANDALONE=1` (and, to try warn-only first, `FORGE_MODE=warn`)
-in the environment the hook command runs in. Install the binary itself with:
+Two commands, no hand edit of `.claude/settings.json`:
 
 ```
 cargo install --git https://github.com/mcpirate17/llm-forge --locked forge
+forge hooks install --host <project-root> --mode warn --standalone
 ```
+
+`install` writes the `PreToolUse` (matcher `.*`) and `SubagentStop`
+entries — each command prefixed with `FORGE_MODE=warn
+FORGE_HOOK_STANDALONE=1` and the binary's absolute path, exactly the shape
+the old hand edit produced — while preserving every other entry and key in
+the file, and backs the previous settings up once (full story, including
+the warn→enforce flip, status and rollback: `docs/install.md`).
 

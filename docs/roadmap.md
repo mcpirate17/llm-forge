@@ -118,6 +118,14 @@ agent tokens. Stop porting; finish Phase 3, then install.
    he turned the PR off on 09-13 morning. Reconciling the ~36 diverged
    conductor files first needs no forge PR (33 forge-ahead, 3 both, 0
    cosmetic).
+2a. (GLM) `forge hooks install/uninstall/status`: one command writes,
+   inspects and rolls back forge's entries in a host's
+   `.claude/settings.json` (mode, standalone, binary path), merging into
+   what is there -- never replacing it, backup written once. The hand
+   edit steps 2 and 2b assumed is one command now, and the warn ->
+   enforce flip is the same command again; `forge --version` stamps the
+   git rev so `status` can tell an installed binary from the running
+   one. DONE PR #59 (`docs/install.md`).
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
