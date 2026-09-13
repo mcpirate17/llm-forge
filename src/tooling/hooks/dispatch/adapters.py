@@ -93,12 +93,19 @@ def _telemetry_path(telemetry: ModuleType) -> Path:
     return Path(os.environ.get("CONTEXT_TELEMETRY_PATH", DEFAULT_PATH))
 
 
-def _telemetry(ctx: Any, hook: str, output: dict[str, Any]) -> None:
+def _telemetry(
+    ctx: Any, hook: str, output: dict[str, Any], *, category: str = ""
+) -> None:
     """What ``context_telemetry hook-context`` logs: the injected context size."""
     telemetry = _conductor(ctx, "conductor.context_telemetry")
     path = _telemetry_path(telemetry)
+    session_id = (
+        ctx.payload.get("session_id", "") if isinstance(ctx.payload, dict) else ""
+    )
     try:
-        item = telemetry.hook_context_event(hook, output)
+        item = telemetry.hook_context_event(
+            hook, output, category=category, session_id=session_id
+        )
         if item["output_bytes"]:
             telemetry.record(item, path)
     except (OSError, TypeError, ValueError) as exc:

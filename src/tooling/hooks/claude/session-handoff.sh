@@ -17,4 +17,4 @@ export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 source "$HOOK_DIR/_identity.sh"
 cd "$REPO_ROOT"
 "$PYTHON" -m conductor.inplace_handoff hook --identity "${A2A_ID:-claude}" \
-  | "$PYTHON" -m conductor.context_telemetry hook-context --hook session-handoff
+  | "$PYTHON" -m conductor.context_telemetry hook-context --hook session-handoff --category instructions
