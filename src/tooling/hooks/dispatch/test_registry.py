@@ -8,7 +8,8 @@ from pathlib import Path
 
 from tooling.hooks.dispatch import adapters, registry
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[3]  # package root (src/) in this repository
+REPO = Path(__file__).resolve().parents[4]  # checkout root, where .claude/ lives
 TEMPLATE = ROOT / "tooling" / "hooks" / "claude" / "settings.dispatcher.json"
 
 # The 18 commands live in the main checkout's (gitignored) .claude/settings.json on 2026-09-02.
@@ -48,7 +49,7 @@ def test_settings_block_wires_every_event_once_to_the_launcher():
 
 
 def test_launcher_is_tracked_and_executable():
-    launcher = ROOT / registry.LAUNCHER
+    launcher = REPO / registry.LAUNCHER
     assert launcher.is_file() and launcher.stat().st_size > 0
     assert os.access(launcher, os.X_OK)
     assert launcher.read_text().startswith("#!/usr/bin/env python3")
