@@ -13,13 +13,13 @@
 //! a broken ledger root or a machine where the write must not happen); the
 //! hook itself still runs unchanged.
 
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::sync::mpsc;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde_json::Value;
+
+use crate::bounded_child::run_bounded;
 
 /// Wall-clock bound for the whole rollup child, kill on overrun (design
 /// step 6: SessionEnd must not delay the harness's shutdown path).
@@ -63,56 +63,13 @@ pub fn rollup_ending_session(payload: &str) {
     }
 }
 
-fn run_rollup_child(transcript: &PathBuf) -> Result<()> {
-    let exe = std::env::current_exe().context("locating the forge binary")?;
-    let mut command = Command::new(exe);
-    command
-        .args(["ledger", "rollup"])
-        .arg(transcript)
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped());
+fn run_rollup_child(transcript: &Path) -> Result<()> {
+    let mut args = vec!["ledger".to_string(), "rollup".to_string()];
+    args.push(transcript.display().to_string());
     if let Some(dir) = telemetry_dir() {
-        command.arg(dir);
+        args.push(dir.display().to_string());
     }
-    let child = command.spawn().context("spawning forge ledger rollup")?;
-    let pid = child.id();
-
-    // The 2 s bound is enforced by waiting on a channel, not on the child:
-    // `Child::wait` blocks with no deadline, so the blocking wait happens on
-    // a thread and the main thread kills the child by pid when the deadline
-    // passes -- the waiter thread then returns and is joined below.
-    let (tx, rx) = mpsc::channel();
-    let handle = std::thread::spawn(move || {
-        let _ = tx.send(child.wait_with_output());
-    });
-    let outcome = match rx.recv_timeout(ROLLOUP_TIMEOUT) {
-        Ok(received) => received.context("waiting for forge ledger rollup"),
-        Err(_) => {
-            let _ = Command::new("kill")
-                .arg(pid.to_string())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-            Err(anyhow::anyhow!(
-                "timed out after {} ms (child killed)",
-                ROLLOUP_TIMEOUT.as_millis()
-            ))
-        }
-    };
-    let _ = handle.join();
-    match outcome {
-        Ok(output) if output.status.success() => Ok(()),
-        Ok(output) => anyhow::bail!(
-            "forge ledger rollup exited {}: {}",
-            output
-                .status
-                .code()
-                .map(|code| code.to_string())
-                .unwrap_or_else(|| "signal".to_string()),
-            String::from_utf8_lossy(&output.stderr).trim()
-        ),
-        Err(err) => Err(err),
-    }
+    run_bounded(&args, ROLLOUP_TIMEOUT, "forge ledger rollup")
 }
 
 #[cfg(test)]

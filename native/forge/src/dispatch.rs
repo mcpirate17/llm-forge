@@ -77,6 +77,7 @@ pub fn run_hook(event: &str) -> Result<u8> {
         "PostToolUse" => run_post_tool_use(event),
         "SessionStart" => run_session_start(event),
         "SessionEnd" => run_session_end(event),
+        "SubagentStop" => run_subagent_stop(event),
         _ => {
             // No native handlers exist for any other event yet: read nothing,
             // change nothing, delegate exactly as before this PR.
@@ -93,6 +94,28 @@ fn run_pre_tool_use(event: &str) -> Result<u8> {
 
     let native_hooks = handlers::native_hook_names_from_env();
     let parsed: Option<Value> = serde_json::from_str(&input).ok();
+
+    // Live cap enforcement (Phase 3 step 3, item 2): runs first,
+    // unconditionally, for every `PreToolUse` call. `NoOp` (no `agent_id`,
+    // or under 80% of a subagent's cap) is the fast path and falls through
+    // to every branch below unchanged; `Warn`/`Deny` print their own JSON
+    // verdict and return immediately -- a documented, accepted tradeoff
+    // (`cap_enforce` module docs, `docs/routing.md`'s enforcement section):
+    // only a call already at or past 80% of its subagent's cap ever skips
+    // the native Bash/`Agent` branches and Python delegation for that one
+    // call.
+    if let Some(payload) = parsed.as_ref() {
+        match crate::cap_enforce::check(payload) {
+            crate::cap_enforce::CapCheck::NoOp => {}
+            crate::cap_enforce::CapCheck::Warn(context_line) => {
+                return print_cap_verdict("allow", None, Some(&context_line));
+            }
+            crate::cap_enforce::CapCheck::Deny(reason) => {
+                return print_cap_verdict("deny", Some(&reason), None);
+            }
+        }
+    }
+
     let tool_name = parsed
         .as_ref()
         .and_then(|payload| payload.get("tool_name"))
@@ -150,6 +173,44 @@ fn run_pre_tool_use(event: &str) -> Result<u8> {
 
     let extra_env = env_for_answers(&native_answers)?;
     delegate(event, Some(input.as_bytes()), &extra_env)
+}
+
+/// Prints one `cap_enforce` verdict as the hook's whole stdout answer and
+/// returns `Ok(0)` -- the same shape the Bash/`Agent` fully-native branches
+/// already use, just with `hookEventName` fixed to `PreToolUse` and a
+/// `permissionDecisionReason`/`additionalContext` instead of an
+/// `updatedInput`.
+fn print_cap_verdict(decision: &str, reason: Option<&str>, context: Option<&str>) -> Result<u8> {
+    let mut specific = serde_json::Map::new();
+    specific.insert(
+        "hookEventName".to_string(),
+        Value::String("PreToolUse".to_string()),
+    );
+    specific.insert(
+        "permissionDecision".to_string(),
+        Value::String(decision.to_string()),
+    );
+    if let Some(reason) = reason {
+        specific.insert(
+            "permissionDecisionReason".to_string(),
+            Value::String(reason.to_string()),
+        );
+    }
+    if let Some(context) = context {
+        specific.insert(
+            "additionalContext".to_string(),
+            Value::String(context.to_string()),
+        );
+    }
+    let answer = serde_json::json!({ "hookSpecificOutput": Value::Object(specific) });
+    let mut stdout = std::io::stdout();
+    stdout
+        .write_all(answer.to_string().as_bytes())
+        .context("failed to write the cap_enforce verdict to stdout")?;
+    stdout
+        .write_all(b"\n")
+        .context("failed to write the cap_enforce verdict to stdout")?;
+    Ok(0)
 }
 
 /// `PostToolUse`: fully native whenever the call's `tool_name` keeps every
@@ -214,6 +275,20 @@ fn run_session_end(event: &str) -> Result<u8> {
         .read_to_string(&mut input)
         .context("failed to read hook payload from stdin")?;
     crate::session_end::rollup_ending_session(&input);
+    delegate(event, Some(input.as_bytes()), &no_native_env())
+}
+
+/// `SubagentStop` (Phase 3 step 3, item 1): finalizes the ending agent's
+/// `task_dispatch` row and deletes its live cap-enforcement state
+/// (`subagent_stop::rollup_ending_agent`, best-effort, 2 s bound), then
+/// delegates exactly as before -- `SubagentStop` owns no verdict of its own,
+/// same shape as `run_session_end`.
+fn run_subagent_stop(event: &str) -> Result<u8> {
+    let mut input = String::new();
+    std::io::stdin()
+        .read_to_string(&mut input)
+        .context("failed to read hook payload from stdin")?;
+    crate::subagent_stop::rollup_ending_agent(&input);
     delegate(event, Some(input.as_bytes()), &no_native_env())
 }
 
