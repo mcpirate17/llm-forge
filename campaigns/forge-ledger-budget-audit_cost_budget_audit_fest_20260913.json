@@ -1,0 +1,39 @@
+{
+  "campaign_id": "forge-ledger-budget-audit_cost_budget_audit_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/cost_budget_audit.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/cost_budget_audit.py": "8bda59ac421e480c467226fea982657d1cfeb86a43f909fff722cdb08645ec7b"
+  },
+  "survivor_baseline": [
+    "constant_replace-98b392f65c77-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T09:36:26.924743+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_cost_budget_audit.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_cost_budget_audit.py": "ee624c17dca38dfbbfec115540026b0184214dab90c81bd09106ad35ad77b257"
+  },
+  "title": "Generated mutants for src/conductor/cost_budget_audit.py, scored on the survivor set"
+}
