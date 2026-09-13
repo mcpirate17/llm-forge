@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from conductor import snapshot_worktree
+from conductor.project_paths import ProjectPathError
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -73,6 +74,73 @@ def test_snapshot_reproduces_dirty_tree_without_polluting_host_objects(
 
     assert _git(repo, "worktree", "list", "--porcelain") == worktrees_before
     assert _object_inventory(repo) == objects_before
+
+
+def test_fixture_trees_survive_a_snapshot_regardless_of_suffix(
+    tmp_path: Path,
+) -> None:
+    """`.db`, `.txt` and extensionless fixtures must reach the snapshot worktree.
+
+    Dropping them by suffix sent campaigns whose tests walk such a tree home as
+    BASELINE_FAILED: the baseline run itself could not pass inside a snapshot
+    that had silently lost its fixtures.
+    """
+
+    repo = _repository(tmp_path)
+    fixtures = {
+        "tests/ledger.db": b"\x00sqlite payload",
+        "fixtures/notes.txt": "plain text\n",
+        "tests/runnable": "#!/bin/sh\n",
+    }
+    for relative, body in fixtures.items():
+        path = repo / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(body, bytes):
+            path.write_bytes(body)
+        else:
+            path.write_text(body, encoding="utf-8")
+    (repo / "src/kept.py").parent.mkdir(parents=True, exist_ok=True)
+    (repo / "src/kept.py").write_text("kept = 1\n", encoding="utf-8")
+    (repo / "data/dropped.bin").parent.mkdir(parents=True, exist_ok=True)
+    (repo / "data/dropped.bin").write_bytes(b"\xff")
+    (repo / "data/extensionless").write_text("no suffix, no fixture dir\n", encoding="utf-8")
+
+    with snapshot_worktree.isolated_snapshot(repo) as snapshot:
+        for relative, body in fixtures.items():
+            assert relative in snapshot.included_untracked
+            expected = body if isinstance(body, bytes) else body.encode()
+            assert (snapshot.worktree / relative).read_bytes() == expected
+        assert "src/kept.py" in snapshot.included_untracked
+        assert "data/dropped.bin" not in snapshot.included_untracked
+        assert "data/extensionless" not in snapshot.included_untracked
+        assert not (snapshot.worktree / "data/dropped.bin").exists()
+
+
+def test_extra_snapshot_suffixes_are_configurable_outside_fixture_trees(
+    tmp_path: Path,
+) -> None:
+    """A host names the suffixes its data files carry where no fixture path rules."""
+
+    repo = _repository(tmp_path)
+    (repo / "pyproject.toml").write_text(
+        '[tool.conductor]\nsnapshot_extra_suffixes = [".db", "dat"]\n',
+        encoding="utf-8",
+    )
+    for relative in ("data/ledger.db", "data/series.dat"):
+        path = repo / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"payload")
+
+    with snapshot_worktree.isolated_snapshot(repo) as snapshot:
+        assert "data/ledger.db" in snapshot.included_untracked
+        assert "data/series.dat" in snapshot.included_untracked
+        assert (snapshot.worktree / "data/ledger.db").read_bytes() == b"payload"
+
+    (repo / "pyproject.toml").write_text(
+        '[tool.conductor]\nsnapshot_extra_suffixes = "db"\n', encoding="utf-8"
+    )
+    with pytest.raises(ProjectPathError, match="snapshot_extra_suffixes"):
+        snapshot_worktree.snapshot_untracked_paths(repo)
 
 
 def test_snapshot_exception_removes_temporary_repository(
