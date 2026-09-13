@@ -18,6 +18,17 @@ pub mod session_ids;
 pub mod subject;
 pub mod writer;
 
+/// The ONE process-wide lock for tests that set `FORGE_MODE` (and the other
+/// env switches `route::resolve_mode` reads fresh on every call). It lives
+/// here, not in `route`, because `ledger/` is also `#[path]`-included into
+/// the integration tests under `tests/`, where `crate::route` does not
+/// exist; `crate::ledger::FORGE_MODE_LOCK` resolves in both builds. Every
+/// test in `route`, `cap_enforce` and `ledger::agent_upsert` that touches
+/// `FORGE_MODE` holds this lock -- per-module locks left a cross-module race
+/// that failed about one full `cargo test` run in three.
+#[cfg(test)]
+pub(crate) static FORGE_MODE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};

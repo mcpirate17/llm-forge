@@ -339,7 +339,10 @@ fn verdict_for(state: &mut LiveState, state_path: &Path, class: &str, cap_tokens
                     state_path.display()
                 );
             }
-            return CapCheck::Warn(format!("forge warn-only: {reason}"));
+            return CapCheck::Warn(format!(
+                "forge warn-only: would deny -- over the {cap_tokens} token cap for class {class} ({} billed); continuing, this dispatch is recorded as over_cap",
+                state.billed_total
+            ));
         }
         return CapCheck::Deny(reason);
     }
@@ -372,8 +375,11 @@ mod tests {
     /// its duration so a concurrently-running test can never observe a
     /// spurious `NoOp` (from `FORGE_CAP_DISABLE`) or a spurious warn-mode
     /// verdict (from `FORGE_MODE`) it did not itself set. Same convention as
-    /// `handlers::tests::ENV_LOCK` and friends.
-    pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// `handlers::tests::ENV_LOCK` and friends. `FORGE_MODE` is also set by
+    /// `route::tests` and `ledger::agent_upsert::tests`, so all three share
+    /// ONE lock -- a per-module lock left a cross-module race that failed
+    /// about one full `cargo test` run in three.
+    use crate::ledger::FORGE_MODE_LOCK as ENV_LOCK;
 
     struct ScratchDir(PathBuf);
     impl ScratchDir {
@@ -556,7 +562,12 @@ mod tests {
                     context.starts_with("forge warn-only: "),
                     "warn-mode over-cap context must be prefixed for the caller: {context}"
                 );
+                assert!(context.contains("would deny -- over the"));
                 assert!(context.contains("token cap for class"));
+                assert!(
+                    !context.contains("stop, write your final report"),
+                    "warn mode must not carry the enforce-mode stop instruction: {context}"
+                );
             }
             other => panic!("call 1 over cap in warn mode must warn once, got {other:?}"),
         }
