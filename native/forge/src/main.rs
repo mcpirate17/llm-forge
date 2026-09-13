@@ -36,6 +36,7 @@ mod post_tool;
 mod read_budget;
 mod receipt_show;
 mod route;
+mod active_state;
 mod session_end;
 mod session_policy;
 mod subagent_stop;
