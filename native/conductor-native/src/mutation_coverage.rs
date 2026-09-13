@@ -315,6 +315,65 @@ fn should_skip_mutation_path_native(path: &str, skip_directory_names: Vec<String
     should_skip_mutation_path(path, &skip)
 }
 
+/// The inventory's git side: raw paths by mode, with plain-String errors so
+/// the unit tests can assert on them without an initialized interpreter (a
+/// PyErr only exists once Python is up; building one in a bare test process
+/// panics, which made the error-path test order-dependent on whichever
+/// earlier test happened to initialize Python first).
+fn inventory_git_paths(
+    repo_root: &str,
+    mode: &str,
+    include_untracked: bool,
+    base: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let mut raw_paths = match mode {
+        "all" => git_paths(repo_root, &["ls-files".to_owned()])?,
+        "changed" => git_paths(
+            repo_root,
+            &[
+                "diff".to_owned(),
+                "--name-only".to_owned(),
+                "HEAD".to_owned(),
+            ],
+        )?,
+        // Diff against a named base ref with merge-base semantics, the shape CI
+        // needs: a clean checkout has no working-tree diff at all, so "changed"
+        // (git diff HEAD) would inventory nothing on a runner. The base must be
+        // named and must resolve -- git's own failure names the ref -- and
+        // untracked files stay out unless the caller asked for them.
+        "changed-from" => {
+            let base = base.ok_or_else(|| {
+                "changed-from inventory mode requires a base ref (--base)".to_owned()
+            })?;
+            git_paths(
+                repo_root,
+                &[
+                    "diff".to_owned(),
+                    "--name-only".to_owned(),
+                    "--diff-filter=ACMR".to_owned(),
+                    format!("{base}...HEAD"),
+                ],
+            )?
+        }
+        _ => {
+            return Err(format!(
+                "mutation inventory mode must be 'all', 'changed' or 'changed-from', got {mode:?}"
+            ));
+        }
+    };
+    if include_untracked || mode == "changed" {
+        raw_paths.extend(git_paths(
+            repo_root,
+            &[
+                "ls-files".to_owned(),
+                "--others".to_owned(),
+                "--exclude-standard".to_owned(),
+            ],
+        )?);
+    }
+    Ok(raw_paths)
+}
+
 #[pyfunction]
 #[pyo3(signature = (repo_root, registry_path, canonical_patterns, skip_directory_names, mode, include_untracked, base=None))]
 fn mutation_test_inventory_native(
@@ -328,56 +387,8 @@ fn mutation_test_inventory_native(
 ) -> PyResult<Vec<String>> {
     let patterns =
         registry_patterns(repo_root, registry_path, &canonical_patterns).map_err(value_error)?;
-    let mut raw_paths = match mode {
-        "all" => git_paths(repo_root, &["ls-files".to_owned()]).map_err(value_error)?,
-        "changed" => git_paths(
-            repo_root,
-            &[
-                "diff".to_owned(),
-                "--name-only".to_owned(),
-                "HEAD".to_owned(),
-            ],
-        )
-        .map_err(value_error)?,
-        // Diff against a named base ref with merge-base semantics, the shape CI
-        // needs: a clean checkout has no working-tree diff at all, so "changed"
-        // (git diff HEAD) would inventory nothing on a runner. The base must be
-        // named and must resolve -- git's own failure names the ref -- and
-        // untracked files stay out unless the caller asked for them.
-        "changed-from" => {
-            let base = base.as_deref().ok_or_else(|| {
-                value_error("changed-from inventory mode requires a base ref (--base)")
-            })?;
-            git_paths(
-                repo_root,
-                &[
-                    "diff".to_owned(),
-                    "--name-only".to_owned(),
-                    "--diff-filter=ACMR".to_owned(),
-                    format!("{base}...HEAD"),
-                ],
-            )
-            .map_err(value_error)?
-        }
-        _ => {
-            return Err(value_error(format!(
-                "mutation inventory mode must be 'all', 'changed' or 'changed-from', got {mode:?}"
-            )));
-        }
-    };
-    if include_untracked || mode == "changed" {
-        raw_paths.extend(
-            git_paths(
-                repo_root,
-                &[
-                    "ls-files".to_owned(),
-                    "--others".to_owned(),
-                    "--exclude-standard".to_owned(),
-                ],
-            )
-            .map_err(value_error)?,
-        );
-    }
+    let raw_paths = inventory_git_paths(repo_root, mode, include_untracked, base.as_deref())
+        .map_err(value_error)?;
 
     let skip: HashSet<&str> = skip_directory_names.iter().map(String::as_str).collect();
     let mut seen = HashSet::with_capacity(raw_paths.len());
@@ -513,7 +524,7 @@ mod tests {
     }
 
     mod changed_from {
-        use super::super::{git_paths, mutation_test_inventory_native};
+        use super::super::{git_paths, inventory_git_paths};
 
         fn run_git(dir: &std::path::Path, args: &[&str]) -> Vec<String> {
             let owned: Vec<String> = args.iter().map(|arg| (*arg).to_owned()).collect();
@@ -525,16 +536,10 @@ mod tests {
             mode: &str,
             include_untracked: bool,
             base: Option<&str>,
-        ) -> pyo3::PyResult<Vec<String>> {
-            mutation_test_inventory_native(
-                &dir.display().to_string(),
-                &dir.join("registry.json").display().to_string(),
-                vec!["test_*.py".to_owned()],
-                Vec::new(),
-                mode,
-                include_untracked,
-                base.map(str::to_owned),
-            )
+        ) -> Result<Vec<String>, String> {
+            // The pure core, not the pyfunction: its errors are plain Strings,
+            // assertable without an initialized interpreter.
+            inventory_git_paths(&dir.display().to_string(), mode, include_untracked, base)
         }
 
         /// Two commits: a file only the base has and a file only the branch
@@ -639,10 +644,10 @@ mod tests {
 
             let missing = inventory(&dir, "changed-from", false, None)
                 .expect_err("changed-from without a base must fail");
-            assert!(missing.to_string().contains("requires a base ref"));
+            assert!(missing.contains("requires a base ref"));
             let unresolved = inventory(&dir, "changed-from", false, Some("no-such-ref"))
                 .expect_err("changed-from with an unknown ref must fail");
-            assert!(unresolved.to_string().contains("no-such-ref"));
+            assert!(unresolved.contains("no-such-ref"));
 
             std::fs::remove_dir_all(&dir).expect("cleanup");
         }
