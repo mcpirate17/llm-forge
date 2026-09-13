@@ -16,16 +16,34 @@
 //! `Full` name against those constants so the two files cannot silently
 //! drift apart.
 //!
-//! `PreToolUse` is the one that surprises: `dispatch::run_pre_tool_use` only
+//! `PreToolUse` is the one that surprises, twice over. First:
+//! `dispatch::run_pre_tool_use` (the non-standalone path) only
 //! special-cases `tool_name == "Bash"` and `tool_name == "Agent"`, so a host
 //! settings entry with matcher `".*"` (the real shape in every project seen
 //! so far -- Python's own per-tool filtering happens inside the dispatcher,
 //! not in settings.json) still needs Python for `Read`, `Edit`, `Write`,
 //! `NotebookEdit` and the `mcp__code_review_graph__*` tools. That makes
 //! `PreToolUse` `Partial` at the `".*"` matcher even though the `Bash` and
-//! `Agent` cases it is built from are each individually `Full` -- exactly
-//! the outcome item 1 of the takeover slice was told to report honestly
-//! rather than round up.
+//! `Agent` cases it is built from would each look `Full` in isolation.
+//!
+//! Second, and more subtle: `--takeover` always implies `--standalone`
+//! (`FORGE_HOOK_STANDALONE=1`), and the standalone path is a *different*
+//! function -- `dispatch::run_pre_tool_use_standalone` -- whose own doc
+//! comment says plainly that "anything else -- Bash included -- has nothing
+//! native to say under standalone and prints nothing." Measured directly
+//! (item 3(b) of the takeover slice): piping a `Bash` `rm -rf /home/x` or
+//! `git push --force origin main` payload through
+//! `FORGE_MODE=warn FORGE_HOOK_STANDALONE=1 forge hook PreToolUse` produces
+//! **no deny at all** -- the same payload only denies under the
+//! non-standalone `forge hook PreToolUse`. So even a hypothetical host
+//! entry with the literal matcher `"Bash"` is not safe to take over: the
+//! guard denials `BASH_PRETOOLUSE_HOOK_NAMES` promises are not live in the
+//! one mode `--takeover` will ever run forge in. `"Bash"` is therefore
+//! `Partial` here too, naming its own native names as missing -- not
+//! because they lack a Rust implementation, but because the standalone
+//! entrypoint never calls it. `"Agent"` is unaffected:
+//! `run_pre_tool_use_standalone` does special-case `tool_name == "Agent"`
+//! and its routing verdict is confirmed live under standalone.
 
 use crate::handlers::{
     AGENT_PRETOOLUSE_HOOK_NAMES, BASH_PRETOOLUSE_HOOK_NAMES, POST_TOOL_USE_HOOK_NAMES,
@@ -48,7 +66,7 @@ pub enum Coverage {
 /// or only the graph-tool matcher (`crg_gate_mark`, `crg_refresh_wait`) --
 /// none has a native twin (absent from every `*_HOOK_NAMES` list in
 /// `handlers.rs`), and `dispatch::run_pre_tool_use` never special-cases
-/// their tools, so any `PreToolUse` matcher wider than exactly `"Bash"` or
+/// their tools, so any `PreToolUse` matcher other than exactly `"Bash"` or
 /// exactly `"Agent"` is missing all six.
 const PRETOOLUSE_NON_BASH_NON_AGENT_ONLY: [&str; 6] = [
     "current_work_guard_read",
@@ -81,8 +99,12 @@ const SESSIONEND_MISSING: [&str; 1] = ["obsidian_session_end"];
 pub fn coverage(event: &str, tool_matcher: &str) -> Coverage {
     match event {
         "PreToolUse" => match tool_matcher {
-            "Bash" => Coverage::Full {
-                native: BASH_PRETOOLUSE_HOOK_NAMES.to_vec(),
+            // Not Full: `run_pre_tool_use_standalone` -- the only path
+            // `--takeover` (implies `--standalone`) ever runs -- never
+            // calls the Bash guard logic; see the module doc comment and
+            // item 3(b)'s measured `rm -rf`/`git push --force` non-denies.
+            "Bash" => Coverage::Partial {
+                missing: BASH_PRETOOLUSE_HOOK_NAMES.to_vec(),
             },
             "Agent" => Coverage::Full {
                 native: AGENT_PRETOOLUSE_HOOK_NAMES.to_vec(),
@@ -111,12 +133,17 @@ mod tests {
     use std::collections::HashSet;
 
     #[test]
-    fn pretooluse_bash_is_full_and_matches_handlers_constant() {
-        let Coverage::Full { native } = coverage("PreToolUse", "Bash") else {
-            panic!("expected Full");
+    fn pretooluse_bash_is_partial_because_standalone_never_runs_the_guard() {
+        // `--takeover` implies `--standalone`, and
+        // `run_pre_tool_use_standalone` has nothing to say for Bash --
+        // confirmed live (item 3(b)): no deny for `rm -rf` or
+        // `git push --force` under
+        // `FORGE_MODE=warn FORGE_HOOK_STANDALONE=1 forge hook PreToolUse`.
+        let Coverage::Partial { missing } = coverage("PreToolUse", "Bash") else {
+            panic!("expected Partial");
         };
         let expected: HashSet<&str> = BASH_PRETOOLUSE_HOOK_NAMES.into_iter().collect();
-        let got: HashSet<&str> = native.into_iter().collect();
+        let got: HashSet<&str> = missing.into_iter().collect();
         assert_eq!(got, expected);
     }
 
