@@ -84,7 +84,20 @@ Cheap tier for Explore/clerical dispatches by default, measured before it is enf
 2. Routing policy: which tier a dispatch gets by default, from the measured per-tier dispatch costs (`ledger/routing_policy.toml`, `forge route`). The dispatch-seam probe found `PreToolUse`'s `updatedInput.model` *does* take (it must carry the whole `tool_input`, not a patch — `docs/routing.md`), and that a hook fired for a call inside a subagent sees the parent's own `session_id`/`transcript_path` plus a populated `agent_id`, never a distinct subagent transcript path. DONE PR #50.
 2b. Install `forge hook PreToolUse` (matcher `Agent`) in the LLM monorepo's own `.claude/settings.json` — `tooling.hooks.dispatch` (Python) is LLM's live hook path today and does not invoke `forge` at all. TODO.
 3. The hook that applies it at the dispatch seam: `SubagentStop` finalizes each dispatch's `task_dispatch` row (`forge ledger rollup-agent`, idempotent by `agent_id`); live `PreToolUse` enforcement derives the subagent's own transcript from verdict B's identity fields and denies once billed tokens exceed the class cap (fast path for calls outside a subagent adds ~0.03 us, derived path ~43 us); `forge ledger report` prints per-tier n/share/median/over_cap/rework/ci_red; the outcome join (`ledger/outcome.rs`) fills `landed`/`required_rework`/`ci_red_on_first_push` from a cached `ci_history` file (`docs/ledger.md`). DONE PR #52 (`docs/routing.md`'s enforcement section, `docs/ledger.md`'s outcome-join section). TODO: the GLM-owned `ci_history` fetcher that populates the cache this join reads (`docs/ledger.md` "ci_history fetcher, not yet built") — the join and its frozen fixture ship now, but every row's three fields read `null` on a real repo until that fetcher exists.
-4. A gate metric that ratchets routing cost. (Claude)
+4. A gate metric that ratchets routing cost. (Claude) DONE PR #54 (`native/forge/src/ledger/audit.rs` gains `cap_breach_rate` and `cheap_tier_rework_rate` alongside the design-step-5 three, `docs/ledger.md`/`docs/routing.md` updated; `cost_budget_audit.py` needed no code change, only docstrings, since its metric map is already generic). `cheap_tier_rework_rate`'s baseline is recorded `null` -- reads as `NO_BASELINE`, never a false regression -- until the step 3 `ci_history` fetcher exists. GLM part (this item's docs/routing.md synopsis sync and `conductor.mk` route-report target) is separate and not done here.
+
+### Phase 3 exit table (fills in as evidence lands)
+
+"Before" is step 3's real per-tier run (PR #52, `/home/tim/.claude/projects/-home-tim-Projects-LLM/` transcripts, 2026-09-13); `rework_rate`/`ci_red_rate` are `null` for every tier there since the `ci_history` fetcher does not exist yet. "After" is debt: one week of `task_dispatch` rows collected after the `PreToolUse` hook is actually installed in the LLM monorepo (step 2b, still TODO) -- until that hook is live, nothing enforces the routing policy this table is meant to show the effect of, so there is no "after" to fill in yet.
+
+| Tier | Share of billed subagent tokens (before) | Share of billed subagent tokens (after) | `over_cap` rate (before) | `over_cap` rate (after) | `rework_rate` (before) | `rework_rate` (after) | `ci_red_rate` (before) | `ci_red_rate` (after) |
+|---|---|---|---|---|---|---|---|---|
+| fable | 18.8% | TODO (step 2b + 1 week) | 95.3% | TODO | null | TODO | null | TODO |
+| glm | 2.5% | TODO (step 2b + 1 week) | 19.0% | TODO | null | TODO | null | TODO |
+| haiku | 3.3% | TODO (step 2b + 1 week) | 28.0% | TODO | null | TODO | null | TODO |
+| opus | 14.6% | TODO (step 2b + 1 week) | 72.9% | TODO | null | TODO | null | TODO |
+| sonnet | 54.5% | TODO (step 2b + 1 week) | 78.6% | TODO | null | TODO | null | TODO |
+| unknown | 6.3% | TODO (step 2b + 1 week) | 66.7% | TODO | null | TODO | null | TODO |
 
 ## Phase 4: bet B2, correct incremental verification (Claude)
 Transitive closure index (Rust) over imports and fixtures, per-test timing DB, flake ledger from the 1,494 receipts, content-addressed check cache keyed per file not per tree. Bound or de-scope the equivalence probe. Exit: gate time proportional to the diff, not the repo.
