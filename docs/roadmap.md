@@ -165,7 +165,7 @@ agent tokens. Stop porting; finish Phase 3, then install.
    ~450 ms per start, a hang until the hook timeout with the network
    down). A new offline leg resolves exactly one of
    `origin/{master,main}` (both is ambiguous), and the advertisement
-   runs only in the reaper (`allow_network`). DONE PR #67 (450 ms ->
+   runs only in the reaper (`allow_network`). DONE PR #68 (450 ms ->
    16 ms median on LLM, same command, no network).
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
