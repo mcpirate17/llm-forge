@@ -139,10 +139,9 @@ baseline-pmd:  ## Record current PMD-CPD duplicate pairs as the baseline (needs 
 	$(UV) run python -m conductor.run_duplicate_audit --tool pmd-python --save-baseline
 
 baseline-complexity:  ## Record current complexity blocks as the ratchet baseline
-	@# --baseline is resolved against radon_complexity.py's own REPO_ROOT (this
-	@# package's src/ directory), not the repo root -- see [checks.complexity].
+	@# REPO_ROOT is the true host root; baseline and scan path are src-relative.
 	$(UV) run python -m conductor.radon_complexity refresh-baseline \
-		--baseline conductor/radon_complexity_baseline.json --path .
+		--baseline src/conductor/radon_complexity_baseline.json --path src
 
 baseline-vulture:  ## Record an empty justified-findings allowlist for vulture (see script docstring)
 	$(UV) run python -m conductor.candidate_review.vulture_baseline_init \

@@ -40,7 +40,8 @@ from conductor.kb_retrieve import (
 from conductor.project_paths import DEFAULT_NOTES_ROOT, host_root, notes_root
 
 ROOT: Final[Path] = host_root()
-SOURCES_PATH: Final[Path] = ROOT / "conductor" / "memory_sources.toml"
+# Ships inside the package next to this module -- not host data, unlike INDEX_PATH.
+SOURCES_PATH: Final[Path] = Path(__file__).resolve().parent / "memory_sources.toml"
 INDEX_PATH: Final[Path] = ROOT / "research" / "cache" / "memory_index.jsonl"
 CATALOG_SCHEMA_VERSION: Final[int] = 1
 SCHEMA_VERSION: Final[int] = 3
@@ -90,13 +91,13 @@ def load_catalog(path: Path = SOURCES_PATH) -> dict[str, Any]:
 
 
 def _expand_relative(text: str) -> Path:
-    """Resolve a catalog's repo-relative root against the workspace, not the package.
+    """Resolve a catalog's repo-relative root against the workspace.
 
-    ``ROOT`` is the package's ``src/`` here, which never held the workspace's
-    ``research/`` tree; the monorepo only worked because its package sat at the
-    root. The notes spelling is the DEFAULT_NOTES_ROOT literal: a host that
-    repointed ``notes_root`` means that tree, so it resolves through the
-    configured path instead of the default location.
+    Calls ``host_root()`` directly rather than reusing the module-level ``ROOT``
+    so this keeps working if ``ROOT`` is ever narrowed to package-only data. The
+    notes spelling is the DEFAULT_NOTES_ROOT literal: a host that repointed
+    ``notes_root`` means that tree, so it resolves through the configured path
+    instead of the default location.
     """
     workspace = host_root()
     if PurePosixPath(text) == DEFAULT_NOTES_ROOT:

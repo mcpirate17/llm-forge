@@ -19,7 +19,9 @@ DEFAULT_EXCLUDES = (
     "*/research/tmp/*",
     "*__pycache__*",
 )
-DEFAULT_BASELINE = REPO_ROOT / "conductor" / "radon_complexity_baseline.json"
+# Ships inside the package next to this module -- the default baseline location,
+# distinct from REPO_ROOT which is the host tree being scanned.
+DEFAULT_BASELINE = Path(__file__).resolve().parent / "radon_complexity_baseline.json"
 RANKS = ("A", "B", "C", "D", "E", "F")
 
 

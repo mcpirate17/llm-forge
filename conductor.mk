@@ -166,11 +166,12 @@ slop-probe:  ## Probe one module against its driver tests: SLOP_MODULE=path.py S
 	$(PYTHON) -m conductor.equivalence_probe "$(SLOP_MODULE)" $(SLOP_TESTS)
 
 # ── Complexity ratchet ───────────────────────────────────────────────────
-# conductor.radon_complexity resolves its own paths and baseline relative to the
-# conductor package's own tree root, not CONDUCTOR_HOST_ROOT -- correct only when
-# this Makefile is the one shipped beside src/conductor (this repo). A host
-# consuming conductor-tooling as a dependency should call the module directly
-# with explicit --path/--baseline instead of this target.
+# conductor.radon_complexity's default baseline ships beside the package; its
+# default scan paths are the monorepo's own layout literals ("conductor",
+# "research", ...), correct only when this Makefile is the one shipped beside
+# src/conductor (this repo). A host consuming conductor-tooling as a
+# dependency should call the module directly with explicit --path/--baseline
+# instead of this target.
 
 complexity-report:  ## Report production Python cyclomatic complexity
 	$(PYTHON) -m conductor.radon_complexity report

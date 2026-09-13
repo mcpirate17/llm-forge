@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 
 from conductor.candidate_review.policy import load_policy
+from conductor.candidate_review.policy_path import resolve_policy_path
+from conductor.project_paths import package_relative
 from conductor.radon_complexity import (
     DEFAULT_PATHS,
     REPO_ROOT,
@@ -42,12 +44,15 @@ KEY = "conductor/example.py::widget"
 
 
 def test_conductor_is_scanned_by_default() -> None:
-    # The ratchet lives in conductor and did not measure its own home.
+    # The ratchet lives in conductor and did not measure its own home. DEFAULT_PATHS
+    # is the monorepo's own layout literal ("conductor" at the repo root); this repo
+    # is src-layout, so the real file is found through the configured package_root.
     assert "conductor" in DEFAULT_PATHS
-    findings, parse_errors = _scan(["conductor/radon_complexity.py"], [])
+    own_module = (package_relative(REPO_ROOT) / "radon_complexity.py").as_posix()
+    findings, parse_errors = _scan([own_module], [])
     assert parse_errors == []
     assert findings, "scanning a conductor file must produce blocks"
-    assert {item["path"] for item in findings} == {"conductor/radon_complexity.py"}
+    assert {item["path"] for item in findings} == {own_module}
 
 
 def test_a_grandfathered_symbol_that_worsens_fails(
@@ -112,8 +117,10 @@ def test_blocks_below_the_minimum_rank_are_not_ratcheted(
 def test_the_ratchet_runs_in_the_pre_commit_profile() -> None:
     # A ratchet nobody runs is a baseline file. pre-commit reviews with
     # --profile fast, so the check has to be declared for that profile or bad
-    # code lands and is only found a branch later.
-    policy = load_policy(REPO_ROOT / "conductor" / "candidate_policy.toml")
+    # code lands and is only found a branch later. resolve_policy_path() is this
+    # host's own policy resolver -- REPO_ROOT / "conductor" / "candidate_policy.toml"
+    # is the monorepo's layout, not this src-layout repo's configured location.
+    policy = load_policy(resolve_policy_path())
     complexity = [c for c in policy.checks if c.check_id == "complexity"]
     assert complexity, "candidate_policy.toml declares no complexity check"
     assert "fast" in complexity[0].profiles
