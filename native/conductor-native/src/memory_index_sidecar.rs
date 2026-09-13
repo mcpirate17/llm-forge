@@ -223,8 +223,10 @@ fn query_sidecar(
             &mmap[matrix_off + index * header.dims * 4..matrix_off + (index + 1) * header.dims * 4];
         let score = compensated_dot(
             query,
-            row.chunks_exact(4)
-                .map(|cell| f32::from_le_bytes([cell[0], cell[1], cell[2], cell[3]]) as f64),
+            row.as_chunks::<4>()
+                .0
+                .iter()
+                .map(|cell| f32::from_le_bytes(*cell) as f64),
         );
         hits.push((score, index));
     }
@@ -576,7 +578,7 @@ mod tests {
         let hits = query_sidecar(&sidecar, &query, 10).unwrap();
         let reference = brute_force(&jsonl, &query, 10);
         let mut reader = BufReader::new(File::open(&jsonl).unwrap());
-        for ((score, offset), (ref_score, index)) in hits.into_iter().zip(reference.into_iter()) {
+        for ((score, offset), (ref_score, index)) in hits.into_iter().zip(reference) {
             assert!((score - ref_score).abs() < 1e-5);
             reader.seek(std::io::SeekFrom::Start(offset)).unwrap();
             let mut line = String::new();
