@@ -17,9 +17,28 @@ jobs:
           # has no ancestry to compute one from (`git diff base...HEAD` then
           # fails with "no merge base", exit 128).
           fetch-depth: 0
+      # uv's cache (~/.cache/uv) holds the wheels it resolves and builds, so a
+      # warm cache turns `uv sync` from "download the world" into hardlinks.
+      # Keyed on uv.lock: any dependency bump misses on purpose.
+      - name: Cache uv artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
       - uses: astral-sh/setup-uv@v3
         with:
           python-version: "3.12"
+      # npm's download cache backs the pinned jscpd global install; keyed on
+      # the repo lockfile so an npm dependency change misses deliberately.
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -33,7 +52,18 @@ jobs:
       # this step exists to catch.
       - name: Install jscpd (pinned)
         run: npm install --global jscpd@4.2.1
+      # The PMD zip is ~a hundred MB of unchanged binaries per run; keyed on
+      # the pinned version literal alone, because a version bump must miss
+      # (and re-download) rather than restore the previous release under the
+      # new pin. No restore-keys for the same reason.
+      - name: Cache pmd distribution
+        id: pmd
+        uses: actions/cache@v4
+        with:
+          path: /tmp/pmd-dist
+          key: pmd-dist-7.27.0
       - name: Install pmd (pinned)
+        if: steps.pmd.outputs.cache-hit != 'true'
         run: |
           curl -sSL -o /tmp/pmd.zip \
             https://github.com/pmd/pmd/releases/download/pmd_releases/7.27.0/pmd-dist-7.27.0-bin.zip
