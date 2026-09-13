@@ -72,6 +72,22 @@ def _registry(repo: Path) -> Path:
     return registry
 
 
+def _commit_test_file(
+    repo: Path,
+    relative: str,
+    content: str,
+    message: str,
+) -> Path:
+    """Write one test file and commit it; returns the file's path."""
+
+    path = repo / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "add", relative], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", message], cwd=repo, check=True)
+    return path
+
+
 def test_is_test_path_matches_python_and_javascript_specs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -108,13 +124,10 @@ def test_is_test_path_matches_python_and_javascript_specs(
 def test_discover_and_changed_paths_include_untracked_tests(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path / "repo")
     registry = _registry(repo)
-    tracked = repo / "research/tests/test_tracked.py"
-    tracked.parent.mkdir(parents=True)
-    tracked.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
-    subprocess.run(
-        ["git", "add", "research/tests/test_tracked.py"], cwd=repo, check=True
+    _commit_test_file(
+        repo, "research/tests/test_tracked.py", "def test_ok():\n    assert True\n",
+        "tracked test",
     )
-    subprocess.run(["git", "commit", "-qm", "tracked test"], cwd=repo, check=True)
     untracked = repo / "research/tests/test_new.py"
     untracked.write_text("def test_new():\n    assert True\n", encoding="utf-8")
     (repo / "research/tools/not_module.py").parent.mkdir(parents=True, exist_ok=True)
@@ -195,13 +208,10 @@ def test_coverage_report_uses_verify_evidence(
 ) -> None:
     repo = _init_repo(tmp_path / "repo")
     registry = _registry(repo)
-    test_file = repo / "research/tests/test_tracked.py"
-    test_file.parent.mkdir(parents=True)
-    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
-    subprocess.run(
-        ["git", "add", "research/tests/test_tracked.py"], cwd=repo, check=True
+    _commit_test_file(
+        repo, "research/tests/test_tracked.py", "def test_ok():\n    assert True\n",
+        "tracked test",
     )
-    subprocess.run(["git", "commit", "-qm", "tracked test"], cwd=repo, check=True)
 
     def fake_verify(registry_path: Path, paths, *, repo_root: Path):
         assert list(paths) == ["research/tests/test_tracked.py"]
@@ -327,11 +337,11 @@ def test_changed_exit_codes_split_debt_from_defects(
         rejection_counts={"not_pass": 1, "decode_error": 1},
     )
     covered = _changed_result(missing=[], rejection_counts={})
-    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *a, **k: debt)
+    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: debt)
     assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 6
-    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *a, **k: defect)
+    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: defect)
     assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 5
-    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *a, **k: covered)
+    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: covered)
     assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 0
     capsys.readouterr()
 
@@ -372,7 +382,7 @@ def test_changed_github_annotations_and_summary(
         ],
         rejection_counts={"not_pass": 1, "decode_error": 1, "superseded": 1},
     )
-    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *a, **k: result)
+    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: result)
     assert mutation_coverage.main(
         ["changed", "--registry", "r.json", "--github"]
     ) == 5
@@ -388,22 +398,18 @@ def test_changed_github_annotations_and_summary(
 def test_changed_base_reaches_the_merge_base_inventory(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path / "repo")
     registry = _registry(repo)
-    tests = repo / "research/tests"
-    tests.mkdir(parents=True)
-    (tests / "test_base_only.py").write_text(
-        "def test_base():\n    assert True\n", encoding="utf-8"
+    _commit_test_file(
+        repo, "research/tests/test_base_only.py",
+        "def test_base():\n    assert True\n", "base",
     )
-    subprocess.run(["git", "add", "."], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-qm", "base"], cwd=repo, check=True)
     base = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
     subprocess.run(["git", "checkout", "-qb", "branch"], cwd=repo, check=True)
-    (tests / "test_branch_only.py").write_text(
-        "def test_branch():\n    assert True\n", encoding="utf-8"
+    _commit_test_file(
+        repo, "research/tests/test_branch_only.py",
+        "def test_branch():\n    assert True\n", "branch",
     )
-    subprocess.run(["git", "add", "."], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-qm", "branch"], cwd=repo, check=True)
 
     # The native path end to end on a temp repo: only the branch's file is in
     # the merge-base diff, so only it needs evidence in CI.
@@ -443,7 +449,7 @@ def test_canary_exit_paths(
         "rejection_counts": {"no_campaign": 9, "not_pass": 3, "superseded": 5},
         "malformed_receipts": [],
     }
-    monkeypatch.setattr(mutation_coverage, "coverage_report", lambda *a, **k: clean)
+    monkeypatch.setattr(mutation_coverage, "coverage_report", lambda *_a, **_k: clean)
     assert mutation_coverage.main(["canary", "--registry", "r.json"]) == 0
     out = capsys.readouterr().out
     assert '"canary"' in out
@@ -466,7 +472,7 @@ def test_canary_exit_paths(
         ],
         "malformed_receipts": ["receipts/gone.json: Expecting value"],
     }
-    monkeypatch.setattr(mutation_coverage, "coverage_report", lambda *a, **k: unreadable)
+    monkeypatch.setattr(mutation_coverage, "coverage_report", lambda *_a, **_k: unreadable)
     assert mutation_coverage.main(["canary", "--registry", "r.json"]) == 5
     out = capsys.readouterr().out
     assert '"offending_kinds": [' in out

@@ -20,7 +20,6 @@ fails only when some receipt anywhere is unreadable.
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 import os
 from collections.abc import Callable, Mapping, Sequence
@@ -219,26 +218,6 @@ def verify_changed(
     result["enforcement"] = "changed_tests"
     result["checked_test_paths"] = list(tests)
     return result
-
-
-def _python_test_nodeids(path: Path, relative: str) -> tuple[str, ...]:
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, SyntaxError) as exc:
-        raise CampaignError(f"cannot parse test file {relative}: {exc}") from exc
-    nodeids: list[str] = []
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
-            nodeids.append(f"{relative}::{node.name}")
-            continue
-        if not isinstance(node, ast.ClassDef) or not node.name.startswith("Test"):
-            continue
-        for child in node.body:
-            if isinstance(child, ast.FunctionDef) and child.name.startswith("test_"):
-                nodeids.append(f"{relative}::{node.name}::{child.name}")
-    if not nodeids:
-        raise CampaignError(f"{relative} contains no test functions to rank")
-    return tuple(nodeids)
 
 
 def _json_print(payload: Mapping[str, Any]) -> None:
