@@ -1,0 +1,115 @@
+{
+  "adapter_sha256": "365003176c192969d035b8028e796e9a7b04618820d84d5ef6fa508cac61ec29",
+  "attribution": {
+    "attributed_mutants": 21,
+    "baseline_repetitions": 2,
+    "killed_mutants": 21,
+    "ranked_tests": 10,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.758681,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "..........                                                               [100%]\n10 passed in 0.13s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/home/tim/.cache/llm-forge/scratch/forge-glm-ci-history/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_bytecode_isolation.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "forge-pycache-immunity_bytecode_isolation_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "8bad6c0bcd26ab876410c9f5079e1e4879159e40da9b9d61da71d7e5a9b97dd4",
+  "detail": {
+    "blob": "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",
+    "encoding": "zstd+base64"
+  },
+  "engine_result": {
+    "duration_seconds": 3.381998,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "inal_text\": \"/\",\n        \"mutated_text\": \"*\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_bytecode_isolation.py::test_a_same_second_edit_runs_stale_code_until_the_env_is_isolated\",\n        \"src/conductor/test_bytecode_isolation.py::test_a_second_mutant_of_the_same_file_never_reads_the_firsts_bytecode\",\n        \"src/conductor/test_bytecode_isolation.py::test_an_unmutated_module_is_served_from_the_prefix_on_the_second_child\",\n        \"src/conductor/test_bytecode_isolation.py::test_each_scratch_names_its_own_prefix\",\n        \"src/conductor/test_bytecode_isolation.py::test_the_env_carries_base_plus_the_run_private_prefix\",\n        \"src/conductor/test_bytecode_isolation.py::test_the_scratch_is_marked_the_moment_it_is_created\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 157532783\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2hgopvx5/worktree/src/conductor/bytecode_isolation.py\",\n        \"line\": 146,\n        \"column\": 9,\n        \"byte_offset\": 6457,\n        \"byte_length\": 111,\n        \"original_text\": \"raise RuntimeError(\\n            f\\\"bytecode isolation scratch {scratch} is not usable: {exc}\\\"\\n        ) from exc\",\n        \"mutated_text\": \"pass\",\n        \"mutator_name\": \"exception_swallow\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_bytecode_isolation.py::test_an_unusable_scratch_fails_loud\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 150806827\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2hgopvx5/worktree/src/conductor/bytecode_isolation.py\",\n        \"line\": 151,\n        \"column\": 21,\n        \"byte_offset\": 6667,\n        \"byte_length\": 25,\n        \"original_text\": \"\\\"PYTHONDONTWRITEBYTECODE\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_bytecode_isolation.py::test_a_same_second_edit_runs_stale_code_until_the_env_is_isolated\",\n        \"src/conductor/test_bytecode_isolation.py::test_a_second_mutant_of_the_same_file_never_reads_the_firsts_bytecode\",\n        \"src/conductor/test_bytecode_isolation.py::test_an_unmutated_module_is_served_from_the_prefix_on_the_second_child\",\n        \"src/conductor/test_bytecode_isolation.py::test_each_scratch_names_its_own_prefix\",\n        \"src/conductor/test_bytecode_isolation.py::test_the_env_carries_base_plus_the_run_private_prefix\",\n        \"src/conductor/test_bytecode_isolation.py::test_the_scratch_is_marked_the_moment_it_is_created\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 198621291\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-2hgopvx5/worktree/src/conductor/bytecode_isolation.py\",\n        \"line\": 153,\n        \"column\": 12,\n        \"byte_offset\": 6764,\n        \"byte_length\": 11,\n        \"original_text\": \"environment\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_bytecode_isolation.py::test_a_same_second_edit_runs_stale_code_until_the_env_is_isolated\",\n        \"src/conductor/test_bytecode_isolation.py::test_a_second_mutant_of_the_same_file_never_reads_the_firsts_bytecode\",\n        \"src/conductor/test_bytecode_isolation.py::test_an_unmutated_module_is_served_from_the_prefix_on_the_second_child\",\n        \"src/conductor/test_bytecode_isolation.py::test_each_scratch_names_its_own_prefix\",\n        \"src/conductor/test_bytecode_isolation.py::test_the_env_carries_base_plus_the_run_private_prefix\",\n        \"src/conductor/test_bytecode_isolation.py::test_the_scratch_is_marked_the_moment_it_is_created\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 161568271\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 3,\n    \"nanos\": 377061814\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 21,
+    "mutants_generated": 30,
+    "mutants_tested": 21,
+    "no_coverage": 9,
+    "survived": 0,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T20:25:04.263947+00:00",
+  "interpreter": "/home/tim/.cache/llm-forge/scratch/forge-glm-ci-history/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/forge-pycache-immunity_bytecode_isolation_fest_20260913.json",
+  "manifest_sha256": "43c66faacd8f6667e5ab7ac491e563ab83de12150a97e00c9c52fd2f92c225c5",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 60,
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 1.0,
+  "new_survivors": [],
+  "no_coverage": 9,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 21,
+    "NO_COVERAGE": 9,
+    "SURVIVED": 0,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/forge-pycache-immunity_bytecode_isolation_fest_20260913_20260913T202504Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "8547341a8ab0448e586620da3adbdced0c6add1444645d79cc7cc73d9e1a3173",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fbaf4781cb73027fb336508b3fc8ec082497ced9edb6a3344e09fb40f58f37ad",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "699ab1e78eccea669c833105b32982e8fc15f53f13fa404d20e55246a0ce5488",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "98412200e5a9b7ed93e5c2b14a70f73bab207e2e49ce8441863c7c6136336b30"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/bytecode_isolation.py": "772e2471a626a3bdbc84473f25ea8b4a1579e58c320feda4aa6928c972c641a2"
+  },
+  "status": "PASS",
+  "survivor_baseline": [],
+  "survivors": [],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_bytecode_isolation.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_bytecode_isolation.py": "15de8465aed82e6af62c617be34cf807ac017f81b26b3ec4e695b93fa84019e4"
+  },
+  "timed_out": 0,
+  "unviable": 0
+}
