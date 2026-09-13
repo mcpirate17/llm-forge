@@ -47,19 +47,20 @@ def _fake_executable(
 
 
 def _git(repo: Path, *args: str) -> str:
-    completed = subprocess.run(
+    """One git invocation inside `repo`; a nonzero exit fails the test."""
+    return subprocess.run(
         ["git", *args], cwd=repo, capture_output=True, text=True, check=True
-    )
-    return completed.stdout.strip()
+    ).stdout.strip()
 
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
+    """A one-commit repository, so a gate run has a real HEAD to diff against."""
     root = tmp_path / "repo"
     root.mkdir()
     _git(root, "init", "--quiet", "-b", "main")
-    _git(root, "config", "user.email", "test@example.invalid")
-    _git(root, "config", "user.name", "test")
+    for key, value in (("user.email", "test@example.invalid"), ("user.name", "test")):
+        _git(root, "config", key, value)
     (root / "tracked.py").write_text("VALUE = 1\n", encoding="utf-8")
     _git(root, "add", "tracked.py")
     _git(root, "commit", "--quiet", "-m", "first")
