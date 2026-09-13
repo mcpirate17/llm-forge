@@ -159,6 +159,15 @@ agent tokens. Stop porting; finish Phase 3, then install.
    binary when `FORGE_BIN` or PATH resolves it (16 ms vs 126 ms for the
    Python pair, same host and day; 3 ms on llm-forge itself). DONE
    PR #65 (`docs/install.md`, "Session start in Rust").
+2f-ii. (GLM) offline integration ref: the ladder's `ls-remote
+   --symref` fallback made session start open a network connection on
+   hosts with no configured branch and no bound `origin/HEAD` (LLM:
+   ~450 ms per start, a hang until the hook timeout with the network
+   down). A new offline leg resolves exactly one of
+   `origin/{master,main}` (both is ambiguous), and the advertisement
+   runs only in the reaper (`allow_network`). DONE PR #68 (450 ms ->
+   16 ms median on LLM, same command, no network).
+
 2h. (Claude) `forge notes index|search` ports `conductor.index_notes`'s
    FTS5 note index to Rust (`native/forge/src/notes_index.rs`), and fixes
    the bug it was written to carry: `_source_roots()` returned EITHER the
