@@ -139,6 +139,32 @@ fn telemetry_file_matches_frozen_summary() {
     );
 }
 
+/// The `commit_subject` join key, end to end through the reader (PR #48):
+/// a `git commit -m` and a `gh pr create --title` in Bash tool_use blocks
+/// each leave exactly one digest -- sorted, deduplicated, never the text.
+/// The landed side of the agreement (`(#N)` strip) is pinned in
+/// `landed.rs`'s FIXTURE_LOG test.
+#[test]
+fn bash_commit_commands_leave_digests_not_text() {
+    let summary = ledger::reader::read_transcript_file(Path::new(&fixture(
+        "transcript_commit_subject.jsonl",
+    )))
+    .expect("commit-subject fixture parses");
+    assert_eq!(
+        summary.commit_subject_digests,
+        vec![
+            ledger::subject::subject_digest("feat(fixtures): a transcript that typed a commit"),
+            ledger::subject::subject_digest("feat(fixtures): the pr title side of the join"),
+        ]
+    );
+    let json = serde_json::to_string(&summary).unwrap();
+    assert!(
+        !json.contains("typed a commit") && !json.contains("pr title side"),
+        "subject text never survives the reader boundary: {json}"
+    );
+    assert_matches_frozen(json, "expected_transcript_commit_subject.json");
+}
+
 /// Hard rule: "the reader keeps `char_len` for text and tool_result blocks
 /// and never retains block text past the reader boundary." Writes a
 /// transcript line whose text carries a long, singular marker and asserts

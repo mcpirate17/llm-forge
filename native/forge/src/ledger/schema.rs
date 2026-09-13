@@ -239,6 +239,14 @@ pub struct TranscriptSummary {
     /// reaches the match since `/` is outside the id's character class, so
     /// "with and without trailing slash" needs no separate handling here.
     pub harness_session_ids: Vec<String>,
+    /// sha256-truncated digests (never text) of the commit subjects this
+    /// file's `Bash` tool_use commands typed -- the first `-m` of a
+    /// `git commit`, the first non-empty line of a `-F -` heredoc, the
+    /// `--title` of a `gh pr create` (`reader.rs::subjects_from_bash_command`,
+    /// `subject.rs::subject_digest`). The `commit_subject` join key: the
+    /// session that typed a landed commit holds its subject's digest here.
+    /// Empty (not omitted) for a file that typed no commits.
+    pub commit_subject_digests: Vec<String>,
 }
 
 /// One `isCompactSummary` line: the harness-written marker for one

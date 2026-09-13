@@ -392,6 +392,7 @@ mod tests {
             resend_bytes: 0,
             resend_events: 0,
             harness_session_ids: ids.iter().map(|s| s.to_string()).collect(),
+            commit_subject_digests: Vec::new(),
             models: models.iter().map(|s| s.to_string()).collect(),
         }
     }
@@ -409,6 +410,7 @@ mod tests {
             pr_number,
             agent_names: agents.iter().map(|s| s.to_string()).collect(),
             harness_session_ids: ids.iter().map(|s| s.to_string()).collect(),
+            subject_digest: String::new(),
             files_changed: 1,
             insertions: 1,
             deletions: 0,

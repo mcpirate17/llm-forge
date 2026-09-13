@@ -77,8 +77,10 @@ pub fn read_transcript_file(path: &Path) -> Result<TranscriptSummary> {
         agent_dispatches: Vec::new(),
         compaction_markers: Vec::new(),
         harness_session_ids: Vec::new(),
+        commit_subject_digests: Vec::new(),
     };
     let mut harness_session_ids: BTreeSet<String> = BTreeSet::new();
+    let mut commit_subject_digests: BTreeSet<String> = BTreeSet::new();
     // The first session id any line carries: for a subagent file this is the
     // PARENT session's uuid (every subagent line's `sessionId` names its
     // parent), which `parent_session_id` reports; for a top-level file it is
@@ -153,6 +155,7 @@ pub fn read_transcript_file(path: &Path) -> Result<TranscriptSummary> {
             &mut summary,
             parsed,
             &mut harness_session_ids,
+            &mut commit_subject_digests,
             &mut pending_dispatches,
         );
     }
@@ -162,6 +165,7 @@ pub fn read_transcript_file(path: &Path) -> Result<TranscriptSummary> {
         summary.parent_session_id = first_session_id;
     }
     summary.harness_session_ids = harness_session_ids.into_iter().collect();
+    summary.commit_subject_digests = commit_subject_digests.into_iter().collect();
     Ok(summary)
 }
 
@@ -179,6 +183,7 @@ fn accumulate_transcript_line(
     summary: &mut TranscriptSummary,
     line: TranscriptLine,
     harness_session_ids: &mut BTreeSet<String>,
+    commit_subject_digests: &mut BTreeSet<String>,
     pending_dispatches: &mut BTreeMap<String, usize>,
 ) {
     if line.is_compact_summary {
@@ -197,6 +202,7 @@ fn accumulate_transcript_line(
         &line.timestamp,
         pending_dispatches,
     );
+    track_commit_subjects(&message.content, commit_subject_digests);
     let blocks = parse_content_blocks(&message.content, harness_session_ids);
     for block in &blocks {
         summary.chars_by_block_type.add(block);
@@ -288,6 +294,201 @@ fn track_agent_dispatch(
             _ => {}
         }
     }
+}
+
+/// Extracts commit subjects from one line's `Bash` `tool_use` blocks: the
+/// command text is scanned for the three shapes a typed subject takes
+/// (`subjects_from_bash_command`), and every subject that survives
+/// `subject.rs`'s floor becomes a digest in `commit_subject_digests` --
+/// never the text. Mirrors `track_agent_dispatch`'s walk (the other
+/// tool_use-input reader) and reads `input.command` the same structural way.
+fn track_commit_subjects(content: &Value, digests: &mut BTreeSet<String>) {
+    let Some(items) = content.as_array() else {
+        return;
+    };
+    for item in items {
+        if item.get("type").and_then(Value::as_str) != Some("tool_use") {
+            continue;
+        }
+        if item.get("name").and_then(Value::as_str) != Some("Bash") {
+            continue;
+        }
+        let Some(command) = item
+            .get("input")
+            .and_then(|input| input.get("command"))
+            .and_then(Value::as_str)
+        else {
+            continue;
+        };
+        for subject in subjects_from_bash_command(command) {
+            let digest = super::subject::subject_digest(&subject);
+            if !digest.is_empty() {
+                digests.insert(digest);
+            }
+        }
+    }
+}
+
+/// The three shapes a typed commit subject takes in a Bash command:
+/// (a) the first `-m` argument of a `git commit` (single- or
+/// double-quoted; `$'...'` needs no handling of its own -- its payload
+/// still ends at the closing quote), (b) the first non-empty line of a
+/// heredoc body when the command runs `git commit` with `-F -`/`-F-` and a
+/// `<<'EOF'`/`<<EOF`-style heredoc, (c) the `--title` argument of a
+/// `gh pr create` (the squash-merged subject is that title plus ` (#N)`,
+/// which `subject.rs`'s normalization strips on the landed side). At most
+/// one subject per command: only the first `-m` counts (the second is the
+/// body), and a `git commit --amend` with no message argument records
+/// nothing. Returns raw subject text; hashing and the short-subject
+/// refusal live in `subject.rs`, shared with the landed side.
+fn subjects_from_bash_command(command: &str) -> Vec<String> {
+    if token_index(command, "git commit").is_some() {
+        if let Some(subject) = first_message_argument(command) {
+            return vec![subject];
+        }
+        if reads_message_from_stdin(command) {
+            if let Some(subject) = heredoc_first_line(command) {
+                return vec![subject];
+            }
+        }
+        return Vec::new();
+    }
+    if token_index(command, "gh pr create").is_some() {
+        if let Some(title) = title_argument(command) {
+            return vec![title];
+        }
+    }
+    Vec::new()
+}
+
+/// Index of `token` in `haystack` when it stands as a shell word: preceded
+/// by whitespace (or nothing) and followed by whitespace (or nothing, or
+/// `=`/a quote so `--title=` and `-m"..."` count). `None` when the string
+/// only occurs inside a longer word.
+fn token_index(haystack: &str, token: &str) -> Option<usize> {
+    let mut from = 0;
+    while let Some(found) = haystack[from..].find(token) {
+        let start = from + found;
+        let end = start + token.len();
+        let bounded_before = haystack[..start]
+            .chars()
+            .next_back()
+            .is_none_or(char::is_whitespace);
+        let bounded_after = haystack[end..]
+            .chars()
+            .next()
+            .is_none_or(|c| c.is_whitespace() || c == '=' || c == '"' || c == '\'');
+        if bounded_before && bounded_after {
+            return Some(start);
+        }
+        from = start + 1;
+    }
+    None
+}
+
+/// The value of a quoted argument starting at `rest[0]` (the opening quote
+/// itself): single quotes run to the next `'` with no escapes; double
+/// quotes honor `\"` and `\\` and keep anything else verbatim. `None` when
+/// `rest` does not start with a quote or the closing quote never came.
+fn quoted_argument(rest: &str) -> Option<String> {
+    let mut chars = rest.chars();
+    match chars.next()? {
+        '\'' => {
+            let end = chars.by_ref().position(|c| c == '\'')?;
+            Some(rest[1..end + 1].to_string())
+        }
+        '"' => {
+            let mut out = String::new();
+            while let Some(c) = chars.next() {
+                match c {
+                    '"' => return Some(out),
+                    '\\' => match chars.next() {
+                        Some(escaped @ ('"' | '\\')) => out.push(escaped),
+                        Some(other) => {
+                            out.push('\\');
+                            out.push(other);
+                        }
+                        None => return None,
+                    },
+                    _ => out.push(c),
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+/// The first `-m` argument after the (first) `git commit` token: shell
+/// whitespace may sit between the flag and its value, and the value may be
+/// glued to the flag (`-m"..."`). `None` when the commit has no message
+/// flag at all (e.g. `git commit --amend --no-edit`) or the quote never
+/// closed.
+fn first_message_argument(command: &str) -> Option<String> {
+    let commit_at = token_index(command, "git commit")?;
+    let flag_at = token_index(&command[commit_at..], "-m")? + commit_at;
+    let rest = command[flag_at + 2..].trim_start();
+    quoted_argument(rest)
+}
+
+/// True when the `git commit` reads its message from stdin: a `-F -` flag
+/// pair or the glued `-F-` form.
+fn reads_message_from_stdin(command: &str) -> bool {
+    if token_index(command, "-F-").is_some() {
+        return true;
+    }
+    match token_index(command, "-F") {
+        Some(at) => command[at + 2..]
+            .trim_start()
+            .strip_prefix('-')
+            .is_some_and(|after| after.starts_with(char::is_whitespace) || after.is_empty()),
+        None => false,
+    }
+}
+
+/// The first non-empty line of a `<<'EOF'`/`<<EOF`/`<<-` heredoc body: the
+/// body starts on the line AFTER the one carrying the marker and ends at
+/// the marker line. `None` when no heredoc marker (or no body) exists.
+fn heredoc_first_line(command: &str) -> Option<String> {
+    let at = command.find("<<")?;
+    let after_markers = &command[at + 2..];
+    let after_markers = after_markers.strip_prefix('-').unwrap_or(after_markers);
+    let word: String = after_markers
+        .trim_start_matches(['\'', '"'])
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
+        .collect();
+    if word.is_empty() {
+        return None;
+    }
+    let body_start = at + command[at..].find('\n')? + 1;
+    for line in command[body_start..].lines() {
+        if line.trim() == word {
+            break;
+        }
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+    None
+}
+
+/// The `--title` argument of a `gh pr create`: `--title "<title>"` (quoted)
+/// or `--title=<title>`/a bare `--title <word>` (up to whitespace). `None`
+/// when the flag or its value is absent.
+fn title_argument(command: &str) -> Option<String> {
+    let at = token_index(command, "--title")?;
+    let rest = &command[at + "--title".len()..];
+    if let Some(value) = rest.strip_prefix('=') {
+        let word: String = value.chars().take_while(|c| !c.is_whitespace()).collect();
+        return (!word.is_empty()).then_some(word);
+    }
+    let rest = rest.trim_start();
+    quoted_argument(rest).or_else(|| {
+        let word: String = rest.chars().take_while(|c| !c.is_whitespace()).collect();
+        (!word.is_empty()).then_some(word)
+    })
 }
 
 /// A `tool_result`'s text pieces (plain string, or the text sub-blocks of
@@ -522,4 +723,122 @@ fn percentile(sorted: &[f64], p: f64) -> Option<f64> {
     let rank = (p * sorted.len() as f64).ceil() as usize;
     let idx = rank.saturating_sub(1).min(sorted.len() - 1);
     Some(sorted[idx])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{subjects_from_bash_command, track_commit_subjects};
+    use crate::ledger::subject::subject_digest;
+    use serde_json::json;
+    use std::collections::BTreeSet;
+
+    fn subjects(command: &str) -> Vec<String> {
+        subjects_from_bash_command(command)
+    }
+
+    #[test]
+    fn first_m_of_a_git_commit_is_the_subject_quoted_either_way() {
+        // (a): the subject is the FIRST -m; the second -m is the body.
+        assert_eq!(
+            subjects(r#"git commit -m 'feat: wire the subject join' -m "body line""#),
+            vec!["feat: wire the subject join".to_string()]
+        );
+        assert_eq!(
+            subjects(
+                r#"git add -A && git commit -m "fix(ledger): double quotes in a compound command""#
+            ),
+            vec!["fix(ledger): double quotes in a compound command".to_string()]
+        );
+        // The value may be glued to the flag; escapes inside double quotes
+        // stay literal subject text after unescaping.
+        assert_eq!(
+            subjects(r#"git commit -m"chore: glued form also carries a subject""#),
+            vec!["chore: glued form also carries a subject".to_string()]
+        );
+        assert_eq!(
+            subjects(r#"git commit -m "fix: say \"hi\" once""#),
+            vec![r#"fix: say "hi" once"#.to_string()]
+        );
+    }
+
+    #[test]
+    fn a_heredoc_message_on_stdin_yields_its_first_non_empty_line() {
+        // (b): git commit -F - with a <<'EOF' heredoc; the body's first
+        // non-empty line is the subject.
+        assert_eq!(
+            subjects("git commit -F - <<'EOF'\nfeat: heredoc subject line\n\nbody\nEOF"),
+            vec!["feat: heredoc subject line".to_string()]
+        );
+        assert_eq!(
+            subjects("git commit -F- <<EOF\n\nchore: unquoted heredoc, leading blank\nEOF"),
+            vec!["chore: unquoted heredoc, leading blank".to_string()]
+        );
+    }
+
+    #[test]
+    fn gh_pr_create_title_is_the_subject() {
+        // (c): a squash-merged PR's landed subject is this title plus
+        // " (#N)", which normalization strips on the landed side.
+        assert_eq!(
+            subjects(
+                r#"gh pr create --title "feat(ledger): credit the session that typed it" --body-file /tmp/x"#
+            ),
+            vec!["feat(ledger): credit the session that typed it".to_string()]
+        );
+        // The `=` form carries the value up to whitespace -- a real shell
+        // would split anything with a space into separate arguments, so a
+        // spaced title always arrives quoted.
+        assert_eq!(
+            subjects("gh pr create --title=fix-typo-subject --fill"),
+            vec!["fix-typo-subject".to_string()]
+        );
+    }
+
+    #[test]
+    fn amend_without_a_message_and_unrelated_commands_record_nothing() {
+        assert!(subjects("git commit --amend --no-edit").is_empty());
+        assert!(subjects("git commit --amend").is_empty());
+        assert!(subjects("git commit -m").is_empty()); // flag with no value
+        assert!(subjects("git log --oneline -5").is_empty());
+        assert!(subjects("git commit -m 'unclosed quote").is_empty());
+        // `-F -` without a heredoc body still yields nothing.
+        assert!(subjects("git commit -F -").is_empty());
+    }
+
+    #[test]
+    fn only_bash_tool_use_blocks_are_scanned() {
+        let mut digests = BTreeSet::new();
+        // An Edit-named tool_use whose input carries a command-shaped
+        // string: not a Bash block, nothing recorded.
+        track_commit_subjects(
+            &json!([{ "type": "tool_use", "name": "Edit", "input": { "command": "git commit -m 'not a bash block'" } }]),
+            &mut digests,
+        );
+        assert!(digests.is_empty());
+        // The same shape named Bash records exactly the digest.
+        track_commit_subjects(
+            &json!([{ "type": "tool_use", "name": "Bash", "input": { "command": "git commit -m 'feat: one bash block'" } }]),
+            &mut digests,
+        );
+        // "feat: one bash block" is 21 chars, above the floor.
+        assert_eq!(
+            digests.into_iter().collect::<Vec<_>>(),
+            vec![subject_digest("feat: one bash block")]
+        );
+    }
+
+    #[test]
+    fn reader_side_and_landed_side_digests_agree() {
+        // The landed subject carries the squash suffix the session never
+        // typed; both sides must land on the same digest.
+        let typed = subjects(r#"gh pr create --title "feat(x): reader and landed agree""#);
+        let landed = "feat(x): reader and landed agree (#51)";
+        assert_eq!(subject_digest(&typed[0]), subject_digest(landed));
+        // And the git-commit form agrees with the landed subject verbatim.
+        let committed = subjects("git commit -m 'fix: same subject on both sides'");
+        assert_eq!(
+            subject_digest(&committed[0]),
+            subject_digest("fix: same subject on both sides")
+        );
+    }
 }

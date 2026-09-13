@@ -181,6 +181,14 @@ pub struct SessionRollupRow {
     /// from it would carry the same superset rather than under-attributing
     /// either.
     pub harness_session_ids: Vec<String>,
+    /// `TranscriptSummary::commit_subject_digests` carried through the same
+    /// way as `harness_session_ids`: a transcript file already is one
+    /// session, so the file-wide digest set the reader computed is this
+    /// session's set. A subagent row (`agent-<id>`) keeps its OWN list -- a
+    /// subagent that typed a commit is joinable on its own digest, which
+    /// `agent.rs`'s join then also credits to its parent. The
+    /// `commit_subject` join key (`subject.rs`).
+    pub commit_subject_digests: Vec<String>,
     /// Distinct `TurnSummary::model` values seen on this session's turns,
     /// sorted (design step 4, `agent_rollup`'s tier inference input).
     pub models: Vec<String>,
@@ -684,6 +692,7 @@ fn session_rollup_row(
         resend_bytes,
         resend_events,
         harness_session_ids: summary.harness_session_ids.to_vec(),
+        commit_subject_digests: summary.commit_subject_digests.to_vec(),
         models,
     }
 }
