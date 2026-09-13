@@ -1,0 +1,152 @@
+[
+  {
+    "id": "clean-main",
+    "branch": "main",
+    "origin": true,
+    "commits": [],
+    "files": [],
+    "worktrees": []
+  },
+  {
+    "id": "clean-master-config",
+    "branch": "master",
+    "origin": true,
+    "integration": "master",
+    "commits": [],
+    "files": [],
+    "worktrees": []
+  },
+  {
+    "id": "unpushed-one",
+    "branch": "main",
+    "origin": true,
+    "commits": ["unpushed.txt"],
+    "files": [],
+    "worktrees": []
+  },
+  {
+    "id": "unpushed-two",
+    "branch": "main",
+    "origin": true,
+    "commits": ["first.txt", "second.txt"],
+    "files": [],
+    "worktrees": []
+  },
+  {
+    "id": "dirty-tracked-stale",
+    "branch": "main",
+    "origin": true,
+    "commits": [],
+    "files": [
+      {"path": "seed.txt", "kind": "modify_tracked", "mtime": 1000000000}
+    ],
+    "worktrees": []
+  },
+  {
+    "id": "dirty-untracked-stale",
+    "branch": "main",
+    "origin": true,
+    "commits": [],
+    "files": [
+      {"path": "notes.md", "kind": "untracked", "mtime": 1000000000}
+    ],
+    "worktrees": []
+  },
+  {
+    "id": "dirty-fresh",
+    "branch": "main",
+    "origin": true,
+    "commits": [],
+    "files": [
+      {"path": "fresh.md", "kind": "untracked", "mtime": "now"}
+    ],
+    "worktrees": []
+  },
+  {
+    "id": "dirty-future-mtime",
+    "branch": "main",
+    "origin": true,
+    "commits": [],
+    "files": [
+      {"path": "from-the-future.md", "kind": "untracked", "mtime": 4102444800}
+    ],
+    "worktrees": []
+  },
+  {
+    "id": "worktree-contained",
+    "branch": "main",
+    "origin": true,
+    "commits": [],
+    "files": [],
+    "worktrees": [
+      {"branch": "topic/done", "commit": null, "dirty": false, "pruned_upstream": false}
+    ]
+  },
+  {
+    "id": "worktree-dirty",
+    "branch": "main",
+    "origin": true,
+    "commits": [],
+    "files": [],
+    "worktrees": [
+      {"branch": "topic/messy", "commit": null, "dirty": true, "pruned_upstream": false}
+    ]
+  },
+  {
+    "id": "worktree-uncontained",
+    "branch": "main",
+    "origin": true,
+    "commits": [],
+    "files": [],
+    "worktrees": [
+      {"branch": "topic/wip", "commit": "wip.txt", "dirty": false, "pruned_upstream": false}
+    ]
+  },
+  {
+    "id": "worktree-merged-pruned",
+    "branch": "main",
+    "origin": true,
+    "commits": [],
+    "files": [],
+    "worktrees": [
+      {"branch": "topic/merged", "commit": "merged.txt", "dirty": false, "pruned_upstream": true}
+    ]
+  },
+  {
+    "id": "no-remote-trunk",
+    "branch": "trunk",
+    "origin": false,
+    "commits": [],
+    "files": [],
+    "worktrees": []
+  },
+  {
+    "id": "master-local-symref",
+    "branch": "master",
+    "origin": true,
+    "origin_head": "master",
+    "commits": [],
+    "files": [],
+    "worktrees": []
+  },
+  {
+    "id": "master-ls-remote-only",
+    "branch": "master",
+    "origin": true,
+    "commits": [],
+    "files": [],
+    "worktrees": []
+  },
+  {
+    "id": "combined-exposure",
+    "branch": "main",
+    "origin": true,
+    "commits": ["wip-change.txt"],
+    "files": [
+      {"path": "stale.md", "kind": "untracked", "mtime": 1000000000}
+    ],
+    "worktrees": [
+      {"branch": "topic/over", "commit": null, "dirty": false, "pruned_upstream": false, "at": "pushed"}
+    ]
+  }
+]

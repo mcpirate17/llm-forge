@@ -1,0 +1,41 @@
+{
+  "campaign_id": "glm_adapters_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/dispatch/adapters.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/adapters.py": "0bbbf86df263fa9aeccac396d5a3f80fa320307979706d624dc3f96ddbdc99bd"
+  },
+  "survivor_baseline": [
+    "comparison_op-5bd4574dba7e-0",
+    "constant_replace-b0759ac254d2-0",
+    "negate_condition-9b23b0f3024c-0"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-13T06:28:37.743897+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test_runner.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test_runner.py": "b9c9b64880e2ac48c556dbeb091238dc76c4e14f9e43e15eb34e14561b088466"
+  },
+  "title": "Generated mutants for src/tooling/hooks/dispatch/adapters.py, scored on the survivor set"
+}

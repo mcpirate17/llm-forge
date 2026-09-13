@@ -83,10 +83,14 @@ mod tests {
 
     #[test]
     fn falls_back_to_python3_without_a_venv() {
+        // `resolve_python_with` with no export, not `resolve_python`: the
+        // mutation engine exports `CONDUCTOR_SNAPSHOT_PYTHON` into every
+        // baseline it runs, and the env-reading form would see it and fail
+        // here while the suite is green everywhere else.
         let tmp =
             std::env::temp_dir().join(format!("forge-interp-test-novenv-{}", std::process::id()));
         std::fs::create_dir_all(&tmp).unwrap();
-        assert_eq!(resolve_python(&tmp), PathBuf::from("python3"));
+        assert_eq!(resolve_python_with(&tmp, None), PathBuf::from("python3"));
         std::fs::remove_dir_all(&tmp).unwrap();
     }
 }

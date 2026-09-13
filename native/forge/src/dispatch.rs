@@ -44,6 +44,16 @@
 //! native fast path for this event: `crg_refresh_report_post` and
 //! `context_telemetry` (both matcher `.*`) are not ported and match every
 //! `PostToolUse` call, so Python always still starts for the event.
+//!
+//! `SessionStart` likewise: `handlers::native_answers_for_session_start`
+//! answers `workspace_exposure_session` (the EXPOSED summary line) and
+//! nothing else -- the legacy `session_start`/`session_handoff` bodies,
+//! `crg_refresh_report_session` and `native_freshness` still run in Python
+//! for every session start, so the event always delegates. The stdin bytes
+//! are still read here (and forwarded unchanged) because the native answer
+//! is computed before the child starts, exactly like the other partial
+//! paths; the payload itself is irrelevant to this answer, which depends
+//! only on the session's checkout.
 
 use crate::{handlers, interpreter, telemetry};
 use anyhow::{Context, Result};
@@ -58,6 +68,7 @@ pub fn run_hook(event: &str) -> Result<u8> {
     match event {
         "PreToolUse" => run_pre_tool_use(event),
         "PostToolUse" => run_post_tool_use(event),
+        "SessionStart" => run_session_start(event),
         _ => {
             // No native handlers exist for any other event yet: read nothing,
             // change nothing, delegate exactly as before this PR.
@@ -125,6 +136,25 @@ fn run_post_tool_use(event: &str) -> Result<u8> {
         .as_ref()
         .map(|payload| handlers::native_answers_for_post_tool_use(payload, &native_hooks))
         .unwrap_or_default();
+
+    let extra_env = env_for_answers(&native_answers)?;
+    delegate(event, Some(input.as_bytes()), &extra_env)
+}
+
+/// `SessionStart`: always starts Python (see module docs for why no fully
+/// native fast path exists here), but splices in
+/// `workspace_exposure_session`'s precomputed answer -- the EXPOSED summary
+/// line over the session's checkout -- exactly like a partially-native
+/// `PreToolUse`/`PostToolUse` call. The payload is forwarded unread-by-this
+/// path (the answer depends on the checkout, not the input).
+fn run_session_start(event: &str) -> Result<u8> {
+    let mut input = String::new();
+    std::io::stdin()
+        .read_to_string(&mut input)
+        .context("failed to read hook payload from stdin")?;
+
+    let native_hooks = handlers::native_hook_names_from_env();
+    let native_answers = handlers::native_answers_for_session_start(&native_hooks);
 
     let extra_env = env_for_answers(&native_answers)?;
     delegate(event, Some(input.as_bytes()), &extra_env)

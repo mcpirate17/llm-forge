@@ -67,6 +67,10 @@ fn run_forge(
     cmd.arg("hook")
         .arg(event)
         .env("CLAUDE_PROJECT_DIR", project)
+        // The stub venv below is the interpreter this test is about; a snapshot
+        // export leaking in from the mutation engine's environment would rank
+        // above it and run the host's python instead of the stub.
+        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -102,6 +106,7 @@ fn run_forge_with_native_hooks(
         .arg("PreToolUse")
         .env("CLAUDE_PROJECT_DIR", project)
         .env_remove("CONTEXT_TELEMETRY_PATH")
+        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -327,4 +332,126 @@ fn skips_telemetry_entirely_when_the_env_var_is_unset() {
 
     assert_eq!(out.status.code(), Some(0));
     assert!(!telemetry.exists());
+}
+
+/// `SessionStart` has no fully-native path: `forge` must read the payload,
+/// compute the opted-in `workspace_exposure_session` answer and hand it to the
+/// Python dispatcher as splice env, then propagate the dispatcher's exit code.
+#[test]
+fn session_start_delegates_and_carries_the_exposure_answer() {
+    let project = tempdir();
+    stub_project(project.path());
+    let payload = r#"{"session_id":"stub-session"}"#;
+
+    let out = run_forge(project.path(), "SessionStart", payload, None);
+
+    assert_eq!(out.status.code(), Some(0), "delegation exits 0");
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran");
+    assert_eq!(stdout["event"], "SessionStart");
+    let answers = stdout["forge_native_answers"].as_str().unwrap_or("");
+    let parsed: serde_json::Value = serde_json::from_str(answers)
+        .unwrap_or_else(|err| panic!("answers must be JSON ({err}): {answers}"));
+    assert!(
+        parsed.get("workspace_exposure_session").is_some(),
+        "the exposure answer must be spliced in: {answers}"
+    );
+}
+
+/// Events with no native handlers at all (`SessionEnd` today) take the bare
+/// delegation arm: payload forwarded, no native env claimed beyond the
+/// documented empty escape hatch.
+#[test]
+fn events_without_native_handlers_still_delegate() {
+    let project = tempdir();
+    stub_project(project.path());
+    let payload = r#"{"reason":"clear"}"#;
+
+    let out = run_forge(project.path(), "SessionEnd", payload, None);
+
+    assert_eq!(out.status.code(), Some(0));
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran");
+    assert_eq!(stdout["event"], "SessionEnd");
+    assert_eq!(
+        stdout["forge_native_hooks"].as_str(),
+        Some(""),
+        "no native hooks are claimed for an event forge does not answer"
+    );
+    assert_eq!(stdout["echoed"]["reason"], "clear");
+}
+
+/// An empty `CLAUDE_PROJECT_DIR` must fall back to the working directory (the
+/// `Path::cwd` arm of `interpreter::project_root`), not to an empty path that
+/// resolves no venv: run forge from inside the stub project with the variable
+/// set but empty and the stub must still be the dispatcher that answers.
+#[test]
+fn an_empty_project_dir_falls_back_to_the_working_directory() {
+    let project = tempdir();
+    stub_project(project.path());
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
+    cmd.arg("hook")
+        .arg("SessionEnd")
+        .env("CLAUDE_PROJECT_DIR", "")
+        .current_dir(project.path())
+        .env_remove("CONTEXT_TELEMETRY_PATH")
+        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
+        .env_remove("FORGE_NATIVE_HOOKS")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd.spawn().expect("spawn forge");
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(br#"{}"#)
+        .expect("write stdin");
+    let out = child.wait_with_output().expect("wait for forge");
+
+    assert_eq!(out.status.code(), Some(0), "cwd-rooted delegation exits 0");
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran");
+    assert_eq!(stdout["event"], "SessionEnd");
+    // The dispatcher must also see the fallback root: forge re-exports
+    // CLAUDE_PROJECT_DIR from project_root(), so an empty-variable bug would
+    // arrive here as the empty string.
+    let echoed = stdout["claude_project_dir"].as_str().unwrap_or_default();
+    assert_eq!(
+        std::fs::canonicalize(echoed).ok(),
+        std::fs::canonicalize(project.path()).ok(),
+        "project_root must fall back to the working directory"
+    );
+}
+
+/// A set-but-empty `CONDUCTOR_SNAPSHOT_PYTHON` is not an export: the filter in
+/// `interpreter::resolve_python` must drop it and let the project venv (the
+/// stub) win.
+#[test]
+fn an_empty_snapshot_export_still_lets_the_project_venv_win() {
+    let project = tempdir();
+    stub_project(project.path());
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
+    cmd.arg("hook")
+        .arg("SessionEnd")
+        .env("CLAUDE_PROJECT_DIR", project.path())
+        .env("CONDUCTOR_SNAPSHOT_PYTHON", "")
+        .env_remove("CONTEXT_TELEMETRY_PATH")
+        .env_remove("FORGE_NATIVE_HOOKS")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd.spawn().expect("spawn forge");
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(br#"{}"#)
+        .expect("write stdin");
+    let out = child.wait_with_output().expect("wait for forge");
+
+    assert_eq!(out.status.code(), Some(0));
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran");
+    assert_eq!(stdout["event"], "SessionEnd");
 }

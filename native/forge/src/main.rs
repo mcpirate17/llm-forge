@@ -25,6 +25,7 @@ mod mutation_plan;
 mod ownership;
 mod telemetry;
 mod tool_quiet;
+mod workspace_hygiene;
 mod write_targets;
 
 use clap::{Parser, Subcommand};
