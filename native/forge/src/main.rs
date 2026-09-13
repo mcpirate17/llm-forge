@@ -9,6 +9,7 @@
 //! whatever is covered.
 
 mod bash_guard;
+mod bash_impact;
 mod dispatch;
 mod handlers;
 mod interpreter;

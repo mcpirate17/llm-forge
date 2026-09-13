@@ -23,7 +23,12 @@ from typing import Any
 from tooling.hooks.dispatch import adapters
 from tooling.hooks.dispatch.merge import HookOutcome, merge
 from tooling.hooks.dispatch.paths import body_path, interpreter_bin
-from tooling.hooks.dispatch.registry import HookSpec, hooks_for, natively_served
+from tooling.hooks.dispatch.registry import (
+    HookSpec,
+    hooks_for,
+    native_answers,
+    natively_served,
+)
 
 
 @dataclass
@@ -247,9 +252,50 @@ def build_context(event: str, raw: bytes, root: Path) -> Context:
     return Context(root, event, payload, raw, env)
 
 
+def _splice_native_outcomes(
+    event: str, payload: dict[str, Any], outcomes: list[HookOutcome]
+) -> list[HookOutcome]:
+    """Adds one `HookOutcome` per hook `select()` dropped as natively served,
+    carrying forge's precomputed answer instead of re-running its adapter, then
+    restores registry order -- `merge()`'s decision algebra is order-dependent,
+    so a served hook must land back where it would have run, not at the end.
+
+    Fails loud (`ValueError`) if a served name has no matching answer: a served
+    hook silently vanishing from the merged result, with no trace anywhere, is
+    exactly the bug this splice exists to prevent.
+    """
+    served = natively_served()
+    if not served:
+        return outcomes
+    subject = subject_of(event, payload)
+    all_specs = hooks_for(event)
+    served_specs = [
+        spec for spec in all_specs if spec.matches(subject) and spec.name in served
+    ]
+    if not served_specs:
+        return outcomes
+    answers = native_answers()
+    spliced = list(outcomes)
+    for spec in served_specs:
+        if spec.name not in answers:
+            raise ValueError(
+                f"FORGE_NATIVE_HOOKS names {spec.name!r} as served natively for "
+                f"event {event!r}, but FORGE_NATIVE_ANSWERS has no entry for it "
+                "-- a served hook must never run twice and never be dropped "
+                "without a native replacement"
+            )
+        spliced.append(
+            HookOutcome(spec.name, answers[spec.name], None, spec.fail_closed, 0.0)
+        )
+    order = {spec.name: index for index, spec in enumerate(all_specs)}
+    spliced.sort(key=lambda outcome: order.get(outcome.name, len(order)))
+    return spliced
+
+
 def dispatch(
     event: str, raw: bytes, root: Path
 ) -> tuple[dict[str, Any], list[HookOutcome]]:
     ctx = build_context(event, raw, root)
     outcomes = run_all(select(event, ctx.payload), ctx)
+    outcomes = _splice_native_outcomes(event, ctx.payload, outcomes)
     return merge(event, outcomes), outcomes

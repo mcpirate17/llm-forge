@@ -230,3 +230,76 @@ def test_malformed_payload_dispatches_with_empty_payload(tmp_path, monkeypatch):
     result, outcomes = runner.dispatch("PostToolUse", b"not json", tmp_path)
     assert result == {"hookSpecificOutput": {"hookEventName": "PostToolUse"}}
     assert outcomes == []
+
+
+def _splice_specs(fake_adapters, calls: list[str]) -> tuple[HookSpec, ...]:
+    """Three PreToolUse/Bash specs -- `a`, `pre_bash`, `b` -- in registry order,
+    each recording its name in `calls` if its adapter actually runs. Shared by
+    every native-splice test below so each only sets the one env var it means
+    to exercise.
+    """
+    for name in ("a", "pre_bash", "b"):
+        fake_adapters(
+            name, lambda ctx, name=name: (calls.append(name), {"ok": name})[1]
+        )
+    return (
+        _spec("a", adapter="a"),
+        _spec("pre_bash", adapter="pre_bash"),
+        _spec("b", adapter="b"),
+    )
+
+
+def test_dispatch_splices_a_native_answer_back_in_at_its_registry_position(
+    tmp_path, fake_adapters, monkeypatch
+):
+    calls: list[str] = []
+    specs = _splice_specs(fake_adapters, calls)
+    monkeypatch.setattr(runner, "hooks_for", lambda event: specs)
+    native_answer = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": "native deny",
+        }
+    }
+    monkeypatch.setenv("FORGE_NATIVE_HOOKS", "pre_bash")
+    monkeypatch.setenv("FORGE_NATIVE_ANSWERS", json.dumps({"pre_bash": native_answer}))
+
+    result, outcomes = runner.dispatch(
+        "PreToolUse", json.dumps(PAYLOAD).encode(), tmp_path
+    )
+
+    assert [o.name for o in outcomes] == ["a", "pre_bash", "b"]
+    pre_bash_outcome = outcomes[1]
+    assert pre_bash_outcome.output == native_answer
+    assert pre_bash_outcome.error is None
+    assert calls == ["a", "b"], "pre_bash's adapter must never run once served natively"
+    assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_dispatch_raises_loud_when_a_served_hook_has_no_native_answer(
+    tmp_path, fake_adapters, monkeypatch
+):
+    calls: list[str] = []
+    specs = _splice_specs(fake_adapters, calls)
+    monkeypatch.setattr(runner, "hooks_for", lambda event: specs)
+    monkeypatch.setenv("FORGE_NATIVE_HOOKS", "pre_bash")
+    monkeypatch.delenv("FORGE_NATIVE_ANSWERS", raising=False)
+
+    with pytest.raises(ValueError, match="pre_bash"):
+        runner.dispatch("PreToolUse", json.dumps(PAYLOAD).encode(), tmp_path)
+
+
+def test_dispatch_runs_everything_in_python_when_forge_native_hooks_is_empty(
+    tmp_path, fake_adapters, monkeypatch
+):
+    calls: list[str] = []
+    specs = _splice_specs(fake_adapters, calls)
+    monkeypatch.setattr(runner, "hooks_for", lambda event: specs)
+    monkeypatch.setenv("FORGE_NATIVE_HOOKS", "")
+    monkeypatch.delenv("FORGE_NATIVE_ANSWERS", raising=False)
+
+    _, outcomes = runner.dispatch("PreToolUse", json.dumps(PAYLOAD).encode(), tmp_path)
+
+    assert calls == ["a", "pre_bash", "b"], "the escape hatch must run every hook"
+    assert [o.name for o in outcomes] == ["a", "pre_bash", "b"]

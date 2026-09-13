@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 
+import pytest
+
 from tooling.hooks.dispatch import adapters, registry
 
 ROOT = Path(__file__).resolve().parents[3]  # package root (src/) in this repository
@@ -86,6 +88,34 @@ def test_natively_served_is_empty_by_default(monkeypatch):
 def test_natively_served_parses_and_trims_the_env_var(monkeypatch):
     monkeypatch.setenv("FORGE_NATIVE_HOOKS", " pre_bash ,, bash_write_targets")
     assert registry.natively_served() == frozenset({"pre_bash", "bash_write_targets"})
+
+
+def test_native_answers_is_empty_by_default(monkeypatch):
+    monkeypatch.delenv("FORGE_NATIVE_ANSWERS", raising=False)
+    assert registry.native_answers() == {}
+
+
+def test_native_answers_is_empty_when_the_env_var_is_blank(monkeypatch):
+    monkeypatch.setenv("FORGE_NATIVE_ANSWERS", "   ")
+    assert registry.native_answers() == {}
+
+
+def test_native_answers_parses_the_json_object(monkeypatch):
+    payload = {"pre_bash": {"hookSpecificOutput": {"permissionDecision": "deny"}}}
+    monkeypatch.setenv("FORGE_NATIVE_ANSWERS", json.dumps(payload))
+    assert registry.native_answers() == payload
+
+
+def test_native_answers_rejects_malformed_json(monkeypatch):
+    monkeypatch.setenv("FORGE_NATIVE_ANSWERS", "{not json")
+    with pytest.raises(ValueError, match="not valid JSON"):
+        registry.native_answers()
+
+
+def test_native_answers_rejects_a_non_object_json_value(monkeypatch):
+    monkeypatch.setenv("FORGE_NATIVE_ANSWERS", "[1, 2, 3]")
+    with pytest.raises(ValueError, match="JSON object"):
+        registry.native_answers()
 
 
 def test_matchers():

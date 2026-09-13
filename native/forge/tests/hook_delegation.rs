@@ -88,6 +88,97 @@ fn run_forge(
     child.wait_with_output().expect("wait for forge")
 }
 
+/// Like `run_forge`, but also controls `FORGE_NATIVE_HOOKS` on forge's own
+/// process: `Some(v)` sets it to `v` (use `Some("")` for the escape hatch),
+/// `None` removes it from the child's environment entirely so no leftover
+/// value from the test runner's own shell can leak in.
+fn run_forge_with_native_hooks(
+    project: &Path,
+    stdin: &str,
+    native_hooks: Option<&str>,
+) -> std::process::Output {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
+    cmd.arg("hook")
+        .arg("PreToolUse")
+        .env("CLAUDE_PROJECT_DIR", project)
+        .env_remove("CONTEXT_TELEMETRY_PATH")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    match native_hooks {
+        Some(v) => {
+            cmd.env("FORGE_NATIVE_HOOKS", v);
+        }
+        None => {
+            cmd.env_remove("FORGE_NATIVE_HOOKS");
+        }
+    }
+    let mut child = cmd.spawn().expect("spawn forge");
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(stdin.as_bytes())
+        .expect("write stdin");
+    child.wait_with_output().expect("wait for forge")
+}
+
+#[test]
+fn default_native_serves_pre_bash_and_forwards_its_deny_answer() {
+    let project = tempdir();
+    stub_project(project.path());
+    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}"#;
+
+    // FORGE_NATIVE_HOOKS unset entirely: the native path must be the default.
+    let out = run_forge_with_native_hooks(project.path(), payload, None);
+
+    assert_eq!(out.status.code(), Some(0), "Python still runs and allows");
+    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
+    assert_eq!(stdout["forge_native_hooks"], "pre_bash");
+    let answers: serde_json::Value = serde_json::from_str(
+        stdout["forge_native_answers"]
+            .as_str()
+            .expect("answers json"),
+    )
+    .expect("valid json");
+    assert_eq!(
+        answers["pre_bash"]["hookSpecificOutput"]["permissionDecision"],
+        "deny"
+    );
+}
+
+#[test]
+fn empty_native_hooks_is_the_escape_hatch_back_to_all_python() {
+    let project = tempdir();
+    stub_project(project.path());
+    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}"#;
+
+    let out = run_forge_with_native_hooks(project.path(), payload, Some(""));
+
+    assert_eq!(out.status.code(), Some(0));
+    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
+    assert_eq!(stdout["forge_native_hooks"], "");
+    assert_eq!(stdout["forge_native_answers"], "");
+}
+
+#[test]
+fn a_stale_env_native_hooks_value_never_leaks_past_a_non_bash_payload() {
+    let project = tempdir();
+    stub_project(project.path());
+    // Simulates a caller whose shell still has FORGE_NATIVE_HOOKS from an
+    // earlier Bash call set when this call is for a different tool: forge
+    // must still override it to "" for the child rather than let Python
+    // believe `pre_bash` was served when no answer exists for it.
+    let payload = r#"{"tool_name":"Write","tool_input":{"file_path":"x","content":"y"}}"#;
+
+    let out = run_forge_with_native_hooks(project.path(), payload, Some("pre_bash"));
+
+    assert_eq!(out.status.code(), Some(0));
+    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
+    assert_eq!(stdout["forge_native_hooks"], "");
+    assert_eq!(stdout["forge_native_answers"], "");
+}
+
 #[test]
 fn forwards_stdin_to_the_dispatcher_and_its_allow_exit_code() {
     let project = tempdir();

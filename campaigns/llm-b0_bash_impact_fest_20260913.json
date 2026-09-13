@@ -1,0 +1,38 @@
+{
+  "campaign_id": "llm-b0_bash_impact_fest_20260913",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "mutant_timeout_seconds": 30,
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/claude/_bash_impact.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/claude/_bash_impact.py": "8900b8291382915d8b4e02354e5aace82158a21f2c0ac264c12acecac468dfb8"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
+  "survivor_baseline_recorded": false,
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/claude/test_bash_impact_parity.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/claude/test_bash_impact_parity.py": "9ec67bbda309443addd2f2cd2795795b5fad8cb09605e7c3def42762372b284a"
+  },
+  "title": "Generated mutants for src/tooling/hooks/claude/_bash_impact.py, scored on the survivor set"
+}
