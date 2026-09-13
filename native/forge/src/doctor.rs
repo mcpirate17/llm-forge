@@ -603,6 +603,7 @@ mod tests {
             standalone: true,
             binary: Some(PathBuf::from("/opt/forge/bin/forge")),
             dry_run: false,
+            takeover: false,
         })
         .unwrap();
         let (check, entries) = check_settings(scratch.path());

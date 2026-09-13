@@ -139,6 +139,17 @@ agent tokens. Stop porting; finish Phase 3, then install.
    1e-4) makes warm query 0.74 s end to end -- the JSON parse is gone,
    the remaining time is process start + the embed call. DONE PR #63
    (4.28 s -> 0.74 s median; `docs/ledger.md`, "Index layout").
+2e. (Claude) `forge hooks install --takeover`: one command retires the
+   host's Python dispatcher entry for every event forge fully covers
+   natively (`native/forge/src/takeover.rs::coverage`), records what it
+   removed for `uninstall` to restore, and leaves every partially-covered
+   event's Python entry untouched. Measured on a synthetic Bash payload:
+   `PostToolUse` (today Python-only, ~45 ms) drops to forge alone
+   (~3 ms) after takeover; `PreToolUse` stays Partial (both dispatch.py
+   and forge run today, ~49 ms combined vs. ~2 ms for forge alone --
+   quantifying the double-run cost, not yet realized since Python stays
+   wired there) -- see the coverage table and proof in the PR. DONE
+   PR #64 (`docs/install.md`, "Take over from the Python dispatcher").
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
