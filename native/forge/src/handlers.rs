@@ -466,7 +466,9 @@ mod tests {
 
     #[test]
     fn env_parsing_trims_and_drops_empties() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::env::set_var("FORGE_NATIVE_HOOKS", " pre_bash ,, bash_write_targets");
         let names = native_hook_names_from_env();
         assert!(names.contains("pre_bash"));
@@ -477,7 +479,9 @@ mod tests {
 
     #[test]
     fn env_unset_defaults_to_native_on_for_every_bash_hook() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::env::remove_var("FORGE_NATIVE_HOOKS");
         let names = native_hook_names_from_env();
         for name in BASH_PRETOOLUSE_HOOK_NAMES {
@@ -489,7 +493,9 @@ mod tests {
 
     #[test]
     fn env_set_empty_is_the_documented_escape_hatch() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::env::set_var("FORGE_NATIVE_HOOKS", "");
         let names = native_hook_names_from_env();
         assert!(names.is_empty());
@@ -574,7 +580,9 @@ mod tests {
     /// `env_parsing_trims_and_drops_empties` test does; restored before return.
     #[test]
     fn native_answers_folds_write_targets_into_a_native_deny_when_both_opted_in() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::env::set_var("CLAUDE_PROJECT_DIR", "/home/tim");
         let payload = json!({
             "tool_name": "Bash",
@@ -598,7 +606,9 @@ mod tests {
 
     #[test]
     fn native_answers_omits_write_targets_context_when_only_pre_bash_is_opted_in() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::env::set_var("CLAUDE_PROJECT_DIR", "/home/tim");
         let payload = json!({
             "tool_name": "Bash",
@@ -614,7 +624,9 @@ mod tests {
 
     #[test]
     fn crg_refresh_report_pre_handler_is_silent_with_no_marker_file() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir =
             std::env::temp_dir().join(format!("forge-handlers-crg-refresh-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -648,7 +660,9 @@ mod tests {
 
     #[test]
     fn fully_native_merges_all_four_outcomes_in_registry_order() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = std::env::temp_dir().join(format!(
             "forge-handlers-fully-native-{}",
             std::process::id()
@@ -672,7 +686,9 @@ mod tests {
 
     #[test]
     fn fully_native_denies_when_pre_bash_denies() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = std::env::temp_dir().join(format!(
             "forge-handlers-fully-native-deny-{}",
             std::process::id()

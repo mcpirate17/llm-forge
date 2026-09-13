@@ -185,14 +185,18 @@ pub(crate) mod tests {
 
     #[test]
     fn no_marker_is_null() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let tmp = ScratchDir::new("no-marker");
         assert_eq!(failure_output("PreToolUse", tmp.path()), Value::Null);
     }
 
     #[test]
     fn failure_notice_reports_and_clears() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let tmp = ScratchDir::new("failure");
         write_marker(
             tmp.path(),
@@ -211,7 +215,9 @@ pub(crate) mod tests {
 
     #[test]
     fn warning_notice_reports_without_failed_language() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let tmp = ScratchDir::new("warning");
         write_marker(
             tmp.path(),
@@ -227,7 +233,9 @@ pub(crate) mod tests {
 
     #[test]
     fn unparseable_line_falls_back_to_a_raw_failure_notice() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let tmp = ScratchDir::new("unparseable");
         write_marker(tmp.path(), &["not json at all"]);
         let out = failure_output("PreToolUse", tmp.path());
@@ -239,7 +247,9 @@ pub(crate) mod tests {
 
     #[test]
     fn crg_data_dir_env_override_is_honored() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let tmp = ScratchDir::new("root");
         let alt = ScratchDir::new("alt");
         std::env::set_var("CRG_DATA_DIR", alt.path());

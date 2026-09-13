@@ -445,7 +445,9 @@ pub(crate) mod tests {
                 std::env::remove_var("CRG_GATE_STATE_DIR");
             }
         }
-        let guard = ENV_LOCK.lock().unwrap();
+        let guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::env::set_var("CRG_GATE_STATE_DIR", dir);
         Guard(guard)
     }

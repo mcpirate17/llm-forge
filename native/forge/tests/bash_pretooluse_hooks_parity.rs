@@ -240,9 +240,15 @@ fn run_guard_case(case: &Value) -> Value {
 
 #[test]
 fn bash_pretooluse_native_hooks_match_the_frozen_corpus() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    let _gate_guard = crg_gate::tests::ENV_LOCK.lock().unwrap();
-    let _refresh_guard = crg_refresh::tests::ENV_LOCK.lock().unwrap();
+    let _guard = ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _gate_guard = crg_gate::tests::ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _refresh_guard = crg_refresh::tests::ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     // A stray inherited value from the outer shell must never leak into a
     // case that does not explicitly set it.
     std::env::remove_var("CRG_GATE_STATE_DIR");
