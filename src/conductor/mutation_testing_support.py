@@ -3,10 +3,15 @@
 The orchestration module keeps its established private API as thin wrappers so
 callers and tests can continue to monkeypatch those names.  Implementations in
 this module receive their cross-module dependencies explicitly.
+
+Runnable directly for the orphan reaper:
+``python -m conductor.mutation_testing_support reap [--apply]``.
 """
 
 from __future__ import annotations
 
+import argparse
+import ctypes
 import hashlib
 import json
 import os
@@ -14,6 +19,7 @@ from pathlib import Path
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from typing import (
     Any,
@@ -28,7 +34,11 @@ from typing import (
 
 # Imports nothing from `conductor`, so this stays circular-safe.
 from conductor.mutation_patch_apply import PatchApplyError, apply_patch_text
-from conductor.project_paths import DEFAULT_MUTATION_REGISTRY
+from conductor.project_paths import (
+    DEFAULT_MUTATION_REGISTRY,
+    host_root,
+    receipts_relative,
+)
 
 
 CANONICAL_TEST_PATTERNS = (
@@ -456,6 +466,99 @@ def _kill_process_group(
         ) from exc
 
 
+# <linux/prctl.h>. Spelled here rather than pulled from a third-party module:
+# one constant, stable in the Linux ABI since 2.1.57.
+PR_SET_PDEATHSIG = 1
+
+
+def _parent_death_preexec(platform: str = sys.platform) -> Callable[[], None]:
+    """The ``preexec_fn`` binding one spawned command to its spawner's death.
+
+    ``prctl(PR_SET_PDEATHSIG, SIGKILL)`` makes the kernel SIGKILL this child
+    the moment the THREAD that forked it exits -- thread, not process, so a
+    short-lived spawning thread would tear down every command it spawned. The
+    engine chain is single-threaded end to end (``python -m
+    conductor.mutation_engine_generated run`` -> adapter -> ``run_command``;
+    no thread is started anywhere between them), so the spawning thread is the
+    main thread and the binding fires exactly when the engine process dies:
+    Ctrl-C at the terminal, a session end, OOM, sandbox teardown.
+
+    PDEATHSIG is cleared on fork, so it binds only the direct child -- the
+    engine binary -- never the mutants that binary already spawned. Stopping
+    the engine stops every further spawn; reaping the orphans it left behind
+    is the registry's job (``reap_orphaned_runs``, below).
+
+    ``preexec_fn`` runs Python between fork and exec, which the subprocess
+    docs warn about only when other threads exist at fork time; there are
+    none here. Non-Linux is refused rather than silently left unbound.
+    """
+
+    if platform != "linux":
+        raise NotImplementedError(
+            "run_command binds spawned commands to their spawner's death with "
+            f"Linux PR_SET_PDEATHSIG; {platform!r} needs an equivalent, not a "
+            "silent skip"
+        )
+
+    def bind_to_parent_death() -> None:
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(PR_SET_PDEATHSIG, signal.SIGKILL, 0, 0, 0) != 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+
+    return bind_to_parent_death
+
+
+LIVE_PGIDS_FILENAME = "live_pgids.json"
+LIVE_PGIDS_KEY = "live"
+
+
+def live_pgids_path(repo_root: Path) -> Path:
+    """The pgid registry: the receipts' own ``.iterations`` scratch directory.
+
+    The same directory ``make mutation-engine-run`` writes iteration receipts
+    into, so a host that redirects its receipts redirects the registry with
+    them and the reaper never needs a second knob.
+    """
+
+    return (
+        repo_root / receipts_relative(repo_root) / ".iterations" / LIVE_PGIDS_FILENAME
+    )
+
+
+def _live_pgid_entries(path: Path) -> list[dict[str, Any]]:
+    """Read the registry; a missing file is empty, any other shape is refused."""
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return []
+    entries = payload.get(LIVE_PGIDS_KEY) if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError(
+            f"live pgid registry {path} is not a JSON object with a list"
+            f" under {LIVE_PGIDS_KEY!r}"
+        )
+    return list(entries)
+
+
+def record_live_pgid(path: Path, *, pgid: int, engine_pid: int, argv0: str) -> None:
+    """Append one live run; engine runs are serialized, publish is atomic."""
+
+    entries = _live_pgid_entries(path)
+    entries.append({"argv0": argv0, "engine_pid": engine_pid, "pgid": pgid})
+    atomic_json(path, {LIVE_PGIDS_KEY: entries})
+
+
+def forget_live_pgid(path: Path, pgid: int) -> None:
+    """Remove one finished run; an absent entry is the outcome this produces."""
+
+    entries = _live_pgid_entries(path)
+    if not any(entry.get("pgid") == pgid for entry in entries):
+        return
+    atomic_json(path, {LIVE_PGIDS_KEY: [e for e in entries if e.get("pgid") != pgid]})
+
+
 def run_command(
     argv: Sequence[str],
     *,
@@ -466,6 +569,7 @@ def run_command(
     result_factory: Callable[..., _CommandResultT],
     output_tail_chars: int,
     stdout_sink: Callable[[str], None] | None = None,
+    pgid_registry: Path | None = None,
 ) -> _CommandResultT:
     """Run one bounded command and retain only the configured output tails.
 
@@ -475,11 +579,21 @@ def run_command(
     megabytes of test chatter into every receipt. The sink keeps the receipt bounded
     and the attribution complete. It is called exactly once per run, including on a
     timeout, so a partial run still attributes the tests that did report.
+
+    The command is bound to this process's lifetime with ``PR_SET_PDEATHSIG``
+    and its pgid is recorded in ``pgid_registry`` (default: the host's
+    ``<receipts>/.iterations/live_pgids.json``) for exactly the run's duration,
+    so a run orphaned by this process's death is findable and killable by
+    ``python -m conductor.mutation_testing_support reap``.
     """
 
     env = os.environ.copy()
     env.update(environment)
     resolved_argv = pin_argv(argv)
+    registry = (
+        pgid_registry if pgid_registry is not None else live_pgids_path(host_root())
+    )
+    preexec_fn = _parent_death_preexec()
     started = time.monotonic()
     with subprocess.Popen(
         resolved_argv,
@@ -491,22 +605,43 @@ def run_command(
         # The command owns a fresh session, so the timeout path can kill every
         # process it spawned rather than only the process it started.
         start_new_session=True,
+        # And it dies with this process rather than outliving it: see
+        # _parent_death_preexec for what that binding does and does not cover.
+        preexec_fn=preexec_fn,
     ) as proc:
         try:
-            stdout, stderr = proc.communicate(timeout=timeout_seconds)
-        except subprocess.TimeoutExpired:
-            stdout, stderr = _kill_process_group(proc)
-            duration = time.monotonic() - started
-            if stdout_sink is not None:
-                stdout_sink(stdout)
-            return result_factory(
-                returncode=None,
-                timed_out=True,
-                duration_seconds=duration,
-                stdout_tail=stdout[-output_tail_chars:],
-                stderr_tail=stderr[-output_tail_chars:],
-            )
-        returncode = proc.returncode
+            try:
+                record_live_pgid(
+                    registry,
+                    pgid=proc.pid,
+                    engine_pid=os.getpid(),
+                    argv0=resolved_argv[0],
+                )
+            except OSError:
+                # A run that cannot be reaped must not start: kill what was
+                # just spawned rather than leave the first orphan of its own.
+                try:
+                    _kill_process_group(proc, drain_seconds=1)
+                except OrphanedProcessGroupError:
+                    pass
+                raise
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout_seconds)
+            except subprocess.TimeoutExpired:
+                stdout, stderr = _kill_process_group(proc)
+                duration = time.monotonic() - started
+                if stdout_sink is not None:
+                    stdout_sink(stdout)
+                return result_factory(
+                    returncode=None,
+                    timed_out=True,
+                    duration_seconds=duration,
+                    stdout_tail=stdout[-output_tail_chars:],
+                    stderr_tail=stderr[-output_tail_chars:],
+                )
+            returncode = proc.returncode
+        finally:
+            forget_live_pgid(registry, proc.pid)
     if stdout_sink is not None:
         stdout_sink(stdout)
     return result_factory(
@@ -516,6 +651,125 @@ def run_command(
         stdout_tail=stdout[-output_tail_chars:],
         stderr_tail=stderr[-output_tail_chars:],
     )
+
+
+def _pid_alive(pid: int) -> bool:
+    """Signal-0 liveness; EPERM counts as alive -- that process exists."""
+
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _killpg_if_present(pgid: int) -> bool:
+    """SIGKILL one recorded group; False when its leader died mid-reap."""
+
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def reap_orphaned_runs(registry: Path, *, apply: bool) -> tuple[list[str], int]:
+    """Report runs whose engine died while the command it spawned still lives.
+
+    PDEATHSIG stops the ENGINE the moment the process that spawned it dies,
+    but the mutants that engine had already spawned inherit nothing and keep
+    running: ten were measured at 100% CPU, 8-10 h old, on 2026-09-13. An
+    entry is touched only when its recorded engine pid is dead while its
+    recorded pgid still leads a live group -- an alive engine pid means the
+    run is in flight, and no pid outside the registry is ever signalled.
+    Returns the report lines and how many orphaned groups were found (killed
+    when ``apply``, only listed without it).
+    """
+
+    if not registry.exists():
+        return [f"no live pgid registry at {registry}"], 0
+    lines: list[str] = []
+    found = 0
+    killed: list[int] = []
+    for entry in _live_pgid_entries(registry):
+        pgid = int(entry["pgid"])
+        engine_pid = int(entry["engine_pid"])
+        argv0 = str(entry.get("argv0", "?"))
+        if _pid_alive(engine_pid):
+            lines.append(
+                f"pgid {pgid} ({argv0}): engine pid {engine_pid} alive"
+                " -- in flight, untouched"
+            )
+        elif not _pid_alive(pgid):
+            lines.append(
+                f"pgid {pgid} ({argv0}): leader gone -- stale entry, untouched"
+            )
+        else:
+            found += 1
+            if not apply:
+                lines.append(
+                    f"pgid {pgid} ({argv0}): engine pid {engine_pid} dead,"
+                    " group alive -- would SIGKILL (dry run)"
+                )
+            elif _killpg_if_present(pgid):
+                killed.append(pgid)
+                lines.append(
+                    f"pgid {pgid} ({argv0}): engine pid {engine_pid} dead"
+                    " -- SIGKILLed"
+                )
+            else:
+                lines.append(
+                    f"pgid {pgid} ({argv0}): leader died before the kill"
+                    " -- already gone"
+                )
+    for pgid in killed:
+        forget_live_pgid(registry, pgid)
+    return lines, found
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """``python -m conductor.mutation_testing_support reap [--apply]``."""
+
+    parser = argparse.ArgumentParser(
+        prog="python -m conductor.mutation_testing_support",
+        description="Reap engine runs orphaned by an engine that died mid-run.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    reaper = subparsers.add_parser(
+        "reap",
+        help="list orphaned engine runs; --apply SIGKILLs the recorded groups",
+    )
+    reaper.add_argument(
+        "--repo-root",
+        type=Path,
+        default=None,
+        help="repository whose receipts tree holds the registry"
+        " (default: the repository enclosing the working directory)",
+    )
+    reaper.add_argument(
+        "--registry",
+        type=Path,
+        default=None,
+        help="read the registry from this path instead of"
+        " <receipts>/.iterations/live_pgids.json",
+    )
+    reaper.add_argument(
+        "--apply",
+        action="store_true",
+        help="SIGKILL every orphaned recorded group instead of listing it",
+    )
+    args = parser.parse_args(argv)
+    registry = args.registry or live_pgids_path(host_root(args.repo_root))
+    lines, found = reap_orphaned_runs(registry, apply=args.apply)
+    if not lines:
+        lines = [f"live pgid registry {registry} records no runs"]
+    for line in lines:
+        print(line)
+    # A dry run that finds orphans is a failed check: the fix is either
+    # --apply or an engine that is still supposed to be alive.
+    return 1 if found and not args.apply else 0
 
 
 def apply_mutation(
@@ -771,3 +1025,7 @@ def vacuous_run_reason(
             "must not report PASS."
         )
     return None
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

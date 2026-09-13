@@ -58,3 +58,16 @@ every iteration was growing the tracked tree by ~350 KB per run, and every
 clone and CI checkout paid for it. When a loop settles,
 `make mutation-receipt-promote` copies the newest iteration receipt into the
 tracked directory; only that copy is committed.
+
+### Orphaned runs
+
+`run_command` starts every engine in its own session and binds it to the
+engine process's lifetime with `PR_SET_PDEATHSIG`, so the kernel kills the
+engine binary the moment the process that spawned it dies (Ctrl-C, session
+end, OOM, sandbox teardown) — but the mutants that engine already spawned
+inherit nothing and keep running. Belt and braces: every live run also
+records its pgid in `campaigns/receipts/.iterations/live_pgids.json`
+(appended on start, removed on exit). `make mutation-reap` lists the
+recorded groups whose engine is dead while the group still lives, and
+`MUTATION_REAP_APPLY=1 make mutation-reap` SIGKILLs exactly those — nothing
+outside the registry is ever signalled.
