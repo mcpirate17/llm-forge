@@ -138,7 +138,10 @@ def isolated_python_env(
         prefix.mkdir(parents=True, exist_ok=True)
         if not os.access(prefix, os.W_OK):
             raise OSError(f"not writable: {prefix}")
-        (scratch / RUN_MARKER_NAME).write_text("", encoding="utf-8")
+        # `touch()`, not `write_text("")`: the marker is a license, never
+        # data -- an empty file by construction, with no string constant a
+        # mutation operator could rewrite into "content".
+        (scratch / RUN_MARKER_NAME).touch()
     except OSError as exc:
         raise RuntimeError(
             f"bytecode isolation scratch {scratch} is not usable: {exc}"

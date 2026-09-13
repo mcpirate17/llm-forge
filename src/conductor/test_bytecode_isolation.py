@@ -117,7 +117,10 @@ def test_the_scratch_is_marked_the_moment_it_is_created(tmp_path: Path) -> None:
     """
 
     isolated_python_env({}, tmp_path / "scratch")
-    assert (tmp_path / "scratch" / RUN_MARKER_NAME).is_file()
+    marker = tmp_path / "scratch" / RUN_MARKER_NAME
+    assert marker.is_file()
+    # The marker is a license, never data: an empty file, and nothing else.
+    assert marker.read_text(encoding="utf-8") == ""
 
 
 def test_each_scratch_names_its_own_prefix(tmp_path: Path) -> None:
