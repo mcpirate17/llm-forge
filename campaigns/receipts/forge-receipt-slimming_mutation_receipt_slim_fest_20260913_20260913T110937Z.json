@@ -1,0 +1,936 @@
+{
+  "adapter_sha256": "a92c6a615a7f3bd0ad5702c3bc5b32fe7f06b7828269b8732127acce300854c2",
+  "attribution": {
+    "attributed_mutants": 19,
+    "baseline_repetitions": 2,
+    "killed_mutants": 19,
+    "ranked_tests": 7,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 0.337638,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": ".......                                                                  [100%]\n7 passed in 0.08s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/mnt/data/llm/scratch/forge-glm-receipts/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_receipt_slim.py",
+    "--cov=src/conductor",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "forge-receipt-slimming_mutation_receipt_slim_fest_20260913",
+  "classification_required": [],
+  "core_sha256": "4c9fbdf4133adc160492aeee71c47d78a7dd5cf59e6a149d2271336281f235a9",
+  "detail": {
+    "encoding": "json",
+    "mutants": [
+      {
+        "byte_length": 976,
+        "byte_offset": 0,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-84f65bf09cf0-0",
+        "line": 1,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"Slim mutation receipts: one Python seam over the native codec.\n\nA receipt's summary block (status, campaign id, score, counts, source hashes,\nengine, base commit, timestamp) stays plain JSON -- every existing reader keys\noff it without change. The bulky per-mutant detail (``mutants`` and\n``test_value``, ~24 of the ~26 MiB the tracked receipts held before slice L)\nmoves under a single ``detail`` key: inline JSON for small campaigns, one\nzstd+base64 blob inside the same file otherwise, and a\n``{\"encoding\": \"superseded\", \"superseded_by\": <file>}`` pointer for receipts a\nnewer run of the same campaign replaced.\n\nThe codec lives in ``conductor-native`` (``receipt_slim.rs``); this module is\nthe only importer, mirroring ``conductor._native``'s single-importer rule.\nReaders that need detail rows expand lazily through :func:`expand_receipt` --\na summary-only reader never decompresses anything, and a legacy receipt\nwithout a ``detail`` key passes through unchanged.\n\"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 75,
+        "byte_offset": 1293,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-5670734d55b8-0",
+        "line": 34,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"A receipt's detail block cannot be decoded (superseded or malformed).\"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 258,
+        "byte_offset": 1439,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-549505be7dec-0",
+        "line": 38,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"The receipt with its detail lists folded under one slim ``detail`` key.\n\n    Every other key is carried over untouched, so the summary block a reader\n    compares stays byte-identical. A receipt with no detail lists comes back\n    as a plain copy.\n    \"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 1787,
+        "duration_seconds": 0.217319,
+        "id": "boolean_op-b2b73f14ed7e-0",
+        "line": 46,
+        "mutated_text": "",
+        "operator": "boolean_op",
+        "original_text": "not ",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ]
+      },
+      {
+        "byte_length": 30,
+        "byte_offset": 1787,
+        "duration_seconds": 0.208607,
+        "id": "negate_condition-0b42b721c7bb-0",
+        "line": 46,
+        "mutated_text": "not (not isinstance(expanded, dict))",
+        "operator": "negate_condition",
+        "original_text": "not isinstance(expanded, dict)",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ]
+      },
+      {
+        "byte_length": 8,
+        "byte_offset": 1901,
+        "duration_seconds": 0.212784,
+        "id": "return_value-6b8f48ad0ed6-0",
+        "line": 48,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "expanded",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ]
+      },
+      {
+        "byte_length": 237,
+        "byte_offset": 1982,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-57f717e16f00-0",
+        "line": 52,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"The receipt with its detail lists restored (legacy receipts unchanged).\n\n    Raises :class:`ReceiptDetailError` for a superseded pointer (naming the\n    newer file) or an unknown encoding -- decoding must fail loud, not guess.\n    \"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 43,
+        "byte_offset": 2371,
+        "duration_seconds": 0.205913,
+        "id": "exception_swallow-12c7e1f8400d-0",
+        "line": 61,
+        "mutated_text": "pass",
+        "operator": "exception_swallow",
+        "original_text": "raise ReceiptDetailError(str(exc)) from exc",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_superseded_pointers_fail_loud_naming_the_replacement"
+        ]
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 2422,
+        "duration_seconds": 0.212579,
+        "id": "boolean_op-b2b73f14ed7e-1",
+        "line": 62,
+        "mutated_text": "",
+        "operator": "boolean_op",
+        "original_text": "not ",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set",
+          "src/conductor/test_mutation_receipt_slim.py::test_legacy_receipts_pass_through_unchanged",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ]
+      },
+      {
+        "byte_length": 30,
+        "byte_offset": 2422,
+        "duration_seconds": 0.214883,
+        "id": "negate_condition-0b42b721c7bb-1",
+        "line": 62,
+        "mutated_text": "not (not isinstance(expanded, dict))",
+        "operator": "negate_condition",
+        "original_text": "not isinstance(expanded, dict)",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set",
+          "src/conductor/test_mutation_receipt_slim.py::test_legacy_receipts_pass_through_unchanged",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ]
+      },
+      {
+        "byte_length": 8,
+        "byte_offset": 2540,
+        "duration_seconds": 0.198105,
+        "id": "return_value-6b8f48ad0ed6-1",
+        "line": 64,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "expanded",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set",
+          "src/conductor/test_mutation_receipt_slim.py::test_legacy_receipts_pass_through_unchanged",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ]
+      },
+      {
+        "byte_length": 208,
+        "byte_offset": 2626,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-30d55ef2dda8-0",
+        "line": 68,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"One detail field of a receipt, or ``None`` when it is absent.\n\n    The lazy-read seam for disk readers: nothing is decompressed unless the\n    asked-for field actually lives under the detail block.\n    \"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 14,
+        "byte_offset": 2843,
+        "duration_seconds": 0.216721,
+        "id": "negate_condition-e5c9d9580435-0",
+        "line": 74,
+        "mutated_text": "not (key in receipt)",
+        "operator": "negate_condition",
+        "original_text": "key in receipt",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ]
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 2847,
+        "duration_seconds": 0.218704,
+        "id": "comparison_op-a445d43156c6-0",
+        "line": 74,
+        "mutated_text": "not in",
+        "operator": "comparison_op",
+        "original_text": "in",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ]
+      },
+      {
+        "byte_length": 12,
+        "byte_offset": 2874,
+        "duration_seconds": 0.200825,
+        "id": "return_value-e69aa27c7857-0",
+        "line": 75,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "receipt[key]",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ]
+      },
+      {
+        "byte_length": 23,
+        "byte_offset": 2894,
+        "duration_seconds": 0.227561,
+        "id": "negate_condition-d204dc878577-0",
+        "line": 76,
+        "mutated_text": "not (\"detail\" not in receipt)",
+        "operator": "negate_condition",
+        "original_text": "\"detail\" not in receipt",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ]
+      },
+      {
+        "byte_length": 8,
+        "byte_offset": 2894,
+        "duration_seconds": 0.200292,
+        "id": "constant_replace-96b0d0c7881d-0",
+        "line": 76,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"detail\"",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ]
+      },
+      {
+        "byte_length": 6,
+        "byte_offset": 2903,
+        "duration_seconds": 0.207053,
+        "id": "comparison_op-f3393f54c599-0",
+        "line": 76,
+        "mutated_text": "in",
+        "operator": "comparison_op",
+        "original_text": "not in",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ]
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 2934,
+        "duration_seconds": 0.171929,
+        "id": "return_value-e635712be36a-0",
+        "line": 77,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "None",
+        "outcome": "SURVIVED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ]
+      },
+      {
+        "byte_length": 32,
+        "byte_offset": 2950,
+        "duration_seconds": 0.205974,
+        "id": "return_value-6b3bdb67cbcd-0",
+        "line": 78,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "expand_receipt(receipt).get(key)",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ]
+      },
+      {
+        "byte_length": 65,
+        "byte_offset": 3044,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-7a21c054ac6a-0",
+        "line": 82,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"Read one receipt file and expand it (the debug/human path).\"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 66,
+        "byte_offset": 3122,
+        "duration_seconds": 0.0,
+        "id": "return_value-8a388ec20d2f-0",
+        "line": 84,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "expand_receipt(json.loads(Path(path).read_text(encoding=\"utf-8\")))",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 299,
+        "byte_offset": 3277,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-10e5eec20d71-0",
+        "line": 88,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"Atomically write the receipt slim, in the canonical receipt format.\n\n    The write mechanics are the pinned runner's own ``atomic_json`` (called,\n    never edited -- every tracked receipt pins that module's hash), so a slim\n    receipt lands on disk byte-shaped exactly like a legacy one.\n    \"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 3720,
+        "duration_seconds": 0.17514,
+        "id": "return_value-e62a2a626c16-0",
+        "line": 99,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "slim",
+        "outcome": "SURVIVED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ]
+      },
+      {
+        "byte_length": 299,
+        "byte_offset": 3799,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-e23755df4257-0",
+        "line": 103,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"Every parseable receipt under ``root`` as ``(path, payload)`` pairs.\n\n    Sorted by filename, ``*.json`` only, non-recursive -- the same walk every\n    receipt indexer in this package performs. One iterator so the audit's\n    index and the compactor's keep-set builder cannot drift apart.\n    \"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 27,
+        "byte_offset": 4165,
+        "duration_seconds": 0.0,
+        "id": "zero_iteration_loop-fc5bcb2094c1-0",
+        "line": 111,
+        "mutated_text": "[]",
+        "operator": "zero_iteration_loop",
+        "original_text": "sorted(root.glob(\"*.json\"))",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 8,
+        "byte_offset": 4324,
+        "duration_seconds": 0.0,
+        "id": "exception_swallow-b20e22c644d5-0",
+        "line": 115,
+        "mutated_text": "pass",
+        "operator": "exception_swallow",
+        "original_text": "continue",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 8,
+        "byte_offset": 4324,
+        "duration_seconds": 0.0,
+        "id": "break_continue-aecb2e506c66-0",
+        "line": 115,
+        "mutated_text": "break",
+        "operator": "break_continue",
+        "original_text": "continue",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 25,
+        "byte_offset": 4344,
+        "duration_seconds": 0.0,
+        "id": "negate_condition-0a42c3eb923d-0",
+        "line": 116,
+        "mutated_text": "not (isinstance(payload, dict))",
+        "operator": "negate_condition",
+        "original_text": "isinstance(payload, dict)",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 4423,
+        "duration_seconds": 0.0,
+        "id": "return_value-46e7d08a50ec-0",
+        "line": 118,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "rows",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 448,
+        "byte_offset": 4526,
+        "duration_seconds": 0.0,
+        "id": "constant_replace-ced89adf96ab-0",
+        "line": 122,
+        "mutated_text": "\"\"",
+        "operator": "constant_replace",
+        "original_text": "\"\"\"One compaction pass over a receipt directory (see the Rust docs).\n\n    Slims every kept receipt, points superseded ones at the kept file of\n    their campaign, returns the before/after stats. ``keep`` maps campaign id\n    to the filename whose detail must survive -- the audit's own acceptance\n    predicate decides it, not the clock (a newer receipt can be rejected for\n    foreign runner components while an older sibling is accepted).\n    \"\"\"",
+        "outcome": "NO_COVERAGE",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": []
+      },
+      {
+        "byte_length": 2,
+        "byte_offset": 5099,
+        "duration_seconds": 0.211071,
+        "id": "comparison_op-a6d7a69fcf86-0",
+        "line": 134,
+        "mutated_text": "is not",
+        "operator": "comparison_op",
+        "original_text": "is",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ]
+      },
+      {
+        "byte_length": 43,
+        "byte_offset": 5213,
+        "duration_seconds": 0.200677,
+        "id": "exception_swallow-12c7e1f8400d-1",
+        "line": 138,
+        "mutated_text": "pass",
+        "operator": "exception_swallow",
+        "original_text": "raise ReceiptDetailError(str(exc)) from exc",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ]
+      },
+      {
+        "byte_length": 4,
+        "byte_offset": 5264,
+        "duration_seconds": 0.208437,
+        "id": "boolean_op-b2b73f14ed7e-2",
+        "line": 139,
+        "mutated_text": "",
+        "operator": "boolean_op",
+        "original_text": "not ",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ]
+      },
+      {
+        "byte_length": 27,
+        "byte_offset": 5264,
+        "duration_seconds": 0.214567,
+        "id": "negate_condition-41c6d614215d-0",
+        "line": 139,
+        "mutated_text": "not (not isinstance(stats, dict))",
+        "operator": "negate_condition",
+        "original_text": "not isinstance(stats, dict)",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ]
+      },
+      {
+        "byte_length": 5,
+        "byte_offset": 5379,
+        "duration_seconds": 0.209663,
+        "id": "return_value-424a30a7b3a3-0",
+        "line": 141,
+        "mutated_text": "None",
+        "operator": "return_value",
+        "original_text": "stats",
+        "outcome": "KILLED",
+        "path": "src/conductor/mutation_receipt_slim.py",
+        "tests_run": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ]
+      }
+    ],
+    "test_value": {
+      "adapter": "pytest-junit",
+      "baseline_repetitions": 2,
+      "classification_counts": {
+        "CORE": 3,
+        "DELETE_CANDIDATE": 0,
+        "INTENTIONAL_REDUNDANCY": 0,
+        "MERGE": 4
+      },
+      "errors": [],
+      "killers_by_mutant": {
+        "boolean_op-b2b73f14ed7e-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ],
+        "boolean_op-b2b73f14ed7e-1": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set",
+          "src/conductor/test_mutation_receipt_slim.py::test_legacy_receipts_pass_through_unchanged",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ],
+        "boolean_op-b2b73f14ed7e-2": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ],
+        "comparison_op-a445d43156c6-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ],
+        "comparison_op-a6d7a69fcf86-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ],
+        "comparison_op-f3393f54c599-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ],
+        "constant_replace-96b0d0c7881d-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ],
+        "exception_swallow-12c7e1f8400d-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_superseded_pointers_fail_loud_naming_the_replacement"
+        ],
+        "exception_swallow-12c7e1f8400d-1": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ],
+        "negate_condition-0b42b721c7bb-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ],
+        "negate_condition-0b42b721c7bb-1": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set",
+          "src/conductor/test_mutation_receipt_slim.py::test_legacy_receipts_pass_through_unchanged",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ],
+        "negate_condition-41c6d614215d-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ],
+        "negate_condition-d204dc878577-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ],
+        "negate_condition-e5c9d9580435-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ],
+        "return_value-424a30a7b3a3-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set"
+        ],
+        "return_value-6b3bdb67cbcd-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ],
+        "return_value-6b8f48ad0ed6-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ],
+        "return_value-6b8f48ad0ed6-1": [
+          "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set",
+          "src/conductor/test_mutation_receipt_slim.py::test_legacy_receipts_pass_through_unchanged",
+          "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes"
+        ],
+        "return_value-e69aa27c7857-0": [
+          "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+        ]
+      },
+      "required_contracts": [
+        {
+          "active_paths": [
+            "src/conductor/mutation_receipt_slim.py"
+          ],
+          "criticality": "high",
+          "id": "forge-receipt-slimming_mutation_receipt_slim_fest_20260913"
+        }
+      ],
+      "retained_core": [
+        "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+        "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set",
+        "src/conductor/test_mutation_receipt_slim.py::test_superseded_pointers_fail_loud_naming_the_replacement"
+      ],
+      "schema_version": "llm.mutation-testing.test-value.v1",
+      "status": "PASS",
+      "subprocess_scaling": "baseline_repetitions + mutants",
+      "tests": [
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "forge-receipt-slimming_mutation_receipt_slim_fest_20260913",
+          "dominated_by": [
+            "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+            "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+          ],
+          "killed_mutants": [
+            "boolean_op-b2b73f14ed7e-0",
+            "boolean_op-b2b73f14ed7e-1",
+            "negate_condition-0b42b721c7bb-0",
+            "negate_condition-0b42b721c7bb-1",
+            "return_value-6b8f48ad0ed6-0",
+            "return_value-6b8f48ad0ed6-1"
+          ],
+          "nodeid": "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+          "runtime_seconds_median": 0.001,
+          "unique_kills": []
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "forge-receipt-slimming_mutation_receipt_slim_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "boolean_op-b2b73f14ed7e-1",
+            "boolean_op-b2b73f14ed7e-2",
+            "comparison_op-a6d7a69fcf86-0",
+            "exception_swallow-12c7e1f8400d-1",
+            "negate_condition-0b42b721c7bb-1",
+            "negate_condition-41c6d614215d-0",
+            "return_value-424a30a7b3a3-0",
+            "return_value-6b8f48ad0ed6-1"
+          ],
+          "nodeid": "src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set",
+          "runtime_seconds_median": 0.002,
+          "unique_kills": [
+            "boolean_op-b2b73f14ed7e-2",
+            "comparison_op-a6d7a69fcf86-0",
+            "exception_swallow-12c7e1f8400d-1",
+            "negate_condition-41c6d614215d-0",
+            "return_value-424a30a7b3a3-0"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "forge-receipt-slimming_mutation_receipt_slim_fest_20260913",
+          "dominated_by": [
+            "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+            "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+          ],
+          "killed_mutants": [
+            "boolean_op-b2b73f14ed7e-1",
+            "negate_condition-0b42b721c7bb-1",
+            "return_value-6b8f48ad0ed6-1"
+          ],
+          "nodeid": "src/conductor/test_mutation_receipt_slim.py::test_legacy_receipts_pass_through_unchanged",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": []
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "forge-receipt-slimming_mutation_receipt_slim_fest_20260913",
+          "dominated_by": [
+            "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+          ],
+          "killed_mutants": [
+            "boolean_op-b2b73f14ed7e-0",
+            "boolean_op-b2b73f14ed7e-1",
+            "negate_condition-0b42b721c7bb-0",
+            "negate_condition-0b42b721c7bb-1",
+            "return_value-6b8f48ad0ed6-0",
+            "return_value-6b8f48ad0ed6-1"
+          ],
+          "nodeid": "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": []
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "forge-receipt-slimming_mutation_receipt_slim_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "exception_swallow-12c7e1f8400d-0"
+          ],
+          "nodeid": "src/conductor/test_mutation_receipt_slim.py::test_superseded_pointers_fail_loud_naming_the_replacement",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": [
+            "exception_swallow-12c7e1f8400d-0"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "CORE",
+          "contract_id": "forge-receipt-slimming_mutation_receipt_slim_fest_20260913",
+          "dominated_by": [],
+          "killed_mutants": [
+            "boolean_op-b2b73f14ed7e-0",
+            "boolean_op-b2b73f14ed7e-1",
+            "comparison_op-a445d43156c6-0",
+            "comparison_op-f3393f54c599-0",
+            "constant_replace-96b0d0c7881d-0",
+            "negate_condition-0b42b721c7bb-0",
+            "negate_condition-0b42b721c7bb-1",
+            "negate_condition-d204dc878577-0",
+            "negate_condition-e5c9d9580435-0",
+            "return_value-6b3bdb67cbcd-0",
+            "return_value-6b8f48ad0ed6-0",
+            "return_value-6b8f48ad0ed6-1",
+            "return_value-e69aa27c7857-0"
+          ],
+          "nodeid": "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for",
+          "runtime_seconds_median": 0.0,
+          "unique_kills": [
+            "comparison_op-a445d43156c6-0",
+            "comparison_op-f3393f54c599-0",
+            "constant_replace-96b0d0c7881d-0",
+            "negate_condition-d204dc878577-0",
+            "negate_condition-e5c9d9580435-0",
+            "return_value-6b3bdb67cbcd-0",
+            "return_value-e69aa27c7857-0"
+          ]
+        },
+        {
+          "baseline_outcomes": [
+            "PASSED",
+            "PASSED"
+          ],
+          "classification": "MERGE",
+          "contract_id": "forge-receipt-slimming_mutation_receipt_slim_fest_20260913",
+          "dominated_by": [
+            "src/conductor/test_mutation_receipt_slim.py::test_big_campaigns_become_one_blob_with_verbatim_numbers",
+            "src/conductor/test_mutation_receipt_slim.py::test_small_campaigns_stay_inline_and_round_trip",
+            "src/conductor/test_mutation_receipt_slim.py::test_the_field_reader_decompresses_only_what_is_asked_for"
+          ],
+          "killed_mutants": [
+            "boolean_op-b2b73f14ed7e-0",
+            "boolean_op-b2b73f14ed7e-1",
+            "negate_condition-0b42b721c7bb-0",
+            "negate_condition-0b42b721c7bb-1",
+            "return_value-6b8f48ad0ed6-0",
+            "return_value-6b8f48ad0ed6-1"
+          ],
+          "nodeid": "src/conductor/test_mutation_receipt_slim.py::test_write_slim_receipt_lands_canonical_bytes",
+          "runtime_seconds_median": 0.003,
+          "unique_kills": []
+        }
+      ]
+    }
+  },
+  "engine_result": {
+    "duration_seconds": 4.3439,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "nt\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nppmqapf/worktree/src/conductor/mutation_receipt_slim.py\",\n        \"line\": 122,\n        \"column\": 5,\n        \"byte_offset\": 4526,\n        \"byte_length\": 448,\n        \"original_text\": \"\\\"\\\"\\\"One compaction pass over a receipt directory (see the Rust docs).\\n\\n    Slims every kept receipt, points superseded ones at the kept file of\\n    their campaign, returns the before/after stats. ``keep`` maps campaign id\\n    to the filename whose detail must survive -- the audit's own acceptance\\n    predicate decides it, not the clock (a newer receipt can be rejected for\\n    foreign runner components while an older sibling is accepted).\\n    \\\"\\\"\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nppmqapf/worktree/src/conductor/mutation_receipt_slim.py\",\n        \"line\": 134,\n        \"column\": 41,\n        \"byte_offset\": 5099,\n        \"byte_length\": 2,\n        \"original_text\": \"is\",\n        \"mutated_text\": \"is not\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 211070858\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nppmqapf/worktree/src/conductor/mutation_receipt_slim.py\",\n        \"line\": 138,\n        \"column\": 9,\n        \"byte_offset\": 5213,\n        \"byte_length\": 43,\n        \"original_text\": \"raise ReceiptDetailError(str(exc)) from exc\",\n        \"mutated_text\": \"pass\",\n        \"mutator_name\": \"exception_swallow\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 200677009\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nppmqapf/worktree/src/conductor/mutation_receipt_slim.py\",\n        \"line\": 139,\n        \"column\": 8,\n        \"byte_offset\": 5264,\n        \"byte_length\": 4,\n        \"original_text\": \"not \",\n        \"mutated_text\": \"\",\n        \"mutator_name\": \"boolean_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 208436546\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nppmqapf/worktree/src/conductor/mutation_receipt_slim.py\",\n        \"line\": 139,\n        \"column\": 8,\n        \"byte_offset\": 5264,\n        \"byte_length\": 27,\n        \"original_text\": \"not isinstance(stats, dict)\",\n        \"mutated_text\": \"not (not isinstance(stats, dict))\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 214567415\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-nppmqapf/worktree/src/conductor/mutation_receipt_slim.py\",\n        \"line\": 141,\n        \"column\": 12,\n        \"byte_offset\": 5379,\n        \"byte_length\": 5,\n        \"original_text\": \"stats\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/conductor/test_mutation_receipt_slim.py::test_compaction_honours_the_audit_keep_set\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 209662531\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 4,\n    \"nanos\": 339453674\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 19,
+    "mutants_generated": 36,
+    "mutants_tested": 21,
+    "no_coverage": 15,
+    "survived": 2,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-13T11:09:37.263036+00:00",
+  "interpreter": "/mnt/data/llm/scratch/forge-glm-receipts/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/forge-receipt-slimming_mutation_receipt_slim_fest_20260913.json",
+  "manifest_sha256": "9141ef6e0201e5de0f097ee8487d5fe88d4cb58a2bce145e174a877e868bf1be",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 60,
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.9047619047619048,
+  "new_survivors": [],
+  "no_coverage": 15,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 19,
+    "NO_COVERAGE": 15,
+    "SURVIVED": 2,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/.iterations/forge-receipt-slimming_mutation_receipt_slim_fest_20260913_20260913T110937Z.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "5a8288ab69b5eba8c5d57e67b1a6dd145a07f39f474fd229763af1f49d9ee889",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fbaf4781cb73027fb336508b3fc8ec082497ced9edb6a3344e09fb40f58f37ad",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "fc3767e103e1742d2f996496c23086738c8c9982bd3b01e117f1aff4885aed9c",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "b75962e0c67452fec0dbdd6792f024dd88fef7d4238786f4de40edb96cad2bb9"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/conductor/mutation_receipt_slim.py": "15d103feec73a302301be00f0efc8d1daa9a46e38f639cb446f2be611d14bc3e"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "return_value-e62a2a626c16-0",
+    "return_value-e635712be36a-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/test_mutation_receipt_slim.py"
+  ],
+  "test_sha256": {
+    "src/conductor/test_mutation_receipt_slim.py": "b4d59df4d6ce13c5bfdb924314f82801b8a8d65a1d8bde56384058010908d723"
+  },
+  "timed_out": 0,
+  "unviable": 0
+}
