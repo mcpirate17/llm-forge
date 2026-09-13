@@ -254,12 +254,7 @@ def execute(
         timeout_seconds=campaign.run_timeout_seconds,
         environment=environment,
     )
-    receipt["baseline_argv"] = baseline_argv
-    receipt["baseline"] = baseline.as_dict()
-    if baseline.timed_out or baseline.returncode != 0:
-        receipt["status"] = "BASELINE_FAILED"
-        _core.atomic_json(output_path, receipt)
-        raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+    _core.note_baseline(campaign, receipt, baseline, baseline_argv, output_path)
     if not coverage_path.is_file():
         raise CampaignError(
             f"baseline produced no coverage database at {coverage_path}"
@@ -267,9 +262,6 @@ def execute(
     # fest.toml is written after the baseline on purpose: the per-mutant
     # timeout it pins is derived from that baseline's wall time when the
     # manifest does not pin one, and the coverage run above does not read it.
-    receipt["mutant_timeout_seconds"] = _core.resolve_mutant_timeout(
-        campaign, baseline.duration_seconds
-    )
     (worktree / "fest.toml").write_text(
         _config(campaign, sys.executable), encoding="utf-8"
     )

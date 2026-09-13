@@ -366,6 +366,33 @@ def resolve_mutant_timeout(
     return derived
 
 
+def note_baseline(
+    campaign: GeneratedCampaign,
+    receipt: dict[str, Any],
+    baseline: CommandResult,
+    baseline_argv: Sequence[str],
+    output_path: Path,
+) -> None:
+    """Record one adapter's baseline run, then pin the per-mutant bound from it.
+
+    Every adapter's baseline means the same three things, in the same order:
+    the receipt names the command that ran, a baseline that failed or hung is
+    a refused campaign rather than a scored one, and only a green baseline can
+    supply the wall time a derived bound needs -- so the resolution belongs
+    here, once, and not three times in the adapters.
+    """
+
+    receipt["baseline_argv"] = list(baseline_argv)
+    receipt["baseline"] = baseline.as_dict()
+    if baseline.timed_out or baseline.returncode != 0:
+        receipt["status"] = "BASELINE_FAILED"
+        atomic_json(output_path, receipt)
+        raise CampaignError(f"unmutated baseline failed; receipt={output_path}")
+    receipt["mutant_timeout_seconds"] = resolve_mutant_timeout(
+        campaign, baseline.duration_seconds
+    )
+
+
 def require_executed(generated: int, tested: int, source: Sequence[str]) -> None:
     """Refuse a run that scored nothing, however green it looks.
 
