@@ -434,6 +434,11 @@ def test_changed_rows_decide_when_counts_do_not_carry_the_kinds(
         {"receipt": "r9.json", "detail": "mutants must be a non-empty list"}
     ]
     assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 5
+    # The default itself, not just the exit it produces: the kind is
+    # "not_pass", never a placeholder that happens to be non-validator-side.
+    assert mutation_coverage._observed_kinds(  # noqa: SLF001
+        {"missing_evidence": [{"receipt_rejections": []}], "rejection_counts": {}}
+    ) == {"not_pass"}
     capsys.readouterr()
 
 
@@ -451,7 +456,16 @@ def test_changed_github_table_renders_legacy_rows_and_writes_nothing_when_clean(
                 "reason": "no registered campaign ranks this test file",
                 "campaigns": [],
                 "receipt_rejections": [],
-            }
+            },
+            # A row whose reason_kind is present and not not_pass: the
+            # column reads the key, never the default.
+            {
+                "path": "src/conductor/test_plain.py",
+                "reason": "no registered campaign ranks this test file",
+                "reason_kind": "no_campaign",
+                "campaigns": [],
+                "receipt_rejections": [],
+            },
         ],
         rejection_counts={},
     )
@@ -465,6 +479,8 @@ def test_changed_github_table_renders_legacy_rows_and_writes_nothing_when_clean(
     # not_pass default render verbatim.
     assert "| `src/conductor/test_legacy.py` | — |" in table
     assert "| not_pass |" in table
+    assert "| `src/conductor/test_plain.py` | — |" in table
+    assert "| no_campaign |" in table
 
     # A clean result writes no table at all: the summary keeps whatever
     # earlier steps left there.
