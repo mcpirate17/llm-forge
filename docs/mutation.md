@@ -2,8 +2,9 @@
 
 How campaigns are generated, run and audited. The commands live in
 `conductor.mutation_campaign_generate` (write/refresh), `conductor.mutation_engine_generated`
-(run), `conductor.mutation_patch_audit` (corpus audit) and `conductor.mutation_retention`
-(sweep); `make mutation-*` wraps the common flows.
+(run), `conductor.mutation_patch_audit` (corpus audit), `conductor.complete_scope_drift`
+(local check for `complete`-mode scope drift before the audit catches it) and
+`conductor.mutation_retention` (sweep); `make mutation-*` wraps the common flows.
 
 ## Receipt format
 
