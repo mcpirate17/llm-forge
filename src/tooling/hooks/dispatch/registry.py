@@ -213,7 +213,7 @@ HOOKS: Final[tuple[HookSpec, ...]] = (
         "PostToolUse",
         ".*",
         5,
-        "python3 $CLAUDE_PROJECT_DIR/conductor/context_telemetry.py",
+        "python3 -m conductor.context_telemetry",
         adapter="context_telemetry",
         emits=False,
     ),

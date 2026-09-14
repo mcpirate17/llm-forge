@@ -28,7 +28,7 @@ LIVE_COMMANDS = (
     "$CLAUDE_PROJECT_DIR/.claude/hooks/obsidian_sync.py post-edit",
     "$CLAUDE_PROJECT_DIR/.claude/hooks/post-bash-graph.sh",
     "$CLAUDE_PROJECT_DIR/.claude/hooks/post-bash-quiet.sh",
-    "python3 $CLAUDE_PROJECT_DIR/conductor/context_telemetry.py",
+    "python3 -m conductor.context_telemetry",
     "$CLAUDE_PROJECT_DIR/.claude/hooks/obsidian_sync.py session-end",
     "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh",
     "$CLAUDE_PROJECT_DIR/.claude/hooks/session-handoff.sh",
