@@ -28,6 +28,7 @@ from pathlib import Path
 
 from conductor.audit_root import resolve_audit_root
 from conductor.duplicate_audit_config import DEFAULT_SOURCE_DIRS
+from conductor.project_paths import guardrail_allowlist_path
 from conductor.reuse import _support as files
 from conductor.reuse import _support as process
 from conductor.reuse import (
@@ -117,7 +118,7 @@ def _iter_code(targets: list[Path], exclude: set[str]) -> list[Path]:
 def _guardrail_allowlist(repo: Path | None) -> tuple[set[str], set[str]]:
     if repo is None:
         return set(), set()
-    path = repo / "conductor" / "guardrail_allowlist.json"
+    path = guardrail_allowlist_path(repo)
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):

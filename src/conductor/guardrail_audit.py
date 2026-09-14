@@ -19,19 +19,20 @@ from conductor.audit_root import (
     resolve_audit_root,
 )
 from conductor.candidate_review.vulture_audit import whitelist_args
-from conductor.project_paths import host_root
+from conductor.project_paths import guardrail_allowlist_path, host_root
 from conductor.run_duplicate_audit import should_skip_python
 
 ROOT = host_root()
 DEFAULT_TARGETS = ("research", "aria_core", "aria_designer", "component_fab")
-ALLOWLIST_PATH = Path(__file__).resolve().parent / "guardrail_allowlist.json"
 
 
-def _load_allowlist() -> dict[str, set[str]]:
-    if not ALLOWLIST_PATH.exists():
+def _load_allowlist(root: Path | None = None) -> dict[str, set[str]]:
+    """The host's guardrail allowlist, resolved at call time -- never a package copy."""
+    path = guardrail_allowlist_path(root if root is not None else host_root())
+    if not path.exists():
         return {"god_files": set(), "god_functions": set(), "complexity": set()}
     try:
-        raw = json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {"god_files": set(), "god_functions": set(), "complexity": set()}
     return {
@@ -39,9 +40,6 @@ def _load_allowlist() -> dict[str, set[str]]:
         "god_functions": set(raw.get("god_functions", [])),
         "complexity": set(raw.get("complexity", [])),
     }
-
-
-_ALLOWLIST = _load_allowlist()
 
 
 def _has_marker(text: str, marker: str) -> bool:
@@ -234,6 +232,7 @@ def _structural_issues(
     issues: list[Issue] = []
     inputs: list[tuple[Path, str, str, list[str]]] = []
     python_records: list[tuple[str, str]] = []
+    allowlist = _load_allowlist(ROOT)
     for path in files:
         rel = path.relative_to(ROOT).as_posix()
         text = _read_candidate_text(path, staged_only=staged_only, from_ref=from_ref)
@@ -244,8 +243,8 @@ def _structural_issues(
 
     function_policy = json.dumps(
         {
-            "god_functions": sorted(_ALLOWLIST["god_functions"]),
-            "complexity": sorted(_ALLOWLIST["complexity"]),
+            "god_functions": sorted(allowlist["god_functions"]),
+            "complexity": sorted(allowlist["complexity"]),
         },
         separators=(",", ":"),
     )
@@ -254,7 +253,7 @@ def _structural_issues(
     )
     native_by_path = {record["path"]: record for record in native_files}
     for path, rel, text, lines in inputs:
-        allow_god_file = rel in _ALLOWLIST["god_files"] or _has_marker(
+        allow_god_file = rel in allowlist["god_files"] or _has_marker(
             text, "allow-god-file"
         )
         if len(lines) > 1250 and not allow_god_file:

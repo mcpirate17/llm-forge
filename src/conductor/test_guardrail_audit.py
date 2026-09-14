@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -280,3 +281,51 @@ def test_root_mismatch_warns(
     err = capsys.readouterr().err
     assert "WARNING" in err
     assert str(target.resolve()) in err
+
+
+def test_load_allowlist_reads_the_host_copy_not_a_package_copy(tmp_path) -> None:
+    """The allowlist comes from the host root passed in, at the default
+    `conductor/guardrail_allowlist.json` path -- never a copy shipped inside the
+    installed package, which is what `ALLOWLIST_PATH = Path(__file__)...` used to
+    read regardless of which host was being audited."""
+    (tmp_path / "conductor").mkdir()
+    (tmp_path / "conductor" / "guardrail_allowlist.json").write_text(
+        json.dumps(
+            {
+                "god_files": ["only/in/this/host.py"],
+                "god_functions": [],
+                "complexity": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    allowlist = guardrail_audit._load_allowlist(tmp_path)
+
+    assert allowlist["god_files"] == {"only/in/this/host.py"}
+
+
+def test_load_allowlist_is_empty_when_the_host_has_none(tmp_path) -> None:
+    assert guardrail_audit._load_allowlist(tmp_path) == {
+        "god_files": set(),
+        "god_functions": set(),
+        "complexity": set(),
+    }
+
+
+def test_load_allowlist_honors_a_conductor_table_override(
+    tmp_path, monkeypatch
+) -> None:
+    (tmp_path / "policy").mkdir()
+    (tmp_path / "policy" / "allow.json").write_text(
+        json.dumps({"god_files": ["moved.py"], "god_functions": [], "complexity": []}),
+        encoding="utf-8",
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nguardrail_allowlist = "policy/allow.json"\n',
+        encoding="utf-8",
+    )
+
+    allowlist = guardrail_audit._load_allowlist(tmp_path)
+
+    assert allowlist["god_files"] == {"moved.py"}

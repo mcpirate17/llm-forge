@@ -41,12 +41,17 @@ DEFAULT_MUTATION_RECEIPT_ROOT = PurePosixPath("research/reports/mutation_testing
 # (kb_retrieve, memory_index's catalog, the notes guards) resolves through
 # `notes_root` so a host with another layout names its own tree once.
 DEFAULT_NOTES_ROOT = PurePosixPath("research/notes")
+# The host allowlist of files/functions permitted to exceed the god-file, god-
+# function and complexity guardrails. Host data, never a packaged copy: a host
+# that ships one at another path names it via `[tool.conductor]`.
+DEFAULT_GUARDRAIL_ALLOWLIST = PurePosixPath("conductor/guardrail_allowlist.json")
 
 CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"
 MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
 PACKAGE_ROOT_ENV = "CONDUCTOR_PACKAGE_ROOT"
 MUTATION_RECEIPT_ROOT_ENV = "CONDUCTOR_MUTATION_RECEIPT_ROOT"
 NOTES_ROOT_ENV = "CONDUCTOR_NOTES_ROOT"
+GUARDRAIL_ALLOWLIST_ENV = "CONDUCTOR_GUARDRAIL_ALLOWLIST"
 INTEGRATION_BRANCH_ENV = "CONDUCTOR_INTEGRATION_BRANCH"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
@@ -54,6 +59,7 @@ MUTATION_REGISTRY_KEY = "mutation_registry"
 PACKAGE_ROOT_KEY = "package_root"
 MUTATION_RECEIPT_ROOT_KEY = "mutation_receipt_root"
 NOTES_ROOT_KEY = "notes_root"
+GUARDRAIL_ALLOWLIST_KEY = "guardrail_allowlist"
 INTEGRATION_BRANCH_KEY = "integration_branch"
 RETIRED_INTEGRATION_BRANCHES_KEY = "retired_integration_branches"
 DEFAULTS = {
@@ -62,6 +68,7 @@ DEFAULTS = {
     PACKAGE_ROOT_KEY: DEFAULT_PACKAGE_ROOT,
     MUTATION_RECEIPT_ROOT_KEY: DEFAULT_MUTATION_RECEIPT_ROOT,
     NOTES_ROOT_KEY: DEFAULT_NOTES_ROOT,
+    GUARDRAIL_ALLOWLIST_KEY: DEFAULT_GUARDRAIL_ALLOWLIST,
 }
 
 
@@ -176,11 +183,13 @@ class ProjectPaths:
     package_relative: PurePosixPath
     receipt_root_relative: PurePosixPath
     notes_relative: PurePosixPath
+    guardrail_allowlist_relative: PurePosixPath
     policy_configured: bool
     registry_configured: bool
     package_configured: bool
     receipt_root_configured: bool
     notes_configured: bool
+    guardrail_allowlist_configured: bool
 
     @property
     def policy_path(self) -> Path:
@@ -214,6 +223,11 @@ class ProjectPaths:
         """The knowledge tree: KB cards and durable findings."""
         return self.root / self.notes_relative.as_posix()
 
+    @property
+    def guardrail_allowlist_path(self) -> Path:
+        """The host's guardrail allowlist -- never the package's own copy."""
+        return self.root / self.guardrail_allowlist_relative.as_posix()
+
 
 def project_paths(root: Path | str) -> ProjectPaths:
     """Resolve every host path against ``root``. Not cached: hosts differ per call."""
@@ -227,6 +241,9 @@ def project_paths(root: Path | str) -> ProjectPaths:
         base, MUTATION_RECEIPT_ROOT_KEY, MUTATION_RECEIPT_ROOT_ENV
     )
     notes, named_notes = _configured(base, NOTES_ROOT_KEY, NOTES_ROOT_ENV)
+    allowlist, named_allowlist = _configured(
+        base, GUARDRAIL_ALLOWLIST_KEY, GUARDRAIL_ALLOWLIST_ENV
+    )
     return ProjectPaths(
         base,
         policy,
@@ -234,11 +251,13 @@ def project_paths(root: Path | str) -> ProjectPaths:
         package,
         receipt_root,
         notes,
+        allowlist,
         named_policy,
         named_reg,
         named_pkg,
         named_receipt_root,
         named_notes,
+        named_allowlist,
     )
 
 
@@ -329,6 +348,21 @@ def package_relative(root: Path | str) -> PurePosixPath:
 
 def package_path(root: Path | str) -> Path:
     return project_paths(root).package_path
+
+
+def guardrail_allowlist_relative(root: Path | str) -> PurePosixPath:
+    """Where the guardrail allowlist sits inside ``root`` (``conductor/guardrail_allowlist.json``, ...)."""
+    return project_paths(root).guardrail_allowlist_relative
+
+
+def guardrail_allowlist_path(root: Path | str) -> Path:
+    """The host's guardrail allowlist, joined onto the root the caller already holds.
+
+    Readers (``guardrail_audit``, ``reuse.detectors``) resolve through this at call
+    time, never from a package-shipped copy: a host names its own allowlist path via
+    ``[tool.conductor]`` and both readers follow.
+    """
+    return project_paths(root).guardrail_allowlist_path
 
 
 def integration_branch(root: Path | str) -> str:
