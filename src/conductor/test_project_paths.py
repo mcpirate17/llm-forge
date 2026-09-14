@@ -355,7 +355,7 @@ def test_package_tree_root_refuses_a_package_no_root_claims(tmp_path):
 
 def test_this_repository_resolves_its_own_package():
     """The live check: the installed package and the checkout agree on the root."""
-    import conductor.candidate_review.engine as engine
+    from conductor.candidate_review import engine
 
     package = Path(engine.__file__).resolve().parents[1]
     root = pp.package_tree_root(package)
