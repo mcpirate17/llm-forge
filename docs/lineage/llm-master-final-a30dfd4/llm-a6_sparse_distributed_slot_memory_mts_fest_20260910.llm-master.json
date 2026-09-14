@@ -1,0 +1,1051 @@
+{
+  "adapter_sha256": "b8c747f658970f34d7045473db5ccf620fb94d8bf152338295cbb7e79ff54203",
+  "attribution": {
+    "attributed_mutants": 13,
+    "baseline_repetitions": 2,
+    "killed_mutants": 14,
+    "ranked_tests": 12,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [
+      {
+        "id": "boolean_op-76e9ed758cbf-0",
+        "reason": "report does not map to nodeids"
+      }
+    ],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 2.678583,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "............ssssssssss                                                   [100%]\n12 passed, 10 skipped in 1.77s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/home/tim/Projects/wt-llm-a6-land401/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "research/tests/test_sparse_distributed_slot_memory_mts.py",
+    "--cov=research/synthesis",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+  "classification_required": [],
+  "core_sha256": "4301f1224c06d92524b377fadec5b61e0aa61f610b51d2f63806974c97af96dd",
+  "engine_result": {
+    "duration_seconds": 23.463179,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "ests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds\"\n      ],\n      \"duration\": {\n        \"secs\": 1,\n        \"nanos\": 372282992\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-dcepbh0x/worktree/research/synthesis/sparse_distributed_slot_memory_mts.py\",\n        \"line\": 124,\n        \"column\": 13,\n        \"byte_offset\": 5858,\n        \"byte_length\": 7,\n        \"original_text\": \"\\\"decay\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds\"\n      ],\n      \"duration\": {\n        \"secs\": 1,\n        \"nanos\": 382218460\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-dcepbh0x/worktree/research/synthesis/sparse_distributed_slot_memory_mts.py\",\n        \"line\": 136,\n        \"column\": 9,\n        \"byte_offset\": 6165,\n        \"byte_length\": 334,\n        \"original_text\": \"\\\"\\\"\\\"Overrides the base module's undecayed scan dispatch with the\\n        decay-aware kernel from ``sdsm_scan_triton_mts``. Signature and return\\n        (reads only, ``(B, L, payload_dim)``) match the base method exactly --\\n        ``forward`` (inherited from ``SparseDistributedSlotMemoryCat2``) is\\n        unaware anything changed.\\\"\\\"\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-dcepbh0x/worktree/research/synthesis/sparse_distributed_slot_memory_mts.py\",\n        \"line\": 150,\n        \"column\": 16,\n        \"byte_offset\": 6741,\n        \"byte_length\": 5,\n        \"original_text\": \"reads\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts\",\n        \"research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds\"\n      ],\n      \"duration\": {\n        \"secs\": 1,\n        \"nanos\": 399327662\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 23,\n    \"nanos\": 459185474\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 14,
+    "mutants_generated": 20,
+    "mutants_tested": 16,
+    "no_coverage": 4,
+    "survived": 2,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-10T04:24:23.898725+00:00",
+  "interpreter": "/home/tim/Projects/wt-llm-a6-land401/.venv/bin/python",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "tasks/mutation_campaigns/llm-a6_sparse_distributed_slot_memory_mts_fest_20260910.json",
+  "manifest_sha256": "6a9c85da34cd16ade09ec716db45624c8d01146253ee4e0c1f449dd72e10a246",
+  "memory_cap_bytes": 8589934592,
+  "mutants": [
+    {
+      "byte_length": 3032,
+      "byte_offset": 42,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-85016f69579b-0",
+      "line": 2,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Multi-timescale (mts) decay on top of the dual-lag cat2 SDSM memory -- arm\n``t2-p5-sdsm-cat2-c4096-mts``.\n\ntasks/trident2_beat_semiring_campaign_2026-09-09.md coordinator steer for this\nrung: the SDSM arm family beats the semiring bar on gMQAR/BLiMP/AR curriculum but\ntrails on LAMBADA (best 0.52 vs bar 0.543) and induction (0.93 vs 0.996). An SSM,\nrouter, softmax, or surprise gate would close that gap but is out of bounds for\nthis family; a fixed, non-learnable per-payload-dimension decay inside the\nexisting SDSM slot memory is not -- it lets the SAME 64-d payload channel hold\nboth \"what just followed X\" (fast-decaying dims, short half-life) and \"what\nfollowed X a while ago\" (slow-decaying dims, long half-life) at once, without a\ngate deciding between them and without adding any trainable parameter.\n\nDecay contract, before vs after (see ``sdsm_scan_triton_mts.py``'s module\ndocstring for the full derivation this module builds on): before, there was no\ndecay at all anywhere in the base or cat2 modules -- ``decay_scales`` is accepted\nsyntactically but only ``(1.0,)`` (no decay) is implemented;\n``sdsm_scan_triton.py``'s kernels carry no decay term. After, this module adds a\nFIXED (``register_buffer``, not ``nn.Parameter`` -- zero trainable-parameter cost)\nPER-PAYLOAD-DIMENSION decay vector, ``(payload_dim,)``, log-spaced across\nhalf-lives ``min_half_life`` to ``max_half_life`` tokens (default 8 to 1024) over\nthe ``payload_dim`` (default 64) dims of the payload channel. It is NOT scalar,\nNOT per-code, and NOT per-token: one decay value per payload dimension, applied to\nevery code row and every timestep identically. Because ``SparseDistributedSlotMemoryCat2``\nalready calls the (overridable) ``self._causal_scan`` once per lag channel with the\nSAME shared method, and both channels use the same ``payload_dim``, one decay\nbuffer suffices for both the lag-1 and lag-2 channels; each channel's scan state\ndecays independently (the two channels' states are never mixed until the\npost-scan ``torch.cat``), so lag-1's fast/slow split and lag-2's fast/slow split\nare each internally complete.\n\nWhy override only ``_causal_scan`` and nothing else: ``SparseDistributedSlotMemoryCat2.forward``\n(inherited here unchanged) calls ``self._causal_scan(write_mask_l1, v1, read_mask,\nchunk_size)`` and ``self._causal_scan(write_mask_l2, v2, read_mask, chunk_size)``\npolymorphically -- both already route through whatever ``_causal_scan`` this\nsubclass defines, so no other line of ``forward`` needs to change to thread the\ndecay buffer through both channels.\n\nParameter count: ``self.decay`` is a buffer, not a parameter -- ``sum(p.numel()\nfor p in module.parameters())`` is IDENTICAL to plain ``SparseDistributedSlotMemoryCat2``\nat the same ``(dim, n_codes, key_dim, payload_dim)``, i.e. unchanged from cat2's\n5_369_456 active parameters at the P5 geometry (``dim=304``); see\n``research/tests/test_sparse_distributed_slot_memory_mts.py`` and\n``test_trident2_stack.py::test_arms_have_exact_active_parameter_contracts``.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 708,
+      "byte_offset": 3433,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-1efbc163d4a7-0",
+      "line": 63,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"``(payload_dim,)`` per-step multiplicative decay factors whose half-lives\n    are log-spaced from ``min_half_life`` to ``max_half_life`` tokens.\n\n    Dim 0 decays fastest (half-life ``min_half_life``); the last dim decays\n    slowest (half-life ``max_half_life``). ``decay = 0.5 ** (1 / half_life)`` is\n    the per-token multiplier such that ``decay ** half_life == 0.5`` exactly --\n    the definition of half-life. ``torch.logspace`` with ``base=2`` spaces the\n    half-lives evenly in log2-space, e.g. for the default (8, 1024, 64 dims) the\n    half-lives run ``8, ~8.36, ..., 1024`` -- log-spaced, not linear, so both the\n    fast and slow ends of the range keep comparable relative resolution.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 15,
+      "byte_offset": 4149,
+      "duration_seconds": 1.359711,
+      "id": "negate_condition-04207517b6ca-0",
+      "line": 74,
+      "mutated_text": "not (payload_dim < 2)",
+      "operator": "negate_condition",
+      "original_text": "payload_dim < 2",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4161,
+      "duration_seconds": 1.421959,
+      "id": "comparison_op-e61e4ad4b70d-0",
+      "line": 74,
+      "mutated_text": ">=",
+      "operator": "comparison_op",
+      "original_text": "<",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4163,
+      "duration_seconds": 1.935064,
+      "id": "constant_replace-63df044c43fa-0",
+      "line": 74,
+      "mutated_text": "3",
+      "operator": "constant_replace",
+      "original_text": "2",
+      "outcome": "SURVIVED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 4291,
+      "duration_seconds": 1.559101,
+      "id": "boolean_op-76e9ed758cbf-0",
+      "line": 78,
+      "mutated_text": "",
+      "operator": "boolean_op",
+      "original_text": "not (",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 41,
+      "byte_offset": 4291,
+      "duration_seconds": 1.388739,
+      "id": "negate_condition-37a1672bcdc2-0",
+      "line": 78,
+      "mutated_text": "not (not (0.0 < min_half_life < max_half_life))",
+      "operator": "negate_condition",
+      "original_text": "not (0.0 < min_half_life < max_half_life)",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 4296,
+      "duration_seconds": 1.984396,
+      "id": "constant_replace-dc8ce8a811dd-0",
+      "line": 78,
+      "mutated_text": "1.0",
+      "operator": "constant_replace",
+      "original_text": "0.0",
+      "outcome": "SURVIVED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4300,
+      "duration_seconds": 1.366036,
+      "id": "comparison_op-e61e4ad4b70d-1",
+      "line": 78,
+      "mutated_text": ">=",
+      "operator": "comparison_op",
+      "original_text": "<",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4316,
+      "duration_seconds": 1.367683,
+      "id": "comparison_op-e61e4ad4b70d-2",
+      "line": 78,
+      "mutated_text": ">=",
+      "operator": "comparison_op",
+      "original_text": "<",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 24,
+      "byte_offset": 4618,
+      "duration_seconds": 1.360321,
+      "id": "return_value-1257ad6dcbd1-0",
+      "line": 86,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "0.5 ** (1.0 / half_life)",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 4618,
+      "duration_seconds": 1.434862,
+      "id": "constant_replace-f74dd1a1b9cc-0",
+      "line": 86,
+      "mutated_text": "1.5",
+      "operator": "constant_replace",
+      "original_text": "0.5",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 2,
+      "byte_offset": 4622,
+      "duration_seconds": 1.345242,
+      "id": "arithmetic_op-d197703ab143-0",
+      "line": 86,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "**",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 3,
+      "byte_offset": 4626,
+      "duration_seconds": 1.432678,
+      "id": "constant_replace-4f6c92fff681-0",
+      "line": 86,
+      "mutated_text": "0.0",
+      "operator": "constant_replace",
+      "original_text": "1.0",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 4630,
+      "duration_seconds": 1.349149,
+      "id": "arithmetic_op-ff2305db03ff-0",
+      "line": 86,
+      "mutated_text": "*",
+      "operator": "arithmetic_op",
+      "original_text": "/",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 240,
+      "byte_offset": 4724,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-65a6553ad25f-0",
+      "line": 90,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"``SparseDistributedSlotMemoryCat2`` with a fixed, per-payload-dim decay\n    threaded through both lag channels' causal scan.\n\n    See the module docstring for the decay contract and why only\n    ``_causal_scan`` needs overriding.\n    \"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 248,
+      "byte_offset": 5325,
+      "duration_seconds": 1.372283,
+      "id": "remove_super_call-677b95a4a2a2-0",
+      "line": 110,
+      "mutated_text": "pass",
+      "operator": "remove_super_call",
+      "original_text": "super().__init__(\n            dim,\n            n_codes=n_codes,\n            active=active,\n            key_dim=key_dim,\n            payload_dim=payload_dim,\n            decay_scales=decay_scales,\n            tie_addressing=tie_addressing,\n        )",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 7,
+      "byte_offset": 5858,
+      "duration_seconds": 1.382218,
+      "id": "constant_replace-668e5be0b5ff-0",
+      "line": 124,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"decay\"",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    {
+      "byte_length": 334,
+      "byte_offset": 6165,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-d2790650f218-0",
+      "line": 136,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Overrides the base module's undecayed scan dispatch with the\n        decay-aware kernel from ``sdsm_scan_triton_mts``. Signature and return\n        (reads only, ``(B, L, payload_dim)``) match the base method exactly --\n        ``forward`` (inherited from ``SparseDistributedSlotMemoryCat2``) is\n        unaware anything changed.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 5,
+      "byte_offset": 6741,
+      "duration_seconds": 1.399328,
+      "id": "return_value-111a8d3826b8-0",
+      "line": 150,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "reads",
+      "outcome": "KILLED",
+      "path": "research/synthesis/sparse_distributed_slot_memory_mts.py",
+      "tests_run": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 0.875,
+  "new_survivors": [],
+  "no_coverage": 4,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 14,
+    "NO_COVERAGE": 4,
+    "SURVIVED": 2,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "tasks/mutation_campaigns/receipts/llm-a6_sparse_distributed_slot_memory_mts_fest_20260910.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "785207555f5c21022ecb2b75fa5fadb7c507258f618ba80e7c95f2cb1b8a7f7c",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "fe80b685e955c1b0eee5c16427ecb0478642360441fda763265deffcc71d83a8",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "6f413bab0dc72f53b740e4e9eb9b7711ae2556b796d2bb96491884b992dbeb2d",
+    "conductor/mutation_testing_support.py": "1d60c52221a96c8cb52ee967fec5d1ea316ca90d27b85829d71d12d127cf8b98",
+    "conductor/mutation_value.py": "2c2d17006482813ddb66529969767a03f2d562cf4c3e825b16d90a4a1a627fff",
+    "conductor/snapshot_worktree.py": "7f2bc12bf5e106842114ca964246b5f9de2658221866b7c45c31920b02541328",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "3e25ed249d3b12666c84b13d8f2fd74eb73ab8903b5203cb38ee280e23d42ced",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "01af5da325d9a941f71557c61a91ae76fa03b640e2d0b039e07065a469e31bcc",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "f2b8a10175571574c26c79d5606deab495350518b56a7ed7733fe16b6d8328ec"
+  },
+  "runner_sha256": "6f413bab0dc72f53b740e4e9eb9b7711ae2556b796d2bb96491884b992dbeb2d",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "seed": 0,
+  "source_sha256": {
+    "research/synthesis/sparse_distributed_slot_memory_mts.py": "67fd8212ba59a7bed619e6937eddcc51b4dc322fbf8a37aac485c963c49e8808"
+  },
+  "status": "RATCHET_HELD",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [
+    "constant_replace-63df044c43fa-0",
+    "constant_replace-dc8ce8a811dd-0"
+  ],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "research/tests/test_sparse_distributed_slot_memory_mts.py"
+  ],
+  "test_sha256": {
+    "research/tests/test_sparse_distributed_slot_memory_mts.py": "1ee007dddd441da770a5f5a9520e4b12058557425ff17394138bd8720e9d8ccc"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 2,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 10
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-d197703ab143-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "arithmetic_op-ff2305db03ff-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "comparison_op-e61e4ad4b70d-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "comparison_op-e61e4ad4b70d-1": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "comparison_op-e61e4ad4b70d-2": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "constant_replace-4f6c92fff681-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state"
+      ],
+      "constant_replace-668e5be0b5ff-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "constant_replace-f74dd1a1b9cc-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state"
+      ],
+      "negate_condition-04207517b6ca-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "negate_condition-37a1672bcdc2-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "remove_super_call-677b95a4a2a2-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "return_value-111a8d3826b8-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ],
+      "return_value-1257ad6dcbd1-0": [
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "research/synthesis/sparse_distributed_slot_memory_mts.py"
+        ],
+        "criticality": "high",
+        "id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910"
+      }
+    ],
+    "retained_core": [
+      "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds",
+      "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2"
+        ],
+        "killed_mutants": [
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-668e5be0b5ff-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "remove_super_call-677b95a4a2a2-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+        "runtime_seconds_median": 0.003,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-d197703ab143-0",
+          "arithmetic_op-ff2305db03ff-0",
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-668e5be0b5ff-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "remove_super_call-677b95a4a2a2-0",
+          "return_value-111a8d3826b8-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+        "runtime_seconds_median": 0.022,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_causality_perturbation_only_moves_forward",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-d197703ab143-0",
+          "arithmetic_op-ff2305db03ff-0",
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-668e5be0b5ff-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "remove_super_call-677b95a4a2a2-0",
+          "return_value-111a8d3826b8-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_chunk_invariance",
+        "runtime_seconds_median": 0.044,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-d197703ab143-0",
+          "arithmetic_op-ff2305db03ff-0",
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-4f6c92fff681-0",
+          "constant_replace-f74dd1a1b9cc-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_buffer_is_not_constant_and_is_log_spaced",
+        "runtime_seconds_median": 0.2505,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2"
+        ],
+        "killed_mutants": [
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-668e5be0b5ff-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "remove_super_call-677b95a4a2a2-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-d197703ab143-0",
+          "arithmetic_op-ff2305db03ff-0",
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-4f6c92fff681-0",
+          "constant_replace-f74dd1a1b9cc-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-d197703ab143-0",
+          "arithmetic_op-ff2305db03ff-0",
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-668e5be0b5ff-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "remove_super_call-677b95a4a2a2-0",
+          "return_value-111a8d3826b8-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+        "runtime_seconds_median": 0.019,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_at_p5_geometry_matches_cat2s_5_369_456_exactly",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_fast_dim_decays_faster_than_slow_dim_state",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2"
+        ],
+        "killed_mutants": [
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-2",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_min_max_half_life_validation",
+        "runtime_seconds_median": 0.003,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_decay_is_a_buffer_not_a_parameter"
+        ],
+        "killed_mutants": [
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-668e5be0b5ff-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "remove_super_call-677b95a4a2a2-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_param_count_unchanged_from_plain_cat2",
+        "runtime_seconds_median": 0.001,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+        ],
+        "killed_mutants": [
+          "arithmetic_op-d197703ab143-0",
+          "arithmetic_op-ff2305db03ff-0",
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-668e5be0b5ff-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "remove_super_call-677b95a4a2a2-0",
+          "return_value-111a8d3826b8-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+        "runtime_seconds_median": 0.009,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "MERGE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_forward_shape_and_slot_read_shape",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_read_at_t_does_not_depend_on_future_tokens",
+          "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds"
+        ],
+        "killed_mutants": [
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-668e5be0b5ff-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "remove_super_call-677b95a4a2a2-0",
+          "return_value-111a8d3826b8-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_straight_through_gradient_reaches_both_channel_lifts",
+        "runtime_seconds_median": 0.0215,
+        "unique_kills": []
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "llm-a6_sparse_distributed_slot_memory_mts_fest_20260910",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-d197703ab143-0",
+          "arithmetic_op-ff2305db03ff-0",
+          "comparison_op-e61e4ad4b70d-0",
+          "comparison_op-e61e4ad4b70d-1",
+          "comparison_op-e61e4ad4b70d-2",
+          "constant_replace-668e5be0b5ff-0",
+          "negate_condition-04207517b6ca-0",
+          "negate_condition-37a1672bcdc2-0",
+          "remove_super_call-677b95a4a2a2-0",
+          "return_value-111a8d3826b8-0",
+          "return_value-1257ad6dcbd1-0"
+        ],
+        "nodeid": "research/tests/test_sparse_distributed_slot_memory_mts.py::test_zero_init_identity_holds",
+        "runtime_seconds_median": 0.009,
+        "unique_kills": []
+      }
+    ]
+  },
+  "unviable": 0
+}

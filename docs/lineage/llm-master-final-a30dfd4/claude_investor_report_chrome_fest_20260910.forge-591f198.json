@@ -1,0 +1,490 @@
+{
+  "adapter_sha256": "365003176c192969d035b8028e796e9a7b04618820d84d5ef6fa508cac61ec29",
+  "attribution": {
+    "attributed_mutants": 10,
+    "baseline_repetitions": 2,
+    "killed_mutants": 10,
+    "ranked_tests": 6,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 1.045727,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                                                   [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m6 passed\u001b[0m\u001b[32m in 0.26s\u001b[0m\u001b[0m\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/home/tim/.cache/llm-forge/scratch/llm-consume/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "research/tests/test_investor_report_chrome.py",
+    "--cov=research/tools",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "claude_investor_report_chrome_fest_20260910",
+  "classification_required": [],
+  "core_sha256": "1046024c2c9f8585212a468c85fd9e123d424c95c5cd9cc339656514593f8899",
+  "engine_result": {
+    "duration_seconds": 2.906795,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "/investor_report_chrome.py\",\n        \"line\": 90,\n        \"column\": 12,\n        \"byte_offset\": 3079,\n        \"byte_length\": 295,\n        \"original_text\": \"f\\\"\\\"\\\"<dialog class=\\\"help\\\" id=\\\"help-dialog\\\" aria-label=\\\"Keyboard shortcuts\\\">\\n<header>Shortcuts and interactions<span class=\\\"topbar-spacer\\\"></span>\\n<button class=\\\"btn btn-sm\\\" type=\\\"button\\\" onclick=\\\"this.closest('dialog').close()\\\">Close</button></header>\\n<div class=\\\"body\\\">{rows}</div>\\n</dialog>\\n\\\"\\\"\\\"\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 291607879\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-3h7de6ve/worktree/research/tools/investor_report_chrome.py\",\n        \"line\": 99,\n        \"column\": 5,\n        \"byte_offset\": 3459,\n        \"byte_length\": 72,\n        \"original_text\": \"\\\"\\\"\\\"Everything after the last card. Identical on every generated page.\\\"\\\"\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-3h7de6ve/worktree/research/tools/investor_report_chrome.py\",\n        \"line\": 101,\n        \"column\": 9,\n        \"byte_offset\": 3553,\n        \"byte_length\": 115,\n        \"original_text\": \"\\\"</main>\\\\n</div>\\\\n\\\"\\n        + help_dialog(help_rows)\\n        + f\\\"<script>\\\\n{script}\\\\n</script>\\\\n</body>\\\\n</html>\\\\n\\\"\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 289645840\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-3h7de6ve/worktree/research/tools/investor_report_chrome.py\",\n        \"line\": 101,\n        \"column\": 9,\n        \"byte_offset\": 3553,\n        \"byte_length\": 19,\n        \"original_text\": \"\\\"</main>\\\\n</div>\\\\n\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 291423378\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-3h7de6ve/worktree/research/tools/investor_report_chrome.py\",\n        \"line\": 102,\n        \"column\": 9,\n        \"byte_offset\": 3581,\n        \"byte_length\": 1,\n        \"original_text\": \"+\",\n        \"mutated_text\": \"-\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 287998772\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-3h7de6ve/worktree/research/tools/investor_report_chrome.py\",\n        \"line\": 103,\n        \"column\": 9,\n        \"byte_offset\": 3614,\n        \"byte_length\": 1,\n        \"original_text\": \"+\",\n        \"mutated_text\": \"-\",\n        \"mutator_name\": \"arithmetic_op\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 290437664\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 2,\n    \"nanos\": 902220067\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 10,
+    "mutants_generated": 14,
+    "mutants_tested": 10,
+    "no_coverage": 4,
+    "survived": 0,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-14T00:45:20.010182+00:00",
+  "interpreter": "/home/tim/.cache/llm-forge/scratch/llm-consume/.venv/bin/python",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "tasks/mutation_campaigns/claude_investor_report_chrome_fest_20260910.json",
+  "manifest_sha256": "c548a9441f73b24155796dea6b5e100aa8a67b5d949f5dc859e0a6f1329aba08",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 30,
+  "mutants": [
+    {
+      "byte_length": 550,
+      "byte_offset": 0,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-434cf5318d82-0",
+      "line": 1,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Shared HTML chrome for every generated investor-report page.\n\nThe report is now two pages -- a focal decision page and a sections page -- and\nboth carry the same document head, top bar, navigation, shortcut dialog and\nclosing script.  Keeping that chrome here means the split renders one identical\nframe around both pages instead of two drifting copies, and it keeps the layout\nmarkup out of the analysis module.\n\nNothing here reads the database or decides anything: every caller passes the\nstylesheet, script and navigation it wants rendered.\n\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 75,
+      "byte_offset": 716,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-961ef2bb9a76-0",
+      "line": 20,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"An anchored content card. ``title``/``note`` may carry inline markup.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 175,
+      "byte_offset": 803,
+      "duration_seconds": 0.288394,
+      "id": "return_value-9badaafee2b8-0",
+      "line": 21,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "f\"\"\"<section id=\"{section_id}\" class=\"card\">\n<div class=\"card-head\"><div class=\"eyebrow\">{eyebrow}</div><h2>{title}</h2>\n<p class=\"note\">{note}</p></div>\n{body}\n</section>\n\"\"\"",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_card_uses_the_given_section_id_as_the_anchor"
+      ]
+    },
+    {
+      "byte_length": 60,
+      "byte_offset": 1063,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-dcd68a51c693-0",
+      "line": 30,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"A collapsed card. Used for the long supporting tables.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 161,
+      "byte_offset": 1135,
+      "duration_seconds": 0.290091,
+      "id": "return_value-f50ff35eb915-0",
+      "line": 31,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "f\"\"\"<details id=\"{section_id}\" class=\"card\">\n<summary>{summary}<span class=\"hint\">{hint}</span></summary>\n<div class=\"details-body\">\n{body}\n</div>\n</details>\n\"\"\"",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_details_card_uses_the_given_section_id_as_the_anchor"
+      ]
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 1358,
+      "duration_seconds": 0.289683,
+      "id": "return_value-6f6bc19d53f5-0",
+      "line": 41,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "f\"\"\"<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{html.escape(title)}</title>\n<style>\n{css}\n</style>\n</head>\n<body>\n\"\"\"",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_document_head_escapes_the_title"
+      ]
+    },
+    {
+      "byte_length": 859,
+      "byte_offset": 1620,
+      "duration_seconds": 0.292897,
+      "id": "return_value-8c13544f5b12-0",
+      "line": 56,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "f\"\"\"<header class=\"topbar\">\n<div class=\"brand\"><span class=\"mark\"></span><h1>Novel Non-QKV Architecture</h1>\n<small>investor report &middot; {html.escape(generated)}</small></div>\n<span class=\"topbar-spacer\"></span>\n<div class=\"gsearch\">\n<span class=\"icon\">&#9906;</span>\n<input id=\"global-search\" type=\"text\" placeholder=\"Search every table&hellip;\"\n       aria-label=\"Search every table\" autocomplete=\"off\">\n<button id=\"global-search-clear\" class=\"clear-x\" type=\"button\" title=\"Clear search\" hidden>&times;</button>\n<span class=\"kbd-hint\"><kbd>/</kbd></span>\n</div>\n<button id=\"reset-all\" class=\"btn\" type=\"button\" title=\"Clear every filter and sort in the report\">&#8634; Reset all</button>\n<button id=\"help-btn\" class=\"btn btn-ghost\" type=\"button\" title=\"Keyboard shortcuts (?)\" aria-label=\"Keyboard shortcuts\">?</button>\n</header>\n<div class=\"shell\">\n\"\"\"",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_topbar_escapes_the_generated_timestamp"
+      ]
+    },
+    {
+      "byte_length": 151,
+      "byte_offset": 2698,
+      "duration_seconds": 0.289904,
+      "id": "return_value-bb7f84d4ca13-0",
+      "line": 80,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "'<aside class=\"sidebar\"><nav class=\"toc\" aria-label=\"Report sections\">'\n        f'<div class=\"toc-label\">Sections</div>{links}</nav></aside>\\n<main>\\n'",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_nav_emits_anchored_links_in_order_and_closes_the_shell_when_empty"
+      ]
+    },
+    {
+      "byte_length": 295,
+      "byte_offset": 3079,
+      "duration_seconds": 0.291608,
+      "id": "return_value-5661e5827602-0",
+      "line": 90,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "f\"\"\"<dialog class=\"help\" id=\"help-dialog\" aria-label=\"Keyboard shortcuts\">\n<header>Shortcuts and interactions<span class=\"topbar-spacer\"></span>\n<button class=\"btn btn-sm\" type=\"button\" onclick=\"this.closest('dialog').close()\">Close</button></header>\n<div class=\"body\">{rows}</div>\n</dialog>\n\"\"\"",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ]
+    },
+    {
+      "byte_length": 72,
+      "byte_offset": 3459,
+      "duration_seconds": 0.0,
+      "id": "constant_replace-0e0ac1f2fa9b-0",
+      "line": 99,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"\"\"Everything after the last card. Identical on every generated page.\"\"\"",
+      "outcome": "NO_COVERAGE",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": []
+    },
+    {
+      "byte_length": 115,
+      "byte_offset": 3553,
+      "duration_seconds": 0.289646,
+      "id": "return_value-4c0e720bc6cd-0",
+      "line": 101,
+      "mutated_text": "None",
+      "operator": "return_value",
+      "original_text": "\"</main>\\n</div>\\n\"\n        + help_dialog(help_rows)\n        + f\"<script>\\n{script}\\n</script>\\n</body>\\n</html>\\n\"",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ]
+    },
+    {
+      "byte_length": 19,
+      "byte_offset": 3553,
+      "duration_seconds": 0.291423,
+      "id": "constant_replace-59ff85deec6e-0",
+      "line": 101,
+      "mutated_text": "\"\"",
+      "operator": "constant_replace",
+      "original_text": "\"</main>\\n</div>\\n\"",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3581,
+      "duration_seconds": 0.287999,
+      "id": "arithmetic_op-2d9613c7fc57-0",
+      "line": 102,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ]
+    },
+    {
+      "byte_length": 1,
+      "byte_offset": 3614,
+      "duration_seconds": 0.290438,
+      "id": "arithmetic_op-2d9613c7fc57-1",
+      "line": 103,
+      "mutated_text": "-",
+      "operator": "arithmetic_op",
+      "original_text": "+",
+      "outcome": "KILLED",
+      "path": "research/tools/investor_report_chrome.py",
+      "tests_run": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ]
+    }
+  ],
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 1.0,
+  "new_survivors": [],
+  "no_coverage": 4,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 10,
+    "NO_COVERAGE": 4,
+    "SURVIVED": 0,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "tasks/mutation_campaigns/receipts/proof_chrome_receipt.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "8547341a8ab0448e586620da3adbdced0c6add1444645d79cc7cc73d9e1a3173",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fbaf4781cb73027fb336508b3fc8ec082497ced9edb6a3344e09fb40f58f37ad",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "699ab1e78eccea669c833105b32982e8fc15f53f13fa404d20e55246a0ce5488",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "98412200e5a9b7ed93e5c2b14a70f73bab207e2e49ce8441863c7c6136336b30"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "research/tools/investor_report_chrome.py": "fc0946e8177c77a9da2aeba5adac9ca77a3d2b90f8cb36d69bdc8b8cbdde30ae"
+  },
+  "status": "PASS",
+  "survivor_baseline": [],
+  "survivors": [],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "research/tests/test_investor_report_chrome.py"
+  ],
+  "test_sha256": {
+    "research/tests/test_investor_report_chrome.py": "ec8e7ed44bea9ef20166eb9dec40924a4c8c7b81bce1ccde4f4ba819f0c72471"
+  },
+  "test_value": {
+    "adapter": "pytest-junit",
+    "baseline_repetitions": 2,
+    "classification_counts": {
+      "CORE": 6,
+      "DELETE_CANDIDATE": 0,
+      "INTENTIONAL_REDUNDANCY": 0,
+      "MERGE": 0
+    },
+    "errors": [],
+    "killers_by_mutant": {
+      "arithmetic_op-2d9613c7fc57-0": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ],
+      "arithmetic_op-2d9613c7fc57-1": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ],
+      "constant_replace-59ff85deec6e-0": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ],
+      "return_value-4c0e720bc6cd-0": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ],
+      "return_value-5661e5827602-0": [
+        "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script"
+      ],
+      "return_value-6f6bc19d53f5-0": [
+        "research/tests/test_investor_report_chrome.py::test_document_head_escapes_the_title"
+      ],
+      "return_value-8c13544f5b12-0": [
+        "research/tests/test_investor_report_chrome.py::test_topbar_escapes_the_generated_timestamp"
+      ],
+      "return_value-9badaafee2b8-0": [
+        "research/tests/test_investor_report_chrome.py::test_card_uses_the_given_section_id_as_the_anchor"
+      ],
+      "return_value-bb7f84d4ca13-0": [
+        "research/tests/test_investor_report_chrome.py::test_nav_emits_anchored_links_in_order_and_closes_the_shell_when_empty"
+      ],
+      "return_value-f50ff35eb915-0": [
+        "research/tests/test_investor_report_chrome.py::test_details_card_uses_the_given_section_id_as_the_anchor"
+      ]
+    },
+    "required_contracts": [
+      {
+        "active_paths": [
+          "research/tools/investor_report_chrome.py"
+        ],
+        "criticality": "high",
+        "id": "claude_investor_report_chrome_fest_20260910"
+      }
+    ],
+    "retained_core": [
+      "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script",
+      "research/tests/test_investor_report_chrome.py::test_card_uses_the_given_section_id_as_the_anchor",
+      "research/tests/test_investor_report_chrome.py::test_details_card_uses_the_given_section_id_as_the_anchor",
+      "research/tests/test_investor_report_chrome.py::test_document_head_escapes_the_title",
+      "research/tests/test_investor_report_chrome.py::test_nav_emits_anchored_links_in_order_and_closes_the_shell_when_empty",
+      "research/tests/test_investor_report_chrome.py::test_topbar_escapes_the_generated_timestamp"
+    ],
+    "schema_version": "llm.mutation-testing.test-value.v1",
+    "status": "PASS",
+    "subprocess_scaling": "baseline_repetitions + mutants",
+    "tests": [
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "claude_investor_report_chrome_fest_20260910",
+        "dominated_by": [],
+        "killed_mutants": [
+          "return_value-9badaafee2b8-0"
+        ],
+        "nodeid": "research/tests/test_investor_report_chrome.py::test_card_uses_the_given_section_id_as_the_anchor",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "return_value-9badaafee2b8-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "claude_investor_report_chrome_fest_20260910",
+        "dominated_by": [],
+        "killed_mutants": [
+          "return_value-f50ff35eb915-0"
+        ],
+        "nodeid": "research/tests/test_investor_report_chrome.py::test_details_card_uses_the_given_section_id_as_the_anchor",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "return_value-f50ff35eb915-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "claude_investor_report_chrome_fest_20260910",
+        "dominated_by": [],
+        "killed_mutants": [
+          "arithmetic_op-2d9613c7fc57-0",
+          "arithmetic_op-2d9613c7fc57-1",
+          "constant_replace-59ff85deec6e-0",
+          "return_value-4c0e720bc6cd-0",
+          "return_value-5661e5827602-0"
+        ],
+        "nodeid": "research/tests/test_investor_report_chrome.py::test_document_close_embeds_the_help_dialog_and_the_raw_script",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "arithmetic_op-2d9613c7fc57-0",
+          "arithmetic_op-2d9613c7fc57-1",
+          "constant_replace-59ff85deec6e-0",
+          "return_value-4c0e720bc6cd-0",
+          "return_value-5661e5827602-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "claude_investor_report_chrome_fest_20260910",
+        "dominated_by": [],
+        "killed_mutants": [
+          "return_value-6f6bc19d53f5-0"
+        ],
+        "nodeid": "research/tests/test_investor_report_chrome.py::test_document_head_escapes_the_title",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "return_value-6f6bc19d53f5-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "claude_investor_report_chrome_fest_20260910",
+        "dominated_by": [],
+        "killed_mutants": [
+          "return_value-bb7f84d4ca13-0"
+        ],
+        "nodeid": "research/tests/test_investor_report_chrome.py::test_nav_emits_anchored_links_in_order_and_closes_the_shell_when_empty",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "return_value-bb7f84d4ca13-0"
+        ]
+      },
+      {
+        "baseline_outcomes": [
+          "PASSED",
+          "PASSED"
+        ],
+        "classification": "CORE",
+        "contract_id": "claude_investor_report_chrome_fest_20260910",
+        "dominated_by": [],
+        "killed_mutants": [
+          "return_value-8c13544f5b12-0"
+        ],
+        "nodeid": "research/tests/test_investor_report_chrome.py::test_topbar_escapes_the_generated_timestamp",
+        "runtime_seconds_median": 0.0,
+        "unique_kills": [
+          "return_value-8c13544f5b12-0"
+        ]
+      }
+    ]
+  },
+  "timed_out": 0,
+  "unviable": 0
+}
