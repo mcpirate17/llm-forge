@@ -382,10 +382,21 @@ pub fn agent_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
 /// never start Python for the call. A `crg_refresh_report_pre` failure
 /// becomes a `HookOutcome` error like every other handler here, not a panic.
 pub fn run_agent_pretooluse_fully_native(payload: &Value) -> Value {
+    let outcomes = vec![
+        crate::route::hook_outcome_for_agent(payload),
+        crg_refresh_report_pre_outcome(payload),
+    ];
+    merge::merge("PreToolUse", &outcomes)
+}
+
+/// Runs `crg_refresh_report_pre` (matcher `.*`, so it matches every tool)
+/// alone and wraps it exactly as the Bash/`Agent` fully-native paths do: a
+/// handler `Err` becomes a `HookOutcome` error, never a panic.
+fn crg_refresh_report_pre_outcome(payload: &Value) -> HookOutcome {
     let handlers = registry();
     let crg = find_handler(&handlers, "crg_refresh_report_pre", "PreToolUse")
         .expect("crg_refresh_report_pre always registered");
-    let crg_outcome = match crg.run(payload) {
+    match crg.run(payload) {
         Ok(output) => HookOutcome {
             name: "crg_refresh_report_pre".to_string(),
             output,
@@ -398,9 +409,21 @@ pub fn run_agent_pretooluse_fully_native(payload: &Value) -> Value {
             error: Some(format!("{err:#}")),
             fail_closed: false,
         },
-    };
-    let outcomes = vec![crate::route::hook_outcome_for_agent(payload), crg_outcome];
-    merge::merge("PreToolUse", &outcomes)
+    }
+}
+
+/// The standalone `PreToolUse` answer for any `tool_name` that is neither
+/// `Bash` nor `Agent` (Grep, Glob, WebFetch, TodoWrite, Task, ...): under
+/// `--takeover` the host's Python `PreToolUse` entry is narrowed away from
+/// `.*` down to the five-tool residual
+/// (`Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*`), so
+/// Python no longer sees these calls at all even though
+/// `crg_refresh_report_pre`'s own matcher is `.*` and would otherwise fire
+/// for every one of them. Running it here, alone, is what keeps a staged
+/// refresh-failure report from being silently dropped for exactly the tools
+/// the narrowed Python entry no longer covers.
+pub fn run_generic_pretooluse_fully_native(payload: &Value) -> Value {
+    merge::merge("PreToolUse", &[crg_refresh_report_pre_outcome(payload)])
 }
 
 /// The hooks forge serves natively when the caller expresses no preference at
