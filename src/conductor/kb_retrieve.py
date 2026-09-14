@@ -21,6 +21,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Final
 
+from conductor.embedding_contract import EMBED_TIMEOUT_SECONDS
 from conductor.http_transport import open_http
 from conductor.project_paths import host_root, notes_root
 
@@ -97,13 +98,32 @@ def assert_guest_embed_meta(payload: dict[str, Any]) -> None:
     assert_embedding_meta(payload)
 
 
+def _normalized_rows(rows: list[Any]) -> list[list[float]]:
+    """Validate each broker row and return its L2-normalized vector."""
+
+    vectors: list[list[float]] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict) or not isinstance(row.get("embedding"), list):
+            raise RetrieveError(f"embedding broker row {index} is invalid")
+        vector = row["embedding"]
+        if not vector or not all(
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(float(value))
+            for value in vector
+        ):
+            raise RetrieveError(f"embedding broker row {index} is not finite numeric")
+        vectors.append(_l2_normalize([float(value) for value in vector]))
+    return vectors
+
+
 def embed_batch(
     texts: list[str],
     *,
     purpose: str,
     required_fingerprint: str = "",
     url: str | None = None,
-    timeout_s: float = 120.0,
+    timeout_s: float = EMBED_TIMEOUT_SECONDS,
 ) -> EmbeddingBatch:
     if not texts:
         return EmbeddingBatch(vectors=[], metadata={})
@@ -149,8 +169,17 @@ def embed_batch(
             raise RetrieveError(
                 f"embedding broker failed after auto-start: {exc}"
             ) from exc
-    except (TimeoutError, json.JSONDecodeError) as exc:
-        raise RetrieveError(f"embedding broker failed: {exc}") from exc
+    except TimeoutError as exc:
+        raise RetrieveError(
+            f"embedding broker did not answer within {timeout_s:.0f}s for "
+            f"{len(texts)} input(s). The backend holds nothing resident, so the "
+            "first call after a quiet period pays a full model load (117 s "
+            "measured cold, 0.6 s warm). Load it first with "
+            "`python -m conductor.cpu_embed warm`, and do not reindex while a "
+            "run is competing for the CPU."
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise RetrieveError(f"embedding broker returned malformed JSON: {exc}") from exc
     if not isinstance(body, dict):
         raise RetrieveError("embedding broker returned a non-object response")
     error = body.get("error")
@@ -160,19 +189,7 @@ def embed_batch(
     metadata = body.get("workspace_embedding")
     if not isinstance(rows, list) or not isinstance(metadata, dict):
         raise RetrieveError("embedding broker response lacks data or metadata")
-    vectors: list[list[float]] = []
-    for index, row in enumerate(rows):
-        if not isinstance(row, dict) or not isinstance(row.get("embedding"), list):
-            raise RetrieveError(f"embedding broker row {index} is invalid")
-        vector = row["embedding"]
-        if not vector or not all(
-            isinstance(value, (int, float))
-            and not isinstance(value, bool)
-            and math.isfinite(float(value))
-            for value in vector
-        ):
-            raise RetrieveError(f"embedding broker row {index} is not finite numeric")
-        vectors.append(_l2_normalize([float(value) for value in vector]))
+    vectors = _normalized_rows(rows)
     if len(vectors) != len(texts):
         raise RetrieveError(
             f"embedding broker returned {len(vectors)} vectors for {len(texts)} inputs"
@@ -189,7 +206,7 @@ def embed_texts(
     url: str | None = None,
     required_fingerprint: str = "",
     purpose: str = "document",
-    timeout_s: float = 120.0,
+    timeout_s: float = EMBED_TIMEOUT_SECONDS,
 ) -> list[list[float]]:
     """Embed many strings through the canonical route."""
 
@@ -208,7 +225,7 @@ def embed_text(
     url: str | None = None,
     required_fingerprint: str = "",
     purpose: str = "document",
-    timeout_s: float = 60.0,
+    timeout_s: float = EMBED_TIMEOUT_SECONDS,
 ) -> list[float]:
     """Embed one string through the canonical route."""
 
