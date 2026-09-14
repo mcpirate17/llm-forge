@@ -1,139 +1,31 @@
+# Packaged fallback catalog -- the answer only for a host that ships no catalog
+# of its own and names none in `[tool.conductor].memory_sources`.
+#
+# It is deliberately small and relative-only. Every entry a real host wants is
+# host data: it names directories in that host's tree, and often absolute paths
+# outside it, which is precisely what must not travel inside a wheel. A host
+# takes ownership by writing `conductor/memory_sources.toml`; from that moment
+# this file is not read at all. See `conductor.memory_index.host_catalog_path`.
 schema_version = 1
-
-# kind = index | catalog | clean
-# index: chunk-embed on CPU. catalog: inventory only. clean: kill-candidate, never auto-delete.
 
 [[source]]
 id = "cards"
 kind = "index"
 root = "research/notes"
 glob = "kb_*.md"
-chunk = "whole"
+chunk = "heading"
 
 [[source]]
 id = "notes"
 kind = "index"
 root = "research/notes"
 glob = "*.md"
-exclude_globs = ["kb_*.md", "current_work_archive*.md"]
+exclude_globs = ["kb_*.md"]
 chunk = "heading"
-
-[[source]]
-id = "archives"
-kind = "index"
-root = ".current_work.archive"
-glob = "*.md"
-chunk = "heading"
-
-[[source]]
-id = "note-archives"
-kind = "index"
-root = "research/notes"
-glob = "current_work_archive*.md"
-chunk = "heading"
-
-[[source]]
-id = "vault-unique"
-kind = "index"
-absolute_root = "/home/tim/Documents/CodexVault"
-include_dirs = [
-  "dashboards",
-  "runbooks",
-  "decisions",
-  "claude",
-  "plain_language",
-  "inbox",
-]
-glob = "*.md"
-# `claude/memory` and `plain_language/claude/memory` hold thin backlink mirrors
-# of the auto-memory files, written by tooling/hooks/claude/obsidian_sync.py on
-# PostToolUse Edit|Write.  They are for reading in Obsidian, not for retrieval:
-# the hook never prunes, so 304 of 434 mirrors named a canonical file that no
-# longer existed (2026-09-14), and it only fires for the Edit/Write tools, so a
-# memory written any other way was never mirrored at all -- 109 of 239 live
-# memories had no mirror.  The `claude-memory` source below indexes the real
-# files instead; excluding these keeps one copy in the index, the true one.
-exclude_dir_names = ["memory"]
-chunk = "heading"
-
-[[source]]
-id = "codex-memories"
-kind = "index"
-absolute_root = "/home/tim/.codex/memories"
-glob = "*.md"
-exclude_dir_names = [".git", ".code-review-graph"]
-chunk = "heading"
-
-[[source]]
-id = "claude-memory"
-kind = "index"
-absolute_root = "/home/tim/.claude/projects"
-# Only the two real projects.  `/home/tim/.claude/projects` also holds scratchpad
-# and worktree session dirs whose memories are throwaway; `include_dirs` names
-# what to keep instead of excluding each one.  `archive/` comes in under the
-# first entry because roots are walked recursively.
-include_dirs = [
-  "-home-tim-Projects-LLM/memory",
-  "-home-tim-Projects-llm-forge/memory",
-]
-glob = "*.md"
-# MEMORY.md is a pointer list, already loaded into every session's context.
-exclude_globs = ["MEMORY.md"]
-chunk = "heading"
-
-[[source]]
-id = "claude-tasks"
-kind = "index"
-absolute_root = "/home/tim/.claude/tasks"
-glob = "*.json"
-chunk = "whole"
 
 [[source]]
 id = "repo-tasks"
 kind = "index"
 root = "tasks"
 glob = "*.md"
-exclude_dir_names = ["audit"]
 chunk = "heading"
-
-[[source]]
-id = "repo-skills"
-kind = "index"
-roots = [".claude/commands", ".claude/skills", ".agents/skills"]
-glob = "*.md"
-chunk = "heading"
-
-[[source]]
-id = "code-graph"
-kind = "catalog"
-note = "Live graph is ~3k files / ~38k nodes. Embed via 7317 (openai provider, qwen3-embed-cpu). Do not markdown-card the tree."
-
-[[source]]
-id = "mnt-data-llm"
-kind = "catalog"
-absolute_root = "/mnt/data/llm"
-note = "Canonical corpora. hf_finefineweb at /mnt/data is a symlink here. Never embed."
-
-[[source]]
-id = "mnt-data-comfy"
-kind = "catalog"
-absolute_root = "/mnt/data/Comfy"
-note = "~234 GB image-gen. Not LLM knowledge."
-
-[[source]]
-id = "codex-worktrees"
-kind = "clean"
-root = ".codex/worktrees"
-note = "~35 GB scratch worktrees. Kill after confirming no unlanded work."
-
-[[source]]
-id = "codex-home-sessions"
-kind = "clean"
-absolute_root = "/home/tim/.codex/sessions"
-note = "~3 GB session logs. Index is memories/, not raw sessions."
-
-[[source]]
-id = "reports-old"
-kind = "clean"
-root = "research/reports"
-note = "205 GB. Subdirs >14d are immortal because prune is root-files-only. hyper_mor ckpt trees are REVIEW not kill."

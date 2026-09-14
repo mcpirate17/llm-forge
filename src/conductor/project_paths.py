@@ -45,6 +45,12 @@ DEFAULT_NOTES_ROOT = PurePosixPath("research/notes")
 # function and complexity guardrails. Host data, never a packaged copy: a host
 # that ships one at another path names it via `[tool.conductor]`.
 DEFAULT_GUARDRAIL_ALLOWLIST = PurePosixPath("conductor/guardrail_allowlist.json")
+# The memory index's source catalog. Host data: every entry names a directory in
+# the host's tree (or an absolute path outside it), so the host -- not this
+# package -- decides what is indexable. A copy ships beside ``memory_index`` and
+# is used only when the host has no catalog of its own and named none, so a
+# fresh install still indexes something; see ``memory_index.host_catalog_path``.
+DEFAULT_MEMORY_SOURCES = PurePosixPath("conductor/memory_sources.toml")
 
 CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"
 MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
@@ -52,6 +58,7 @@ PACKAGE_ROOT_ENV = "CONDUCTOR_PACKAGE_ROOT"
 MUTATION_RECEIPT_ROOT_ENV = "CONDUCTOR_MUTATION_RECEIPT_ROOT"
 NOTES_ROOT_ENV = "CONDUCTOR_NOTES_ROOT"
 GUARDRAIL_ALLOWLIST_ENV = "CONDUCTOR_GUARDRAIL_ALLOWLIST"
+MEMORY_SOURCES_ENV = "CONDUCTOR_MEMORY_SOURCES"
 INTEGRATION_BRANCH_ENV = "CONDUCTOR_INTEGRATION_BRANCH"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
@@ -60,6 +67,7 @@ PACKAGE_ROOT_KEY = "package_root"
 MUTATION_RECEIPT_ROOT_KEY = "mutation_receipt_root"
 NOTES_ROOT_KEY = "notes_root"
 GUARDRAIL_ALLOWLIST_KEY = "guardrail_allowlist"
+MEMORY_SOURCES_KEY = "memory_sources"
 INTEGRATION_BRANCH_KEY = "integration_branch"
 RETIRED_INTEGRATION_BRANCHES_KEY = "retired_integration_branches"
 DEFAULTS = {
@@ -69,6 +77,7 @@ DEFAULTS = {
     MUTATION_RECEIPT_ROOT_KEY: DEFAULT_MUTATION_RECEIPT_ROOT,
     NOTES_ROOT_KEY: DEFAULT_NOTES_ROOT,
     GUARDRAIL_ALLOWLIST_KEY: DEFAULT_GUARDRAIL_ALLOWLIST,
+    MEMORY_SOURCES_KEY: DEFAULT_MEMORY_SOURCES,
 }
 
 
@@ -184,12 +193,14 @@ class ProjectPaths:
     receipt_root_relative: PurePosixPath
     notes_relative: PurePosixPath
     guardrail_allowlist_relative: PurePosixPath
+    memory_sources_relative: PurePosixPath
     policy_configured: bool
     registry_configured: bool
     package_configured: bool
     receipt_root_configured: bool
     notes_configured: bool
     guardrail_allowlist_configured: bool
+    memory_sources_configured: bool
 
     @property
     def policy_path(self) -> Path:
@@ -228,6 +239,11 @@ class ProjectPaths:
         """The host's guardrail allowlist -- never the package's own copy."""
         return self.root / self.guardrail_allowlist_relative.as_posix()
 
+    @property
+    def memory_sources_path(self) -> Path:
+        """Where the host keeps its memory-index catalog."""
+        return self.root / self.memory_sources_relative.as_posix()
+
 
 def project_paths(root: Path | str) -> ProjectPaths:
     """Resolve every host path against ``root``. Not cached: hosts differ per call."""
@@ -244,6 +260,9 @@ def project_paths(root: Path | str) -> ProjectPaths:
     allowlist, named_allowlist = _configured(
         base, GUARDRAIL_ALLOWLIST_KEY, GUARDRAIL_ALLOWLIST_ENV
     )
+    memory_sources, named_memory_sources = _configured(
+        base, MEMORY_SOURCES_KEY, MEMORY_SOURCES_ENV
+    )
     return ProjectPaths(
         base,
         policy,
@@ -252,12 +271,14 @@ def project_paths(root: Path | str) -> ProjectPaths:
         receipt_root,
         notes,
         allowlist,
+        memory_sources,
         named_policy,
         named_reg,
         named_pkg,
         named_receipt_root,
         named_notes,
         named_allowlist,
+        named_memory_sources,
     )
 
 
@@ -339,6 +360,22 @@ def notes_root(root: Path | str) -> Path:
     follows. Note the argument is the tree root, not the package directory.
     """
     return project_paths(root).notes_path
+
+
+def memory_sources_relative(root: Path | str) -> PurePosixPath:
+    """Where the host keeps its memory-index catalog, relative to ``root``."""
+    return project_paths(root).memory_sources_relative
+
+
+def memory_sources_path(root: Path | str) -> Path:
+    """The host's memory-index catalog, joined onto the root the caller holds.
+
+    May not exist: a host that ships no catalog and names none falls back to the
+    packaged copy, which only ``memory_index.host_catalog_path`` decides. A host
+    that *names* one and does not ship it is a configuration error, refused
+    there rather than silently papered over.
+    """
+    return project_paths(root).memory_sources_path
 
 
 def package_relative(root: Path | str) -> PurePosixPath:

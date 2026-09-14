@@ -799,3 +799,57 @@ def test_include_dirs_source_takes_named_subtrees_and_drops_the_index_file(
     assert names == {"a-fact.md", "an-old-fact.md"}
     assert memory_index.path_matches_source(entry, kept / "MEMORY.md") is False
     assert memory_index.path_matches_source(entry, throwaway / "scratch.md") is False
+
+
+def _catalog_body() -> str:
+    return 'schema_version = 1\n[[source]]\nid = "x"\nkind = "index"\nroot = "."\n'
+
+
+def test_host_catalog_path_prefers_the_host_copy(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("CONDUCTOR_MEMORY_SOURCES", raising=False)
+    host = tmp_path / "conductor" / "memory_sources.toml"
+    host.parent.mkdir(parents=True)
+    host.write_text(_catalog_body(), encoding="utf-8")
+    assert memory_index.host_catalog_path(tmp_path) == host
+
+
+def test_host_catalog_path_falls_back_to_the_packaged_copy(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.delenv("CONDUCTOR_MEMORY_SOURCES", raising=False)
+    assert (
+        memory_index.host_catalog_path(tmp_path)
+        == memory_index.PACKAGED_SOURCES_PATH
+    )
+
+
+def test_host_catalog_path_refuses_a_named_catalog_that_is_absent(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("CONDUCTOR_MEMORY_SOURCES", "cfg/absent.toml")
+    with pytest.raises(memory_index.RetrieveError, match="does not exist"):
+        memory_index.host_catalog_path(tmp_path)
+
+
+def test_both_catalog_readers_resolve_the_same_file(tmp_path, monkeypatch) -> None:
+    """memory_index and memory_auto_index must never disagree about the catalog.
+
+    They used to: one read the packaged copy, the other a host literal, so a
+    source added to one was invisible to the other and the write->index loop
+    stayed open for exactly the files the host had just declared indexable.
+    """
+
+    from conductor import memory_auto_index
+
+    monkeypatch.delenv("CONDUCTOR_MEMORY_SOURCES", raising=False)
+    host = tmp_path / "conductor" / "memory_sources.toml"
+    host.parent.mkdir(parents=True)
+    host.write_text(_catalog_body(), encoding="utf-8")
+    seen: list[Path] = []
+    monkeypatch.setattr(
+        memory_auto_index,
+        "load_catalog",
+        lambda path: seen.append(path) or {"source": []},
+    )
+    memory_auto_index.indexed_path_sources({}, repo_root=tmp_path)
+    assert seen == [memory_index.host_catalog_path(tmp_path)] == [host]

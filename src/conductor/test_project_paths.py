@@ -533,3 +533,33 @@ def test_guardrail_allowlist_refuses_an_unusable_value(tmp_path):
     _write(tmp_path, '[tool.conductor]\nguardrail_allowlist = "../elsewhere.json"\n')
     with pytest.raises(pp.ProjectPathError):
         pp.guardrail_allowlist_relative(tmp_path)
+
+
+def test_memory_sources_defaults_to_the_host_conductor_dir(tmp_path, monkeypatch):
+    monkeypatch.delenv(pp.MEMORY_SOURCES_ENV, raising=False)
+    paths = pp.project_paths(tmp_path)
+    assert paths.memory_sources_relative == PurePosixPath(
+        "conductor/memory_sources.toml"
+    )
+    assert paths.memory_sources_configured is False
+    assert paths.memory_sources_path == tmp_path / "conductor" / "memory_sources.toml"
+
+
+def test_memory_sources_follows_the_conductor_table(tmp_path, monkeypatch):
+    monkeypatch.delenv(pp.MEMORY_SOURCES_ENV, raising=False)
+    _write(tmp_path, '[tool.conductor]\nmemory_sources = "cfg/catalog.toml"\n')
+    paths = pp.project_paths(tmp_path)
+    assert paths.memory_sources_relative == PurePosixPath("cfg/catalog.toml")
+    assert paths.memory_sources_configured is True
+
+
+def test_memory_sources_env_beats_the_conductor_table(tmp_path, monkeypatch):
+    _write(tmp_path, '[tool.conductor]\nmemory_sources = "cfg/catalog.toml"\n')
+    monkeypatch.setenv(pp.MEMORY_SOURCES_ENV, "env/catalog.toml")
+    assert pp.memory_sources_relative(tmp_path) == PurePosixPath("env/catalog.toml")
+
+
+def test_memory_sources_refuses_an_absolute_value(tmp_path, monkeypatch):
+    monkeypatch.setenv(pp.MEMORY_SOURCES_ENV, "/etc/catalog.toml")
+    with pytest.raises(pp.ProjectPathError):
+        pp.project_paths(tmp_path)

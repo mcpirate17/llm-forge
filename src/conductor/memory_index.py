@@ -41,11 +41,22 @@ from conductor.kb_retrieve import (
     embed_batch,
     embed_text,
 )
-from conductor.project_paths import DEFAULT_NOTES_ROOT, host_root, notes_root
+from conductor.project_paths import (
+    DEFAULT_NOTES_ROOT,
+    host_root,
+    notes_root,
+    project_paths,
+)
 
 ROOT: Final[Path] = host_root()
-# Ships inside the package next to this module -- not host data, unlike INDEX_PATH.
-SOURCES_PATH: Final[Path] = Path(__file__).resolve().parent / "memory_sources.toml"
+# The packaged fallback catalog, shipped beside this module. It is NOT the answer
+# for a host that has its own: every [[source]] names a directory in someone's
+# tree, so the catalog is host data and lives in the host repo. Resolve through
+# `host_catalog_path`, never this constant -- reading it directly is what let
+# `memory_index` and `memory_auto_index` disagree about what was indexable.
+PACKAGED_SOURCES_PATH: Final[Path] = (
+    Path(__file__).resolve().parent / "memory_sources.toml"
+)
 INDEX_PATH: Final[Path] = ROOT / "research" / "cache" / "memory_index.jsonl"
 CATALOG_SCHEMA_VERSION: Final[int] = 1
 SCHEMA_VERSION: Final[int] = 3
@@ -86,8 +97,32 @@ class IndexBuildResult:
         return [*preserved, *self.rows]
 
 
-def load_catalog(path: Path = SOURCES_PATH) -> dict[str, Any]:
-    payload = tomllib.loads(path.read_text(encoding="utf-8"))
+def host_catalog_path(root: Path | None = None) -> Path:
+    """The catalog this host indexes by, else the packaged fallback.
+
+    A host that names ``[tool.conductor].memory_sources`` (or sets
+    ``CONDUCTOR_MEMORY_SOURCES``) must ship that file: a named catalog that is
+    absent is a configuration error and is refused here rather than silently
+    replaced by the package's own, which would index the wrong tree without
+    saying so. A host that names nothing gets ``conductor/memory_sources.toml``
+    when it exists, and the packaged copy when it does not -- so a fresh install
+    still works, and adding that file is all it takes to take ownership.
+    """
+
+    paths = project_paths(root if root is not None else ROOT)
+    candidate = paths.memory_sources_path
+    if candidate.is_file():
+        return candidate
+    if paths.memory_sources_configured:
+        raise RetrieveError(
+            f"configured memory-source catalog {candidate} does not exist"
+        )
+    return PACKAGED_SOURCES_PATH
+
+
+def load_catalog(path: Path | None = None) -> dict[str, Any]:
+    resolved = path if path is not None else host_catalog_path()
+    payload = tomllib.loads(resolved.read_text(encoding="utf-8"))
     if payload.get("schema_version") != CATALOG_SCHEMA_VERSION:
         raise RetrieveError(
             f"unsupported catalog schema {payload.get('schema_version')!r}"
@@ -351,7 +386,7 @@ def _embed_fresh_chunks(
 def build_index_result(
     *,
     source_ids: set[str] | None = None,
-    catalog_path: Path = SOURCES_PATH,
+    catalog_path: Path | None = None,
     embedder: Callable[[str], list[float]] = embed_text,
     incremental: bool = True,
     index_path: Path = INDEX_PATH,
