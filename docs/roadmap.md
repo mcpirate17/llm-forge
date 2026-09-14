@@ -182,6 +182,17 @@ agent tokens. Stop porting; finish Phase 3, then install.
    `rebuild_indexes_repo_and_vault_together`), a live Python-vs-Rust
    byte-comparison harness on a larger fixture is debt for the follow-up
    PR.
+2i. (GLM) `memory_index index` measured before any port
+   (`docs/memory_index_rebuild_measurement.md`): the unchanged
+   whole-catalog run is 3.9 s (parse-dominated, zero embeds, no
+   rewrite) -- reuse works, no bug; the 5-minute wall is embed of
+   accumulated real change at ~0.6 s per chunk on the CPU route,
+   amplified by whole-file reuse granularity on two append-only
+   journals (~960 of 983 fresh chunks: `raw_memories.md` 648 KB ->
+   549 chunks, a 490 KB CodexVault daily note). Port nothing; index
+   more often, or move to chunk-hash reuse for append-only files as a
+   deliberate follow-up. DONE PR #69 (docs only).
+2j. (Claude) residual PreToolUse Python (crg_gate_mark/verify, crg_refresh_wait, current_work_guard_edit/read, pre_read_skeleton for Read|Edit|Write|NotebookEdit|MCP graph) NOT ported: measured 36-37 ms per call, ~80 such calls per session (~3 s) vs 8.7K Bash calls now native; scraps -- stop here, the hook path is done.
 2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
    settings.json wiring, `FORGE_MODE=warn`), then one week of
    `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
