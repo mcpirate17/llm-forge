@@ -182,17 +182,15 @@ def exception_group():
 def test_policy_thresholds_markers_allowlists_and_order(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        guardrail_audit,
-        "_ALLOWLIST",
-        {key: set(values) for key, values in guardrail_audit._ALLOWLIST.items()},
-    )
+    # A private copy of the host allowlist: the module holds no global any more,
+    # `_load_allowlist` resolves it per call, so the test owns the dict it mutates.
+    allowlist = guardrail_audit._load_allowlist(guardrail_audit.ROOT)
 
     def native_issues(path: str, source: str) -> list[dict[str, object]]:
         policy = json.dumps(
             {
-                "god_functions": sorted(guardrail_audit._ALLOWLIST["god_functions"]),
-                "complexity": sorted(guardrail_audit._ALLOWLIST["complexity"]),
+                "god_functions": sorted(allowlist["god_functions"]),
+                "complexity": sorted(allowlist["complexity"]),
             }
         )
         payload = json.loads(guardrail_ast_metrics_native([(path, source)], policy))
@@ -242,14 +240,11 @@ def test_policy_thresholds_markers_allowlists_and_order(
         issue["kind"] for issue in native_issues("pkg/nesting.py", nesting_source)
     ] == ["complexity"]
 
-    guardrail_audit._ALLOWLIST["complexity"].add("pkg/probe.py::candidate")
+    allowlist["complexity"].add("pkg/probe.py::candidate")
     assert not native_issues("pkg/probe.py", source)
 
-    monkeypatch.setattr(
-        guardrail_audit,
-        "_ALLOWLIST",
-        {"god_files": set(), "god_functions": set(), "complexity": set()},
-    )
+    for entries in allowlist.values():
+        entries.clear()
     route_source = "\n".join(
         ["def register_routes(values):", "    def handler():", "        return 1"]
         + [f"    if flag_{index}: pass" for index in range(21)]
@@ -266,12 +261,9 @@ def test_policy_thresholds_markers_allowlists_and_order(
 def test_god_file_boundary_and_cpython_syntax_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # ROOT under tmp_path carries no conductor/guardrail_allowlist.json, so the
+    # per-call loader yields the empty allowlist this test wants.
     monkeypatch.setattr(guardrail_audit, "ROOT", tmp_path)
-    monkeypatch.setattr(
-        guardrail_audit,
-        "_ALLOWLIST",
-        {"god_files": set(), "god_functions": set(), "complexity": set()},
-    )
     exact = tmp_path / "exact.txt"
     exact.write_text("\n".join("line" for _ in range(1250)), encoding="utf-8")
     above = tmp_path / "above.txt"
