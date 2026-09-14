@@ -42,16 +42,16 @@ from typing import Any
 from conductor.project_paths import (
     DEFAULT_MUTATION_REGISTRY,
     campaigns_relative,
+    host_root,
     receipts_relative,
 )
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = host_root()
 
 # The default layout, for callers that name a directory without holding a root; every
 # function below resolves against the root it is given instead.
 CAMPAIGN_DIRECTORY = str(DEFAULT_MUTATION_REGISTRY.parent)
 RECEIPT_DIRECTORY = f"{CAMPAIGN_DIRECTORY}/receipts"
-
 
 
 class RetentionError(Exception):

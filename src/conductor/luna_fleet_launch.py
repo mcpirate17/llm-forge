@@ -22,8 +22,9 @@ import time
 from pathlib import Path
 
 from conductor.agent_a2a import BIND_HOST, DEFAULT_STATE_DIR, A2aError, load_registry
+from conductor.project_paths import host_root
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = host_root()
 POOLS: dict[str, str] = {
     "luna": "luna-",
     "glm": "glm-flash-",

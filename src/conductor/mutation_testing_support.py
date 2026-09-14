@@ -572,12 +572,26 @@ def record_live_pgid(path: Path, *, pgid: int, engine_pid: int, argv0: str) -> N
 
 
 def forget_live_pgid(path: Path, pgid: int) -> None:
-    """Remove one finished run; an absent entry is the outcome this produces."""
+    """Remove one finished run; an absent entry is the outcome this produces.
+
+    When the last live entry is forgotten, remove the registry file (and its
+    now-empty ``.iterations`` directory) instead of writing back an empty
+    document -- an empty file left on every clean run dirtied the host tree
+    and made the next mutation run refuse with "dirty mutation scope".
+    """
 
     entries = _live_pgid_entries(path)
     if not any(entry.get("pgid") == pgid for entry in entries):
         return
-    atomic_json(path, {LIVE_PGIDS_KEY: [e for e in entries if e.get("pgid") != pgid]})
+    remaining = [e for e in entries if e.get("pgid") != pgid]
+    if remaining:
+        atomic_json(path, {LIVE_PGIDS_KEY: remaining})
+        return
+    path.unlink(missing_ok=True)
+    try:
+        path.parent.rmdir()
+    except OSError:
+        pass
 
 
 def run_command(
@@ -737,8 +751,7 @@ def reap_orphaned_runs(registry: Path, *, apply: bool) -> tuple[list[str], int]:
             elif _killpg_if_present(pgid):
                 killed.append(pgid)
                 lines.append(
-                    f"pgid {pgid} ({argv0}): engine pid {engine_pid} dead"
-                    " -- SIGKILLed"
+                    f"pgid {pgid} ({argv0}): engine pid {engine_pid} dead -- SIGKILLed"
                 )
             else:
                 lines.append(

@@ -38,7 +38,8 @@ def _host_dependency_campaign(
     (host / "reports" / "screen" / "receipt.json").write_text("{}", encoding="utf-8")
     (host / "reports" / "screen" / "ignored.json").write_text("[]", encoding="utf-8")
     campaign_path = (
-        mutation_testing.REPO_ROOT / "src/conductor/testdata/mutation_testing/campaign.json"
+        mutation_testing.REPO_ROOT
+        / "src/conductor/testdata/mutation_testing/campaign.json"
     )
     return dataclasses.replace(
         mutation_testing.load_campaign(campaign_path),
@@ -208,17 +209,12 @@ def test_run_command_completion_is_unaffected_by_the_new_session(
     assert (result.returncode, result.timed_out) == (3, False)
     assert (result.stdout_tail, result.stderr_tail) == ("out", "err")
     assert 0.0 < result.duration_seconds < 30.0
-    # A finished run is not live: the registry it appended is emptied again,
-    # or the reaper would one day kill a recycled pid on stale evidence. The
-    # bytes are checked, not just the JSON, because the registry is read back
-    # by a human-adjacent tool and written through atomic_json's canonical
-    # shape -- a trailing newline included.
-    assert registry.read_text(encoding="utf-8") == (
-        json.dumps(
-            {mutation_testing_support.LIVE_PGIDS_KEY: []}, indent=2, sort_keys=True
-        )
-        + "\n"
-    )
+    # A finished run is not live: the registry it appended is forgotten again,
+    # or the reaper would one day kill a recycled pid on stale evidence. It is
+    # removed outright rather than rewritten to an empty document -- an empty
+    # file left behind on every clean run dirtied the host tree and made the
+    # next mutation run refuse ("dirty mutation scope").
+    assert not registry.exists()
 
 
 def test_kill_process_group_reports_both_ends_of_the_race(
@@ -449,7 +445,9 @@ def test_live_pgids_path_sits_in_the_iterations_dir_beside_receipts(
     from conductor.project_paths import receipts_relative
 
     assert mutation_testing_support.live_pgids_path(tmp_path) == (
-        tmp_path / receipts_relative(tmp_path) / ".iterations"
+        tmp_path
+        / receipts_relative(tmp_path)
+        / ".iterations"
         / mutation_testing_support.LIVE_PGIDS_FILENAME
     )
 
@@ -467,6 +465,44 @@ def test_a_malformed_registry_refuses_rather_than_guessing(tmp_path: Path) -> No
     registry.write_text('{"pgid": 1}', encoding="utf-8")
     with pytest.raises(ValueError, match="not a JSON object with a list"):
         mutation_testing_support.reap_orphaned_runs(registry, apply=False)
+
+
+def test_forgetting_the_last_live_pgid_removes_the_registry_and_its_dir(
+    tmp_path: Path,
+) -> None:
+    """An empty ``{"live": []}`` left behind dirtied the host tree and made
+    the next mutation run refuse ("dirty mutation scope"); forgetting the
+    last live entry must remove the file, not rewrite it empty."""
+
+    iterations_dir = tmp_path / ".iterations"
+    registry = iterations_dir / mutation_testing_support.LIVE_PGIDS_FILENAME
+    mutation_testing_support.record_live_pgid(
+        registry, pgid=4242, engine_pid=os.getpid(), argv0="sleep"
+    )
+    assert registry.exists()
+
+    mutation_testing_support.forget_live_pgid(registry, 4242)
+
+    assert not registry.exists()
+    assert not iterations_dir.exists()
+
+
+def test_forgetting_one_of_several_live_pgids_keeps_the_registry(
+    tmp_path: Path,
+) -> None:
+    registry = tmp_path / "live_pgids.json"
+    mutation_testing_support.record_live_pgid(
+        registry, pgid=1, engine_pid=os.getpid(), argv0="sleep"
+    )
+    mutation_testing_support.record_live_pgid(
+        registry, pgid=2, engine_pid=os.getpid(), argv0="sleep"
+    )
+
+    mutation_testing_support.forget_live_pgid(registry, 1)
+
+    assert registry.exists()
+    remaining = mutation_testing_support._live_pgid_entries(registry)  # noqa: SLF001
+    assert [e["pgid"] for e in remaining] == [2]
 
 
 class _OrphanScene:
@@ -492,7 +528,9 @@ class _OrphanScene:
         self.in_flight = subprocess.Popen(["sleep", "300"], start_new_session=True)
         self.live_engine = subprocess.Popen(["sleep", "300"], start_new_session=True)
         mutation_testing_support.record_live_pgid(
-            self.registry, pgid=self.orphan.pid, engine_pid=self.dead_engine,
+            self.registry,
+            pgid=self.orphan.pid,
+            engine_pid=self.dead_engine,
             argv0="sleep",
         )
         mutation_testing_support.record_live_pgid(

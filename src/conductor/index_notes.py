@@ -36,7 +36,7 @@ import time
 
 from conductor.project_paths import host_root, notes_root
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = str(host_root())
 DB_PATH = os.path.join(REPO, "research", "runs.db")
 VAULT_ROOT = os.path.expanduser("~/Documents/CodexVault")
 
