@@ -98,6 +98,25 @@ def assert_guest_embed_meta(payload: dict[str, Any]) -> None:
     assert_embedding_meta(payload)
 
 
+def _normalized_rows(rows: list[Any]) -> list[list[float]]:
+    """Validate each broker row and return its L2-normalized vector."""
+
+    vectors: list[list[float]] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict) or not isinstance(row.get("embedding"), list):
+            raise RetrieveError(f"embedding broker row {index} is invalid")
+        vector = row["embedding"]
+        if not vector or not all(
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(float(value))
+            for value in vector
+        ):
+            raise RetrieveError(f"embedding broker row {index} is not finite numeric")
+        vectors.append(_l2_normalize([float(value) for value in vector]))
+    return vectors
+
+
 def embed_batch(
     texts: list[str],
     *,
@@ -170,19 +189,7 @@ def embed_batch(
     metadata = body.get("workspace_embedding")
     if not isinstance(rows, list) or not isinstance(metadata, dict):
         raise RetrieveError("embedding broker response lacks data or metadata")
-    vectors: list[list[float]] = []
-    for index, row in enumerate(rows):
-        if not isinstance(row, dict) or not isinstance(row.get("embedding"), list):
-            raise RetrieveError(f"embedding broker row {index} is invalid")
-        vector = row["embedding"]
-        if not vector or not all(
-            isinstance(value, (int, float))
-            and not isinstance(value, bool)
-            and math.isfinite(float(value))
-            for value in vector
-        ):
-            raise RetrieveError(f"embedding broker row {index} is not finite numeric")
-        vectors.append(_l2_normalize([float(value) for value in vector]))
+    vectors = _normalized_rows(rows)
     if len(vectors) != len(texts):
         raise RetrieveError(
             f"embedding broker returned {len(vectors)} vectors for {len(texts)} inputs"
