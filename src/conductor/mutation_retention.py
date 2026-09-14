@@ -54,7 +54,6 @@ CAMPAIGN_DIRECTORY = str(DEFAULT_MUTATION_REGISTRY.parent)
 RECEIPT_DIRECTORY = f"{CAMPAIGN_DIRECTORY}/receipts"
 
 
-
 class RetentionError(Exception):
     """The corpus cannot be read well enough to decide what to delete."""
 
