@@ -485,3 +485,51 @@ def test_a_host_configured_with_the_monorepo_default_still_resolves_there(tmp_pa
     resolved = pp.project_paths(tmp_path)
     assert resolved.notes_configured is True
     assert pp.notes_root(tmp_path) == tmp_path / "research/notes"
+
+
+def test_guardrail_allowlist_defaults_to_the_monorepo_literal():
+    assert pp.DEFAULT_GUARDRAIL_ALLOWLIST == PurePosixPath(
+        "conductor/guardrail_allowlist.json"
+    )
+    assert pp.DEFAULTS[pp.GUARDRAIL_ALLOWLIST_KEY] == pp.DEFAULT_GUARDRAIL_ALLOWLIST
+
+
+def test_guardrail_allowlist_is_the_default_without_configuration(tmp_path):
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.guardrail_allowlist_relative == PurePosixPath(
+        "conductor/guardrail_allowlist.json"
+    )
+    assert resolved.guardrail_allowlist_configured is False
+    assert (
+        resolved.guardrail_allowlist_path
+        == tmp_path / "conductor/guardrail_allowlist.json"
+    )
+    assert pp.guardrail_allowlist_relative(tmp_path) == PurePosixPath(
+        "conductor/guardrail_allowlist.json"
+    )
+    assert (
+        pp.guardrail_allowlist_path(tmp_path)
+        == tmp_path / "conductor/guardrail_allowlist.json"
+    )
+
+
+def test_guardrail_allowlist_comes_from_the_conductor_table(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nguardrail_allowlist = "policy/allow.json"\n')
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.guardrail_allowlist_relative == PurePosixPath("policy/allow.json")
+    assert resolved.guardrail_allowlist_configured is True
+    assert pp.guardrail_allowlist_path(tmp_path) == tmp_path / "policy/allow.json"
+
+
+def test_guardrail_allowlist_environment_overrides_the_table(tmp_path, monkeypatch):
+    _write(tmp_path, '[tool.conductor]\nguardrail_allowlist = "policy/allow.json"\n')
+    monkeypatch.setenv(pp.GUARDRAIL_ALLOWLIST_ENV, "other/allow.json")
+    assert pp.guardrail_allowlist_relative(tmp_path) == PurePosixPath(
+        "other/allow.json"
+    )
+
+
+def test_guardrail_allowlist_refuses_an_unusable_value(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nguardrail_allowlist = "../elsewhere.json"\n')
+    with pytest.raises(pp.ProjectPathError):
+        pp.guardrail_allowlist_relative(tmp_path)
