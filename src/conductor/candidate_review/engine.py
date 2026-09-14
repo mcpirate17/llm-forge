@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fcntl
 import hmac
+import importlib.metadata as importlib_metadata
 import json
 import os
 import re
@@ -11,6 +12,7 @@ import secrets
 import subprocess
 import sys
 import time
+import tomllib
 import traceback
 from collections.abc import Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -202,7 +204,114 @@ def _package_hash(root: Path) -> tuple[str, dict[str, str]]:
         for path in sorted(package.glob("*.py"))
         if path.is_file()
     }
+    if not files:
+        # A host that consumes the package keeps its own data under the package
+        # path (a grandfathered-nodeid list, baselines); a directory with no
+        # sources holds no engine and must not read as a modified one.
+        return "", {}
     return sha256_json(files), files
+
+
+ENGINE_DISTRIBUTION = "conductor-tooling"
+
+
+def _installed_engine_commit() -> str | None:
+    """The git commit the running engine was installed from, or None.
+
+    A consumer host installs the package from llm-forge at a pinned revision; pip
+    and uv record that provenance in the distribution's ``direct_url.json``. An
+    editable or path install (the package's own checkout) has no commit, and
+    answers None so the in-tree comparison stays authoritative there.
+    """
+    try:
+        text = importlib_metadata.distribution(ENGINE_DISTRIBUTION).read_text(
+            "direct_url.json"
+        )
+    except importlib_metadata.PackageNotFoundError:
+        return None
+    if not text:
+        return None
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    vcs = payload.get("vcs_info") if isinstance(payload, dict) else None
+    commit = vcs.get("commit_id") if isinstance(vcs, dict) else None
+    return commit if isinstance(commit, str) and commit else None
+
+
+def _pinned_engine_commit(root: Path) -> str | None:
+    """The engine commit the candidate tree's ``uv.lock`` resolves the package to.
+
+    The lock records a git source as ``<url>?rev=<requested>#<full sha>``; the
+    fragment is the exact commit, which is what the installed engine reports too.
+    None when the tree has no lock, no such package, or a non-git source.
+    """
+    lock = root / "uv.lock"
+    if not lock.is_file():
+        return None
+    try:
+        payload = tomllib.loads(lock.read_text(encoding="utf-8"))
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError):
+        return None
+    for package in payload.get("package", []):
+        if not isinstance(package, dict) or package.get("name") != ENGINE_DISTRIBUTION:
+            continue
+        source = package.get("source")
+        git = source.get("git") if isinstance(source, dict) else None
+        if not isinstance(git, str) or "#" not in git:
+            return None
+        commit = git.rsplit("#", 1)[1]
+        return commit if re.fullmatch(r"[0-9a-f]{40}", commit) else None
+    return None
+
+
+def _engine_findings(
+    candidate_hash: str,
+    runtime_hash: str,
+    installed_commit: str | None,
+    pinned_commit: str | None,
+) -> list[Finding]:
+    """Decide engine integrity from the two ways a tree can carry its engine.
+
+    In-tree (the package's own repository): the candidate's engine sources must
+    hash exactly like the running ones. Installed (a consumer host): the tree
+    carries no engine sources, so the question becomes whether the engine
+    reviewing it is the commit its lockfile pins. A tree with neither is refused.
+    """
+    if candidate_hash:
+        if runtime_hash != candidate_hash:
+            return [
+                Finding(
+                    check_id="engine-integrity",
+                    rule_id="dirty-engine-source",
+                    severity=Severity.CRITICAL,
+                    message="executing governance engine differs from the exact candidate-tree engine",
+                )
+            ]
+        return []
+    if installed_commit and pinned_commit:
+        if installed_commit == pinned_commit:
+            return []
+        return [
+            Finding(
+                check_id="engine-integrity",
+                rule_id="engine-pin-mismatch",
+                severity=Severity.CRITICAL,
+                message=(
+                    f"installed governance engine {installed_commit[:12]} is not the engine "
+                    f"the candidate tree pins in uv.lock ({pinned_commit[:12]})"
+                ),
+            )
+        ]
+    return [
+        Finding(
+            check_id="engine-integrity",
+            rule_id="engine-absent-from-candidate",
+            severity=Severity.CRITICAL,
+            message="candidate tree does not contain the governance engine that is reviewing it",
+        )
+    ]
 
 
 def _engine_integrity(ctx: ReviewContext) -> tuple[dict[str, object], CheckResult]:
@@ -213,42 +322,43 @@ def _engine_integrity(ctx: ReviewContext) -> tuple[dict[str, object], CheckResul
     # package's bytes, never the host's layout.
     runtime_root = package_tree_root(Path(__file__).resolve().parents[1])
     runtime_hash, runtime_files = _package_hash(runtime_root)
-    findings: list[Finding] = []
-    if not candidate_hash:
-        findings.append(
-            Finding(
-                check_id="engine-integrity",
-                rule_id="engine-absent-from-candidate",
-                severity=Severity.CRITICAL,
-                message="candidate tree does not contain the governance engine that is reviewing it",
-            )
-        )
-    elif runtime_hash != candidate_hash:
-        findings.append(
-            Finding(
-                check_id="engine-integrity",
-                rule_id="dirty-engine-source",
-                severity=Severity.CRITICAL,
-                message="executing governance engine differs from the exact candidate-tree engine",
-                evidence={
-                    "runtime_sha256": runtime_hash,
-                    "candidate_sha256": candidate_hash,
-                    "runtime_files": runtime_files,
-                    "candidate_files": candidate_files,
-                },
-            )
-        )
+    installed_commit = None if candidate_hash else _installed_engine_commit()
+    pinned_commit = None if candidate_hash else _pinned_engine_commit(ctx.snapshot)
+    findings = _engine_findings(
+        candidate_hash, runtime_hash, installed_commit, pinned_commit
+    )
+    for finding in findings:
+        if finding.rule_id == "dirty-engine-source":
+            finding.evidence = {
+                "runtime_sha256": runtime_hash,
+                "candidate_sha256": candidate_hash,
+                "runtime_files": runtime_files,
+                "candidate_files": candidate_files,
+            }
+        else:
+            finding.evidence = {
+                "installed_commit": installed_commit,
+                "pinned_commit": pinned_commit,
+            }
+    mode = "in-tree" if candidate_hash else "installed"
     result = CheckResult(
         check_id="engine-integrity",
         status=CheckStatus.FAILED if findings else CheckStatus.PASSED,
         duration_ms=round((time.perf_counter() - started) * 1000),
         findings=[finding.finalize() for finding in findings],
-        metrics={"candidate_sha256": candidate_hash, "runtime_sha256": runtime_hash},
+        metrics={
+            "candidate_sha256": candidate_hash,
+            "runtime_sha256": runtime_hash,
+            "engine_mode": mode,
+            "engine_commit": installed_commit or "",
+        },
     )
     return {
         "schema_version": SCHEMA_VERSION,
         "candidate_source_sha256": candidate_hash,
         "runtime_source_sha256": runtime_hash,
+        "engine_mode": mode,
+        "engine_commit": installed_commit or "",
         "files": candidate_files,
     }, result
 
