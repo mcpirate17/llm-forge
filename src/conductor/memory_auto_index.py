@@ -24,7 +24,12 @@ from conductor.atomic_json import write_json_atomic
 from typing import Any, Final
 
 from conductor.kb_retrieve import RetrieveError
-from conductor.memory_index import ROOT, load_catalog, path_matches_source
+from conductor.memory_index import (
+    ROOT,
+    host_catalog_path,
+    load_catalog,
+    path_matches_source,
+)
 
 STATE_SCHEMA_VERSION: Final[int] = 1
 DEFAULT_TIMEOUT_SECONDS: Final[float] = 240.0
@@ -89,7 +94,7 @@ def indexed_path_sources(
 ) -> dict[Path, tuple[str, ...]]:
     """Map payload paths to the indexed catalog sources that contain them."""
 
-    catalog = load_catalog(catalog_path or repo_root / "conductor/memory_sources.toml")
+    catalog = load_catalog(catalog_path or host_catalog_path(repo_root))
     entries = [entry for entry in catalog["source"] if entry.get("kind") == "index"]
     matches: dict[Path, tuple[str, ...]] = {}
     for path in candidate_paths(payload, repo_root):
