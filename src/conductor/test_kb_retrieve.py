@@ -511,3 +511,65 @@ def test_default_notes_dir_environment_overrides_the_table(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CONDUCTOR_NOTES_ROOT", "envnotes")
     assert kb_retrieve.default_notes_dir() == tmp_path / "envnotes"
+def test_every_embed_entry_point_budgets_for_a_cold_model_load() -> None:
+    """A 120 s budget could not survive the 117 s cold load that was measured.
+
+    The query path was worse still at 60 s -- strictly less than one cold load,
+    so the first retrieval after any quiet period could not succeed at all.
+    """
+    import inspect
+
+    from conductor.embedding_contract import EMBED_TIMEOUT_SECONDS
+
+    assert EMBED_TIMEOUT_SECONDS >= 300.0
+    for entry_point in (
+        kb_retrieve.embed_batch,
+        kb_retrieve.embed_texts,
+        kb_retrieve.embed_text,
+    ):
+        default = inspect.signature(entry_point).parameters["timeout_s"].default
+        assert default == EMBED_TIMEOUT_SECONDS, entry_point.__name__
+
+
+def test_broker_timeout_names_the_budget_and_the_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bare 'timed out' sent one session hunting a wedged broker twice.
+
+    The broker was never wedged: it was loading a 639 MB blob off cold disk.
+    The message has to carry the budget it spent and the command that pays the
+    load deliberately, or the next reader misdiagnoses it the same way.
+    """
+
+    def timing_out_urlopen(*_args: object, **_kwargs: object) -> object:
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(kb_retrieve.urllib.request, "urlopen", timing_out_urlopen)
+    with pytest.raises(kb_retrieve.RetrieveError) as excinfo:
+        kb_retrieve.embed_batch(["one", "two"], purpose="document", timeout_s=300.0)
+    message = str(excinfo.value)
+    assert "300s" in message
+    assert "2 input(s)" in message
+    assert "conductor.cpu_embed warm" in message
+
+
+def test_malformed_json_is_not_reported_as_a_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Splitting the handler must not relabel a decode failure as a cold load."""
+
+    class _Resp:
+        def read(self) -> bytes:
+            return b"{not json"
+
+        def __enter__(self) -> _Resp:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    monkeypatch.setattr(kb_retrieve.urllib.request, "urlopen", lambda *a, **k: _Resp())
+    with pytest.raises(kb_retrieve.RetrieveError) as excinfo:
+        kb_retrieve.embed_batch(["one"], purpose="document")
+    assert "malformed JSON" in str(excinfo.value)
+    assert "cpu_embed warm" not in str(excinfo.value)

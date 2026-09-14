@@ -569,7 +569,12 @@ def test_main_reports_retrieve_error_and_exits_2(
     def boom(*_a: object, **_k: object) -> list[dict[str, object]]:
         raise memory_index.RetrieveError("index produced zero chunks")
 
+    # Both query seams: main uses the native streaming path when the index is a
+    # real file and the load/query seam otherwise, so patching only one made the
+    # assertion depend on whether this machine happened to have a built index --
+    # and on a machine that had one, this test issued a live broker query.
     monkeypatch.setattr(memory_index, "load_index", boom)
+    monkeypatch.setattr(memory_index, "query_index_file", boom)
 
     exit_code = memory_index.main(["query", "anything"])
 
@@ -740,3 +745,57 @@ def test_expand_root_keeps_the_monorepo_default_for_a_host_so_configured(
     assert memory_index._expand_root({"id": "notes", "root": "research/notes"}) == (
         tmp_path / "research/notes"
     )
+def test_catalog_indexes_the_canonical_auto_memory() -> None:
+    """Auto-memory is indexed from the real files, not from the vault mirrors.
+
+    The mirrors under CodexVault are backlink stubs written by a PostToolUse
+    hook.  It never prunes -- 304 of 434 mirrors named a canonical file that no
+    longer existed (2026-09-14) -- and it only fires for the Edit and Write
+    tools, so a memory written any other way was never mirrored: 109 of 239
+    live memories had no mirror.  Indexing the mirrors served a corpus that was
+    70% deleted knowledge and missing nearly half of the live knowledge.
+    """
+    catalog = memory_index.load_catalog()
+    by_id = {str(entry["id"]): entry for entry in catalog["source"]}
+
+    memory_source = by_id["claude-memory"]
+    assert memory_source["kind"] == "index"
+    assert memory_source["absolute_root"] == "/home/tim/.claude/projects"
+    assert "MEMORY.md" in memory_source["exclude_globs"]
+    # Named projects only: the same tree holds scratchpad and worktree session
+    # dirs whose memories are throwaway.
+    assert all(
+        str(directory).endswith("/memory")
+        for directory in memory_source["include_dirs"]
+    )
+
+    assert "memory" in by_id["vault-unique"]["exclude_dir_names"]
+
+
+def test_include_dirs_source_takes_named_subtrees_and_drops_the_index_file(
+    tmp_path: Path,
+) -> None:
+    """The mechanism the claude-memory source relies on, exercised in isolation."""
+    projects = tmp_path / "projects"
+    kept = projects / "real-project" / "memory"
+    archived = kept / "archive"
+    throwaway = projects / "scratchpad-session" / "memory"
+    for directory in (kept, archived, throwaway):
+        directory.mkdir(parents=True)
+    (kept / "a-fact.md").write_text("fact", encoding="utf-8")
+    (kept / "MEMORY.md").write_text("pointer list", encoding="utf-8")
+    (archived / "an-old-fact.md").write_text("old", encoding="utf-8")
+    (throwaway / "scratch.md").write_text("scratch", encoding="utf-8")
+
+    entry = {
+        "id": "claude-memory",
+        "kind": "index",
+        "absolute_root": str(projects),
+        "include_dirs": ["real-project/memory"],
+        "glob": "*.md",
+        "exclude_globs": ["MEMORY.md"],
+    }
+    names = {p.name for p in memory_index.iter_source_files(entry)}
+    assert names == {"a-fact.md", "an-old-fact.md"}
+    assert memory_index.path_matches_source(entry, kept / "MEMORY.md") is False
+    assert memory_index.path_matches_source(entry, throwaway / "scratch.md") is False

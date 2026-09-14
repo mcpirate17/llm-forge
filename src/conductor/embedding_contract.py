@@ -24,6 +24,16 @@ ROUTES_PATH: Final[Path] = Path(__file__).resolve().parent / "embedding_routes.t
 CONTRACT_VERSION: Final[int] = 1
 QUALITY_SCHEMA_VERSION: Final[int] = 1
 QUALITY_RECEIPT_ENV: Final[str] = "WORKSPACE_EMBED_QUALITY_RECEIPT"
+# One budget for every layer of the embed path: client -> broker -> backend.
+# The backend loads its 639 MB blob per call (`keep_alive` is 0 by contract, so
+# nothing stays resident).  Warm, that load is page-cache fast: a full reindex
+# embedded 1579 real 2000-char chunks in 14m09s on 2026-09-14 -- 69 s per 128,
+# every one of them paying the load.  Cold off disk under CPU contention a
+# single embed took 117 s on the same box -- which a 120 s budget cannot
+# survive, and which is why three memory reindexes died on request #1 having
+# embedded nothing.
+# Size the budget for the cold case; the warm case never reaches it.
+EMBED_TIMEOUT_SECONDS: Final[float] = 300.0
 
 
 class EmbeddingContractError(RuntimeError):

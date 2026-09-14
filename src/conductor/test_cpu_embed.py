@@ -735,3 +735,63 @@ def test_models_route_propagates_contract_error_uncaught(
     with TestClient(cpu_embed.build_app(), raise_server_exceptions=True) as client:
         with pytest.raises(embedding_contract.EmbeddingContractError):
             client.get("/v1/models")
+
+
+def test_warm_reports_what_the_model_load_cost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Warming exists to put a number on a wait that otherwise reads as a hang.
+
+    Nothing stays resident between calls, so a reindex pays the load inside its
+    first batch with no output. `warm` pays it as one measured step instead.
+    """
+    seen: dict[str, object] = {}
+
+    def fake_post_json(url: str, payload: dict[str, object], **kwargs: object) -> dict:
+        seen["url"] = url
+        seen["payload"] = payload
+        seen["timeout_s"] = kwargs.get("timeout_s")
+        return {
+            "model": "qwen3-embed-cpu",
+            "data": [{"embedding": [0.1, 0.2, 0.3]}],
+        }
+
+    monkeypatch.setattr(cpu_embed, "ensure_service", lambda *a, **k: False)
+    monkeypatch.setattr(cpu_embed, "_post_json", fake_post_json)
+    result = cpu_embed.warm()
+    assert result["ok"] is True
+    assert result["dimension"] == 3
+    assert result["model"] == "qwen3-embed-cpu"
+    assert isinstance(result["seconds"], float)
+    assert seen["url"] == cpu_embed.BROKER_EMBED_URL
+    assert seen["timeout_s"] == embedding_contract.EMBED_TIMEOUT_SECONDS
+
+
+def test_warm_fails_loud_when_the_broker_returns_no_vector(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A warm-up that reports success without a vector would hide a dead route."""
+
+    monkeypatch.setattr(cpu_embed, "ensure_service", lambda *a, **k: False)
+    monkeypatch.setattr(
+        cpu_embed, "_post_json", lambda *a, **k: {"data": [{"embedding": []}]}
+    )
+    with pytest.raises(cpu_embed.CpuEmbedError, match="empty vector"):
+        cpu_embed.warm()
+
+    monkeypatch.setattr(cpu_embed, "_post_json", lambda *a, **k: {"data": []})
+    with pytest.raises(cpu_embed.CpuEmbedError, match="expected one vector"):
+        cpu_embed.warm()
+
+
+def test_broker_side_embed_calls_budget_for_a_cold_load() -> None:
+    """The client budget is useless if the broker gives up on the backend first."""
+    import inspect
+
+    for entry_point in (
+        cpu_embed.ollama_embed,
+        cpu_embed.openai_compatible_embed,
+        cpu_embed.embed_with_routing,
+    ):
+        default = inspect.signature(entry_point).parameters["timeout_s"].default
+        assert default == embedding_contract.EMBED_TIMEOUT_SECONDS, entry_point.__name__

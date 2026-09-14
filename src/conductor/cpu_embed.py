@@ -35,6 +35,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from conductor.embedding_contract import (
+    EMBED_TIMEOUT_SECONDS,
     EmbeddingContractError,
     QualityReceipt,
     ResolvedRoute,
@@ -49,6 +50,7 @@ from conductor.http_transport import open_http
 BIND_HOST: Final[str] = "127.0.0.1"
 BIND_PORT: Final[int] = 7317
 BROKER_HEALTH_URL: Final[str] = f"http://{BIND_HOST}:{BIND_PORT}/health"
+BROKER_EMBED_URL: Final[str] = f"http://{BIND_HOST}:{BIND_PORT}/v1/embeddings"
 OLLAMA_HEALTH_URL: Final[str] = "http://127.0.0.1:11434/api/tags"
 OLLAMA_EMBED_URL: Final[str] = "http://127.0.0.1:11434/api/embed"
 DEFAULT_MODEL: Final[str] = "qwen3-embed-cpu"
@@ -289,7 +291,7 @@ def ollama_embed(
     *,
     model: str,
     url: str = OLLAMA_EMBED_URL,
-    timeout_s: float = 120.0,
+    timeout_s: float = EMBED_TIMEOUT_SECONDS,
     num_gpu: int | None = None,
 ) -> list[list[float]]:
     if not texts:
@@ -409,7 +411,7 @@ def openai_compatible_embed(
     texts: list[str],
     *,
     route: ResolvedRoute,
-    timeout_s: float = 120.0,
+    timeout_s: float = EMBED_TIMEOUT_SECONDS,
 ) -> list[list[float]]:
     """Call an explicitly enabled paid provider using a compatibility protocol."""
 
@@ -461,7 +463,7 @@ def embed_with_routing(
     texts: list[str],
     *,
     required_fingerprint: str = "",
-    timeout_s: float = 120.0,
+    timeout_s: float = EMBED_TIMEOUT_SECONDS,
     config: RoutingConfig | None = None,
     quality: QualityReceipt | None = None,
 ) -> RoutedEmbedding:
@@ -661,14 +663,50 @@ def serve(host: str = BIND_HOST, port: int = BIND_PORT) -> None:
     uvicorn.run(build_app(), host=host, port=port, log_level="warning")
 
 
+def warm(timeout_s: float = EMBED_TIMEOUT_SECONDS) -> dict[str, Any]:
+    """Pay the backend's model load once, deliberately, and report what it cost.
+
+    `keep_alive` is 0 by contract, so the backend holds nothing resident and
+    every call reloads the blob.  Warm that is page-cache fast; cold off disk
+    under CPU contention it took 117 s (measured 2026-09-14), which is why the
+    first bulk embed after a quiet period used to die on request #1.  Running
+    this first turns that cost into one measured step whose `seconds` says
+    whether the box is quiet enough to reindex at all.
+    """
+
+    ensure_service()
+    started = time.monotonic()
+    body = _post_json(
+        BROKER_EMBED_URL,
+        {"input": ["warm"], "workspace_purpose": "document"},
+        timeout_s=timeout_s,
+    )
+    elapsed = time.monotonic() - started
+    rows = body.get("data")
+    if not isinstance(rows, list) or len(rows) != 1:
+        raise CpuEmbedError(f"warm-up embed returned {rows!r}, expected one vector")
+    vector = rows[0].get("embedding") if isinstance(rows[0], dict) else None
+    if not isinstance(vector, list) or not vector:
+        raise CpuEmbedError("warm-up embed returned an empty vector")
+    return {
+        "ok": True,
+        "seconds": round(elapsed, 2),
+        "dimension": len(vector),
+        "model": str(body.get("model", "")),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Provider-neutral embedding broker")
-    parser.add_argument("command", choices=["serve", "ensure", "status"])
+    parser.add_argument("command", choices=["serve", "ensure", "status", "warm"])
     parser.add_argument("--host", default=BIND_HOST)
     parser.add_argument("--port", type=int, default=BIND_PORT)
     args = parser.parse_args(argv)
     if args.command == "serve":
         serve(args.host, args.port)
+        return 0
+    if args.command == "warm":
+        print(json.dumps(warm()))
         return 0
     if args.command == "ensure":
         started = ensure_service()

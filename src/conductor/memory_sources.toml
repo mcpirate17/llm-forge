@@ -45,6 +45,15 @@ include_dirs = [
   "inbox",
 ]
 glob = "*.md"
+# `claude/memory` and `plain_language/claude/memory` hold thin backlink mirrors
+# of the auto-memory files, written by tooling/hooks/claude/obsidian_sync.py on
+# PostToolUse Edit|Write.  They are for reading in Obsidian, not for retrieval:
+# the hook never prunes, so 304 of 434 mirrors named a canonical file that no
+# longer existed (2026-09-14), and it only fires for the Edit/Write tools, so a
+# memory written any other way was never mirrored at all -- 109 of 239 live
+# memories had no mirror.  The `claude-memory` source below indexes the real
+# files instead; excluding these keeps one copy in the index, the true one.
+exclude_dir_names = ["memory"]
 chunk = "heading"
 
 [[source]]
@@ -53,6 +62,23 @@ kind = "index"
 absolute_root = "/home/tim/.codex/memories"
 glob = "*.md"
 exclude_dir_names = [".git", ".code-review-graph"]
+chunk = "heading"
+
+[[source]]
+id = "claude-memory"
+kind = "index"
+absolute_root = "/home/tim/.claude/projects"
+# Only the two real projects.  `/home/tim/.claude/projects` also holds scratchpad
+# and worktree session dirs whose memories are throwaway; `include_dirs` names
+# what to keep instead of excluding each one.  `archive/` comes in under the
+# first entry because roots are walked recursively.
+include_dirs = [
+  "-home-tim-Projects-LLM/memory",
+  "-home-tim-Projects-llm-forge/memory",
+]
+glob = "*.md"
+# MEMORY.md is a pointer list, already loaded into every session's context.
+exclude_globs = ["MEMORY.md"]
 chunk = "heading"
 
 [[source]]
