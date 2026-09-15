@@ -166,3 +166,44 @@ def test_main_passes_when_nothing_changed_maps_to_a_crate(
 ) -> None:
     monkeypatch.chdir(bare_root)
     assert mod.main(["--mode", "fmt"]) == 0
+
+
+def test_default_roster_location_is_the_unconfigured_default(tmp_path: Path) -> None:
+    # No pyproject.toml at all: the roster still resolves to the historical
+    # literal every existing consumer already has on disk.
+    from conductor import project_paths
+
+    assert project_paths.crate_roster_relative(tmp_path) == mod.ROSTER
+    assert mod.ROSTER == project_paths.DEFAULT_CRATE_ROSTER
+
+
+def test_host_overrides_the_roster_location(tmp_path: Path) -> None:
+    from conductor import project_paths
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\ncrate_roster = "other/place/crates.toml"\n',
+        encoding="utf-8",
+    )
+    other = tmp_path / "other" / "place"
+    other.mkdir(parents=True)
+    (other / "crates.toml").write_text(BARE_ROSTER, encoding="utf-8")
+    _crate(tmp_path, "a/only")
+
+    roster = mod.Roster.load(tmp_path)
+    assert roster.tested == frozenset({"a/only"})
+    assert project_paths.crate_roster_path(tmp_path) == other / "crates.toml"
+
+
+def test_configured_but_absent_roster_fails_loud_naming_the_resolved_path(
+    tmp_path: Path,
+) -> None:
+    # A host that repoints the roster and never ships the file must not read as
+    # "no crates" -- that would silently stop linting and testing every crate.
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\ncrate_roster = "elsewhere/crates.toml"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(mod.RosterError) as excinfo:
+        mod.Roster.load(tmp_path)
+    resolved = str(tmp_path / "elsewhere" / "crates.toml")
+    assert resolved in str(excinfo.value)

@@ -1,0 +1,49 @@
+{
+  "campaign_id": "forge-roster-path_cargo_lint_files_fest_20260915",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/conductor/candidate_review/cargo_lint_files.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/conductor/candidate_review/cargo_lint_files.py": "cfa433dbc8c5ca53b9bbf764550fe0639b1264e5fa1a7dccbf56fc9bb3b0bbab"
+  },
+  "survivor_baseline": [
+    "boolean_op-e89c459ca3c5-1",
+    "break_continue-22d2976b351c-0",
+    "break_continue-22d2976b351c-1",
+    "constant_replace-78e1ee7c77f6-0",
+    "constant_replace-9577d5305ef1-0",
+    "constant_replace-eab4ed852638-0",
+    "constant_replace-eab4ed852638-1",
+    "negate_condition-dd9b1437c419-0",
+    "return_value-a7e04b60f5e8-0",
+    "return_value-a7e04b60f5e8-1",
+    "return_value-a7e04b60f5e8-2"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-15T20:39:26.722151+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/conductor/candidate_review/test_cargo_lint_files.py"
+  ],
+  "test_sha256": {
+    "src/conductor/candidate_review/test_cargo_lint_files.py": "d7d2790666b27ac0023314a36675072948f0e5885612877e18190a1001d10854"
+  },
+  "title": "Generated mutants for src/conductor/candidate_review/cargo_lint_files.py, scored on the survivor set"
+}

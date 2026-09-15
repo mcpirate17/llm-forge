@@ -5,8 +5,9 @@ should not want to: it fires ahead of a commit, so the crates worth compiling
 are the ones the candidate touched. This maps changed files onto their owning
 `Cargo.toml` and runs the same two commands CI runs, over that subset.
 
-The crate roster lives in `tooling/native/crates.toml`, which CI reads too, so
-a crate cannot be linted in one place and not the other.
+The crate roster lives at `project_paths.crate_roster_path` (`tooling/native/crates.toml`
+by default; a host repoints it via `[tool.conductor].crate_roster`), which CI reads
+too, so a crate cannot be linted in one place and not the other.
 """
 
 from __future__ import annotations
@@ -17,9 +18,14 @@ import sys
 import tomllib
 from pathlib import Path
 
+from conductor import project_paths
 from conductor.candidate_review.cargo_audit_files import rust_toolchain_env
 
-ROSTER = Path("tooling/native/crates.toml")
+# Kept for callers and tests that still resolve the roster the old way: the
+# unconfigured default, repo-root-relative. ``Roster.load`` itself resolves
+# through ``project_paths.crate_roster_path`` so a host's own configuration
+# is honoured; this name never diverges from that default.
+ROSTER = project_paths.DEFAULT_CRATE_ROSTER
 
 MODES = {
     "fmt": ("cargo", "fmt", "--manifest-path", "{manifest}", "--check"),
@@ -37,7 +43,7 @@ MODES = {
 
 
 class RosterError(RuntimeError):
-    """`tooling/native/crates.toml` is absent or does not declare a crate."""
+    """The configured crate roster is absent, malformed, or declares no crate."""
 
 
 class Roster:
@@ -57,16 +63,16 @@ class Roster:
 
     @classmethod
     def load(cls, root: Path) -> Roster:
-        path = root / ROSTER
+        path = project_paths.crate_roster_path(root)
         try:
             data = tomllib.loads(path.read_text(encoding="utf-8"))
         except OSError as error:
-            raise RosterError(f"{ROSTER} is unreadable: {error}") from error
+            raise RosterError(f"{path} is unreadable: {error}") from error
         except tomllib.TOMLDecodeError as error:
-            raise RosterError(f"{ROSTER} is malformed: {error}") from error
+            raise RosterError(f"{path} is malformed: {error}") from error
         roster = cls(data, root=root)
         if not roster.manifest_globs:
-            raise RosterError(f"{ROSTER} declares no globs.manifests")
+            raise RosterError(f"{path} declares no globs.manifests")
         return roster
 
     def unclassified(self) -> list[str]:
