@@ -263,6 +263,48 @@ def test_run_command_completion_is_unaffected_by_the_new_session(
     assert not registry.exists()
 
 
+def test_the_caller_s_registry_is_the_one_the_run_records_its_pgid_in(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An explicit ``pgid_registry`` wins over the host default, during the run.
+
+    Every other registry assertion here reads the file *after* the run, when a
+    clean run has already removed it -- so it cannot tell the caller's path
+    from the host's. The command reads the registry while it is still live,
+    which is the only moment the choice is observable. ``CONDUCTOR_HOST_ROOT``
+    points the fallback at a scratch host so that a run which takes it writes
+    there and not into the real receipts tree.
+    """
+
+    registry = tmp_path / "live_pgids.json"
+    seen = tmp_path / "seen.json"
+    host = tmp_path / "host"
+    host.mkdir()
+    monkeypatch.setenv("CONDUCTOR_HOST_ROOT", str(host))
+
+    result = mutation_testing_support.run_command(
+        ["sh", "-c", f"cat {registry} > {seen}"],
+        cwd=tmp_path,
+        timeout_seconds=30,
+        environment={},
+        pin_argv=list,
+        result_factory=_Result,
+        output_tail_chars=200,
+        pgid_registry=registry,
+    )
+
+    assert result.returncode == 0, (
+        f"the run could not read {registry}: {result.stderr_tail!r} -- it "
+        "recorded its pgid somewhere else"
+    )
+    recorded = json.loads(seen.read_text(encoding="utf-8"))
+    entries = recorded[mutation_testing_support.LIVE_PGIDS_KEY]
+    assert [entry["argv0"] for entry in entries] == ["sh"]
+    assert entries[0]["engine_pid"] == os.getpid()
+    assert not registry.exists()
+
+
 def test_kill_process_group_reports_both_ends_of_the_race(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -483,6 +525,52 @@ def test_the_binding_is_actually_set_on_the_spawned_command() -> None:
         preexec_fn=mutation_testing_support._parent_death_preexec(),  # noqa: SLF001
     )
     assert probe.stdout.strip() == str(signal.SIGKILL)
+
+
+def test_a_liveness_probe_does_not_disturb_what_it_asks_about(tmp_path: Path) -> None:
+    """Signal 0 asks; every other signal answers by killing.
+
+    ``_pid_alive`` and ``_group_alive`` are called from the reaper's dry run,
+    which promises to touch nothing, and from ``_reap_then_forget`` on every
+    successful run. A probe that sends signal 1 instead would SIGHUP each one
+    -- the dry run would kill the orphan it only meant to list, and every
+    healthy run would hang up on the group it was about to let go.
+    """
+
+    probe = subprocess.Popen(["sleep", "300"], start_new_session=True)
+    try:
+        assert mutation_testing_support._pid_alive(probe.pid) is True  # noqa: SLF001
+        assert mutation_testing_support._group_alive(probe.pid) is True  # noqa: SLF001
+
+        # Delivery is immediate; the wait is for a signal that should never
+        # arrive, so it ends as soon as one does rather than always sleeping.
+        deadline = time.monotonic() + 1.0
+        while probe.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert probe.poll() is None, (
+            f"pid {probe.pid} died while being asked whether it was alive; the "
+            "probe signalled it instead of 0"
+        )
+    finally:
+        probe.kill()
+        probe.wait()
+
+
+def test_a_published_json_document_ends_in_a_newline(tmp_path: Path) -> None:
+    """Receipts and registries are text files, and text files end in a newline.
+
+    Without it every published document is the one line `git diff`, `tail` and
+    a POSIX text editor each report as truncated, and a receipt that round
+    trips through any of them stops matching its own recorded bytes.
+    """
+
+    path = tmp_path / "iterations" / "receipt.json"
+    mutation_testing_support.atomic_json(path, {"b": 1, "a": 2})
+
+    text = path.read_text(encoding="utf-8")
+    assert text.endswith("\n")
+    assert json.loads(text) == {"a": 2, "b": 1}
+    assert not list(path.parent.glob(".*.tmp")), "temporary residue was left behind"
 
 
 def test_live_pgids_path_sits_in_the_iterations_dir_beside_receipts(
