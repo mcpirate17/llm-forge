@@ -15,6 +15,7 @@ outlive their own runs -- and clean them up in ``finally`` blocks.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import json
 import os
@@ -189,6 +190,51 @@ def test_run_command_timeout_kills_the_whole_process_group(tmp_path: Path) -> No
     )
 
 
+def test_run_command_reaps_descendants_a_cleanly_exiting_command_left(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The timeout path is not the only way a run leaks a spinning mutant.
+
+    fest scores a non-terminating mutant TIMED_OUT and then exits 0 -- it did
+    its job -- so `_kill_process_group` never runs and PDEATHSIG, cleared on
+    fork, covers only fest itself. The pytest it abandoned keeps burning a core.
+    Forgetting the registry entry on that path erased the only record of its
+    group, putting it past `reap_orphaned_runs` too. One such mutant held 99.8%
+    CPU for two hours on 2026-09-15.
+    """
+
+    # The descendant must not hold the pipes, or communicate() would block on
+    # it and this would be the timeout path again rather than a clean exit.
+    marker = tmp_path / "leaked.pid"
+    registry = tmp_path / "live_pgids.json"
+    result = mutation_testing_support.run_command(
+        ["sh", "-c", f"sleep 300 >/dev/null 2>&1 & echo $! > {marker}; exit 0"],
+        cwd=tmp_path,
+        timeout_seconds=30,
+        environment={},
+        pin_argv=list,
+        result_factory=_Result,
+        output_tail_chars=200,
+        pgid_registry=registry,
+    )
+
+    # The run itself succeeded; the leak is not the receipt's fault.
+    assert result.timed_out is False
+    assert result.returncode == 0
+
+    leaked = int(marker.read_text(encoding="utf-8").strip())
+    deadline = time.monotonic() + 10
+    while _alive(leaked) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not _alive(leaked), (
+        f"pid {leaked} survived a clean exit; nothing kills the group on this "
+        "path, so every TIMED_OUT mutant orphans a spinning pytest"
+    )
+    assert "without reaping process group" in capsys.readouterr().err
+    assert not registry.exists(), "the entry is still forgotten once it is safe"
+
+
 def test_run_command_completion_is_unaffected_by_the_new_session(
     tmp_path: Path,
 ) -> None:
@@ -214,6 +260,48 @@ def test_run_command_completion_is_unaffected_by_the_new_session(
     # removed outright rather than rewritten to an empty document -- an empty
     # file left behind on every clean run dirtied the host tree and made the
     # next mutation run refuse ("dirty mutation scope").
+    assert not registry.exists()
+
+
+def test_the_caller_s_registry_is_the_one_the_run_records_its_pgid_in(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An explicit ``pgid_registry`` wins over the host default, during the run.
+
+    Every other registry assertion here reads the file *after* the run, when a
+    clean run has already removed it -- so it cannot tell the caller's path
+    from the host's. The command reads the registry while it is still live,
+    which is the only moment the choice is observable. ``CONDUCTOR_HOST_ROOT``
+    points the fallback at a scratch host so that a run which takes it writes
+    there and not into the real receipts tree.
+    """
+
+    registry = tmp_path / "live_pgids.json"
+    seen = tmp_path / "seen.json"
+    host = tmp_path / "host"
+    host.mkdir()
+    monkeypatch.setenv("CONDUCTOR_HOST_ROOT", str(host))
+
+    result = mutation_testing_support.run_command(
+        ["sh", "-c", f"cat {registry} > {seen}"],
+        cwd=tmp_path,
+        timeout_seconds=30,
+        environment={},
+        pin_argv=list,
+        result_factory=_Result,
+        output_tail_chars=200,
+        pgid_registry=registry,
+    )
+
+    assert result.returncode == 0, (
+        f"the run could not read {registry}: {result.stderr_tail!r} -- it "
+        "recorded its pgid somewhere else"
+    )
+    recorded = json.loads(seen.read_text(encoding="utf-8"))
+    entries = recorded[mutation_testing_support.LIVE_PGIDS_KEY]
+    assert [entry["argv0"] for entry in entries] == ["sh"]
+    assert entries[0]["engine_pid"] == os.getpid()
     assert not registry.exists()
 
 
@@ -439,6 +527,52 @@ def test_the_binding_is_actually_set_on_the_spawned_command() -> None:
     assert probe.stdout.strip() == str(signal.SIGKILL)
 
 
+def test_a_liveness_probe_does_not_disturb_what_it_asks_about(tmp_path: Path) -> None:
+    """Signal 0 asks; every other signal answers by killing.
+
+    ``_pid_alive`` and ``_group_alive`` are called from the reaper's dry run,
+    which promises to touch nothing, and from ``_reap_then_forget`` on every
+    successful run. A probe that sends signal 1 instead would SIGHUP each one
+    -- the dry run would kill the orphan it only meant to list, and every
+    healthy run would hang up on the group it was about to let go.
+    """
+
+    probe = subprocess.Popen(["sleep", "300"], start_new_session=True)
+    try:
+        assert mutation_testing_support._pid_alive(probe.pid) is True  # noqa: SLF001
+        assert mutation_testing_support._group_alive(probe.pid) is True  # noqa: SLF001
+
+        # Delivery is immediate; the wait is for a signal that should never
+        # arrive, so it ends as soon as one does rather than always sleeping.
+        deadline = time.monotonic() + 1.0
+        while probe.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert probe.poll() is None, (
+            f"pid {probe.pid} died while being asked whether it was alive; the "
+            "probe signalled it instead of 0"
+        )
+    finally:
+        probe.kill()
+        probe.wait()
+
+
+def test_a_published_json_document_ends_in_a_newline(tmp_path: Path) -> None:
+    """Receipts and registries are text files, and text files end in a newline.
+
+    Without it every published document is the one line `git diff`, `tail` and
+    a POSIX text editor each report as truncated, and a receipt that round
+    trips through any of them stops matching its own recorded bytes.
+    """
+
+    path = tmp_path / "iterations" / "receipt.json"
+    mutation_testing_support.atomic_json(path, {"b": 1, "a": 2})
+
+    text = path.read_text(encoding="utf-8")
+    assert text.endswith("\n")
+    assert json.loads(text) == {"a": 2, "b": 1}
+    assert not list(path.parent.glob(".*.tmp")), "temporary residue was left behind"
+
+
 def test_live_pgids_path_sits_in_the_iterations_dir_beside_receipts(
     tmp_path: Path,
 ) -> None:
@@ -599,6 +733,62 @@ def test_reap_dry_run_lists_findings_and_touches_nothing(tmp_path: Path) -> None
         assert _alive(scene.orphan.pid), "listing must stay a dry run"
     finally:
         scene.close()
+
+
+def test_reap_finds_the_orphan_whose_group_leader_already_exited(
+    tmp_path: Path,
+) -> None:
+    """The real orphan shape: the engine led the group and exited cleanly.
+
+    `_OrphanScene`'s orphan is a `sleep` that IS its own group leader, so a
+    leader-liveness test finds it. Production never looks like that: the engine
+    is the leader (`start_new_session=True`), and after it records a mutant
+    TIMED_OUT it exits 0, taking the leader with it while the pytest it spawned
+    keeps spinning. Asking whether the leader is alive called that a stale entry
+    and walked past it -- for two hours, on 2026-09-15.
+    """
+
+    registry = tmp_path / "live_pgids.json"
+    marker = tmp_path / "grandchild.pid"
+    leader = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import pathlib,subprocess,sys;"
+            "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(300)']);"
+            f"pathlib.Path({str(marker)!r}).write_text(str(p.pid));"
+            "sys.exit(0)",
+        ],
+        start_new_session=True,
+    )
+    pgid = leader.pid
+    assert leader.wait(timeout=10) == 0, "the leader must exit cleanly, unsignalled"
+    grandchild = int(marker.read_text())
+    try:
+        assert not _alive(pgid), "the group leader is gone"
+        assert _alive(grandchild), "its child is not"
+        assert os.getpgid(grandchild) == pgid, "and is still in the recorded group"
+
+        mutation_testing_support.record_live_pgid(
+            registry, pgid=pgid, engine_pid=pgid, argv0="fest"
+        )
+        lines, found = mutation_testing_support.reap_orphaned_runs(
+            registry, apply=False
+        )
+        assert found == 1, lines
+        assert any("would SIGKILL" in line for line in lines), lines
+        assert not any("stale" in line for line in lines), lines
+        assert _alive(grandchild), "a dry run must not kill"
+
+        _, found = mutation_testing_support.reap_orphaned_runs(registry, apply=True)
+        assert found == 1
+        deadline = time.monotonic() + 10
+        while _alive(grandchild) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert not _alive(grandchild), "--apply must reach a leaderless group"
+    finally:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(pgid, signal.SIGKILL)
 
 
 def test_reap_apply_kills_only_the_recorded_orphan(tmp_path: Path) -> None:

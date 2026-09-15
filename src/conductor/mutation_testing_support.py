@@ -676,7 +676,7 @@ def run_command(
                 )
             returncode = proc.returncode
         finally:
-            forget_live_pgid(registry, proc.pid)
+            _reap_then_forget(registry, proc.pid, argv0=resolved_argv[0])
     if stdout_sink is not None:
         stdout_sink(stdout)
     return result_factory(
@@ -700,14 +700,63 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
+def _group_alive(pgid: int) -> bool:
+    """Does the group still hold a member? Signal 0 to the GROUP, not the leader.
+
+    A process group outlives its leader: it exists while any member is in it,
+    and ``killpg`` reaches those members whether or not the leader is around.
+    Asking ``_pid_alive(pgid)`` instead answers a different question -- is the
+    leader alive -- and gets it wrong in exactly the case that matters here.
+    ``run_command`` spawns with ``start_new_session=True``, so the ENGINE is
+    the group leader; when it exits cleanly after recording a timeout, the
+    leader is always gone while the mutants it spawned run on.
+    """
+
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _killpg_if_present(pgid: int) -> bool:
-    """SIGKILL one recorded group; False when its leader died mid-reap."""
+    """SIGKILL one recorded group; False when its last member died mid-reap."""
 
     try:
         os.killpg(pgid, signal.SIGKILL)
     except ProcessLookupError:
         return False
     return True
+
+
+def _reap_then_forget(registry: Path, pgid: int, *, argv0: str) -> None:
+    """Drop a finished run from the registry -- but never over a live group.
+
+    The engine exits cleanly after recording a mutant ``TIMED_OUT``: it scored
+    the hang, so from its point of view nothing failed. None of the kill levers
+    fire on that path -- PDEATHSIG binds only the engine itself, and
+    ``_kill_process_group`` runs only on the timeout branch -- so the pytest
+    the engine gave up on is still spinning when we get here. Forgetting the
+    entry unconditionally then erased the one record naming its group, putting
+    it beyond ``reap_orphaned_runs`` as well. That is how a mutant of
+    ``owning_crate`` held a core at 99.8% for two hours on 2026-09-15.
+
+    The group was opened by ``start_new_session=True`` and the engine is
+    already reaped by the time this runs, so every process still in it is
+    something the engine spawned and failed to clean up. Kill it, say so on
+    stderr, and only then forget. Loud rather than raising: the receipt this
+    run just earned is valid, and the leak is not its fault.
+    """
+
+    if _group_alive(pgid) and _killpg_if_present(pgid):
+        print(
+            f"run_command: {argv0} exited without reaping process group {pgid};"
+            " SIGKILLed the descendants it left behind",
+            file=sys.stderr,
+        )
+    forget_live_pgid(registry, pgid)
 
 
 def reap_orphaned_runs(registry: Path, *, apply: bool) -> tuple[list[str], int]:
@@ -717,8 +766,16 @@ def reap_orphaned_runs(registry: Path, *, apply: bool) -> tuple[list[str], int]:
     but the mutants that engine had already spawned inherit nothing and keep
     running: ten were measured at 100% CPU, 8-10 h old, on 2026-09-13. An
     entry is touched only when its recorded engine pid is dead while its
-    recorded pgid still leads a live group -- an alive engine pid means the
-    run is in flight, and no pid outside the registry is ever signalled.
+    recorded group still holds a member -- an alive engine pid means the run
+    is in flight, and no pid outside the registry is ever signalled.
+
+    Group liveness is `killpg(pgid, 0)`, never `kill(pgid, 0)`. The engine is
+    itself the group leader (`start_new_session=True`), so when it exits
+    cleanly -- which is what it does after recording a mutant TIMED_OUT, with
+    none of the kill levers firing -- the leader is gone by definition. Testing
+    the leader therefore dismissed every clean-exit orphan as a stale entry:
+    the one case this function exists to catch. One such mutant ran 99.8% CPU
+    for two hours on 2026-09-15 with the registry naming its group all along.
     Returns the report lines and how many orphaned groups were found (killed
     when ``apply``, only listed without it).
     """
@@ -737,10 +794,8 @@ def reap_orphaned_runs(registry: Path, *, apply: bool) -> tuple[list[str], int]:
                 f"pgid {pgid} ({argv0}): engine pid {engine_pid} alive"
                 " -- in flight, untouched"
             )
-        elif not _pid_alive(pgid):
-            lines.append(
-                f"pgid {pgid} ({argv0}): leader gone -- stale entry, untouched"
-            )
+        elif not _group_alive(pgid):
+            lines.append(f"pgid {pgid} ({argv0}): group empty -- stale entry, untouched")
         else:
             found += 1
             if not apply:
