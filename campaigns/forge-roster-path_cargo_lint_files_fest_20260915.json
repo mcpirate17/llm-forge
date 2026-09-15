@@ -17,7 +17,7 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/conductor/candidate_review/cargo_lint_files.py": "cfa433dbc8c5ca53b9bbf764550fe0639b1264e5fa1a7dccbf56fc9bb3b0bbab"
+    "src/conductor/candidate_review/cargo_lint_files.py": "3448d3b6f4abc81abb56ac81214f8806469a906aa4619b8a7f35f49a8be1a049"
   },
   "survivor_baseline": [
     "boolean_op-e89c459ca3c5-1",
@@ -32,6 +32,7 @@
     "return_value-a7e04b60f5e8-1",
     "return_value-a7e04b60f5e8-2"
   ],
+  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
   "survivor_baseline_recorded": true,
   "survivor_baseline_recorded_at": "2026-09-15T20:39:26.722151+00:00",
   "test_argv": [
@@ -43,7 +44,7 @@
     "src/conductor/candidate_review/test_cargo_lint_files.py"
   ],
   "test_sha256": {
-    "src/conductor/candidate_review/test_cargo_lint_files.py": "d7d2790666b27ac0023314a36675072948f0e5885612877e18190a1001d10854"
+    "src/conductor/candidate_review/test_cargo_lint_files.py": "0ab9dc45ba88cb4081d6bf1262c4a7773e9800465261ff1020b4bef9f15ae3a2"
   },
   "title": "Generated mutants for src/conductor/candidate_review/cargo_lint_files.py, scored on the survivor set"
 }
