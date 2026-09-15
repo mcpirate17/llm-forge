@@ -103,14 +103,22 @@ class Roster:
 
 
 def owning_crate(path: Path, *, root: Path) -> str | None:
-    """The repo-relative directory of the `Cargo.toml` that owns `path`."""
-    candidate = path if path.is_dir() else path.parent
-    while candidate.is_relative_to(root):
+    """The repo-relative directory of the `Cargo.toml` that owns `path`.
+
+    The walk is a finite sequence rather than a hand-advanced cursor. The old
+    form advanced `candidate` itself and leaned on three separate statements to
+    stop -- the `while` guard, an `== root` break, and the assignment -- so a
+    `break_continue` mutant of the break left the cursor parked on `root` with
+    the guard still true, and the mutant ran forever instead of failing. A
+    mutant that never returns is unkillable by any test, which scores the
+    campaign `TIMED_OUT` rather than `SURVIVED`. `parents` is finite by
+    construction, so every mutant of this form terminates.
+    """
+    start = path if path.is_dir() else path.parent
+    within = (d for d in (start, *start.parents) if d.is_relative_to(root))
+    for candidate in within:
         if (candidate / "Cargo.toml").is_file():
             return candidate.relative_to(root).as_posix()
-        if candidate == root:
-            break
-        candidate = candidate.parent
     return None
 
 

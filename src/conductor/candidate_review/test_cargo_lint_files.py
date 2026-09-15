@@ -125,6 +125,28 @@ def test_changed_crates_separates_orphans_from_owned(root: Path) -> None:
     assert orphans == ["loose.rs"]
 
 
+def test_owning_crate_stops_at_root_and_never_claims_an_outer_manifest(
+    root: Path,
+) -> None:
+    # A Cargo.toml above the repo root belongs to something this gate does not
+    # lint. Without the boundary the walk would climb into it and report a
+    # crate path that `relative_to(root)` cannot even express.
+    (root.parent / "Cargo.toml").write_text("[package]\n", encoding="utf-8")
+    loose = root / "loose.rs"
+    loose.write_text("", encoding="utf-8")
+
+    assert mod.owning_crate(loose, root=root) is None
+    assert mod.owning_crate(root.parent / "outer.rs", root=root) is None
+
+
+def test_owning_crate_returns_the_nearest_manifest_not_the_outermost(
+    root: Path,
+) -> None:
+    # a/keep and a/keep/src both sit under a manifest; the inner one wins.
+    (root / "Cargo.toml").write_text("[package]\n", encoding="utf-8")
+    assert mod.owning_crate(root / "a" / "keep" / "src" / "lib.rs", root=root) == "a/keep"
+
+
 def test_fmt_covers_every_crate_except_the_unstyled(root: Path) -> None:
     selected, _ = mod._selected(
         "fmt", ["a/keep", "a/skip", "a/old"], mod.Roster.load(root)
