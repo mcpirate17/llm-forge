@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
-from conductor.project_paths import host_root
+from conductor.project_paths import host_root, worktree_patterns
 
 ROOT: Final[Path] = host_root()
 ACTIVE_STATE: Final[Path] = ROOT / "conductor" / "active_state.json"
@@ -28,7 +28,9 @@ HELM_SEAT: Final[str] = "fable-helm"
 INBOX_LIMIT: Final[int] = 40
 _INBOX_HEADER = re.compile(r"^\[(UNREAD|READ)\]\s+(\S+)\s+from=(\S+)\s+at=(\S+)")
 _HEADING_SEAT = re.compile(r",\s*([\w.-]+)\s*$")
-_WORKTREE = re.compile(r"(/tmp/llm-[\w.-]+|/home/\w+/Projects/LLM[\w.-]*)")
+# Host-configured via `[tool.conductor].worktree_patterns` (see project_paths);
+# defaults to this monorepo's own layout so nothing regresses on this host.
+_WORKTREE = re.compile("(" + "|".join(worktree_patterns(ROOT)) + ")")
 # Display classification only (which trees get per-process detail); no temp
 # files are created here.
 _DISPOSABLE_TREE = re.compile(r"^/tmp/")
@@ -119,7 +121,10 @@ def build_report() -> dict[str, Any]:
         fleet_status_build_report_native(
             json.dumps(peers, ensure_ascii=False),
             json.dumps(heard, ensure_ascii=False),
-            json.dumps({"active_claims": claims, "active_headings": headings}, ensure_ascii=False),
+            json.dumps(
+                {"active_claims": claims, "active_headings": headings},
+                ensure_ascii=False,
+            ),
             json.dumps(read_worktree_procs(), ensure_ascii=False),
             datetime.now(UTC).isoformat(timespec="seconds"),
             str(ROOT),

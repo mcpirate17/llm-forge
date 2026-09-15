@@ -599,3 +599,43 @@ def test_memory_sources_refuses_an_absolute_value(tmp_path, monkeypatch):
     monkeypatch.setenv(pp.MEMORY_SOURCES_ENV, "/etc/catalog.toml")
     with pytest.raises(pp.ProjectPathError):
         pp.project_paths(tmp_path)
+
+
+def test_worktree_patterns_defaults_to_the_monorepo_literals(tmp_path):
+    assert pp.worktree_patterns(tmp_path) == (
+        r"/tmp/llm-[\w.-]+",
+        r"/home/\w+/Projects/LLM[\w.-]*",
+    )
+
+
+def test_worktree_patterns_follows_the_conductor_table(tmp_path):
+    _write(
+        tmp_path,
+        "[tool.conductor]\n" r'worktree_patterns = ["/srv/work/[\\w.-]+"]' "\n",
+    )
+    assert pp.worktree_patterns(tmp_path) == (r"/srv/work/[\w.-]+",)
+
+
+def test_worktree_patterns_has_no_environment_override(tmp_path, monkeypatch):
+    # Matches retired_integration_branches: a worktree layout is host history,
+    # not a per-invocation answer, so only [tool.conductor] can name it.
+    monkeypatch.setenv("CONDUCTOR_WORKTREE_PATTERNS", "/should/not/apply")
+    assert pp.worktree_patterns(tmp_path) == pp.DEFAULT_WORKTREE_PATTERNS
+
+
+def test_worktree_patterns_refuses_a_non_list_value(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nworktree_patterns = "/tmp/foo"\n')
+    with pytest.raises(pp.ProjectPathError, match="must be a list of strings"):
+        pp.worktree_patterns(tmp_path)
+
+
+def test_worktree_patterns_refuses_an_invalid_regex(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nworktree_patterns = ["/tmp/[unclosed"]\n')
+    with pytest.raises(pp.ProjectPathError, match="not a valid regex"):
+        pp.worktree_patterns(tmp_path)
+
+
+def test_worktree_patterns_refuses_an_empty_string(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nworktree_patterns = [""]\n')
+    with pytest.raises(pp.ProjectPathError, match="must not be empty"):
+        pp.worktree_patterns(tmp_path)
