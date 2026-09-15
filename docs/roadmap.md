@@ -82,22 +82,22 @@ Cheap tier for Explore/clerical dispatches by default, measured before it is enf
 
 1. Ledger plumbing for routing evidence: subagent identity (`agent-<id>` keying, `parent_session_id`), the `task_dispatch` table (one row per `Agent` tool_use: tier requested vs. used, billed tokens, over-cap), the subagent walk (`<dir>/<session>/subagents/agent-*.jsonl`, `--no-subagents` to opt out) and `--branch` for non-main repos. DONE PR #45. Credit accuracy: the `commit_subject` join (a landed commit's subject digest, typed in the session's own Bash commands, outranks any time overlap). DONE PR #48.
 2. Routing policy: which tier a dispatch gets by default, from the measured per-tier dispatch costs (`ledger/routing_policy.toml`, `forge route`). The dispatch-seam probe found `PreToolUse`'s `updatedInput.model` *does* take (it must carry the whole `tool_input`, not a patch — `docs/routing.md`), and that a hook fired for a call inside a subagent sees the parent's own `session_id`/`transcript_path` plus a populated `agent_id`, never a distinct subagent transcript path. DONE PR #50.
-2b. Install `forge hook PreToolUse` (matcher `Agent`) in the LLM monorepo's own `.claude/settings.json` — `tooling.hooks.dispatch` (Python) is LLM's live hook path today and does not invoke `forge` at all. Warn-only install ready, PR #56 (`FORGE_HOOK_STANDALONE=1`/`FORGE_MODE=warn`, `docs/routing.md`'s "Warn-only mode and standalone install" section, `cargo install --git ... --locked forge`) — the actual LLM monorepo settings.json wiring is still TODO.
+2b. Install `forge hook PreToolUse` (matcher `Agent`) in the LLM monorepo's own `.claude/settings.json` — `tooling.hooks.dispatch` (Python) is LLM's live hook path today and does not invoke `forge` at all. Warn-only install ready, PR #56 (`FORGE_HOOK_STANDALONE=1`/`FORGE_MODE=warn`, `docs/routing.md`'s "Warn-only mode and standalone install" section, `cargo install --git ... --locked forge`). **Installed and live** on this machine since 2026-09-13 (`FORGE_MODE=warn FORGE_HOOK_STANDALONE=1 forge hook PreToolUse` is wired into `/home/tim/Projects/LLM/.claude/settings.json` today, verified 2026-09-15), but **not reproducible from a clean clone**: that settings.json is untracked in the LLM monorepo (`.gitignore`'s `.claude/*` catches it; `git ls-files` shows nothing), so the install exists only on this one machine. Whether to track the file or to document `forge hooks install` as the repeatable route is Tim's call, not decided here.
 3. The hook that applies it at the dispatch seam: `SubagentStop` finalizes each dispatch's `task_dispatch` row (`forge ledger rollup-agent`, idempotent by `agent_id`); live `PreToolUse` enforcement derives the subagent's own transcript from verdict B's identity fields and denies once billed tokens exceed the class cap (fast path for calls outside a subagent adds ~0.03 us, derived path ~43 us); `forge ledger report` prints per-tier n/share/median/over_cap/rework/ci_red; the outcome join (`ledger/outcome.rs`) fills `landed`/`required_rework`/`ci_red_on_first_push` from a cached `ci_history` file (`docs/ledger.md`). DONE PR #52 (`docs/routing.md`'s enforcement section, `docs/ledger.md`'s outcome-join section) plus PR #55: the `ci_history` fetcher (`conductor.ci_history_fetch`, `make ci-history`) that populates the cache the join reads, incremental by `fetched_utc`, with the first real cache (all 53 merged PRs) committed as data.
 4. A gate metric that ratchets routing cost. (Claude) DONE PR #54 (`native/forge/src/ledger/audit.rs` gains `cap_breach_rate` and `cheap_tier_rework_rate` alongside the design-step-5 three, `docs/ledger.md`/`docs/routing.md` updated; `cost_budget_audit.py` needed no code change, only docstrings, since its metric map is already generic). `cheap_tier_rework_rate`'s baseline is recorded `null` -- reads as `NO_BASELINE`, never a false regression -- until the step 3 `ci_history` fetcher exists. GLM part DONE PR #58 (the `docs/routing.md`-vs-policy sync test and the `conductor.mk` `route-report` target).
 
 ### Phase 3 exit table (fills in as evidence lands)
 
-"Before" is step 3's real per-tier run (PR #52, `/home/tim/.claude/projects/-home-tim-Projects-LLM/` transcripts, 2026-09-13); `rework_rate`/`ci_red_rate` are `null` for every tier there since the `ci_history` fetcher does not exist yet. "After" is debt: one week of `task_dispatch` rows collected after the `PreToolUse` hook is actually installed in the LLM monorepo (step 2b, still TODO) -- until that hook is live, nothing enforces the routing policy this table is meant to show the effect of, so there is no "after" to fill in yet.
+"Before" is step 3's real per-tier run (PR #52, `/home/tim/.claude/projects/-home-tim-Projects-LLM/` transcripts, 2026-09-13); `rework_rate`/`ci_red_rate` are `null` for every tier there since the `ci_history` fetcher does not exist yet. "After" is debt: one week of `task_dispatch` rows collected after the `PreToolUse` hook is actually installed in the LLM monorepo. Step 2b's hook went live in warn mode on this machine on 2026-09-13, so that week runs 2026-09-13 -> 2026-09-20; the install is not yet reproducible from a clean clone (the LLM monorepo's `.claude/settings.json` is untracked), so "after" numbers below are collecting but not committed as reproducible evidence until that gap closes.
 
 | Tier | Share of billed subagent tokens (before) | Share of billed subagent tokens (after) | `over_cap` rate (before) | `over_cap` rate (after) | `rework_rate` (before) | `rework_rate` (after) | `ci_red_rate` (before) | `ci_red_rate` (after) |
 |---|---|---|---|---|---|---|---|---|
-| fable | 18.8% | TODO (step 2b + 1 week) | 95.3% | TODO | null | TODO | null | TODO |
-| glm | 2.5% | TODO (step 2b + 1 week) | 19.0% | TODO | null | TODO | null | TODO |
-| haiku | 3.3% | TODO (step 2b + 1 week) | 28.0% | TODO | null | TODO | null | TODO |
-| opus | 14.6% | TODO (step 2b + 1 week) | 72.9% | TODO | null | TODO | null | TODO |
-| sonnet | 54.5% | TODO (step 2b + 1 week) | 78.6% | TODO | null | TODO | null | TODO |
-| unknown | 6.3% | TODO (step 2b + 1 week) | 66.7% | TODO | null | TODO | null | TODO |
+| fable | 18.8% | collecting since 2026-09-13, due 2026-09-20 | 95.3% | TODO | null | TODO | null | TODO |
+| glm | 2.5% | collecting since 2026-09-13, due 2026-09-20 | 19.0% | TODO | null | TODO | null | TODO |
+| haiku | 3.3% | collecting since 2026-09-13, due 2026-09-20 | 28.0% | TODO | null | TODO | null | TODO |
+| opus | 14.6% | collecting since 2026-09-13, due 2026-09-20 | 72.9% | TODO | null | TODO | null | TODO |
+| sonnet | 54.5% | collecting since 2026-09-13, due 2026-09-20 | 78.6% | TODO | null | TODO | null | TODO |
+| unknown | 6.3% | collecting since 2026-09-13, due 2026-09-20 | 66.7% | TODO | null | TODO | null | TODO |
 
 ## Phase 4: stable install into LLM, then LLM cleanup
 
@@ -220,10 +220,15 @@ agent tokens. Stop porting; finish Phase 3, then install.
    more often, or move to chunk-hash reuse for append-only files as a
    deliberate follow-up. DONE PR #69 (docs only).
 2j. (Claude) residual PreToolUse Python (crg_gate_mark/verify, crg_refresh_wait, current_work_guard_edit/read, pre_read_skeleton for Read|Edit|Write|NotebookEdit|MCP graph) NOT ported: measured 36-37 ms per call, ~80 such calls per session (~3 s) vs 8.7K Bash calls now native; scraps -- stop here, the hook path is done.
-2. (GLM) Warn-mode hook install in the LLM monorepo (step 2b's
-   settings.json wiring, `FORGE_MODE=warn`), then one week of
-   `task_dispatch` rows -- that week is the Phase 3 exit table's "after"
-   columns.
+2. Warn-mode hook install in the LLM monorepo (step 2b's settings.json
+   wiring, `FORGE_MODE=warn`): done and live on this machine since
+   2026-09-13, but not reproducible from a clean clone -- the LLM
+   monorepo's `.claude/settings.json` is untracked (gitignored), so
+   the install has no committed record. Remaining debt is Tim's call:
+   track that file, or document `forge hooks install` as the
+   reproducible route. The one week of `task_dispatch` rows the Phase
+   3 exit table's "after" columns need started counting from the same
+   2026-09-13 install date.
 3. (GLM) Move what still lives in LLM but belongs here, hooks first:
    `tooling/hooks/{dispatch,claude,agent}` (7.9K LOC, the Python half of
    the hook path `forge hook` delegates to -- forge's hooks are not
