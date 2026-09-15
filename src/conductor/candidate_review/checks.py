@@ -389,6 +389,34 @@ def check_secrets(ctx: ReviewContext) -> CheckResult:
     return _result("secret-scan", started, findings, files=files)
 
 
+DEVICE_KERNEL_DECORATORS = frozenset(
+    {
+        "triton.jit",
+        "jit",
+        "triton.autotune",
+        "triton.heuristics",
+        "numba.njit",
+        "numba.jit",
+        "numba.cuda.jit",
+    }
+)
+"""Decorators whose function body is compiled to native or device code.
+
+A ``for`` inside one of these is not a Python loop. ``tl.static_range`` is a
+compile-time unroll that lowers to straight-line GPU code, and a ``numba`` loop
+is machine code by the time it runs, so `nested-loop-hotpath` there tells the
+author to go write the native path they are already standing in. Every kernel
+in ``research/synthesis/triton_scale_wavelet_features.py`` was flagged for the
+crime of being Triton, and the file-scoped exception that would have silenced
+it would equally have silenced a real Python loop in the same file.
+"""
+
+
+def _decorator_name(node: ast.expr) -> str:
+    """Dotted name of a decorator, whether or not it is applied with arguments."""
+    return _call_name(node.func if isinstance(node, ast.Call) else node)
+
+
 class _PythonVisitor(ast.NodeVisitor):
     def __init__(self, rel: str, lines: list[str], hot_path: bool) -> None:
         self.rel = rel
@@ -397,6 +425,7 @@ class _PythonVisitor(ast.NodeVisitor):
         self.findings: list[Finding] = []
         self.loop_depth = 0
         self.protocol_depth = 0
+        self.kernel_depth = 0
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._visit_function(node)
@@ -434,6 +463,14 @@ class _PythonVisitor(ast.NodeVisitor):
                 body[0],
                 "ellipsis-only function is a stub",
             )
+        if any(
+            _decorator_name(decorator) in DEVICE_KERNEL_DECORATORS
+            for decorator in node.decorator_list
+        ):
+            self.kernel_depth += 1
+            self.generic_visit(node)
+            self.kernel_depth -= 1
+            return
         self.generic_visit(node)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
@@ -449,7 +486,7 @@ class _PythonVisitor(ast.NodeVisitor):
 
     def visit_For(self, node: ast.For) -> None:
         self.loop_depth += 1
-        if self.loop_depth >= 2 and self.hot_path:
+        if self.loop_depth >= 2 and self.hot_path and not self.kernel_depth:
             self._add(
                 "nested-loop-hotpath",
                 Severity.MEDIUM,
