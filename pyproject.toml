@@ -130,6 +130,10 @@ integration_branch = "main"
 # monorepo's `research/notes/`, which this repository does not have; this
 # repository's own docs are its knowledge base.
 notes_root = "docs"
+# The complexity ratchet's grandfathered scores. Host data keyed by `path::name`,
+# so each repository needs its own; the unconfigured default is the monorepo's
+# `conductor/radon_complexity_baseline.json`, and this repository is a src layout.
+radon_complexity_baseline = "src/conductor/radon_complexity_baseline.json"
 
 # OS prerequisite for conductor.project_context's additive Linux resolver.
 # Informational package metadata: pip/uv do not install system executables.
