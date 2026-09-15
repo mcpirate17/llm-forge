@@ -96,8 +96,11 @@ fixed). Precedence, highest first:
 
 A host also configures its own layout in `pyproject.toml`'s `[tool.conductor]` table
 (`candidate_policy`, `mutation_registry`, `package_root`, `mutation_receipt_root`,
-`integration_branch`, `notes_root`) so `conductor.project_paths` stops assuming this
-repo's own monorepo-shaped defaults. Hook commands installed by `conductor.bootstrap`
+`integration_branch`, `notes_root`, `crate_roster`) so `conductor.project_paths` stops
+assuming this repo's own monorepo-shaped defaults. `crate_roster` defaults to
+`tooling/native/crates.toml` -- the crate list `candidate_review.cargo_lint_files` and
+a host's own CI both read -- and a configured-but-missing roster fails loud naming the
+resolved path rather than linting nothing. Hook commands installed by `conductor.bootstrap`
 invoke the CLI the same way a human would (`python -m conductor.<module> ...`, or the
 installed console script), from the host's working directory -- there is nothing extra
 to configure for path resolution beyond the two items above.

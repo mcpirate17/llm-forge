@@ -535,6 +535,42 @@ def test_guardrail_allowlist_refuses_an_unusable_value(tmp_path):
         pp.guardrail_allowlist_relative(tmp_path)
 
 
+def test_crate_roster_defaults_to_the_monorepo_literal():
+    assert pp.DEFAULT_CRATE_ROSTER == PurePosixPath("tooling/native/crates.toml")
+    assert pp.DEFAULTS[pp.CRATE_ROSTER_KEY] == pp.DEFAULT_CRATE_ROSTER
+
+
+def test_crate_roster_is_the_default_without_configuration(tmp_path):
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.crate_roster_relative == PurePosixPath("tooling/native/crates.toml")
+    assert resolved.crate_roster_configured is False
+    assert resolved.crate_roster_path == tmp_path / "tooling/native/crates.toml"
+    assert pp.crate_roster_relative(tmp_path) == PurePosixPath(
+        "tooling/native/crates.toml"
+    )
+    assert pp.crate_roster_path(tmp_path) == tmp_path / "tooling/native/crates.toml"
+
+
+def test_crate_roster_comes_from_the_conductor_table(tmp_path):
+    _write(tmp_path, '[tool.conductor]\ncrate_roster = "native/roster.toml"\n')
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.crate_roster_relative == PurePosixPath("native/roster.toml")
+    assert resolved.crate_roster_configured is True
+    assert pp.crate_roster_path(tmp_path) == tmp_path / "native/roster.toml"
+
+
+def test_crate_roster_environment_overrides_the_table(tmp_path, monkeypatch):
+    _write(tmp_path, '[tool.conductor]\ncrate_roster = "native/roster.toml"\n')
+    monkeypatch.setenv(pp.CRATE_ROSTER_ENV, "other/roster.toml")
+    assert pp.crate_roster_relative(tmp_path) == PurePosixPath("other/roster.toml")
+
+
+def test_crate_roster_refuses_an_unusable_value(tmp_path):
+    _write(tmp_path, '[tool.conductor]\ncrate_roster = "../elsewhere.toml"\n')
+    with pytest.raises(pp.ProjectPathError):
+        pp.crate_roster_relative(tmp_path)
+
+
 def test_memory_sources_defaults_to_the_host_conductor_dir(tmp_path, monkeypatch):
     monkeypatch.delenv(pp.MEMORY_SOURCES_ENV, raising=False)
     paths = pp.project_paths(tmp_path)

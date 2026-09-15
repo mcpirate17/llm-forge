@@ -51,6 +51,12 @@ DEFAULT_GUARDRAIL_ALLOWLIST = PurePosixPath("conductor/guardrail_allowlist.json"
 # is used only when the host has no catalog of its own and named none, so a
 # fresh install still indexes something; see ``memory_index.host_catalog_path``.
 DEFAULT_MEMORY_SOURCES = PurePosixPath("conductor/memory_sources.toml")
+# The native crate roster: which crates are tested, linted, unstyled or excluded.
+# A consumer repo's CI and its local gate both read this one file, so a crate
+# cannot be linted in one place and not the other -- see
+# ``candidate_review.cargo_lint_files``. Host data, never a packaged copy: a
+# host that ships one at another path names it via ``[tool.conductor]``.
+DEFAULT_CRATE_ROSTER = PurePosixPath("tooling/native/crates.toml")
 
 CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"
 MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
@@ -60,6 +66,7 @@ NOTES_ROOT_ENV = "CONDUCTOR_NOTES_ROOT"
 GUARDRAIL_ALLOWLIST_ENV = "CONDUCTOR_GUARDRAIL_ALLOWLIST"
 MEMORY_SOURCES_ENV = "CONDUCTOR_MEMORY_SOURCES"
 INTEGRATION_BRANCH_ENV = "CONDUCTOR_INTEGRATION_BRANCH"
+CRATE_ROSTER_ENV = "CONDUCTOR_CRATE_ROSTER"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
 MUTATION_REGISTRY_KEY = "mutation_registry"
@@ -70,12 +77,14 @@ GUARDRAIL_ALLOWLIST_KEY = "guardrail_allowlist"
 MEMORY_SOURCES_KEY = "memory_sources"
 INTEGRATION_BRANCH_KEY = "integration_branch"
 RETIRED_INTEGRATION_BRANCHES_KEY = "retired_integration_branches"
+CRATE_ROSTER_KEY = "crate_roster"
 DEFAULTS = {
     CANDIDATE_POLICY_KEY: DEFAULT_CANDIDATE_POLICY,
     MUTATION_REGISTRY_KEY: DEFAULT_MUTATION_REGISTRY,
     PACKAGE_ROOT_KEY: DEFAULT_PACKAGE_ROOT,
     MUTATION_RECEIPT_ROOT_KEY: DEFAULT_MUTATION_RECEIPT_ROOT,
     NOTES_ROOT_KEY: DEFAULT_NOTES_ROOT,
+    CRATE_ROSTER_KEY: DEFAULT_CRATE_ROSTER,
     GUARDRAIL_ALLOWLIST_KEY: DEFAULT_GUARDRAIL_ALLOWLIST,
     MEMORY_SOURCES_KEY: DEFAULT_MEMORY_SOURCES,
 }
@@ -194,6 +203,7 @@ class ProjectPaths:
     notes_relative: PurePosixPath
     guardrail_allowlist_relative: PurePosixPath
     memory_sources_relative: PurePosixPath
+    crate_roster_relative: PurePosixPath
     policy_configured: bool
     registry_configured: bool
     package_configured: bool
@@ -201,6 +211,7 @@ class ProjectPaths:
     notes_configured: bool
     guardrail_allowlist_configured: bool
     memory_sources_configured: bool
+    crate_roster_configured: bool
 
     @property
     def policy_path(self) -> Path:
@@ -244,6 +255,11 @@ class ProjectPaths:
         """Where the host keeps its memory-index catalog."""
         return self.root / self.memory_sources_relative.as_posix()
 
+    @property
+    def crate_roster_path(self) -> Path:
+        """The native crate roster -- CI and the local gate both read this file."""
+        return self.root / self.crate_roster_relative.as_posix()
+
 
 def project_paths(root: Path | str) -> ProjectPaths:
     """Resolve every host path against ``root``. Not cached: hosts differ per call."""
@@ -263,6 +279,9 @@ def project_paths(root: Path | str) -> ProjectPaths:
     memory_sources, named_memory_sources = _configured(
         base, MEMORY_SOURCES_KEY, MEMORY_SOURCES_ENV
     )
+    crate_roster, named_crate_roster = _configured(
+        base, CRATE_ROSTER_KEY, CRATE_ROSTER_ENV
+    )
     return ProjectPaths(
         base,
         policy,
@@ -272,6 +291,7 @@ def project_paths(root: Path | str) -> ProjectPaths:
         notes,
         allowlist,
         memory_sources,
+        crate_roster,
         named_policy,
         named_reg,
         named_pkg,
@@ -279,6 +299,7 @@ def project_paths(root: Path | str) -> ProjectPaths:
         named_notes,
         named_allowlist,
         named_memory_sources,
+        named_crate_roster,
     )
 
 
@@ -400,6 +421,24 @@ def guardrail_allowlist_path(root: Path | str) -> Path:
     ``[tool.conductor]`` and both readers follow.
     """
     return project_paths(root).guardrail_allowlist_path
+
+
+def crate_roster_relative(root: Path | str) -> PurePosixPath:
+    """Where the native crate roster sits inside ``root`` (``tooling/native/crates.toml``, ...)."""
+    return project_paths(root).crate_roster_relative
+
+
+def crate_roster_path(root: Path | str) -> Path:
+    """The host's crate roster, joined onto the root the caller already holds.
+
+    ``candidate_review.cargo_lint_files`` resolves through this at call time,
+    never from the package literal: a host names its own roster path via
+    ``[tool.conductor]`` and the reader follows. A configured path that does not
+    exist on disk is not this function's problem to catch -- the caller that
+    reads the file fails loud naming the resolved path, exactly as it would for
+    the unconfigured default; this function never falls back to an empty roster.
+    """
+    return project_paths(root).crate_roster_path
 
 
 def integration_branch(root: Path | str) -> str:
