@@ -19,9 +19,21 @@
   "source_sha256": {
     "src/conductor/candidate_review/cargo_lint_files.py": "cfa433dbc8c5ca53b9bbf764550fe0639b1264e5fa1a7dccbf56fc9bb3b0bbab"
   },
-  "survivor_baseline": [],
-  "survivor_baseline_note": "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.",
-  "survivor_baseline_recorded": false,
+  "survivor_baseline": [
+    "boolean_op-e89c459ca3c5-1",
+    "break_continue-22d2976b351c-0",
+    "break_continue-22d2976b351c-1",
+    "constant_replace-78e1ee7c77f6-0",
+    "constant_replace-9577d5305ef1-0",
+    "constant_replace-eab4ed852638-0",
+    "constant_replace-eab4ed852638-1",
+    "negate_condition-dd9b1437c419-0",
+    "return_value-a7e04b60f5e8-0",
+    "return_value-a7e04b60f5e8-1",
+    "return_value-a7e04b60f5e8-2"
+  ],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-15T20:39:26.722151+00:00",
   "test_argv": [
     "python",
     "-m",
