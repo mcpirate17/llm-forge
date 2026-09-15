@@ -18,6 +18,7 @@ the caller that needs it.
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -32,6 +33,14 @@ DEFAULT_PACKAGE_ROOT = PurePosixPath("conductor")
 # still must recognise) via `[tool.conductor]`, never by carrying the old literal here.
 DEFAULT_INTEGRATION_BRANCH = "main"
 DEFAULT_RETIRED_INTEGRATION_BRANCHES: tuple[str, ...] = ()
+# The monorepo `conductor` was extracted from keeps its worktrees under a temp
+# scratch prefix and a fixed per-user project directory. This package's default
+# carries those two literals so nothing regresses on that host; a host with
+# another layout names its own patterns via `[tool.conductor]`.
+DEFAULT_WORKTREE_PATTERNS: tuple[str, ...] = (
+    r"/tmp/llm-[\w.-]+",
+    r"/home/\w+/Projects/LLM[\w.-]*",
+)
 # Where a freshly-run receipt lands when nothing named an explicit ``--receipt``. This
 # is scratch output, not the registered evidence directory (`receipts_relative`) --
 # the monorepo treats it as auto-pruned staging under `research/reports/`, which a
@@ -84,6 +93,7 @@ MEMORY_SOURCES_KEY = "memory_sources"
 INTEGRATION_BRANCH_KEY = "integration_branch"
 RETIRED_INTEGRATION_BRANCHES_KEY = "retired_integration_branches"
 CRATE_ROSTER_KEY = "crate_roster"
+WORKTREE_PATTERNS_KEY = "worktree_patterns"
 RADON_BASELINE_KEY = "radon_complexity_baseline"
 DEFAULTS = {
     CANDIDATE_POLICY_KEY: DEFAULT_CANDIDATE_POLICY,
@@ -132,6 +142,29 @@ def _branch_name_tuple(raw: object, source: str) -> tuple[str, ...]:
             f"{source} must be a list of strings, got {type(raw).__name__}"
         )
     return tuple(_branch_name(item, f"{source}[{i}]") for i, item in enumerate(raw))
+
+
+def _regex_pattern(raw: object, source: str) -> str:
+    """A configured value as a non-empty, compilable regex source, or a loud refusal."""
+    if not isinstance(raw, str):
+        raise ProjectPathError(f"{source} must be a string, got {type(raw).__name__}")
+    text = raw.strip()
+    if not text:
+        raise ProjectPathError(f"{source} must not be empty")
+    try:
+        re.compile(text)
+    except re.error as exc:
+        raise ProjectPathError(f"{source} is not a valid regex: {exc}") from exc
+    return text
+
+
+def _regex_pattern_tuple(raw: object, source: str) -> tuple[str, ...]:
+    """A configured value as a tuple of regex sources, or a loud refusal."""
+    if not isinstance(raw, (list, tuple)):
+        raise ProjectPathError(
+            f"{source} must be a list of strings, got {type(raw).__name__}"
+        )
+    return tuple(_regex_pattern(item, f"{source}[{i}]") for i, item in enumerate(raw))
 
 
 def conductor_table(root: Path) -> Mapping[str, Any]:
@@ -197,6 +230,26 @@ def _configured_retired_integration_branches(
             True,
         )
     return DEFAULT_RETIRED_INTEGRATION_BRANCHES, False
+
+
+def _configured_worktree_patterns(root: Path) -> tuple[tuple[str, ...], bool]:
+    """(worktree regex sources, whether the host named them). No env override.
+
+    Unlike ``integration_branch``, a worktree layout is host history, not a
+    single current answer worth overriding per-invocation -- it belongs in the
+    committed ``pyproject.toml`` alongside the rest of this host's paths.
+    """
+    table = conductor_table(root)
+    if WORKTREE_PATTERNS_KEY in table:
+        source = (
+            f"[tool.conductor].{WORKTREE_PATTERNS_KEY} in "
+            f"{Path(root) / 'pyproject.toml'}"
+        )
+        return (
+            _regex_pattern_tuple(table[WORKTREE_PATTERNS_KEY], source),
+            True,
+        )
+    return DEFAULT_WORKTREE_PATTERNS, False
 
 
 @dataclass(frozen=True)
@@ -491,6 +544,17 @@ def retired_integration_branches(root: Path | str) -> tuple[str, ...]:
     own ``pyproject.toml``, never baked into the package.
     """
     return _configured_retired_integration_branches(Path(root))[0]
+
+
+def worktree_patterns(root: Path | str) -> tuple[str, ...]:
+    """Regex sources matching this host's worktree paths, for display grouping.
+
+    Defaults to the monorepo's own layout (a ``/tmp/llm-*`` scratch prefix and a
+    fixed per-user ``~/Projects/LLM*`` clone) so nothing regresses on that host.
+    A host with another layout names its own patterns via ``[tool.conductor]``;
+    there is no environment override, matching ``retired_integration_branches``.
+    """
+    return _configured_worktree_patterns(Path(root))[0]
 
 
 def integration_branches(root: Path | str) -> tuple[str, ...]:

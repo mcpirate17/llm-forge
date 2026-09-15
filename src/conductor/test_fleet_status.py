@@ -192,3 +192,14 @@ def test_module_entrypoint():
     )
     assert proc.returncode == 0
     assert "fleet status" in proc.stdout.lower()
+
+
+def test_worktree_regex_is_configured_via_project_paths():
+    # fs._WORKTREE is built from project_paths.worktree_patterns(fs.ROOT) at
+    # import time; this pins the observable behaviour without re-importing.
+    from conductor import project_paths as pp
+
+    assert fs._WORKTREE.pattern == "(" + "|".join(pp.worktree_patterns(fs.ROOT)) + ")"
+    assert fs._WORKTREE.search("/tmp/llm-scratch/foo") is not None
+    assert fs._WORKTREE.search("/home/tim/Projects/LLM/bar") is not None
+    assert fs._WORKTREE.search("/var/nope") is None
