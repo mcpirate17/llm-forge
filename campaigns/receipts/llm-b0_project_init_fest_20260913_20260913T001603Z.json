@@ -5192,7 +5192,7 @@
     "TIMED_OUT": 0,
     "UNVIABLE": 0
   },
-  "receipt_path": "conductor/mutation_campaigns/receipts/llm-b0_project_init_fest_20260913_20260913T001603Z.json",
+  "receipt_path": "campaigns/receipts/llm-b0_project_init_fest_20260913_20260913T001603Z.json",
   "resolved_survivors": [],
   "runner_components_sha256": {
     "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
