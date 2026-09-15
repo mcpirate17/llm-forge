@@ -15,6 +15,7 @@ outlive their own runs -- and clean them up in ``finally`` blocks.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import json
 import os
@@ -187,6 +188,51 @@ def test_run_command_timeout_kills_the_whole_process_group(tmp_path: Path) -> No
         f"pid {grandchild} survived the timeout; the kill reached only the "
         "direct child, so mutant processes still orphan"
     )
+
+
+def test_run_command_reaps_descendants_a_cleanly_exiting_command_left(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The timeout path is not the only way a run leaks a spinning mutant.
+
+    fest scores a non-terminating mutant TIMED_OUT and then exits 0 -- it did
+    its job -- so `_kill_process_group` never runs and PDEATHSIG, cleared on
+    fork, covers only fest itself. The pytest it abandoned keeps burning a core.
+    Forgetting the registry entry on that path erased the only record of its
+    group, putting it past `reap_orphaned_runs` too. One such mutant held 99.8%
+    CPU for two hours on 2026-09-15.
+    """
+
+    # The descendant must not hold the pipes, or communicate() would block on
+    # it and this would be the timeout path again rather than a clean exit.
+    marker = tmp_path / "leaked.pid"
+    registry = tmp_path / "live_pgids.json"
+    result = mutation_testing_support.run_command(
+        ["sh", "-c", f"sleep 300 >/dev/null 2>&1 & echo $! > {marker}; exit 0"],
+        cwd=tmp_path,
+        timeout_seconds=30,
+        environment={},
+        pin_argv=list,
+        result_factory=_Result,
+        output_tail_chars=200,
+        pgid_registry=registry,
+    )
+
+    # The run itself succeeded; the leak is not the receipt's fault.
+    assert result.timed_out is False
+    assert result.returncode == 0
+
+    leaked = int(marker.read_text(encoding="utf-8").strip())
+    deadline = time.monotonic() + 10
+    while _alive(leaked) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not _alive(leaked), (
+        f"pid {leaked} survived a clean exit; nothing kills the group on this "
+        "path, so every TIMED_OUT mutant orphans a spinning pytest"
+    )
+    assert "without reaping process group" in capsys.readouterr().err
+    assert not registry.exists(), "the entry is still forgotten once it is safe"
 
 
 def test_run_command_completion_is_unaffected_by_the_new_session(
@@ -599,6 +645,62 @@ def test_reap_dry_run_lists_findings_and_touches_nothing(tmp_path: Path) -> None
         assert _alive(scene.orphan.pid), "listing must stay a dry run"
     finally:
         scene.close()
+
+
+def test_reap_finds_the_orphan_whose_group_leader_already_exited(
+    tmp_path: Path,
+) -> None:
+    """The real orphan shape: the engine led the group and exited cleanly.
+
+    `_OrphanScene`'s orphan is a `sleep` that IS its own group leader, so a
+    leader-liveness test finds it. Production never looks like that: the engine
+    is the leader (`start_new_session=True`), and after it records a mutant
+    TIMED_OUT it exits 0, taking the leader with it while the pytest it spawned
+    keeps spinning. Asking whether the leader is alive called that a stale entry
+    and walked past it -- for two hours, on 2026-09-15.
+    """
+
+    registry = tmp_path / "live_pgids.json"
+    marker = tmp_path / "grandchild.pid"
+    leader = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import pathlib,subprocess,sys;"
+            "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(300)']);"
+            f"pathlib.Path({str(marker)!r}).write_text(str(p.pid));"
+            "sys.exit(0)",
+        ],
+        start_new_session=True,
+    )
+    pgid = leader.pid
+    assert leader.wait(timeout=10) == 0, "the leader must exit cleanly, unsignalled"
+    grandchild = int(marker.read_text())
+    try:
+        assert not _alive(pgid), "the group leader is gone"
+        assert _alive(grandchild), "its child is not"
+        assert os.getpgid(grandchild) == pgid, "and is still in the recorded group"
+
+        mutation_testing_support.record_live_pgid(
+            registry, pgid=pgid, engine_pid=pgid, argv0="fest"
+        )
+        lines, found = mutation_testing_support.reap_orphaned_runs(
+            registry, apply=False
+        )
+        assert found == 1, lines
+        assert any("would SIGKILL" in line for line in lines), lines
+        assert not any("stale" in line for line in lines), lines
+        assert _alive(grandchild), "a dry run must not kill"
+
+        _, found = mutation_testing_support.reap_orphaned_runs(registry, apply=True)
+        assert found == 1
+        deadline = time.monotonic() + 10
+        while _alive(grandchild) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert not _alive(grandchild), "--apply must reach a leaderless group"
+    finally:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(pgid, signal.SIGKILL)
 
 
 def test_reap_apply_kills_only_the_recorded_orphan(tmp_path: Path) -> None:
