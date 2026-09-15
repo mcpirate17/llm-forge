@@ -451,3 +451,110 @@ def test_a_missing_engine_is_a_named_critical_finding_not_a_crash(
     assert finding.severity is Severity.CRITICAL
     assert "slop_core is not installed (test)" in finding.message
     assert not result.files
+
+
+# --- nested-loop-hotpath inside a compiled kernel -------------------------
+#
+# Third instance of this module's defect class: a rule that reports the native
+# path as if it were the Python one. ``tl.static_range`` is a compile-time
+# unroll, so every kernel in research/synthesis/triton_scale_wavelet_features.py
+# was told to "vectorize or go native" while already being Triton.
+
+
+def _hotpath_lines(source: str) -> list[int]:
+    visitor = _PythonVisitor("lane.py", source.splitlines(), hot_path=True)
+    visitor.visit(ast.parse(source))
+    return [f.line for f in visitor.findings if f.rule_id == "nested-loop-hotpath"]
+
+
+_KERNEL = """
+import triton
+import triton.language as tl
+
+@triton.jit
+def kernel(out_ptr, S: tl.constexpr):
+    for scale in tl.static_range(S):
+        for offset in tl.static_range(8):
+            tl.store(out_ptr + scale * 8 + offset, 0.0)
+"""
+
+_DECORATED = {
+    "triton.jit": "@triton.jit",
+    "bare jit": "@jit",
+    "triton.autotune": "@triton.autotune(configs=[], key=['S'])",
+    "numba.njit": "@numba.njit",
+    "numba.cuda.jit": "@numba.cuda.jit",
+}
+
+
+@pytest.mark.parametrize("decorator", sorted(_DECORATED.values()))
+def test_device_kernel_loops_are_not_reported_as_python_hot_paths(
+    decorator: str,
+) -> None:
+    source = f"""
+{decorator}
+def kernel(values):
+    for row in values:
+        for column in row:
+            store(row, column)
+"""
+    assert _hotpath_lines(source) == []
+
+
+def test_triton_static_range_kernel_is_clean() -> None:
+    assert _hotpath_lines(_KERNEL) == []
+
+
+def test_a_real_python_nested_loop_beside_a_kernel_still_reports() -> None:
+    """The suppression must be function-scoped, not file-scoped.
+
+    A file-scoped exception was the alternative fix, and it would have hidden
+    exactly this loop -- the reason the rule exists -- for as long as the file
+    also contained a kernel.
+    """
+    source = (
+        _KERNEL
+        + """
+
+def accumulate(rows):
+    total = 0
+    for row in rows:
+        for value in row:
+            total += value
+    return total
+"""
+    )
+    reported = _hotpath_lines(source)
+    assert len(reported) == 1
+    assert source.splitlines()[reported[0] - 1].strip() == "for value in row:"
+
+
+def test_undecorated_helper_after_a_kernel_is_not_swallowed() -> None:
+    """kernel_depth must unwind: a plain function following a kernel is Python."""
+    source = (
+        _KERNEL
+        + """
+
+def plain(rows):
+    for row in rows:
+        for value in row:
+            print(value)
+"""
+    )
+    assert len(_hotpath_lines(source)) == 1
+
+
+def test_hot_path_flag_still_gates_the_rule() -> None:
+    source = """
+def accumulate(rows):
+    total = 0
+    for row in rows:
+        for value in row:
+            total += value
+    return total
+"""
+    cold = _PythonVisitor("lane.py", source.splitlines(), hot_path=False)
+    cold.visit(ast.parse(source))
+    assert [
+        f.rule_id for f in cold.findings if f.rule_id == "nested-loop-hotpath"
+    ] == []
