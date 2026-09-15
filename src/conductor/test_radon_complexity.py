@@ -9,11 +9,12 @@ import pytest
 
 from conductor.candidate_review.policy import load_policy
 from conductor.candidate_review.policy_path import resolve_policy_path
-from conductor.project_paths import package_relative
+from conductor.project_paths import package_relative, radon_baseline_path
 from conductor.radon_complexity import (
     DEFAULT_PATHS,
     REPO_ROOT,
     _load_baseline,
+    _resolve_baseline,
     _run_check,
     _scan,
 )
@@ -125,3 +126,53 @@ def test_the_ratchet_runs_in_the_pre_commit_profile() -> None:
     assert complexity, "candidate_policy.toml declares no complexity check"
     assert "fast" in complexity[0].profiles
     assert "full" in complexity[0].profiles
+
+
+def test_the_unflagged_default_baseline_lives_in_the_host_tree() -> None:
+    # Until 2026-09-15 the default was Path(__file__).parent / "...json" -- an
+    # ABSOLUTE path -- and main() then did (REPO_ROOT / args.baseline), where an
+    # absolute right operand discards REPO_ROOT entirely. Every consumer that ran
+    # `python -m conductor.radon_complexity` therefore ratcheted its own tree
+    # against this package's installed baseline. Measured on LLM the same day: a
+    # 7,661-byte packaged baseline stood in for a 124,467-byte host one and the
+    # check reported "405 new D-F blocks" against a tree that had regressed none.
+    resolved = _resolve_baseline(None)
+    assert resolved.is_relative_to(REPO_ROOT), resolved
+    assert resolved == radon_baseline_path(REPO_ROOT).resolve()
+
+
+def test_the_default_follows_the_host_and_not_this_package(tmp_path: Path) -> None:
+    # The same package, asked about another host, must answer with that host's
+    # file. This is the property the __file__-derived default could not have.
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nradon_complexity_baseline = "ratchet/base.json"\n',
+        encoding="utf-8",
+    )
+    assert radon_baseline_path(tmp_path) == tmp_path / "ratchet" / "base.json"
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    assert (
+        radon_baseline_path(bare)
+        == bare / "conductor" / "radon_complexity_baseline.json"
+    )
+
+
+def test_a_relative_baseline_flag_resolves_against_the_host_root() -> None:
+    assert _resolve_baseline("campaigns/x.json") == (REPO_ROOT / "campaigns/x.json")
+
+
+def test_an_absolute_baseline_flag_is_taken_as_given(tmp_path: Path) -> None:
+    # The caller named a file outside the host tree on purpose; joining it onto
+    # REPO_ROOT would be a silent no-op, which is how the bug above hid.
+    target = tmp_path / "elsewhere.json"
+    assert _resolve_baseline(str(target)) == target.resolve()
+
+
+def test_a_missing_baseline_is_refused_by_name(tmp_path: Path) -> None:
+    # Fail loud: an unreadable baseline must never read as "nothing is
+    # grandfathered", which would fail the ratchet on the entire tree.
+    missing = tmp_path / "absent.json"
+    with pytest.raises(FileNotFoundError) as excinfo:
+        _load_baseline(missing)
+    assert str(missing) in str(excinfo.value)
+    assert "radon_complexity_baseline" in str(excinfo.value)

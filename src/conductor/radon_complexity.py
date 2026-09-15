@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from conductor.project_paths import host_root
+from conductor.project_paths import host_root, radon_baseline_path
 
 REPO_ROOT = host_root()
 DEFAULT_PATHS = ("conductor", "research", "aria_core", "aria_designer")
@@ -19,9 +19,6 @@ DEFAULT_EXCLUDES = (
     "*/research/tmp/*",
     "*__pycache__*",
 )
-# Ships inside the package next to this module -- the default baseline location,
-# distinct from REPO_ROOT which is the host tree being scanned.
-DEFAULT_BASELINE = Path(__file__).resolve().parent / "radon_complexity_baseline.json"
 RANKS = ("A", "B", "C", "D", "E", "F")
 
 
@@ -98,6 +95,12 @@ def _counts(findings: list[dict[str, Any]]) -> dict[str, int]:
 def _load_baseline(path: Path) -> dict[str, int]:
     """Map each grandfathered key to the worst score it is allowed to hold."""
 
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"complexity baseline not found: {path}. Name the host's own file with "
+            "[tool.conductor].radon_complexity_baseline, $CONDUCTOR_RADON_BASELINE "
+            "or --baseline."
+        )
     raw = json.loads(path.read_text(encoding="utf-8"))
     entries = raw.get("findings", raw if isinstance(raw, list) else [])
     baseline: dict[str, int] = {}
@@ -150,7 +153,15 @@ def _print_report(findings: list[dict[str, Any]], minimum_rank: str) -> None:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("report", "check", "refresh-baseline"))
-    parser.add_argument("--baseline", default=str(DEFAULT_BASELINE))
+    parser.add_argument(
+        "--baseline",
+        default=None,
+        help=(
+            "baseline file; relative paths resolve against the host repo root. "
+            "Default: [tool.conductor].radon_complexity_baseline, else "
+            "conductor/radon_complexity_baseline.json in the host tree."
+        ),
+    )
     parser.add_argument("--min-rank", default="D", choices=RANKS)
     parser.add_argument("--path", dest="paths", action="append", default=[])
     parser.add_argument("--exclude", dest="excludes", action="append", default=[])
@@ -220,11 +231,28 @@ def _run_check(
     return 1
 
 
+def _resolve_baseline(raw: str | None) -> Path:
+    """The baseline this invocation ratchets against.
+
+    An explicit ``--baseline`` wins, resolved against the host root when it is
+    relative. Absent one, the host's configured path -- never a copy derived from
+    ``__file__``. The old default was absolute, so ``REPO_ROOT / default``
+    collapsed onto the installed package and every consumer silently ratcheted
+    against this package's own blocks instead of its own.
+    """
+    if raw is None:
+        return radon_baseline_path(REPO_ROOT).resolve()
+    candidate = Path(raw)
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (REPO_ROOT / candidate).resolve()
+
+
 def main() -> int:
     args = _parse_args()
     paths = args.paths or list(DEFAULT_PATHS)
     excludes = args.excludes or list(DEFAULT_EXCLUDES)
-    baseline_path = (REPO_ROOT / args.baseline).resolve()
+    baseline_path = _resolve_baseline(args.baseline)
     findings, parse_errors = _scan(paths, excludes)
     if parse_errors:
         for err in parse_errors:
@@ -238,7 +266,12 @@ def main() -> int:
     if args.command == "refresh-baseline":
         _write_baseline(baseline_path, findings, args.min_rank, paths, excludes)
         _print_report(findings, args.min_rank)
-        print(f"Wrote baseline: {baseline_path.relative_to(REPO_ROOT)}")
+        shown = (
+            baseline_path.relative_to(REPO_ROOT)
+            if baseline_path.is_relative_to(REPO_ROOT)
+            else baseline_path
+        )
+        print(f"Wrote baseline: {shown}")
         return 0
 
     return _run_check(baseline_path, findings, args.min_rank)

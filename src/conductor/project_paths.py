@@ -57,6 +57,11 @@ DEFAULT_MEMORY_SOURCES = PurePosixPath("conductor/memory_sources.toml")
 # ``candidate_review.cargo_lint_files``. Host data, never a packaged copy: a
 # host that ships one at another path names it via ``[tool.conductor]``.
 DEFAULT_CRATE_ROSTER = PurePosixPath("tooling/native/crates.toml")
+# The complexity ratchet's grandfathered scores. Host data: every key names a
+# block in the host's own tree, so a packaged copy describes the wrong repo
+# entirely. `radon_complexity` resolved this from ``__file__`` until 2026-09-15,
+# which silently ratcheted every consumer against this package's baseline.
+DEFAULT_RADON_BASELINE = PurePosixPath("conductor/radon_complexity_baseline.json")
 
 CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"
 MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
@@ -67,6 +72,7 @@ GUARDRAIL_ALLOWLIST_ENV = "CONDUCTOR_GUARDRAIL_ALLOWLIST"
 MEMORY_SOURCES_ENV = "CONDUCTOR_MEMORY_SOURCES"
 INTEGRATION_BRANCH_ENV = "CONDUCTOR_INTEGRATION_BRANCH"
 CRATE_ROSTER_ENV = "CONDUCTOR_CRATE_ROSTER"
+RADON_BASELINE_ENV = "CONDUCTOR_RADON_BASELINE"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
 MUTATION_REGISTRY_KEY = "mutation_registry"
@@ -78,6 +84,7 @@ MEMORY_SOURCES_KEY = "memory_sources"
 INTEGRATION_BRANCH_KEY = "integration_branch"
 RETIRED_INTEGRATION_BRANCHES_KEY = "retired_integration_branches"
 CRATE_ROSTER_KEY = "crate_roster"
+RADON_BASELINE_KEY = "radon_complexity_baseline"
 DEFAULTS = {
     CANDIDATE_POLICY_KEY: DEFAULT_CANDIDATE_POLICY,
     MUTATION_REGISTRY_KEY: DEFAULT_MUTATION_REGISTRY,
@@ -85,6 +92,7 @@ DEFAULTS = {
     MUTATION_RECEIPT_ROOT_KEY: DEFAULT_MUTATION_RECEIPT_ROOT,
     NOTES_ROOT_KEY: DEFAULT_NOTES_ROOT,
     CRATE_ROSTER_KEY: DEFAULT_CRATE_ROSTER,
+    RADON_BASELINE_KEY: DEFAULT_RADON_BASELINE,
     GUARDRAIL_ALLOWLIST_KEY: DEFAULT_GUARDRAIL_ALLOWLIST,
     MEMORY_SOURCES_KEY: DEFAULT_MEMORY_SOURCES,
 }
@@ -204,6 +212,7 @@ class ProjectPaths:
     guardrail_allowlist_relative: PurePosixPath
     memory_sources_relative: PurePosixPath
     crate_roster_relative: PurePosixPath
+    radon_baseline_relative: PurePosixPath
     policy_configured: bool
     registry_configured: bool
     package_configured: bool
@@ -212,6 +221,7 @@ class ProjectPaths:
     guardrail_allowlist_configured: bool
     memory_sources_configured: bool
     crate_roster_configured: bool
+    radon_baseline_configured: bool
 
     @property
     def policy_path(self) -> Path:
@@ -260,6 +270,11 @@ class ProjectPaths:
         """The native crate roster -- CI and the local gate both read this file."""
         return self.root / self.crate_roster_relative.as_posix()
 
+    @property
+    def radon_baseline_path(self) -> Path:
+        """The complexity ratchet's baseline for *this* host, never a packaged one."""
+        return self.root / self.radon_baseline_relative.as_posix()
+
 
 def project_paths(root: Path | str) -> ProjectPaths:
     """Resolve every host path against ``root``. Not cached: hosts differ per call."""
@@ -282,6 +297,9 @@ def project_paths(root: Path | str) -> ProjectPaths:
     crate_roster, named_crate_roster = _configured(
         base, CRATE_ROSTER_KEY, CRATE_ROSTER_ENV
     )
+    radon_baseline, named_radon_baseline = _configured(
+        base, RADON_BASELINE_KEY, RADON_BASELINE_ENV
+    )
     return ProjectPaths(
         base,
         policy,
@@ -292,6 +310,7 @@ def project_paths(root: Path | str) -> ProjectPaths:
         allowlist,
         memory_sources,
         crate_roster,
+        radon_baseline,
         named_policy,
         named_reg,
         named_pkg,
@@ -300,6 +319,7 @@ def project_paths(root: Path | str) -> ProjectPaths:
         named_allowlist,
         named_memory_sources,
         named_crate_roster,
+        named_radon_baseline,
     )
 
 
@@ -439,6 +459,22 @@ def crate_roster_path(root: Path | str) -> Path:
     the unconfigured default; this function never falls back to an empty roster.
     """
     return project_paths(root).crate_roster_path
+
+
+def radon_baseline_relative(root: Path | str) -> PurePosixPath:
+    """Where the complexity ratchet's baseline sits inside ``root``."""
+    return project_paths(root).radon_baseline_relative
+
+
+def radon_baseline_path(root: Path | str) -> Path:
+    """The host's complexity baseline, joined onto the root the caller holds.
+
+    Resolved against the host tree, never from ``__file__``: a baseline keyed by
+    ``path::name`` describes one repository's blocks, so the copy shipping beside
+    ``radon_complexity`` grandfathers this package's own code and nothing else.
+    An absent file is the reader's to report, naming the resolved path.
+    """
+    return project_paths(root).radon_baseline_path
 
 
 def integration_branch(root: Path | str) -> str:
