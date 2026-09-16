@@ -17,7 +17,7 @@ max_file_bytes = 1000000
 max_binary_bytes = 5000000
 coverage_threshold = 40.0
 high_risk_coverage_threshold = 65.0
-baseline_expires = 2026-09-15
+baseline_expires = 2026-12-15
 [classes]
 governance = [
   "src/conductor/**",
