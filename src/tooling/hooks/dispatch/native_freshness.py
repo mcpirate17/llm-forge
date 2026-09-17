@@ -9,9 +9,10 @@ report silently lost a section), a wheel still resolving out of a deleted
 worktree, and ``uv sync`` serving a cached wheel for an unchanged version after
 the crate's surface had changed.
 
-So this module asks four questions of each crate under ``tooling/native`` that
-declares a ``[tool.maturin] module-name``, and the SessionStart hook prints what
-it finds:
+So this module asks four questions of each crate under the host's native root
+(``project_paths.native_root``; ``tooling/native`` unless the host says otherwise)
+that declares a ``[tool.maturin] module-name``, and the SessionStart hook prints
+what it finds:
 
 * installed at all, in *this* checkout's ``.venv``;
 * installed version equal to the version the crate declares;
@@ -26,8 +27,9 @@ exactly the case worth catching.
 
 Everything is read off disk rather than imported, so the answer is about the
 session's checkout and not about whichever interpreter the hook happens to run
-under. A checkout with no ``.venv``, or no ``tooling/native`` -- a foreign
-project running the installed tooling -- has nothing to compare and says nothing.
+under. A checkout with no ``.venv``, or no native root -- a consumer project that
+installs the crates rather than building them -- has nothing to compare here and
+says nothing; :mod:`conductor.crg_venv_sync` asks that host its own question.
 """
 
 from __future__ import annotations
@@ -41,7 +43,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Iterator, Mapping
 
-NATIVE_DIR: Final[str] = "tooling/native"
+from conductor.project_paths import native_root
+
 STAMP: Final[str] = ".venv/.native-stamp.json"
 VENV: Final[str] = ".venv"
 
@@ -53,6 +56,8 @@ SOURCE_NAMES: Final[frozenset[str]] = frozenset(
     {"Cargo.toml", "Cargo.lock", "pyproject.toml"}
 )
 EXCLUDED_DIRS: Final[frozenset[str]] = frozenset({"target", ".git"})
+# What a compiled extension is called once installed, on either platform.
+EXTENSION_SUFFIXES: Final[tuple[str, ...]] = (".so", ".pyd")
 
 
 @dataclass(frozen=True)
@@ -107,8 +112,12 @@ def crates(root: Path) -> tuple[Crate, ...]:
     A crate with no ``pyproject.toml`` (``snapshot-retention``,
     ``tooling-standalone-smoke``) is a Rust binary, not something installed into
     the venv, and there is nothing here to be stale.
+
+    The directory is the host's, resolved per call: it was the module constant
+    ``tooling/native`` until 2026-09-16, which returned ``()`` for every host on
+    another layout and so answered every freshness question with silence.
     """
-    native = root / NATIVE_DIR
+    native = native_root(root)
     if not native.is_dir():
         return ()
     found = (
@@ -162,12 +171,34 @@ def installed_version(info: Path) -> str:
     return info.name[: -len(".dist-info")].rpartition("-")[2]
 
 
+def direct_url(info: Path) -> Mapping[str, object]:
+    """PEP 610: where this distribution came from, empty when it came from an index.
+
+    Present only for a direct reference -- a path, an archive or a VCS -- so its
+    mere existence separates "built from a source tree we own" from "resolved from
+    PyPI", which is the one filter that tells an extension crate of ours apart from
+    a third-party wheel that also happens to ship a ``.so`` (numpy, coverage).
+    """
+    try:
+        data = json.loads((info / "direct_url.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return {}
+    return data if isinstance(data, Mapping) else {}
+
+
+def compiled_extensions(info: Path) -> tuple[str, ...]:
+    """The extension modules this distribution installed, from its own RECORD."""
+    try:
+        record = (info / "RECORD").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ()
+    installed = (line.split(",", 1)[0] for line in record.splitlines())
+    return tuple(name for name in installed if name.endswith(EXTENSION_SUFFIXES))
+
+
 def built_from(info: Path) -> Path | None:
     """The directory the wheel was built from, when the installer recorded one."""
-    try:
-        url = json.loads((info / "direct_url.json").read_text(encoding="utf-8"))["url"]
-    except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError):
-        return None
+    url = direct_url(info).get("url")
     if not isinstance(url, str) or not url.startswith("file://"):
         return None
     return Path(url[len("file://") :])

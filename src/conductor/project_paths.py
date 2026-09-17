@@ -50,6 +50,13 @@ DEFAULT_MUTATION_RECEIPT_ROOT = PurePosixPath("research/reports/mutation_testing
 # (kb_retrieve, memory_index's catalog, the notes guards) resolves through
 # `notes_root` so a host with another layout names its own tree once.
 DEFAULT_NOTES_ROOT = PurePosixPath("research/notes")
+# The prose-search index over the notes tree: `index_notes` writes it and
+# `index_notes search` reads it. Its own file, not the run/experiment database:
+# the two share no key and never join, and a host that splits them (the monorepo
+# did on 2026-09-14) otherwise gets an index written to one file and every
+# documented reader pointed at the other. Rebuildable cache, never a record --
+# repointing it costs one `python -m conductor.index_notes` run.
+DEFAULT_NOTES_DB = PurePosixPath("research/notes.db")
 # The host allowlist of files/functions permitted to exceed the god-file, god-
 # function and complexity guardrails. Host data, never a packaged copy: a host
 # that ships one at another path names it via `[tool.conductor]`.
@@ -66,21 +73,42 @@ DEFAULT_MEMORY_SOURCES = PurePosixPath("conductor/memory_sources.toml")
 # ``candidate_review.cargo_lint_files``. Host data, never a packaged copy: a
 # host that ships one at another path names it via ``[tool.conductor]``.
 DEFAULT_CRATE_ROSTER = PurePosixPath("tooling/native/crates.toml")
+# Where the extension crates' sources sit: the directory `native_freshness`
+# scans for maturin `pyproject.toml` files, and through it the roster
+# `crg_venv_sync` compares the graph server's interpreter against. A module
+# constant until 2026-09-16, which disarmed both on every host that does not
+# use the monorepo's layout -- this repository keeps its crates in `native/`,
+# so `crates()` found none here and the freshness question answered "nothing
+# to compare" rather than asking anything. Sibling of `crate_roster`, not its
+# parent: the roster names which crates are linted, this names where they are.
+DEFAULT_NATIVE_ROOT = PurePosixPath("tooling/native")
 # The complexity ratchet's grandfathered scores. Host data: every key names a
 # block in the host's own tree, so a packaged copy describes the wrong repo
 # entirely. `radon_complexity` resolved this from ``__file__`` until 2026-09-15,
 # which silently ratcheted every consumer against this package's baseline.
 DEFAULT_RADON_BASELINE = PurePosixPath("conductor/radon_complexity_baseline.json")
 
+# What this package is called once installed. Spelled out rather than derived:
+# `importlib.metadata`'s reverse map from package to distribution is blind to an
+# editable install, which is how this repository installs itself, so asking the
+# interpreter answers `None` exactly where the tooling is being developed.
+# `package_resources` keeps its own copy on purpose -- it is a byte-verifying
+# reader whose import graph is deliberately two modules wide, and importing this
+# one would break the minimal wheel its tests install. `test_project_paths` pins
+# the two spellings together so a rename cannot take only one of them.
+DISTRIBUTION_NAME = "conductor-tooling"
+
 CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"
 MUTATION_REGISTRY_ENV = "CONDUCTOR_MUTATION_REGISTRY"
 PACKAGE_ROOT_ENV = "CONDUCTOR_PACKAGE_ROOT"
 MUTATION_RECEIPT_ROOT_ENV = "CONDUCTOR_MUTATION_RECEIPT_ROOT"
 NOTES_ROOT_ENV = "CONDUCTOR_NOTES_ROOT"
+NOTES_DB_ENV = "CONDUCTOR_NOTES_DB"
 GUARDRAIL_ALLOWLIST_ENV = "CONDUCTOR_GUARDRAIL_ALLOWLIST"
 MEMORY_SOURCES_ENV = "CONDUCTOR_MEMORY_SOURCES"
 INTEGRATION_BRANCH_ENV = "CONDUCTOR_INTEGRATION_BRANCH"
 CRATE_ROSTER_ENV = "CONDUCTOR_CRATE_ROSTER"
+NATIVE_ROOT_ENV = "CONDUCTOR_NATIVE_ROOT"
 RADON_BASELINE_ENV = "CONDUCTOR_RADON_BASELINE"
 
 CANDIDATE_POLICY_KEY = "candidate_policy"
@@ -88,11 +116,13 @@ MUTATION_REGISTRY_KEY = "mutation_registry"
 PACKAGE_ROOT_KEY = "package_root"
 MUTATION_RECEIPT_ROOT_KEY = "mutation_receipt_root"
 NOTES_ROOT_KEY = "notes_root"
+NOTES_DB_KEY = "notes_db"
 GUARDRAIL_ALLOWLIST_KEY = "guardrail_allowlist"
 MEMORY_SOURCES_KEY = "memory_sources"
 INTEGRATION_BRANCH_KEY = "integration_branch"
 RETIRED_INTEGRATION_BRANCHES_KEY = "retired_integration_branches"
 CRATE_ROSTER_KEY = "crate_roster"
+NATIVE_ROOT_KEY = "native_root"
 WORKTREE_PATTERNS_KEY = "worktree_patterns"
 RADON_BASELINE_KEY = "radon_complexity_baseline"
 DEFAULTS = {
@@ -101,7 +131,9 @@ DEFAULTS = {
     PACKAGE_ROOT_KEY: DEFAULT_PACKAGE_ROOT,
     MUTATION_RECEIPT_ROOT_KEY: DEFAULT_MUTATION_RECEIPT_ROOT,
     NOTES_ROOT_KEY: DEFAULT_NOTES_ROOT,
+    NOTES_DB_KEY: DEFAULT_NOTES_DB,
     CRATE_ROSTER_KEY: DEFAULT_CRATE_ROSTER,
+    NATIVE_ROOT_KEY: DEFAULT_NATIVE_ROOT,
     RADON_BASELINE_KEY: DEFAULT_RADON_BASELINE,
     GUARDRAIL_ALLOWLIST_KEY: DEFAULT_GUARDRAIL_ALLOWLIST,
     MEMORY_SOURCES_KEY: DEFAULT_MEMORY_SOURCES,
@@ -262,18 +294,22 @@ class ProjectPaths:
     package_relative: PurePosixPath
     receipt_root_relative: PurePosixPath
     notes_relative: PurePosixPath
+    notes_db_relative: PurePosixPath
     guardrail_allowlist_relative: PurePosixPath
     memory_sources_relative: PurePosixPath
     crate_roster_relative: PurePosixPath
+    native_root_relative: PurePosixPath
     radon_baseline_relative: PurePosixPath
     policy_configured: bool
     registry_configured: bool
     package_configured: bool
     receipt_root_configured: bool
     notes_configured: bool
+    notes_db_configured: bool
     guardrail_allowlist_configured: bool
     memory_sources_configured: bool
     crate_roster_configured: bool
+    native_root_configured: bool
     radon_baseline_configured: bool
 
     @property
@@ -309,6 +345,11 @@ class ProjectPaths:
         return self.root / self.notes_relative.as_posix()
 
     @property
+    def notes_db_path(self) -> Path:
+        """The prose-search index over ``notes_path`` -- its own file."""
+        return self.root / self.notes_db_relative.as_posix()
+
+    @property
     def guardrail_allowlist_path(self) -> Path:
         """The host's guardrail allowlist -- never the package's own copy."""
         return self.root / self.guardrail_allowlist_relative.as_posix()
@@ -322,6 +363,11 @@ class ProjectPaths:
     def crate_roster_path(self) -> Path:
         """The native crate roster -- CI and the local gate both read this file."""
         return self.root / self.crate_roster_relative.as_posix()
+
+    @property
+    def native_root_path(self) -> Path:
+        """Where the extension crates' sources sit -- what ``crates()`` scans."""
+        return self.root / self.native_root_relative.as_posix()
 
     @property
     def radon_baseline_path(self) -> Path:
@@ -341,6 +387,7 @@ def project_paths(root: Path | str) -> ProjectPaths:
         base, MUTATION_RECEIPT_ROOT_KEY, MUTATION_RECEIPT_ROOT_ENV
     )
     notes, named_notes = _configured(base, NOTES_ROOT_KEY, NOTES_ROOT_ENV)
+    notes_db, named_notes_db = _configured(base, NOTES_DB_KEY, NOTES_DB_ENV)
     allowlist, named_allowlist = _configured(
         base, GUARDRAIL_ALLOWLIST_KEY, GUARDRAIL_ALLOWLIST_ENV
     )
@@ -350,6 +397,7 @@ def project_paths(root: Path | str) -> ProjectPaths:
     crate_roster, named_crate_roster = _configured(
         base, CRATE_ROSTER_KEY, CRATE_ROSTER_ENV
     )
+    native_root, named_native_root = _configured(base, NATIVE_ROOT_KEY, NATIVE_ROOT_ENV)
     radon_baseline, named_radon_baseline = _configured(
         base, RADON_BASELINE_KEY, RADON_BASELINE_ENV
     )
@@ -360,18 +408,22 @@ def project_paths(root: Path | str) -> ProjectPaths:
         package,
         receipt_root,
         notes,
+        notes_db,
         allowlist,
         memory_sources,
         crate_roster,
+        native_root,
         radon_baseline,
         named_policy,
         named_reg,
         named_pkg,
         named_receipt_root,
         named_notes,
+        named_notes_db,
         named_allowlist,
         named_memory_sources,
         named_crate_roster,
+        named_native_root,
         named_radon_baseline,
     )
 
@@ -456,6 +508,17 @@ def notes_root(root: Path | str) -> Path:
     return project_paths(root).notes_path
 
 
+def notes_db_path(root: Path | str) -> Path:
+    """The prose-search index over the notes tree, joined onto ``root``.
+
+    Resolved at call time like :func:`notes_root`, never from a module constant:
+    ``index_notes`` writes this file and ``index_notes search`` reads it, so a host
+    that keeps its prose index apart from its run database names it once in
+    ``[tool.conductor]`` and both ends follow.
+    """
+    return project_paths(root).notes_db_path
+
+
 def memory_sources_relative(root: Path | str) -> PurePosixPath:
     """Where the host keeps its memory-index catalog, relative to ``root``."""
     return project_paths(root).memory_sources_relative
@@ -512,6 +575,22 @@ def crate_roster_path(root: Path | str) -> Path:
     the unconfigured default; this function never falls back to an empty roster.
     """
     return project_paths(root).crate_roster_path
+
+
+def native_root(root: Path | str) -> Path:
+    """Where the extension crates' sources sit, joined onto ``root``.
+
+    ``native_freshness.crates`` resolves through this at call time rather than
+    from a module constant, the way every other host path here is resolved. It
+    was the constant ``tooling/native`` until 2026-09-16, so a host with another
+    layout -- this repository, whose crates are in ``native/`` -- declared no
+    crates as far as the freshness check could see, and both it and
+    ``crg_venv_sync`` answered "nothing to compare" instead of comparing. A
+    directory that does not exist is not an error here: a consumer checkout that
+    installs the crates rather than building them genuinely has no sources, and
+    the caller decides what that means.
+    """
+    return project_paths(root).native_root_path
 
 
 def radon_baseline_relative(root: Path | str) -> PurePosixPath:

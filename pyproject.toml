@@ -130,6 +130,13 @@ integration_branch = "main"
 # monorepo's `research/notes/`, which this repository does not have; this
 # repository's own docs are its knowledge base.
 notes_root = "docs"
+# Where the extension crates' sources sit (env override: $CONDUCTOR_NATIVE_ROOT).
+# `native_freshness` scans this for maturin `pyproject.toml` files, and
+# `crg_venv_sync` compares the graph server's interpreter against what it finds.
+# The unconfigured default is the monorepo's `tooling/native/`; this repository
+# keeps its crates at the top level, so until this line existed both checks saw
+# an empty roster here and reported "nothing to compare" rather than comparing.
+native_root = "native"
 # The complexity ratchet's grandfathered scores. Host data keyed by `path::name`,
 # so each repository needs its own; the unconfigured default is the monorepo's
 # `conductor/radon_complexity_baseline.json`, and this repository is a src layout.

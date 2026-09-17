@@ -1,6 +1,8 @@
-"""Index research notes + task docs into runs.db for durable, fast search.
+"""Index research notes + task docs into the notes DB for durable, fast search.
 
-Two complementary indexes, both queryable straight from `research/runs.db`:
+Two complementary indexes, both queryable straight from the host's notes
+database (`research/notes.db` by default, `[tool.conductor] notes_db` to
+repoint it):
 
   1. notes_fts   — SQLite FTS5 full-text index over every .md (prose search).
   2. note_tables — every markdown table extracted as structured rows
@@ -34,10 +36,9 @@ import sqlite3
 import sys
 import time
 
-from conductor.project_paths import host_root, notes_root
+from conductor.project_paths import host_root, notes_db_path, notes_root
 
 REPO = str(host_root())
-DB_PATH = os.path.join(REPO, "research", "runs.db")
 VAULT_ROOT = os.path.expanduser("~/Documents/CodexVault")
 
 VAULT_SOURCES = (
@@ -283,9 +284,19 @@ def cmd_tables(conn: sqlite3.Connection, note_like: str) -> None:
 
 
 def main(argv: list[str]) -> None:
-    if not os.path.exists(DB_PATH):
-        raise FileNotFoundError(f"runs.db not found at {DB_PATH}")
-    conn = sqlite3.connect(DB_PATH)
+    # Resolved per call, never a module constant: the host names this file in
+    # ``[tool.conductor] notes_db`` and both the writer and ``search`` follow the
+    # one answer. Until 2026-09-16 this was hardcoded to ``research/runs.db``,
+    # so after the monorepo split its prose index kept landing in the run
+    # database while every documented reader -- CLAUDE.md, ``defaults.NOTES_DB``,
+    # ``build_obsidian_ops`` -- read ``research/notes.db``, which stayed frozen.
+    db_path = str(notes_db_path(REPO))
+    if not os.path.exists(db_path):
+        raise FileNotFoundError(
+            f"notes database not found at {db_path}; create it or set "
+            "[tool.conductor] notes_db / CONDUCTOR_NOTES_DB"
+        )
+    conn = sqlite3.connect(db_path)
     try:
         if len(argv) >= 2 and argv[1] == "search":
             cmd_search(conn, " ".join(argv[2:]))
@@ -293,7 +304,7 @@ def main(argv: list[str]) -> None:
             cmd_tables(conn, " ".join(argv[2:]))
         else:
             n_files, n_tables = rebuild(conn)
-            print(f"indexed {n_files} notes, {n_tables} tables into runs.db")
+            print(f"indexed {n_files} notes, {n_tables} tables into {db_path}")
             print("  search: python -m conductor.index_notes search '<query>'")
             print("  tables: python -m conductor.index_notes tables '<note>'")
     finally:

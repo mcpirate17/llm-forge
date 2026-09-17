@@ -291,7 +291,10 @@ def test_task_previews_opens_index_read_only(
             connection.execute("CREATE TABLE forbidden_write (value INTEGER)")
         return [{"title": "Task", "snippet": "Pending", "path": "task.md"}]
 
-    monkeypatch.setattr(index_notes, "DB_PATH", database)
+    # Steered where the reader really looks: the host's configured notes index,
+    # not a module constant. It was `index_notes.DB_PATH` -- `research/runs.db`
+    # -- until 2026-09-16, which is not the file the writer wrote.
+    monkeypatch.setattr(sb, "notes_db_path", lambda _root: database)
     monkeypatch.setattr(index_notes, "search_notes", fake_search)
 
     assert sb.task_previews("pending work") == ["- Task: Pending (task.md)"]

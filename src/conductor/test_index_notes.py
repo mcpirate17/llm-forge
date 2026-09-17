@@ -12,9 +12,9 @@ Rust.
 The Python side runs in-process against a monkeypatched module (its source
 roots, vault root and REPO are all module-level constants derived from this
 checkout, not CLI flags) rather than shelling out to
-`python -m conductor.index_notes`, which hardcodes `DB_PATH`/`TASKS_SOURCE`/
-`VAULT_ROOT` onto *this repo's own* `research/runs.db` -- a subprocess call
-would read/write the real database instead of the fixture. The Rust side
+`python -m conductor.index_notes`, whose `TASKS_SOURCE`/`VAULT_ROOT` and
+resolved notes database all point at *this repo's own* tree -- a subprocess
+call would read/write the real database instead of the fixture. The Rust side
 does have `--host`/`--vault`/`--db` flags, so it runs as the real
 `forge notes` binary via subprocess, which is the actual CI/user path.
 """
@@ -106,7 +106,6 @@ def _index_python(
     db_path.parent.mkdir(parents=True, exist_ok=True)
     db_path.touch()
     monkeypatch.setattr(index_notes, "REPO", str(host))
-    monkeypatch.setattr(index_notes, "DB_PATH", str(db_path))
     monkeypatch.setattr(index_notes, "VAULT_ROOT", str(vault))
     monkeypatch.setattr(index_notes, "TASKS_SOURCE", ("tasks", str(host / "tasks")))
     monkeypatch.setattr(
