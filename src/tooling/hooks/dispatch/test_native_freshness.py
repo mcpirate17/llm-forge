@@ -19,7 +19,9 @@ import pytest
 from tooling.hooks.dispatch import adapters, registry
 from tooling.hooks.dispatch.native_freshness import (
     Crate,
+    compiled_extensions,
     crates,
+    direct_url,
     dist_info,
     findings,
     report,
@@ -106,6 +108,41 @@ def test_only_a_crate_declaring_a_module_name_is_installed(tmp_path: Path):
 
 def test_a_tree_with_no_native_directory_declares_nothing(tmp_path: Path):
     assert crates(tmp_path) == ()
+
+
+def test_the_host_names_where_its_crates_are(tmp_path: Path):
+    """``tooling/native`` was a module constant until 2026-09-16.
+
+    A host on another layout -- llm-forge keeps its crates in ``native/`` --
+    declared no crates as far as this module could see, so every question below
+    answered with silence instead of an answer, on the checkout that builds them.
+    """
+    crate = tmp_path / "crates/demo-native"
+    (crate / "src").mkdir(parents=True)
+    (crate / "pyproject.toml").write_text(PYPROJECT)
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nnative_root = "crates"\n'
+    )
+    assert [one.distribution for one in crates(tmp_path)] == ["demo-native"]
+
+
+def test_a_compiled_extension_is_read_from_the_record(tmp_path: Path):
+    info = install(tmp_path)
+    (info / "RECORD").write_text(
+        "demo_native/demo_native.cpython-312-x86_64-linux-gnu.so,,\n"
+        "demo_native/__init__.py,,\n"
+    )
+    assert compiled_extensions(info) == (
+        "demo_native/demo_native.cpython-312-x86_64-linux-gnu.so",
+    )
+
+
+def test_a_distribution_from_an_index_records_no_origin(tmp_path: Path):
+    """PEP 610 writes ``direct_url.json`` only for a path, archive or VCS install."""
+    assert direct_url(install(tmp_path)) == {}
+    assert direct_url(install(tmp_path, version="9.9.9", url="file:///x"))["url"] == (
+        "file:///x"
+    )
 
 
 def test_the_make_target_names_the_directory_not_the_distribution(tmp_path: Path):

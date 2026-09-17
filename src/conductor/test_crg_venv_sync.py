@@ -84,6 +84,42 @@ def installed(packages: Path, distribution: str, version: str) -> None:
     (packages / f"{normalized(distribution)}-{version}.dist-info").mkdir(parents=True)
 
 
+def consumer_venv(
+    root: Path,
+    distribution: str,
+    version: str,
+    *,
+    origin: dict[str, object] | None = None,
+    extension: bool = True,
+) -> Path:
+    """Install one distribution into the checkout's *own* venv, as a consumer has it.
+
+    ``origin`` is the PEP 610 record a direct reference leaves behind and an index
+    install does not; ``extension`` is whether the wheel carried a compiled module.
+    Together they are the filter that tells a crate of ours from numpy.
+    """
+    module = normalized(distribution)
+    packages = root / ".venv" / "lib" / "python3.12" / "site-packages"
+    info = packages / f"{module}-{version}.dist-info"
+    info.mkdir(parents=True)
+    payload = (
+        f"{module}/{module}.cpython-312-x86_64-linux-gnu.so"
+        if extension
+        else f"{module}/__init__.py"
+    )
+    (info / "RECORD").write_text(f"{payload},,\n", encoding="utf-8")
+    if origin is not None:
+        (info / "direct_url.json").write_text(json.dumps(origin), encoding="utf-8")
+    return info
+
+
+GIT_ORIGIN: dict[str, object] = {
+    "url": "https://github.com/example/forge",
+    "vcs_info": {"vcs": "git", "commit_id": "c0ffee"},
+    "subdirectory": "native/demo-native",
+}
+
+
 @pytest.fixture
 def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A checkout declaring one crate and a server on its own private interpreter."""
@@ -145,9 +181,9 @@ def test_sync_repairs_the_mismatch_and_reports_what_it_installed(
     installed(packages, "conductor-native", "0.1.25")
     monkeypatch.setenv("FAKE_IMPORT_ERROR", "cannot import name 'new_symbol_native'")
 
-    def fake_install(_: Path, crate: sync.Crate) -> None:
+    def fake_install(_: Path, one: sync.Requirement) -> None:
         monkeypatch.delenv("FAKE_IMPORT_ERROR", raising=False)
-        installed(packages, crate.distribution, crate.version)
+        installed(packages, one.distribution, one.version)
 
     monkeypatch.setattr(sync, "install", fake_install)
     verdict, detail = sync.run(tree, check_only=False)
@@ -163,8 +199,8 @@ def test_absent_crates_are_installed_only_after_the_mismatches_fail(
     monkeypatch.setenv("FAKE_IMPORT_ERROR", "cannot import name 'new_symbol_native'")
     order: list[str] = []
 
-    def fake_install(_: Path, crate: sync.Crate) -> None:
-        order.append(crate.distribution)
+    def fake_install(_: Path, one: sync.Requirement) -> None:
+        order.append(one.distribution)
         if len(order) == 2:  # only the second stage clears the import
             monkeypatch.delenv("FAKE_IMPORT_ERROR", raising=False)
 
@@ -204,11 +240,106 @@ def test_the_checkouts_own_venv_is_a_skip(
     assert any("uv sync" in line for line in detail)
 
 
-def test_a_tree_with_no_crates_is_a_skip(tmp_path: Path) -> None:
+def test_a_tree_with_neither_sources_nor_an_install_is_a_skip(tmp_path: Path) -> None:
     declare_server(tmp_path, interpreter(tmp_path))
     verdict, detail = sync.run(tmp_path, check_only=True)
     assert verdict == "SKIP"
     assert any("no extension crates" in line for line in detail)
+    # Both places it looked, named -- the message said only "this tree declares
+    # none" until 2026-09-16 and had only ever looked in the first of them.
+    assert any("tooling/native" in line and ".venv" in line for line in detail)
+
+
+@pytest.fixture
+def consumer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A checkout with no crate sources that installs them: the monorepo's shape."""
+    packages = tmp_path / "server-venv" / "site-packages"
+    packages.mkdir(parents=True)
+    consumer_venv(tmp_path, "demo-native", "0.1.30", origin=GIT_ORIGIN)
+    declare_server(tmp_path, interpreter(tmp_path))
+    monkeypatch.setattr(sync, "declared_names", lambda: ("demo-native",))
+    monkeypatch.setenv("FAKE_PURELIB", str(packages))
+    monkeypatch.delenv("FAKE_IMPORT_ERROR", raising=False)
+    return tmp_path
+
+
+def test_a_consumer_checkout_is_compared_against_what_it_installed(
+    consumer: Path,
+) -> None:
+    """The defect this guard spent 2026-09-14..09-16 unable to see.
+
+    The crates left the monorepo's tree in the extraction, so ``crates()`` found
+    none, ``skipped()`` said "this tree declares no extension crates", and the one
+    host with a separate server interpreter -- the only host the check exists for
+    -- returned SKIP and exit 0 on every run. Nothing pinned that it ever compared.
+    """
+    installed(packages_of(consumer), "demo-native", "0.1.25")
+    verdict, detail = sync.run(consumer, check_only=True)
+    assert verdict == "FAIL"
+    assert any("0.1.25 installed, 0.1.30 declared" in line for line in detail)
+
+
+def test_a_consumer_repair_installs_the_reference_not_a_directory(
+    consumer: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """There is no crate directory to point at, and pointing at one installs a lie."""
+    installed(packages_of(consumer), "demo-native", "0.1.25")
+    monkeypatch.setenv("FAKE_IMPORT_ERROR", "cannot import name 'new_symbol_native'")
+    sources: list[str] = []
+
+    def fake_install(_: Path, one: sync.Requirement) -> None:
+        sources.append(one.source)
+        monkeypatch.delenv("FAKE_IMPORT_ERROR", raising=False)
+
+    monkeypatch.setattr(sync, "install", fake_install)
+    assert sync.run(consumer, check_only=False)[0] == "SYNCED"
+    assert sources == [
+        "demo-native @ git+https://github.com/example/forge@c0ffee"
+        "#subdirectory=native/demo-native"
+    ]
+
+
+def test_an_index_installed_requirement_is_not_a_crate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """numpy, coverage and PyYAML all ship a ``.so`` and none of them is ours."""
+    consumer_venv(tmp_path, "demo-native", "0.1.30", origin=None)
+    monkeypatch.setattr(sync, "declared_names", lambda: ("demo-native",))
+    assert sync.required(tmp_path) == ()
+
+
+def test_a_pure_python_requirement_is_not_a_crate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Installed from a direct reference, but there is no extension to be stale."""
+    consumer_venv(tmp_path, "demo-native", "0.1.30", origin=GIT_ORIGIN, extension=False)
+    monkeypatch.setattr(sync, "declared_names", lambda: ("demo-native",))
+    assert sync.required(tmp_path) == ()
+
+
+def test_crate_sources_in_the_tree_win_over_what_is_installed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A host that builds its crates is measured against the build, not the install.
+
+    The installed copy is whatever was last synced; the sources are what the next
+    `make` produces. Reading the install on a tree that has sources would hide
+    exactly the version bump the freshness check exists to catch.
+    """
+    directory = crate_dir(tmp_path, "demo-native", "0.2.0")
+    consumer_venv(tmp_path, "demo-native", "0.1.30", origin=GIT_ORIGIN)
+    monkeypatch.setattr(sync, "declared_names", lambda: ("demo-native",))
+    assert sync.required(tmp_path) == (
+        sync.Requirement("demo-native", "0.2.0", str(directory)),
+    )
+
+
+def test_the_requirement_names_come_from_this_packages_own_metadata() -> None:
+    """Not a literal here: a crate added upstream must not need this file edited."""
+    names = sync.declared_names()
+    assert "conductor-native" in names
+    # Extras are another install's problem -- the graph server's own pin among them.
+    assert not any(name.startswith("code-review-graph") for name in names)
 
 
 def test_an_undeclared_server_fails_loud(tmp_path: Path) -> None:

@@ -37,7 +37,7 @@ from conductor.candidate_review.ownership import (
     paths_overlap,
 )
 from conductor.context_envelope import dedupe_fragments, fit_text
-from conductor.project_paths import host_root
+from conductor.project_paths import host_root, notes_db_path
 from conductor.session_preamble import MAX_HEADINGS, load_state
 
 ROOT: Final[Path] = host_root()
@@ -222,14 +222,23 @@ def memory_previews(task: str, k: int = MEMORY_K) -> list[str]:
 
 
 def task_previews(task: str, k: int = 3) -> list[str]:
-    """Fetch cheap, local task/TODO previews without opening whole documents."""
+    """Fetch cheap, local task/TODO previews without opening whole documents.
+
+    The database is the host's prose index, resolved the same way ``index_notes``
+    resolves it when it writes. This read ``index_notes.DB_PATH`` until
+    2026-09-16, which was hardcoded to ``research/runs.db``: on a host that had
+    split its databases the writer and this reader were pointed at different
+    files, so every session's task previews came from whatever the run database
+    happened to hold -- on the monorepo, an index frozen since the 09-14 split.
+    """
 
     try:
-        from conductor.index_notes import DB_PATH, search_notes
+        from conductor.index_notes import search_notes
 
-        if not Path(DB_PATH).is_file():
+        database = notes_db_path(ROOT)
+        if not database.is_file():
             return []
-        with sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True) as connection:
+        with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
             rows = search_notes(connection, task, limit=k, source="tasks")
     except (OSError, RuntimeError, sqlite3.Error, ValueError):
         return []

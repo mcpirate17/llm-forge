@@ -487,6 +487,49 @@ def test_a_host_configured_with_the_monorepo_default_still_resolves_there(tmp_pa
     assert pp.notes_root(tmp_path) == tmp_path / "research/notes"
 
 
+def test_notes_db_defaults_beside_the_notes_tree_not_in_the_run_database():
+    """The default that was wrong until 2026-09-16.
+
+    ``index_notes`` hardcoded ``research/runs.db``, so a host that split its
+    databases indexed prose into the run database while every documented reader
+    -- the monorepo's ``defaults.NOTES_DB``, its CLAUDE.md, ``build_obsidian_ops``
+    -- opened ``research/notes.db`` and saw a frozen index. Nothing pinned the
+    literal, so the drift was silent; this is that pin.
+    """
+    assert pp.DEFAULT_NOTES_DB == PurePosixPath("research/notes.db")
+    assert pp.DEFAULTS[pp.NOTES_DB_KEY] == pp.DEFAULT_NOTES_DB
+    assert pp.DEFAULT_NOTES_DB != pp.DEFAULT_NOTES_ROOT
+
+
+def test_notes_db_is_the_default_without_configuration(tmp_path):
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.notes_db_relative == PurePosixPath("research/notes.db")
+    assert resolved.notes_db_configured is False
+    assert resolved.notes_db_path == tmp_path / "research/notes.db"
+    assert pp.notes_db_path(tmp_path) == tmp_path / "research/notes.db"
+
+
+def test_notes_db_comes_from_the_conductor_table(tmp_path):
+    """A host that never split its databases says so once and keeps one file."""
+    _write(tmp_path, '[tool.conductor]\nnotes_db = "research/runs.db"\n')
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.notes_db_relative == PurePosixPath("research/runs.db")
+    assert resolved.notes_db_configured is True
+    assert pp.notes_db_path(tmp_path) == tmp_path / "research/runs.db"
+
+
+def test_notes_db_environment_overrides_the_table(tmp_path, monkeypatch):
+    _write(tmp_path, '[tool.conductor]\nnotes_db = "research/runs.db"\n')
+    monkeypatch.setenv(pp.NOTES_DB_ENV, "var/prose.db")
+    assert pp.notes_db_path(tmp_path) == tmp_path / "var/prose.db"
+
+
+def test_notes_db_refuses_an_unusable_value(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nnotes_db = "/absolute/prose.db"\n')
+    with pytest.raises(pp.ProjectPathError):
+        pp.notes_db_path(tmp_path)
+
+
 def test_guardrail_allowlist_defaults_to_the_monorepo_literal():
     assert pp.DEFAULT_GUARDRAIL_ALLOWLIST == PurePosixPath(
         "conductor/guardrail_allowlist.json"
@@ -569,6 +612,69 @@ def test_crate_roster_refuses_an_unusable_value(tmp_path):
     _write(tmp_path, '[tool.conductor]\ncrate_roster = "../elsewhere.toml"\n')
     with pytest.raises(pp.ProjectPathError):
         pp.crate_roster_relative(tmp_path)
+
+
+def test_the_distribution_name_matches_the_package_resources_copy():
+    """Two spellings of one name, deliberately not shared.
+
+    ``package_resources`` verifies wheel bytes and keeps its import graph two
+    modules wide -- the minimal wheel its own tests install carries nothing else --
+    so it cannot import this constant. That is the trade; this is the pin that
+    stops a rename from taking only one side.
+    """
+    from conductor import package_resources
+
+    assert package_resources._DISTRIBUTION_NAME == pp.DISTRIBUTION_NAME
+
+
+def test_native_root_defaults_to_the_monorepo_literal():
+    """The constant that disarmed two checks until 2026-09-16.
+
+    ``native_freshness.crates`` scanned the module constant ``tooling/native`` and
+    returned ``()`` for any host on another layout -- this repository among them,
+    whose crates are in ``native/``. Both it and ``crg_venv_sync`` then answered
+    every freshness question with "nothing to compare" rather than comparing.
+    """
+    assert pp.DEFAULT_NATIVE_ROOT == PurePosixPath("tooling/native")
+    assert pp.DEFAULTS[pp.NATIVE_ROOT_KEY] == pp.DEFAULT_NATIVE_ROOT
+    # The roster and the sources are separate keys: one names which crates are
+    # linted, the other where they live, and a host can move either alone.
+    assert pp.NATIVE_ROOT_KEY != pp.CRATE_ROSTER_KEY
+
+
+def test_native_root_is_the_default_without_configuration(tmp_path):
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.native_root_relative == PurePosixPath("tooling/native")
+    assert resolved.native_root_configured is False
+    assert resolved.native_root_path == tmp_path / "tooling/native"
+    assert pp.native_root(tmp_path) == tmp_path / "tooling/native"
+
+
+def test_native_root_comes_from_the_conductor_table(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nnative_root = "native"\n')
+    resolved = pp.project_paths(tmp_path)
+    assert resolved.native_root_relative == PurePosixPath("native")
+    assert resolved.native_root_configured is True
+    assert pp.native_root(tmp_path) == tmp_path / "native"
+
+
+def test_native_root_environment_overrides_the_table(tmp_path, monkeypatch):
+    _write(tmp_path, '[tool.conductor]\nnative_root = "native"\n')
+    monkeypatch.setenv(pp.NATIVE_ROOT_ENV, "crates")
+    assert pp.native_root(tmp_path) == tmp_path / "crates"
+
+
+def test_native_root_refuses_an_unusable_value(tmp_path):
+    _write(tmp_path, '[tool.conductor]\nnative_root = "/elsewhere/native"\n')
+    with pytest.raises(pp.ProjectPathError):
+        pp.native_root(tmp_path)
+
+
+def test_this_repository_declares_where_its_own_crates_are():
+    """The fix is only live because this repository says so in its own table."""
+    here = Path(__file__).resolve().parents[2]
+    assert pp.project_paths(here).native_root_configured is True
+    assert pp.native_root(here) == here / "native"
 
 
 def test_memory_sources_defaults_to_the_host_conductor_dir(tmp_path, monkeypatch):

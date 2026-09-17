@@ -363,9 +363,15 @@ pub fn search_notes(conn: &Connection, query: &str, limit: u32) -> Result<Vec<Se
     Ok(rows)
 }
 
+/// The prose-search index, defaulting to `HOST/research/notes.db`.
+///
+/// Kept byte-identical to the Python reference's `notes_db_path` default:
+/// both hardcoded `runs.db` until 2026-09-16, so after the monorepo split
+/// the index landed in the run database while every documented reader
+/// looked in `notes.db`. A host that keeps the two together passes `--db`.
 fn resolve_db_path(host: &Path, db: Option<&Path>) -> PathBuf {
     db.map(PathBuf::from)
-        .unwrap_or_else(|| host.join("research").join("runs.db"))
+        .unwrap_or_else(|| host.join("research").join("notes.db"))
 }
 
 #[derive(Args)]
@@ -377,7 +383,7 @@ pub struct IndexArgs {
     /// only when its `research/` child exists.
     #[arg(long)]
     pub vault: Option<PathBuf>,
-    /// Overrides the default `HOST/research/runs.db`.
+    /// Overrides the default `HOST/research/notes.db`.
     #[arg(long)]
     pub db: Option<PathBuf>,
 }
@@ -395,18 +401,21 @@ pub struct SearchArgs {
     pub json: bool,
 }
 
-/// `forge notes index`: same "runs.db not found" refusal as the Python CLI
+/// `forge notes index`: same "notes database not found" refusal as the Python CLI
 /// -- this command does not create the db file itself, only opens it.
 pub fn run_index(args: &IndexArgs) -> Result<u8> {
     let db_path = resolve_db_path(&args.host, args.db.as_deref());
     if !db_path.exists() {
-        bail!("runs.db not found at {}", db_path.display());
+        bail!("notes database not found at {}", db_path.display());
     }
     let vault = args.vault.clone().unwrap_or_else(default_vault_root);
     let mut conn =
         Connection::open(&db_path).with_context(|| format!("opening {}", db_path.display()))?;
     let (n_files, n_tables) = rebuild(&mut conn, &args.host, Some(&vault))?;
-    println!("indexed {n_files} notes, {n_tables} tables into runs.db");
+    println!(
+        "indexed {n_files} notes, {n_tables} tables into {}",
+        db_path.display()
+    );
     Ok(0)
 }
 
@@ -414,7 +423,7 @@ pub fn run_index(args: &IndexArgs) -> Result<u8> {
 pub fn run_search(args: &SearchArgs) -> Result<u8> {
     let db_path = resolve_db_path(&args.host, args.db.as_deref());
     if !db_path.exists() {
-        bail!("runs.db not found at {}", db_path.display());
+        bail!("notes database not found at {}", db_path.display());
     }
     let conn =
         Connection::open(&db_path).with_context(|| format!("opening {}", db_path.display()))?;
@@ -516,6 +525,25 @@ mod tests {
         let hits = search_notes(&conn, "tfwd", 10).unwrap();
         assert_eq!(hits.len(), 1);
         assert!(hits[0].path.ends_with("alpha.md"));
+    }
+
+    #[test]
+    fn default_db_is_the_notes_database_not_the_run_database() {
+        // Parity pin with the Python reference's `DEFAULT_NOTES_DB`. Both sides
+        // hardcoded `runs.db` until 2026-09-16, which sent the prose index to the
+        // run database on any host that had split the two.
+        let host = Path::new("/srv/host");
+        assert_eq!(
+            resolve_db_path(host, None),
+            PathBuf::from("/srv/host/research/notes.db")
+        );
+    }
+
+    #[test]
+    fn an_explicit_db_flag_wins_over_the_default() {
+        let host = Path::new("/srv/host");
+        let chosen = PathBuf::from("/tmp/other.db");
+        assert_eq!(resolve_db_path(host, Some(&chosen)), chosen);
     }
 
     fn tempfile_dir() -> PathBuf {

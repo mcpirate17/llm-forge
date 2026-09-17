@@ -16,6 +16,14 @@ questions per crate -- the version installed over there against the one this tre
 declares -- and then the one that decides it: can that interpreter import
 ``conductor.crg_server`` at all.
 
+The roster is the crates *this checkout runs on*, which is not always the crates
+this tree builds. A host that installs the tooling rather than building it -- the
+monorepo, since the 2026-09-14 extraction -- has no crate sources at all, so the
+roster comes from its own ``.venv`` instead: the extension distributions this
+package requires, at the versions installed here. Until 2026-09-16 only the
+in-tree sources were looked for, so the one host this guard exists to protect
+answered ``SKIP`` on every run and the skew it watches for could not be seen.
+
 A crate that is merely *absent* over there is not drift while the server still
 imports: ``slop_core`` is optional by construction in ``conductor/_native.py`` and the
 server never reaches it, so putting it in a venv that exists to serve graph tools would
@@ -37,15 +45,20 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
+from importlib import metadata
 from pathlib import Path
 
 from conductor.crg_mcp_probe import ProbeError, load_server_cmd
+from conductor.project_paths import DISTRIBUTION_NAME, native_root
 from tooling.hooks.dispatch.native_freshness import (
-    Crate,
+    compiled_extensions,
     crates,
+    direct_url,
     dist_info,
     installed_version,
     site_packages,
@@ -54,6 +67,9 @@ from tooling.hooks.dispatch.native_freshness import (
 ABSENT = "absent"
 IMPORT_PROBE = "import conductor.crg_server"
 PURELIB_PROBE = "import sysconfig; print(sysconfig.get_paths()['purelib'])"
+# Where a requirement's name stops and its version specifier, extras or marker
+# begins, in the `Requires-Dist` strings importlib hands back.
+NAME_END = re.compile(r"[<>=!~;\[(\s]")
 TIMEOUT_SECONDS = 900
 # A SessionStart hook may not wait fifteen minutes on a wedged interpreter. Both
 # probes it runs are sub-second measured (startup, and 0.26 s for the import), so
@@ -62,10 +78,26 @@ SESSION_TIMEOUT_SECONDS = 20
 
 
 @dataclass(frozen=True)
-class Skew:
-    """One crate the server's interpreter does not carry at this tree's version."""
+class Requirement:
+    """One extension crate this checkout runs on, and where to get it again.
 
-    crate: Crate
+    ``source`` is whatever ``uv pip install`` should be handed: a crate directory
+    when this tree builds the crate, and a PEP 508 direct reference when it only
+    installs it. Repair needs that distinction -- a consumer checkout has no
+    directory to point at, and pointing at the wrong one installs someone else's
+    crate into the server's interpreter.
+    """
+
+    distribution: str
+    version: str
+    source: str
+
+
+@dataclass(frozen=True)
+class Skew:
+    """One crate the server's interpreter does not carry at this checkout's version."""
+
+    requirement: Requirement
     installed: str
 
     @property
@@ -74,9 +106,84 @@ class Skew:
 
     def line(self) -> str:
         return (
-            f"{self.crate.distribution}: {self.installed} installed, "
-            f"{self.crate.version} declared"
+            f"{self.requirement.distribution}: {self.installed} installed, "
+            f"{self.requirement.version} declared"
         )
+
+
+def _reference(distribution: str, info: Path) -> str | None:
+    """The PEP 508 direct reference that would reinstall this distribution."""
+    origin = direct_url(info)
+    url = origin.get("url")
+    if not isinstance(url, str):
+        return None
+    vcs = origin.get("vcs_info")
+    if isinstance(vcs, Mapping):
+        backend = vcs.get("vcs")
+        commit = vcs.get("commit_id") or vcs.get("requested_revision")
+        if not isinstance(backend, str) or not isinstance(commit, str):
+            return None
+        url = f"{backend}+{url}@{commit}"
+    subdirectory = origin.get("subdirectory")
+    if isinstance(subdirectory, str) and subdirectory:
+        url = f"{url}#subdirectory={subdirectory}"
+    return f"{distribution} @ {url}"
+
+
+def declared_names() -> tuple[str, ...]:
+    """What this package requires, asked of the metadata of the copy now running.
+
+    The server imports ``conductor`` out of the checkout under inspection, so the
+    requirement *names* are this code's own -- read from the distribution that
+    owns this module rather than spelled out here, so a crate added upstream is
+    picked up without editing this file. The *versions* come from the checkout.
+    """
+    try:
+        declared = metadata.distribution(DISTRIBUTION_NAME).requires or ()
+    except metadata.PackageNotFoundError:
+        # A source checkout running straight off the tree, never installed. It has
+        # its crates in-tree by construction, so this source is not what answers.
+        return ()
+    return tuple(
+        NAME_END.split(spec, maxsplit=1)[0]
+        for spec in declared
+        if "extra ==" not in spec.partition(";")[2]
+    )
+
+
+def installed_requirements(root: Path) -> tuple[Requirement, ...]:
+    """The extension crates this checkout carries as installed distributions.
+
+    A requirement counts only when it was installed from a direct reference *and*
+    ships a compiled extension. Both halves are load-bearing: the reference is
+    what separates a crate of ours from a third-party wheel that also carries a
+    ``.so`` (numpy, coverage, PyYAML all do), and the extension is what separates
+    a crate from the pure-Python requirements installed the same way.
+    """
+    packages = site_packages(root)
+    if packages is None:
+        return ()
+    found = []
+    for name in declared_names():
+        info = dist_info(packages, name)
+        if info is None or not compiled_extensions(info):
+            continue
+        reference = _reference(name, info)
+        if reference is None:
+            continue
+        found.append(Requirement(name, installed_version(info), reference))
+    return tuple(found)
+
+
+def required(root: Path) -> tuple[Requirement, ...]:
+    """The extension crates this checkout runs on -- built here, else installed here."""
+    built = crates(root)
+    if built:
+        return tuple(
+            Requirement(crate.distribution, crate.version, str(crate.directory))
+            for crate in built
+        )
+    return installed_requirements(root)
 
 
 def uv_env() -> dict[str, str]:
@@ -105,14 +212,14 @@ def purelib(interpreter: Path, timeout: float = TIMEOUT_SECONDS) -> Path:
     return Path(done.stdout.strip())
 
 
-def skews(packages: Path, declared: tuple[Crate, ...]) -> tuple[Skew, ...]:
-    """Every crate whose version over there is not the version this tree declares."""
+def skews(packages: Path, declared: tuple[Requirement, ...]) -> tuple[Skew, ...]:
+    """Every crate whose version over there is not the version this checkout runs on."""
     found = []
-    for crate in declared:
-        info = dist_info(packages, crate.distribution)
+    for requirement in declared:
+        info = dist_info(packages, requirement.distribution)
         installed = installed_version(info) if info is not None else ABSENT
-        if installed != crate.version:
-            found.append(Skew(crate, installed))
+        if installed != requirement.version:
+            found.append(Skew(requirement, installed))
     return tuple(found)
 
 
@@ -137,8 +244,8 @@ def imports_server(
     return lines[-1] if lines else f"exit {done.returncode}"
 
 
-def install(interpreter: Path, crate: Crate) -> None:
-    """Rebuild one crate into the server's interpreter without touching its other pins."""
+def install(interpreter: Path, requirement: Requirement) -> None:
+    """Put one crate into the server's interpreter without touching its other pins."""
     done = subprocess.run(
         [
             "uv",
@@ -148,7 +255,7 @@ def install(interpreter: Path, crate: Crate) -> None:
             str(interpreter),
             "--no-deps",
             "--reinstall",
-            str(crate.directory),
+            requirement.source,
         ],
         env=uv_env(),
         capture_output=True,
@@ -157,15 +264,16 @@ def install(interpreter: Path, crate: Crate) -> None:
     )
     if done.returncode != 0:
         raise ProbeError(
-            f"installing {crate.distribution} into {interpreter} failed:\n{done.stderr}"
+            f"installing {requirement.distribution} into {interpreter} "
+            f"failed:\n{done.stderr}"
         )
 
 
 def repair(
     interpreter: Path, cwd: Path, env: dict[str, str], skew: tuple[Skew, ...]
-) -> tuple[list[Crate], str | None]:
+) -> tuple[list[Requirement], str | None]:
     """Install the mismatches, then the absent crates only if the import is still broken."""
-    installed: list[Crate] = []
+    installed: list[Requirement] = []
     failure: str | None = None
     stages = (
         tuple(one for one in skew if not one.absent),
@@ -173,20 +281,31 @@ def repair(
     )
     for stage in stages:
         for one in stage:
-            install(interpreter, one.crate)
-            installed.append(one.crate)
+            install(interpreter, one.requirement)
+            installed.append(one.requirement)
         failure = imports_server(interpreter, cwd, env)
         if failure is None:
             return installed, None
     return installed, failure
 
 
-def skipped(root: Path, interpreter: Path, packages: Path | None) -> str | None:
+def skipped(
+    root: Path,
+    declared: tuple[Requirement, ...],
+    interpreter: Path,
+    packages: Path | None,
+) -> str | None:
     """Why there is nothing to compare, when there is nothing to compare."""
     if not interpreter.exists():
         return f"{interpreter} does not exist; the server is not installed here"
-    if not crates(root):
-        return "this tree declares no extension crates"
+    if not declared:
+        # Both places a crate can be, named: this read "this tree declares no
+        # extension crates" until 2026-09-16 and only ever looked in the first,
+        # so the consumer checkout it exists to guard skipped every run.
+        return (
+            f"no extension crates: none under {native_root(root)}, and this "
+            "checkout's .venv carries none of the ones this package requires"
+        )
     own = site_packages(root)
     # Both interpreters are symlinks onto the same base python, so only the
     # site-packages they resolve to separates a private venv from this one.
@@ -198,19 +317,20 @@ def skipped(root: Path, interpreter: Path, packages: Path | None) -> str | None:
 def run(root: Path, check_only: bool) -> tuple[str, list[str]]:
     """The verdict -- SKIP, PASS, FAIL or SYNCED -- and the lines that justify it."""
     interpreter, cwd, env = server_interpreter(root)
-    reason = skipped(root, interpreter, None)
+    declared = required(root)
+    reason = skipped(root, declared, interpreter, None)
     if reason is None:
         packages = purelib(interpreter)
-        reason = skipped(root, interpreter, packages)
+        reason = skipped(root, declared, interpreter, packages)
     if reason is not None:
         return "SKIP", [reason]
 
-    skew = skews(packages, crates(root))
+    skew = skews(packages, declared)
     failure = imports_server(interpreter, cwd, env)
     mismatched = tuple(one for one in skew if not one.absent)
     detail = [one.line() for one in mismatched]
     detail += [
-        f"{one.crate.distribution}: absent from the server's interpreter"
+        f"{one.requirement.distribution}: absent from the server's interpreter"
         for one in skew
         if one.absent
     ]
@@ -222,7 +342,7 @@ def run(root: Path, check_only: bool) -> tuple[str, list[str]]:
         return "FAIL", detail
 
     installed, remaining = repair(interpreter, cwd, env, skew)
-    names = ", ".join(crate.distribution for crate in installed) or "nothing"
+    names = ", ".join(one.distribution for one in installed) or "nothing"
     if remaining is not None:
         return "FAIL", [*detail, f"reinstalled {names}, still broken: {remaining}"]
     return "SYNCED", [*detail, f"reinstalled {names} into {interpreter}"]
@@ -249,13 +369,14 @@ def session_findings(root: Path) -> tuple[str, ...]:
         # A checkout that does not declare the server has nothing to compare, the
         # same silence native_freshness keeps for a checkout with no .venv.
         return ()
-    if skipped(root, interpreter, None) is not None:
+    declared = required(root)
+    if skipped(root, declared, interpreter, None) is not None:
         return ()
     packages = purelib(interpreter, timeout=SESSION_TIMEOUT_SECONDS)
-    if skipped(root, interpreter, packages) is not None:
+    if skipped(root, declared, interpreter, packages) is not None:
         return ()
 
-    mismatched = [one for one in skews(packages, crates(root)) if not one.absent]
+    mismatched = [one for one in skews(packages, declared) if not one.absent]
     if not mismatched:
         return ()
     lines = [f"{one.line()}; `make crg-sync`" for one in mismatched]

@@ -189,7 +189,7 @@ forge notes index --host /path/to/repo [--vault ~/Documents/CodexVault] [--db PA
 forge notes search --host /path/to/repo "binding wall semiring" [--limit N] [--json]
 ```
 
-`index` rebuilds `HOST/research/runs.db`'s `notes_fts` (FTS5 prose) and
+`index` rebuilds `HOST/research/notes.db`'s `notes_fts` (FTS5 prose) and
 `note_tables` (extracted markdown tables) from **both** trees always: the
 host's own `research/notes/**.md` (`source=notes`) and `tasks/**.md`
 (`source=tasks`, excluding `tasks/audit/`), plus -- when the Obsidian vault
@@ -199,7 +199,10 @@ to*, never instead of, the repo's own notes. `search` runs an FTS5 `MATCH`
 query over an already-built index. `python -m conductor.index_notes`
 (`src/conductor/index_notes.py`) is the reference implementation the schema
 and extraction rules are ported from byte-for-byte; it stays the source of
-truth if the two ever disagree.
+truth if the two ever disagree. Both sides defaulted to `research/runs.db`
+until 2026-09-16; a host that keeps its prose index and its run database in
+one file names it in `[tool.conductor] notes_db` (or `$CONDUCTOR_NOTES_DB`,
+or `--db` for the Rust CLI) and both the writer and `search` follow.
 
 ## Known host issues fixed
 
