@@ -3,6 +3,14 @@
 `conductor` is the tooling this repository ships **and** the tooling it is governed by.
 Every rule below applies to work on `src/conductor/`, `src/tooling/` and `native/`.
 
+## Open work
+
+Known defects live in the GitHub issue tracker, and nothing else in this repository
+records them. Before starting, read it — `gh issue list` — and say in your PR body which
+issue you are closing, or that you found none covering the work. An agent that skips this
+re-derives a defect someone already wrote up, or lands a fix beside an open issue that
+still describes the broken behaviour.
+
 ## Commits
 
 Conventional subject: `<type>(<scope>): <what and why>`. Every commit carries an
