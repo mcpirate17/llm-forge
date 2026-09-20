@@ -1,0 +1,39 @@
+{
+  "campaign_id": "codex-hook-wire_main_fest_20260920",
+  "environment": {},
+  "generator": {
+    "exclude": [
+      "**/test_*.py",
+      "**/conftest.py"
+    ],
+    "operators": [],
+    "run_timeout_seconds": 1800,
+    "seed": 0,
+    "source": [
+      "src/tooling/hooks/dispatch/__main__.py"
+    ]
+  },
+  "language": "python",
+  "mutation_engine": "fest",
+  "schema_version": 1,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/__main__.py": "c0d2876e756b3b55265d689987fe8a0cbf27f2f5768604246acf5772b2ef801f"
+  },
+  "survivor_baseline": [],
+  "survivor_baseline_recorded": true,
+  "survivor_baseline_recorded_at": "2026-09-20T18:52:18.710780+00:00",
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test___main__.py",
+    "src/tooling/hooks/dispatch/test_runner.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test___main__.py": "ccd5bae85bc255cc8802bf5a957de00e2859bc9f871acc34b2718a179aec5757",
+    "src/tooling/hooks/dispatch/test_runner.py": "eea2c8a5ab6c98b72fa13b759fabaf28b2c439dc079dc0d14359465656a610ca"
+  },
+  "title": "Generated mutants for src/tooling/hooks/dispatch/__main__.py, scored on the survivor set"
+}

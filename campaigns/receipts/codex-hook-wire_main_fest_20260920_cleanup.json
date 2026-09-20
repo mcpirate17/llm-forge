@@ -1,0 +1,119 @@
+{
+  "adapter_sha256": "365003176c192969d035b8028e796e9a7b04618820d84d5ef6fa508cac61ec29",
+  "attribution": {
+    "attributed_mutants": 64,
+    "baseline_repetitions": 2,
+    "killed_mutants": 64,
+    "ranked_tests": 9,
+    "schema_version": "llm.mutation-testing.attribution.v1",
+    "status": "ATTRIBUTED",
+    "unattributed": [],
+    "unusable_nodeids": []
+  },
+  "baseline": {
+    "duration_seconds": 2.846843,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "............................                                             [100%]\n28 passed in 2.19s\n",
+    "timed_out": false
+  },
+  "baseline_argv": [
+    "/home/tim/Projects/llm-forge/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test___main__.py",
+    "src/tooling/hooks/dispatch/test_runner.py",
+    "--cov=src/tooling/hooks/dispatch",
+    "--cov-context=test",
+    "--cov-fail-under=0",
+    "--cov-report="
+  ],
+  "campaign_id": "codex-hook-wire_main_fest_20260920",
+  "classification_required": [],
+  "core_sha256": "1046024c2c9f8585212a468c85fd9e123d424c95c5cd9cc339656514593f8899",
+  "detail": {
+    "blob": "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",
+    "encoding": "zstd+base64"
+  },
+  "engine_result": {
+    "duration_seconds": 9.299438,
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "        \"secs\": 0,\n        \"nanos\": 142438828\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-4ffol12c/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 141,\n        \"column\": 70,\n        \"byte_offset\": 5220,\n        \"byte_length\": 7,\n        \"original_text\": \"\\\"quiet\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_runner.py::test_main_applies_explicit_codex_protocol_before_stdout\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 142499429\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-4ffol12c/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 148,\n        \"column\": 23,\n        \"byte_offset\": 5513,\n        \"byte_length\": 4,\n        \"original_text\": \"\\\"\\\\n\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_runner.py::test_main_applies_explicit_codex_protocol_before_stdout\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 146041740\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-4ffol12c/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 150,\n        \"column\": 12,\n        \"byte_offset\": 5554,\n        \"byte_length\": 1,\n        \"original_text\": \"0\",\n        \"mutated_text\": \"None\",\n        \"mutator_name\": \"return_value\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_runner.py::test_main_applies_explicit_codex_protocol_before_stdout\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 144692533\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-4ffol12c/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 150,\n        \"column\": 12,\n        \"byte_offset\": 5554,\n        \"byte_length\": 1,\n        \"original_text\": \"0\",\n        \"mutated_text\": \"1\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"Killed\",\n      \"tests_run\": [\n        \"src/tooling/hooks/dispatch/test_runner.py::test_main_applies_explicit_codex_protocol_before_stdout\"\n      ],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 146232291\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-4ffol12c/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 153,\n        \"column\": 4,\n        \"byte_offset\": 5561,\n        \"byte_length\": 22,\n        \"original_text\": \"__name__ == \\\"__main__\\\"\",\n        \"mutated_text\": \"not (__name__ == \\\"__main__\\\")\",\n        \"mutator_name\": \"negate_condition\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-4ffol12c/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 153,\n        \"column\": 13,\n        \"byte_offset\": 5570,\n        \"byte_length\": 2,\n        \"original_text\": \"==\",\n        \"mutated_text\": \"!=\",\n        \"mutator_name\": \"comparison_op\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    },\n    {\n      \"mutant\": {\n        \"file_path\": \"/tmp/llm-orchestrator-snapshot-4ffol12c/worktree/src/tooling/hooks/dispatch/__main__.py\",\n        \"line\": 153,\n        \"column\": 16,\n        \"byte_offset\": 5573,\n        \"byte_length\": 10,\n        \"original_text\": \"\\\"__main__\\\"\",\n        \"mutated_text\": \"\\\"\\\"\",\n        \"mutator_name\": \"constant_replace\"\n      },\n      \"status\": \"NoCoverage\",\n      \"tests_run\": [],\n      \"duration\": {\n        \"secs\": 0,\n        \"nanos\": 0\n      }\n    }\n  ],\n  \"duration\": {\n    \"secs\": 9,\n    \"nanos\": 293904243\n  },\n  \"seed\": 0\n}\n",
+    "timed_out": false
+  },
+  "engine_summary": {
+    "errors": 0,
+    "files_scanned": 1,
+    "killed": 64,
+    "mutants_generated": 85,
+    "mutants_tested": 64,
+    "no_coverage": 21,
+    "survived": 0,
+    "timeouts": 0
+  },
+  "generated_at": "2026-09-20T18:51:56.120669+00:00",
+  "interpreter": "/home/tim/Projects/llm-forge/.venv/bin/python3",
+  "killer_enforcement": null,
+  "language": "python",
+  "manifest": "campaigns/codex-hook-wire_main_fest_20260920.json",
+  "manifest_sha256": "1d5304a4783310e719444ee3291b4d080323997c39ff1153f5f4a6ba2fa20cc3",
+  "memory_cap_bytes": 8589934592,
+  "mutant_timeout_seconds": 60,
+  "mutants_are_generated": true,
+  "mutation_engine": "fest",
+  "mutation_score": 1.0,
+  "new_survivors": [],
+  "no_coverage": 21,
+  "outcome_counts": {
+    "ERROR": 0,
+    "KILLED": 64,
+    "NO_COVERAGE": 21,
+    "SURVIVED": 0,
+    "TIMED_OUT": 0,
+    "UNVIABLE": 0
+  },
+  "receipt_path": "campaigns/receipts/codex-hook-wire_main_fest_20260920_cleanup.json",
+  "resolved_survivors": [],
+  "runner_components_sha256": {
+    "conductor/mutation_campaign_model.py": "57f7094f4bf04670c35a41ea6ed0984070e3583bce5ee718d47fd340b4ccc8b4",
+    "conductor/mutation_patch_apply.py": "84042dbe9417c5eb65fc1f94126deea7a71bb35911fc39c566aa365b65a9eeb9",
+    "conductor/mutation_receipt_build.py": "b63f58698c31749707a50f4f9cc011f5cd2510912f16b4a5106f91682e29886e",
+    "conductor/mutation_scope.py": "b625b4fccc8e4786e6270f802d2eef611ce6a54ebb4101cfd39cc1ac8d3b32c4",
+    "conductor/mutation_testing.py": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+    "conductor/mutation_testing_support.py": "d85501ad727d23805987bc2be47f5bd448b33e309a32a9acea7b43ef788f307d",
+    "conductor/mutation_value.py": "aa15824cf3d53f43d8191d9702b22f585ff820bc31a058825291bd297202c47b",
+    "conductor/snapshot_worktree.py": "fbaf4781cb73027fb336508b3fc8ec082497ced9edb6a3344e09fb40f58f37ad",
+    "tooling/native/conductor-native/src/mutation_evidence.rs": "699ab1e78eccea669c833105b32982e8fc15f53f13fa404d20e55246a0ce5488",
+    "tooling/native/conductor-native/src/mutation_manifest.rs": "c57aa5c5d202aae70c11248b0f6f62023ca53ca089bab1bd8de7d41ccae5c272",
+    "tooling/native/conductor-native/src/mutation_receipt.rs": "98412200e5a9b7ed93e5c2b14a70f73bab207e2e49ce8441863c7c6136336b30"
+  },
+  "runner_sha256": "49167bc841b80f17f08b3a6edc50fc2c633e5f78dfee75866b7e285351271175",
+  "schema_version": "llm.mutation-testing.receipt.v3",
+  "scope_guard_sha256": "d43739a66905b713a40aaf419761faa7c26802b23e3b998fe9ac956aba614511",
+  "seed": 0,
+  "source_sha256": {
+    "src/tooling/hooks/dispatch/__main__.py": "c0d2876e756b3b55265d689987fe8a0cbf27f2f5768604246acf5772b2ef801f"
+  },
+  "status": "PASS",
+  "survivor_baseline": [],
+  "survivor_baseline_recorded_by_this_run": true,
+  "survivors": [],
+  "test_argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--rootdir=.",
+    "src/tooling/hooks/dispatch/test___main__.py",
+    "src/tooling/hooks/dispatch/test_runner.py"
+  ],
+  "test_sha256": {
+    "src/tooling/hooks/dispatch/test___main__.py": "ccd5bae85bc255cc8802bf5a957de00e2859bc9f871acc34b2718a179aec5757",
+    "src/tooling/hooks/dispatch/test_runner.py": "eea2c8a5ab6c98b72fa13b759fabaf28b2c439dc079dc0d14359465656a610ca"
+  },
+  "timed_out": 0,
+  "unviable": 0
+}

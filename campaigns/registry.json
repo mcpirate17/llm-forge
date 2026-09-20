@@ -1,5 +1,9 @@
 {
-  "campaigns": [],
+  "campaigns": [
+    {
+      "manifest": "campaigns/codex-hook-wire_main_fest_20260920.json"
+    }
+  ],
   "enforcement": "changed_tests",
   "engine_adapters": {
     "c": [
