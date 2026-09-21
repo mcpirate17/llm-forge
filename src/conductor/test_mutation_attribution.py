@@ -403,6 +403,25 @@ def test_narrowing_keeps_what_follows_a_selector_and_refuses_what_it_cannot(
         )
 
 
+def test_selection_pins_rootdir_to_the_snapshot_worktree(worktree: Path) -> None:
+    selected = attribution._selection(
+        ["pytest", "-q"], worktree, [ADD], worktree / "r.xml"
+    )
+    assert f"--rootdir={worktree}" in selected
+
+    # Either spelling of an explicit rootdir is part of the campaign command and
+    # remains authoritative.
+    for explicit in (["--rootdir=elsewhere"], ["--rootdir", "elsewhere"]):
+        selected = attribution._selection(
+            ["pytest", "-q", *explicit],
+            worktree,
+            [ADD],
+            worktree / "r.xml",
+        )
+        assert f"--rootdir={worktree}" not in selected
+        assert all(arg in selected for arg in explicit)
+
+
 def test_re_runs_never_disable_the_run_private_cache(worktree: Path) -> None:
     """The session must not smuggle PYTHONDONTWRITEBYTECODE back into a run.
 
@@ -442,8 +461,10 @@ def test_reapplying_a_mutant_evicts_its_cached_bytecode(worktree: Path) -> None:
     target = worktree / MODULE
     scratch = scratch_root_for(worktree)
     cached = cache_paths_for(target, scratch / "pycache")[0]
-    beside = target.parent / "__pycache__" / (
-        f"{target.stem}.{sys.implementation.cache_tag}.pyc"
+    beside = (
+        target.parent
+        / "__pycache__"
+        / (f"{target.stem}.{sys.implementation.cache_tag}.pyc")
     )
     beside.parent.mkdir()
     beside.write_bytes(b"stale")

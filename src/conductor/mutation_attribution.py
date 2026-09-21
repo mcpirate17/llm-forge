@@ -147,7 +147,15 @@ def _selection(
 ) -> list[str]:
     """The campaign's command, narrowed to exactly these tests, reporting JUnit."""
 
-    return list(pytest_junit_argv([*_narrowed(argv, worktree), *nodeids], junit))
+    narrowed = _narrowed(argv, worktree)
+    # A nested pytest.ini can move pytest's inferred rootdir below the snapshot
+    # root. JUnit class names then stop matching the repo-root-relative node IDs
+    # used by the attribution resolver, silently marking every rerun
+    # unattributed. Preserve a campaign's explicit rootdir; otherwise pin the
+    # snapshot root before appending the selected node IDs.
+    if not any(arg == "--rootdir" or arg.startswith("--rootdir=") for arg in narrowed):
+        narrowed.append(f"--rootdir={worktree}")
+    return list(pytest_junit_argv([*narrowed, *nodeids], junit))
 
 
 def _invalidate(target: Path, worktree: Path) -> None:
