@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import stat
@@ -11,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from tooling.hooks.dispatch import __main__ as dispatch_main
 from tooling.hooks.dispatch import adapters, runner
 from tooling.hooks.dispatch.registry import HookSpec
 
@@ -250,6 +252,189 @@ def test_malformed_payload_dispatches_with_empty_payload(tmp_path, monkeypatch):
     result, outcomes = runner.dispatch("PostToolUse", b"not json", tmp_path)
     assert result == {"hookSpecificOutput": {"hookEventName": "PostToolUse"}}
     assert outcomes == []
+
+
+def test_codex_pretooluse_normalization_is_host_specific():
+    bare_allow = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "permissionDecisionReason": "benign",
+        }
+    }
+    assert (
+        dispatch_main._normalize_output("claude", "PreToolUse", bare_allow)
+        == bare_allow
+    )
+    assert dispatch_main._normalize_output("codex", "PreToolUse", bare_allow) == {}
+
+    with_system_message = {**bare_allow, "systemMessage": "kept", "ignored": True}
+    assert dispatch_main._normalize_output(
+        "codex", "PreToolUse", with_system_message
+    ) == {"systemMessage": "kept"}
+
+    rewrite = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "updatedInput": {"command": "echo rewritten"},
+        }
+    }
+    assert dispatch_main._normalize_output("codex", "PreToolUse", rewrite) == rewrite
+
+    deny = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": "blocked",
+        }
+    }
+    assert dispatch_main._normalize_output("codex", "PreToolUse", deny) == deny
+
+
+def test_codex_pretooluse_turns_unsupported_ask_into_deny():
+    result = dispatch_main._normalize_output(
+        "codex",
+        "PreToolUse",
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "ask",
+                "permissionDecisionReason": "review this",
+            }
+        },
+    )
+    assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert result["hookSpecificOutput"]["permissionDecisionReason"] == "review this"
+
+    without_reason = dispatch_main._normalize_output(
+        "codex",
+        "PreToolUse",
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "ask",
+            }
+        },
+    )
+    assert without_reason["hookSpecificOutput"]["permissionDecisionReason"] == (
+        "Hook requested approval, but Codex PreToolUse hooks do not support ask."
+    )
+
+
+def test_codex_posttooluse_drops_unsupported_rewrites_and_suppression():
+    result = dispatch_main._normalize_output(
+        "codex",
+        "PostToolUse",
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "updatedToolOutput": {"output": "bounded"},
+                "updatedMCPToolOutput": {"content": []},
+            },
+            "suppressOutput": True,
+            "systemMessage": "kept",
+        },
+    )
+    assert result == {"systemMessage": "kept"}
+
+    supported = {
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "reviewed",
+        },
+        "decision": "block",
+        "reason": "needs review",
+        "continue": False,
+        "stopReason": "replace output",
+    }
+    assert (
+        dispatch_main._normalize_output("codex", "PostToolUse", supported) == supported
+    )
+
+
+def test_main_applies_explicit_codex_protocol_before_stdout(
+    tmp_path, monkeypatch, capsys
+):
+    raw = b'{"turn_id":"turn-test"}'
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(raw)))
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", stdout)
+    roots = []
+
+    def _dispatch(event, payload, root):
+        roots.append(root)
+        return (
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "allow",
+                }
+            },
+            [
+                runner.HookOutcome(
+                    name="json-hook", output={"ok": True}, elapsed_ms=1.0
+                ),
+                runner.HookOutcome(name="quiet-hook", output=None, elapsed_ms=1.0),
+                runner.HookOutcome(
+                    name="error-hook", output=None, error="boom", elapsed_ms=1.0
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(
+        dispatch_main.runner,
+        "dispatch",
+        _dispatch,
+    )
+    monkeypatch.setattr(dispatch_main, "_record_hook_timings", lambda *args: None)
+    monkeypatch.setenv("HOOK_DISPATCH_TRACE", "1")
+
+    assert (
+        dispatch_main.main(
+            ["PreToolUse", "--protocol", "codex", "--project-dir", str(tmp_path)]
+        )
+        == 0
+    )
+    assert json.loads(stdout.getvalue()) == {}
+    assert stdout.getvalue().endswith("\n")
+    assert roots == [tmp_path.resolve()]
+    trace = capsys.readouterr().err.splitlines()
+    assert any(
+        "[dispatch] json-hook" in line and line.endswith("  json") for line in trace
+    )
+    assert any(
+        "[dispatch] quiet-hook" in line and line.endswith("  quiet") for line in trace
+    )
+    assert any(
+        "[dispatch] error-hook" in line and line.endswith("  boom") for line in trace
+    )
+
+
+def test_main_settings_prints_the_registry_block(monkeypatch):
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(dispatch_main, "settings_block", lambda: {"hooks": "ok"})
+
+    assert dispatch_main.main(["settings"]) == 0
+    assert json.loads(stdout.getvalue()) == {"hooks": "ok"}
+
+
+def test_record_hook_timings_labels_quiet_outcomes(monkeypatch):
+    from conductor import context_telemetry
+
+    events = []
+    monkeypatch.setattr(
+        context_telemetry, "record", lambda event, path: events.append(event)
+    )
+
+    dispatch_main._record_hook_timings(
+        "PostToolUse",
+        [runner.HookOutcome(name="quiet-hook", output=None, elapsed_ms=1.0)],
+        "session",
+    )
+
+    assert events[0]["status"] == "quiet"
 
 
 def _splice_specs(fake_adapters, calls: list[str]) -> tuple[HookSpec, ...]:
