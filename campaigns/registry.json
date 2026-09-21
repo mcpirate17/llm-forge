@@ -2,6 +2,9 @@
   "campaigns": [
     {
       "manifest": "campaigns/codex-hook-wire_main_fest_20260920.json"
+    },
+    {
+      "manifest": "campaigns/fix-mutation-attribution-rootdir_mutation_attribution_fest_20260921.json"
     }
   ],
   "enforcement": "changed_tests",
