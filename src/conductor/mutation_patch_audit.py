@@ -496,7 +496,16 @@ def audit_reproducibility(
     }
 
 
-_LANGUAGE_SUFFIXES = {"python": ".py", "rust": ".rs"}
+# Source suffixes each campaign language's engine can mutate. A changed file
+# counts as measured territory only when its suffix is one of these, so a
+# markdown note beside a pinned module is not reported as unmeasured code.
+_LANGUAGE_SUFFIXES: dict[str, tuple[str, ...]] = {
+    "python": (".py",),
+    "rust": (".rs",),
+    "python-rust": (".py", ".rs"),
+    "c": (".c", ".h"),
+    "cpp": (".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp"),
+}
 
 
 def _uncovered_changed_files(
@@ -507,35 +516,31 @@ def _uncovered_changed_files(
     PR #28 changed ten ``.rs`` files under ``native/forge`` while the crate's
     only campaign pinned five others, and the audit called the crate covered.
     Measured territory is every directory a registered campaign pins a file
-    in -- and, suffix-matched to that campaign's language, everything beneath
-    such a directory, because a campaign scoped to a crate speaks for the
-    crate's submodules too. A changed file inside territory that nothing pins
+    in, and everything beneath it, restricted to source files in that
+    campaign's language -- a campaign scoped to a crate speaks for the crate's
+    submodules too, but not for the docs beside them. A campaign in a language
+    with no known suffixes claims its pinned directories for every file, and
+    nothing beneath them. A changed file inside territory that nothing pins
     ships unmeasured; the repair is the generator: plan the narrow campaign.
     """
 
     pinned: set[str] = set()
-    directories: set[str] = set()
-    territories: list[tuple[str, str]] = []
+    territories: set[tuple[str, tuple[str, ...] | None]] = set()
     for campaign in campaigns:
         scope = [*(campaign.source_sha256 or {}), *(campaign.test_sha256 or {})]
         if not scope:
             continue
         pinned.update(scope)
-        parents = {PurePosixPath(path).parent.as_posix() for path in scope}
-        directories.update(parents)
-        if suffix := _LANGUAGE_SUFFIXES.get(campaign.language):
-            territories.extend((parent, suffix) for parent in parents)
+        suffixes = _LANGUAGE_SUFFIXES.get(campaign.language)
+        territories.update(
+            (PurePosixPath(path).parent.as_posix(), suffixes) for path in scope
+        )
     rows: list[dict[str, str]] = []
     for relative in sorted(set(changed)):
         if relative in pinned:
             continue
-        parent = PurePosixPath(relative).parent.as_posix()
-        inside = any(
-            parent == root or parent.startswith(f"{root}/")
-            for root, suffix in territories
-            if PurePosixPath(relative).suffix == suffix
-        )
-        if parent in directories or inside:
+        path = PurePosixPath(relative)
+        if any(_in_territory(path, root, suffixes) for root, suffixes in territories):
             rows.append(
                 {
                     "file": relative,
@@ -547,6 +552,15 @@ def _uncovered_changed_files(
                 }
             )
     return rows
+
+
+def _in_territory(
+    path: PurePosixPath, root: str, suffixes: tuple[str, ...] | None
+) -> bool:
+    parent = path.parent.as_posix()
+    if suffixes is None:
+        return parent == root
+    return path.suffix in suffixes and (parent == root or parent.startswith(f"{root}/"))
 
 
 DEFAULT_BASELINE = Path(

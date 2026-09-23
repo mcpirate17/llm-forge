@@ -1189,6 +1189,65 @@ def test_a_new_file_beside_a_covered_file_is_reported_uncovered(
     assert mutation_patch_audit._uncovered_changed_files(set(), [covered]) == []
 
 
+def test_measured_territory_is_limited_to_the_campaign_language(
+    tmp_path: Path,
+) -> None:
+    """A doc beside a pinned module is not unmeasured code.
+
+    LLM PR #452 could not carry a ``research/CLAUDE.md`` edit because a
+    campaign pinned ``research/scientist/...`` and ``research/tests/...``
+    files and the beside-check ignored the suffix. Each language claims only
+    its own source suffixes; an unknown language keeps the conservative
+    any-file beside-check and claims nothing beneath.
+    """
+
+    python = dataclasses.replace(
+        _campaign(tmp_path, "python", ()), source_sha256={"src/a.py": "d" * 64}
+    )
+    mixed = dataclasses.replace(
+        _campaign(tmp_path, "mixed", ()),
+        language="python-rust",
+        source_sha256={"crate/lib.rs": "d" * 64},
+    )
+    cpp = dataclasses.replace(
+        _campaign(tmp_path, "cpp", ()),
+        language="cpp",
+        source_sha256={"kern/k.cpp": "d" * 64},
+    )
+    unknown = dataclasses.replace(
+        _campaign(tmp_path, "unknown", ()),
+        language="zig",
+        source_sha256={"z/main.zig": "d" * 64},
+    )
+    rows = mutation_patch_audit._uncovered_changed_files(
+        {
+            "src/CLAUDE.md",  # beside a python pin, not python
+            "src/data.json",  # beside a python pin, not python
+            "src/b.py",  # beside a python pin
+            "src/deep/c.py",  # beneath a python pin
+            "src/deep/notes.md",  # beneath, not python
+            "crate/glue.py",  # python-rust claims .py too
+            "crate/sub/mod.rs",  # and .rs beneath
+            "crate/README.md",  # but not docs
+            "kern/k.h",  # header beside a cpp pin
+            "kern/sub/x.cc",  # cpp source beneath
+            "kern/sub/x.py",  # wrong language beneath
+            "z/build.txt",  # unknown language: any file beside
+            "z/sub/other.zig",  # unknown language: nothing beneath
+        },
+        [python, mixed, cpp, unknown],
+    )
+    assert [row["file"] for row in rows] == [
+        "crate/glue.py",
+        "crate/sub/mod.rs",
+        "kern/k.h",
+        "kern/sub/x.cc",
+        "src/b.py",
+        "src/deep/c.py",
+        "z/build.txt",
+    ]
+
+
 def test_unpinned_changed_files_fail_the_whole_audit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
