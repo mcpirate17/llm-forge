@@ -17,7 +17,7 @@
   "mutation_engine": "fest",
   "schema_version": 1,
   "source_sha256": {
-    "src/conductor/mutation_patch_audit.py": "910f075ff2fd4d24bc6d306a72e53da1d3d5be61ca1a964e4e63b25464532037"
+    "src/conductor/mutation_patch_audit.py": "1558f984ae25743496a96dca8019dd761216eeacea16cc3f58acc7a81cc941a0"
   },
   "survivor_baseline": [
     "constant_replace-088ea960a50d-0",
@@ -42,7 +42,7 @@
     "src/conductor/test_mutation_patch_audit.py"
   ],
   "test_sha256": {
-    "src/conductor/test_mutation_patch_audit.py": "aabb5aa890c82c16d54bcc8ec65b4213a190c57ebd41158755d14d66ea88c2b2"
+    "src/conductor/test_mutation_patch_audit.py": "e28f2818a5f0be70c237b1b58ca87d9ff8f5124bcef7b8452e7632fae78f0ad9"
   },
   "title": "Generated mutants for src/conductor/mutation_patch_audit.py, scored on the survivor set"
 }
