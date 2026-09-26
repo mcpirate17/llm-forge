@@ -594,3 +594,80 @@ def test_a_baseline_that_writes_no_report_still_refuses(worktree: Path) -> None:
     rows = [mutant("add-op", "a + b", "a - b")]
     with pytest.raises(CampaignError, match="baseline 0 exited -6 without a JUnit"):
         run_attribution(worktree, rows, AbortingRunner(worktree, "def add"))
+
+
+class HangingRunner(FakeRunner):
+    """Fast baselines; times out (as `run` reports a hang) when the file holds `hang`.
+
+    Records every `timeout_seconds` it was handed, so the limit each run got is
+    observable rather than inferred.
+    """
+
+    def __init__(self, worktree: Path, hang: str, baseline_seconds: float) -> None:
+        super().__init__(worktree)
+        self.hang = hang
+        self.baseline_seconds = baseline_seconds
+        self.timeouts: list[int] = []
+
+    def __call__(
+        self, argv: list[str], *, timeout_seconds: int, **kwargs: Any
+    ) -> tuple[CommandResult, str]:
+        self.timeouts.append(timeout_seconds)
+        if self.hang in (self.worktree / MODULE).read_text(encoding="utf-8"):
+            self.commands.append(list(argv))
+            return CommandResult(None, True, float(timeout_seconds), "", ""), ""
+        result, stdout = super().__call__(
+            argv, timeout_seconds=timeout_seconds, **kwargs
+        )
+        return (
+            CommandResult(result.returncode, False, self.baseline_seconds, "", ""),
+            stdout,
+        )
+
+
+class SlowCampaign(Campaign):
+    run_timeout_seconds = 1800
+
+
+def test_a_hung_mutant_rerun_gets_the_baseline_derived_limit_and_says_so(
+    worktree: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rows = [mutant("hang-op", "a + b", "a - b"), mutant("mul-op", "a * b", "a / b")]
+    runner = HangingRunner(worktree, "a - b", baseline_seconds=20.0)
+    receipt: dict[str, Any] = {"mutants": rows, "test_value": None}
+    attribution.attribute(
+        SlowCampaign(),
+        receipt,
+        worktree=worktree,
+        environment={},
+        interpreter=sys.executable,
+        run=runner,
+    )
+
+    # Two baselines under the campaign limit, then both re-runs at 10 x 20 s.
+    assert runner.timeouts == [1800, 1800, 200, 200]
+    err = capsys.readouterr().err
+    assert "attribution: mutant 1/2 (hang-op) re-run timed out after 200s" in err
+    assert "mul-op) re-run timed out" not in err
+    assert receipt["attribution"]["unattributed"] == [
+        {"id": "hang-op", "reason": "covering set timed out"}
+    ]
+    assert receipt["test_value"]["killers_by_mutant"] == {"mul-op": [MUL]}
+
+
+def test_the_rerun_limit_never_exceeds_the_campaign_limit_nor_drops_below_the_floor(
+    worktree: Path,
+) -> None:
+    assert attribution.rerun_timeout(1800, 20.0) == 200
+    assert attribution.rerun_timeout(1800, 180.0) == 1800
+    assert attribution.rerun_timeout(1800, 181.0) == 1800
+    assert attribution.rerun_timeout(1800, 179.01) == 1791
+    assert attribution.rerun_timeout(1800, 0.5) == 60
+    assert attribution.rerun_timeout(1800, 6.0) == 60
+    assert attribution.rerun_timeout(1800, 6.01) == 61
+    assert attribution.rerun_timeout(30, 0.5) == 30  # cap wins over the floor
+
+    # End to end: slow baselines against the 60 s campaign cap stay capped.
+    runner = HangingRunner(worktree, "a - b", baseline_seconds=900.0)
+    run_attribution(worktree, [mutant("hang-op", "a + b", "a - b")], runner)
+    assert runner.timeouts == [60, 60, 60]
