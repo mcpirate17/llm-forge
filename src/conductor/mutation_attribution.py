@@ -28,6 +28,7 @@ dropped: an attribution rate is a diagnostic, and a silent one is worthless.
 
 from __future__ import annotations
 
+import math
 import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -54,6 +55,17 @@ ATTRIBUTION_SCHEMA = "llm.mutation-testing.attribution.v1"
 # test whose outcome moves on its own -- and a test that flickers would
 # otherwise be read as a kill.
 BASELINE_REPETITIONS = 2
+
+# A killed mutant's re-run gets this many times the slowest unmutated baseline
+# before it is called hung. The campaign's own run timeout (1800 s from the
+# generator) sizes the whole suite; a re-run selects a handful of covering
+# tests, and a mutant that deadlocks the process (a Triton launch given the
+# wrong grid sat in futex wait at 1% CPU, LLM PR #456) otherwise costs the full
+# 30 minutes per mutant.
+RERUN_TIMEOUT_MULTIPLIER = 10
+# ...but never less than this: a sub-second baseline must not turn ordinary
+# scheduler noise on a loaded host into a false "hung".
+RERUN_TIMEOUT_FLOOR_SECONDS = 60
 
 # `criticality` is a closed vocabulary in the validator: "critical" or "high".
 # A generated campaign has no author to grade its subject, so it claims the
@@ -244,6 +256,8 @@ class _Session:
         # re-apply below and again by the engine's plugin at each child's
         # startup -- so no re-run imports a mutant's predecessor.
         self.environment = dict(environment)
+        # The baselines run under the campaign's limit; `_baselines` then
+        # narrows it for the mutant re-runs to what those runs measured.
         self.timeout = campaign.run_timeout_seconds
         self.run = run
         self.reports = worktree / ".attribution"
@@ -273,10 +287,27 @@ class _Session:
         return result, parse_pytest_junit(junit, nodeids)
 
 
+def rerun_timeout(cap_seconds: int, slowest_baseline_seconds: float) -> int:
+    """The per-mutant re-run limit, sized from the measured baselines.
+
+    Never above the campaign's own limit, never below the floor.
+    """
+
+    derived = max(
+        RERUN_TIMEOUT_FLOOR_SECONDS,
+        math.ceil(RERUN_TIMEOUT_MULTIPLIER * slowest_baseline_seconds),
+    )
+    return min(cap_seconds, derived)
+
+
 def _baselines(session: _Session, ranked: Sequence[str]) -> list[dict[str, Any]]:
-    """The unmutated runs the validator compares every mutant against."""
+    """The unmutated runs the validator compares every mutant against.
+
+    Their wall time then bounds every mutant re-run (`rerun_timeout`).
+    """
 
     reports = []
+    durations = []
     for index in range(BASELINE_REPETITIONS):
         result, report = session.measure(ranked, f"baseline-{index}")
         if result.timed_out:
@@ -287,6 +318,8 @@ def _baselines(session: _Session, ranked: Sequence[str]) -> list[dict[str, Any]]
                 "without a JUnit report"
             )
         reports.append(report)
+        durations.append(result.duration_seconds)
+    session.timeout = rerun_timeout(session.timeout, max(durations))
     return reports
 
 
@@ -343,6 +376,12 @@ def _matrix(
         with _applied(session.worktree, row):
             result, report = session.measure(covering, f"mutant-{position}")
         if result.timed_out:
+            print(
+                f"attribution: mutant {position + 1}/{total} ({mutation_id}) "
+                f"re-run timed out after {session.timeout}s",
+                file=sys.stderr,
+                flush=True,
+            )
             _unattributed(summary, mutation_id, "covering set timed out")
         elif report is None:
             # The process died before pytest wrote its report: a real kill
