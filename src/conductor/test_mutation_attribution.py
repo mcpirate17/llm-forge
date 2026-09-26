@@ -126,7 +126,9 @@ def worktree(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def run_attribution(worktree: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
+def run_attribution(
+    worktree: Path, rows: list[dict[str, Any]], runner: Any = None
+) -> dict[str, Any]:
     receipt: dict[str, Any] = {"mutants": rows, "test_value": None}
     attribution.attribute(
         Campaign(),
@@ -134,7 +136,7 @@ def run_attribution(worktree: Path, rows: list[dict[str, Any]]) -> dict[str, Any
         worktree=worktree,
         environment={},
         interpreter=sys.executable,
-        run=FakeRunner(worktree),
+        run=runner or FakeRunner(worktree),
     )
     return receipt
 
@@ -576,26 +578,11 @@ class AbortingRunner(FakeRunner):
         return super().__call__(argv, **kwargs)
 
 
-def _attribute_with(
-    worktree: Path, rows: list[dict[str, Any]], runner: Any
-) -> dict[str, Any]:
-    receipt: dict[str, Any] = {"mutants": rows, "test_value": None}
-    attribution.attribute(
-        Campaign(),
-        receipt,
-        worktree=worktree,
-        environment={},
-        interpreter=sys.executable,
-        run=runner,
-    )
-    return receipt
-
-
 def test_a_mutant_that_aborts_the_rerun_is_unattributed_not_fatal(
     worktree: Path,
 ) -> None:
     rows = [mutant("abort-op", "a + b", "a // b"), mutant("mul-op", "a * b", "a / b")]
-    receipt = _attribute_with(worktree, rows, AbortingRunner(worktree, "a // b"))
+    receipt = run_attribution(worktree, rows, AbortingRunner(worktree, "a // b"))
 
     assert receipt["attribution"]["unattributed"] == [
         {"id": "abort-op", "reason": "covering set crashed without a report"}
@@ -606,4 +593,4 @@ def test_a_mutant_that_aborts_the_rerun_is_unattributed_not_fatal(
 def test_a_baseline_that_writes_no_report_still_refuses(worktree: Path) -> None:
     rows = [mutant("add-op", "a + b", "a - b")]
     with pytest.raises(CampaignError, match="baseline 0 exited -6 without a JUnit"):
-        _attribute_with(worktree, rows, AbortingRunner(worktree, "def add"))
+        run_attribution(worktree, rows, AbortingRunner(worktree, "def add"))
