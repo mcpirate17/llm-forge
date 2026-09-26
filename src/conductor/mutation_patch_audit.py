@@ -473,7 +473,7 @@ def audit_reproducibility(
     absent = [row for row in interpreters if row["reason"] == "INTERPRETER_ABSENT"]
     unmeasured, inert = _value_verdicts(campaigns, receipts, current, package_root, tree)
     uncovered_files = (
-        _uncovered_changed_files(changed_files, campaigns)
+        _uncovered_changed_files(changed_files, campaigns, repo_root=repo_root)
         if changed_files is not None
         else []
     )
@@ -509,7 +509,7 @@ _LANGUAGE_SUFFIXES: dict[str, tuple[str, ...]] = {
 
 
 def _uncovered_changed_files(
-    changed: Iterable[str], campaigns: Sequence[Campaign]
+    changed: Iterable[str], campaigns: Sequence[Campaign], *, repo_root: Path
 ) -> list[dict[str, str]]:
     """Changed files inside measured territory that no registered campaign pins.
 
@@ -522,6 +522,12 @@ def _uncovered_changed_files(
     with no known suffixes claims its pinned directories for every file, and
     nothing beneath them. A changed file inside territory that nothing pins
     ships unmeasured; the repair is the generator: plan the narrow campaign.
+
+    Only paths that exist in the candidate tree at ``repo_root`` count: a
+    deleted file ships nothing and no campaign can ever pin it, so reporting
+    it would be permanent debt. The filter lives here rather than in a
+    ``--diff-filter`` so every caller's path list behaves the same; a deleted
+    file a campaign still pins is caught by the stale/unloadable audit.
     """
 
     pinned: set[str] = set()
@@ -537,7 +543,7 @@ def _uncovered_changed_files(
         )
     rows: list[dict[str, str]] = []
     for relative in sorted(set(changed)):
-        if relative in pinned:
+        if relative in pinned or not (repo_root / relative).exists():
             continue
         path = PurePosixPath(relative)
         if any(_in_territory(path, root, suffixes) for root, suffixes in territories):

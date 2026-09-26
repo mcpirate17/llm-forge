@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 import dataclasses
 import json
 from pathlib import Path
@@ -1154,6 +1155,15 @@ def test_one_stale_hash_fails_the_whole_audit(
     assert delta["new_uncovered_campaigns"] == ["corpus"]
 
 
+def _touch(root: Path, relatives: Iterable[str]) -> None:
+    """Materialize changed files: only paths in the candidate tree count."""
+
+    for relative in relatives:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+
+
 def test_a_new_file_beside_a_covered_file_is_reported_uncovered(
     tmp_path: Path,
 ) -> None:
@@ -1170,23 +1180,53 @@ def test_a_new_file_beside_a_covered_file_is_reported_uncovered(
         source_sha256={"src/one.py": "d" * 64},
         test_sha256={"tests/test_one.py": "e" * 64},
     )
+    changed = {
+        "src/one.py",  # pinned: covered
+        "tests/test_one.py",  # pinned: covered
+        "src/two.py",  # beside a pinned file
+        "src/nested/three.py",  # deeper inside the campaign's territory
+        "docs/readme.md",  # outside every territory, wrong suffix
+        "native/other/lib.rs",  # right suffix, no rust campaign anywhere
+    }
+    _touch(tmp_path, changed)
     rows = mutation_patch_audit._uncovered_changed_files(
-        {
-            "src/one.py",  # pinned: covered
-            "tests/test_one.py",  # pinned: covered
-            "src/two.py",  # beside a pinned file
-            "src/nested/three.py",  # deeper inside the campaign's territory
-            "docs/readme.md",  # outside every territory, wrong suffix
-            "native/other/lib.rs",  # right suffix, no rust campaign anywhere
-        },
-        [covered],
+        changed, [covered], repo_root=tmp_path
     )
     assert [row["file"] for row in rows] == ["src/nested/three.py", "src/two.py"]
     assert all(row["reason"] == "NO_PINNING_CAMPAIGN" for row in rows)
     assert "plan one" in rows[0]["detail"]
 
     # Legacy whole-tree mode: no changed-file set, no per-PR dimension.
-    assert mutation_patch_audit._uncovered_changed_files(set(), [covered]) == []
+    assert (
+        mutation_patch_audit._uncovered_changed_files(
+            set(), [covered], repo_root=tmp_path
+        )
+        == []
+    )
+
+
+def test_a_deleted_file_inside_territory_is_not_reported_uncovered(
+    tmp_path: Path,
+) -> None:
+    """``git diff --name-only`` lists deletions; a deleted file ships nothing.
+
+    LLM branch llm-43/c-delete-slow-paths carried 44 permanently uncovered
+    rows that were deleted files no campaign could ever pin. A deleted file
+    inside territory drops out; an existing unpinned file beside it stays.
+    """
+
+    covered = dataclasses.replace(
+        _campaign(tmp_path, "covered", ()),
+        source_sha256={"src/one.py": "d" * 64},
+        test_sha256={},
+    )
+    _touch(tmp_path, {"src/kept.py"})
+    rows = mutation_patch_audit._uncovered_changed_files(
+        {"src/kept.py", "src/deleted.py", "src/gone/deep.py"},
+        [covered],
+        repo_root=tmp_path,
+    )
+    assert [row["file"] for row in rows] == ["src/kept.py"]
 
 
 def test_measured_territory_is_limited_to_the_campaign_language(
@@ -1219,23 +1259,24 @@ def test_measured_territory_is_limited_to_the_campaign_language(
         language="zig",
         source_sha256={"z/main.zig": "d" * 64},
     )
+    changed = {
+        "src/CLAUDE.md",  # beside a python pin, not python
+        "src/data.json",  # beside a python pin, not python
+        "src/b.py",  # beside a python pin
+        "src/deep/c.py",  # beneath a python pin
+        "src/deep/notes.md",  # beneath, not python
+        "crate/glue.py",  # python-rust claims .py too
+        "crate/sub/mod.rs",  # and .rs beneath
+        "crate/README.md",  # but not docs
+        "kern/k.h",  # header beside a cpp pin
+        "kern/sub/x.cc",  # cpp source beneath
+        "kern/sub/x.py",  # wrong language beneath
+        "z/build.txt",  # unknown language: any file beside
+        "z/sub/other.zig",  # unknown language: nothing beneath
+    }
+    _touch(tmp_path, changed)
     rows = mutation_patch_audit._uncovered_changed_files(
-        {
-            "src/CLAUDE.md",  # beside a python pin, not python
-            "src/data.json",  # beside a python pin, not python
-            "src/b.py",  # beside a python pin
-            "src/deep/c.py",  # beneath a python pin
-            "src/deep/notes.md",  # beneath, not python
-            "crate/glue.py",  # python-rust claims .py too
-            "crate/sub/mod.rs",  # and .rs beneath
-            "crate/README.md",  # but not docs
-            "kern/k.h",  # header beside a cpp pin
-            "kern/sub/x.cc",  # cpp source beneath
-            "kern/sub/x.py",  # wrong language beneath
-            "z/build.txt",  # unknown language: any file beside
-            "z/sub/other.zig",  # unknown language: nothing beneath
-        },
-        [python, mixed, cpp, unknown],
+        changed, [python, mixed, cpp, unknown], repo_root=tmp_path
     )
     assert [row["file"] for row in rows] == [
         "crate/glue.py",
@@ -1289,6 +1330,15 @@ def test_unpinned_changed_files_fail_the_whole_audit(
             "stale": [],
             "unloadable": [],
         },
+    )
+    # The changed-file check reads the candidate tree, and main() binds the
+    # host root; point the audit at this tree, where sibling.py exists.
+    (tmp_path / "sibling.py").write_text("x = 1\n", encoding="utf-8")
+    audit_corpus = mutation_patch_audit.audit_corpus
+    monkeypatch.setattr(
+        mutation_patch_audit,
+        "audit_corpus",
+        lambda *a, **k: audit_corpus(*a, **{**k, "repo_root": tmp_path}),
     )
     baseline = tmp_path / "baseline.json"
     # The campaign's own recorded debt (it has no value analysis) is paid for
