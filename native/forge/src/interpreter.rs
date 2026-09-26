@@ -30,23 +30,39 @@ pub fn project_root() -> PathBuf {
 /// The interpreter the Python dispatcher should run under: the one a mutation
 /// snapshot exported (`CONDUCTOR_SNAPSHOT_PYTHON` -- snapshots are git trees and
 /// `.venv` is gitignored, so the host hands its interpreter over), else the
-/// project's `.venv/bin/python` when one exists (so it imports the same
+/// configured `CONDUCTOR_PYTHON`, then the project's `.venv/bin/python` when
+/// one exists (so it imports the same
 /// `conductor`/`tooling` forge does), else `python3` from `PATH`. Mirrors
 /// `tooling.hooks.dispatch.paths.own_interpreter`'s venv-over-PATH preference,
 /// with the snapshot export ranked above both because inside a sandbox it is
 /// the only interpreter that can import `conductor` at all.
 pub fn resolve_python(root: &Path) -> PathBuf {
+    resolve_python_binding(root, None)
+}
+
+/// Resolve an installed command's binding without mutating the doctor's environment.
+pub fn resolve_python_binding(root: &Path, binding: Option<&str>) -> PathBuf {
     let snapshot = env::var("CONDUCTOR_SNAPSHOT_PYTHON")
         .ok()
         .filter(|value| !value.trim().is_empty());
-    resolve_python_with(root, snapshot.as_deref())
+    let configured = env::var("CONDUCTOR_PYTHON")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    resolve_python_with(root, snapshot.as_deref(), binding.or(configured.as_deref()))
 }
 
 /// `resolve_python` with the snapshot export supplied instead of read from the
 /// environment, so the preference order is testable without racing every other
 /// test that might touch the process environment.
-fn resolve_python_with(root: &Path, snapshot_python: Option<&str>) -> PathBuf {
+fn resolve_python_with(
+    root: &Path,
+    snapshot_python: Option<&str>,
+    configured_python: Option<&str>,
+) -> PathBuf {
     if let Some(value) = snapshot_python {
+        return PathBuf::from(value);
+    }
+    if let Some(value) = configured_python {
         return PathBuf::from(value);
     }
     let venv_python = root.join(".venv").join("bin").join("python");
@@ -67,7 +83,7 @@ mod tests {
         std::fs::create_dir_all(&venv_bin).unwrap();
         let python = venv_bin.join("python");
         std::fs::write(&python, b"#!/bin/sh\n").unwrap();
-        assert_eq!(resolve_python_with(&tmp, None), python);
+        assert_eq!(resolve_python_with(&tmp, None, None), python);
         std::fs::remove_dir_all(&tmp).unwrap();
     }
 
@@ -82,7 +98,11 @@ mod tests {
         std::fs::create_dir_all(&venv_bin).unwrap();
         std::fs::write(venv_bin.join("python"), b"#!/bin/sh\n").unwrap();
         assert_eq!(
-            resolve_python_with(&tmp, Some("/host/.venv/bin/python")),
+            resolve_python_with(
+                &tmp,
+                Some("/host/.venv/bin/python"),
+                Some("/external/python")
+            ),
             PathBuf::from("/host/.venv/bin/python")
         );
         std::fs::remove_dir_all(&tmp).unwrap();
@@ -97,7 +117,27 @@ mod tests {
         let tmp =
             std::env::temp_dir().join(format!("forge-interp-test-novenv-{}", std::process::id()));
         std::fs::create_dir_all(&tmp).unwrap();
-        assert_eq!(resolve_python_with(&tmp, None), PathBuf::from("python3"));
+        assert_eq!(
+            resolve_python_with(&tmp, None, None),
+            PathBuf::from("python3")
+        );
         std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn explicit_binding_wins_with_or_without_a_host_venv() {
+        let tmp = std::env::temp_dir().join(format!("forge-bound-python-{}", std::process::id()));
+        let configured = "/external environment/bin/python";
+        assert_eq!(
+            resolve_python_with(&tmp, None, Some(configured)),
+            PathBuf::from(configured)
+        );
+        std::fs::create_dir_all(tmp.join(".venv/bin")).unwrap();
+        std::fs::write(tmp.join(".venv/bin/python"), b"different interpreter").unwrap();
+        assert_eq!(
+            resolve_python_with(&tmp, None, Some(configured)),
+            PathBuf::from(configured)
+        );
+        std::fs::remove_dir_all(tmp).unwrap();
     }
 }

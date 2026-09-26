@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """A2A-protocol transport between local agent sessions (codex, Claude, fable).
 
 Replaces ``conductor.agent_mailbox``: each agent identity serves an Agent Card
@@ -79,8 +78,8 @@ from a2a.utils.constants import (
     AGENT_CARD_WELL_KNOWN_PATH,
     DEFAULT_RPC_URL,
     PROTOCOL_VERSION_1_0,
-    TransportProtocol,
     VERSION_HEADER,
+    TransportProtocol,
 )
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -93,17 +92,17 @@ from conductor.a2a_compaction import (
     validate_coordination_v2,
 )
 from conductor.a2a_registry import (
-    BIND_HOST as BIND_HOST,
-    DEFAULT_REAP_FAILURES as DEFAULT_REAP_FAILURES,
-    DEFAULT_STATE_DIR as DEFAULT_STATE_DIR,
-    IDENTITY_RE as IDENTITY_RE,
-    KNOWN_AGENTS as KNOWN_AGENTS,
-    LIVENESS_SCHEMA_VERSION as LIVENESS_SCHEMA_VERSION,
-    PROBE_TIMEOUT_S as PROBE_TIMEOUT_S,
-    ROOT as ROOT,
-    SCHEMA_VERSION as SCHEMA_VERSION,
-    A2aError as A2aError,
-    AgentRecord as AgentRecord,
+    BIND_HOST,
+    DEFAULT_REAP_FAILURES,
+    DEFAULT_STATE_DIR,
+    IDENTITY_RE,
+    KNOWN_AGENTS,
+    LIVENESS_SCHEMA_VERSION,
+    PROBE_TIMEOUT_S,
+    ROOT,
+    SCHEMA_VERSION,
+    A2aError,
+    AgentRecord,
     _atomic_json,
     _liveness_payload,
     _registration_fingerprint,
@@ -111,12 +110,56 @@ from conductor.a2a_registry import (
     _registry_payload,
     _serve_port,
     _utc_now,
-    fetch_card as fetch_card,
-    init_registry as init_registry,
-    list_peers as list_peers,
-    load_registry as load_registry,
-    probe_peer as probe_peer,
+    fetch_card,
+    init_registry,
+    list_peers,
+    load_registry,
+    probe_peer,
 )
+
+# Registry symbols remain part of the public transport facade after extraction.
+__all__ = [
+    "BIND_HOST",
+    "DATA_KINDS",
+    "DEFAULT_COMPACT_MESSAGES",
+    "DEFAULT_CONTEXT_CHARS",
+    "DEFAULT_PREVIEW_CHARS",
+    "DEFAULT_REAP_FAILURES",
+    "DEFAULT_STATE_DIR",
+    "HEX64_RE",
+    "IDENTITY_RE",
+    "KNOWN_AGENTS",
+    "LIVENESS_SCHEMA_VERSION",
+    "MAX_BODY_BYTES",
+    "MAX_PREVIEW_ROWS",
+    "PROBE_TIMEOUT_S",
+    "REVIEW_GATES",
+    "ROOT",
+    "SCHEMA_VERSION",
+    "SEND_TIMEOUT_S",
+    "TOKEN_HEADER",
+    "A2aError",
+    "A2aStore",
+    "AgentRecord",
+    "InboxExecutor",
+    "TokenMiddleware",
+    "build_agent_card",
+    "build_app",
+    "build_parser",
+    "compact_inbox_payload",
+    "fetch_card",
+    "flush_queued",
+    "init_registry",
+    "list_peers",
+    "load_registry",
+    "main",
+    "probe_peer",
+    "reap_registry",
+    "render_compact_inbox",
+    "send_message",
+    "serve",
+    "validate_data_payload",
+]
 
 MAX_BODY_BYTES: Final = 1 << 18
 SEND_TIMEOUT_S: Final = 10.0
@@ -177,6 +220,13 @@ class A2aStore:
                 );
                 CREATE INDEX IF NOT EXISTS messages_inbox
                     ON messages(direction, read_at, created_at);
+                CREATE TABLE IF NOT EXISTS delivery_events (
+                    event_id INTEGER PRIMARY KEY,
+                    message_id TEXT NOT NULL,
+                    occurred_at TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    reason TEXT
+                );
                 CREATE TABLE IF NOT EXISTS message_state (
                     direction TEXT NOT NULL,
                     message_id TEXT NOT NULL,
@@ -469,6 +519,11 @@ class A2aStore:
             )
             if cursor.rowcount != 1:
                 raise A2aError(f"unknown outbound message {message_id!r}")
+            connection.execute(
+                "INSERT INTO delivery_events(message_id, occurred_at, status, reason) "
+                "VALUES (?, ?, ?, ?)",
+                (message_id, _utc_now(), status, reason),
+            )
 
     def mark_read(self, message_id: str) -> sqlite3.Row:
         with self.connect() as connection:
@@ -495,17 +550,29 @@ class A2aStore:
             raise A2aError(f"unknown message {message_id!r}")
         return row
 
-    def queued_outbound(self, to_name: str | None = None) -> list[sqlite3.Row]:
+    def queued_outbound(
+        self,
+        to_name: str | None = None,
+        *,
+        limit: int | None = None,
+        exclude: Sequence[str] = (),
+    ) -> list[sqlite3.Row]:
         """Outbound messages awaiting redelivery, oldest first."""
         query = (
             "SELECT * FROM messages "
-            "WHERE direction='outbound' AND delivery_status='queued'"
+            "WHERE direction='outbound' AND delivery_status IN ('queued', 'pending')"
         )
-        params: tuple[str, ...] = ()
+        params: list[Any] = []
         if to_name is not None:
             query += " AND recipient=?"
-            params = (to_name,)
-        query += " ORDER BY created_at"
+            params.append(to_name)
+        if exclude:
+            query += " AND recipient NOT IN (" + ",".join("?" for _ in exclude) + ")"
+            params.extend(exclude)
+        query += " ORDER BY created_at, rowid"
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
         with self.connect() as connection:
             return list(connection.execute(query, params).fetchall())
 
@@ -570,7 +637,7 @@ class A2aStore:
                 query, (preview_chars, preview_chars, preview_chars, limit)
             ).fetchall()
         total = int(fetched[0]["total_count"]) if fetched else 0
-        return ([{key: row[key] for key in row.keys()} for row in fetched], total)
+        return ([dict(row) for row in fetched], total)
 
     def message(self, message_id: str, direction: str = "inbound") -> sqlite3.Row:
         with self.connect() as connection:
@@ -760,10 +827,8 @@ class InboxExecutor(AgentExecutor):
         payloads = get_data_parts(message.parts)
         for payload in payloads:
             validate_data_payload(payload)
-        # protobuf 6.x upb Struct has __getitem__/__contains__ but no .get()
-        sender = (
-            message.metadata["sender"] if "sender" in message.metadata else "unknown"
-        )
+        # protobuf Struct has no .get(); convert it before applying dict semantics.
+        sender = MessageToDict(message.metadata).get("sender", "unknown")
         message_id = message.message_id or str(uuid.uuid4())
         self.store.record_inbound(
             message_id=message_id,
@@ -897,6 +962,10 @@ def _coordination_v2_card(
         return None
     try:
         card = fetch_card(record, timeout=PROBE_TIMEOUT_S)
+    except httpx.TransportError:
+        # Capability is checked again at delivery. An offline peer must not
+        # prevent the sender from durably queueing a structured message.
+        return None
     except httpx.HTTPError as exc:
         raise A2aError(
             f"cannot verify coordination-v2 support for peer {record.name!r}: {exc}"
@@ -971,123 +1040,22 @@ def send_message(
     state_dir: Path,
     queue_on_unreachable: bool = True,
 ) -> dict[str, Any]:
-    records = load_registry(state_dir)
-    if from_name not in records:
-        raise A2aError(f"unknown sender {from_name!r}; registered: {sorted(records)}")
-    if to_name not in records:
-        raise A2aError(f"unknown recipient {to_name!r}; registered: {sorted(records)}")
-    if len(body.encode()) > MAX_BODY_BYTES:
-        raise A2aError(f"body exceeds {MAX_BODY_BYTES} bytes")
-    if data_payload is not None:
-        validate_data_payload(data_payload)
-    record = records[to_name]
-    delivery_card = _coordination_v2_card(record, data_payload)
-    message_id = str(uuid.uuid4())
-    data_json: str | None = None
-    if data_payload is not None:
-        data_json = json.dumps(data_payload, ensure_ascii=False, sort_keys=True)
-    store = A2aStore(state_dir, from_name)
-    # Preserve ordering: anything already queued for this peer goes first.
-    if store.queued_outbound(to_name):
-        flush_queued(state_dir, from_name=from_name, to_name=to_name)
-    store.record_outbound(
-        message_id=message_id,
-        sender=from_name,
-        recipient=to_name,
-        body=body,
-        data_json=data_json,
+    from conductor.a2a_delivery import send_message as implementation
+
+    return implementation(
+        from_name, to_name, body, data_payload, state_dir, queue_on_unreachable
     )
-    try:
-        _deliver_wire(
-            record,
-            from_name,
-            message_id,
-            body,
-            data_payload,
-            card=delivery_card,
-        )
-        store.mark_outbound(message_id, "delivered", None, _utc_now())
-    except httpx.TransportError as exc:
-        reason = f"peer unreachable: {exc}"
-        if queue_on_unreachable:
-            store.mark_outbound(message_id, "queued", reason[:500], None)
-        else:
-            store.mark_outbound(message_id, "failed", reason[:500], None)
-            raise A2aError(reason) from exc
-    except (A2aError, httpx.HTTPError) as exc:
-        reason = str(exc) if isinstance(exc, A2aError) else f"peer error: {exc}"
-        store.mark_outbound(message_id, "failed", reason[:500], None)
-        raise A2aError(reason) from exc
-    return _outbound_row(store, message_id)
 
 
 def flush_queued(
     state_dir: Path,
     from_name: str | None = None,
     to_name: str | None = None,
+    max_messages: int = 100,
 ) -> list[dict[str, Any]]:
-    """Redeliver queued outbound messages whose recipients are now reachable.
+    from conductor.a2a_delivery import flush_queued as implementation
 
-    Per recipient, messages go oldest-first; the first transport failure
-    stops that recipient's flush so ordering is never violated.  A peer that
-    answers and rejects marks that message terminally ``failed``.  Returns a
-    summary row per attempted message.
-    """
-    records = load_registry(state_dir)
-    if from_name is not None:
-        senders = [from_name]
-    else:
-        senders = sorted(
-            d.name
-            for d in state_dir.iterdir()
-            if d.is_dir() and d.name in records and (d / "store.sqlite").is_file()
-        )
-    results: list[dict[str, Any]] = []
-    for sender in senders:
-        store = A2aStore(state_dir, sender)
-        unreachable: set[str] = set()
-        for row in store.queued_outbound(to_name):
-            recipient = row["recipient"]
-            if recipient in unreachable:
-                continue
-            if recipient not in records:
-                store.mark_outbound(
-                    row["message_id"], "failed", "recipient no longer registered", None
-                )
-                results.append({"message_id": row["message_id"], "status": "failed"})
-                continue
-            data_payload = json.loads(row["data_json"]) if row["data_json"] else None
-            try:
-                _deliver_wire(
-                    records[recipient],
-                    sender,
-                    row["message_id"],
-                    row["body"],
-                    data_payload,
-                )
-                store.mark_outbound(row["message_id"], "delivered", None, _utc_now())
-                status = "delivered"
-            except httpx.TransportError as exc:
-                store.mark_outbound(
-                    row["message_id"],
-                    "queued",
-                    f"still unreachable at {_utc_now()}: {exc}"[:500],
-                    None,
-                )
-                unreachable.add(recipient)
-                status = "queued"
-            except (A2aError, httpx.HTTPError) as exc:
-                store.mark_outbound(row["message_id"], "failed", str(exc)[:500], None)
-                status = "failed"
-            results.append(
-                {
-                    "message_id": row["message_id"],
-                    "sender": sender,
-                    "recipient": recipient,
-                    "status": status,
-                }
-            )
-    return results
+    return implementation(state_dir, from_name, to_name, max_messages)
 
 
 def _outbound_row(store: A2aStore, message_id: str) -> dict[str, Any]:
@@ -1111,7 +1079,7 @@ def _outbound_row(store: A2aStore, message_id: str) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "authority": "a2a-delivery-receipt",
-        **{key: row[key] for key in row.keys()},
+        **dict(row),
     }
 
 

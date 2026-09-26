@@ -46,13 +46,13 @@ from conductor_native import (
     git_diff_changes_native,
     git_rename_sources_native,
     git_tree_entries_native,
+    guardrail_ast_metrics_native,
     hook_installer_is_managed_native,
     hook_installer_merge_install_native,
     hook_installer_shlex_join_native,
     hook_installer_shlex_split_native,
     hook_installer_without_managed_native,
     hook_merge_native,
-    guardrail_ast_metrics_native,
     inspect_mutation_campaign_native,
     is_mutation_test_path_native,
     kb_retrieve_l2_normalize_native,
@@ -103,6 +103,15 @@ SLOP_CORE_BUILD_HINT = (
     "slop_core is not installed. Build it into the venv with `make slop-core` "
     "(`maturin develop --release` in tooling/native/slop-core) or `uv sync`."
 )
+
+
+def guardrail_duplicate_candidates_native(
+    files: list[list[str]], window: int
+) -> tuple[list[tuple[int, int]], int, int]:
+    """Load the audit index when needed; an older extension fails at this seam."""
+    from conductor_native import guardrail_duplicate_candidates_native as candidates
+
+    return candidates(files, window)
 
 
 class SlopCoreUnavailable(ImportError):
@@ -169,13 +178,14 @@ __all__ = [
     "git_diff_changes_native",
     "git_rename_sources_native",
     "git_tree_entries_native",
+    "guardrail_ast_metrics_native",
+    "guardrail_duplicate_candidates_native",
     "hook_installer_is_managed_native",
     "hook_installer_merge_install_native",
     "hook_installer_shlex_join_native",
     "hook_installer_shlex_split_native",
     "hook_installer_without_managed_native",
     "hook_merge_native",
-    "guardrail_ast_metrics_native",
     "inspect_mutation_campaign_native",
     "is_mutation_test_path_native",
     "kb_retrieve_l2_normalize_native",
@@ -206,9 +216,12 @@ __all__ = [
     "normalize_mutation_path_native",
     "plan_mutation_evidence_native",
     "project_context_parse_config_native",
+    "receipt_compact_directory_native",
+    "receipt_expand_detail_native",
     "receipt_inventory_digest_native",
     "receipt_manifest_pins_native",
     "receipt_sha256_native",
+    "receipt_slim_detail_native",
     "scan_untracked_import_closure_native",
     "should_skip_mutation_path_native",
     "slop_core",

@@ -30,6 +30,8 @@ dependencies = [
   "httpx>=0.28",
   "numpy>=1.26",
   "pydantic>=2",
+  "pylint>=3.3,<5",
+  "astroid>=3.3,<5",
   "pyyaml>=6.0",
   # conductor/radon_complexity.py imports radon.complexity at call time, and the
   # complexity ratchet runs in candidate_policy.toml's pre-commit profile -- so it is

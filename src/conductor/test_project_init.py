@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import stat
 import subprocess
 import sys
 import tomllib
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -27,8 +28,20 @@ def _repo(tmp_path: Path) -> Path:
     return project
 
 
-def _config(project: Path, **kw: object) -> pi.InitConfig:
-    return pi.InitConfig(project_dir=project, python=Path(sys.executable), **kw)
+def _config(
+    project: Path,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+    check: bool = False,
+) -> pi.InitConfig:
+    return pi.InitConfig(
+        project_dir=project,
+        python=Path(sys.executable),
+        force=force,
+        dry_run=dry_run,
+        check=check,
+    )
 
 
 @pytest.fixture
@@ -218,9 +231,8 @@ def test_plan_wires_settings_to_a_detected_project_local_forge_binary(
     settings_action = next(a for a in plan_.actions if a.path == pi.SETTINGS)
     rendered = json.loads(settings_action.after)
     for event in EVENTS:
-        assert (
-            rendered["hooks"][event][0]["hooks"][0]["command"]
-            == f"{local} hook {event}"
+        assert rendered["hooks"][event][0]["hooks"][0]["command"] == shlex.join(
+            ["env", f"CONDUCTOR_PYTHON={sys.executable}", str(local), "hook", event]
         )
 
 
@@ -294,7 +306,7 @@ def test_gitignore_block_appended_once_and_replaced_when_stale() -> None:
 
 def test_policy_template_is_loadable(tmp_path: Path) -> None:
     path = tmp_path / "candidate_policy.toml"
-    path.write_text(pi.render_policy(date.today()), encoding="utf-8")
+    path.write_text(pi.render_policy(datetime.now(UTC).date()), encoding="utf-8")
     policy = load_policy(path)
     assert policy.block_at == "high"
     assert {c.check_id for c in policy.checks} == {
@@ -318,7 +330,7 @@ def test_apply_then_second_run_is_idempotent(tmp_path: Path) -> None:
     # ``<forge> hook <Event>``, without it the Python launcher TEMPLATE_HOOKS
     # encodes -- both are correct scaffolds, and idempotency must hold for
     # whichever one was written.
-    expected = pi._hooks_block(pi.resolve_forge_binary(project))
+    expected = pi._hooks_block(pi.resolve_forge_binary(project), Path(sys.executable))
     assert settings["hooks"] == expected
     launcher = project / pi.LAUNCHER
     assert launcher.stat().st_mode & stat.S_IXUSR

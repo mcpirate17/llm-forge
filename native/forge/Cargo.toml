@@ -1,6 +1,6 @@
 [package]
 name = "forge"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Native launcher for llm-forge's Claude Code hook path -- step 1 of the Rust hook port: a thin binary that delegates to the existing Python dispatcher while later steps move hook logic in natively."
 

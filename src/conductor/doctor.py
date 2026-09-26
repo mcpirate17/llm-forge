@@ -5,14 +5,16 @@ alive; this one proves the *values* around them are the cheap ones. It reads
 the project's ``.claude/settings.json`` (under ``$CLAUDE_PROJECT_DIR``) and
 the user's ``~/.claude/settings.json`` (under ``$HOME``; a missing user file
 is a skip, not a failure -- the harness default applies) and checks four
-items, PASS/FAIL each, with the repair spelled out as the single JSON edit
+items after applying project-over-user scalar/environment precedence. Hooks
+remain additive across the two scopes. Repairs target the effective value's
+owning scope, with the repair spelled out as the single JSON edit
 ``--fix`` applies:
 
 - ``subagentPromptCacheTtl`` is ``"1h"``: a five-minute TTL rewarms a
   ~180K-token prefix at write price for every subagent spawn.
 - every hook event routes through the one dispatcher command
   (``registry.settings_block``'s wiring, or ``forge hook <Event>`` once that
-  binary exists) -- the project file must wire all of the dispatcher's
+  binary exists) -- the effective settings must wire all of the dispatcher's
   events, and neither file may carry a stray per-hook command under them,
   because a stray command is a hook the doctor cannot vouch for and the
   dispatcher cannot bound.
@@ -40,6 +42,11 @@ from pathlib import Path
 from typing import Any, Final
 
 from tooling.hooks.dispatch import registry
+
+
+class SettingsSchemaError(ValueError):
+    """Serialized harness settings are unreadable or violate their schema."""
+
 
 TTL_KEY: Final[str] = "subagentPromptCacheTtl"
 TTL_WANTED: Final[str] = "1h"
@@ -91,15 +98,6 @@ def _check_ttl(scope: str, payload: dict[str, Any]) -> Finding:
     )
 
 
-def _dispatcher_forms(event: str) -> frozenset[str]:
-    """The two commands that legitimately serve an event.
-
-    ``$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch.py <Event>`` today;
-    ``forge hook <Event>`` once the Rust dispatcher carries the launcher.
-    """
-    return frozenset({registry.dispatcher_command(event), f"forge hook {event}"})
-
-
 def _declared_commands(payload: dict[str, Any]) -> dict[str, list[str]]:
     hooks = payload.get("hooks")
     declared: dict[str, list[str]] = {}
@@ -115,7 +113,9 @@ def _declared_commands(payload: dict[str, Any]) -> dict[str, list[str]]:
     return declared
 
 
-def _check_hooks(scope: str, payload: dict[str, Any], *, require_wiring: bool) -> Finding:
+def _check_hooks(
+    scope: str, payload: dict[str, Any], *, require_wiring: bool
+) -> Finding:
     declared = _declared_commands(payload)
     problems: list[str] = []
     wired = 0
@@ -127,7 +127,7 @@ def _check_hooks(scope: str, payload: dict[str, Any], *, require_wiring: bool) -
             continue
         wired += 1
         for command in commands:
-            if command not in _dispatcher_forms(event):
+            if registry.resolve_dispatcher(command) != event:
                 problems.append(f"{event}: {command!r} bypasses the dispatcher")
     if problems:
         return Finding(
@@ -192,17 +192,6 @@ def _check_model(scope: str, payload: dict[str, Any]) -> Finding:
     )
 
 
-def _findings_for(scope: str, payload: dict[str, Any]) -> list[Finding]:
-    # The dispatcher wiring is the project file's job (bootstrap writes it
-    # there); the user file only has to not bypass it.
-    return [
-        _check_ttl(scope, payload),
-        _check_hooks(scope, payload, require_wiring=scope == "project"),
-        _check_limit(scope, payload),
-        _check_model(scope, payload),
-    ]
-
-
 def _apply_fixes(payload: dict[str, Any], findings: list[Finding]) -> bool:
     """Apply the failed items' edits in place; return whether anything moved."""
     touched = False
@@ -228,9 +217,11 @@ def _load(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ValueError(f"settings file {path} is not readable JSON: {exc}") from exc
+        raise SettingsSchemaError(
+            f"settings file {path} is not readable JSON: {exc}"
+        ) from exc
     if not isinstance(payload, dict):
-        raise ValueError(f"settings file {path} is not a JSON object")
+        raise SettingsSchemaError(f"settings file {path} is not a JSON object")
     return payload
 
 
@@ -252,19 +243,17 @@ def diagnose(
 ) -> tuple[list[Finding], Path | None, Path | None]:
     """Collect findings for both settings files, plus the paths ``--fix`` writes.
 
-    Each file is checked independently: the project file must exist (the
-    dispatcher wiring lives there) -- its absence is a FAIL whose fix writes
-    the canonical settings -- while the user file may legitimately be absent,
-    which reports one SKIP row, not a FAIL. A file that exists but is not
-    readable JSON raises, whichever file it is.
+    Project scalars override user scalars; environment keys merge by key and
+    hooks from both scopes remain active. Repairs target the winning scope.
     """
     user_path = home / ".claude" / "settings.json"
     project_path = project / ".claude" / "settings.json"
     findings: list[Finding] = []
-    if project_path.is_file():
-        findings.extend(_findings_for("project", _load(project_path)))
-        project_target = project_path
-    else:
+    project_target = project_path if project_path.is_file() else None
+    user_target = user_path if user_path.is_file() else None
+    project_settings = _load(project_path) if project_target else {}
+    user_settings = _load(user_path) if user_target else {}
+    if project_target is None:
         findings.append(
             Finding(
                 "project",
@@ -274,20 +263,60 @@ def diagnose(
                 "write the canonical dispatcher settings",
             )
         )
-        project_target = None
-    if user_path.is_file():
-        findings.extend(_findings_for("user", _load(user_path)))
-        user_target = user_path
-    else:
+    if user_target is None:
         findings.append(
             Finding("user", CHECK_FILE, "SKIP", f"no user settings at {user_path}")
         )
-        user_target = None
+    effective = {**user_settings, **project_settings}
+    user_env = user_settings.get("env", {})
+    project_env = project_settings.get("env", {})
+    if not isinstance(user_env, dict) or not isinstance(project_env, dict):
+        raise SettingsSchemaError("settings env must be a JSON object")
+    effective["env"] = {**user_env, **project_env}
+    for key, check in ((TTL_KEY, _check_ttl), (MODEL_KEY, _check_model)):
+        scope = (
+            "project" if key in project_settings or key not in user_settings else "user"
+        )
+        findings.append(check(scope, effective))
+    limit_scope = (
+        "project"
+        if LIMIT_ENV_KEY in project_env or LIMIT_ENV_KEY not in user_env
+        else "user"
+    )
+    findings.append(_check_limit(limit_scope, effective))
+    for scope, payload in (("project", project_settings), ("user", user_settings)):
+        if payload:
+            findings.append(_check_hooks(scope, payload, require_wiring=False))
+    wired = set(_declared_commands(project_settings)) | set(
+        _declared_commands(user_settings)
+    )
+    missing = [
+        event
+        for event in registry.EVENTS
+        if event not in wired
+        or not (
+            _declared_commands(project_settings).get(event)
+            or _declared_commands(user_settings).get(event)
+        )
+    ]
+    if missing and project_target is not None:
+        findings.append(
+            Finding(
+                "project",
+                CHECK_HOOKS,
+                "FAIL",
+                f"no effective dispatcher wiring for {', '.join(missing)}",
+                "write missing dispatcher events in project settings",
+            )
+        )
     return findings, project_target, user_target
 
 
 def _fix_everything(
-    findings: list[Finding], project: Path, project_path: Path | None, user_path: Path | None
+    findings: list[Finding],
+    project: Path,
+    project_path: Path | None,
+    user_path: Path | None,
 ) -> int:
     """Apply failed items' edits to the files on disk; return the edit count."""
     fixed = 0
@@ -314,7 +343,9 @@ def render(findings: list[Finding], *, fixed: int) -> str:
         lines.append(row)
     failed = sum(f.status == "FAIL" for f in findings)
     suffix = f" fixed={fixed}" if fixed else ""
-    lines.append(f"harness-doctor | {'FAIL' if failed else 'PASS'} fails={failed}{suffix}")
+    lines.append(
+        f"harness-doctor | {'FAIL' if failed else 'PASS'} fails={failed}{suffix}"
+    )
     return "\n".join(lines)
 
 
@@ -353,15 +384,22 @@ def main(argv: list[str] | None = None) -> int:
         findings, project_path, user_path = diagnose(project, home)
         fixed = 0
         if args.fix:
-            fixed = _fix_everything(findings, project, project_path, user_path)
-            # Report the post-fix truth: what still fails after the edits,
-            # so `--fix` exit 0 means the settings are now the cheap ones.
-            findings, _, _ = diagnose(project, home)
+            # Project model settings take precedence over user settings.
+            # Validate the effective value again after each scope is repaired.
+            for _ in range(2):
+                fixed += _fix_everything(findings, project, project_path, user_path)
+                findings, project_path, user_path = diagnose(project, home)
+                if not any(f.status == "FAIL" for f in findings):
+                    break
     except ValueError as exc:
         print(f"harness-doctor | FAIL {exc}", file=sys.stderr)
         return 2
     if args.json:
-        print(json.dumps({"findings": [f.__dict__ for f in findings], "fixed": fixed}, indent=2))
+        print(
+            json.dumps(
+                {"findings": [f.__dict__ for f in findings], "fixed": fixed}, indent=2
+            )
+        )
     else:
         print(render(findings, fixed=fixed))
     return 1 if any(f.status == "FAIL" for f in findings) else 0

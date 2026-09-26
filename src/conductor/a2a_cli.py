@@ -193,6 +193,13 @@ def _add_send_commands(sub: argparse._SubParsersAction[Any]) -> None:
         "--as-name", help="flush only this sender's queue (default: all local stores)"
     )
     flush_parser.add_argument("--to", help="flush only messages to this recipient")
+    flush_parser.add_argument("--max-messages", type=int, default=100)
+    history_parser = sub.add_parser(
+        "history", help="read bounded durable delivery events"
+    )
+    history_parser.add_argument("--as-name", required=True)
+    history_parser.add_argument("--message-id")
+    history_parser.add_argument("--limit", type=int, default=20)
 
 
 def _add_inbox_commands(sub: argparse._SubParsersAction[Any]) -> None:
@@ -309,6 +316,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_inbox_commands(sub)
     _add_lifecycle_commands(sub)
     _add_watch_and_status_commands(sub)
+    from conductor.a2a_supervisor import add_parser
+
+    add_parser(sub)
     return parser
 
 
@@ -389,9 +399,37 @@ def _cmd_send(args: argparse.Namespace) -> int:
 
 
 def _cmd_flush(args: argparse.Namespace) -> int:
-    results = flush_queued(args.state_dir, from_name=args.as_name, to_name=args.to)
+    results = flush_queued(
+        args.state_dir,
+        from_name=args.as_name,
+        to_name=args.to,
+        max_messages=args.max_messages,
+    )
     print(json.dumps(results, ensure_ascii=False, indent=2, sort_keys=True))
-    return 3 if any(row["status"] == "queued" for row in results) else 0
+    names = [args.as_name] if args.as_name else list(load_registry(args.state_dir))
+    remaining = any(
+        (args.state_dir / name / "store.sqlite").is_file()
+        and A2aStore(args.state_dir, name).queued_outbound(args.to, limit=1)
+        for name in names
+    )
+    return 3 if remaining else 0
+
+
+def _cmd_history(args: argparse.Namespace) -> int:
+    from conductor.a2a_delivery import history
+
+    print(
+        json.dumps(
+            history(
+                args.state_dir,
+                args.as_name,
+                message_id=args.message_id,
+                limit=args.limit,
+            ),
+            sort_keys=True,
+        )
+    )
+    return 0
 
 
 def _cmd_inbox(args: argparse.Namespace) -> int:
@@ -567,6 +605,7 @@ COMMANDS: dict[str, CommandHandler] = {
     "serve": _cmd_serve,
     "send": _cmd_send,
     "flush": _cmd_flush,
+    "history": _cmd_history,
     "inbox": _cmd_inbox,
     "read": _cmd_read,
     "show": _cmd_show,
@@ -582,6 +621,10 @@ COMMANDS: dict[str, CommandHandler] = {
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "supervise":
+            from conductor.a2a_supervisor import command
+
+            return command(args)
         return COMMANDS[args.command](args)
     except (A2aError, sqlite3.Error, OSError, ValueError) as exc:
         print(f"agent-a2a: {exc}", file=sys.stderr)

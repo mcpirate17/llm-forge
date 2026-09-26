@@ -194,9 +194,13 @@ fn check_binaries(entries: &[hooks_install::ParsedHook]) -> Check {
     Check::pass(
         "binary",
         format!(
-            "{} binar{} checked, versions match {}",
+            "{} {} checked, versions match {}",
             binaries.len(),
-            if binaries.len() > 1 { "ies" } else { "y" },
+            if binaries.len() > 1 {
+                "binaries"
+            } else {
+                "binary"
+            },
             hooks_install::VERSION_LINE
         ),
     )
@@ -271,16 +275,32 @@ fn check_python(host: &Path, entries: &[hooks_install::ParsedHook]) -> Check {
             "every installed entry is standalone; forge never delegates to Python".to_string(),
         );
     }
-    let python = interpreter::resolve_python(host);
-    let mut cmd = Command::new(&python);
+    let interpreters: std::collections::BTreeSet<_> = entries
+        .iter()
+        .filter(|entry| !entry.standalone)
+        .map(|entry| interpreter::resolve_python_binding(host, entry.python.as_deref()))
+        .collect();
+    let mut details = Vec::new();
+    for python in interpreters {
+        let result = check_interpreter(host, &python);
+        if result.status == Status::Fail {
+            return result;
+        }
+        details.push(result.detail);
+    }
+    Check::pass("python", details.join("; "))
+}
+
+fn check_interpreter(host: &Path, python: &Path) -> Check {
+    let mut cmd = Command::new(python);
     cmd.arg("-c")
-        .arg("import conductor, tooling.hooks.dispatch")
+        .arg("import conductor, conductor_native, tooling.hooks.dispatch")
         .current_dir(host);
     match run_capture_bounded(cmd, None, PYTHON_IMPORT_TIMEOUT) {
         Ok(output) if output.status.success() => Check::pass(
             "python",
             format!(
-                "{} imports conductor and tooling.hooks.dispatch from {}",
+                "{} imports conductor, conductor_native and tooling.hooks.dispatch from {}",
                 python.display(),
                 host.display()
             ),
@@ -288,7 +308,7 @@ fn check_python(host: &Path, entries: &[hooks_install::ParsedHook]) -> Check {
         Ok(output) => Check::fail(
             "python",
             format!(
-                "{} -c 'import conductor, tooling.hooks.dispatch' (cwd {}) failed: {}",
+                "{} -c 'import conductor, conductor_native, tooling.hooks.dispatch' (cwd {}) failed: {}",
                 python.display(),
                 host.display(),
                 tail(&String::from_utf8_lossy(&output.stderr), 200)
@@ -602,6 +622,7 @@ mod tests {
             mode: "warn".to_string(),
             standalone: true,
             binary: Some(PathBuf::from("/opt/forge/bin/forge")),
+            python: None,
             dry_run: false,
             takeover: false,
         })

@@ -39,6 +39,28 @@ def test_settings_template_is_generated_from_the_registry():
     assert json.loads(TEMPLATE.read_text()) == registry.settings_block()
 
 
+@pytest.mark.parametrize(
+    "command,expected",
+    [
+        (
+            "env 'CONDUCTOR_PYTHON=/runtime with spaces/python' '/tools with spaces/forge' hook SessionStart",
+            "SessionStart",
+        ),
+        (
+            "CONDUCTOR_PYTHON=/runtime/python /tools/forge hook SessionStart",
+            "SessionStart",
+        ),
+        ("env X=1 /tools/forge hook SessionStart; echo bypass", None),
+        ("env X=1 '/tools/forge hook SessionStart", None),
+        ("env X=1 /tools/forge other SessionStart", None),
+    ],
+)
+def test_dispatcher_recognition_handles_shell_quoting_and_rejects_extra_commands(
+    command, expected
+):
+    assert registry.resolve_dispatcher(command) == expected
+
+
 def test_settings_block_wires_every_event_once_to_the_launcher():
     block = registry.settings_block()["hooks"]
     assert tuple(block) == registry.EVENTS

@@ -4,7 +4,7 @@ A development environment for building reliable LLM systems: agent coordination,
 context and token efficiency, code quality, auditing, testing, and automated
 governance.
 
-The Python package is `conductor` (distribution `conductor-tooling`), backed by two
+The Python package is `conductor` (distribution `conductor-tooling`), backed by three
 Rust crates under `native/`:
 
 - `src/conductor/` — mutation campaigns and receipts, candidate review and the gate,
@@ -15,30 +15,57 @@ Rust crates under `native/`:
 - `native/conductor-native/` — the `conductor_native` PyO3 extension behind
   `conductor/_native.py`.
 - `native/slop-core/` — the slop scanner.
+- `native/forge/` — the native hook runtime, installer, routing, and coordination CLI.
 
 ## Install
 
+To use the current checkout, including changes that have not been published:
+
 ```sh
+cd /path/to/llm-forge
 uv venv .venv --python 3.12
-uv sync --extra test
+uv sync --extra test --extra mutation --extra graph
 .venv/bin/python -m pytest src/conductor -q
+make forge-build
+export PATH="$PWD/.tools/bin:$PATH"
 ```
 
-Every host project pins this repo by tag in its own `pyproject.toml`:
+`uv sync` installs the checkout's Python package in editable mode; `make forge-build`
+builds the same checkout's native executable locally. The provider selection,
+explicit native interpreter binding, coordination, and delivery changes described
+below require this current source build until a reviewed revision containing them
+is published.
+
+For a reproducible **published snapshot**, no release tag is available yet. The
+following real commit predates these additions: it does **not** provide the new
+`--provider all` or native `--python` behavior. Pin all three packages because
+dependency projects' uv source overrides are not the host's source configuration:
 
 ```toml
 [tool.uv.sources]
-conductor-tooling = { git = "https://github.com/mcpirate17/llm-forge", tag = "v0.1.0" }
+conductor-tooling = { git = "https://github.com/mcpirate17/llm-forge", rev = "d2d83d671977e464effcb44f52dcf470089f655f" }
+conductor-native = { git = "https://github.com/mcpirate17/llm-forge", rev = "d2d83d671977e464effcb44f52dcf470089f655f", subdirectory = "native/conductor-native" }
+slop-core = { git = "https://github.com/mcpirate17/llm-forge", rev = "d2d83d671977e464effcb44f52dcf470089f655f", subdirectory = "native/slop-core" }
 ```
+
+Declare all three packages in the host's dependencies so these source pins apply.
+Select `conductor-tooling[graph,mutation]` for graph retrieval and Python mutation
+campaigns; `test` adds the platform's pytest tools. Native packages build from source
+and require a Rust toolchain. The `forge` executable is installed separately with
+`make forge-build` in this checkout, or `cargo install --git
+https://github.com/mcpirate17/llm-forge --rev d2d83d671977e464effcb44f52dcf470089f655f
+--locked --root .tools forge`. Add the resulting `.tools/bin` to PATH. Keep all
+components pinned to the same reviewed revision when upgrading.
 
 ## Bootstrap a host project
 
-Once `conductor-tooling` is installed into a host project's venv, one command scaffolds
-everything that project needs to adopt the platform:
+Using the current checkout's environment and native build above:
 
 ```sh
-python -m conductor.bootstrap /path/to/host-project
-# equivalently: python -m conductor bootstrap /path/to/host-project
+.venv/bin/python -m conductor.bootstrap /path/to/host-project
+# equivalently: .venv/bin/python -m conductor bootstrap /path/to/host-project
+# Explicitly provision additional harnesses and report their supported features:
+.venv/bin/python -m conductor bootstrap /path/to/host-project --provider all
 ```
 
 It writes, idempotently and fail-loud (`--dry-run` to preview, `--check` for CI drift
@@ -68,17 +95,29 @@ byte where it was cut plus the `Read(offset=..., limit=...)` call that reaches t
 
 ## Installing into a host project
 
-`conductor-tooling` is meant to be installed as a dependency of a host project's own
-venv, not run from an in-tree checkout:
+For ongoing host use, install the platform in the host project's own environment.
+To use the current local source, replace the published-snapshot source entries with:
 
 ```toml
 [tool.uv.sources]
-conductor-tooling = { git = "https://github.com/mcpirate17/llm-forge", tag = "v0.1.0" }
+conductor-tooling = { path = "/path/to/llm-forge", editable = true }
+conductor-native = { path = "/path/to/llm-forge/native/conductor-native" }
+slop-core = { path = "/path/to/llm-forge/native/slop-core" }
 ```
 
-```sh
-uv add "conductor-tooling @ git+https://github.com/mcpirate17/llm-forge"
-```
+With all three dependencies declared as above, run `uv sync` from the host, then
+build its matching executable with `cargo install --path
+/path/to/llm-forge/native/forge --locked --root /path/to/host-project/.tools`.
+Rebuild the native packages after Rust changes with `uv sync --reinstall-package
+conductor-native --reinstall-package slop-core`. The Git pins above remain an
+alternative for the older published snapshot; advance them together only after the
+desired changes have been reviewed and published.
+
+In the current source build, Python and `forge` hooks both retain bootstrap's
+`--python` binding, even when the target has no `.venv`.
+The native installer accepts the same explicit binding with
+`forge hooks install --host /path/to/host-project --python /path/to/venv/bin/python`.
+Mutation snapshots override that binding with their isolated interpreter.
 
 Every CLI (`conductor.active_state`, `conductor.session_preamble`, `conductor.gate`,
 ...) resolves the *host* repository root from the working directory or environment --
@@ -112,8 +151,11 @@ gate, risk/approval tiers, mutation evidence, context budget, CI coverage), writ
 host project adopting this platform, plus two reference pages:
 [`docs/makefile_targets.md`](docs/makefile_targets.md) (every `conductor.mk` target,
 generated from its help annotations) and [`docs/bootstrap.md`](docs/bootstrap.md)
-(scaffolding a host project). `AGENTS.md` is the working contract for changes to
-this repository itself.
+(scaffolding a host project). Operational guides cover
+[messaging and delivery](docs/messaging.md),
+[task coordination and status](docs/coordination.md), and
+[guardrail audits](docs/guardrail_audit.md). `AGENTS.md` is the working contract
+for changes to this repository itself.
 
 ## Baselines
 
