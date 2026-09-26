@@ -126,7 +126,9 @@ def worktree(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def run_attribution(worktree: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
+def run_attribution(
+    worktree: Path, rows: list[dict[str, Any]], runner: Any = None
+) -> dict[str, Any]:
     receipt: dict[str, Any] = {"mutants": rows, "test_value": None}
     attribution.attribute(
         Campaign(),
@@ -134,7 +136,7 @@ def run_attribution(worktree: Path, rows: list[dict[str, Any]]) -> dict[str, Any
         worktree=worktree,
         environment={},
         interpreter=sys.executable,
-        run=FakeRunner(worktree),
+        run=runner or FakeRunner(worktree),
     )
     return receipt
 
@@ -560,3 +562,35 @@ def test_progress_step_arithmetic_is_pinned_at_a_chosen_total(
     assert len(large_lines) < large_total  # bounded, not one line per mutant
     assert large_lines[0] == "attribution: 1/47 killed mutants re-run"
     assert large_lines[-1] == "attribution: 47/47 killed mutants re-run"
+
+
+class AbortingRunner(FakeRunner):
+    """Dies like a SIGABRT (no JUnit report) whenever the file holds `fatal`."""
+
+    def __init__(self, worktree: Path, fatal: str) -> None:
+        super().__init__(worktree)
+        self.fatal = fatal
+
+    def __call__(self, argv: list[str], **kwargs: Any) -> tuple[CommandResult, str]:
+        if self.fatal in (self.worktree / MODULE).read_text(encoding="utf-8"):
+            self.commands.append(list(argv))
+            return CommandResult(-6, False, 0.01, "", "Aborted"), ""
+        return super().__call__(argv, **kwargs)
+
+
+def test_a_mutant_that_aborts_the_rerun_is_unattributed_not_fatal(
+    worktree: Path,
+) -> None:
+    rows = [mutant("abort-op", "a + b", "a // b"), mutant("mul-op", "a * b", "a / b")]
+    receipt = run_attribution(worktree, rows, AbortingRunner(worktree, "a // b"))
+
+    assert receipt["attribution"]["unattributed"] == [
+        {"id": "abort-op", "reason": "covering set crashed without a report"}
+    ]
+    assert receipt["test_value"]["killers_by_mutant"] == {"mul-op": [MUL]}
+
+
+def test_a_baseline_that_writes_no_report_still_refuses(worktree: Path) -> None:
+    rows = [mutant("add-op", "a + b", "a - b")]
+    with pytest.raises(CampaignError, match="baseline 0 exited -6 without a JUnit"):
+        run_attribution(worktree, rows, AbortingRunner(worktree, "def add"))

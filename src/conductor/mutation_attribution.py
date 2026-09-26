@@ -249,8 +249,15 @@ class _Session:
         self.reports = worktree / ".attribution"
         self.reports.mkdir(exist_ok=True)
 
-    def measure(self, nodeids: Sequence[str], name: str) -> tuple[Any, dict[str, Any]]:
-        """Run exactly these tests and read their outcomes back out."""
+    def measure(
+        self, nodeids: Sequence[str], name: str
+    ) -> tuple[Any, dict[str, Any] | None]:
+        """Run exactly these tests and read their outcomes back out.
+
+        The report is None when pytest wrote none -- a mutant that aborts the
+        interpreter (SIGABRT out of a native or Triton launch) kills pytest
+        before it can write XML. The caller decides what that means.
+        """
 
         junit = self.reports / f"{name}.xml"
         result, _ = self.run(
@@ -261,6 +268,8 @@ class _Session:
         )
         if result.timed_out:
             return result, {}
+        if not junit.is_file():
+            return result, None
         return result, parse_pytest_junit(junit, nodeids)
 
 
@@ -272,6 +281,11 @@ def _baselines(session: _Session, ranked: Sequence[str]) -> list[dict[str, Any]]
         result, report = session.measure(ranked, f"baseline-{index}")
         if result.timed_out:
             raise CampaignError(f"attribution baseline {index} timed out")
+        if report is None:
+            raise CampaignError(
+                f"attribution baseline {index} exited {result.returncode} "
+                "without a JUnit report"
+            )
         reports.append(report)
     return reports
 
@@ -330,6 +344,10 @@ def _matrix(
             result, report = session.measure(covering, f"mutant-{position}")
         if result.timed_out:
             _unattributed(summary, mutation_id, "covering set timed out")
+        elif report is None:
+            # The process died before pytest wrote its report: a real kill
+            # with no per-test outcome to charge it to.
+            _unattributed(summary, mutation_id, "covering set crashed without a report")
         elif report["status"] != "COMPLETE":
             # Usually an import-time break: every covering test errors during
             # collection, so the report carries cases that map to no nodeid.
