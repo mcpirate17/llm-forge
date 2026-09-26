@@ -307,7 +307,7 @@ def _baselines(session: _Session, ranked: Sequence[str]) -> list[dict[str, Any]]
     """
 
     reports = []
-    slowest = 0.0
+    durations = []
     for index in range(BASELINE_REPETITIONS):
         result, report = session.measure(ranked, f"baseline-{index}")
         if result.timed_out:
@@ -318,8 +318,8 @@ def _baselines(session: _Session, ranked: Sequence[str]) -> list[dict[str, Any]]
                 "without a JUnit report"
             )
         reports.append(report)
-        slowest = max(slowest, result.duration_seconds)
-    session.timeout = rerun_timeout(session.timeout, slowest)
+        durations.append(result.duration_seconds)
+    session.timeout = rerun_timeout(session.timeout, max(durations))
     return reports
 
 
