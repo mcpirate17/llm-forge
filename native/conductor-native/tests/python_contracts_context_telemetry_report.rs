@@ -246,3 +246,86 @@ fn strict_hook_hash_keeps_text_rules_separate_from_permissive_byte_count() {
         assert!(mapped.get_item("content_hash").unwrap().is_none());
     });
 }
+
+#[test]
+fn hook_hash_follows_optional_labels_in_serialized_key_order() {
+    let _case = Case::new();
+    Python::attach(|py| {
+        let telemetry = module(py, "conductor.context_telemetry");
+        let native = module(py, "conductor._native");
+        let payload = PyDict::new(py);
+        let specific = PyDict::new(py);
+        specific
+            .set_item("additionalContext", "visible text")
+            .unwrap();
+        payload.set_item("hookSpecificOutput", specific).unwrap();
+
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("category", "instructions").unwrap();
+        kwargs.set_item("session_id", "s-9").unwrap();
+        let event = telemetry
+            .getattr("hook_context_event")
+            .unwrap()
+            .call(("hook", &payload), Some(&kwargs))
+            .unwrap();
+        let event = event.cast::<PyDict>().unwrap();
+        let keys: Vec<String> = event
+            .keys()
+            .iter()
+            .map(|key| key.extract().unwrap())
+            .collect();
+        assert_eq!(
+            &keys[keys.len() - 3..],
+            ["category", "session_id", "content_hash"]
+        );
+        let json: String = py
+            .import("json")
+            .unwrap()
+            .getattr("dumps")
+            .unwrap()
+            .call1((event,))
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert!(json.find(r#""category""#).unwrap() < json.find(r#""session_id""#).unwrap());
+        assert!(json.find(r#""session_id""#).unwrap() < json.find(r#""content_hash""#).unwrap());
+
+        let direct = native
+            .getattr("context_telemetry_hook_event_with_hash_native")
+            .unwrap()
+            .call1(("hook", &payload, "", "2026-09-27T12:00:00Z"))
+            .unwrap();
+        let direct = direct.cast::<PyDict>().unwrap();
+        assert!(direct.get_item("category").unwrap().is_none());
+        assert!(direct.get_item("session_id").unwrap().is_none());
+        assert!(direct.get_item("content_hash").unwrap().is_some());
+
+        let falsey = native
+            .getattr("context_telemetry_hook_event_with_hash_native")
+            .unwrap()
+            .call1(("hook", &payload, "", "2026-09-27T12:00:00Z", 0, ""))
+            .unwrap();
+        let falsey = falsey.cast::<PyDict>().unwrap();
+        assert!(falsey.get_item("category").unwrap().is_none());
+        assert!(falsey.get_item("session_id").unwrap().is_none());
+
+        let label = PyDict::new(py);
+        label.set_item("kind", "instructions").unwrap();
+        let truthy = native
+            .getattr("context_telemetry_hook_event_with_hash_native")
+            .unwrap()
+            .call1(("hook", &payload, "", "2026-09-27T12:00:00Z", &label, 7))
+            .unwrap();
+        let truthy = truthy.cast::<PyDict>().unwrap();
+        assert!(truthy.get_item("category").unwrap().unwrap().is(&label));
+        assert_eq!(
+            truthy
+                .get_item("session_id")
+                .unwrap()
+                .unwrap()
+                .extract::<i64>()
+                .unwrap(),
+            7
+        );
+    });
+}

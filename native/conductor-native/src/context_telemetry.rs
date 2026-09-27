@@ -405,7 +405,9 @@ fn hook_event<'py>(
     event_name: &str,
     timestamp: &str,
     include_hash: bool,
+    labels: (Option<&Bound<'py, PyAny>>, Option<&Bound<'py, PyAny>>),
 ) -> PyResult<Bound<'py, PyDict>> {
+    let (category, session_id) = labels;
     let mapping = mapping_type(py)?;
     let mut context = String::new();
     let mut hash_text = String::new();
@@ -461,6 +463,16 @@ fn hook_event<'py>(
         "hook-additional-context-bytes",
     )?;
     result.set_item("output_bounded", false)?;
+    if let Some(category) = category {
+        if category.is_truthy()? {
+            result.set_item("category", category)?;
+        }
+    }
+    if let Some(session_id) = session_id {
+        if session_id.is_truthy()? {
+            result.set_item("session_id", session_id)?;
+        }
+    }
     if !hash_text.is_empty() {
         let digest = Sha256::digest(hash_text.as_bytes());
         result.set_item("content_hash", format!("{digest:x}")[..16].to_owned())?;
@@ -476,18 +488,36 @@ fn context_telemetry_hook_event_native<'py>(
     event_name: &str,
     timestamp: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
-    hook_event(py, hook, hook_json, event_name, timestamp, false)
+    hook_event(
+        py,
+        hook,
+        hook_json,
+        event_name,
+        timestamp,
+        false,
+        (None, None),
+    )
 }
 
-#[pyfunction]
+#[pyfunction(signature = (hook, hook_json, event_name, timestamp, category=None, session_id=None))]
 fn context_telemetry_hook_event_with_hash_native<'py>(
     py: Python<'py>,
     hook: &str,
     hook_json: &Bound<'py, PyAny>,
     event_name: &str,
     timestamp: &str,
+    category: Option<&Bound<'py, PyAny>>,
+    session_id: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    hook_event(py, hook, hook_json, event_name, timestamp, true)
+    hook_event(
+        py,
+        hook,
+        hook_json,
+        event_name,
+        timestamp,
+        true,
+        (category, session_id),
+    )
 }
 
 fn injected_context_text(specific: &Bound<'_, PyDict>) -> PyResult<String> {

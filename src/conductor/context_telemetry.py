@@ -228,11 +228,9 @@ def hook_context_event(
         hook_json,
         event_name,
         datetime.now(UTC).isoformat(timespec="milliseconds"),
+        category,
+        session_id,
     )
-    if category:
-        item["category"] = category
-    if session_id:
-        item["session_id"] = session_id
     return item
 
 
@@ -276,9 +274,7 @@ def summarize(paths: list[Path], *, bound_bytes: int = 8000) -> dict[str, Any]:
 def _parse_since(since: str) -> datetime:
     from conductor._native import context_telemetry_parse_since_native
 
-    cutoff = context_telemetry_parse_since_native(
-        since, datetime.now(UTC).isoformat()
-    )
+    cutoff = context_telemetry_parse_since_native(since, datetime.now(UTC).isoformat())
     return datetime.fromisoformat(cutoff)
 
 
