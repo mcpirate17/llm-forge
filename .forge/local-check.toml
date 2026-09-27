@@ -141,7 +141,9 @@ set -eu
 export PYO3_PYTHON="$PWD/.venv/bin/python"
 export PYTHONPATH="$PWD/src:$($PYO3_PYTHON -c 'import site; print(site.getsitepackages()[0])')"
 export LD_LIBRARY_PATH="$($PYO3_PYTHON -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
-cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml \
+core_target="${CARGO_TARGET_DIR:-$PWD/native/conductor-native/target}"
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then core_target="$core_target/variants/compat"; fi
+CARGO_TARGET_DIR="$core_target" cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml \
   --features python-compat-tests --test 'python_contracts_*' -- --test-threads=1
 '''
 timeout_s = 2400
@@ -185,10 +187,11 @@ name = "rust-conductor-native"
 paths = ['^native/conductor-native/', '^src/conductor/', '^\.forge/local-check\.toml$']
 run = '''
 set -eu
+core_target="${CARGO_TARGET_DIR:-$PWD/native/conductor-native/target}"
 cargo +1.98.0 fmt --manifest-path native/conductor-native/Cargo.toml --check
-PYO3_PYTHON="$PWD/.venv/bin/python" cargo +1.98.0 clippy --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --all-targets -- -D warnings
-PYO3_PYTHON="$PWD/.venv/bin/python" cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml
-PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --no-default-features --features source-analysis -- --test-threads=1
+CARGO_TARGET_DIR="$core_target/variants/default" PYO3_PYTHON="$PWD/.venv/bin/python" cargo +1.98.0 clippy --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --all-targets -- -D warnings
+CARGO_TARGET_DIR="$core_target/variants/default" PYO3_PYTHON="$PWD/.venv/bin/python" cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml
+CARGO_TARGET_DIR="$core_target/variants/source-analysis" PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --no-default-features --features source-analysis -- --test-threads=1
 '''
 timeout_s = 1800
 
@@ -197,6 +200,7 @@ name = "rust-slop-core"
 paths = ['^native/slop-core/', '^\.forge/local-check\.toml$']
 run = '''
 set -eu
+export PYO3_PYTHON="$PWD/.venv/bin/python"
 cargo +1.98.0 fmt --manifest-path native/slop-core/Cargo.toml --check
 cargo +1.98.0 clippy --offline --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml --all-targets -- -D warnings
 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml

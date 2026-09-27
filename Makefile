@@ -57,6 +57,14 @@ BASELINE_EXPIRES ?= $(shell $(UV) run python -c \
 INSTALL_REINSTALL ?=
 INSTALL_SYNC_ARGS ?=
 
+# The cdylib/rlib pair has an unhashed output, so feature sets need separate
+# directories. Preserve the usual compat cache and isolate a shared override
+# from Forge's Python-free conductor-native dependency.
+CORE_TARGET_ROOT = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(CURDIR)/native/conductor-native/target)
+CORE_COMPAT_TARGET = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR)/variants/compat,$(CORE_TARGET_ROOT))
+CORE_DEFAULT_TARGET = $(CORE_TARGET_ROOT)/variants/default
+CORE_SOURCE_TARGET = $(CORE_TARGET_ROOT)/variants/source-analysis
+
 install:  ## Sync the developer venv and precompile all native test targets
 	@set -eu; \
 	export CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 UV_CONCURRENT_BUILDS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 RUSTUP_TOOLCHAIN=1.98.0; \
@@ -68,13 +76,13 @@ install:  ## Sync the developer venv and precompile all native test targets
 	test -x "$$venv/bin/forge"; \
 	export PATH="$$venv/bin:$$PATH"; \
 	export PYO3_PYTHON="$$venv/bin/python" FORGE_BIN="$$venv/bin/forge"; \
-	cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml \
+	CARGO_TARGET_DIR="$(CORE_COMPAT_TARGET)" cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml \
 		--locked --jobs 2 --all-targets --features python-compat-tests --no-run; \
-	cargo +1.98.0 build --manifest-path native/conductor-native/Cargo.toml \
+	CARGO_TARGET_DIR="$(CORE_COMPAT_TARGET)" cargo +1.98.0 build --manifest-path native/conductor-native/Cargo.toml \
 		--locked --jobs 2 --bins --features python-compat-tests; \
-	cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml \
+	CARGO_TARGET_DIR="$(CORE_DEFAULT_TARGET)" cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml \
 		--locked --jobs 2 --all-targets --no-run; \
-	PYO3_NO_PYTHON=1 cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml \
+	CARGO_TARGET_DIR="$(CORE_SOURCE_TARGET)" PYO3_NO_PYTHON=1 cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml \
 		--locked --jobs 2 --all-targets --no-default-features --features source-analysis --no-run; \
 	cargo +1.98.0 test --manifest-path native/slop-core/Cargo.toml \
 		--locked --jobs 2 --all-targets --no-run; \
@@ -124,10 +132,10 @@ test:  ## Run the native compatibility and Rust test suites
 	export PYO3_PYTHON="$$venv/bin/python" FORGE_BIN="$$venv/bin/forge"; \
 	export PYTHONPATH="$(CURDIR)/src:$$("$$PYO3_PYTHON" -c 'import site; print(site.getsitepackages()[0])')"; \
 	export LD_LIBRARY_PATH="$$("$$PYO3_PYTHON" -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):$${LD_LIBRARY_PATH:-}"; \
-	cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml \
+	CARGO_TARGET_DIR="$(CORE_COMPAT_TARGET)" cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml \
 		--features python-compat-tests --test 'python_contracts_*' -- --test-threads=1; \
-	cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml; \
-	PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml \
+	CARGO_TARGET_DIR="$(CORE_DEFAULT_TARGET)" cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml; \
+	CARGO_TARGET_DIR="$(CORE_SOURCE_TARGET)" PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml \
 		--no-default-features --features source-analysis -- --test-threads=1; \
 	PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml; \
 	cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml

@@ -22,6 +22,11 @@ two jobs, and limits each Rust harness to two concurrent tests (the Python
 contracts run one at a time). jscpd 4.2.1 and PMD 7.27.0 are installed once under
 `.git/forge-tools` when their checks are selected. The initial run may need
 network access and the system SQLite library required by the native crates.
+The core's feature configurations use separate Cargo output directories because
+their `cdylib`/`rlib` artifacts would otherwise overwrite each other. Install and
+test select the same directories and Python interpreter so prebuilt tests remain
+usable; a shared `CARGO_TARGET_DIR` override also isolates the compatibility build
+from Forge's Python-free core dependency.
 
 The Python stages inspect tracked pytest suite paths before invoking pytest;
 the conductor inventory excludes its `testdata/` inputs. A stage with no

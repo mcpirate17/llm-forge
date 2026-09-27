@@ -85,10 +85,11 @@ cases, and 44 runtime-audit cases. The post-retirement run passed 191 tests
 across 21 targets; discovery passed 34 tests. Final-source integration and
 entrypoint Clippy checks passed. Entrypoint packaging tests passed 3 cases;
 one installed-runtime smoke test was deliberately ignored because it requires
-a clean synchronized environment and remains part of the pending full gate.
+a clean synchronized environment and runs separately in the full gate.
 The benchmark target passed 4 tests. These are scoped checks; the required
-full local check and verification gate is pending. No full `make test` timing
-or speed comparison was run for this cohort.
+full local check and verification gate had not run when this archive evidence
+was assembled. Later source-bound receipts and `make test` timings belong to
+the landing PR; this bundle makes no speed comparison for the cohort.
 
 The [measurement evidence](native-metrics/15be2ad-evidence.tar.gz) contains
 classified manifests, source hashes, raw Tokei reports, AST ranges, all 88
