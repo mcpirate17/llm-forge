@@ -10,10 +10,22 @@ import json
 import os
 import shutil
 import subprocess
+import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from conductor.project_init import resolve_forge_binary
+
+
+def run_main(handler: Callable[[Any], Any]) -> int:
+    """Preserve the legacy JSON stdin/stdout entrypoint for native adapters."""
+    try:
+        payload = json.load(sys.stdin)
+    except (json.JSONDecodeError, OSError):
+        payload = None
+    print(json.dumps(handler(payload)))
+    return 0
 
 
 def _binary() -> Path:
@@ -56,8 +68,6 @@ def call(operation: str, **request: Any) -> Any:
     if process.stderr:
         # Native warnings (for example an unrecognized response shape) are
         # part of the hook contract even on a successful call.
-        import sys
-
         print(process.stderr, end="", file=sys.stderr)
     if process.returncode:
         raise RuntimeError(

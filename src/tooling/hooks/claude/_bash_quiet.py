@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 import tempfile
@@ -11,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from native_legacy_bridge import call
+from native_legacy_bridge import call, run_main
 
 REPO_ROOT = Path(
     os.environ.get("PROJECT_DIR") or Path(__file__).resolve().parents[3]
@@ -58,12 +57,7 @@ def hook_output(payload: Any) -> dict[str, Any]:
 
 
 def main() -> int:
-    try:
-        payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, OSError):
-        payload = None
-    print(json.dumps(hook_output(payload)))
-    return 0
+    return run_main(hook_output)
 
 
 if __name__ == "__main__":

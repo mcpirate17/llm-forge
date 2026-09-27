@@ -267,24 +267,6 @@ def test_junit_attribution_maps_parameterized_failures_and_incomplete_reports(
     assert attribution["status"] == "INCOMPLETE"
 
 
-def test_collect_pytest_batch_reports_all_fail_closed_fields(tmp_path: Path) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_alpha"
-    report = tmp_path / "missing" / "report.xml"
-    result, attribution = mutation_value.collect_pytest_junit_batch(
-        argv=("pytest",),
-        report_path=report,
-        ranked_nodeids=[nodeid],
-        run_command=lambda _argv: "ran",
-    )
-    assert result == "ran"
-    assert attribution["status"] == "INCOMPLETE"
-    assert attribution["tests"] == {}
-    assert attribution["failed_nodeids"] == []
-    assert attribution["missing_nodeids"] == [nodeid]
-    assert attribution["unmapped_cases"] == []
-    assert "error" in attribution
-
-
 def test_pytest_attribution_support_rejects_unmappable_batches() -> None:
     nodeid = "conductor/test_mutation_value.py::test_alpha"
     assert mutation_value.pytest_attribution_supported(("pytest",), [nodeid])
@@ -295,26 +277,6 @@ def test_pytest_attribution_support_rejects_unmappable_batches() -> None:
     assert not mutation_value.pytest_attribution_supported(
         ("pytest",), ["native_test.cpp::test_alpha"]
     )
-
-
-def test_collect_ctest_batch_reports_all_fail_closed_fields(tmp_path: Path) -> None:
-    _assert_unrun_ctest_batch_cannot_inherit_report(tmp_path)
-    nodeid = "tests/reset.c::test_reset"
-    report = tmp_path / "missing" / "ctest.xml"
-    result, attribution = mutation_value.collect_ctest_junit_batch(
-        argv=("ctest",),
-        report_path=report,
-        ranked_nodeids=[nodeid],
-        run_command=lambda _argv: "ran",
-    )
-    assert result == "ran"
-    assert attribution["status"] == "INCOMPLETE"
-    assert attribution["tests"] == {}
-    assert attribution["failed_nodeids"] == []
-    assert attribution["missing_nodeids"] == [nodeid]
-    assert attribution["unmapped_cases"] == []
-    assert attribution["unranked_failures"] == []
-    assert "error" in attribution
 
 
 def test_value_analysis_selects_core_and_flags_merge_and_delete_candidates() -> None:
@@ -816,34 +778,6 @@ def test_a_ctest_report_separates_the_declared_killer_from_collateral(
     partial = mutation_value.parse_ctest_junit(report_path, [reset, absent])
     assert partial["status"] == "INCOMPLETE"
     assert partial["missing_nodeids"] == [absent]
-
-
-def _assert_unrun_ctest_batch_cannot_inherit_report(
-    tmp_path: Path,
-) -> None:
-    """A build failure must not inherit the previous mutant's CTest report."""
-
-    report_path = tmp_path / ".mutation-value" / "ctest.xml"
-    report_path.parent.mkdir(parents=True)
-    report_path.write_text(_CTEST_JUNIT, encoding="utf-8")
-    reset = "research/runtime/native/tests/test_profiler.c::test_reset_clears_all"
-
-    result, report = mutation_value.collect_ctest_junit_batch(
-        argv=("sh", "-c", "false"),
-        report_path=report_path,
-        ranked_nodeids=[reset],
-        run_command=lambda argv: "build failed",
-    )
-    assert result == "build failed"
-    assert report["status"] == "INCOMPLETE"
-    assert report["missing_nodeids"] == [reset]
-    assert report["tests"] == {}
-    assert "cannot parse ctest JUnit report" in report["error"]
-    assert not report_path.exists()
-
-    mutation = SimpleNamespace(expected_killers=[reset])
-    verdict = mutation_testing.killer_verdict(mutation, report, "KILLED")
-    assert verdict["status"] == "UNATTRIBUTED"
 
 
 def test_a_c_batch_is_routed_to_the_ctest_collector(tmp_path: Path) -> None:

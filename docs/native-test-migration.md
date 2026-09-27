@@ -46,6 +46,13 @@ test covers the core killer selection and evidence ordering. The former
 monkeypatch targeted `analyze_test_value_native`, which the wrapper no longer
 imports after native report collection absorbed that step.
 
+The two `test_collect_{pytest,ctest}_batch_reports_all_fail_closed_fields`
+cases and the CTest stale-report helper now run in
+`tests/python_contracts_mutation_value.rs`. Rust assertions verify the full
+missing-evidence result, stale-report removal and unattributed-kill verdict
+through the Python process API. Both Rust cases passed before the duplicate
+Python cases were retired.
+
 ## Graph refresh waits
 
 Three cases from `src/tooling/hooks/agent/test_crg_refresh_state.py` now run in
