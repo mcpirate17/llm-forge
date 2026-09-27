@@ -36,6 +36,10 @@ fn patch_fixture_source(path: &str) -> bool {
     path.starts_with("src/conductor/testdata/") && path.ends_with(".patch")
 }
 
+fn python_fixture_source(path: &str) -> bool {
+    path.starts_with("src/conductor/testdata/") && path.ends_with(".py")
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CargoCommand {
     pub cwd: String,
@@ -46,6 +50,7 @@ pub struct CargoCommand {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ContractPlan {
+    /// Mapped Python evidence inputs, including fixtures; not a coverage inventory.
     pub source_paths: Vec<String>,
     pub targets: Vec<String>,
     pub test_paths: Vec<String>,
@@ -68,6 +73,7 @@ fn parse_registry(contents: &str) -> Result<Registry> {
             .split_once('\t')
             .with_context(|| format!("contract registry line {} has no tab", index + 1))?;
         let source_file = (source.starts_with("src/")
+            && !python_fixture_source(source)
             && [".py", ".json", ".sh"]
                 .iter()
                 .any(|suffix| source.ends_with(suffix)))
@@ -82,7 +88,8 @@ fn parse_registry(contents: &str) -> Result<Registry> {
             || native_source(source)
             || fixture_source(source)
             || corpus_source(source)
-            || patch_fixture_source(source))
+            || patch_fixture_source(source)
+            || python_fixture_source(source))
             || source.contains("..")
             || source.contains('\\')
             || source.chars().any(char::is_control)
@@ -165,7 +172,7 @@ pub fn registered_sources() -> Result<Vec<String>> {
     Ok(registry()?
         .by_source
         .into_keys()
-        .filter(|source| source.ends_with(".py"))
+        .filter(|source| source.ends_with(".py") && !python_fixture_source(source))
         .collect())
 }
 
@@ -289,7 +296,11 @@ fn validate_selected_helpers(root: &Path, target: &str, entries: &Registry) -> R
         }
     }
     for (fixture, targets) in &entries.by_source {
-        if (corpus_source(fixture) || patch_fixture_source(fixture)) && targets.contains(target) {
+        if (corpus_source(fixture)
+            || patch_fixture_source(fixture)
+            || python_fixture_source(fixture))
+            && targets.contains(target)
+        {
             require_regular_file(root, fixture)?;
         }
         if fixture_source(fixture)

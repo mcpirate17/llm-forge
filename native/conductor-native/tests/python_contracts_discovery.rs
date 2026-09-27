@@ -55,12 +55,38 @@ impl Fixture {
             if helper.starts_with(&format!("{TEST_DIR}/python_contracts/"))
                 || helper.starts_with(&format!("{TEST_DIR}/fixtures/"))
                 || helper.ends_with(".json")
-                || (helper.starts_with("src/conductor/testdata/") && helper.ends_with(".patch"))
+                || (helper.starts_with("src/conductor/testdata/")
+                    && (helper.ends_with(".patch") || helper.ends_with(".py")))
             {
                 fs::create_dir_all(root.join(helper).parent().unwrap()).unwrap();
                 fs::copy(repo_root().join(helper), root.join(helper)).unwrap();
             }
         }
+        Self { root }
+    }
+
+    fn python_input_probe() -> Self {
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let root =
+            std::env::temp_dir().join(format!("forge-contract-plan-{}-{id}", std::process::id()));
+        fs::create_dir_all(root.join(TEST_DIR)).unwrap();
+        fs::create_dir_all(root.join("native/conductor-native/src")).unwrap();
+        fs::write(
+            root.join("native/conductor-native/Cargo.toml"),
+            "[package]\nname='fixture'\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join(format!("{TEST_DIR}/python_contracts_fixture_probe.rs")),
+            "// self-contained contract target\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join(REGISTRY_PATH),
+            "src/conductor/probe.py\tpython_contracts_fixture_probe\n\
+             src/conductor/testdata/probe/fixture.py\tpython_contracts_fixture_probe\n",
+        )
+        .unwrap();
         Self { root }
     }
 }
@@ -242,6 +268,106 @@ fn patch_fixture_dependencies_are_bounded_and_required_for_selected_targets() {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn python_testdata_inputs_select_contracts_as_mapped_evidence() {
+    let fixture = Fixture::python_input_probe();
+    let relative = "src/conductor/testdata/probe/fixture.py";
+    let file = fixture.root.join(relative);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "fixture input, not parsed by discovery\n").unwrap();
+    let selected = plan(&fixture.root, &[relative.to_owned()]).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_fixture_probe"]);
+    assert_eq!(selected.source_paths, [relative]);
+    assert_eq!(selected.commands[0].targets, selected.targets);
+
+    let provider = "src/conductor/probe.py";
+    let selected = plan(&fixture.root, &[provider.to_owned()]).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_fixture_probe"]);
+    assert_eq!(selected.source_paths, [provider]);
+}
+
+#[cfg(unix)]
+#[test]
+fn python_testdata_evidence_covers_only_registered_inputs() {
+    let fixture = Fixture::python_input_probe();
+    let relative = "src/conductor/testdata/probe/fixture.py";
+    let unknown = "src/conductor/testdata/probe/unmapped.py";
+    let file = fixture.root.join(relative);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "fixture input\n").unwrap();
+    let selected = plan(&fixture.root, &[relative.to_owned(), unknown.to_owned()]).unwrap();
+    assert_eq!(selected.source_paths, [relative]);
+    let mut request = serde_json::json!({
+        "sources": [relative], "graph_tests": [], "convention_tests": [],
+        "changed_tests": [], "native_tests": {}, "graph": {},
+        "contract_sources": selected.source_paths,
+        "contract_targets": selected.targets, "contract_test_paths": selected.test_paths,
+    });
+    let decide = |request: &serde_json::Value| {
+        conductor_native::candidate_verification::decide("selection_decide", request).unwrap()
+    };
+    let covered = decide(&request);
+    assert_eq!(covered["findings"], serde_json::json!([]));
+    assert_eq!(covered["tests"], serde_json::json!([]));
+    assert_eq!(covered["graph"]["contract_test_files"], 1);
+    request["sources"] = serde_json::json!([relative, unknown]);
+    let mixed = decide(&request);
+    assert_eq!(mixed["findings"].as_array().unwrap().len(), 1);
+    assert_eq!(mixed["findings"][0]["rule_id"], "no-targeted-tests");
+    assert_eq!(
+        mixed["findings"][0]["evidence"]["source_paths"],
+        serde_json::json!([unknown])
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn python_testdata_inputs_must_be_regular_and_stay_inside_repository() {
+    let fixture = Fixture::python_input_probe();
+    let relative = "src/conductor/testdata/probe/fixture.py";
+    let file = fixture.root.join(relative);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "fixture input\n").unwrap();
+    let registry = fixture.root.join(REGISTRY_PATH);
+    let rows = fs::read_to_string(&registry).unwrap();
+    let direct = [relative.to_owned()];
+    let provider = ["src/conductor/probe.py".to_owned()];
+
+    fs::remove_file(&file).unwrap();
+    for changed in [&direct, &provider] {
+        let error = plan(&fixture.root, changed).unwrap_err().to_string();
+        assert!(error.contains("mapped contract file missing"), "{error}");
+    }
+
+    std::os::unix::fs::symlink(
+        repo_root().join("native/conductor-native/Cargo.toml"),
+        &file,
+    )
+    .unwrap();
+    let direct_error = plan(&fixture.root, &direct).unwrap_err().to_string();
+    assert!(
+        direct_error.contains("resolves outside repository"),
+        "{direct_error}"
+    );
+    let provider_error = plan(&fixture.root, &provider).unwrap_err().to_string();
+    assert!(provider_error.contains("not regular"), "{provider_error}");
+    fs::remove_file(&file).unwrap();
+    fs::create_dir(&file).unwrap();
+    for changed in [&direct, &provider] {
+        let error = plan(&fixture.root, changed).unwrap_err().to_string();
+        assert!(error.contains("not regular"), "{error}");
+    }
+
+    fs::write(
+        &registry,
+        format!("{rows}src/conductor/testdata/../escaped.py\tpython_contracts_fixture_probe\n"),
+    )
+    .unwrap();
+    let error = format!("{:#}", plan(&fixture.root, &provider).unwrap_err());
+    assert!(error.contains("invalid contract path"), "{error}");
+}
+
 impl Drop for Fixture {
     fn drop(&mut self) {
         fs::remove_dir_all(&self.root).unwrap();
@@ -298,7 +424,9 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
             "python_contracts_active_state",
             "python_contracts_inplace_handoff",
             "python_contracts_local_ai_policy",
-            "python_contracts_session_preamble"
+            "python_contracts_session_preamble",
+            "python_contracts_workspace_eval",
+            "python_contracts_workspace_runtime_reconcile"
         ]
     );
     let close = plan(&root, &["src/conductor/session_close.py".to_owned()]).unwrap();
@@ -626,6 +754,58 @@ fn rust_syntax_cannot_hide_an_external_helper_from_the_registry() {
         &["src/conductor/memory_vectors.py".to_owned()]
     )
     .is_ok());
+}
+
+#[cfg(unix)]
+#[test]
+fn slop_consuming_contract_stages_candidate_extension_before_ambient_sites() {
+    let fixture = Fixture::new();
+    let forge = fixture.root.join("native/forge/Cargo.toml");
+    fs::create_dir_all(forge.parent().unwrap()).unwrap();
+    fs::write(forge, "[package]\nname='forge'\n").unwrap();
+    let request = serde_json::json!({
+        "snapshot": fixture.root, "runtime_dir": "/tmp/contract-runtime",
+        "python_executable": "/usr/bin/python3",
+        "python_sites": ["/ambient/site-packages"],
+        "targets": ["python_contracts_memory_vectors", "python_contracts_policy_engine_crash"],
+    });
+    let runtime =
+        || conductor_native::candidate_verification::decide("contract_runtime_plan", &request);
+    assert!(runtime()
+        .unwrap_err()
+        .contains("require candidate slop_core"));
+    let slop = fixture.root.join("native/slop-core/Cargo.toml");
+    fs::create_dir_all(slop.parent().unwrap()).unwrap();
+    fs::write(&slop, "[package]\nname='slop-core'\n").unwrap();
+    let plan = runtime().unwrap();
+    let builds = plan["build_commands"].as_array().unwrap();
+    assert_eq!(builds.len(), 3);
+    let candidate = builds
+        .iter()
+        .find(|build| {
+            build["destination"] == "/tmp/contract-runtime/contract-extension/slop_core.so"
+        })
+        .expect("candidate slop extension build");
+    assert_eq!(candidate["cwd"], fixture.root.to_str().unwrap());
+    assert!(candidate["argv"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|arg| arg == "native/slop-core/Cargo.toml"));
+    assert_eq!(
+        candidate["artifact"],
+        "/tmp/contract-runtime/contract-cargo-target/debug/libslop_core.so"
+    );
+    let paths: Vec<_> =
+        std::env::split_paths(plan["test_env"]["PYTHONPATH"].as_str().unwrap()).collect();
+    assert_eq!(
+        paths.first().unwrap(),
+        Path::new("/tmp/contract-runtime/contract-extension")
+    );
+    assert_eq!(paths.last().unwrap(), Path::new("/ambient/site-packages"));
+    fs::remove_file(&slop).unwrap();
+    std::os::unix::fs::symlink(repo_root().join("native/slop-core/Cargo.toml"), &slop).unwrap();
+    assert!(runtime().unwrap_err().contains("not regular"));
 }
 
 #[cfg(unix)]

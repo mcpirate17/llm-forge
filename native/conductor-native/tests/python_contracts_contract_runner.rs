@@ -230,6 +230,7 @@ fn slop_build_is_selected_only_for_observed_consumers() {
             ("python_contracts_probe", false),
             ("python_contracts_native_ablations", true),
             ("python_contracts_candidate_style", true),
+            ("python_contracts_policy_engine_crash", true),
             ("python_contracts_reuse_inventory", true),
             ("python_contracts_reuse_roi", true),
             ("python_contracts_reuse_consolidation", true),
@@ -425,7 +426,9 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
                 "python_contracts_inplace_handoff",
                 "python_contracts_local_ai_policy",
                 "python_contracts_memory_vectors",
-                "python_contracts_session_preamble"
+                "python_contracts_session_preamble",
+                "python_contracts_workspace_eval",
+                "python_contracts_workspace_runtime_reconcile"
             ]
         );
         let graph = selection.getattr("graph").unwrap();
@@ -435,7 +438,7 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
                 .unwrap()
                 .extract::<usize>()
                 .unwrap(),
-            6
+            8
         );
     });
 }
