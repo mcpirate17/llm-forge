@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.46"
+version = "0.1.48"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 anyhow = "1"
 base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 pyo3 = { version = "0.29", optional = true }
 proc-macro2 = { version = "1", features = ["span-locations"], optional = true }
 quick-xml = { version = "0.38", features = ["encoding"] }
@@ -19,6 +20,7 @@ regex = "1"
 # bundled-sqlite because its standalone process has no Python SQLite connection.
 rusqlite = { version = "0.32", features = ["modern_sqlite"] }
 libloading = { version = "0.8", optional = true }
+libc = "0.2"
 ruff_python_ast = { package = "rustpython-ruff_python_ast", version = "0.15.8", optional = true }
 ruff_python_parser = { package = "rustpython-ruff_python_parser", version = "0.15.8", optional = true }
 ruff_text_size = { package = "rustpython-ruff_text_size", version = "0.15.8", optional = true }
@@ -28,6 +30,7 @@ serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order
 sha2 = "0.10"
 syn = { version = "2", features = ["full", "visit", "parsing"], optional = true }
 toml = "0.8"
+unicode-general-category = { version = "0.6", optional = true }
 zstd = "0.13"
 
 # `extension-module` tells pyo3 not to link libpython, which is right for the
@@ -40,7 +43,7 @@ zstd = "0.13"
 [features]
 default = ["python"]
 bundled-sqlite = ["rusqlite/bundled"]
-source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:syn", "dep:proc-macro2"]
+source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:syn", "dep:proc-macro2", "dep:unicode-general-category"]
 python = ["dep:pyo3", "source-analysis", "dep:memmap2", "dep:libloading"]
 python-compat-tests = ["python"]
 extension-module = ["python", "pyo3/extension-module"]

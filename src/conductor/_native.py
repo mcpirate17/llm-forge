@@ -33,9 +33,14 @@ from conductor_native import (
     compare_duplicate_baseline_native,
     context_telemetry_append_native,
     context_telemetry_event_native,
+    context_telemetry_format_summary_native,
     context_telemetry_hook_event_native,
+    context_telemetry_hook_event_with_hash_native,
+    context_telemetry_injected_context_native,
     context_telemetry_model_visible_output_native,
+    context_telemetry_parse_since_native,
     context_telemetry_record_native,
+    context_telemetry_report_native,
     context_telemetry_rotate_native,
     context_telemetry_summarize_native,
     dead_tests_closure_native,
@@ -46,6 +51,7 @@ from conductor_native import (
     git_diff_changes_native,
     git_rename_sources_native,
     git_tree_entries_native,
+    graph_context_native,
     guardrail_ast_metrics_native,
     hook_installer_is_managed_native,
     hook_installer_merge_install_native,
@@ -117,6 +123,18 @@ def candidate_checks_native(operation: str, payload_json: str) -> str:
     return evaluate(operation, payload_json)
 
 
+def candidate_verification_native(operation: str, request_json: str) -> str:
+    from conductor_native import candidate_verification_native as decide
+
+    return decide(operation, request_json)
+
+
+def candidate_verification_ast_native(source: str, path: str) -> str:
+    from conductor_native import candidate_verification_ast_native as definitions
+
+    return definitions(source, path)
+
+
 def workspace_runtime_matrix_native(operation: str, payload_json: str) -> str:
     from conductor_native import workspace_runtime_matrix_native as dispatch
 
@@ -154,6 +172,18 @@ def mutation_refresh_native(request_json: str) -> str:
     from conductor_native import mutation_refresh_native as refresh
 
     return refresh(request_json)
+
+
+def reuse_consolidation_native(operation: str, payload_json: str) -> str:
+    from conductor_native import reuse_consolidation_native as evaluate
+
+    return evaluate(operation, payload_json)
+
+
+def project_context_native(operation: str, payload_json: str) -> str:
+    from conductor_native import project_context_native as evaluate
+
+    return evaluate(operation, payload_json)
 
 
 def project_paths_relative_native(raw: str, source: str) -> str:
@@ -345,12 +375,19 @@ __all__ = [
     "candidate_policy_parse_native",
     "candidate_structure_facts_native",
     "candidate_value_waivers_parse_native",
+    "candidate_verification_ast_native",
+    "candidate_verification_native",
     "compare_duplicate_baseline_native",
     "context_telemetry_append_native",
     "context_telemetry_event_native",
+    "context_telemetry_format_summary_native",
     "context_telemetry_hook_event_native",
+    "context_telemetry_hook_event_with_hash_native",
+    "context_telemetry_injected_context_native",
     "context_telemetry_model_visible_output_native",
+    "context_telemetry_parse_since_native",
     "context_telemetry_record_native",
+    "context_telemetry_report_native",
     "context_telemetry_rotate_native",
     "context_telemetry_summarize_native",
     "dead_tests_closure_native",
@@ -361,6 +398,7 @@ __all__ = [
     "git_diff_changes_native",
     "git_rename_sources_native",
     "git_tree_entries_native",
+    "graph_context_native",
     "guardrail_ast_metrics_native",
     "guardrail_duplicate_candidates_native",
     "hook_installer_is_managed_native",
@@ -408,6 +446,7 @@ __all__ = [
     "normalize_jscpd_report_native",
     "normalize_mutation_path_native",
     "plan_mutation_evidence_native",
+    "project_context_native",
     "project_context_parse_config_native",
     "project_paths_enclosing_repo_native",
     "project_paths_host_root_native",
@@ -423,6 +462,7 @@ __all__ = [
     "receipt_manifest_pins_native",
     "receipt_sha256_native",
     "receipt_slim_detail_native",
+    "reuse_consolidation_native",
     "scan_untracked_import_closure_native",
     "should_skip_mutation_path_native",
     "slop_core",

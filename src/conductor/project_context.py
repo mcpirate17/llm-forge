@@ -7,14 +7,9 @@ discovery using the system Git executable specified by the T03a contract.
 
 from __future__ import annotations
 
-import os
 import json
-import selectors
-import signal
+import os
 import stat
-import subprocess
-import time
-import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
@@ -25,19 +20,7 @@ Mode = Literal["git", "read_only"]
 SourceKind = Literal["argument", "environment", "config", "git", "default", "derived"]
 ResolvedValue = str | tuple[str, ...] | None
 
-_GIT: Final[Path] = Path("/usr/bin/git")
-_GIT_TIMEOUT_SECONDS: Final[float] = 3.0
-_GIT_STDOUT_CAP: Final[int] = 32 * 1024
-_GIT_STDERR_CAP: Final[int] = 4 * 1024
-_CONFIG_CAP: Final[int] = 64 * 1024
 _MESSAGE_CAP: Final[int] = 1_024
-_GIT_ENV: Final[dict[str, str]] = {
-    "PATH": "/usr/bin:/bin",
-    "LC_ALL": "C",
-    "GIT_CONFIG_NOSYSTEM": "1",
-    "GIT_CONFIG_GLOBAL": "/dev/null",
-    "GIT_OPTIONAL_LOCKS": "0",
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +75,23 @@ def _error(code: str, field: str | None, message: str) -> ContextError:
     return ContextError(ErrorDetail(code, field, message[:_MESSAGE_CAP]))
 
 
+def _path_hex(path: Path) -> str:
+    return os.fsencode(path).hex()
+
+
+def _path_from_hex(raw: str) -> Path:
+    return Path(os.fsdecode(bytes.fromhex(raw)))
+
+
+def _native_decide(operation: str, payload: dict[str, object]) -> dict[str, object]:
+    from conductor._native import project_context_native
+
+    result = json.loads(project_context_native(operation, json.dumps(payload)))
+    if detail := result.get("error"):
+        raise _error(detail["code"], detail["field"], detail["message"])
+    return result["value"]
+
+
 def _path_argument(value: Path | None, field: str) -> Path | None:
     if value is None:
         return None
@@ -129,26 +129,16 @@ def _existing_directory(path: Path, field: str) -> Path:
     return _clean_canonical(resolved, field)
 
 
-def _inside(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-    except ValueError:
-        return False
-    return True
-
-
 def _resolved_reference(path: Path, anchor: Path, root: Path, field: str) -> Path:
     candidate = _absolute(path, anchor)
     try:
         resolved = candidate.resolve(strict=False)
     except (OSError, RuntimeError, ValueError) as exc:
         raise _error("INVALID_PATH", field, f"{field} cannot be resolved") from exc
-    if not _inside(resolved, root):
-        raise _error(
-            "PATH_OUTSIDE_PROJECT",
-            field,
-            f"{field} must remain inside the selected project",
-        )
+    _native_decide(
+        "reference-inside",
+        {"path_hex": _path_hex(resolved), "root_hex": _path_hex(root), "field": field},
+    )
     return _clean_canonical(resolved, field)
 
 
@@ -181,103 +171,10 @@ def _provenance(
 
 
 def _bounded_git(argv: tuple[str, ...]) -> bytes:
-    if not _GIT.is_file() or not os.access(_GIT, os.X_OK):
-        raise _error(
-            "GIT_UNAVAILABLE",
-            None,
-            "trusted /usr/bin/git is not an executable regular file",
-        )
-    try:
-        process = subprocess.Popen(
-            (_GIT.as_posix(), *argv),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=dict(_GIT_ENV),
-            start_new_session=True,
-        )
-    except OSError as exc:
-        raise _error(
-            "GIT_UNAVAILABLE", None, "trusted /usr/bin/git could not be started"
-        ) from exc
-
-    def terminate() -> None:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            # guardrail: allow-fallback -- the group is already gone. git exited
-            # between the deadline check and the kill, which is the ordinary race
-            # on a fast probe, not a failure to report: process.wait() below still
-            # reaps it and the caller still sees the timeout/exit status it earned.
-            pass
-        process.wait()
-
-    assert process.stdout is not None
-    assert process.stderr is not None
-    streams: dict[int, str] = {
-        process.stdout.fileno(): "stdout",
-        process.stderr.fileno(): "stderr",
-    }
-    selector = selectors.DefaultSelector()
-    output = {"stdout": bytearray(), "stderr": bytearray()}
-    deadline = time.monotonic() + _GIT_TIMEOUT_SECONDS
-    failure: tuple[str, str] | None = None
-    try:
-        for fd in streams:
-            selector.register(fd, selectors.EVENT_READ)
-        while streams:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                failure = (
-                    "GIT_TIMEOUT",
-                    "Git discovery exceeded its 3-second deadline",
-                )
-                break
-            for key, _events in selector.select(remaining):
-                fd = key.fd
-                name = streams[fd]
-                chunk = os.read(fd, 8_192)
-                if not chunk:
-                    selector.unregister(fd)
-                    streams.pop(fd)
-                    continue
-                cap = _GIT_STDOUT_CAP if name == "stdout" else _GIT_STDERR_CAP
-                remaining_cap = cap - len(output[name])
-                if len(chunk) > remaining_cap:
-                    output[name].extend(chunk[:remaining_cap])
-                    failure = (
-                        "GIT_OUTPUT_LIMIT",
-                        f"Git {name} exceeded its output limit",
-                    )
-                    break
-                output[name].extend(chunk)
-            if failure is not None:
-                break
-        if failure is not None:
-            terminate()
-            raise _error(failure[0], None, failure[1])
-        returncode = process.wait(timeout=max(0.0, deadline - time.monotonic()))
-    except subprocess.TimeoutExpired as exc:
-        terminate()
-        raise _error(
-            "GIT_TIMEOUT", None, "Git discovery exceeded its 3-second deadline"
-        ) from exc
-    except OSError as exc:
-        terminate()
-        raise _error(
-            "GIT_DISCOVERY_FAILED", None, "Git discovery pipe I/O failed"
-        ) from exc
-    finally:
-        selector.close()
-        process.stdout.close()
-        process.stderr.close()
-    if returncode != 0:
-        raise _error(
-            "GIT_DISCOVERY_FAILED",
-            None,
-            "Git discovery failed for the selected project",
-        )
-    return bytes(output["stdout"])
+    result = _native_decide(
+        "bounded-git", {"argv_hex": [os.fsencode(item).hex() for item in argv]}
+    )
+    return bytes.fromhex(result["stdout_hex"])
 
 
 def _git_paths(selected: Path) -> tuple[Path, Path, Path]:
@@ -290,18 +187,7 @@ def _git_paths(selected: Path) -> tuple[Path, Path, Path]:
             "--is-bare-repository",
         )
     )
-    if probe != b"true\nfalse\n":
-        if probe in {b"false\nfalse\n", b"false\ntrue\n", b"true\ntrue\n"}:
-            raise _error(
-                "UNSUPPORTED_REPOSITORY",
-                "project",
-                "selected project is not a non-bare Git worktree",
-            )
-        raise _error(
-            "GIT_DISCOVERY_FAILED",
-            "project",
-            "Git returned malformed worktree discovery output",
-        )
+    _native_decide("git-probe", {"raw_hex": probe.hex()})
 
     def topology(directory: Path) -> tuple[Path, Path, Path]:
         raw = _bounded_git(
@@ -315,49 +201,14 @@ def _git_paths(selected: Path) -> tuple[Path, Path, Path]:
                 "--git-common-dir",
             )
         )
-        if raw.endswith(b"\n"):
-            raw = raw[:-1]
-        parts = raw.split(b"\n")
-        if len(parts) != 3 or any(not part for part in parts):
-            raise _error(
-                "GIT_DISCOVERY_FAILED",
-                "project",
-                "Git returned malformed topology output",
-            )
-        try:
-            texts = tuple(os.fsdecode(part) for part in parts)
-            if any(
-                not Path(text).is_absolute()
-                or any(mark in text for mark in ("\x00", "\r", "\n"))
-                for text in texts
-            ):
-                raise ValueError("non-absolute or malformed Git path")
-            values = tuple(
-                _clean_canonical(Path(text).resolve(strict=True), "project")
-                for text in texts
-            )
-        except (OSError, RuntimeError, UnicodeError, ValueError) as exc:
-            raise _error(
-                "GIT_DISCOVERY_FAILED",
-                "project",
-                "Git returned an unreadable topology path",
-            ) from exc
-        top, git_dir, common_dir = values
-        if not top.is_dir() or not git_dir.is_dir() or not common_dir.is_dir():
-            raise _error(
-                "GIT_DISCOVERY_FAILED",
-                "project",
-                "Git returned a non-directory topology path",
-            )
-        return top, git_dir, common_dir
+        parsed = _native_decide("git-topology", {"raw_hex": raw.hex()})
+        return tuple(_path_from_hex(item) for item in parsed["paths_hex"])
 
     top, git_dir, common_dir = topology(selected)
-    if not _inside(selected, top):
-        raise _error(
-            "PROJECT_MISMATCH",
-            "project",
-            "selected directory is outside Git worktree top level",
-        )
+    _native_decide(
+        "git-membership",
+        {"selected_hex": _path_hex(selected), "top_hex": _path_hex(top)},
+    )
     if topology(top) != (top, git_dir, common_dir):
         raise _error(
             "PROJECT_MISMATCH", "project", "Git topology changed during discovery"
@@ -396,81 +247,23 @@ def _read_config(candidate: Path, explicit: bool, root: Path) -> _Config:
             )
         return _Config(None, None, None, None, None, ())
     _existing_regular(resolved, "config", "CONFIG_IO")
-    raw, before, during, after = _read_config_bytes(resolved, root)
-    if len(raw) > _CONFIG_CAP:
-        raise _error("CONFIG_TOO_LARGE", "config", "configuration exceeds 65536 bytes")
-    if _stat_signature(before) != _stat_signature(during) or _stat_signature(
-        before
-    ) != _stat_signature(after):
-        raise _error(
-            "INPUT_CHANGED", "config", "configuration changed while it was read"
-        )
+    raw, signatures = _read_config_bytes(resolved, root)
+    _native_decide(
+        "config-read",
+        {
+            "size": len(raw),
+            "signatures": signatures,
+        },
+    )
     return _parse_config(raw, resolved)
 
 
-def _stat_signature(entry: os.stat_result) -> tuple[int, int, int, int]:
-    return entry.st_dev, entry.st_ino, entry.st_size, entry.st_mtime_ns
-
-
-def _read_config_bytes(
-    path: Path, root: Path
-) -> tuple[bytes, os.stat_result, os.stat_result, os.stat_result]:
-    try:
-        before = path.stat()
-        descriptor = _open_contained_regular(root, path)
-        try:
-            during = os.fstat(descriptor)
-            if not stat.S_ISREG(during.st_mode):
-                raise _error(
-                    "CONFIG_IO", "config", "opened configuration is not a regular file"
-                )
-            chunks: list[bytes] = []
-            remaining = _CONFIG_CAP + 1
-            while remaining:
-                chunk = os.read(descriptor, remaining)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                remaining -= len(chunk)
-        finally:
-            os.close(descriptor)
-        after = path.stat()
-    except OSError as exc:
-        raise _error("CONFIG_IO", "config", "configuration could not be read") from exc
-    return b"".join(chunks), before, during, after
-
-
-def _open_contained_regular(root: Path, path: Path) -> int:
-    """Open a canonical config path through no-follow directory descriptors."""
-    try:
-        relative = path.relative_to(root)
-    except ValueError as exc:
-        raise _error(
-            "PATH_OUTSIDE_PROJECT",
-            "config",
-            "config must remain inside the selected project",
-        ) from exc
-    directory_flags = (
-        os.O_RDONLY
-        | os.O_DIRECTORY
-        | getattr(os, "O_CLOEXEC", 0)
-        | getattr(os, "O_NOFOLLOW", 0)
+def _read_config_bytes(path: Path, root: Path) -> tuple[bytes, list[list[int]]]:
+    """Read through native no-follow descriptors, retaining this patchable seam."""
+    result = _native_decide(
+        "read-config-bytes", {"path_hex": _path_hex(path), "root_hex": _path_hex(root)}
     )
-    file_flags = (
-        os.O_RDONLY
-        | os.O_NONBLOCK
-        | getattr(os, "O_CLOEXEC", 0)
-        | getattr(os, "O_NOFOLLOW", 0)
-    )
-    directory = os.open(root, directory_flags)
-    try:
-        for component in relative.parts[:-1]:
-            next_directory = os.open(component, directory_flags, dir_fd=directory)
-            os.close(directory)
-            directory = next_directory
-        return os.open(relative.name, file_flags, dir_fd=directory)
-    finally:
-        os.close(directory)
+    return bytes.fromhex(result["raw_hex"]), result["signatures"]
 
 
 def _parse_config(raw: bytes, resolved: Path) -> _Config:
@@ -496,127 +289,21 @@ def _parse_config(raw: bytes, resolved: Path) -> _Config:
 
 def _validate_config_ancestry(candidate: Path, root: Path) -> None:
     """Distinguish an absent default file from a dangling ancestor link."""
-    try:
-        ancestors = candidate.relative_to(root).parts[:-1]
-    except ValueError:
-        return
-    cursor = root
-    for component in ancestors:
-        cursor = cursor / component
-        try:
-            entry = cursor.lstat()
-        except FileNotFoundError:
-            return
-        except OSError as exc:
-            raise _error(
-                "CONFIG_IO", "config", "configuration ancestry cannot be inspected"
-            ) from exc
-        if stat.S_ISLNK(entry.st_mode):
-            try:
-                target = cursor.resolve(strict=True)
-            except (OSError, RuntimeError, ValueError) as exc:
-                raise _error(
-                    "CONFIG_IO",
-                    "config",
-                    "configuration ancestry has a dangling symlink",
-                ) from exc
-            if not target.is_dir():
-                raise _error(
-                    "CONFIG_IO", "config", "configuration ancestry is not a directory"
-                )
-        elif not stat.S_ISDIR(entry.st_mode):
-            raise _error(
-                "CONFIG_IO", "config", "configuration ancestry is not a directory"
-            )
-
-
-def _config_tables(parsed: object) -> tuple[dict[str, object], dict[str, object]]:
-    if not isinstance(parsed, dict) or set(parsed) - {
-        "schema_version",
-        "project",
-        "paths",
-    }:
-        raise _error(
-            "CONFIG_SCHEMA", "config", "configuration contains unknown top-level keys"
-        )
-    version = parsed.get("schema_version")
-    if type(version) is not int or version != 1:
-        raise _error("CONFIG_SCHEMA", "config", "schema_version must be integer 1")
-    project, paths = parsed.get("project", {}), parsed.get("paths", {})
-    if not isinstance(project, dict) or set(project) - {"id"}:
-        raise _error("CONFIG_SCHEMA", "config", "[project] only supports id")
-    if not isinstance(paths, dict) or set(paths) - {"policy", "registry", "notes"}:
-        raise _error("CONFIG_SCHEMA", "config", "[paths] has unknown keys")
-    return project, paths
-
-
-def _config_project_id(project: Mapping[str, object]) -> str | None:
-    project_id = project.get("id")
-    valid = isinstance(project_id, str) and 1 <= len(project_id) <= 128
-    valid = (
-        valid
-        and project_id == project_id.strip()
-        and not any(unicodedata.category(char) == "Cc" for char in project_id)
+    _native_decide(
+        "config-ancestry",
+        {"candidate_hex": _path_hex(candidate), "root_hex": _path_hex(root)},
     )
-    if project_id is not None and not valid:
-        raise _error(
-            "CONFIG_SCHEMA",
-            "project.id",
-            "project.id must be a trimmed 1-128 character non-control string",
-        )
-    return project_id
-
-
-def _config_paths(
-    paths: Mapping[str, object],
-) -> tuple[str | None, str | None, tuple[str, ...]]:
-    policy, registry = paths.get("policy"), paths.get("registry")
-    for field, value in (("policy", policy), ("registry", registry)):
-        if value is not None and (
-            not isinstance(value, str)
-            or not value
-            or any(mark in value for mark in ("\x00", "\r", "\n"))
-        ):
-            raise _error(
-                "CONFIG_SCHEMA",
-                f"paths.{field}",
-                f"paths.{field} must be a non-empty string",
-            )
-    notes = paths.get("notes", [])
-    if not isinstance(notes, list) or any(
-        not isinstance(item, str)
-        or not item
-        or any(mark in item for mark in ("\x00", "\r", "\n"))
-        for item in notes
-    ):
-        raise _error(
-            "CONFIG_SCHEMA",
-            "paths.notes",
-            "paths.notes must be an array of non-empty strings",
-        )
-    return policy, registry, tuple(notes)
 
 
 def _safe_derived_directory(common_dir: Path, path: Path, field: str) -> None:
-    cursor = common_dir
-    for component in path.relative_to(common_dir).parts:
-        cursor = cursor / component
-        try:
-            item = cursor.lstat()
-        except FileNotFoundError:
-            return
-        except (OSError, RuntimeError, ValueError) as exc:
-            raise _error(
-                "UNSAFE_STATE_PATH", field, f"{field} cannot be inspected"
-            ) from exc
-        if stat.S_ISLNK(item.st_mode) or not stat.S_ISDIR(item.st_mode):
-            raise _error(
-                "UNSAFE_STATE_PATH", field, f"{field} has an unsafe existing ancestor"
-            )
-
-
-def _key(prefix: str, payload: bytes) -> str:
-    return prefix + sha256(payload).hexdigest()
+    _native_decide(
+        "safe-derived",
+        {
+            "common_hex": _path_hex(common_dir),
+            "path_hex": _path_hex(path),
+            "field": field,
+        },
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -667,32 +354,21 @@ def _invocation_directory(start_dir: Path | None) -> Path:
 def _select_project(
     project: Path | None, invocation_dir: Path, environment: Mapping[str, str]
 ) -> tuple[Path, Provenance]:
-    if project is not None:
-        selected = _existing_directory(_absolute(project, invocation_dir), "project")
-        return selected, _provenance("repo_root", "argument", "project", str(selected))
-    if "CONDUCTOR_PROJECT_DIR" not in environment:
-        return invocation_dir, _provenance(
-            "repo_root", "default", "invocation directory", str(invocation_dir)
-        )
-    raw_project = environment["CONDUCTOR_PROJECT_DIR"]
-    if not raw_project:
-        raise _error(
-            "INVALID_ARGUMENT",
-            "CONDUCTOR_PROJECT_DIR",
-            "CONDUCTOR_PROJECT_DIR must not be empty",
-        )
-    if (
-        any(mark in raw_project for mark in ("\x00", "\r", "\n"))
-        or not Path(raw_project).is_absolute()
-    ):
-        raise _error(
-            "INVALID_PATH",
-            "CONDUCTOR_PROJECT_DIR",
-            "CONDUCTOR_PROJECT_DIR must be an absolute clean path",
-        )
-    selected = _existing_directory(Path(raw_project), "CONDUCTOR_PROJECT_DIR")
-    return selected, _provenance(
-        "repo_root", "environment", "CONDUCTOR_PROJECT_DIR", str(selected)
+    selected = _native_decide(
+        "select-project",
+        {
+            "invocation_hex": _path_hex(invocation_dir),
+            "argument_hex": _path_hex(project) if project is not None else None,
+            "environment_hex": (
+                os.fsencode(environment["CONDUCTOR_PROJECT_DIR"]).hex()
+                if "CONDUCTOR_PROJECT_DIR" in environment
+                else None
+            ),
+        },
+    )
+    path = _path_from_hex(selected["selected_hex"])
+    return path, _provenance(
+        "repo_root", selected["kind"], selected["source"], str(path)
     )
 
 
@@ -728,17 +404,17 @@ def _resolve_topology(mode: Mode, inputs: _Inputs) -> _Topology:
             )
         return _Topology(inputs.selected, None, None, None, None)
     root, git_dir, common_dir = _git_paths(inputs.selected)
-    repository_key = _key(
-        "repo-v1-", b"conductor.repository.v1\0" + os.fsencode(str(common_dir))
+    keys = _native_decide(
+        "keys",
+        {
+            "common_hex": _path_hex(common_dir),
+            "git_hex": _path_hex(git_dir),
+            "root_hex": _path_hex(root),
+        },
     )
-    worktree_key = _key(
-        "wt-v1-",
-        b"conductor.worktree.v1\0"
-        + os.fsencode(str(git_dir))
-        + b"\0"
-        + os.fsencode(str(root)),
+    return _Topology(
+        root, git_dir, common_dir, keys["repository_key"], keys["worktree_key"]
     )
-    return _Topology(root, git_dir, common_dir, repository_key, worktree_key)
 
 
 def _resolve_reference(
@@ -749,35 +425,22 @@ def _resolve_reference(
     inputs: _Inputs,
     config: _Config,
     root: Path,
-) -> tuple[Path, Provenance]:
+) -> Path:
     if argument is not None:
-        resolved, kind, source, digest = (
-            _resolved_reference(argument, inputs.invocation_dir, root, field),
-            "argument",
-            field,
-            None,
-        )
+        resolved = _resolved_reference(argument, inputs.invocation_dir, root, field)
     elif configured is not None:
-        resolved, kind, source, digest = (
-            _resolved_reference(Path(configured), config.path.parent, root, field),
-            "config",
-            f"{config.path}#paths.{field}",
-            config.sha256,
+        resolved = _resolved_reference(
+            Path(configured), config.path.parent, root, field
         )
     else:
-        resolved, kind, source, digest = (
-            _resolved_reference(default, root, root, field),
-            "default",
-            str(default),
-            None,
-        )
+        resolved = _resolved_reference(default, root, root, field)
     try:
         exists = resolved.exists()
     except (OSError, RuntimeError, ValueError) as exc:
         raise _error("INVALID_PATH", field, f"{field} cannot be inspected") from exc
     if exists:
         _existing_regular(resolved, field, "INVALID_PATH")
-    return resolved, _provenance(field + "_path", kind, source, str(resolved), digest)
+    return resolved
 
 
 def _allowed_notes_roots(
@@ -821,14 +484,14 @@ def _resolve_notes(
                 "paths.notes",
                 "each notes root must be an existing directory",
             )
-        if not _inside(resolved, root) and not any(
-            _inside(resolved, item) for item in allowed
-        ):
-            raise _error(
-                "PATH_OUTSIDE_PROJECT",
-                "paths.notes",
-                "external notes root lacks a caller grant",
-            )
+        _native_decide(
+            "note-authorized",
+            {
+                "path_hex": _path_hex(resolved),
+                "root_hex": _path_hex(root),
+                "allowed_hex": [_path_hex(item) for item in allowed],
+            },
+        )
         if resolved not in notes:
             notes.append(resolved)
     return tuple(notes)
@@ -839,11 +502,17 @@ def _derived_directories(
 ) -> tuple[Path | None, Path | None, Path | None]:
     if topology.common_dir is None:
         return None, None, None
-    state = (
-        topology.common_dir / "conductor" / "projects" / str(topology.repository_key)
+    layout = _native_decide(
+        "derived-layout",
+        {
+            "common_hex": _path_hex(topology.common_dir),
+            "repository_key": topology.repository_key,
+            "worktree_key": topology.worktree_key,
+        },
     )
-    cache = state / "worktrees" / str(topology.worktree_key) / "cache"
-    artifacts = state / "worktrees" / str(topology.worktree_key) / "artifacts"
+    state = _path_from_hex(layout["state_hex"])
+    cache = _path_from_hex(layout["cache_hex"])
+    artifacts = _path_from_hex(layout["artifact_hex"])
     for field, value in (
         ("state_dir", state),
         ("cache_dir", cache),
@@ -881,7 +550,7 @@ def resolve_project_context(
         else topology.root / ".conductor" / "project.toml"
     )
     parsed = _read_config(candidate, inputs.config is not None, topology.root)
-    policy_path, policy_provenance = _resolve_reference(
+    policy_path = _resolve_reference(
         "policy",
         inputs.policy,
         parsed.policy,
@@ -890,7 +559,7 @@ def resolve_project_context(
         parsed,
         topology.root,
     )
-    registry_path, registry_provenance = _resolve_reference(
+    registry_path = _resolve_reference(
         "registry",
         inputs.registry,
         parsed.registry,
@@ -913,8 +582,6 @@ def resolve_project_context(
         candidate,
         policy_path,
         registry_path,
-        policy_provenance,
-        registry_provenance,
         notes,
         state_dir,
         cache_dir,
@@ -930,26 +597,43 @@ def _project_context(
     candidate: Path,
     policy_path: Path,
     registry_path: Path,
-    policy_provenance: Provenance,
-    registry_provenance: Provenance,
     notes: tuple[Path, ...],
     state_dir: Path | None,
     cache_dir: Path | None,
     artifact_dir: Path | None,
 ) -> ProjectContext:
-    project_id, identity_provenance = _identity_provenance(topology, config)
-    selection = _provenance(
-        "repo_root", inputs.selection.kind, inputs.selection.source, str(topology.root)
+    assembled = _native_decide(
+        "assemble",
+        {
+            "mode": mode,
+            "selection_kind": inputs.selection.kind,
+            "selection_source": inputs.selection.source,
+            "root_hex": _path_hex(topology.root),
+            "git_hex": _path_hex(topology.git_dir) if topology.git_dir else None,
+            "common_hex": _path_hex(topology.common_dir)
+            if topology.common_dir
+            else None,
+            "repository_key": topology.repository_key,
+            "worktree_key": topology.worktree_key,
+            "config_project_id": config.project_id,
+            "config_path_hex": _path_hex(config.path) if config.path else None,
+            "config_candidate_hex": _path_hex(candidate),
+            "config_sha256": config.sha256,
+            "config_explicit": inputs.config is not None,
+            "policy_path_hex": _path_hex(policy_path),
+            "policy_argument": inputs.policy is not None,
+            "policy_configured": config.policy is not None,
+            "registry_path_hex": _path_hex(registry_path),
+            "registry_argument": inputs.registry is not None,
+            "registry_configured": config.registry is not None,
+            "state_hex": _path_hex(state_dir) if state_dir else None,
+            "cache_hex": _path_hex(cache_dir) if cache_dir else None,
+            "artifact_hex": _path_hex(artifact_dir) if artifact_dir else None,
+            "notes_hex": [_path_hex(item) for item in notes],
+            "notes_configured": bool(config.notes),
+        },
     )
-    provenance = (
-        (_provenance("mode", "argument", "mode", mode), selection)
-        + _topology_provenance(topology)
-        + identity_provenance
-        + _config_provenance(inputs, config, candidate)
-        + (policy_provenance, registry_provenance)
-        + _state_provenance(state_dir, cache_dir, artifact_dir)
-        + _notes_provenance(config, notes)
-    )
+    provenance = tuple(_native_provenance(item) for item in assembled["provenance"])
     return ProjectContext(
         mode,
         topology.root,
@@ -958,7 +642,7 @@ def _project_context(
         topology.common_dir,
         topology.repository_key,
         topology.worktree_key,
-        project_id,
+        assembled["project_id"],
         config.path,
         policy_path,
         registry_path,
@@ -970,121 +654,27 @@ def _project_context(
     )
 
 
-def _topology_provenance(topology: _Topology) -> tuple[Provenance, ...]:
-    is_git = topology.git_dir is not None
-    return (
-        _provenance(
-            "worktree_root",
-            "git" if is_git else "argument",
-            "git:show-toplevel" if is_git else "project",
-            str(topology.root),
-        ),
-        _provenance(
-            "git_dir",
-            "git" if is_git else "default",
-            "git:absolute-git-dir" if is_git else "read_only",
-            str(topology.git_dir) if is_git else None,
-        ),
-        _provenance(
-            "git_common_dir",
-            "git" if is_git else "default",
-            "git:git-common-dir" if is_git else "read_only",
-            str(topology.common_dir) if is_git else None,
-        ),
-    )
-
-
-def _identity_provenance(
-    topology: _Topology, config: _Config
-) -> tuple[str | None, tuple[Provenance, ...]]:
-    project_id = (
-        config.project_id if config.project_id is not None else topology.repository_key
-    )
-    derived = topology.repository_key is not None
-    project_kind: SourceKind = (
-        "config"
-        if config.project_id is not None
-        else ("derived" if derived else "default")
-    )
-    project_source = (
-        f"{config.path}#project.id"
-        if config.project_id is not None
-        else ("repository_key" if derived else "read_only")
-    )
-    entries = (
-        _provenance(
-            "repository_key",
-            "derived" if derived else "default",
-            "repository_key" if derived else "read_only",
-            topology.repository_key,
-        ),
-        _provenance(
-            "worktree_key",
-            "derived" if derived else "default",
-            "worktree_key" if derived else "read_only",
-            topology.worktree_key,
-        ),
-        _provenance(
-            "project_id",
-            project_kind,
-            project_source,
-            project_id,
-            config.sha256 if config.project_id is not None else None,
-        ),
-    )
-    return project_id, entries
-
-
-def _config_provenance(
-    inputs: _Inputs, config: _Config, candidate: Path
-) -> tuple[Provenance, ...]:
-    return (
-        _provenance(
-            "config_path",
-            "argument" if inputs.config else "default",
-            str(config.path) if config.path else str(candidate),
-            str(config.path) if config.path else None,
-            config.sha256 if config.path else None,
-        ),
-    )
-
-
-def _state_provenance(
-    state: Path | None, cache: Path | None, artifacts: Path | None
-) -> tuple[Provenance, ...]:
-    return (
-        _provenance(
-            "state_dir",
-            "derived" if state else "default",
-            "git_common_dir" if state else "read_only",
-            str(state) if state else None,
-        ),
-        _provenance(
-            "cache_dir",
-            "derived" if cache else "default",
-            "state_dir/worktree_key" if cache else "read_only",
-            str(cache) if cache else None,
-        ),
-        _provenance(
-            "artifact_dir",
-            "derived" if artifacts else "default",
-            "state_dir/worktree_key" if artifacts else "read_only",
-            str(artifacts) if artifacts else None,
-        ),
-    )
-
-
-def _notes_provenance(
-    config: _Config, notes: tuple[Path, ...]
-) -> tuple[Provenance, ...]:
-    return (
-        _provenance(
-            "notes_roots",
-            "config" if config.notes else "default",
-            f"{config.path}#paths.notes" if config.notes else "empty notes default",
-            tuple(str(item) for item in notes),
-            config.sha256 if config.notes else None,
-        ),
+def _native_provenance(item: dict[str, object]) -> Provenance:
+    source = item["source"]
+    if "path_hex" in source:
+        source_text = str(_path_from_hex(source["path_hex"])) + source.get("suffix", "")
+    else:
+        source_text = source["text"]
+    value = item["value"]
+    if value is None:
+        resolved_value = None
+    elif "path_hex" in value:
+        resolved_value = str(_path_from_hex(value["path_hex"]))
+    elif "paths_hex" in value:
+        resolved_value = tuple(str(_path_from_hex(raw)) for raw in value["paths_hex"])
+    else:
+        resolved_value = value["text"]
+    return Provenance(
+        item["field"],
+        item["kind"],
+        source_text,
+        resolved_value,
+        item["config_sha256"],
     )
 
 
