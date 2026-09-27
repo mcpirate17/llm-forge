@@ -8,7 +8,6 @@
 //! default features to use the shared planning, receipt and shell parsing cores
 //! without compiling Python bindings or linking an interpreter.
 
-#[cfg(feature = "python")]
 mod a2a_compaction;
 #[cfg(feature = "python")]
 mod a2a_retention;
@@ -63,6 +62,10 @@ mod text_normalization;
 #[cfg(feature = "python")]
 mod tooling_boundary;
 
+pub use a2a_compaction::{
+    compact_message_value as compact_a2a_message, compact_threads_value as compact_a2a_threads,
+    validate_coordination_v2_value,
+};
 pub use text_normalization::normalized_text as normalize_a2a_text;
 
 #[cfg(feature = "python")]

@@ -12,6 +12,7 @@ mod crg_refresh;
 mod current_work_guard;
 mod dispatch;
 mod doctor;
+mod graph_context;
 mod handlers;
 mod hooks_install;
 mod identity;
@@ -75,8 +76,10 @@ enum Command {
     Task(tasks::TaskArgs),
     /// Read-only health across tasks, claims, messaging, hooks and ledger paths.
     Status(status::StatusArgs),
-    /// Inspect and acknowledge existing local mailboxes without a Python process.
+    /// Inspect, acknowledge and queue messages in existing local mailboxes.
     Mailbox(mailbox::MailboxArgs),
+    /// Retrieve bounded code relationships and message references from the local graph.
+    Graph(graph_context::GraphArgs),
     /// Land a branch on the integration line from a persistent local clone:
     /// rebase, run the host's `.forge/land.toml` checks bounded, fast-forward
     /// push, delete the branch. No CI service involved.
@@ -244,6 +247,7 @@ fn main() -> ExitCode {
         Command::Land(args) => command_exit("land", land::run(args), 2),
         Command::Status(args) => command_exit("status", status::run(args), 1),
         Command::Mailbox(args) => command_exit("mailbox", mailbox::run(args), 2),
+        Command::Graph(args) => command_exit("graph", graph_context::run(args), 2),
         Command::Hook { event } => match dispatch::run_hook(&event) {
             Ok(code) => ExitCode::from(code),
             Err(err) => {

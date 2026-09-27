@@ -37,6 +37,29 @@ retained store after its registry entry is removed. `history` requires a registe
 identity and reports unavailable history when its store or event table is absent.
 Lifecycle and presentation state remain owned by the transport.
 
+## Queue an outbound message with Rust
+
+```sh
+forge mailbox --host /path/to/project enqueue --from-name sender --to recipient --body-file message.txt
+forge mailbox --host /path/to/project enqueue --from-name sender --to recipient --body 'Review is ready' --data-file coordination.json
+```
+
+`enqueue` records a durable outbound message and returns its message ID with a
+`queued` receipt. It performs no network operation. Both identities must already
+be registered, and the sender must have an initialized store with the current
+message, lifecycle and delivery-event tables. The command does not initialize or
+migrate a store.
+
+Bodies are limited to 256 KiB of UTF-8; structured data is limited to 1 MiB.
+The receipt includes a bounded summary and digests, without full body or data
+fields. Inputs that exceed the limits fail before a message is written.
+
+The command uses the transport's sender lock and atomically writes the message,
+lifecycle metadata and delivery event. The existing dispatcher can then deliver
+queued messages in order. Structured `coordination-v2` payloads are validated
+before writing. A queued receipt is evidence of local storage; delivery requires
+a later successful transport receipt.
+
 ## Deliver through the transport
 
 ```sh
