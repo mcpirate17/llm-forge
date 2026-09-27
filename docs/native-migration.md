@@ -51,6 +51,61 @@ behavior to raise these percentages.
 
 ## Latest verified commit
 
+Commit `eeb30d5dd2c7956918d0b62067d002faa8ec10d9`, measured from a
+plain `git archive` with the unchanged path classification, Tokei 15.0.0,
+and syn-based inline Rust test treatment. The archive stream SHA-256 is
+`c88c126723ae6ecc9400b55f0af7b0a78fbf5c23940041bda4969eb85e10f184`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,633 | 53,727 | 204 | **50.8952% native** |
+| Tests | 8,985 | 109,785 | 0 | **92.4350% Rust** |
+| All tracked source, including examples | 60,618 | 163,611 | 204 | 72.8997% native |
+
+The manifests contain 378 production files, 377 test files, and two Rust
+examples, or 757 counted source files. The examples contribute 99 Rust code
+lines only to the all-source view. The splitter found 102 test-only ranges in
+87 production Rust files: 43,893 original code lines become 30,789 after
+masking. The 13,104-line delta belongs to tests. Production Rust is 66,831
+raw lines minus 13,104 = 53,727; Rust tests are 96,681 separate lines plus
+13,104 = 109,785.
+
+Compared with verified `8d71bca`, production native share is unchanged and
+Rust test share rose 1.6266 percentage points. This cohort retired five
+executable Python suites with 93 named and 124 statically expanded cases:
+doctor (34), package resources (23), installed layout (one), tooling boundary
+(40), and mutation attribution (26). Five Rust contract targets contain 124
+corresponding tests. The pinned tree retains 12 executable Python test suites
+with 315 named and 337 statically expanded cases, plus 34 Python fixture
+inputs and shared `conftest.py`. In the current Forge environment, 303 of
+those cases collect. The 34-case `test_equivalence_probe.py` module calls
+`pytest.importorskip("torch")`, and torch is absent; its static cases remain
+counted, but they did not execute. Collection is not a test pass.
+
+Scoped validation passed 34 doctor, 23 resource, one installed-layout, 40
+tooling-boundary, and 26 attribution Rust cases at their recorded stages.
+The resource and installed-layout runs followed the fixture repair; the
+40-case tooling-boundary run preceded it. The committed 0.1.68 source also
+passed 29 discovery and 26 attribution integration cases and scoped Clippy.
+The required full local check and verification gate was pending when this
+evidence was assembled. There was no matched performance experiment for this
+cohort. The resource target's 3.00-second scoped duration does not establish a
+speed difference; the prior 134-case matched benchmark remains tied to
+`8d71bca` below.
+
+The [measurement evidence](native-metrics/eeb30d5-evidence.tar.gz) contains
+classified path manifests and hashes independently checked against all 757
+counted Git blobs and a second archive extraction, per-file Tokei reports,
+inline AST ranges and verification of all 87 masked and extracted copies,
+tool hashes, the five-suite Python retirement inventory and exact 124-case
+Rust map, reproduction scripts, and phase-labeled scoped validation logs.
+The SHA-256 of its source-content manifest is
+`9c7e3b3abc0c5edfdd8c0b4a78c6ab0924ef6733455cf3d08210f93153293a6e`;
+the evidence archive SHA-256 is
+`259c9310b9d6e2173a101c1217e44d0e5603b2b7261c024615521fa27e875b7f`.
+
+## Previous verified commit
+
 Commit `8d71bca853c0e3f83d0747ea9bb317338356df48`, measured from a
 plain `git archive` with the unchanged path classification, Tokei 15.0.0,
 and syn-based inline Rust test treatment. The archive stream SHA-256 is
@@ -104,51 +159,6 @@ logs. The SHA-256 of its source-content manifest is
 `8baf05f8728edcf26f03842b9dc5ac69f8730e8e786229d9938f450d33e74563`;
 the evidence archive SHA-256 is
 `626d886c69e05d7fb7dc7b6cd20153c009d5c77fa9af0d12b0ecebf50dfc7a9f`.
-
-## Previous verified commit
-
-Commit `650b7f1205b8200b1494590ba2cde3c45e5dbf4c`, measured from a
-plain `git archive` with the unchanged path classification, Tokei 15.0.0,
-and syn-based inline Rust test treatment. The archive stream SHA-256 is
-`cea5c87b2c8f83d4aafc39983157e5ead2384d47c1c25fd185d7b7e2c1692df2`.
-
-| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
-| --- | ---: | ---: | ---: | ---: |
-| Production | 51,633 | 53,724 | 204 | **50.8938% native** |
-| Tests | 13,321 | 101,017 | 0 | **88.3495% Rust** |
-| All tracked source, including examples | 64,954 | 154,840 | 204 | 70.3825% native |
-
-The manifests contain 378 production files, 369 test files, and two Rust
-examples, or 749 counted source files. The examples contribute 99 Rust code
-lines only to the all-source view. The splitter found 102 test-only ranges in
-87 production Rust files: 43,893 original code lines become 30,789 after
-masking. The 13,104-line delta belongs to tests. Production Rust is 66,828
-raw lines minus 13,104 = 53,724; Rust tests are 87,913 separate lines plus
-13,104 = 101,017.
-
-Compared with verified `98327f4`, production native share rose 0.3078
-percentage points and Rust test share rose 2.3435 points. This cohort retired
-ten executable Python suites containing 122 named and 135 statically expanded
-cases. Ten Rust contract targets contain 135 corresponding test functions.
-The pinned tree retains 26 executable Python test suites with 534 named and
-595 statically expanded cases; its 34 Python fixture inputs and shared
-conftest are inventoried separately. The source commit also adds Forge's
-local `check`/`verify` runner and maps invalid A2A message input to the SDK's
-typed JSON-RPC error. Scoped development tests passed; the full local-check
-gate was pending when this measurement was assembled. These figures measure
-source composition and static inventory, not runtime coverage, behavioral
-coverage, or performance. The longer-term all-Rust-test target remains open.
-
-The [measurement evidence](native-metrics/650b7f1-evidence.tar.gz) contains
-classified path manifests and hashes independently checked against all 749
-counted Git blobs and a second archive extraction, per-file Tokei reports,
-inline AST ranges and verification of all 87 masked and extracted copies,
-tool hashes, the Python retirement inventory and Rust case map, reproduction
-scripts, and clearly labeled scoped validation logs. The SHA-256 of its
-source-content manifest is
-`3d96e189ac9140b6ccf3615b29595029ece4c51ab4b171511419fd7fe3e7097e`;
-the evidence archive SHA-256 is
-`27d506a15330a315da80535a82392d2b52d2e15d2bbc9f002f1285131add36e7`.
 
 ## Behavioral migration
 

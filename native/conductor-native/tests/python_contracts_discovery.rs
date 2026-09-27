@@ -461,6 +461,7 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
         [
             "python_contracts_active_state",
             "python_contracts_inplace_handoff",
+            "python_contracts_installed_layout",
             "python_contracts_local_ai_policy",
             "python_contracts_session_preamble",
             "python_contracts_workspace_eval",
@@ -593,6 +594,7 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_dispatch_merge",
             "python_contracts_dispatch_runner_execution",
             "python_contracts_dispatch_runner_protocol",
+            "python_contracts_doctor",
             "python_contracts_handoff",
             "python_contracts_harness_provisioning",
             "python_contracts_import_ablation",
