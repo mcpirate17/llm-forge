@@ -782,6 +782,49 @@ verification scripts. Its SHA-256 is
 
 ## Latest verified commit
 
+Commit `af62ae016a705f57e2f0bc7de2b89ef323af14a9`, measured from a
+plain `git archive` with the unchanged path classification, Tokei 15.0.0,
+and syn-based inline Rust test treatment. The archive stream SHA-256 is
+`4af0cbac05b8ede032eecd299f012322d616ac9255d4c6c2a1619eacea424085`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,614 | 53,037 | 204 | **50.5813% native** |
+| Tests | 17,373 | 92,504 | 0 | **84.1887% Rust** |
+| All tracked source, including examples | 68,987 | 145,640 | 204 | 67.7928% native |
+
+The manifests contain 376 production files, 365 test files, and two Rust
+examples, or 743 counted source files. The examples contribute 99 Rust code
+lines only to the all-source view. The splitter found 100 test-only ranges in
+85 production Rust files: 43,180 original Rust code lines become 30,121 after
+masking. The 13,059-line delta belongs to tests. Production Rust is 66,096
+raw lines minus 13,059 = 53,037; Rust tests are 79,445 separate lines plus
+13,059 = 92,504.
+
+Relative to `b40b79a`, this pinned tree retires six Python executable test
+suites containing 53 named tests and 63 statically expanded parameter cases.
+Six Rust contract targets add 51 direct test functions and 12 statically
+expanded macro cases, with two shared test helpers and one child fixture.
+Production source counts and native share are unchanged; Rust test share rose
+0.9296 percentage points. The tree retains 46 executable Python test suites
+with 776 named tests and 856 statically expanded parameter cases. Its 32
+static Python fixture inputs and shared conftest are inventoried separately.
+These are source composition and static inventory measures, not runtime or
+behavioral coverage claims. The longer-term all-Rust-test target remains open.
+Uncommitted checkout work is excluded.
+
+The [measurement evidence](native-metrics/af62ae0-evidence.tar.gz) contains
+classified path manifests, hashes independently checked against all 743
+counted Git blobs and a second archive extraction, per-file Tokei reports,
+inline AST ranges and verification of all 85 masked and extracted copies,
+tool hashes, the remaining-Python-test inventory, and reproduction scripts.
+The SHA-256 of its source-content manifest is
+`d1132f2f5b7e4a9c1ba603bf18596ad054c7a99008d5ad75386ad1f70616f077`;
+the evidence archive SHA-256 is
+`13997b17d2562cbd6514631666e2784208bb405d8f029a253a6cbb621e1e6392`.
+
+## Earlier verified commit
+
 Commit `b40b79ad42c9188fba9f3cf4ac09e6f637fa0de9`, measured from a
 plain `git archive` with the unchanged path classification, Tokei 15.0.0,
 and syn-based inline Rust test treatment. The archive stream SHA-256 is

@@ -1,5 +1,19 @@
 # Native test migration
 
+At pinned commit `af62ae016a705f57e2f0bc7de2b89ef323af14a9`, the
+separate Rust-test source milestone is **84.1887%**: 92,504 Rust test code
+lines (79,445 in separate test files plus 13,059 inline) and 17,373 Python
+test code lines. Six Python suites with 53 named and 63 statically expanded
+cases are retired in favor of six Rust contract targets with 51 direct tests
+and 12 statically expanded macro cases, plus two shared helpers and one child
+fixture. The pinned tree retains **46 executable Python suites**, with 776
+named tests and 856 statically expanded parameter cases. Its 32 static Python
+fixture inputs and one shared conftest are inventoried separately. Production
+remains **50.5813% native**. These are source-composition and static inventory
+figures, not a pytest collection result or behavioral coverage claim. The
+[full method and pinned evidence](native-migration.md#latest-verified-commit)
+record every counted input.
+
 At pinned commit `b40b79ad42c9188fba9f3cf4ac09e6f637fa0de9`, the
 separate Rust-test source milestone is **83.2591%**: 90,436 Rust test code
 lines (77,377 in separate test files plus 13,059 inline) and 18,184 Python
@@ -10,8 +24,9 @@ and 919 statically expanded parameter cases. Its 32 static Python fixture
 inputs and one shared conftest are inventoried separately. Production remains
 **50.5813% native**. These are source-composition and static inventory figures,
 not a pytest collection result or behavioral coverage claim. The
-[full method and pinned evidence](native-migration.md#latest-verified-commit)
-record every counted input.
+[counting rules](native-migration.md#counting-rules) and
+[b40b79a pinned evidence](native-metrics/b40b79a-evidence.tar.gz) record every
+counted input.
 
 At pinned commit `14e570e6c7d2798a1ef9586c0f4e04863bc28a0d`, the
 separate Rust-test source milestone is **82.9284%**: 89,770 Rust test code
