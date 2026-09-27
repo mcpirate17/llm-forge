@@ -1,4 +1,4 @@
-//! Read-only, bounded queries against a host's code-review-graph SQLite index.
+//! Read-only, bounded queries against a Forge or external structural index.
 
 use anyhow::{ensure, Context, Result};
 use rusqlite::{params, Connection, OpenFlags};
@@ -51,6 +51,7 @@ pub struct GraphStore {
     has_signature: bool,
     has_hash: bool,
     has_edge_line: bool,
+    has_files: bool,
 }
 
 struct QueryScope<'a> {
@@ -61,8 +62,15 @@ struct QueryScope<'a> {
 }
 
 impl GraphStore {
-    pub fn open(host: &Path) -> Result<Self> {
-        let path = host.join(".code-review-graph/graph.db");
+    pub fn open(host: &Path, explicit_db: Option<&Path>) -> Result<Self> {
+        let path = match explicit_db {
+            Some(path) if path.is_absolute() => path.to_path_buf(),
+            Some(path) => host.join(path),
+            None if host.join(super::indexer::DEFAULT_DB).is_file() => {
+                host.join(super::indexer::DEFAULT_DB)
+            }
+            None => host.join(".code-review-graph/graph.db"),
+        };
         if !path.is_file() {
             return Ok(Self::unavailable("unavailable (graph.db missing)"));
         }
@@ -73,6 +81,7 @@ impl GraphStore {
         conn.execute_batch("PRAGMA query_only=ON")?;
         let nodes = columns(&conn, "nodes")?;
         let edges = columns(&conn, "edges")?;
+        let files = columns(&conn, "files")?;
         let missing_nodes = missing(&nodes, REQUIRED_NODES);
         let missing_edges = missing(&edges, REQUIRED_EDGES);
         if !missing_nodes.is_empty() || !missing_edges.is_empty() {
@@ -88,6 +97,7 @@ impl GraphStore {
             has_signature: nodes.contains("signature"),
             has_hash: nodes.contains("file_hash"),
             has_edge_line: edges.contains("line"),
+            has_files: files.contains("file_path") && files.contains("file_hash"),
         })
     }
 
@@ -98,6 +108,7 @@ impl GraphStore {
             has_signature: false,
             has_hash: false,
             has_edge_line: false,
+            has_files: false,
         }
     }
 
@@ -130,8 +141,22 @@ impl GraphStore {
         let transaction = conn
             .unchecked_transaction()
             .context("begin read-only graph snapshot")?;
-        let (symbols, indexed_hashes) = self.symbols(&transaction, &scope)?;
-        let graph_status = if symbols.is_empty() {
+        let (symbols, mut indexed_hashes) = self.symbols(&transaction, &scope)?;
+        if self.has_files && indexed_hashes.is_empty() {
+            let file_hash = transaction.query_row(
+                "SELECT file_hash FROM files WHERE file_path IN (?1,?2) LIMIT 1",
+                params![scope.absolute, scope.relative],
+                |row| row.get::<_, String>(0),
+            );
+            match file_hash {
+                Ok(hash) => indexed_hashes.push(hash),
+                Err(rusqlite::Error::QueryReturnedNoRows) => {}
+                Err(error) => return Err(error).context("query indexed file hash"),
+            }
+        }
+        let graph_status = if symbols.is_empty() && self.has_files && !indexed_hashes.is_empty() {
+            "indexed (no matching symbols)"
+        } else if symbols.is_empty() {
             "unindexed (file or symbol absent from graph)"
         } else {
             "ok"
@@ -352,6 +377,7 @@ fn columns(conn: &Connection, table: &str) -> Result<HashSet<String>> {
     let sql = match table {
         "nodes" => "PRAGMA table_info(nodes)",
         "edges" => "PRAGMA table_info(edges)",
+        "files" => "PRAGMA table_info(files)",
         _ => unreachable!(),
     };
     let mut stmt = conn.prepare(sql)?;

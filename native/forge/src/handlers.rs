@@ -33,7 +33,7 @@
 //! Read has the same full/partial contract with `READ_PRETOOLUSE_HOOK_NAMES`:
 //! the refresh report, current-work guard and whole-file read-size guard.
 //! Other tools without specialized registry gates need only the native
-//! refresh report; edit and graph tools remain delegated.
+//! refresh report; edit and graph tools are served by `crate::pre_edit`.
 //!
 //! `PostToolUse` lives in `crate::post_tool` (same registry, same
 //! env-var contract): the nine ported names splice partially like the Bash
@@ -73,6 +73,7 @@ use crate::post_tool::{
     ContextTelemetry, CrgGraphRefresh, CrgRefreshReportPost, ObsidianPostEdit, PostBashGraph,
     PostBashQuiet, PostEdit, PostToolQuiet, ReadBudget,
 };
+use crate::pre_edit::{EDIT_PRETOOLUSE_HOOK_NAMES, GRAPH_PRETOOLUSE_HOOK_NAMES};
 use crate::workspace_hygiene;
 use crate::write_targets;
 
@@ -384,7 +385,7 @@ pub fn is_read_payload(payload: &Value) -> bool {
         == Some("Read")
 }
 
-/// Conservative registry matcher: never skip an edit or graph gate.
+/// Conservative generic matcher: edit and graph tools have separate handlers.
 pub fn generic_pretooluse_tool(tool_name: &str) -> bool {
     !tool_name.is_empty()
         && !matches!(
@@ -572,6 +573,8 @@ fn default_native_hook_names() -> HashSet<String> {
         .collect();
     names.insert("bash_write_targets".to_string());
     names.extend(READ_PRETOOLUSE_HOOK_NAMES.iter().map(|s| s.to_string()));
+    names.extend(EDIT_PRETOOLUSE_HOOK_NAMES.iter().map(|s| s.to_string()));
+    names.extend(GRAPH_PRETOOLUSE_HOOK_NAMES.iter().map(|s| s.to_string()));
     names.extend(POST_TOOL_USE_HOOK_NAMES.iter().map(|s| s.to_string()));
     names.extend(SESSIONSTART_HOOK_NAMES.iter().map(|s| s.to_string()));
     names

@@ -14,14 +14,17 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from xml.etree.ElementTree import ParseError
-
-from defusedxml.ElementTree import parse as parse_xml
 
 from conductor._native import (
     admission_errors_native,
-    analyze_test_value_native,
+    analyze_test_value_reports_native,
     load_value_analysis_native,
+    mutation_value_attribution_supported_native,
+    mutation_value_cargo_identity_native,
+    mutation_value_ctest_identity_native,
+    mutation_value_parse_cargo_native,
+    mutation_value_parse_junit_native,
+    mutation_value_pytest_identity_native,
 )
 from conductor._native import (
     test_value_receipt_errors_native as _test_value_receipt_errors_native,
@@ -145,14 +148,10 @@ def pytest_junit_argv(argv: Sequence[str], report_path: Path) -> tuple[str, ...]
 
 
 def _pytest_identity(nodeid: str) -> tuple[str, str]:
-    parts = nodeid.split("::")
-    module = parts[0]
-    if not module.endswith(".py") or len(parts) < 2:
-        raise ValueEvidenceError(f"pytest-junit requires a Python nodeid: {nodeid}")
-    classname = module[:-3].replace("/", ".")
-    if len(parts) > 2:
-        classname = f"{classname}.{'.'.join(parts[1:-1])}"
-    return classname, parts[-1]
+    try:
+        return mutation_value_pytest_identity_native(nodeid)
+    except ValueError as exc:
+        raise ValueEvidenceError(str(exc)) from exc
 
 
 def pytest_attribution_supported(
@@ -164,12 +163,7 @@ def pytest_attribution_supported(
         return False
     if any(arg == "--junitxml" or arg.startswith("--junitxml=") for arg in argv):
         return False
-    for nodeid in ranked_nodeids:
-        try:
-            _pytest_identity(nodeid)
-        except ValueEvidenceError:
-            return False
-    return True
+    return mutation_value_attribution_supported_native(ADAPTER, list(ranked_nodeids))
 
 
 def parse_pytest_junit(
@@ -178,68 +172,13 @@ def parse_pytest_junit(
     """Parse one pytest JUnit report into function-level outcomes and runtimes."""
 
     try:
-        root = parse_xml(report_path).getroot()
-    except (OSError, ParseError) as exc:
-        raise ValueEvidenceError(f"cannot parse pytest JUnit report: {exc}") from exc
-    if root is None:
-        raise ValueEvidenceError("pytest JUnit report has no document root")
-    identities = {_pytest_identity(nodeid): nodeid for nodeid in ranked_nodeids}
-    aggregate: dict[str, dict[str, Any]] = {}
-    unmapped: list[dict[str, str]] = []
-    for case in root.iter("testcase"):
-        classname = case.attrib.get("classname", "")
-        raw_name = case.attrib.get("name", "")
-        name = raw_name.split("[", 1)[0]
-        nodeid = identities.get((classname, name))
-        if nodeid is None:
-            unmapped.append({"classname": classname, "name": raw_name})
-            continue
-        if case.find("error") is not None:
-            outcome = "ERROR"
-        elif case.find("failure") is not None:
-            outcome = "FAILED"
-        elif case.find("skipped") is not None:
-            outcome = "SKIPPED"
-        else:
-            outcome = "PASSED"
-        try:
-            duration = float(case.attrib.get("time") or 0)
-        except ValueError:
-            duration = 0.0
-        row = aggregate.setdefault(
-            nodeid,
-            {"outcome": "PASSED", "duration_seconds": 0.0, "cases": 0},
+        return json.loads(
+            mutation_value_parse_junit_native(
+                str(report_path), ADAPTER, list(ranked_nodeids)
+            )
         )
-        if outcome == "ERROR":
-            row["outcome"] = outcome
-        elif outcome == "FAILED" and row["outcome"] != "ERROR":
-            row["outcome"] = outcome
-        elif outcome == "SKIPPED" and row["cases"] == 0:
-            row["outcome"] = outcome
-        elif (outcome, row["outcome"]) == ("PASSED", "SKIPPED"):
-            row["outcome"] = outcome
-        row["duration_seconds"] += duration
-        row["cases"] += 1
-    missing = [nodeid for nodeid in ranked_nodeids if nodeid not in aggregate]
-    tests = {
-        nodeid: {
-            "outcome": row["outcome"],
-            "duration_seconds": round(row["duration_seconds"], 6),
-            "cases": row["cases"],
-        }
-        for nodeid, row in aggregate.items()
-    }
-    return {
-        "status": "COMPLETE" if not missing and not unmapped else "INCOMPLETE",
-        "tests": tests,
-        "failed_nodeids": [
-            nodeid
-            for nodeid in ranked_nodeids
-            if tests.get(nodeid, {}).get("outcome") in {"FAILED", "ERROR"}
-        ],
-        "missing_nodeids": missing,
-        "unmapped_cases": unmapped,
-    }
+    except ValueError as exc:
+        raise ValueEvidenceError(str(exc)) from exc
 
 
 # ------------------------------------------------------------ cargo / libtest
@@ -253,16 +192,15 @@ def parse_pytest_junit(
 CARGO_TEST_LINE = re.compile(
     r"^test\s+(?P<name>\S+)\s+\.\.\.\s+(?P<outcome>ok|FAILED|ignored)\b"
 )
-_CARGO_OUTCOMES = {"ok": "PASSED", "FAILED": "FAILED", "ignored": "SKIPPED"}
 
 
 def _cargo_identity(nodeid: str) -> str:
     """Return the test function name a `<path>.rs::<fn>` nodeid names."""
 
-    path, separator, function = nodeid.partition("::")
-    if not separator or not path.endswith(".rs") or "::" in function or not function:
-        raise ValueEvidenceError(f"cargo-libtest requires a Rust nodeid: {nodeid}")
-    return function
+    try:
+        return mutation_value_cargo_identity_native(nodeid)
+    except ValueError as exc:
+        raise ValueEvidenceError(str(exc)) from exc
 
 
 def cargo_attribution_supported(ranked_nodeids: Sequence[str]) -> bool:
@@ -273,74 +211,20 @@ def cargo_attribution_supported(ranked_nodeids: Sequence[str]) -> bool:
     literally `cargo` would leave exactly those campaigns unattributed.
     """
 
-    if not ranked_nodeids:
-        return False
-    try:
-        names = [_cargo_identity(nodeid) for nodeid in ranked_nodeids]
-    except ValueEvidenceError:
-        return False
-    # libtest prints the module path, not the file, so two ranked tests that share
-    # a function name are indistinguishable in the output. Guessing would attribute
-    # a kill to the wrong contract, which is worse than reporting no attribution.
-    return len(set(names)) == len(names)
+    return mutation_value_attribution_supported_native(
+        CARGO_ADAPTER, list(ranked_nodeids)
+    )
 
 
 def parse_cargo_libtest(stdout: str, ranked_nodeids: Sequence[str]) -> dict[str, Any]:
     """Map one libtest run's printed outcomes onto the campaign's ranked nodeids."""
 
-    by_name = {_cargo_identity(nodeid): nodeid for nodeid in ranked_nodeids}
-    if len(by_name) != len(ranked_nodeids):
-        raise ValueEvidenceError(
-            "ranked tests share a function name; libtest output cannot separate them"
+    try:
+        return json.loads(
+            mutation_value_parse_cargo_native(stdout, list(ranked_nodeids))
         )
-    tests: dict[str, dict[str, Any]] = {}
-    unranked_failures: list[str] = []
-    printed_names: dict[str, set[str]] = {}
-    for line in stdout.splitlines():
-        match = CARGO_TEST_LINE.match(line.strip())
-        if match is None:
-            continue
-        printed = match.group("name")
-        outcome = _CARGO_OUTCOMES[match.group("outcome")]
-        nodeid = by_name.get(printed.rpartition("::")[2])
-        if nodeid is None:
-            # A batch usually runs more than the ranked set -- a crate-wide `cargo
-            # test` runs every test in the binary. Those are not a defect, but a
-            # mutant that fails many of them is a blunt mutant, and that is worth
-            # recording even though it cannot enter `tests` (which is keyed by
-            # nodeid and is what the killer verdict reads).
-            if outcome == "FAILED":
-                unranked_failures.append(printed)
-            continue
-        # libtest reports no per-test duration on stable, so no duration key is
-        # written rather than a fabricated 0.0.
-        row = tests.setdefault(nodeid, {"outcome": outcome, "cases": 0})
-        if outcome == "FAILED":
-            row["outcome"] = outcome
-        row["cases"] += 1
-        printed_names.setdefault(nodeid, set()).add(printed)
-    # A ranked nodeid carries no module path, so it matches on the last segment
-    # alone. Two DIFFERENT tests in the binary can therefore land on one nodeid --
-    # `crate::a::test_roundtrip` and `crate::b::test_roundtrip` both end
-    # `::test_roundtrip`. Merging them attributes one test's failure to the other's
-    # contract, which is the misattribution this adapter exists to prevent, so the
-    # nodeid is dropped rather than resolved by guesswork. The ambiguity is visible
-    # in the output itself, which is why it is caught here and not in the
-    # supported-shape check.
-    ambiguous = sorted(
-        nodeid for nodeid, names in printed_names.items() if len(names) > 1
-    )
-    for nodeid in ambiguous:
-        del tests[nodeid]
-    missing = [nodeid for nodeid in ranked_nodeids if nodeid not in tests]
-    return {
-        "status": "COMPLETE" if not missing else "INCOMPLETE",
-        "tests": tests,
-        "missing_nodeids": missing,
-        "ambiguous_nodeids": ambiguous,
-        "unmapped_cases": [],
-        "unranked_failures": sorted(unranked_failures),
-    }
+    except ValueError as exc:
+        raise ValueEvidenceError(str(exc)) from exc
 
 
 def collect_cargo_libtest_batch[BatchResultT](
@@ -385,15 +269,10 @@ def _ctest_identity(nodeid: str) -> str:
     stem of the nodeid's file is what carries the binary.
     """
 
-    path, separator, function = nodeid.partition("::")
-    if (
-        not separator
-        or not function
-        or "::" in function
-        or not path.endswith(C_TEST_SUFFIXES)
-    ):
-        raise ValueEvidenceError(f"ctest requires a C/C++ nodeid: {nodeid}")
-    return f"{Path(path).stem}.{function}"
+    try:
+        return mutation_value_ctest_identity_native(nodeid)
+    except ValueError as exc:
+        raise ValueEvidenceError(str(exc)) from exc
 
 
 def ctest_attribution_supported(ranked_nodeids: Sequence[str]) -> bool:
@@ -404,17 +283,9 @@ def ctest_attribution_supported(ranked_nodeids: Sequence[str]) -> bool:
     `ctest` is not argv[0].
     """
 
-    if not ranked_nodeids:
-        return False
-    try:
-        names = [_ctest_identity(nodeid) for nodeid in ranked_nodeids]
-    except ValueEvidenceError:
-        return False
-    # Two source files can each define `test_reset`; if their stems collide too,
-    # the registered ctest names collide and a kill would be attributed to
-    # whichever contract sorted first. Reporting no attribution is the honest
-    # answer.
-    return len(set(names)) == len(names)
+    return mutation_value_attribution_supported_native(
+        CTEST_ADAPTER, list(ranked_nodeids)
+    )
 
 
 def ctest_junit_path(snapshot_root: Path) -> Path:
@@ -429,57 +300,13 @@ def parse_ctest_junit(
     """Parse one ctest JUnit report into per-test outcomes and runtimes."""
 
     try:
-        root = parse_xml(report_path).getroot()
-    except (OSError, ParseError) as exc:
-        raise ValueEvidenceError(f"cannot parse ctest JUnit report: {exc}") from exc
-    if root is None:
-        raise ValueEvidenceError("ctest JUnit report has no document root")
-    identities = {_ctest_identity(nodeid): nodeid for nodeid in ranked_nodeids}
-    tests: dict[str, dict[str, Any]] = {}
-    unranked_failures: list[str] = []
-    for case in root.iter("testcase"):
-        name = case.attrib.get("name", "")
-        status = case.attrib.get("status")
-        if case.find("error") is not None:
-            outcome = "ERROR"
-        elif case.find("failure") is not None or status == "fail":
-            outcome = "FAILED"
-        elif case.find("skipped") is not None or status in {"disabled", "notrun"}:
-            outcome = "SKIPPED"
-        else:
-            outcome = "PASSED"
-        nodeid = identities.get(name)
-        if nodeid is None:
-            # `ctest` runs the whole project, not the ranked set, so unranked
-            # cases are normal. A mutant that takes down unranked tests is a
-            # blunt mutant, which is worth recording even though it cannot
-            # enter `tests` -- that map is keyed by nodeid and is what the
-            # killer verdict reads.
-            if outcome in {"FAILED", "ERROR"}:
-                unranked_failures.append(name)
-            continue
-        try:
-            duration = float(case.attrib.get("time") or 0)
-        except ValueError:
-            duration = 0.0
-        tests[nodeid] = {
-            "outcome": outcome,
-            "duration_seconds": round(duration, 6),
-            "cases": 1,
-        }
-    missing = [nodeid for nodeid in ranked_nodeids if nodeid not in tests]
-    return {
-        "status": "COMPLETE" if not missing else "INCOMPLETE",
-        "tests": tests,
-        "failed_nodeids": [
-            nodeid
-            for nodeid in ranked_nodeids
-            if tests.get(nodeid, {}).get("outcome") in {"FAILED", "ERROR"}
-        ],
-        "missing_nodeids": missing,
-        "unmapped_cases": [],
-        "unranked_failures": sorted(unranked_failures),
-    }
+        return json.loads(
+            mutation_value_parse_junit_native(
+                str(report_path), CTEST_ADAPTER, list(ranked_nodeids)
+            )
+        )
+    except ValueError as exc:
+        raise ValueEvidenceError(str(exc)) from exc
 
 
 def collect_ctest_junit_batch[BatchResultT](
@@ -571,46 +398,13 @@ def analyze_test_value(
 ) -> dict[str, Any]:
     """Build kill attribution, value classifications, and a retained core set."""
 
-    nodeids = [test.nodeid for test in spec.tests]
-    mutant_evidence = []
-    for mutation_id in spec.mutation_contracts:
-        report = mutant_reports.get(mutation_id)
-        if not isinstance(report, dict) or report.get("status") != "COMPLETE":
-            report_state = "INCOMPLETE"
-            killers: list[str] = []
-        elif not isinstance(report.get("tests"), dict):
-            report_state = "NO_TEST_MAP"
-            killers = []
-        else:
-            report_state = "COMPLETE"
-            tests = report["tests"]
-            failed_nodeids = report.get("failed_nodeids")
-            if isinstance(failed_nodeids, list) and all(
-                isinstance(nodeid, str) for nodeid in failed_nodeids
-            ):
-                failed = set(failed_nodeids)
-                killers = [nodeid for nodeid in nodeids if nodeid in failed]
-            else:
-                killers = [
-                    nodeid
-                    for nodeid in nodeids
-                    if isinstance(tests.get(nodeid), dict)
-                    and tests[nodeid].get("outcome") in {"FAILED", "ERROR"}
-                ]
-        mutant_evidence.append(
-            {
-                "mutation_id": mutation_id,
-                "outcome": mutant_outcomes.get(mutation_id),
-                "report_state": report_state,
-                "killers": killers,
-            }
-        )
     try:
         return json.loads(
-            analyze_test_value_native(
+            analyze_test_value_reports_native(
                 json.dumps(_spec_payload(spec)),
                 json.dumps(baseline_reports),
-                json.dumps(mutant_evidence),
+                json.dumps(mutant_reports),
+                json.dumps(mutant_outcomes),
             )
         )
     except (TypeError, ValueError) as exc:

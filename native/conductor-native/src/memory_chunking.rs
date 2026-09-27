@@ -4,6 +4,7 @@
 //! writes. Rust owns the line-loop chunker that ran as a Python closure over
 //! every line of every indexed file.
 
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 
 const MAX_CHUNK_CHARS: usize = 1500;
@@ -101,6 +102,30 @@ fn markdown_chunks(
 
 /// Native entry: ``memory_index.chunk_text``. Returns a JSON array of chunk
 /// objects, parsed once on the Python side.
+pub fn chunk_text(
+    text: &str,
+    source_id: &str,
+    path: &str,
+    title: &str,
+    mode: &str,
+) -> Vec<(String, String, String, String)> {
+    let text = py_strip(text);
+    if text.is_empty() {
+        return Vec::new();
+    }
+    if mode == "whole" {
+        vec![(
+            source_id.to_owned(),
+            path.to_owned(),
+            title.to_owned(),
+            take_chars(text, WHOLE_MODE_LIMIT),
+        )]
+    } else {
+        markdown_chunks(text, source_id, path, title)
+    }
+}
+
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (text, source_id, path, title, mode))]
 fn memory_index_chunk_text_native(
@@ -110,23 +135,10 @@ fn memory_index_chunk_text_native(
     title: &str,
     mode: &str,
 ) -> PyResult<Vec<(String, String, String, String)>> {
-    let text = py_strip(text);
-    if text.is_empty() {
-        return Ok(Vec::new());
-    }
-    let chunks = if mode == "whole" {
-        vec![(
-            source_id.to_owned(),
-            path.to_owned(),
-            title.to_owned(),
-            take_chars(text, WHOLE_MODE_LIMIT),
-        )]
-    } else {
-        markdown_chunks(text, source_id, path, title)
-    };
-    Ok(chunks)
+    Ok(chunk_text(text, source_id, path, title, mode))
 }
 
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(memory_index_chunk_text_native, module)?)
 }
@@ -148,7 +160,7 @@ mod tests {
     #[test]
     fn empty_text_yields_no_chunks() {
         assert_eq!(
-            memory_index_chunk_text_native("   \n  ", "s", "p", "t", "lines").unwrap(),
+            chunk_text("   \n  ", "s", "p", "t", "lines"),
             Vec::<(String, String, String, String)>::new()
         );
     }
@@ -156,7 +168,42 @@ mod tests {
     #[test]
     fn whole_mode_truncates_at_3000_chars() {
         let text = "x".repeat(4000);
-        let out = memory_index_chunk_text_native(&text, "s", "p", "t", "whole").unwrap();
+        let out = chunk_text(&text, "s", "p", "t", "whole");
         assert_eq!(out[0].3.chars().count(), 3000);
+    }
+
+    #[test]
+    fn heading_after_four_hundred_characters_starts_a_new_chunk() {
+        let text = format!("# One\n{}\n## Two\n{}", "a".repeat(500), "b".repeat(500));
+        let out = chunk_text(&text, "notes", "x.md", "x.md", "heading");
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].0, "notes");
+        assert_eq!(out[0].2, "x.md");
+        assert!(out[0].3.starts_with("# One\n"));
+        assert_eq!(out[1].2, "Two");
+        assert!(out[1].3.starts_with("## Two\n"));
+    }
+
+    #[test]
+    fn heading_only_uses_fallback_title_and_preserves_path() {
+        let out = chunk_text("# ###", "s", "docs/n.md", "n.md", "chunk");
+        assert_eq!(
+            out,
+            vec![(
+                "s".to_owned(),
+                "docs/n.md".to_owned(),
+                "n.md".to_owned(),
+                "# ###".to_owned(),
+            )]
+        );
+    }
+
+    #[test]
+    fn chunk_mode_splits_at_character_limit_without_breaking_utf8() {
+        let text = "雪".repeat(1_500);
+        let out = chunk_text(&text, "s", "docs/n.md", "n.md", "chunk");
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].3.chars().count(), 1_500);
+        assert_eq!(out[0].3, text);
     }
 }

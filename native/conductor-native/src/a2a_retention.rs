@@ -6,14 +6,17 @@
 
 use std::collections::{BTreeSet, HashSet};
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::{PyBytes, PyDict};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
-const POLICY_VERSION: u64 = 2;
-const TOMBSTONE_BODY: &str = "[compacted: resolved A2A content retained by digest]";
+pub const POLICY_VERSION: u64 = 2;
+pub const TOMBSTONE_BODY: &str = "[compacted: resolved A2A content retained by digest]";
 const MAX_EVIDENCE_FILES: usize = 512;
 const MAX_EVIDENCE_FILE_BYTES: usize = 2 << 20;
 const MAX_EVIDENCE_TOTAL_BYTES: usize = 32 << 20;
@@ -39,13 +42,19 @@ fn sha256(value: &[u8]) -> String {
 }
 
 fn canonical_bytes(value: &Value) -> Result<Vec<u8>, String> {
-    serde_json::to_vec(value).map_err(|error| error.to_string())
+    // A native caller can enable serde_json's preserve_order feature for the
+    // entire dependency graph. Sort explicitly so both consumers hash the
+    // same canonical bytes regardless of feature unification.
+    let mut sorted = value.clone();
+    sorted.sort_all_objects();
+    serde_json::to_vec(&sorted).map_err(|error| error.to_string())
 }
 
 fn canonical_string(value: &Value) -> Result<String, String> {
     String::from_utf8(canonical_bytes(value)?).map_err(|error| error.to_string())
 }
 
+#[cfg(feature = "python")]
 fn required<'py, T: FromPyObjectOwned<'py>>(row: &Bound<'py, PyDict>, field: &str) -> PyResult<T> {
     row.get_item(field)?
         .ok_or_else(|| PyValueError::new_err(format!("retention row is missing field {field:?}")))?
@@ -55,30 +64,31 @@ fn required<'py, T: FromPyObjectOwned<'py>>(row: &Bound<'py, PyDict>, field: &st
         })
 }
 
-#[derive(Debug)]
-struct RetentionRow {
-    message_id: String,
-    direction: String,
-    sender: String,
-    recipient: String,
-    body: String,
-    data_json: Option<String>,
-    created_at: String,
-    received_at: Option<String>,
-    read_at: String,
-    resolved_at: Option<String>,
-    superseded_at: Option<String>,
-    thread_id: String,
-    summary: String,
-    protocol_status: String,
-    requires_response: bool,
-    retention_class: String,
-    body_sha256: String,
-    body_bytes: u64,
-    data_sha256: Option<String>,
-    data_bytes: u64,
+#[derive(Debug, Clone)]
+pub struct RetentionRow {
+    pub message_id: String,
+    pub direction: String,
+    pub sender: String,
+    pub recipient: String,
+    pub body: String,
+    pub data_json: Option<String>,
+    pub created_at: String,
+    pub received_at: Option<String>,
+    pub read_at: String,
+    pub resolved_at: Option<String>,
+    pub superseded_at: Option<String>,
+    pub thread_id: String,
+    pub summary: String,
+    pub protocol_status: String,
+    pub requires_response: bool,
+    pub retention_class: String,
+    pub body_sha256: String,
+    pub body_bytes: u64,
+    pub data_sha256: Option<String>,
+    pub data_bytes: u64,
 }
 
+#[cfg(feature = "python")]
 impl RetentionRow {
     fn extract(row: &Bound<'_, PyDict>) -> PyResult<Self> {
         Ok(Self {
@@ -177,18 +187,23 @@ fn event_sha256(message_id: &str, manifest_sha256: &str) -> String {
     sha256(format!("{POLICY_VERSION}\0inbound\0{message_id}\0{manifest_sha256}").as_bytes())
 }
 
-#[pyfunction]
-fn a2a_retention_evidence_native(
-    py: Python<'_>,
-    candidate_ids: Vec<String>,
-    files: Vec<(String, Py<PyBytes>)>,
-) -> PyResult<(Vec<String>, Vec<String>, String)> {
-    let candidate_ids = candidate_ids.into_iter().collect::<HashSet<_>>();
+pub type EvidenceResult = (Vec<String>, Vec<String>, String);
+pub type ManifestItem = (String, String, String, String, u64, u64);
+pub type ManifestResult = (Vec<ManifestItem>, u64, u64, u64);
+
+pub fn evidence(
+    candidate_ids: &[String],
+    files: &[(String, Vec<u8>)],
+) -> Result<EvidenceResult, String> {
+    let candidate_ids = candidate_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
     if files.len() > MAX_EVIDENCE_FILES {
-        return Err(PyValueError::new_err(format!(
+        return Err(format!(
             "evidence scan found {} files; maximum is {MAX_EVIDENCE_FILES}",
             files.len()
-        )));
+        ));
     }
 
     let mut protected = BTreeSet::new();
@@ -196,40 +211,38 @@ fn a2a_retention_evidence_native(
     let mut total_bytes = 0usize;
     let mut total_nodes = 0usize;
     for (path, raw) in files {
-        let raw = raw.bind(py).as_bytes();
         if raw.len() > MAX_EVIDENCE_FILE_BYTES {
-            return Err(PyValueError::new_err(format!(
+            return Err(format!(
                 "evidence file exceeds {MAX_EVIDENCE_FILE_BYTES} bytes: {path}"
-            )));
+            ));
         }
         total_bytes = total_bytes.saturating_add(raw.len());
         if total_bytes > MAX_EVIDENCE_TOTAL_BYTES {
-            return Err(PyValueError::new_err(format!(
+            return Err(format!(
                 "evidence scan exceeds {MAX_EVIDENCE_TOTAL_BYTES} total bytes"
-            )));
+            ));
         }
-        let payload = serde_json::from_slice::<Value>(raw).map_err(|_| {
-            PyValueError::new_err(format!("evidence file is malformed JSON: {path}"))
-        })?;
+        let payload = serde_json::from_slice::<Value>(raw)
+            .map_err(|_| format!("evidence file is malformed JSON: {path}"))?;
         let mut stack = vec![&payload];
         while let Some(node) = stack.pop() {
             total_nodes += 1;
             if total_nodes > MAX_EVIDENCE_NODES {
-                return Err(PyValueError::new_err(format!(
+                return Err(format!(
                     "evidence scan exceeds {MAX_EVIDENCE_NODES} JSON nodes"
-                )));
+                ));
             }
             match node {
                 Value::Object(values) => {
                     for (key, value) in values {
-                        if candidate_ids.contains(key) {
+                        if candidate_ids.contains(key.as_str()) {
                             protected.insert(key.clone());
                         }
                         stack.push(value);
                     }
                 }
                 Value::Array(values) => stack.extend(values),
-                Value::String(value) if candidate_ids.contains(value) => {
+                Value::String(value) if candidate_ids.contains(value.as_str()) => {
                     protected.insert(value.clone());
                 }
                 _ => {}
@@ -252,27 +265,16 @@ fn a2a_retention_evidence_native(
         .iter()
         .map(|item| item["path"].as_str().expect("path string").to_owned())
         .collect();
-    let snapshot_sha256 = sha256(&canonical_bytes(&snapshot).map_err(PyValueError::new_err)?);
+    let snapshot_sha256 = sha256(&canonical_bytes(&snapshot)?);
     Ok((paths, protected.into_iter().collect(), snapshot_sha256))
 }
 
-#[pyfunction]
-#[allow(clippy::type_complexity)]
-fn a2a_retention_manifests_native(
-    rows: Vec<Bound<'_, PyDict>>,
-    compacted_at: &str,
-) -> PyResult<(
-    Vec<(String, String, String, String, u64, u64)>,
-    u64,
-    u64,
-    u64,
-)> {
+pub fn manifests(rows: &[RetentionRow], compacted_at: &str) -> Result<ManifestResult, String> {
     let row_count = rows.len();
     let mut items = Vec::with_capacity(rows.len());
     let mut original_content_bytes = 0u64;
     for row in rows {
-        let row = RetentionRow::extract(&row)?;
-        let manifest = manifest(&row, compacted_at).map_err(PyValueError::new_err)?;
+        let manifest = manifest(row, compacted_at)?;
         let manifest_sha256 = manifest["manifest_sha256"]
             .as_str()
             .expect("manifest digest string")
@@ -280,8 +282,8 @@ fn a2a_retention_manifests_native(
         let event_sha256 = event_sha256(&row.message_id, &manifest_sha256);
         original_content_bytes += row.body_bytes + row.data_bytes;
         items.push((
-            row.message_id,
-            canonical_string(&manifest).map_err(PyValueError::new_err)?,
+            row.message_id.clone(),
+            canonical_string(&manifest)?,
             manifest_sha256,
             event_sha256,
             row.body_bytes,
@@ -297,6 +299,55 @@ fn a2a_retention_manifests_native(
     ))
 }
 
+#[cfg(feature = "python")]
+#[pyfunction]
+fn a2a_retention_evidence_native(
+    py: Python<'_>,
+    candidate_ids: Vec<String>,
+    files: Vec<(String, Py<PyBytes>)>,
+) -> PyResult<EvidenceResult> {
+    if files.len() > MAX_EVIDENCE_FILES {
+        return Err(PyValueError::new_err(format!(
+            "evidence scan found {} files; maximum is {MAX_EVIDENCE_FILES}",
+            files.len()
+        )));
+    }
+    let mut total = 0usize;
+    for (path, raw) in &files {
+        let size = raw.bind(py).as_bytes().len();
+        if size > MAX_EVIDENCE_FILE_BYTES {
+            return Err(PyValueError::new_err(format!(
+                "evidence file exceeds {MAX_EVIDENCE_FILE_BYTES} bytes: {path}"
+            )));
+        }
+        total = total.saturating_add(size);
+        if total > MAX_EVIDENCE_TOTAL_BYTES {
+            return Err(PyValueError::new_err(format!(
+                "evidence scan exceeds {MAX_EVIDENCE_TOTAL_BYTES} total bytes"
+            )));
+        }
+    }
+    let files = files
+        .into_iter()
+        .map(|(path, raw)| (path, raw.bind(py).as_bytes().to_vec()))
+        .collect::<Vec<_>>();
+    evidence(&candidate_ids, &files).map_err(PyValueError::new_err)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn a2a_retention_manifests_native(
+    rows: Vec<Bound<'_, PyDict>>,
+    compacted_at: &str,
+) -> PyResult<ManifestResult> {
+    let rows = rows
+        .iter()
+        .map(RetentionRow::extract)
+        .collect::<PyResult<Vec<_>>>()?;
+    manifests(&rows, compacted_at).map_err(PyValueError::new_err)
+}
+
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(a2a_retention_evidence_native, module)?)?;
     module.add_function(wrap_pyfunction!(a2a_retention_manifests_native, module)?)?;

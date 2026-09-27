@@ -43,7 +43,21 @@ jobs:
         with:
           node-version: "20"
       - run: uv sync --extra test
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/forge
+      - name: Build native CLI for legacy compatibility entrypoints
+        env:
+          PYO3_NO_PYTHON: "1"
+          CARGO_BUILD_JOBS: "2"
+        run: |
+          cargo build --locked --manifest-path native/forge/Cargo.toml
+          echo "FORGE_BIN=$GITHUB_WORKSPACE/native/forge/target/debug/forge" >> "$GITHUB_ENV"
+          echo "$GITHUB_WORKSPACE/native/forge/target/debug" >> "$GITHUB_PATH"
       - run: uv run python -m pytest src/conductor -q -p no:cacheprovider --timeout 600
+      - name: Legacy hook compatibility seams
+        run: uv run python -m pytest src/tooling/hooks -q -p no:cacheprovider --timeout 120
       # candidate-review's "full" profile needs jscpd and pmd on PATH (see
       # [tools.jscpd]/[tools.pmd] in candidate_policy.toml and README.md's
       # "Baselines" section). Both are pinned to the exact version the
@@ -167,4 +181,4 @@ jobs:
         env:
           PYO3_NO_PYTHON: "1"
           CARGO_BUILD_JOBS: "2"
-        run: cargo test --locked --no-default-features --lib -- --test-threads=1
+        run: cargo test --locked --no-default-features --features source-analysis -- --test-threads=1

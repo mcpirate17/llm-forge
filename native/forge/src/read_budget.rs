@@ -101,7 +101,7 @@ fn step_tokens() -> Result<u64> {
 
 /// `tally`: add `tokens` to the session ledger, returning
 /// `(previous_total, new_total)`.
-fn tally(state_dir: &Path, key: &str, tokens: u64) -> std::io::Result<(u64, u64)> {
+pub(crate) fn tally(state_dir: &Path, key: &str, tokens: u64) -> std::io::Result<(u64, u64)> {
     let path = state_dir.join(format!("{key}.read-tokens"));
     let previous = std::fs::read_to_string(&path)
         .ok()

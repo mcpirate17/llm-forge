@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # PreToolUse/Bash: Block commands that destroy work or violate project policy.
 #
-# The deny rules live in _bash_guard.py, which matches at COMMAND POSITION
+# The deny rules live in forge's native bash_guard module, reached by
+# _bash_guard.py for old settings. It matches at COMMAND POSITION
 # (shlex tokenization + operator split + recursion into `bash -c`) rather than
 # grepping the raw string. The old inline greps matched inside quotes, so a
 # command that merely MENTIONED a banned pattern was denied -- see the header of
@@ -30,6 +31,11 @@ CMD=$(printf '%s' "$PAYLOAD" \
 if REASON=$(printf '%s' "$CMD" | python3 "$HOOK_DIR/_bash_guard.py"); then
     :  # exit 0 -> allowed, fall through to the impact analyzer
 else
+    STATUS=$?
+    if [ "$STATUS" -ne 1 ] || [ -z "$REASON" ]; then
+        echo "pre-bash: native guard failed (exit $STATUS); command not checked" >&2
+        exit 2
+    fi
     # Build the JSON in python so quotes/newlines in the reason cannot break it.
     REASON="$REASON" python3 -c '
 import json, os
@@ -44,9 +50,12 @@ fi
 # ── Impact analyzer for borderline-destructive commands ───────────────
 # Soft-allow but force the impact (file count / size / row count) into the
 # conversation, so the agent must surface it to the user before/after running.
-if [ -x "$HOOK_DIR/_bash_impact.py" ]; then
-    printf '%s' "$PAYLOAD" | python3 "$HOOK_DIR/_bash_impact.py" || allow
+if [ ! -x "$HOOK_DIR/_bash_impact.py" ]; then
+    echo "pre-bash: native impact entrypoint missing: $HOOK_DIR/_bash_impact.py" >&2
+    exit 2
+fi
+if printf '%s' "$PAYLOAD" | python3 "$HOOK_DIR/_bash_impact.py"; then
     exit 0
 fi
-
-allow
+echo "pre-bash: native impact analysis failed; command not checked" >&2
+exit 2

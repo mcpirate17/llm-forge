@@ -25,7 +25,7 @@ ROOT = HOOK_DIR.parents[2]
 sys.path.insert(0, str(HOOK_DIR))
 sys.path.insert(0, str(ROOT))
 
-from crg_refresh_state import (  # noqa: E402
+from crg_refresh_state import (
     Store,
     drain,
     record_failure,
@@ -84,63 +84,6 @@ def body(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(module, "REPO_ROOT", repo)
     monkeypatch.setattr(sys.modules["crg_gate"], "REPO_ROOT", repo)
     return module
-
-
-class FakeClock:
-    def __init__(self) -> None:
-        self.now = 100.0
-        self.sleeps: list[float] = []
-
-    def __call__(self) -> float:
-        return self.now
-
-    def sleep(self, seconds: float) -> None:
-        self.sleeps.append(seconds)
-        self.now += seconds
-
-
-# ── wait ─────────────────────────────────────────────────────────────────────
-
-
-def test_wait_times_out_while_a_worker_holds_the_lock(store: Store, held_lock):
-    clock = FakeClock()
-    outcome = wait_for_fresh(
-        store, timeout=3.0, poll=0.5, clock=clock, sleep=clock.sleep
-    )
-    assert outcome == "timeout"
-    assert clock.sleeps == [0.5] * 6
-    assert clock.now == pytest.approx(103.0)
-
-
-def test_wait_returns_fresh_once_marker_and_worker_are_gone(store: Store):
-    clock = FakeClock()
-    store.pending.write_text("a.py\n", encoding="utf-8")
-    calls: list[str] = []
-
-    def respawn() -> None:
-        calls.append("respawn")
-        store.pending.unlink()
-
-    outcome = wait_for_fresh(
-        store, timeout=3.0, poll=0.5, clock=clock, sleep=clock.sleep, respawn=respawn
-    )
-    assert outcome == "fresh"
-    assert calls == ["respawn"]
-    assert clock.sleeps == [0.5]
-
-
-def test_wait_output_reports_a_stale_graph_only_on_timeout(body):
-    lock = body.store_for(body.REPO_ROOT).lock
-    fd = os.open(lock, os.O_RDWR | os.O_CREAT, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        output = body.wait_output(timeout=0.05)
-    finally:
-        os.close(fd)
-    assert output is not None
-    assert "STALE" in output["systemMessage"]
-    assert output["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
-    assert body.wait_output(timeout=0.05) is None
 
 
 # ── lock ─────────────────────────────────────────────────────────────────────

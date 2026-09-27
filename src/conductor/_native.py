@@ -114,6 +114,81 @@ def guardrail_duplicate_candidates_native(
     return candidates(files, window)
 
 
+# Resolve new entry points on use, so an older installed wheel does not prevent
+# unrelated tooling from importing this seam while the native package is updated.
+def analyze_test_value_reports_native(
+    spec_json: str,
+    baseline_reports_json: str,
+    mutant_reports_json: str,
+    mutant_outcomes_json: str,
+) -> str:
+    from conductor_native import analyze_test_value_reports_native as implementation
+
+    return implementation(
+        spec_json, baseline_reports_json, mutant_reports_json, mutant_outcomes_json
+    )
+
+
+def mutation_value_pytest_identity_native(nodeid: str) -> tuple[str, str]:
+    from conductor_native import mutation_value_pytest_identity_native as implementation
+
+    return implementation(nodeid)
+
+
+def mutation_value_cargo_identity_native(nodeid: str) -> str:
+    from conductor_native import mutation_value_cargo_identity_native as implementation
+
+    return implementation(nodeid)
+
+
+def mutation_value_ctest_identity_native(nodeid: str) -> str:
+    from conductor_native import mutation_value_ctest_identity_native as implementation
+
+    return implementation(nodeid)
+
+
+def mutation_value_attribution_supported_native(
+    adapter: str, ranked: list[str]
+) -> bool:
+    from conductor_native import (
+        mutation_value_attribution_supported_native as implementation,
+    )
+
+    return implementation(adapter, ranked)
+
+
+def mutation_value_parse_junit_native(
+    path: str, adapter: str, ranked: list[str]
+) -> str:
+    from conductor_native import mutation_value_parse_junit_native as implementation
+
+    return implementation(path, adapter, ranked)
+
+
+def mutation_value_parse_cargo_native(stdout: str, ranked: list[str]) -> str:
+    from conductor_native import mutation_value_parse_cargo_native as implementation
+
+    return implementation(stdout, ranked)
+
+
+def mutation_evidence_exit_code_native(result_json: str) -> int:
+    from conductor_native import mutation_evidence_exit_code_native as implementation
+
+    return implementation(result_json)
+
+
+def mutation_canary_verdict_native(report_json: str) -> str:
+    from conductor_native import mutation_canary_verdict_native as implementation
+
+    return implementation(report_json)
+
+
+def mutation_github_output_native(result_json: str) -> str:
+    from conductor_native import mutation_github_output_native as implementation
+
+    return implementation(result_json)
+
+
 class SlopCoreUnavailable(ImportError):
     """The ``slop_core`` extension is missing; the message names the build step.
 
@@ -157,6 +232,7 @@ __all__ = [
     "a2a_validate_coordination_v2_native",
     "admission_errors_native",
     "analyze_test_value_native",
+    "analyze_test_value_reports_native",
     "branch_policy_second_branch_conflict_native",
     "branch_policy_stamp_age_hours_native",
     "branch_policy_validate_bindings_native",
@@ -202,7 +278,10 @@ __all__ = [
     "memory_index_score_rows_native",
     "memory_index_sidecar_header_native",
     "memory_index_sidecar_is_fresh_native",
+    "mutation_canary_verdict_native",
+    "mutation_evidence_exit_code_native",
     "mutation_git_paths_native",
+    "mutation_github_output_native",
     "mutation_patch_paths_native",
     "mutation_plan_native",
     "mutation_registry_patterns_native",
@@ -210,6 +289,12 @@ __all__ = [
     "mutation_rust_test_surface_native",
     "mutation_source_drift_native",
     "mutation_test_inventory_native",
+    "mutation_value_attribution_supported_native",
+    "mutation_value_cargo_identity_native",
+    "mutation_value_ctest_identity_native",
+    "mutation_value_parse_cargo_native",
+    "mutation_value_parse_junit_native",
+    "mutation_value_pytest_identity_native",
     "native_reuse_candidates_native",
     "normalize_duplicate_rows_native",
     "normalize_jscpd_report_native",

@@ -758,3 +758,322 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(a2a_compact_threads_native, module)?)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn coordination() -> Value {
+        json!({
+            "kind": "coordination-v2",
+            "thread_id": "thread-1",
+            "summary": "Compact status",
+            "status": "open",
+            "requires_response": false,
+            "supersedes": [],
+        })
+    }
+
+    fn row(body: &str, data: Option<Value>) -> Value {
+        json!({
+            "message_id": "m1",
+            "direction": "inbound",
+            "sender": "alice",
+            "recipient": "bob",
+            "body": body,
+            "data_json": data.map(|value| serde_json::to_string(&value).unwrap()),
+            "created_at": "2026-08-30T12:00:00+00:00",
+            "received_at": "2026-08-30T12:00:01+00:00",
+            "delivery_status": "delivered",
+            "status_reason": null,
+            "read_at": null,
+        })
+    }
+
+    #[test]
+    fn coordination_rejects_invalid_protocol_shapes() {
+        let invalid = [
+            Value::Null,
+            json!([]),
+            json!({}),
+            json!({"kind": "coordination"}),
+            json!({"kind": "coordination-v2", "unknown": 1}),
+            json!({"kind": "coordination-v2", "thread_id": "bad id"}),
+            json!({"kind": "coordination-v2", "summary": "   "}),
+            json!({"kind": "coordination-v2", "status": "done"}),
+            json!({"kind": "coordination-v2", "requires_response": 1}),
+            json!({"kind": "coordination-v2", "supersedes": "m1"}),
+            json!({"kind": "coordination-v2", "supersedes": ["bad id"]}),
+            json!({"kind": "coordination-v2", "supersedes": ["m1", "m1"]}),
+        ];
+        for payload in invalid {
+            assert!(
+                validate_coordination_v2_value(&payload).is_err(),
+                "accepted {payload}"
+            );
+        }
+    }
+
+    #[test]
+    fn coordination_normalizes_summary_and_preserves_supersedes_order() {
+        let mut payload = coordination();
+        payload["summary"] = json!("  one\n  two  ");
+        payload["supersedes"] = json!(["m-old", "m-older"]);
+        let result = validate_coordination_v2_value(&payload).unwrap();
+        assert_eq!(result["summary"], "one two");
+        assert_eq!(result["supersedes"], json!(["m-old", "m-older"]));
+        assert_eq!(result["thread_id"], "thread-1");
+        assert_eq!(result["status"], "open");
+        assert_eq!(result["requires_response"], false);
+    }
+
+    #[test]
+    fn coordination_bounds_use_utf8_bytes_and_supersedes_count() {
+        let mut payload = coordination();
+        payload["summary"] = json!("é".repeat(MAX_PROTOCOL_SUMMARY_BYTES));
+        assert!(validate_coordination_v2_value(&payload)
+            .unwrap_err()
+            .contains("UTF-8 bytes"));
+        payload["summary"] = json!("short");
+        payload["supersedes"] = json!((0..=MAX_SUPERSEDES)
+            .map(|index| format!("m-{index}"))
+            .collect::<Vec<_>>());
+        assert!(validate_coordination_v2_value(&payload)
+            .unwrap_err()
+            .contains("at most"));
+    }
+
+    #[test]
+    fn compact_message_is_deterministic_and_omits_raw_payload() {
+        let mut data = coordination();
+        data["summary"] = json!("Review the bounded evidence");
+        let source = row("Please inspect the attached result.", Some(data));
+        let receipt = compact_message_value(&source).unwrap();
+        assert_eq!(receipt, compact_message_value(&source).unwrap());
+        assert_eq!(receipt["authority"], AUTHORITY);
+        assert_eq!(receipt["summary"], "Review the bounded evidence");
+        let rendered = receipt.to_string();
+        assert!(!rendered.contains("Please inspect the attached result."));
+        assert!(!rendered.contains("Compact status"));
+        assert_eq!(receipt["source_sha256"].as_str().unwrap().len(), 64);
+        assert_eq!(receipt["receipt_sha256"].as_str().unwrap().len(), 64);
+    }
+
+    #[test]
+    fn legacy_fallback_is_bounded_and_empty_body_has_a_label() {
+        let long = row(
+            &"  legacy\nmessage  ".repeat(100),
+            Some(json!({"kind": "coordination"})),
+        );
+        let receipt = compact_message_value(&long).unwrap();
+        assert_eq!(receipt["protocol"], "legacy");
+        assert_eq!(receipt["summary_source"], "body-fallback");
+        assert!(receipt["summary"].as_str().unwrap().len() <= MAX_COMPACT_SUMMARY_BYTES);
+        assert!(receipt["summary"].as_str().unwrap().ends_with('…'));
+        assert_eq!(receipt["status"], Value::Null);
+        assert_eq!(receipt["requires_response"], Value::Null);
+        assert_eq!(receipt["actionable"], true);
+
+        let empty = row("", Some(json!({"kind": "gate-review-request"})));
+        let labelled = compact_message_value(&empty).unwrap();
+        assert_eq!(labelled["summary"], "gate-review-request message m1");
+        assert_eq!(labelled["summary_source"], "deterministic-label");
+    }
+
+    #[test]
+    fn actionability_preserves_status_and_response_independently() {
+        for status in COORDINATION_STATUSES {
+            for requires_response in [false, true] {
+                let mut data = coordination();
+                data["status"] = json!(status);
+                data["requires_response"] = json!(requires_response);
+                let receipt = compact_message_value(&row("body", Some(data))).unwrap();
+                assert_eq!(receipt["status"], status);
+                assert_eq!(receipt["requires_response"], requires_response);
+                assert_eq!(
+                    receipt["actionable"],
+                    requires_response || matches!(status, "open" | "in_progress" | "blocked"),
+                );
+            }
+        }
+        let receipt = compact_message_value(&row(
+            "body",
+            Some(json!({"kind": "coordination-v2", "requires_response": false})),
+        ))
+        .unwrap();
+        assert_eq!(receipt["status"], Value::Null);
+        assert_eq!(receipt["actionable"], true);
+    }
+
+    #[test]
+    fn malformed_v2_and_self_supersession_fail_closed() {
+        let implicit = row("body", Some(json!({"summary": "looks like v2"})));
+        assert!(compact_message_value(&implicit)
+            .unwrap_err()
+            .contains("explicit kind"));
+        let mut data = coordination();
+        data["supersedes"] = json!(["m1"]);
+        assert!(compact_message_value(&row("body", Some(data)))
+            .unwrap_err()
+            .contains("supersede itself"));
+    }
+
+    #[test]
+    fn malformed_json_and_unicode_have_exact_byte_accounting() {
+        let mut invalid = row("body", None);
+        invalid["data_json"] = json!("{not-json");
+        let receipt = compact_message_value(&invalid).unwrap();
+        assert_eq!(receipt["protocol"], "legacy");
+        assert_eq!(receipt["data_json_valid"], false);
+        assert_eq!(receipt["raw_data_bytes"], 9);
+        assert_eq!(receipt["data_sha256"].as_str().unwrap().len(), 64);
+
+        let unicode = row("é🙂", Some(json!({"kind": "coordination", "note": "雪"})));
+        let receipt = compact_message_value(&unicode).unwrap();
+        let data_len = unicode["data_json"].as_str().unwrap().len();
+        assert_eq!(receipt["raw_body_bytes"], "é🙂".len());
+        assert_eq!(receipt["raw_data_bytes"], data_len);
+        assert_eq!(receipt["omitted_raw_bytes"], "é🙂".len() + data_len);
+    }
+
+    #[test]
+    fn prose_fields_truncate_on_utf8_boundaries_and_metadata_fails_loud() {
+        let receipt = compact_message_value(&row(
+            &"雪".repeat(1_000),
+            Some(json!({"kind": "分類".repeat(1_000)})),
+        ))
+        .unwrap();
+        for (field, max) in [
+            ("summary", MAX_COMPACT_SUMMARY_BYTES),
+            ("data_kind", MAX_DATA_KIND_BYTES),
+        ] {
+            let value = receipt[field].as_str().unwrap();
+            assert!(value.len() <= max);
+            assert!(value.ends_with('…'));
+        }
+        let mut too_large = row("body", None);
+        too_large["sender"] = json!("é".repeat(MAX_METADATA_BYTES));
+        assert!(compact_message_value(&too_large)
+            .unwrap_err()
+            .contains("sender"));
+    }
+
+    #[test]
+    fn threads_deduplicate_identical_rows_and_sort_receipts() {
+        let mut earlier = row("first", Some(coordination()));
+        earlier["message_id"] = json!("m0");
+        earlier["created_at"] = json!("2026-08-30T11:00:00+00:00");
+        let later = row("second", Some(coordination()));
+        let input = json!({
+            "rows": [later, earlier, earlier],
+            "max_threads": 4,
+            "max_messages_per_thread": 4,
+        });
+        let result = compact_threads_value(&input).unwrap();
+        assert_eq!(result["thread_count"], 1);
+        assert_eq!(result["message_count"], 2);
+        assert_eq!(result["threads"][0]["message_ids"], json!(["m0", "m1"]));
+        assert_eq!(
+            result["threads"][0]["actionable_message_ids"],
+            json!(["m0", "m1"])
+        );
+        assert_eq!(
+            result["threads"][0]["messages"].as_array().unwrap().len(),
+            2
+        );
+        assert_eq!(result["compaction_sha256"].as_str().unwrap().len(), 64);
+    }
+
+    #[test]
+    fn conflicting_duplicates_fail_before_thread_output() {
+        let first = row("first", Some(coordination()));
+        let second = row("changed", Some(coordination()));
+        let input = json!({
+            "rows": [first, second],
+            "max_threads": 4,
+            "max_messages_per_thread": 4,
+        });
+        assert!(compact_threads_value(&input)
+            .unwrap_err()
+            .contains("conflicting duplicate"));
+    }
+
+    #[test]
+    fn detail_cap_preserves_actionable_messages_and_newest_resolved_message() {
+        let mut rows = Vec::new();
+        for (id, status) in [
+            ("m0", "resolved"),
+            ("m1", "open"),
+            ("m2", "informational"),
+            ("m3", "resolved"),
+        ] {
+            let mut data = coordination();
+            data["status"] = json!(status);
+            let mut message = row(id, Some(data));
+            message["message_id"] = json!(id);
+            message["created_at"] = json!(format!("2026-08-30T12:00:0{}+00:00", &id[1..]));
+            rows.push(message);
+        }
+        let result = compact_threads_value(&json!({
+            "rows": rows,
+            "max_threads": 4,
+            "max_messages_per_thread": 2,
+        }))
+        .unwrap();
+        let thread = &result["threads"][0];
+        assert_eq!(thread["message_count"], 4);
+        assert_eq!(thread["actionable_count"], 1);
+        assert_eq!(thread["actionable_message_ids"], json!(["m1"]));
+        assert_eq!(thread["omitted_message_details"], 2);
+        let ids = thread["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|message| message["message_id"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, ["m1", "m3"]);
+        assert_eq!(thread["provenance"].as_array().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn detail_cap_refuses_to_drop_actionable_messages() {
+        let first = row("first", Some(coordination()));
+        let mut second = row("second", Some(coordination()));
+        second["message_id"] = json!("m2");
+        let request = json!({
+            "rows": [first, second],
+            "max_threads": 4,
+            "max_messages_per_thread": 1,
+        });
+        assert!(compact_threads_value(&request)
+            .unwrap_err()
+            .contains("2 actionable messages"));
+    }
+
+    #[test]
+    fn threads_reject_invalid_bounds_and_distinct_message_limit() {
+        for request in [
+            json!({"rows": [], "max_threads": 0, "max_messages_per_thread": 1}),
+            json!({"rows": [], "max_threads": 1, "max_messages_per_thread": 0}),
+            json!({"rows": [], "max_threads": MAX_THREADS + 1, "max_messages_per_thread": 1}),
+            json!({"rows": [], "max_threads": 1, "max_messages_per_thread": MAX_DETAILED_MESSAGES + 1}),
+        ] {
+            assert!(compact_threads_value(&request).is_err());
+        }
+        let rows = (0..=MAX_INPUT_MESSAGES)
+            .map(|index| {
+                let mut message = row("body", None);
+                message["message_id"] = json!(format!("m{index}"));
+                message
+            })
+            .collect::<Vec<_>>();
+        let request = json!({
+            "rows": rows,
+            "max_threads": MAX_THREADS,
+            "max_messages_per_thread": MAX_DETAILED_MESSAGES,
+        });
+        assert!(compact_threads_value(&request)
+            .unwrap_err()
+            .contains("at most 256 distinct messages"));
+    }
+}

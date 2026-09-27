@@ -12,7 +12,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{walk_expr, walk_stmt, SourceOrderVisitor};
@@ -281,6 +283,7 @@ enum DeadTestScanError {
 }
 
 impl DeadTestScanError {
+    #[cfg(feature = "python")]
     fn into_python(self) -> PyErr {
         match self {
             Self::Read { path, source } => {
@@ -481,11 +484,13 @@ struct DeadTestReportCore {
     unreferenced_sources: Vec<UnreferencedDeadTestSource>,
 }
 
+#[cfg(feature = "python")]
 #[pyclass(module = "conductor_native")]
 struct DeadTestsResolverNative {
     resolver: PythonModuleResolver,
 }
 
+#[cfg(feature = "python")]
 #[pymethods]
 impl DeadTestsResolverNative {
     #[new]
@@ -562,6 +567,7 @@ impl DeadTestsResolverNative {
     }
 }
 
+#[cfg(feature = "python")]
 #[pyclass(module = "conductor_native")]
 struct DeadTestsAnalysisNative {
     modules: BTreeMap<String, DeadTestModule>,
@@ -570,6 +576,7 @@ struct DeadTestsAnalysisNative {
     untracked_importers: BTreeMap<String, Vec<String>>,
 }
 
+#[cfg(feature = "python")]
 #[pymethods]
 impl DeadTestsAnalysisNative {
     #[new]
@@ -722,6 +729,7 @@ impl DeadTestsAnalysisNative {
     }
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn dead_tests_closure_native(start: &str, modules_json: &str) -> PyResult<String> {
     let modules = serde_json::from_str::<BTreeMap<String, DeadTestModule>>(modules_json)
@@ -926,6 +934,7 @@ fn untracked_import_closure_scan(
     }
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn scan_untracked_import_closure_native(
     py: Python<'_>,
@@ -936,6 +945,7 @@ fn scan_untracked_import_closure_native(
     Ok(serde_json::to_string(&scan).expect("import closure contains serializable values"))
 }
 
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<DeadTestsResolverNative>()?;
     module.add_class::<DeadTestsAnalysisNative>()?;
@@ -956,7 +966,7 @@ mod tests {
 
     use super::{
         dependency_closure, scan_dead_test_module, untracked_import_closure_scan, DeadTestModule,
-        PythonModuleResolver, UntrackedImportFinding,
+        DeadTestScanError, PythonModuleResolver, UntrackedImportFinding,
     };
 
     static NEXT_TEST_PATH: AtomicU64 = AtomicU64::new(0);
@@ -1053,6 +1063,8 @@ if FLAG:
     import pkg.hard_missing
 if TYPE_CHECKING:
     import pkg.type_missing
+if typing.TYPE_CHECKING:
+    import pkg.attribute_missing
 if __name__ == "__main__":
     import pkg.main_missing
 try:
@@ -1061,6 +1073,8 @@ except ImportError:
     pass
 def lazy():
     import pkg.lazy_missing
+async def async_lazy():
+    import pkg.async_missing
 "pkg.dynamic"
 "loader.py"
 "#,
@@ -1089,6 +1103,8 @@ def lazy():
         assert_eq!(
             module.soft_missing,
             BTreeSet::from([
+                "pkg.async_missing".to_owned(),
+                "pkg.attribute_missing".to_owned(),
                 "pkg.lazy_missing".to_owned(),
                 "pkg.main_missing".to_owned(),
                 "pkg.try_missing".to_owned(),
@@ -1132,5 +1148,87 @@ def lazy():
 
         assert_eq!(missing, BTreeSet::from(["pkg.gone".to_owned()]));
         assert_eq!(untracked, BTreeSet::from(["pkg/local_only.py".to_owned()]));
+    }
+
+    #[test]
+    fn resolver_scopes_untracked_files_to_its_explicit_root() {
+        let target = repo_path();
+        let decoy = repo_path();
+        write(&decoy, "pkg/helper.py", "VALUE = 1\n");
+        let resolver = PythonModuleResolver::new(&target, &["main.py".to_owned()]);
+        assert_eq!(resolver.resolve_untracked("pkg.helper", "main.py"), None);
+        write(&target, "pkg/helper.py", "VALUE = 1\n");
+        assert_eq!(
+            resolver.resolve_untracked("pkg.helper", "main.py"),
+            Some("pkg/helper.py".to_owned())
+        );
+        fs::remove_dir_all(target).unwrap();
+        fs::remove_dir_all(decoy).unwrap();
+    }
+
+    #[test]
+    fn parser_error_names_file_and_does_not_make_an_empty_module() {
+        let root = repo_path();
+        write(&root, "pkg/__init__.py", "");
+        write(&root, "pkg/broken.py", "if:\n");
+        let resolver = PythonModuleResolver::new(
+            &root,
+            &["pkg/__init__.py".to_owned(), "pkg/broken.py".to_owned()],
+        );
+        match scan_dead_test_module(&root, "pkg/broken.py", &resolver) {
+            Err(DeadTestScanError::Parse { path, detail }) => {
+                assert_eq!(path, "pkg/broken.py");
+                assert!(!detail.is_empty());
+            }
+            _ => panic!("invalid source must produce a parse error"),
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn closure_missing_dependency_reports_the_missing_key() {
+        let modules = BTreeMap::from([(
+            "test_probe.py".to_owned(),
+            DeadTestModule {
+                path: "test_probe.py".to_owned(),
+                has_main: false,
+                basenames: BTreeSet::new(),
+                deps: BTreeSet::from(["pkg/absent.py".to_owned()]),
+                missing: BTreeSet::new(),
+                soft_missing: BTreeSet::new(),
+                untracked: BTreeSet::new(),
+            },
+        )]);
+        assert_eq!(
+            dependency_closure("test_probe.py", &modules).unwrap_err(),
+            "pkg/absent.py"
+        );
+    }
+
+    #[test]
+    fn scanned_module_json_orders_dependencies_independently_of_tracked_input() {
+        let root = repo_path();
+        write(&root, "pkg/__init__.py", "");
+        write(&root, "pkg/a.py", "import pkg.c\nimport pkg.b\n");
+        write(&root, "pkg/b.py", "VALUE = 1\n");
+        write(&root, "pkg/c.py", "VALUE = 2\n");
+        let resolver = PythonModuleResolver::new(
+            &root,
+            &[
+                "pkg/c.py".to_owned(),
+                "pkg/a.py".to_owned(),
+                "pkg/b.py".to_owned(),
+                "pkg/__init__.py".to_owned(),
+            ],
+        );
+        let first = scan_dead_test_module(&root, "pkg/a.py", &resolver).unwrap();
+        let second = scan_dead_test_module(&root, "pkg/a.py", &resolver).unwrap();
+        let first_json = serde_json::to_string(&first).unwrap();
+        assert_eq!(first_json, serde_json::to_string(&second).unwrap());
+        assert_eq!(
+            serde_json::to_value(&first).unwrap()["deps"],
+            serde_json::json!(["pkg/b.py", "pkg/c.py"])
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }

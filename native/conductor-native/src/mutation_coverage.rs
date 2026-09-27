@@ -2,20 +2,207 @@
 // though the handwritten functions do not perform a redundant conversion.
 #![allow(clippy::useless_conversion)]
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
-use serde_json::Value;
+use serde::Serialize;
+use serde_json::{json, Value};
 
-fn value_error(message: impl Into<String>) -> PyErr {
-    PyValueError::new_err(message.into())
+const VALIDATOR_SIDE_KINDS: [&str; 3] = ["decode_error", "schema_error", "manifest_load_error"];
+
+fn missing_rows(result: &Value) -> &[Value] {
+    result
+        .get("missing_evidence")
+        .and_then(Value::as_array)
+        .map_or(&[], Vec::as_slice)
 }
 
+fn rejection_rows(row: &Value) -> &[Value] {
+    row.get("receipt_rejections")
+        .and_then(Value::as_array)
+        .map_or(&[], Vec::as_slice)
+}
+
+fn field<'a>(value: &'a Value, name: &str) -> &'a str {
+    value.get(name).and_then(Value::as_str).unwrap_or("")
+}
+
+fn validator_side(kind: &str) -> bool {
+    VALIDATOR_SIDE_KINDS.contains(&kind)
+}
+
+pub fn observed_evidence_kinds(result: &Value) -> BTreeSet<String> {
+    let mut kinds = BTreeSet::new();
+    if let Some(counts) = result.get("rejection_counts").and_then(Value::as_object) {
+        for (kind, count) in counts {
+            if count.as_i64().is_some_and(|value| value != 0) {
+                kinds.insert(kind.clone());
+            }
+        }
+    }
+    for row in missing_rows(result) {
+        kinds.insert(
+            row.get("reason_kind")
+                .and_then(Value::as_str)
+                .unwrap_or("not_pass")
+                .to_owned(),
+        );
+        for rejection in rejection_rows(row) {
+            kinds.insert(
+                rejection
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .unwrap_or("schema_error")
+                    .to_owned(),
+            );
+        }
+    }
+    kinds
+}
+
+pub fn evidence_exit_code(result: &Value) -> i32 {
+    if observed_evidence_kinds(result)
+        .iter()
+        .any(|kind| validator_side(kind))
+    {
+        5
+    } else if !missing_rows(result).is_empty() {
+        6
+    } else {
+        0
+    }
+}
+
+pub fn canary_verdict(mut report: Value) -> Result<Value, String> {
+    let counts = report
+        .get("rejection_counts")
+        .and_then(Value::as_object)
+        .ok_or("coverage report rejection_counts must be an object")?;
+    let offending = VALIDATOR_SIDE_KINDS
+        .iter()
+        .copied()
+        .filter(|kind| {
+            counts
+                .get(*kind)
+                .and_then(Value::as_i64)
+                .is_some_and(|count| count != 0)
+        })
+        .collect::<Vec<_>>();
+    let mut offending = offending;
+    offending.sort_unstable();
+    let mut offenders = Vec::new();
+    for row in missing_rows(&report) {
+        for rejection in rejection_rows(row) {
+            if validator_side(field(rejection, "kind")) {
+                offenders.push(json!({
+                    "path": field(row, "path"),
+                    "receipt": field(rejection, "receipt"),
+                    "kind": field(rejection, "kind"),
+                    "detail": field(rejection, "detail"),
+                }));
+            }
+        }
+    }
+    if let Some(malformed) = report.get("malformed_receipts").and_then(Value::as_array) {
+        for receipt in malformed {
+            offenders.push(json!({"receipt": receipt, "kind": "decode_error", "detail": receipt}));
+        }
+    }
+    let canary = json!({
+        "status": if offending.is_empty() { "PASS" } else { "FAIL" },
+        "offending_kinds": offending,
+        "offending_receipts": offenders,
+    });
+    report
+        .as_object_mut()
+        .ok_or("coverage report must be an object")?
+        .insert("canary".to_owned(), canary);
+    Ok(report)
+}
+
+#[derive(Serialize)]
+struct GithubOutput {
+    annotations: Vec<String>,
+    summary: String,
+}
+
+pub fn github_output(result: &Value) -> Value {
+    let mut annotations = Vec::new();
+    let mut rows = Vec::new();
+    for row in missing_rows(result) {
+        let path = field(row, "path");
+        let reason = field(row, "reason");
+        annotations.push(format!("::warning file={path}::{reason}"));
+        let mut rejection_kinds = BTreeSet::new();
+        for rejection in rejection_rows(row) {
+            let kind = field(rejection, "kind");
+            rejection_kinds.insert(kind.to_owned());
+            if validator_side(kind) {
+                annotations.push(format!(
+                    "::error::{path}: {}: {}",
+                    field(rejection, "receipt"),
+                    field(rejection, "detail")
+                ));
+            }
+        }
+        let mut kind = row
+            .get("reason_kind")
+            .and_then(Value::as_str)
+            .unwrap_or("not_pass")
+            .to_owned();
+        if !rejection_kinds.is_empty() {
+            kind.push_str(&format!(
+                " ({})",
+                rejection_kinds.into_iter().collect::<Vec<_>>().join(", ")
+            ));
+        }
+        let campaigns = row
+            .get("campaigns")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .filter(|joined| !joined.is_empty())
+            .unwrap_or_else(|| "—".to_owned());
+        rows.push(format!("| `{path}` | {campaigns} | {reason} | {kind} |"));
+    }
+    let summary = if rows.is_empty() {
+        String::new()
+    } else {
+        let mut lines = vec![
+            "".to_owned(),
+            "### Mutation evidence (changed tests)".to_owned(),
+            "".to_owned(),
+            "| path | campaign | status | kind |".to_owned(),
+            "|---|---|---|---|".to_owned(),
+        ];
+        lines.extend(rows);
+        format!("{}\n", lines.join("\n"))
+    };
+    serde_json::to_value(GithubOutput {
+        annotations,
+        summary,
+    })
+    .expect("serializable output")
+}
+
+#[cfg(feature = "python")]
+fn value_error(message: impl std::fmt::Display) -> PyErr {
+    PyValueError::new_err(message.to_string())
+}
+
+#[cfg(any(feature = "python", test))]
 fn normalize_mutation_path(value: &str, label: &str) -> Result<String, String> {
     let text = value.replace('\\', "/");
     if text.trim().is_empty() {
@@ -46,6 +233,7 @@ fn normalize_mutation_path(value: &str, label: &str) -> Result<String, String> {
     }
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn normalize_mutation_path_native(value: &str, label: &str) -> PyResult<String> {
     normalize_mutation_path(value, label).map_err(value_error)
@@ -129,6 +317,7 @@ fn registry_patterns(
     Ok(patterns)
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn mutation_registry_patterns_native(
     repo_root: &str,
@@ -213,6 +402,7 @@ fn is_mutation_test_path(path: &str, patterns: &[String]) -> bool {
     })
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn is_mutation_test_path_native(path: &str, patterns: Vec<String>) -> bool {
     is_mutation_test_path(path, &patterns)
@@ -268,6 +458,7 @@ fn is_inventory_surface(repo_root: &Path, normalized: &str, patterns: &[String])
     is_mutation_test_path(normalized, patterns) || is_rust_test_surface(repo_root, normalized)
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn mutation_rust_test_surface_native(repo_root: &str, path: &str) -> bool {
     is_rust_test_surface(Path::new(repo_root), path)
@@ -294,6 +485,7 @@ fn git_paths(repo_root: &str, args: &[String]) -> Result<Vec<String>, String> {
         .collect())
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn mutation_git_paths_native(repo_root: &str, args: Vec<String>) -> PyResult<Vec<String>> {
     git_paths(repo_root, &args).map_err(value_error)
@@ -309,6 +501,7 @@ fn should_skip_mutation_path(path: &str, skip_directory_names: &HashSet<&str>) -
         || (parts.contains(&"research") && parts.contains(&"cache"))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn should_skip_mutation_path_native(path: &str, skip_directory_names: Vec<String>) -> bool {
     let skip: HashSet<&str> = skip_directory_names.iter().map(String::as_str).collect();
@@ -374,21 +567,17 @@ fn inventory_git_paths(
     Ok(raw_paths)
 }
 
-#[pyfunction]
-#[pyo3(signature = (repo_root, registry_path, canonical_patterns, skip_directory_names, mode, include_untracked, base=None))]
-fn mutation_test_inventory_native(
+pub fn test_inventory(
     repo_root: &str,
     registry_path: &str,
-    canonical_patterns: Vec<String>,
-    skip_directory_names: Vec<String>,
+    canonical_patterns: &[String],
+    skip_directory_names: &[String],
     mode: &str,
     include_untracked: bool,
-    base: Option<String>,
-) -> PyResult<Vec<String>> {
-    let patterns =
-        registry_patterns(repo_root, registry_path, &canonical_patterns).map_err(value_error)?;
-    let raw_paths = inventory_git_paths(repo_root, mode, include_untracked, base.as_deref())
-        .map_err(value_error)?;
+    base: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let patterns = registry_patterns(repo_root, registry_path, canonical_patterns)?;
+    let raw_paths = inventory_git_paths(repo_root, mode, include_untracked, base)?;
 
     let skip: HashSet<&str> = skip_directory_names.iter().map(String::as_str).collect();
     let mut seen = HashSet::with_capacity(raw_paths.len());
@@ -412,6 +601,53 @@ fn mutation_test_inventory_native(
     Ok(selected)
 }
 
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (repo_root, registry_path, canonical_patterns, skip_directory_names, mode, include_untracked, base=None))]
+fn mutation_test_inventory_native(
+    repo_root: &str,
+    registry_path: &str,
+    canonical_patterns: Vec<String>,
+    skip_directory_names: Vec<String>,
+    mode: &str,
+    include_untracked: bool,
+    base: Option<String>,
+) -> PyResult<Vec<String>> {
+    test_inventory(
+        repo_root,
+        registry_path,
+        &canonical_patterns,
+        &skip_directory_names,
+        mode,
+        include_untracked,
+        base.as_deref(),
+    )
+    .map_err(value_error)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn mutation_evidence_exit_code_native(result_json: &str) -> PyResult<i32> {
+    let result = serde_json::from_str(result_json).map_err(value_error)?;
+    Ok(evidence_exit_code(&result))
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn mutation_canary_verdict_native(report_json: &str) -> PyResult<String> {
+    let report = serde_json::from_str(report_json).map_err(value_error)?;
+    let verdict = canary_verdict(report).map_err(value_error)?;
+    serde_json::to_string(&verdict).map_err(value_error)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn mutation_github_output_native(result_json: &str) -> PyResult<String> {
+    let result = serde_json::from_str(result_json).map_err(value_error)?;
+    serde_json::to_string(&github_output(&result)).map_err(value_error)
+}
+
+#[cfg(feature = "python")]
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(normalize_mutation_path_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_registry_patterns_native, module)?)?;
@@ -420,14 +656,231 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(should_skip_mutation_path_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_rust_test_surface_native, module)?)?;
     module.add_function(wrap_pyfunction!(mutation_test_inventory_native, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        mutation_evidence_exit_code_native,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(mutation_canary_verdict_native, module)?)?;
+    module.add_function(wrap_pyfunction!(mutation_github_output_native, module)?)?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        declares_rust_tests, is_inventory_surface, is_rust_test_surface, rust_attribute_path,
+        canary_verdict, declares_rust_tests, evidence_exit_code, git_paths, github_output,
+        is_inventory_surface, is_mutation_test_path, is_rust_test_surface, normalize_mutation_path,
+        observed_evidence_kinds, registry_patterns, rust_attribute_path, should_skip_mutation_path,
+        test_inventory,
     };
+    use serde_json::{json, Value};
+    use std::collections::HashSet;
+
+    fn missing(path: &str, kind: &str, rejections: Value) -> Value {
+        json!({
+            "path": path,
+            "reason": "no current complete PASS receipt",
+            "reason_kind": kind,
+            "campaigns": ["c1", "c2"],
+            "receipt_rejections": rejections,
+        })
+    }
+
+    #[test]
+    fn evidence_exit_codes_separate_debt_from_validator_defects() {
+        let debt = json!({
+            "missing_evidence": [missing("test_new.py", "no_campaign", json!([])),
+                missing("test_old.py", "not_pass", json!([
+                    {"receipt": "r1.json", "kind": "superseded", "detail": "old"},
+                    {"receipt": "r0.json", "kind": "runner_map_mismatch", "detail": "old"}
+                ]))],
+            "rejection_counts": {"no_campaign": 1, "not_pass": 1, "superseded": 1,
+                "runner_map_mismatch": 1},
+        });
+        assert_eq!(evidence_exit_code(&debt), 6);
+        let defect = json!({
+            "missing_evidence": [missing("test_new.py", "not_pass", json!([
+                {"receipt": "r1.json", "kind": "decode_error", "detail": "bad base64"}
+            ]))],
+            "rejection_counts": {"not_pass": 1, "decode_error": 1},
+        });
+        assert_eq!(evidence_exit_code(&defect), 5);
+        let covered = json!({"missing_evidence": [], "rejection_counts": {"superseded": 2}});
+        assert_eq!(evidence_exit_code(&covered), 0);
+        let corrupt_sibling =
+            json!({"missing_evidence": [], "rejection_counts": {"schema_error": 1}});
+        assert_eq!(evidence_exit_code(&corrupt_sibling), 5);
+    }
+
+    #[test]
+    fn row_kinds_and_legacy_defaults_are_fail_closed() {
+        let row_only = json!({"missing_evidence": [missing("test_decode.py", "decode_error", json!([]))],
+            "rejection_counts": {}});
+        assert_eq!(evidence_exit_code(&row_only), 5);
+        let mut legacy = json!({"missing_evidence": [{"path": "test_legacy.py", "receipt_rejections": []}],
+            "rejection_counts": {}});
+        assert_eq!(
+            observed_evidence_kinds(&legacy)
+                .into_iter()
+                .collect::<Vec<_>>(),
+            ["not_pass"]
+        );
+        assert_eq!(evidence_exit_code(&legacy), 6);
+        legacy["missing_evidence"][0]["receipt_rejections"] =
+            json!([{"receipt": "r9.json", "detail": "bad shape"}]);
+        assert_eq!(evidence_exit_code(&legacy), 5);
+    }
+
+    #[test]
+    fn github_output_keeps_annotations_order_and_legacy_table_defaults() {
+        let result = json!({"missing_evidence": [
+            missing("test_new.py", "not_pass", json!([
+                {"receipt": "r1.json", "kind": "decode_error", "detail": "bad base64"},
+                {"receipt": "r0.json", "kind": "superseded", "detail": "old"}
+            ])),
+            {"path": "test_legacy.py", "reason": "no campaign", "campaigns": [], "receipt_rejections": []},
+            {"path": "test_plain.py", "reason": "no campaign", "reason_kind": "no_campaign",
+                "campaigns": [], "receipt_rejections": []}
+        ]});
+        let output = github_output(&result);
+        assert_eq!(
+            output["annotations"],
+            json!([
+                "::warning file=test_new.py::no current complete PASS receipt",
+                "::error::test_new.py: r1.json: bad base64",
+                "::warning file=test_legacy.py::no campaign",
+                "::warning file=test_plain.py::no campaign",
+            ])
+        );
+        let summary = output["summary"].as_str().unwrap();
+        assert!(summary.contains("| path | campaign | status | kind |"));
+        assert!(summary.contains("| `test_new.py` | c1, c2 | no current complete PASS receipt | not_pass (decode_error, superseded) |"));
+        assert!(summary.contains("| `test_legacy.py` | — | no campaign | not_pass |"));
+        assert!(summary.contains("| `test_plain.py` | — | no campaign | no_campaign |"));
+        assert_eq!(
+            github_output(&json!({"missing_evidence": []}))["summary"],
+            ""
+        );
+    }
+
+    #[test]
+    fn canary_names_only_validator_offenders_and_keeps_debt() {
+        let clean = json!({
+            "status": "FAIL", "missing_evidence": [missing("test_debt.py", "no_campaign", json!([]))],
+            "rejection_counts": {"no_campaign": 9, "not_pass": 3, "superseded": 5},
+            "malformed_receipts": [],
+        });
+        let clean_verdict = canary_verdict(clean).unwrap();
+        assert_eq!(
+            clean_verdict["canary"],
+            json!({"status": "PASS", "offending_kinds": [],
+            "offending_receipts": []})
+        );
+        let unreadable = json!({
+            "status": "FAIL", "missing_evidence": [missing("test_broken.py", "not_pass", json!([
+                {"receipt": "r1.json", "kind": "decode_error", "detail": "frame error"},
+                {"receipt": "r0.json", "kind": "superseded", "detail": "old"}
+            ]))],
+            "rejection_counts": {"no_campaign": 9, "decode_error": 1},
+            "malformed_receipts": ["receipts/gone.json: invalid JSON"],
+        });
+        let verdict = canary_verdict(unreadable).unwrap();
+        assert_eq!(
+            verdict["canary"],
+            json!({
+                "status": "FAIL", "offending_kinds": ["decode_error"],
+                "offending_receipts": [
+                    {"path": "test_broken.py", "receipt": "r1.json", "kind": "decode_error", "detail": "frame error"},
+                    {"receipt": "receipts/gone.json: invalid JSON", "kind": "decode_error",
+                        "detail": "receipts/gone.json: invalid JSON"}
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn path_globs_normalization_and_skip_sets_preserve_inventory_rules() {
+        let patterns = vec!["**/test_*.py".to_owned(), "**/*.spec.js".to_owned()];
+        assert!(is_mutation_test_path(
+            "research/tests/test_foo.py",
+            &patterns
+        ));
+        assert!(is_mutation_test_path(
+            "aria_designer/e2e/designer.spec.js",
+            &patterns
+        ));
+        assert!(!is_mutation_test_path("research/tools/foo.py", &patterns));
+        assert_eq!(
+            normalize_mutation_path("src\\tests//test_x.py", "path").unwrap(),
+            "src/tests/test_x.py"
+        );
+        for unsafe_path in ["../escape.py", "/abs.py", "./test_x.py"] {
+            assert!(normalize_mutation_path(unsafe_path, "path")
+                .unwrap_err()
+                .contains("normalized"));
+        }
+        assert!(normalize_mutation_path("   ", "path")
+            .unwrap_err()
+            .contains("non-empty"));
+        let skip = HashSet::from([".venv", "__pycache__"]);
+        assert!(should_skip_mutation_path(
+            "research/cache/foo/test_x.py",
+            &skip
+        ));
+        assert!(should_skip_mutation_path(".venv/lib/test_x.py", &skip));
+        assert!(!should_skip_mutation_path(
+            "research/tests/test_x.py",
+            &skip
+        ));
+    }
+
+    #[test]
+    fn registry_rejects_outside_malformed_and_noncanonical_patterns() {
+        let repo = std::env::temp_dir().join(format!(
+            "conductor-native-registry-validation-{}", std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&repo);
+        std::fs::create_dir_all(&repo).unwrap();
+        let registry = repo.join("registry.json");
+        let outside = repo.with_extension("outside.json");
+        std::fs::write(&outside, "{}").unwrap();
+        let root = repo.to_str().unwrap();
+        let canonical = vec!["**/test_*.py".to_owned()];
+        assert!(registry_patterns(root, outside.to_str().unwrap(), &canonical)
+            .unwrap_err().contains("inside the repository"));
+        for (contents, fragment) in [
+            ("not json", "cannot load"),
+            ("[]", "JSON object"),
+            (r#"{"test_patterns": []}"#, "test_patterns"),
+            (r#"{"test_patterns": ["never-a-test"]}"#, "canonical inventory"),
+        ] {
+            std::fs::write(&registry, contents).unwrap();
+            assert!(registry_patterns(root, registry.to_str().unwrap(), &canonical)
+                .unwrap_err().contains(fragment));
+        }
+        std::fs::remove_file(outside).unwrap();
+        std::fs::remove_dir_all(repo).unwrap();
+    }
+
+    #[test]
+    fn git_errors_and_inventory_include_content_declared_rust_tests() {
+        let repo = std::env::temp_dir().join(format!(
+            "conductor-native-inventory-git-{}", std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&repo);
+        std::fs::create_dir_all(repo.join("crate/src")).unwrap();
+        let root = repo.to_str().unwrap();
+        assert!(git_paths(root, &["status".to_owned()]).unwrap_err().contains("git"));
+        git_paths(root, &["init".to_owned(), "--quiet".to_owned()]).unwrap();
+        let registry = repo.join("registry.json");
+        std::fs::write(&registry, r#"{"test_patterns": ["**/test_*.py"]}"#).unwrap();
+        std::fs::write(repo.join("crate/src/lib.rs"), "#[cfg(test)]\nmod tests {\n#[test]\nfn one() {}\n}\n").unwrap();
+        std::fs::write(repo.join("crate/src/plumbing.rs"), "pub fn two() {}\n").unwrap();
+        let inventory = test_inventory(root, registry.to_str().unwrap(),
+            &["**/test_*.py".to_owned()], &[], "all", true, None).unwrap();
+        assert_eq!(inventory, vec!["crate/src/lib.rs".to_owned()]);
+        std::fs::remove_dir_all(repo).unwrap();
+    }
 
     #[test]
     fn attribute_path_stops_at_the_first_delimiter() {

@@ -22,15 +22,18 @@ mod json_canon;
 mod land;
 mod land_exec;
 mod ledger;
+mod legacy_hook_api;
 mod local_ai_policy;
 mod mailbox;
 mod merge;
 mod mutation_plan;
+mod mutation_results;
 mod notes_index;
 mod obsidian_sync;
 mod ownership;
 mod post_edit_audit;
 mod post_tool;
+mod pre_edit;
 mod pre_read;
 mod read_budget;
 mod receipt_show;
@@ -70,6 +73,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Internal compatibility boundary for installed legacy hook entrypoints.
+    #[command(hide = true)]
+    LegacyHook { operation: String },
     #[command(hide = true)]
     TaskLimitExec(task_limits::LimitExecArgs),
     /// Durable assignment, execution, receipts, retries and lease recovery.
@@ -179,6 +185,8 @@ enum MutationCommand {
     /// without writing anything. Same computation as the Python `plan()`
     /// function's native path (`CONDUCTOR_PLAN_IMPL` unset).
     Plan(mutation_plan::PlanArgs),
+    /// Parse a test report into ordered attribution JSON without running tests.
+    Results(mutation_results::ResultsArgs),
 }
 
 #[derive(Subcommand)]
@@ -240,6 +248,9 @@ fn command_exit(label: &str, result: anyhow::Result<u8>, failure: u8) -> ExitCod
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
+        Command::LegacyHook { operation } => {
+            command_exit("legacy-hook", legacy_hook_api::run(&operation), 2)
+        }
         Command::TaskLimitExec(args) => {
             command_exit("task limits", task_limits::run_guard(args), 1)
         }
@@ -256,6 +267,9 @@ fn main() -> ExitCode {
             }
         },
         Command::Mutation { action } => match action {
+            MutationCommand::Results(args) => {
+                command_exit("mutation results", mutation_results::run(args), 2)
+            }
             MutationCommand::Plan(args) => match mutation_plan::run(args) {
                 Ok(code) => ExitCode::from(code as u8),
                 Err(err) => {
