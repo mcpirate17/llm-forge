@@ -18,6 +18,8 @@ mod identity;
 mod instant;
 mod interpreter;
 mod json_canon;
+mod land;
+mod land_exec;
 mod ledger;
 mod local_ai_policy;
 mod merge;
@@ -67,6 +69,10 @@ enum Command {
     Task(tasks::TaskArgs),
     /// Read-only health across tasks, claims, messaging, hooks and ledger paths.
     Status(status::StatusArgs),
+    /// Land a branch on the integration line from a persistent local clone:
+    /// rebase, run the host's `.forge/land.toml` checks bounded, fast-forward
+    /// push, delete the branch. No CI service involved.
+    Land(land::LandArgs),
     /// Run one Claude Code hook event: read the payload on stdin, delegate to the
     /// Python dispatcher, forward its stdout/stderr/exit code unchanged.
     Hook {
@@ -218,6 +224,13 @@ fn main() -> ExitCode {
             Err(error) => {
                 eprintln!("forge task: {error:#}");
                 ExitCode::from(1)
+            }
+        },
+        Command::Land(args) => match land::run(args) {
+            Ok(code) => ExitCode::from(code),
+            Err(error) => {
+                eprintln!("forge land: {error:#}");
+                ExitCode::from(2)
             }
         },
         Command::Status(args) => match status::run(args) {

@@ -1,0 +1,46 @@
+# `forge land <branch>` policy for llm-forge (native/forge/src/land.rs).
+# Checks run in a persistent clone whose .venv and cargo target/ survive
+# between landings, so setup is incremental. The copy on `main` governs.
+target = "main"
+clone_dir = "/mnt/data/llm/land/llm-forge"
+required_trailers = ["Agent"]
+path_prepend = [".venv/bin"]
+
+[env]
+CUDA_VISIBLE_DEVICES = ""
+
+[[setup]]
+name = "uv-sync"
+run = "uv sync --frozen --extra test"
+timeout_s = 900
+
+# Path-source crates keep their cached wheel under a plain sync.
+[[check]]
+name = "native-reinstall"
+run = "uv sync --frozen --extra test --reinstall-package conductor-native --reinstall-package slop-core"
+paths = ['^native/(conductor-native|slop-core)/', '^pyproject\.toml$', '^uv\.lock$']
+timeout_s = 1200
+
+[[check]]
+name = "pytest"
+run = "python -m pytest src/conductor -q -p no:cacheprovider --timeout 600"
+paths = ['^src/', '^native/(conductor-native|slop-core)/', '^pyproject\.toml$', '^uv\.lock$', '^campaigns/', '^candidate_policy\.toml$']
+timeout_s = 2400
+
+[[check]]
+name = "rust-forge"
+run = "cd native/forge && cargo fmt --check && cargo clippy --quiet --all-targets -- -D warnings && cargo test --quiet"
+paths = ['^native/forge/', '^native/conductor-native/', '^docs/routing\.md$', '^ledger/']
+timeout_s = 1800
+
+[[check]]
+name = "rust-conductor-native"
+run = "cd native/conductor-native && cargo fmt --check && cargo clippy --quiet --all-targets -- -D warnings && cargo test --quiet"
+paths = ['^native/conductor-native/']
+timeout_s = 1800
+
+[[check]]
+name = "rust-slop-core"
+run = "cd native/slop-core && cargo fmt --check && cargo clippy --quiet --all-targets -- -D warnings && cargo test --quiet"
+paths = ['^native/slop-core/']
+timeout_s = 1800
