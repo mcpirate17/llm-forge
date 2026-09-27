@@ -408,6 +408,7 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
         helper.targets,
         [
             "python_contracts_agent_a2a",
+            "python_contracts_baseline_merge",
             "python_contracts_bash_pretooluse_parity",
             "python_contracts_bash_quiet_legacy",
             "python_contracts_branch_policy_native",
