@@ -17,6 +17,8 @@ const SLOP_CONSUMERS: &[&str] = &[
     "python_contracts_reuse_roi",
     "python_contracts_reuse_consolidation",
     "python_contracts_reuse_file_families",
+    "python_contracts_reuse_audit_inventory",
+    "python_contracts_reuse_file_family_lsh",
 ];
 
 fn required_string<'a>(request: &'a Value, key: &str) -> Result<&'a str, String> {
