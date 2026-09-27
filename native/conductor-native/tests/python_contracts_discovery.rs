@@ -425,6 +425,7 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_dispatch_runner_protocol",
             "python_contracts_handoff",
             "python_contracts_harness_provisioning",
+            "python_contracts_import_ablation",
             "python_contracts_local_clerk",
             "python_contracts_mutation_coverage",
             "python_contracts_mutation_engine_mull_args",

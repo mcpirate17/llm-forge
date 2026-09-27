@@ -1,6 +1,6 @@
 //! Integration tests for `forge hook <Event>`'s delegation to a Python dispatcher.
 //!
-//! `tests/fixtures/stub_dispatch.py` stands in for the real
+//! The Rust-only `tests/fixtures/stub_dispatch` crate stands in for the real
 //! `tooling.hooks.dispatch` module -- installed as a fake project's
 //! `.venv/bin/python` so `interpreter::resolve_python` finds it exactly the way it
 //! would find a real venv. This proves the forwarding contract (stdin passthrough,
@@ -12,8 +12,11 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
+static STUB_BIN: OnceLock<PathBuf> = OnceLock::new();
 
 struct TempDir(PathBuf);
 
@@ -41,13 +44,79 @@ fn tempdir() -> TempDir {
     TempDir(path)
 }
 
-/// Installs `tests/fixtures/stub_dispatch.py` as `<project>/.venv/bin/python`.
+/// Compile the Rust-only fixture once into Cargo's ignored test output tree.
+/// This keeps the normal `cargo test` coverage without adding a shipping bin.
+fn stub_binary() -> &'static Path {
+    STUB_BIN.get_or_init(|| {
+        let fixture =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/stub_dispatch/Cargo.toml");
+        let target = Path::new(env!("CARGO_TARGET_TMPDIR")).join("stub-dispatch-target");
+        fs::create_dir_all(&target).expect("create fixture build target");
+        let stdout_path = target.join(format!("build-{}-stdout.log", std::process::id()));
+        let stderr_path = target.join(format!("build-{}-stderr.log", std::process::id()));
+        let stdout = fs::File::create(&stdout_path).expect("create fixture build stdout log");
+        let stderr = fs::File::create(&stderr_path).expect("create fixture build stderr log");
+        let mut child = Command::new(option_env!("CARGO").unwrap_or("cargo"))
+            .arg("build")
+            .arg("--offline")
+            .arg("--locked")
+            .arg("--jobs")
+            .arg("2")
+            .arg("--manifest-path")
+            .arg(&fixture)
+            .env("CARGO_TARGET_DIR", &target)
+            .env("CARGO_BUILD_JOBS", "2")
+            .stdout(Stdio::from(stdout))
+            .stderr(Stdio::from(stderr))
+            .spawn()
+            .expect("spawn Rust dispatcher fixture build");
+        let start = Instant::now();
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) => {}
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("poll Rust dispatcher fixture build failed: {error}; stdout:\n{}\nstderr:\n{}", fs::read_to_string(&stdout_path).unwrap_or_default(), fs::read_to_string(&stderr_path).unwrap_or_default());
+                }
+            }
+            if start.elapsed() > Duration::from_secs(180) {
+                let _ = child.kill(); // The child may have exited since try_wait returned None.
+                let _ = child.wait(); // Always reap before reporting the timeout.
+                panic!(
+                    "Rust dispatcher fixture build timed out after 180 s; stdout:\n{}\nstderr:\n{}",
+                    fs::read_to_string(&stdout_path).unwrap_or_default(),
+                    fs::read_to_string(&stderr_path).unwrap_or_default()
+                );
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        };
+        assert!(
+            status.success(),
+            "Rust dispatcher fixture build failed ({status}); stdout:\n{}\nstderr:\n{}",
+            fs::read_to_string(&stdout_path).unwrap_or_default(),
+            fs::read_to_string(&stderr_path).unwrap_or_default()
+        );
+        let binary = target.join("debug").join(format!(
+            "forge-test-stub-dispatch{}",
+            std::env::consts::EXE_SUFFIX
+        ));
+        assert!(
+            binary.is_file(),
+            "Rust dispatcher fixture binary missing: {}",
+            binary.display()
+        );
+        binary
+    })
+}
+
+/// Install the executable test double as `<project>/.venv/bin/python`.
 fn stub_project(project: &Path) {
     let venv_bin = project.join(".venv").join("bin");
     fs::create_dir_all(&venv_bin).expect("create fake .venv/bin");
-    let stub_src = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/stub_dispatch.py");
     let dest = venv_bin.join("python");
-    fs::copy(&stub_src, &dest).expect("install stub dispatcher");
+    fs::copy(stub_binary(), &dest).expect("install stub dispatcher");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -55,6 +124,100 @@ fn stub_project(project: &Path) {
         perms.set_mode(0o755);
         fs::set_permissions(&dest, perms).unwrap();
     }
+}
+
+fn run_stub(event: &str, input: &str) -> std::process::Output {
+    let mut child = Command::new(stub_binary())
+        .arg("-m")
+        .arg("tooling.hooks.dispatch")
+        .arg(event)
+        .env_remove("FORGE_NATIVE_HOOKS")
+        .env_remove("FORGE_NATIVE_ANSWERS")
+        .env_remove("CLAUDE_PROJECT_DIR")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn Rust dispatcher fixture");
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .expect("write fixture stdin");
+    child.wait_with_output().expect("wait for Rust fixture")
+}
+
+#[test]
+fn rust_dispatcher_fixture_preserves_process_protocol() {
+    let pre = run_stub(
+        "PreToolUse",
+        "{\"z\":\"é\",\"a\":[1,true],\"esc\":\"\\u007f\"}",
+    );
+    assert_eq!(pre.status.code(), Some(0));
+    assert_eq!(pre.stderr, b"");
+    assert_eq!(
+        pre.stdout,
+        br#"{"echoed": {"z": "\u00e9", "a": [1, true], "esc": "\u007f"}, "forge_native_hooks": null, "forge_native_answers": null}"#
+    );
+
+    let numbers = run_stub(
+        "PreToolUse",
+        r#"{"zero":-0,"small":1e-7,"small5":1e-5,"small6":1e-6,"int20":100000000000000000000,"beyond_u64":18446744073709551616,"below_i64":-9223372036854775809,"big":123456789012345678901234567890}"#,
+    );
+    assert_eq!(numbers.status.code(), Some(0));
+    assert_eq!(
+        numbers.stdout,
+        br#"{"echoed": {"zero": 0, "small": 1e-07, "small5": 1e-05, "small6": 1e-06, "int20": 100000000000000000000, "beyond_u64": 18446744073709551616, "below_i64": -9223372036854775809, "big": 123456789012345678901234567890}, "forge_native_hooks": null, "forge_native_answers": null}"#
+    );
+
+    let session = run_stub("SessionStart", "");
+    assert_eq!(session.status.code(), Some(0));
+    assert_eq!(session.stderr, b"");
+    assert_eq!(
+        session.stdout,
+        br#"{"event": "SessionStart", "claude_project_dir": null, "echoed": {}, "forge_native_hooks": null, "forge_native_answers": null}"#
+    );
+
+    let post = run_stub("PostToolUse", "ignored");
+    assert_eq!(post.status.code(), Some(0));
+    assert_eq!(
+        post.stdout,
+        br#"{"ok": true, "forge_native_hooks": null, "forge_native_answers": null}"#
+    );
+    assert_eq!(post.stderr, b"stub dispatcher: soft warning on stderr\n");
+
+    let deny = run_stub("Deny", "{}");
+    assert_eq!(deny.status.code(), Some(2));
+    assert_eq!(
+        deny.stdout,
+        br#"{"decision": "block", "reason": "stub deny"}"#
+    );
+    assert_eq!(deny.stderr, b"");
+
+    let explode = run_stub("Explode", "{}");
+    assert_eq!(explode.status.code(), Some(7));
+    assert_eq!(explode.stdout, b"");
+    assert_eq!(explode.stderr, b"stub dispatcher: fatal\n");
+
+    let unexpected = run_stub("Unexpected", "{}");
+    assert_eq!(unexpected.status.code(), Some(1));
+    assert_eq!(unexpected.stdout, b"");
+    assert_eq!(
+        unexpected.stderr,
+        b"stub_dispatch.py: unhandled test event 'Unexpected'\n"
+    );
+    let apostrophe = run_stub("It's", "{}");
+    assert_eq!(apostrophe.status.code(), Some(1));
+    assert_eq!(
+        apostrophe.stderr,
+        b"stub_dispatch.py: unhandled test event \"It's\"\n"
+    );
+
+    let invalid = run_stub("PreToolUse", "{");
+    assert_eq!(invalid.status.code(), Some(1));
+    assert_eq!(invalid.stdout, b"");
+    assert!(String::from_utf8_lossy(&invalid.stderr).contains("invalid stdin JSON"));
 }
 
 fn run_forge(
