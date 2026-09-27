@@ -165,7 +165,7 @@ blobs, exact archive hash, raw Tokei JSON, inline AST ranges and counts, splitte
 source and lockfile, tool hashes, and reproduction script. Its SHA-256 is
 `bc5d354822e23abb4d602f1d53b9fc77c4c864d74be11b22dccd4496e62b8732`.
 
-## Latest verified commit
+## Previous verified commit
 
 Commit `8eb7c76b909f2da7e1d5e1847eb53904332fb293`, measured from a `git archive`
 with the same classification and inline-test treatment. The archive stream
@@ -176,7 +176,7 @@ SHA-256 is
 | --- | ---: | ---: | ---: | ---: |
 | Production | 51,296 | 51,599 | 194 | **50.0529% native** |
 | Tests | 40,566 | 41,398 | 0 | **50.5075% Rust** |
-| All tracked source, including examples | 91,862 | 93,096 | 194 | 50.3392% native |
+| All tracked source, including examples | 91,862 | 93,096 | 194 | 50.2810% native |
 
 The manifests contain 371 production files, 295 test files, and 668 source
 files total. The splitter identified 100 test-only ranges in 85 production
@@ -198,6 +198,40 @@ blobs, exact archive stream hash, raw Tokei JSON, inline AST ranges and counts,
 splitter source and lockfile, tool hashes, and reproduction script. Evidence
 SHA-256:
 `5c16894ce99d2cc0d9a99565e4cff122e046a2fe77f5fea592230196dd2c4a2b`.
+
+## Latest verified commit
+
+Commit `f74113d9236c9a1f79f7605f264e9e913e57d8ac`, measured from a `git archive`
+with the same classification and inline-test treatment. The archive stream
+SHA-256 is
+`09735a6c2ab17c5eeba074c0ee86d75ca11049b8da2c70e0963fdb6dbcd8a0b8`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,296 | 51,599 | 194 | **50.0529% native** |
+| Tests | 40,566 | 41,447 | 0 | **50.5371% Rust** |
+| All tracked source, including examples | 91,862 | 93,145 | 194 | 50.2940% native |
+
+The manifests contain 371 production files, 295 test files, and 668 source
+files total. The splitter identified 100 test-only ranges in 85 production
+Rust files. Those files contain 43,010 original Rust code lines and 29,951
+after masking, so the inline test delta is 13,059. Production Rust remains
+64,658 raw lines minus 13,059 inline-test lines = 51,599. Adding the same delta
+to 28,388 separate Rust test lines gives 41,447 Rust test lines. The 99 example
+lines remain in the all-source view and outside both milestone scopes.
+
+The source change since `8eb7c76` is confined to a Rust mailbox test fixture's
+TCP readiness handling. Production counts and the production native share are
+unchanged; the Rust test share increased 0.0296 percentage points. Both
+independent 50% source SLOC milestones remain achieved. These percentages do
+not measure runtime coverage, behavioral coverage, or performance.
+
+The [measurement evidence](native-metrics/f74113d-evidence.tar.gz) contains the
+source path manifests, source hashes independently checked against all 668 Git
+blobs, exact archive stream hash, raw Tokei JSON, inline AST ranges and counts,
+splitter source and lockfile, tool hashes, and reproduction script. Evidence
+SHA-256:
+`c3d66d18c9eaa07fa5f5a13a36d45b67bc159bfbec136bf4656ec4550b08ce33`.
 
 ## Behavioral migration
 
