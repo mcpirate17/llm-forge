@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.62"
+version = "0.1.63"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -39,6 +39,13 @@ bench = false
 [[bin]]
 name = "hook_project_seam_child"
 path = "tests/fixtures/hook_project_seam_child.rs"
+required-features = ["python-compat-tests"]
+test = false
+bench = false
+
+[[bin]]
+name = "hook_matrix_child"
+path = "tests/fixtures/hook_matrix_child.rs"
 required-features = ["python-compat-tests"]
 test = false
 bench = false
