@@ -1,5 +1,33 @@
 # Native test migration
 
+At pinned commit `b40b79ad42c9188fba9f3cf4ac09e6f637fa0de9`, the
+separate Rust-test source milestone is **83.2591%**: 90,436 Rust test code
+lines (77,377 in separate test files plus 13,059 inline) and 18,184 Python
+test code lines. The 14-case `test_hook_project_seam.py` suite is retired in
+favor of 15 Rust-owned contracts, including a new executable-precedence case.
+The pinned tree retains **52 executable Python suites**, with 829 named tests
+and 919 statically expanded parameter cases. Its 32 static Python fixture
+inputs and one shared conftest are inventoried separately. Production remains
+**50.5813% native**. These are source-composition and static inventory figures,
+not a pytest collection result or behavioral coverage claim. The
+[full method and pinned evidence](native-migration.md#latest-verified-commit)
+record every counted input.
+
+At pinned commit `14e570e6c7d2798a1ef9586c0f4e04863bc28a0d`, the
+separate Rust-test source milestone is **82.9284%**: 89,770 Rust test code
+lines (76,711 in separate test files plus 13,059 inline) and 18,480 Python
+test code lines. The 38-case `test_project_init.py` suite is retired in favor
+of 42 Rust-owned contracts across four targets; four cases exercise new
+resolver precedence. Installation and prebuild contracts add Rust test source.
+The pinned tree retains **53 executable Python suites**, with 843 named tests
+and 933 statically expanded parameter cases. Its 32 static Python fixture
+inputs and one shared conftest are inventoried separately. Production is
+**50.5813% native**. These are source-composition and static inventory figures,
+not a pytest collection result or behavioral coverage claim. The
+[counting rules](native-migration.md#counting-rules) and
+[14e570e pinned evidence](native-metrics/14e570e-evidence.tar.gz) record every
+counted input.
+
 At pinned commit `6ba68187ffedb4984f32f8f85b0c5a1370efefdc`, the separate
 Rust-test source milestone is **82.3393%**: 88,173 Rust test code lines and
 18,912 Python test code lines under the unchanged path and inline-test rules.

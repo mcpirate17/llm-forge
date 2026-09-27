@@ -297,6 +297,7 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
         [
             "python_contracts_active_state",
             "python_contracts_inplace_handoff",
+            "python_contracts_local_ai_policy",
             "python_contracts_session_preamble"
         ]
     );
@@ -444,18 +445,21 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_mutation_support_process",
             "python_contracts_mutation_testing_core",
             "python_contracts_mutation_testing_evidence",
+            "python_contracts_native_test_selection",
             "python_contracts_post_tool_parity",
             "python_contracts_post_tool_quiet",
             "python_contracts_project_init_binary",
             "python_contracts_project_init_manifest",
             "python_contracts_project_init_merge",
             "python_contracts_project_init_run",
+            "python_contracts_receipt_scope",
             "python_contracts_reuse_audit_inventory",
             "python_contracts_reuse_consolidation",
             "python_contracts_reuse_file_families",
             "python_contracts_reuse_file_family_lsh",
             "python_contracts_reuse_inventory",
             "python_contracts_reuse_roi",
+            "python_contracts_sandbox",
             "python_contracts_session_brief",
         ]
     );
