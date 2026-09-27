@@ -15,6 +15,38 @@ The baseline is commit `edf2090da4eb0936ab7ad60a046c238202114d0c`.
 | Tests | 49,975 | 21,587 | 0 | **30.1655% Rust** |
 | All tracked source, including examples | 106,534 | 60,704 | 185 | 36.2579% native |
 
+## First committed cohort
+
+Measured at commit `ed679936f413f881c07ebe39675fac9bafac141a` using the
+same path classification and inline Rust test treatment as the baseline:
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 55,004 | 42,081 | 194 | **43.2581% native** |
+| Tests | 47,993 | 24,318 | 0 | **33.6297% Rust** |
+| All tracked source, including examples | 102,997 | 66,498 | 194 | 39.1882% native |
+
+The production share rose 2.5133 percentage points and the Rust test share
+rose 3.4642 points from the baseline. Both independent 50% milestones remain
+open. These figures count committed source composition only; they do not claim
+that all Python behavior has a native implementation or a native test.
+
+The [measurement evidence](native-metrics/ed679936-evidence.tar.gz) contains
+the three NUL-delimited source path manifests, Tokei 15.0.0 raw JSON for each
+scope, the original and masked inline Rust files' raw Tokei JSON, the AST
+range list, the AST splitter source and dependency lockfile, and tool hashes.
+Its SHA-256 is
+`4a8b2ca8730ecefa033008bbafbf19de9211beffc07af842131d3f684df52b7d`.
+The AST splitter found 91 test-only ranges across 76 production Rust files.
+Those files contained 40,448 raw Rust code lines and 28,008 after masking, so
+12,440 lines were assigned to tests. The separate test-path manifest contains
+11,878 Rust code lines, yielding 24,318 Rust test lines in total. The
+extracted snippets' Tokei JSON is included for inspection, but its 13,073
+code-line count is not added: snippet extraction changes comment
+classification, while the original-minus-masked method stays additive.
+The all-source view includes 99 Rust code lines in two `native/forge/examples/`
+files; these are excluded from production and tests, as at baseline.
+
 ## Counting rules
 
 Count code SLOC with **Tokei 15.0.0** against an explicit manifest derived from

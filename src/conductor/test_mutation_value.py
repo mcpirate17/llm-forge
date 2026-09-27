@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -911,41 +910,18 @@ def _assert_capable_unattributed_kill_refuses_campaign() -> None:
     assert wrong["status"] == "REFUSED" and wrong["misattributed"] == ["a"]
 
 
-def test_value_analysis_uses_explicit_failed_nodeids_for_killers(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_value_analysis_uses_explicit_failed_nodeids_for_killers() -> None:
     _assert_capable_unattributed_kill_refuses_campaign()
     nodeid = "conductor/test_mutation_value.py::test_contract"
     spec = _spec()
-    complete = {
-        "status": "COMPLETE",
-        "tests": {nodeid: {"outcome": "PASSED"}},
-        "failed_nodeids": [nodeid],
-    }
-    clean = {
-        "status": "COMPLETE",
-        "tests": {nodeid: {"outcome": "PASSED"}},
-        "failed_nodeids": [],
-    }
-    captured: dict[str, Any] = {}
-
-    def fake_native(spec_json: str, baseline_json: str, evidence_json: str) -> str:
-        captured["evidence"] = json.loads(evidence_json)
-        return json.dumps({"status": "PASS", "killers_by_mutant": {"mutant": [nodeid]}})
-
-    monkeypatch.setattr(mutation_value, "analyze_test_value_native", fake_native)
+    clean = _report({nodeid: ("PASSED", 0.1)})
+    complete = _report({nodeid: ("PASSED", 0.1)})
+    complete["failed_nodeids"] = [nodeid]
     result = mutation_value.analyze_test_value(
         spec,
         baseline_reports=[clean, clean],
         mutant_reports={"mutant": complete},
         mutant_outcomes={"mutant": "KILLED"},
     )
+    assert result["status"] == "PASS"
     assert result["killers_by_mutant"] == {"mutant": [nodeid]}
-    assert captured["evidence"] == [
-        {
-            "mutation_id": "mutant",
-            "outcome": "KILLED",
-            "report_state": "COMPLETE",
-            "killers": [nodeid],
-        }
-    ]

@@ -37,6 +37,15 @@ The remaining Python tests check public wrappers, argv rewriting, stale report
 removal, captured subprocess output, adapter routing, killer verdicts, and
 value-analysis integration. They should move only with those host boundaries.
 
+`test_value_analysis_uses_explicit_failed_nodeids_for_killers` now calls the
+public Python wrapper through the production native entrypoint. It checks that
+an explicit failed nodeid wins even when the per-test outcome says `PASSED`,
+and retains the separate Python receipt-enforcement assertions. The native
+`mutation_value_inputs::mutant_evidence_prefers_explicit_failed_nodeids_and_preserves_order`
+test covers the core killer selection and evidence ordering. The former
+monkeypatch targeted `analyze_test_value_native`, which the wrapper no longer
+imports after native report collection absorbed that step.
+
 ## Graph refresh waits
 
 Three cases from `src/tooling/hooks/agent/test_crg_refresh_state.py` now run in

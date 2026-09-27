@@ -837,7 +837,8 @@ mod tests {
     #[test]
     fn registry_rejects_outside_malformed_and_noncanonical_patterns() {
         let repo = std::env::temp_dir().join(format!(
-            "conductor-native-registry-validation-{}", std::process::id()
+            "conductor-native-registry-validation-{}",
+            std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&repo);
         std::fs::create_dir_all(&repo).unwrap();
@@ -846,17 +847,26 @@ mod tests {
         std::fs::write(&outside, "{}").unwrap();
         let root = repo.to_str().unwrap();
         let canonical = vec!["**/test_*.py".to_owned()];
-        assert!(registry_patterns(root, outside.to_str().unwrap(), &canonical)
-            .unwrap_err().contains("inside the repository"));
+        assert!(
+            registry_patterns(root, outside.to_str().unwrap(), &canonical)
+                .unwrap_err()
+                .contains("inside the repository")
+        );
         for (contents, fragment) in [
             ("not json", "cannot load"),
             ("[]", "JSON object"),
             (r#"{"test_patterns": []}"#, "test_patterns"),
-            (r#"{"test_patterns": ["never-a-test"]}"#, "canonical inventory"),
+            (
+                r#"{"test_patterns": ["never-a-test"]}"#,
+                "canonical inventory",
+            ),
         ] {
             std::fs::write(&registry, contents).unwrap();
-            assert!(registry_patterns(root, registry.to_str().unwrap(), &canonical)
-                .unwrap_err().contains(fragment));
+            assert!(
+                registry_patterns(root, registry.to_str().unwrap(), &canonical)
+                    .unwrap_err()
+                    .contains(fragment)
+            );
         }
         std::fs::remove_file(outside).unwrap();
         std::fs::remove_dir_all(repo).unwrap();
@@ -865,19 +875,34 @@ mod tests {
     #[test]
     fn git_errors_and_inventory_include_content_declared_rust_tests() {
         let repo = std::env::temp_dir().join(format!(
-            "conductor-native-inventory-git-{}", std::process::id()
+            "conductor-native-inventory-git-{}",
+            std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&repo);
         std::fs::create_dir_all(repo.join("crate/src")).unwrap();
         let root = repo.to_str().unwrap();
-        assert!(git_paths(root, &["status".to_owned()]).unwrap_err().contains("git"));
+        assert!(git_paths(root, &["status".to_owned()])
+            .unwrap_err()
+            .contains("git"));
         git_paths(root, &["init".to_owned(), "--quiet".to_owned()]).unwrap();
         let registry = repo.join("registry.json");
         std::fs::write(&registry, r#"{"test_patterns": ["**/test_*.py"]}"#).unwrap();
-        std::fs::write(repo.join("crate/src/lib.rs"), "#[cfg(test)]\nmod tests {\n#[test]\nfn one() {}\n}\n").unwrap();
+        std::fs::write(
+            repo.join("crate/src/lib.rs"),
+            "#[cfg(test)]\nmod tests {\n#[test]\nfn one() {}\n}\n",
+        )
+        .unwrap();
         std::fs::write(repo.join("crate/src/plumbing.rs"), "pub fn two() {}\n").unwrap();
-        let inventory = test_inventory(root, registry.to_str().unwrap(),
-            &["**/test_*.py".to_owned()], &[], "all", true, None).unwrap();
+        let inventory = test_inventory(
+            root,
+            registry.to_str().unwrap(),
+            &["**/test_*.py".to_owned()],
+            &[],
+            "all",
+            true,
+            None,
+        )
+        .unwrap();
         assert_eq!(inventory, vec!["crate/src/lib.rs".to_owned()]);
         std::fs::remove_dir_all(repo).unwrap();
     }
