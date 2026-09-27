@@ -117,6 +117,18 @@ def candidate_checks_native(operation: str, payload_json: str) -> str:
     return evaluate(operation, payload_json)
 
 
+def candidate_verification_native(operation: str, request_json: str) -> str:
+    from conductor_native import candidate_verification_native as decide
+
+    return decide(operation, request_json)
+
+
+def candidate_verification_ast_native(source: str, path: str) -> str:
+    from conductor_native import candidate_verification_ast_native as definitions
+
+    return definitions(source, path)
+
+
 def workspace_runtime_matrix_native(operation: str, payload_json: str) -> str:
     from conductor_native import workspace_runtime_matrix_native as dispatch
 
@@ -154,6 +166,12 @@ def mutation_refresh_native(request_json: str) -> str:
     from conductor_native import mutation_refresh_native as refresh
 
     return refresh(request_json)
+
+
+def project_context_native(operation: str, payload_json: str) -> str:
+    from conductor_native import project_context_native as evaluate
+
+    return evaluate(operation, payload_json)
 
 
 def project_paths_relative_native(raw: str, source: str) -> str:
@@ -345,6 +363,8 @@ __all__ = [
     "candidate_policy_parse_native",
     "candidate_structure_facts_native",
     "candidate_value_waivers_parse_native",
+    "candidate_verification_ast_native",
+    "candidate_verification_native",
     "compare_duplicate_baseline_native",
     "context_telemetry_append_native",
     "context_telemetry_event_native",
@@ -408,6 +428,7 @@ __all__ = [
     "normalize_jscpd_report_native",
     "normalize_mutation_path_native",
     "plan_mutation_evidence_native",
+    "project_context_native",
     "project_context_parse_config_native",
     "project_paths_enclosing_repo_native",
     "project_paths_host_root_native",

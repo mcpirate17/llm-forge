@@ -19,6 +19,8 @@ pub mod candidate_checks;
 pub mod candidate_policy;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_structure;
+#[cfg(feature = "source-analysis")]
+pub mod candidate_verification;
 #[cfg(feature = "python")]
 mod context_telemetry;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
@@ -57,8 +59,7 @@ mod mutation_value;
 pub mod mutation_value_inputs;
 #[cfg(feature = "python")]
 mod native_reuse;
-#[cfg(feature = "python")]
-mod project_context;
+pub mod project_context;
 pub mod project_paths;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod receipt_auth;
@@ -85,6 +86,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     branch_policy::register(module)?;
     candidate_checks::register(module)?;
     candidate_structure::register(module)?;
+    candidate_verification::register(module)?;
     context_telemetry::register(module)?;
     dead_tests::register(module)?;
     duplicate_bodies::register(module)?;

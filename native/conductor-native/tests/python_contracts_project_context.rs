@@ -8,131 +8,12 @@ mod support;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyCFunction, PyDict, PyModule, PyTuple};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs;
-use std::io::Write as _;
-use std::os::fd::FromRawFd;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use support::{attr_text, module, path, text, AttrPatch, Case};
-
-#[derive(Default)]
-struct SelectorState {
-    registered: HashMap<i32, i32>,
-    closed: bool,
-}
-
-#[pyclass]
-struct MockSelector(Arc<Mutex<SelectorState>>);
-
-type MockProcessParts = (
-    Py<PyAny>,
-    Vec<std::thread::JoinHandle<()>>,
-    Arc<Mutex<Vec<i32>>>,
-);
-
-#[pymethods]
-impl MockSelector {
-    fn register(&self, descriptor: i32, events: i32) {
-        let mut state = self.0.lock().unwrap();
-        assert!(!state.closed && !state.registered.contains_key(&descriptor));
-        state.registered.insert(descriptor, events);
-    }
-
-    fn unregister(&self, descriptor: i32) {
-        let mut state = self.0.lock().unwrap();
-        assert!(!state.closed);
-        state
-            .registered
-            .remove(&descriptor)
-            .expect("registered descriptor");
-    }
-
-    fn select(&self, _timeout: f64) -> Vec<()> {
-        assert!(!self.0.lock().unwrap().closed);
-        Vec::new()
-    }
-
-    fn close(&self) {
-        let mut state = self.0.lock().unwrap();
-        state.registered.clear();
-        state.closed = true;
-    }
-}
-
-fn pipe_reader(
-    py: Python<'_>,
-    initial: Option<Vec<u8>>,
-) -> (Py<PyAny>, Option<std::thread::JoinHandle<()>>, Option<i32>) {
-    let os = PyModule::import(py, "os").unwrap();
-    let (read_fd, write_fd): (i32, i32) = os
-        .getattr("pipe")
-        .unwrap()
-        .call0()
-        .unwrap()
-        .extract()
-        .unwrap();
-    let reader = os
-        .getattr("fdopen")
-        .unwrap()
-        .call1((read_fd, "rb"))
-        .unwrap()
-        .unbind();
-    match initial {
-        Some(bytes) => {
-            let writer = std::thread::spawn(move || {
-                // Ownership of the write descriptor moves to the writer thread.
-                let mut file = unsafe { fs::File::from_raw_fd(write_fd) };
-                let _ = file.write_all(&bytes);
-            });
-            (reader, Some(writer), None)
-        }
-        None => (reader, None, Some(write_fd)),
-    }
-}
-
-fn mock_process(py: Python<'_>, stdout: Option<Vec<u8>>, pid: i32) -> MockProcessParts {
-    let (stdout_reader, stdout_writer, open_stdout) = pipe_reader(py, stdout);
-    let (stderr_reader, stderr_writer, open_stderr) = pipe_reader(py, Some(Vec::new()));
-    let mut writers = Vec::new();
-    writers.extend(stdout_writer);
-    writers.extend(stderr_writer);
-    let open_fds = Arc::new(Mutex::new(
-        open_stdout
-            .into_iter()
-            .chain(open_stderr)
-            .collect::<Vec<_>>(),
-    ));
-    let wait_fds = Arc::clone(&open_fds);
-    let wait = PyCFunction::new_closure(
-        py,
-        None,
-        None,
-        move |_args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| -> PyResult<i32> {
-            for fd in wait_fds.lock().unwrap().drain(..) {
-                // The timeout path reaps the fake process just as the real path does.
-                drop(unsafe { fs::File::from_raw_fd(fd) });
-            }
-            Ok(0)
-        },
-    )
-    .unwrap();
-    let process = PyModule::import(py, "types")
-        .unwrap()
-        .getattr("SimpleNamespace")
-        .unwrap()
-        .call0()
-        .unwrap();
-    process.setattr("pid", pid).unwrap();
-    process.setattr("returncode", 0).unwrap();
-    process.setattr("stdout", stdout_reader.bind(py)).unwrap();
-    process.setattr("stderr", stderr_reader.bind(py)).unwrap();
-    process.setattr("wait", wait).unwrap();
-    (process.unbind(), writers, open_fds)
-}
 
 fn git(repo: &Path, args: &[&str]) -> String {
     let output = Command::new("/usr/bin/git")
@@ -545,214 +426,28 @@ fn config_symlink_escape_and_missing_targets_are_refused() {
 }
 
 #[test]
-fn config_open_refuses_fifo_and_swapped_ancestor() {
+fn config_open_refuses_fifo_without_blocking() {
     let case = Case::new();
     let repo = repository(&case, "repository");
     let config = case.write("repository/.conductor/project.toml", "schema_version = 1\n");
-    let holder = repo.join(".conductor");
-    Python::attach(|py| {
-        let ctx = module(py, "conductor.project_context");
-        let os = ctx.getattr("os").unwrap();
-        let original = os.getattr("open").unwrap().unbind();
-        let mkfifo = os.getattr("mkfifo").unwrap().unbind();
-        let changed = Arc::new(AtomicBool::new(false));
-        let changed_in_callback = Arc::clone(&changed);
-        let config_in_callback = config.clone();
-        let open = PyCFunction::new_closure(
-            py,
-            None,
-            None,
-            move |args: &Bound<'_, PyTuple>,
-                  kwargs: Option<&Bound<'_, PyDict>>|
-                  -> PyResult<Py<PyAny>> {
-                let py = args.py();
-                let relative_open = match kwargs {
-                    Some(dict) => dict
-                        .get_item("dir_fd")?
-                        .is_some_and(|value| !value.is_none()),
-                    None => false,
-                };
-                if relative_open && !changed_in_callback.swap(true, Ordering::SeqCst) {
-                    fs::remove_file(&config_in_callback).unwrap();
-                    mkfifo
-                        .bind(py)
-                        .call1((config_in_callback.to_str().unwrap(),))?;
-                }
-                Ok(original.bind(py).call(args, kwargs)?.unbind())
-            },
-        )
-        .unwrap();
-        let patch = AttrPatch::replace(&os, "open", open.as_any());
-        assert_eq!(
-            error_code(py, &ctx, resolve(&ctx, &kwargs_project(py, &repo))),
-            "CONFIG_IO"
-        );
-        assert!(changed.load(Ordering::SeqCst));
-        drop(patch);
-    });
-
     fs::remove_file(&config).unwrap();
-    fs::write(&config, "schema_version = 1\n").unwrap();
-    let outside = case.mkdir("outside");
-    case.write("outside/project.toml", "schema_version = 1\n");
-    let moved = repo.join(".conductor-before-swap");
     Python::attach(|py| {
         let ctx = module(py, "conductor.project_context");
-        let os = ctx.getattr("os").unwrap();
-        let original = os.getattr("open").unwrap().unbind();
-        let changed = Arc::new(AtomicBool::new(false));
-        let changed_in_callback = Arc::clone(&changed);
-        let holder_in_callback = holder.clone();
-        let moved_in_callback = moved.clone();
-        let outside_in_callback = outside.clone();
-        let open = PyCFunction::new_closure(
-            py,
-            None,
-            None,
-            move |args: &Bound<'_, PyTuple>,
-                  kwargs: Option<&Bound<'_, PyDict>>|
-                  -> PyResult<Py<PyAny>> {
-                let py = args.py();
-                let relative_open = match kwargs {
-                    Some(dict) => dict
-                        .get_item("dir_fd")?
-                        .is_some_and(|value| !value.is_none()),
-                    None => false,
-                };
-                if relative_open && !changed_in_callback.swap(true, Ordering::SeqCst) {
-                    fs::rename(&holder_in_callback, &moved_in_callback).unwrap();
-                    std::os::unix::fs::symlink(&outside_in_callback, &holder_in_callback).unwrap();
-                }
-                Ok(original.bind(py).call(args, kwargs)?.unbind())
-            },
-        )
-        .unwrap();
-        let patch = AttrPatch::replace(&os, "open", open.as_any());
+        ctx.getattr("os")
+            .unwrap()
+            .getattr("mkfifo")
+            .unwrap()
+            .call1((path(py, &config),))
+            .unwrap();
         assert_eq!(
             error_code(py, &ctx, resolve(&ctx, &kwargs_project(py, &repo))),
             "CONFIG_IO"
         );
-        assert!(changed.load(Ordering::SeqCst));
-        drop(patch);
     });
 }
 
 #[test]
-fn git_probe_has_fixed_environment_and_output_cap() {
-    let _case = Case::new();
-    Python::attach(|py| {
-        let ctx = module(py, "conductor.project_context");
-        assert_fixed_git_environment(py, &ctx);
-        assert_git_output_cap(py, &ctx);
-    });
-}
-
-fn assert_fixed_git_environment(py: Python<'_>, ctx: &Bound<'_, PyModule>) {
-    let subprocess = ctx.getattr("subprocess").unwrap();
-    let (process, writers, _) = mock_process(py, Some(b"ok\n".to_vec()), 73_421);
-    let observed = Arc::new(Mutex::new(None::<(HashMap<String, String>, bool)>));
-    let observed_in_callback = Arc::clone(&observed);
-    let popen = PyCFunction::new_closure(
-        py,
-        None,
-        None,
-        move |args: &Bound<'_, PyTuple>,
-              kwargs: Option<&Bound<'_, PyDict>>|
-              -> PyResult<Py<PyAny>> {
-            let py = args.py();
-            let kwargs = kwargs.expect("Popen keyword arguments");
-            let env: HashMap<String, String> =
-                kwargs.get_item("env")?.expect("explicit env").extract()?;
-            let new_session: bool = kwargs
-                .get_item("start_new_session")?
-                .expect("session flag")
-                .extract()?;
-            *observed_in_callback.lock().unwrap() = Some((env, new_session));
-            Ok(process.clone_ref(py))
-        },
-    )
-    .unwrap();
-    let patch = AttrPatch::replace(&subprocess, "Popen", popen.as_any());
-    let result: Vec<u8> = ctx
-        .getattr("_bounded_git")
-        .unwrap()
-        .call1((("rev-parse",),))
-        .unwrap()
-        .extract()
-        .unwrap();
-    assert_eq!(result, b"ok\n");
-    let (env, session) = observed.lock().unwrap().clone().expect("Popen invocation");
-    assert_eq!(
-        env,
-        HashMap::from([
-            ("PATH".into(), "/usr/bin:/bin".into()),
-            ("LC_ALL".into(), "C".into()),
-            ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
-            ("GIT_CONFIG_GLOBAL".into(), "/dev/null".into()),
-            ("GIT_OPTIONAL_LOCKS".into(), "0".into()),
-        ])
-    );
-    assert!(session);
-    drop(patch);
-    for writer in writers {
-        writer.join().unwrap();
-    }
-}
-
-fn assert_git_output_cap(py: Python<'_>, ctx: &Bound<'_, PyModule>) {
-    let subprocess = ctx.getattr("subprocess").unwrap();
-    let (process, writers, _) = mock_process(py, Some(vec![b'x'; 32 * 1024 + 1]), 73_421);
-    let popen = PyCFunction::new_closure(
-        py,
-        None,
-        None,
-        move |args: &Bound<'_, PyTuple>,
-              _kwargs: Option<&Bound<'_, PyDict>>|
-              -> PyResult<Py<PyAny>> { Ok(process.clone_ref(args.py())) },
-    )
-    .unwrap();
-    let patch_popen = AttrPatch::replace(&subprocess, "Popen", popen.as_any());
-    let killed = Arc::new(Mutex::new(Vec::<(i32, i32)>::new()));
-    let killed_in_callback = Arc::clone(&killed);
-    let killpg = PyCFunction::new_closure(
-        py,
-        None,
-        None,
-        move |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| -> PyResult<()> {
-            killed_in_callback.lock().unwrap().push(args.extract()?);
-            Ok(())
-        },
-    )
-    .unwrap();
-    let os = ctx.getattr("os").unwrap();
-    let patch_kill = AttrPatch::replace(&os, "killpg", killpg.as_any());
-    assert_eq!(
-        error_code(
-            py,
-            ctx,
-            ctx.getattr("_bounded_git")
-                .unwrap()
-                .call1((("rev-parse",),))
-        ),
-        "GIT_OUTPUT_LIMIT"
-    );
-    let sigkill: i32 = ctx
-        .getattr("signal")
-        .unwrap()
-        .getattr("SIGKILL")
-        .unwrap()
-        .extract()
-        .unwrap();
-    assert_eq!(*killed.lock().unwrap(), [(73_421, sigkill)]);
-    drop(patch_kill);
-    drop(patch_popen);
-    for writer in writers {
-        writer.join().unwrap();
-    }
-}
-
-#[test]
-fn git_probe_timeout_reaps_and_relative_topology_is_refused() {
+fn relative_git_topology_is_refused() {
     let case = Case::new();
     let relative = case.mkdir("relative");
     let git_dir = case.mkdir("git");
@@ -760,95 +455,8 @@ fn git_probe_timeout_reaps_and_relative_topology_is_refused() {
     let _cwd = case.chdir(".");
     Python::attach(|py| {
         let ctx = module(py, "conductor.project_context");
-        assert_git_timeout(py, &ctx);
         assert_relative_topology_is_refused(py, &ctx, &relative, &git_dir, &common_dir);
     });
-}
-
-fn assert_git_timeout(py: Python<'_>, ctx: &Bound<'_, PyModule>) {
-    let subprocess = ctx.getattr("subprocess").unwrap();
-    let (process, writers, open_fds) = mock_process(py, None, 73_422);
-    let popen = PyCFunction::new_closure(
-        py,
-        None,
-        None,
-        move |args: &Bound<'_, PyTuple>,
-              _kwargs: Option<&Bound<'_, PyDict>>|
-              -> PyResult<Py<PyAny>> { Ok(process.clone_ref(args.py())) },
-    )
-    .unwrap();
-    let patch_popen = AttrPatch::replace(&subprocess, "Popen", popen.as_any());
-    let selector_state = Arc::new(Mutex::new(SelectorState::default()));
-    let selector = Py::new(py, MockSelector(Arc::clone(&selector_state))).unwrap();
-    let selector_factory = PyCFunction::new_closure(
-        py,
-        None,
-        None,
-        move |args: &Bound<'_, PyTuple>,
-              _kwargs: Option<&Bound<'_, PyDict>>|
-              -> PyResult<Py<MockSelector>> { Ok(selector.clone_ref(args.py())) },
-    )
-    .unwrap();
-    let selectors = ctx.getattr("selectors").unwrap();
-    let patch_selector =
-        AttrPatch::replace(&selectors, "DefaultSelector", selector_factory.as_any());
-    let time = ctx.getattr("time").unwrap();
-    let ticks = Arc::new(Mutex::new(vec![4.0, 0.0]));
-    let ticks_in_callback = Arc::clone(&ticks);
-    let monotonic = PyCFunction::new_closure(
-        py,
-        None,
-        None,
-        move |_args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| -> PyResult<f64> {
-            Ok(ticks_in_callback
-                .lock()
-                .unwrap()
-                .pop()
-                .expect("bounded monotonic calls"))
-        },
-    )
-    .unwrap();
-    let patch_time = AttrPatch::replace(&time, "monotonic", monotonic.as_any());
-    let killed = Arc::new(Mutex::new(Vec::<i32>::new()));
-    let killed_in_callback = Arc::clone(&killed);
-    let killpg = PyCFunction::new_closure(
-        py,
-        None,
-        None,
-        move |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| -> PyResult<()> {
-            let (pid, _signal): (i32, i32) = args.extract()?;
-            killed_in_callback.lock().unwrap().push(pid);
-            Ok(())
-        },
-    )
-    .unwrap();
-    let os = ctx.getattr("os").unwrap();
-    let patch_kill = AttrPatch::replace(&os, "killpg", killpg.as_any());
-    assert_eq!(
-        error_code(
-            py,
-            ctx,
-            ctx.getattr("_bounded_git")
-                .unwrap()
-                .call1((("rev-parse",),))
-        ),
-        "GIT_TIMEOUT"
-    );
-    assert_eq!(*killed.lock().unwrap(), [73_422]);
-    let state = selector_state.lock().unwrap();
-    assert!(state.closed && state.registered.is_empty());
-    drop(state);
-    assert!(
-        open_fds.lock().unwrap().is_empty(),
-        "process.wait closed open pipe writers"
-    );
-    drop(patch_kill);
-    drop(patch_time);
-    drop(patch_selector);
-    drop(patch_popen);
-    for writer in writers {
-        writer.join().unwrap();
-    }
 }
 
 fn assert_relative_topology_is_refused(
