@@ -5,6 +5,9 @@ at least 50% Rust test code. The longer-term test target is 100% Rust. These are
 source composition metrics, not runtime coverage, behavioral coverage, or speed
 claims. Adding tests cannot increase the production percentage.
 
+Both independent 50% source-SLOC milestones are achieved at the latest verified
+commit below.
+
 ## Baseline
 
 The baseline is commit `edf2090da4eb0936ab7ad60a046c238202114d0c`.
@@ -76,7 +79,7 @@ tool versions, path manifests, AST ranges and raw Tokei JSON with every update.
 Do not pad implementations, move live code into excluded paths, or remove needed
 behavior to raise these percentages.
 
-## Previous verified commit
+## Earlier verified commit
 
 Commit `e70f2d9a816d76131dbf92f14158c0ec2f5a13d0`, measured from a `git archive`
 with the same path classification and inline Rust test treatment:
@@ -101,7 +104,7 @@ original and masked inline-file counts, AST splitter source and lockfile, and
 tool hashes. Its SHA-256 is
 `f2ff08f2c0c51c8160c65f6a20f70d169d2be6689d45e1c7038b8cb0147b06e3`.
 
-## Latest verified commit
+## Previous verified commit
 
 Commit `f2dcdf776e3cb167006bf5bdb20cd31c165cfe1f`, measured from a `git archive`
 with the same classification and inline-test treatment:
@@ -129,6 +132,38 @@ source manifests and hashes, raw Tokei JSON, AST ranges, splitter source and
 lockfile, tool hashes, and reproduction script. The archived source hashes also
 match an independent extraction of each committed blob. Evidence SHA-256:
 `6db0524bff8a9ae155af039270dd6b0b5c5f6e69808f9474c56d68ee5e50c4c7`.
+
+## Latest verified commit
+
+Commit `b2ec44f7cbb9c2f6eb42960e0c710fc4cc3e0169`, measured from a `git archive`
+with the same classification and inline Rust test treatment. The archive stream
+SHA-256 is
+`eb5864447e7bdb6ccf99e48d2c5fa0b5724614c5a40543d60bddb58f66b402aa`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,300 | 51,569 | 194 | **50.0364% native** |
+| Tests | 40,566 | 41,320 | 0 | **50.4604% Rust** |
+| All tracked source, including examples | 91,866 | 92,988 | 194 | 50.2507% native |
+
+The source manifests contain 371 production files, 295 test files, and 668
+source files in all. The splitter identified 100 test-only ranges in 85
+production Rust files. Those same files contain 42,894 original Rust code lines
+and 29,835 after masking, so the inline test delta is 13,059. Subtracting this
+delta from 64,628 raw production Rust lines gives 51,569 production Rust lines;
+adding it to 28,261 separate Rust test lines gives 41,320 Rust test lines. The
+99 example lines remain in the all-source view and outside both milestones.
+
+Production native share increased 2.2889 percentage points from the previous
+verified commit; Rust test share increased 3.3737 points. Both independent 50%
+milestones are achieved on source SLOC. These percentages do not measure runtime
+coverage, behavioral coverage, or performance.
+
+The [measurement evidence](native-metrics/b2ec44f-evidence.tar.gz) contains the
+source path manifests, source hashes independently checked against all 668 Git
+blobs, exact archive hash, raw Tokei JSON, inline AST ranges and counts, splitter
+source and lockfile, tool hashes, and reproduction script. Its SHA-256 is
+`bc5d354822e23abb4d602f1d53b9fc77c4c864d74be11b22dccd4496e62b8732`.
 
 ## Behavioral migration
 

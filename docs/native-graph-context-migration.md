@@ -51,9 +51,10 @@ The focused native graph target passed five tests, and the two private bounded
 process unit tests passed. The 68 focused Python graph and hook regressions
 passed after the native source move; a final 18-case AST and API run passed
 after factoring the pre-existing sync/async stubifier duplication. The scoped
-five-file duplicate scan found zero clones, and Clippy passed with warnings
-denied. The final directory-entry cap was added after these runs and is part of
-the parent's final native and CI verification.
+six-file duplicate scan found zero clones. Rust 1.98 Clippy passed for all
+targets and Python compatibility features with warnings denied. The final
+directory-entry cap was included in the complete Python-free core run, which
+passed all 239 tests.
 
 No covering issue appeared in `gh issue list --limit 100` at the start of this
 port. There is no new dependency or mutation campaign.
