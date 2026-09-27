@@ -299,7 +299,7 @@ the archive stream hash, raw Tokei JSON, inline AST ranges and counts, splitter
 source and lockfile, tool hashes, and reproduction script. Evidence SHA-256:
 `941a2a8ddd27cd62c750b4ea81e8c0d576fcbcf405f21916ac64e4d1f8611abb`.
 
-## Latest verified commit
+## Previous verified commit
 
 Commit `a67cc2ad2f4cf57dcc477550462fe61d620db342`, measured from a `git archive`
 with the same classification and inline-test treatment. The archive stream
@@ -331,6 +331,75 @@ source manifests and hashes independently checked against all 661 Git blobs,
 the archive stream hash, raw Tokei JSON, inline AST ranges and counts, splitter
 source and lockfile, tool hashes, and reproduction script. Evidence SHA-256:
 `4ae295a221f3affa7e163d3de72eae2e5261261880393976a99f80abe88063b0`.
+
+## Previous verified commit
+
+Commit `63c1bea0fa56d649d35aad10b44b05b8eec968f5`, measured from a `git archive`
+with the same classification and inline-test treatment. The archive stream
+SHA-256 is
+`663576eb521160540a3638eb866587cb0cce5690602000e643eb58c9d1f76b44`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,296 | 51,599 | 194 | **50.0529% native** |
+| Tests | 35,383 | 51,546 | 0 | **59.2967% Rust** |
+| All tracked source, including examples | 86,679 | 103,244 | 194 | 54.3055% native |
+
+The manifests contain 371 production files, 293 test files, and 666 source
+files total; the all-source view includes two Rust example files outside the
+production and test scopes. The splitter identified 100 test-only ranges in
+85 production Rust files. Those files contain 43,010 original Rust code lines
+and 29,951 after masking, so the inline test delta is 13,059. Production Rust
+is 64,658 raw lines minus 13,059 = 51,599. Adding the same delta to 38,487
+separate Rust test lines gives 51,546 Rust test lines.
+
+This commit retires three Python test modules. Production counts and native
+share are unchanged from `a67cc2a`; the Rust test share increased 1.3551
+percentage points.
+Both independent 50% source SLOC milestones remain achieved. These figures
+measure source composition, not runtime coverage, behavioral coverage, or
+performance.
+
+The [measurement evidence](native-metrics/63c1bea-evidence.tar.gz) contains
+source manifests and hashes independently checked against all 666 Git blobs,
+the archive stream hash, raw Tokei JSON, inline AST ranges and counts, splitter
+source and lockfile, tool hashes, and reproduction script. Evidence SHA-256:
+`15c360f18b83de0bddf95885eb0153ca6a3bc6f1b668b7f7817ea038273ac8ed`.
+
+## Latest verified commit
+
+Commit `18e296e81793d12ca1041a7cc8bf3d47ec719c84`, measured from a `git archive`
+with the same classification and inline-test treatment. The archive stream
+SHA-256 is
+`80e3e4aec3f2c887bef6c43fb189df3aefa2730d944a12f7776855077bcf984b`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,296 | 51,599 | 194 | **50.0529% native** |
+| Tests | 33,391 | 54,785 | 0 | **62.1314% Rust** |
+| All tracked source, including examples | 84,687 | 106,483 | 194 | 55.6442% native |
+
+The manifests contain 371 production files, 295 test files, and 668 source
+files total; the all-source view includes two Rust example files outside the
+production and test scopes. The splitter identified 100 test-only ranges in
+85 production Rust files. Those files contain 43,010 original Rust code lines
+and 29,951 after masking, so the inline test delta is 13,059. Production Rust
+is 64,658 raw lines minus 13,059 = 51,599. Adding the same delta to 41,726
+separate Rust test lines gives 54,785 Rust test lines.
+
+This commit retires six additional Python test modules since `63c1bea`; across
+the current PR108 test cohort, nine Python test modules have been retired.
+Production counts and native share are unchanged from `63c1bea`; the Rust test
+share increased 2.8347 percentage points. Both independent 50% source SLOC
+milestones remain achieved. These figures measure source composition, not
+runtime coverage, behavioral coverage, or performance.
+
+The [measurement evidence](native-metrics/18e296e-evidence.tar.gz) contains
+source path manifests and hashes independently checked against all 668 Git
+blobs, the archive stream hash, raw Tokei JSON, inline AST ranges and counts,
+splitter source and lockfile, tool hashes, and reproduction script. Evidence
+SHA-256:
+`d2b85d62034586e719cf4110609ee62cfa69534adc78b964a64ca1f11f1172e8`.
 
 ## Behavioral migration
 
