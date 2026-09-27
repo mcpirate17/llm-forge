@@ -4,7 +4,7 @@ use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Output, Stdio};
@@ -58,6 +58,14 @@ impl Fixture {
     }
 
     fn start(&mut self, name: &str) {
+        let previous_generation = fs::read(self.state.join("agents.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            .and_then(|registry| {
+                registry["agents"][name]["generation"]
+                    .as_str()
+                    .map(str::to_owned)
+            });
         self.child = Some(
             self.command("serve")
                 .args(["--as-name", name, "--port", &self.port.to_string()])
@@ -71,12 +79,55 @@ impl Fixture {
             if let Some(status) = self.child.as_mut().unwrap().try_wait().unwrap() {
                 panic!("server exited early: {status}");
             }
-            if TcpStream::connect(("127.0.0.1", self.port)).is_ok() {
+            if self.registration_is_fresh(name, previous_generation.as_deref())
+                && self.serves_card(name)
+            {
                 return;
             }
             thread::sleep(Duration::from_millis(20));
         }
-        panic!("server did not bind in 5 seconds");
+        panic!("server did not register and serve its card in 5 seconds");
+    }
+
+    fn registration_is_fresh(&self, name: &str, previous_generation: Option<&str>) -> bool {
+        let Ok(bytes) = fs::read(self.state.join("agents.json")) else {
+            return false;
+        };
+        let Ok(registry) = serde_json::from_slice::<Value>(&bytes) else {
+            return false;
+        };
+        let record = &registry["agents"][name];
+        record["port"].as_u64() == Some(u64::from(self.port))
+            && record["generation"]
+                .as_str()
+                .is_some_and(|generation| Some(generation) != previous_generation)
+    }
+
+    fn serves_card(&self, name: &str) -> bool {
+        let address = SocketAddr::from(([127, 0, 0, 1], self.port));
+        let Ok(mut stream) = TcpStream::connect_timeout(&address, Duration::from_millis(100))
+        else {
+            return false;
+        };
+        if stream
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .is_err()
+            || stream
+                .write_all(b"GET /.well-known/agent-card.json HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+                .is_err()
+        {
+            return false;
+        }
+        let mut response = Vec::new();
+        if stream.read_to_end(&mut response).is_err() {
+            return false;
+        }
+        let Some(split) = response.windows(4).position(|part| part == b"\r\n\r\n") else {
+            return false;
+        };
+        response.starts_with(b"HTTP/1.1 200 ")
+            && serde_json::from_slice::<Value>(&response[split + 4..])
+                .is_ok_and(|card| card["name"] == name)
     }
 
     fn registry(&self) -> Value {
