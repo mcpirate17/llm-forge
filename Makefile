@@ -12,6 +12,7 @@
 # Drop the inherited VIRTUAL_ENV so uv stops warning on every invocation.
 UV ?= env -u VIRTUAL_ENV uv
 .SILENT:
+.DEFAULT_GOAL := help
 
 # The platform's user-facing commands (governance, slop, complexity, dupes,
 # mutation maintenance, worktree/graph hygiene) live in conductor.mk so a host

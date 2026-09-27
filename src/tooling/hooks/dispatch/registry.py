@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Final
@@ -23,6 +24,10 @@ EVENTS: Final[tuple[str, ...]] = (
     "SessionEnd",
 )
 LAUNCHER: Final[str] = ".claude/hooks/dispatch.py"
+
+
+class NativeAnswersError(ValueError):
+    """Serialized native hook answers violate the dispatch wire schema."""
 
 
 @dataclass(frozen=True)
@@ -354,11 +359,11 @@ def native_answers() -> dict[str, dict]:
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise ValueError(
+        raise NativeAnswersError(
             f"FORGE_NATIVE_ANSWERS is set but is not valid JSON: {raw!r}"
         ) from exc
     if not isinstance(parsed, dict):
-        raise ValueError(
+        raise NativeAnswersError(
             f"FORGE_NATIVE_ANSWERS must decode to a JSON object, got {type(parsed).__name__}"
         )
     return parsed
@@ -386,16 +391,15 @@ def resolve_dispatcher(command: str) -> str | None:
     for event in EVENTS:
         if command == dispatcher_command(event):
             return event
-    tokens = command.split()
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None
     if tokens and tokens[0] == "env":
         tokens = tokens[1:]
-        while tokens and "=" in tokens[0]:
-            tokens = tokens[1:]
-    if (
-        len(tokens) == 3
-        and tokens[1] == "hook"
-        and PurePath(tokens[0]).name == "forge"
-    ):
+    while tokens and re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*=.*", tokens[0], re.DOTALL):
+        tokens = tokens[1:]
+    if len(tokens) == 3 and tokens[1] == "hook" and PurePath(tokens[0]).name == "forge":
         for event in EVENTS:
             if tokens[2] == event:
                 return event

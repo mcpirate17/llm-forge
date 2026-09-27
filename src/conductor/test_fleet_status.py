@@ -41,20 +41,40 @@ def test_run_returns_stdout():
 
 
 def test_read_last_heard_keeps_newest_per_sender(monkeypatch):
-    inbox = (
-        "[UNREAD] m1 from=seat-a at=2026-09-01T03:00:00+00:00\n"
-        "newest words from a\n"
-        "\n"
-        "[READ] m2 from=seat-a at=2026-09-01T02:00:00+00:00\n"
-        "older words from a\n"
-        "\n"
-        "[READ] m3 from=seat-b at=2026-09-01T01:00:00+00:00\n" + "b" * 200 + "\n"
-    )
-    monkeypatch.setattr(fs, "_run", lambda argv: inbox)
+    inbox = {
+        "messages": [
+            {
+                "from": "seat-a",
+                "at": "2026-09-01T02:00:00+00:00",
+                "summary": "older words",
+            },
+            {
+                "from": "seat-a",
+                "at": "2026-09-01T03:00:00+00:00",
+                "summary": "newest words from a",
+            },
+            {"from": "seat-b", "at": "2026-09-01T01:00:00+00:00", "summary": "b" * 200},
+        ]
+    }
+
+    def run(argv):
+        assert "--json" in argv and "--compact" in argv and "--full" not in argv
+        return json.dumps(inbox)
+
+    monkeypatch.setattr(fs, "_run", run)
     heard = fs.read_last_heard()
     assert heard["seat-a"]["at"] == "2026-09-01T03:00:00+00:00"
     assert heard["seat-a"]["said"] == "newest words from a"
     assert heard["seat-b"]["said"] == "b" * 160
+
+
+@pytest.mark.parametrize(
+    "payload", ["garbled", '{"messages":null}', '{"messages":[{}]}']
+)
+def test_read_last_heard_rejects_invalid_json_contract(monkeypatch, payload):
+    monkeypatch.setattr(fs, "_run", lambda _: payload)
+    with pytest.raises(fs.FleetStatusError, match="invalid compact A2A inbox"):
+        fs.read_last_heard()
 
 
 def test_heading_seat_extraction():
@@ -189,6 +209,7 @@ def test_module_entrypoint():
         capture_output=True,
         text=True,
         timeout=60,
+        check=False,
     )
     assert proc.returncode == 0
     assert "fleet status" in proc.stdout.lower()

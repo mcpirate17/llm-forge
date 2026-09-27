@@ -14,7 +14,7 @@ fn shlex_whitespace(c: char) -> bool {
 
 /// Python ``shlex.split(command, posix=True)``: quotes abut, backslash escapes
 /// outside quotes, inside double quotes it escapes only ``"`` and ``\``.
-fn shlex_split(command: &str) -> Result<Vec<String>, String> {
+pub fn shlex_split(command: &str) -> Result<Vec<String>, String> {
     let mut parts: Vec<String> = Vec::new();
     let mut token = String::new();
     let mut have_token = false;
@@ -79,7 +79,7 @@ fn shlex_quote(part: &str) -> String {
     format!("'{}'", part.replace('\'', "'\"'\"'"))
 }
 
-fn shlex_join(parts: &[String]) -> String {
+pub fn shlex_join(parts: &[String]) -> String {
     parts
         .iter()
         .map(|part| shlex_quote(part))

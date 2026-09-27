@@ -14,7 +14,8 @@ mod duplicate_bodies;
 mod fleet_status;
 mod git_source;
 mod guardrail_ast;
-mod hook_installer;
+mod guardrail_duplicates;
+pub mod hook_installer;
 mod hook_merge;
 mod kb_retrieve;
 mod memory_chunking;
@@ -45,6 +46,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     duplicate_bodies::register(module)?;
     fleet_status::register(module)?;
     guardrail_ast::register(module)?;
+    guardrail_duplicates::register(module)?;
     hook_installer::register(module)?;
     hook_merge::register(module)?;
     git_source::register(module)?;

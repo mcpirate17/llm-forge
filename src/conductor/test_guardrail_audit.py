@@ -63,7 +63,12 @@ def _stub_external_tool_results(
     monkeypatch, results: tuple[tuple[int, str], ...]
 ) -> None:
     result_iter = iter(results)
-    monkeypatch.setattr(guardrail_audit, "_iter_files", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        guardrail_audit,
+        "_iter_files",
+        lambda *args, **kwargs: [guardrail_audit.ROOT / "example.py"],
+    )
+    monkeypatch.setattr(guardrail_audit, "_structural_issues", lambda *a, **k: ([], 1))
     monkeypatch.setattr(
         guardrail_audit,
         "_resolve_tool_command",
@@ -74,6 +79,31 @@ def _stub_external_tool_results(
         "_run_tool",
         lambda *args, **kwargs: next(result_iter),
     )
+
+    def duplicate_result(_targets, issues, failures):
+        returncode, output = next(result_iter)
+        if returncode not in {0, 8}:
+            guardrail_audit._record_incomplete_tool(
+                issues,
+                failures,
+                tool="pylint",
+                returncode=returncode,
+                output=output,
+            )
+            return returncode, [], {}
+        issue = guardrail_audit.Issue(
+            "duplicate_code",
+            "medium",
+            "multiple",
+            None,
+            output,
+            "deduplicate",
+            {},
+        )
+        issues.append(issue)
+        return returncode, [output], {}
+
+    monkeypatch.setattr(guardrail_audit, "_pylint_duplicate_issues", duplicate_result)
 
 
 def test_incomplete_external_tools_fail_closed(monkeypatch) -> None:
@@ -90,10 +120,16 @@ def test_incomplete_external_tools_fail_closed(monkeypatch) -> None:
 
     incomplete = [issue for issue in issues if issue.kind == "audit_incomplete"]
     assert len(incomplete) == 2
-    assert all(issue.severity == "critical" for issue in incomplete)
+    assert all(issue.severity == "error" for issue in incomplete)
     assert summary["audit_complete"] is False
-    assert summary["dead_code_hits"] == 0
-    assert summary["duplicate_hits"] == 0
+    assert summary["dead_code_hits"] is None
+    assert summary["duplicate_hits"] is None
+    assert "dead code hits reported by vulture: n/a (tool did not complete)" in report
+    assert (
+        "duplicate-code hits reported by indexed pylint: n/a (tool did not complete)"
+        in report
+    )
+    assert "critical findings: 0" in report
     assert "external tool audit complete: False" in report
 
 
@@ -329,3 +365,110 @@ def test_load_allowlist_honors_a_conductor_table_override(
     allowlist = guardrail_audit._load_allowlist(tmp_path)
 
     assert allowlist["god_files"] == {"moved.py"}
+
+
+def test_default_targets_scan_forge_python_and_rust_and_prune_builds(
+    tmp_path, monkeypatch
+):
+    from conductor.guardrail_targets import resolve_targets
+
+    for relative in (
+        "src/conductor/probe.py",
+        "native/core/src/lib.rs",
+        "native/core/target/debug/junk.rs",
+    ):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("// native\n" if path.suffix == ".rs" else "value = 1\n")
+    monkeypatch.setattr(guardrail_audit, "ROOT", tmp_path)
+    assert resolve_targets(tmp_path, None) == (".",)
+    files = guardrail_audit._iter_files((".",))
+    assert {path.relative_to(tmp_path).as_posix() for path in files} == {
+        "src/conductor/probe.py",
+        "native/core/src/lib.rs",
+    }
+    issues, python_count = guardrail_audit._structural_issues(
+        files,
+        staged_only=False,
+        from_ref=None,
+    )
+    assert python_count == 1
+    assert not issues
+
+
+def test_host_target_configuration_and_cli_override(tmp_path):
+    from conductor.guardrail_targets import resolve_targets
+
+    (tmp_path / "source").mkdir()
+    (tmp_path / "other").mkdir()
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.conductor]\nguardrail_targets = ["source"]\n',
+    )
+    assert resolve_targets(tmp_path, None) == ("source",)
+    assert resolve_targets(tmp_path, ["other"]) == ("other",)
+
+
+@pytest.mark.parametrize(
+    "targets", [[], ["missing"], ["../escape"], ["/tmp"], [""], "source"]
+)
+def test_invalid_targets_fail_loudly(tmp_path, targets):
+    from conductor.guardrail_targets import resolve_targets
+
+    with pytest.raises(ValueError):
+        resolve_targets(tmp_path, targets)
+
+
+def test_no_python_and_scoped_reports_do_not_claim_zero_tool_findings(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(guardrail_audit, "ROOT", tmp_path)
+    monkeypatch.setattr(guardrail_audit, "_iter_files", lambda *a, **k: [])
+    _, whole = guardrail_audit.collect_issues((".",))
+    _, scoped = guardrail_audit.collect_issues((".",), staged_only=True)
+    assert whole["vulture_status"] == "not_applicable"
+    assert scoped["vulture_status"] == "not_run_scoped"
+    assert whole["dead_code_hits"] is None and scoped["duplicate_hits"] is None
+    assert "no eligible Python files" in guardrail_audit.build_markdown_report(
+        [], whole
+    )
+    assert "not run in scoped audit" in guardrail_audit.build_markdown_report(
+        [], scoped
+    )
+
+
+def test_incomplete_audit_returns_error_without_code_critical(tmp_path, monkeypatch):
+    monkeypatch.setattr(guardrail_audit, "resolve_audit_root", lambda _root: tmp_path)
+    summary = {
+        "files_scanned": 1,
+        "python_files_scanned": 1,
+        "dead_code_hits": None,
+        "duplicate_hits": None,
+        "audit_complete": False,
+        "tool_failures": ["missing tool"],
+    }
+    monkeypatch.setattr(
+        guardrail_audit, "collect_issues", lambda *a, **k: ([], summary)
+    )
+    assert guardrail_audit.main([]) == 2
+
+
+def test_duplicate_failure_is_unavailable_in_external_summary(tmp_path, monkeypatch):
+    from conductor import guardrail_duplicates
+
+    path = tmp_path / "probe.py"
+    path.write_text("value = 1\n")
+    monkeypatch.setattr(guardrail_audit, "ROOT", tmp_path)
+    monkeypatch.setattr(guardrail_audit, "_run_tool", lambda *a, **k: (0, ""))
+
+    def fail(_root, _targets):
+        raise ValueError("cannot normalize selected source")
+
+    monkeypatch.setattr(guardrail_duplicates, "scan_duplicates", fail)
+    issues = []
+    result = guardrail_audit._external_issues((".",), [path], issues)
+    assert result["duplicate_hits"] is None
+    assert result["pylint_status"] == "incomplete"
+    assert result["dead_code_hits"] == 0
+    assert result["audit_complete"] is False
+    assert issues[0].kind == "audit_incomplete"
+    assert issues[0].severity == "error"

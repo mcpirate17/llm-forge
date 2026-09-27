@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """One-screen fleet view: what every seat is doing right now.
 
 Joins four read-only sources — A2A peer liveness, the helm inbox (last words
@@ -25,8 +24,6 @@ from conductor.project_paths import host_root, worktree_patterns
 ROOT: Final[Path] = host_root()
 ACTIVE_STATE: Final[Path] = ROOT / "conductor" / "active_state.json"
 HELM_SEAT: Final[str] = "fable-helm"
-INBOX_LIMIT: Final[int] = 40
-_INBOX_HEADER = re.compile(r"^\[(UNREAD|READ)\]\s+(\S+)\s+from=(\S+)\s+at=(\S+)")
 _HEADING_SEAT = re.compile(r",\s*([\w.-]+)\s*$")
 # Host-configured via `[tool.conductor].worktree_patterns` (see project_paths);
 # defaults to this monorepo's own layout so nothing regresses on this host.
@@ -66,20 +63,29 @@ def read_last_heard(as_name: str = HELM_SEAT) -> dict[str, dict[str, str]]:
             "inbox",
             "--as-name",
             as_name,
-            "--limit",
-            str(INBOX_LIMIT),
+            "--compact",
+            "--json",
+            "--max-messages",
+            "8",
+            "--max-chars",
+            "10000",
         ]
     )
     latest: dict[str, dict[str, str]] = {}
-    lines = out.splitlines()
-    for i, line in enumerate(lines):
-        m = _INBOX_HEADER.match(line)
-        if not m:
-            continue
-        sender, at = m.group(3), m.group(4)
-        body = lines[i + 1].strip() if i + 1 < len(lines) else ""
-        # inbox is newest-first; keep only the first (latest) entry per sender
-        latest.setdefault(sender, {"at": at, "said": body[:160]})
+    try:
+        payload = json.loads(out)
+        for message in payload["messages"]:
+            sender, at, summary = (message["from"], message["at"], message["summary"])
+            if not all(isinstance(value, str) for value in (sender, at, summary)):
+                raise ValueError(
+                    "message sender, timestamp and summary must be strings"
+                )
+            # Compact views may order by thread/actionability. Compare timestamps
+            # explicitly instead of depending on presentation order.
+            if sender not in latest or at > latest[sender]["at"]:
+                latest[sender] = {"at": at, "said": summary[:160]}
+    except (ValueError, KeyError, TypeError) as exc:
+        raise FleetStatusError(f"invalid compact A2A inbox: {exc}") from exc
     return latest
 
 

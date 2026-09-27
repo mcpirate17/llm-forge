@@ -19,11 +19,11 @@ from conductor.audit_root import (
     resolve_audit_root,
 )
 from conductor.candidate_review.vulture_audit import whitelist_args
+from conductor.guardrail_targets import SKIP_PARTS, resolve_targets, walk_sources
 from conductor.project_paths import guardrail_allowlist_path, host_root
 from conductor.run_duplicate_audit import should_skip_python
 
 ROOT = host_root()
-DEFAULT_TARGETS = ("research", "aria_core", "aria_designer", "component_fab")
 
 
 def _load_allowlist(root: Path | None = None) -> dict[str, set[str]]:
@@ -58,18 +58,7 @@ CODE_EXTS = {
     ".cu",
     ".h",
     ".hpp",
-}
-SKIP_PARTS = {
-    "node_modules",
-    ".venv",
-    "__pycache__",
-    ".git",
-    "archive",
-    ".pytest_cache",
-    ".mypy_cache",
-    "dist",
-    "build",
-    "conductor",
+    ".rs",
 }
 
 
@@ -85,7 +74,7 @@ class Issue:
 
 
 def _should_skip(path: Path) -> bool:
-    return any(part in SKIP_PARTS for part in path.parts)
+    return any(part in SKIP_PARTS for part in path.relative_to(ROOT).parts)
 
 
 def _git_changed_paths(
@@ -122,15 +111,7 @@ def _iter_files(
             )
         ]
     else:
-        candidates = []
-        for target in target_list:
-            base = ROOT / target
-            if not base.exists():
-                continue
-            if base.is_file():
-                candidates.append(base)
-            else:
-                candidates.extend(p for p in base.rglob("*") if p.is_file())
+        candidates = list(walk_sources(ROOT, target_list))
     out: list[Path] = []
     for path in candidates:
         if (not staged_only and from_ref is None and not path.exists()) or _should_skip(
@@ -196,7 +177,10 @@ def _run_tool(
             stdout = stdout.decode("utf-8", errors="replace")
         if isinstance(stderr, bytes):
             stderr = stderr.decode("utf-8", errors="replace")
-        return 124, f"timed out: {' '.join(command)}\n{stdout}\n{stderr}".strip()
+        return (
+            124,
+            f"timed out after {timeout_seconds}s: {command[0]}\n{stdout}\n{stderr}".strip(),
+        )
     return proc.returncode, (proc.stdout + proc.stderr).strip()
 
 
@@ -213,7 +197,7 @@ def _record_incomplete_tool(
     issues.append(
         Issue(
             kind="audit_incomplete",
-            severity="critical",
+            severity="error",
             path="tooling",
             symbol=tool,
             message=f"{tool} audit did not complete: {detail}",
@@ -303,7 +287,7 @@ def _vulture_issues(
     command = _resolve_tool_command(
         "vulture",
         *target_list,
-        *whitelist_args(),
+        *whitelist_args(ROOT),
         "--min-confidence",
         "80",
         "--exclude",
@@ -341,26 +325,21 @@ def _pylint_duplicate_issues(
     python_targets: list[str],
     issues: list[Issue],
     tool_failures: list[str],
-) -> tuple[int, list[str]]:
-    command = _resolve_tool_command(
-        "pylint",
-        *python_targets,
-        "--disable=all",
-        "--enable=duplicate-code",
-        "--min-similarity-lines=10",
-        "--jobs=0",
-    )
-    returncode, output = _run_tool(command, timeout_seconds=600)
-    if returncode not in {0, 8}:
+) -> tuple[int, list[str], dict[str, Any]]:
+    try:
+        from conductor.guardrail_duplicates import scan_duplicates
+
+        scan = scan_duplicates(ROOT, python_targets)
+    except (ImportError, OSError, SyntaxError, ValueError) as exc:
         _record_incomplete_tool(
             issues,
             tool_failures,
             tool="pylint",
-            returncode=returncode,
-            output=output,
+            returncode=2,
+            output=f"{type(exc).__name__}: {exc}",
         )
-        return returncode, []
-    hits = [line for line in output.splitlines() if "duplicate-code" in line]
+        return 2, [], {}
+    hits = list(scan.findings)
     for line in hits[:25]:
         issues.append(
             Issue(
@@ -375,7 +354,9 @@ def _pylint_duplicate_issues(
                 metric={},
             )
         )
-    return returncode, hits
+    details = asdict(scan)
+    details.pop("findings")
+    return (8 if hits else 0), hits, details
 
 
 def _external_issues(
@@ -387,15 +368,31 @@ def _external_issues(
         for path in files
         if path.suffix == ".py" and not should_skip_python(path, root=ROOT)
     ]
-    vulture_rc, dead_code_hits = _vulture_issues(target_list, issues, tool_failures)
-    pylint_rc, duplicate_hits = _pylint_duplicate_issues(
+    if not python_targets:
+        return {
+            "vulture_exit_code": None,
+            "pylint_exit_code": None,
+            "dead_code_hits": None,
+            "duplicate_hits": None,
+            "vulture_status": "not_applicable",
+            "pylint_status": "not_applicable",
+            "audit_complete": True,
+            "tool_failures": [],
+        }
+    vulture_rc, dead_code_hits = _vulture_issues(
+        tuple(python_targets), issues, tool_failures
+    )
+    pylint_rc, duplicate_hits, duplicate_scan = _pylint_duplicate_issues(
         python_targets, issues, tool_failures
     )
     return {
         "vulture_exit_code": vulture_rc,
         "pylint_exit_code": pylint_rc,
-        "dead_code_hits": len(dead_code_hits),
-        "duplicate_hits": len(duplicate_hits),
+        "dead_code_hits": len(dead_code_hits) if vulture_rc in {0, 3} else None,
+        "duplicate_hits": len(duplicate_hits) if pylint_rc in {0, 8} else None,
+        "vulture_status": "complete" if vulture_rc in {0, 3} else "incomplete",
+        "pylint_status": "complete" if pylint_rc in {0, 8} else "incomplete",
+        "duplicate_scan": duplicate_scan,
         "audit_complete": not tool_failures,
         "tool_failures": tool_failures,
     }
@@ -414,10 +411,12 @@ def collect_issues(
         files, staged_only=staged_only, from_ref=from_ref
     )
     metrics: dict[str, Any] = {
-        "vulture_exit_code": 0,
-        "pylint_exit_code": 0,
-        "dead_code_hits": 0,
-        "duplicate_hits": 0,
+        "vulture_exit_code": None,
+        "pylint_exit_code": None,
+        "dead_code_hits": None,
+        "duplicate_hits": None,
+        "vulture_status": "not_run_scoped",
+        "pylint_status": "not_run_scoped",
         "audit_complete": True,
         "tool_failures": [],
     }
@@ -426,6 +425,7 @@ def collect_issues(
     return issues, {
         "files_scanned": len(files),
         "python_files_scanned": py_count,
+        "structural_coverage": {"all_languages": "file_size", "python": "AST metrics"},
         **metrics,
     }
 
@@ -436,6 +436,18 @@ def _group(issues: list[Issue], *kinds: str) -> list[Issue]:
         [issue for issue in issues if issue.kind in kinds],
         key=lambda item: (order.get(item.severity, 9), item.path, item.symbol or ""),
     )
+
+
+def _hit_count(summary: dict[str, Any], key: str, tool: str) -> str:
+    value = summary[key]
+    if value is not None:
+        return str(value)
+    status = summary.get(f"{tool}_status", "incomplete")
+    reason = {
+        "not_run_scoped": "not run in scoped audit",
+        "not_applicable": "no eligible Python files",
+    }.get(status, "tool did not complete")
+    return f"n/a ({reason})"
 
 
 def build_markdown_report(issues: list[Issue], summary: dict[str, Any]) -> str:
@@ -521,9 +533,10 @@ def build_markdown_report(issues: list[Issue], summary: dict[str, Any]) -> str:
             "",
             "### G. Proof",
             f"- files scanned: {summary['files_scanned']}",
-            f"- dead code hits reported by vulture: {summary['dead_code_hits']}",
-            f"- duplicate-code hits reported by pylint: {summary['duplicate_hits']}",
+            f"- dead code hits reported by vulture: {_hit_count(summary, 'dead_code_hits', 'vulture')}",
+            f"- duplicate-code hits reported by indexed pylint: {_hit_count(summary, 'duplicate_hits', 'pylint')}",
             f"- external tool audit complete: {summary['audit_complete']}",
+            "- structural coverage: file-size limits for all code; function and complexity metrics for Python only",
             *(
                 [f"- tool failure: {failure}" for failure in summary["tool_failures"]]
                 or ["- tool failures: none"]
@@ -544,13 +557,17 @@ def _critical_issues(issues: list[Issue]) -> list[Issue]:
         "native_hotspot_candidate",
         "dead_code",
         "complexity",
-        "audit_incomplete",
     )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Guardrail audit and blocking checks")
-    parser.add_argument("--targets", nargs="*", default=list(DEFAULT_TARGETS))
+    parser.add_argument(
+        "--targets",
+        nargs="+",
+        default=None,
+        help="Root-relative paths; defaults to tool.conductor.guardrail_targets or '.'",
+    )
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--staged-only", action="store_true")
     source.add_argument(
@@ -579,9 +596,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"ERROR: guardrail-audit: {exc}", file=sys.stderr)
         return 2
     print_audit_provenance("guardrail-audit", ROOT)
-
+    try:
+        targets = resolve_targets(ROOT, args.targets)
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: guardrail-audit: {exc}", file=sys.stderr)
+        return 2
     issues, summary = collect_issues(
-        args.targets,
+        targets,
         staged_only=args.staged_only,
         from_ref=args.from_ref,
     )
@@ -600,6 +621,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
+    if not summary["audit_complete"]:
+        return 2
     if args.check:
         blockers = [i for i in issues if i.severity in {"critical", "high"}]
         return 1 if blockers else 0

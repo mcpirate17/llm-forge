@@ -1,10 +1,12 @@
-# llm-forge platform laws
+# llm-forge platform reference
 
 llm-forge ships governance mechanics — claims, leased worktrees, a single landing gate,
 automated mutation evidence, and context/token budget discipline — as executable tooling
-under `src/conductor/`. This directory is the reference documentation for the *rules*
-behind that tooling, written for a host project adopting the platform rather than for the
-monorepo it was originally extracted from.
+under `src/conductor/`. This directory documents the policies those tools can support
+when a host explicitly adopts them. Shipping these tools does not activate their
+policies in Forge. The LLM repository's governance requirements apply only to LLM;
+Forge uses ordinary tests and code-quality checks without mandatory governance claims,
+landing-gate receipts, or mutation evidence.
 
 Each page keeps its **KB id** (`KB-GOV-01`, `KB-MUT-02`, …) as a stable anchor: the code
 and doc comments under `src/` cite these ids directly (`grep -rn 'KB-' src/` finds every
@@ -25,9 +27,8 @@ move. If you rename a page, keep the id in its front matter and its `#` heading.
 
 Every id cited anywhere under `src/` (`KB-GOV-01`, `KB-GOV-07`, `KB-MUT-02`, `KB-CI-01`) has
 a page above. `KB-GOV-02`, `KB-GOV-06` and `KB-OPS-CTX-01` are not yet cited by any source
-comment but are part of the same platform contract (branch/landing discipline, approval
-tiers, and the context-budget rules the retrieval tooling in this repo exists to enforce)
-and are documented here for the same reason the cited ones are.
+comment but document the same optional host policies (branch/landing discipline, approval
+tiers, and context-budget rules) and are included for the same reason the cited ones are.
 
 These pages are deliberately host-agnostic: no training runs, no GPU-specific rules, no
 corpus or model names, no personal names, and no absolute paths from the monorepo this
@@ -70,4 +71,5 @@ same thing) keeps resolving there unchanged.
 ## Top-level index
 
 See the [project README](../README.md) for how this package fits into a host project;
-`AGENTS.md` at the repository root is the working contract these pages elaborate on.
+`AGENTS.md` at the repository root contains Forge's own contribution rules. The host
+policy references in this directory do not add governance requirements to that contract.

@@ -1,12 +1,4 @@
-//! `forge`: native launcher for llm-forge's Claude Code hook path.
-//!
-//! Step 1 of the Rust hook port (see `research/rust_port_plan.md` section 4): this
-//! binary owns nothing yet but the process boundary. `forge hook <Event>` reads the
-//! hook JSON on stdin, times the call, and delegates whole to the existing Python
-//! dispatcher (`python -m tooling.hooks.dispatch <Event>`), forwarding stdin,
-//! stdout, stderr and the exit code unchanged. Later PRs move one hook body at a
-//! time into `handlers::registry()` and `dispatch::run_hook` stops shelling out for
-//! whatever is covered.
+//! Native agent platform: hooks, governance evidence, coordination and costs.
 
 mod active_state;
 mod bash_guard;
@@ -41,9 +33,13 @@ mod route;
 mod session_end;
 mod session_policy;
 mod session_preamble;
+mod status;
 mod subagent_stop;
 mod subagent_transcript;
 mod takeover;
+mod task_run;
+mod task_store;
+mod tasks;
 mod telemetry;
 mod tool_quiet;
 mod workspace_hygiene;
@@ -58,7 +54,7 @@ use std::process::ExitCode;
     // The git rev (stamped by build.rs, `unknown` outside a checkout) is
     // what `forge hooks status` compares an installed hook's binary by.
     version = concat!(env!("CARGO_PKG_VERSION"), " (git ", env!("FORGE_GIT_REV"), ")"),
-    about = "Native launcher for llm-forge's Claude Code hook path"
+    about = "Native hooks, task coordination, governance evidence and agent cost tooling"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -67,6 +63,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Durable assignment, execution, receipts, retries and lease recovery.
+    Task(tasks::TaskArgs),
+    /// Read-only health across tasks, claims, messaging, hooks and ledger paths.
+    Status(status::StatusArgs),
     /// Run one Claude Code hook event: read the payload on stdin, delegate to the
     /// Python dispatcher, forward its stdout/stderr/exit code unchanged.
     Hook {
@@ -213,6 +213,20 @@ fn resolve_agent_route(subagent_type: Option<&str>) -> ledger::agent_upsert::Age
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
+        Command::Task(args) => match tasks::run(args) {
+            Ok(code) => ExitCode::from(code),
+            Err(error) => {
+                eprintln!("forge task: {error:#}");
+                ExitCode::from(1)
+            }
+        },
+        Command::Status(args) => match status::run(args) {
+            Ok(code) => ExitCode::from(code),
+            Err(error) => {
+                eprintln!("forge status: {error:#}");
+                ExitCode::from(1)
+            }
+        },
         Command::Hook { event } => match dispatch::run_hook(&event) {
             Ok(code) => ExitCode::from(code),
             Err(err) => {

@@ -34,17 +34,19 @@ import argparse
 import difflib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
 import tomllib
 from collections.abc import Sequence
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from conductor import harness_provisioning, hook_installer
 from tooling.hooks.dispatch.paths import TOOLING_ROOT
 from tooling.hooks.dispatch.registry import EVENTS, LAUNCHER, settings_block
 
@@ -100,6 +102,7 @@ class InitConfig(BaseModel):
     force: bool = False
     dry_run: bool = False
     check: bool = False
+    providers: tuple[str, ...] = ("claude",)
 
 
 class FileAction(BaseModel):
@@ -224,7 +227,9 @@ def resolve_forge_binary(project_dir: Path) -> Path | None:
     return Path(found) if found else None
 
 
-def _hooks_block(forge_binary: Path | None) -> dict[str, Any]:
+def _hooks_block(
+    forge_binary: Path | None, python: Path | None = None
+) -> dict[str, Any]:
     """``settings_block()``'s hooks, with each event's command swapped to
     ``<forge_binary> hook <Event>`` when a forge binary was found -- the Python
     launcher command otherwise."""
@@ -232,15 +237,21 @@ def _hooks_block(forge_binary: Path | None) -> dict[str, Any]:
     if forge_binary is None:
         return block
     for event in EVENTS:
-        block[event][0]["hooks"][0]["command"] = f"{forge_binary} hook {event}"
+        argv = [str(forge_binary), "hook", event]
+        if python is not None:
+            argv = ["env", f"CONDUCTOR_PYTHON={python}", *argv]
+        block[event][0]["hooks"][0]["command"] = shlex.join(argv)
     return block
 
 
 def render_settings(
-    existing: str | None, force: bool, forge_binary: Path | None = None
+    existing: str | None,
+    force: bool,
+    forge_binary: Path | None = None,
+    python: Path | None = None,
 ) -> str:
     return _render_merged(
-        SETTINGS, existing, "hooks", _hooks_block(forge_binary), force
+        SETTINGS, existing, "hooks", _hooks_block(forge_binary, python), force
     )
 
 
@@ -549,23 +560,67 @@ def _pyproject_conductor_warnings(project_dir: Path) -> list[str]:
     ]
 
 
+def _provider_actions(config: InitConfig) -> list[FileAction]:
+    root = config.project_dir
+    actions = []
+    for provider in config.providers:
+        if provider == "claude":
+            actions.extend(
+                [
+                    _action(
+                        SETTINGS,
+                        _read(root, SETTINGS),
+                        render_settings(
+                            _read(root, SETTINGS),
+                            config.force,
+                            resolve_forge_binary(root),
+                            config.python,
+                        ),
+                    ),
+                    _action(
+                        LAUNCHER,
+                        _read(root, LAUNCHER),
+                        render_launcher(config.python),
+                        executable=True,
+                    ),
+                ]
+            )
+            continue
+        relative = str(hook_installer.PROVIDERS[provider].relative_path)
+        existing = _read(root, relative)
+        wanted = harness_provisioning.provider_hooks(provider, config.python, root)
+        if provider == "codex":
+            after = _render_merged(relative, existing, "hooks", wanted, config.force)
+        else:
+            # Only the bounded startup hook is managed for these providers;
+            # preserve every other hook, including one on the same event.
+            payload = hook_installer.merge_install(
+                _load_json(relative, existing),
+                hook_installer.PROVIDERS[provider],
+                hook_installer.startup_command(
+                    hook_installer.PROVIDERS[provider], interpreter=str(config.python)
+                ),
+            )
+            after = (
+                existing
+                if existing is not None and _load_json(relative, existing) == payload
+                else _dump_json(payload)
+            )
+        actions.append(_action(relative, existing, after))
+    return actions
+
+
 def plan(config: InitConfig, *, today: date | None = None) -> InitPlan:
     root = config.project_dir
-    forge_binary = resolve_forge_binary(root)
+    unknown = set(config.providers) - harness_provisioning.CAPABILITIES.keys()
+    if unknown or not config.providers:
+        raise InitError(
+            f"select supported providers: {', '.join(harness_provisioning.CAPABILITIES)}"
+        )
     actions = [
-        _action(
-            SETTINGS,
-            _read(root, SETTINGS),
-            render_settings(_read(root, SETTINGS), config.force, forge_binary),
-        ),
-        _action(
-            LAUNCHER,
-            _read(root, LAUNCHER),
-            render_launcher(config.python),
-            executable=True,
-        ),
+        *_provider_actions(config),
         _action(MCP, _read(root, MCP), render_mcp(_read(root, MCP), config)),
-        _create_once(root, POLICY, render_policy(today or date.today())),
+        _create_once(root, POLICY, render_policy(today or datetime.now(UTC).date())),
         _create_once(root, PREAUTH, PREAUTH_TEXT),
         _create_once(root, REGISTRY, REGISTRY_TEXT),
         _create_once(root, WORKFLOW, WORKFLOW_TEXT),
@@ -576,6 +631,11 @@ def plan(config: InitConfig, *, today: date | None = None) -> InitPlan:
         ),
     ]
     warnings: list[str] = []
+    warnings.extend(
+        f"{provider}: {harness_provisioning.CAPABILITIES[provider]}"
+        for provider in config.providers
+        if provider != "claude"
+    )
     if not _crg_importable(config.python):
         warnings.append(
             f"code_review_graph is not importable from {config.python}; the "
@@ -603,6 +663,21 @@ def run_doctor(config: InitConfig) -> int:
     """The hook doctor over the scaffolded settings; its exit status, output shown."""
     # The doctor, and the launcher it exercises, must see the tooling this init ran
     # with: the checkout in the monorepo, site-packages in a foreign install.
+    failed = False
+    for provider in config.providers:
+        if provider == "claude":
+            continue
+        errors = harness_provisioning.check_provider(
+            provider, config.python, config.project_dir
+        )
+        for error in errors:
+            print(f"conductor init | CHECK FAIL {error}", file=sys.stderr)
+        print(
+            f"conductor init | {provider} {'FAIL' if errors else 'PASS'} | {harness_provisioning.CAPABILITIES[provider]}"
+        )
+        failed |= bool(errors)
+    if "claude" not in config.providers:
+        return int(failed)
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join(
         [str(TOOLING_ROOT), *filter(None, [env.get("PYTHONPATH")])]
@@ -624,7 +699,7 @@ def run_doctor(config: InitConfig) -> int:
     )
     sys.stdout.write(proc.stdout)
     sys.stderr.write(proc.stderr)
-    return proc.returncode
+    return proc.returncode or int(failed)
 
 
 def _report(plan_: InitPlan, *, diff: bool) -> None:
@@ -665,6 +740,12 @@ def parse_args(argv: Sequence[str] | None) -> InitConfig:
     )
     parser.add_argument("project_dir", type=Path)
     parser.add_argument(
+        "--provider",
+        action="append",
+        choices=("all", *harness_provisioning.CAPABILITIES),
+        help="harness to provision; repeat or select all (default: claude)",
+    )
+    parser.add_argument(
         "--python",
         type=Path,
         default=Path(sys.executable),
@@ -691,6 +772,9 @@ def parse_args(argv: Sequence[str] | None) -> InitConfig:
         force=args.force,
         dry_run=args.dry_run,
         check=args.check,
+        providers=tuple(harness_provisioning.CAPABILITIES)
+        if "all" in (args.provider or [])
+        else tuple(dict.fromkeys(args.provider or ["claude"])),
     )
 
 
@@ -698,7 +782,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     config = parse_args(argv)
     try:
         return run(config)
-    except InitError as exc:
+    except (InitError, hook_installer.HookInstallerError) as exc:
         print(f"conductor init | REFUSED {exc}", file=sys.stderr)
         return 2
 

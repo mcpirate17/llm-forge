@@ -16,6 +16,7 @@
 use crate::takeover;
 use anyhow::{bail, Context, Result};
 use clap::{Args, Subcommand};
+use conductor_native::hook_installer::{shlex_join, shlex_split};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
@@ -72,6 +73,9 @@ pub struct InstallArgs {
     /// The forge binary the hooks call; defaults to this running binary.
     #[arg(long)]
     pub(crate) binary: Option<PathBuf>,
+    /// Pin the Python interpreter used for delegated hooks, independent of PATH.
+    #[arg(long)]
+    pub(crate) python: Option<PathBuf>,
     /// Print the unified diff and write nothing.
     #[arg(long)]
     pub(crate) dry_run: bool,
@@ -133,7 +137,10 @@ pub(crate) fn hook_command(binary: &str, mode: &str, standalone: bool, event: &s
     if standalone {
         command.push_str(" FORGE_HOOK_STANDALONE=1");
     }
-    command.push_str(&format!(" {binary} hook {event}"));
+    command.push_str(&format!(
+        " {} hook {event}",
+        shlex_join(&[binary.to_string()])
+    ));
     command
 }
 
@@ -162,35 +169,40 @@ pub(crate) struct ParsedHook {
     pub(crate) mode: String,
     pub(crate) standalone: bool,
     pub(crate) binary: String,
+    pub(crate) python: Option<String>,
 }
 
 fn parse_hook_command(command: &str) -> Option<ParsedHook> {
-    let tokens: Vec<&str> = command.split_whitespace().collect();
-    let i = tokens.iter().position(|t| *t == "hook")?;
-    if i == 0 || i + 1 >= tokens.len() {
+    let tokens = shlex_split(command).ok()?;
+    let i = tokens.iter().position(|t| t == "hook")?;
+    if i == 0 || i + 2 != tokens.len() {
         return None;
     }
-    let binary = tokens[i - 1];
+    let binary = &tokens[i - 1];
     if Path::new(binary).file_name()?.to_str()? != "forge" {
         return None;
     }
-    for token in &tokens[..i - 1] {
+    let prefix = usize::from(tokens.first().is_some_and(|t| t == "env"));
+    for token in &tokens[prefix..i - 1] {
         if !token.contains('=') {
             return None;
         }
     }
-    let env = &tokens[..i - 1];
+    let env = &tokens[prefix..i - 1];
     let mode = env
         .iter()
         .find_map(|t| t.strip_prefix("FORGE_MODE="))
         .unwrap_or("enforce")
         .to_string();
-    let standalone = env.contains(&"FORGE_HOOK_STANDALONE=1");
+    let standalone = env.iter().any(|t| t == "FORGE_HOOK_STANDALONE=1");
     Some(ParsedHook {
         event: tokens[i + 1].to_string(),
         mode,
         standalone,
         binary: binary.to_string(),
+        python: env
+            .iter()
+            .find_map(|t| t.strip_prefix("CONDUCTOR_PYTHON=").map(str::to_string)),
     })
 }
 
@@ -284,6 +296,24 @@ pub(crate) fn install(args: &InstallArgs) -> Result<u8> {
     }
     let standalone = args.standalone || args.takeover;
     let binary = resolve_binary(&args.binary)?;
+    let python = args
+        .python
+        .as_ref()
+        .map(|path| -> Result<PathBuf> {
+            let absolute = if path.is_absolute() {
+                path.clone()
+            } else {
+                std::env::current_dir()?.join(path)
+            };
+            if !absolute.is_file() {
+                bail!(
+                    "--python must name an existing interpreter: {}",
+                    absolute.display()
+                );
+            }
+            Ok(absolute)
+        })
+        .transpose()?;
     let (old_text, mut settings) = load_settings(&args.host)?;
     install_into(&mut settings, &binary, mode, standalone)?;
     let mut takeover_lines = Vec::new();
@@ -313,6 +343,9 @@ pub(crate) fn install(args: &InstallArgs) -> Result<u8> {
                 }
             });
         }
+    }
+    if let Some(python) = python.as_ref() {
+        bind_python(&mut settings, python);
     }
     let new_text = serialize(&settings);
     if old_text.as_deref() == Some(new_text.as_str()) {
@@ -349,8 +382,36 @@ pub(crate) fn install(args: &InstallArgs) -> Result<u8> {
     Ok(0)
 }
 
-/// `--binary` if given (made absolute against the cwd), else the absolute
-/// path of the running executable.
+/// Replace bindings after every installer phase, including takeover additions.
+fn bind_python(settings: &mut Value, python: &Path) {
+    if let Some(events) = settings.get_mut("hooks").and_then(Value::as_object_mut) {
+        for groups in events.values_mut().filter_map(Value::as_array_mut) {
+            for group in groups {
+                if let Some(hooks) = group.get_mut("hooks").and_then(Value::as_array_mut) {
+                    for hook in hooks {
+                        if let Some(command) = hook.get("command").and_then(Value::as_str) {
+                            if parse_hook_command(command).is_some() {
+                                let mut words = shlex_split(command).expect("parsed hook tokens");
+                                if words.first().is_some_and(|word| word == "env") {
+                                    words.remove(0);
+                                }
+                                words.retain(|word| !word.starts_with("CONDUCTOR_PYTHON="));
+                                let mut bound = vec![
+                                    "env".into(),
+                                    format!("CONDUCTOR_PYTHON={}", python.display()),
+                                ];
+                                bound.extend(words);
+                                hook["command"] = Value::String(shlex_join(&bound));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// `--binary` made absolute against cwd, otherwise the running executable.
 fn resolve_binary(binary: &Option<PathBuf>) -> Result<PathBuf> {
     if let Some(path) = binary {
         if path.is_absolute() {
@@ -542,8 +603,8 @@ fn status_line(event: &str, installed: &[ParsedHook], python: &str, missing_bina
         "n/a (binary missing)".to_string()
     };
     println!(
-        "{event}: installed mode={} standalone={} binary={} exists={} version={} python={python}",
-        parsed.mode, parsed.standalone, parsed.binary, exists, version
+        "{event}: installed mode={} standalone={} binary={} exists={} version={} python={python} bound_python={}",
+        parsed.mode, parsed.standalone, parsed.binary, exists, version, parsed.python.as_deref().unwrap_or("auto")
     );
     if installed.len() > 1 {
         println!(
@@ -747,6 +808,7 @@ mod tests {
             mode: mode.to_string(),
             standalone,
             binary: Some(PathBuf::from(BIN)),
+            python: None,
             dry_run: false,
             takeover: false,
         }
@@ -758,6 +820,7 @@ mod tests {
             mode: "warn".to_string(),
             standalone: false,
             binary: Some(PathBuf::from(BIN)),
+            python: None,
             dry_run,
             takeover: true,
         }
@@ -1067,4 +1130,67 @@ mod tests {
     // included (not a `mod`) so it shares `tests`'s own scope (`ScratchDir`,
     // `install`, `run`, `takeover`, ...) without a second `use super::*`.
     include!("hooks_install_takeover_tests.rs");
+
+    #[test]
+    fn explicit_python_and_quoted_binary_survive_reinstall_and_uninstall() {
+        let scratch = ScratchDir::new("python-binding");
+        let python = scratch.path().join("runtime with spaces/python");
+        std::fs::create_dir_all(python.parent().unwrap()).unwrap();
+        std::fs::write(&python, b"interpreter").unwrap();
+        let mut args = install_args(scratch.path(), "warn", false);
+        args.binary = Some(PathBuf::from("/tools with spaces/forge"));
+        args.python = Some(python.clone());
+        install(&args).unwrap();
+        let first = scratch.settings_text();
+        let mut already_bound = scratch.settings_value();
+        bind_python(&mut already_bound, &python);
+        assert_eq!(serialize(&already_bound), first);
+        for event in EVENTS {
+            let commands = commands_for(&scratch.settings_value(), event);
+            assert_eq!(commands.len(), 1);
+            let words = shlex_split(&commands[0]).unwrap();
+            assert!(words.contains(&format!("CONDUCTOR_PYTHON={}", python.display())));
+            let parsed = parse_hook_command(&commands[0]).unwrap();
+            assert_eq!(parsed.binary, "/tools with spaces/forge");
+            assert_eq!(parsed.python.as_deref(), python.to_str());
+            assert_eq!(parsed.event, event);
+        }
+        install(&args).unwrap();
+        assert_eq!(scratch.settings_text(), first);
+        let mut settings = scratch.settings_value();
+        assert_eq!(uninstall_from(&mut settings).unwrap().len(), EVENTS.len());
+        assert!(parse_hook_command("env X=1 /tools/forge hook SessionStart ; touch x").is_none());
+    }
+
+    #[test]
+    fn missing_explicit_python_is_refused_before_writing_settings() {
+        let scratch = ScratchDir::new("missing-python");
+        let mut args = install_args(scratch.path(), "warn", false);
+        args.python = Some(scratch.path().join("not-an-interpreter"));
+        assert!(install(&args).is_err());
+        assert!(!settings_path(scratch.path()).exists());
+    }
+
+    #[test]
+    fn takeover_added_entries_get_the_same_binding_without_duplicate_env_prefixes() {
+        let scratch = ScratchDir::new("takeover-python-binding");
+        scratch.write_settings(&dispatcher_settings());
+        let python = scratch.path().join("python");
+        std::fs::write(&python, b"interpreter").unwrap();
+        let mut args = takeover_args(scratch.path(), false);
+        args.python = Some(python.clone());
+        install(&args).unwrap();
+        let first = scratch.settings_text();
+        install(&args).unwrap();
+        assert_eq!(scratch.settings_text(), first);
+        for event in ["PreToolUse", "PostToolUse", "SubagentStop"] {
+            let entries = scratch.settings_value()["hooks"][event]
+                .as_array()
+                .unwrap()
+                .clone();
+            let parsed: Vec<_> = entries.iter().flat_map(entry_parsed_hooks).collect();
+            assert_eq!(parsed.len(), 1, "expected one native binding for {event}");
+            assert_eq!(parsed[0].python.as_deref(), python.to_str());
+        }
+    }
 }
