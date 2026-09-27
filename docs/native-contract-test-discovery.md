@@ -22,7 +22,9 @@ select their registered contracts and must be canonical regular files before
 those contracts run. They are data inputs, never applied by discovery.
 Contracts can also register top-level Rust source dependencies under
 `native/conductor-native/src/` or `native/slop-core/src/` when a test exercises,
-reads, or checks those inputs.
+reads, or checks those inputs. Providers under `native/forge/src/` may also
+use nested Rust modules, such as `ledger/outcome.rs`; the same path validation
+rejects traversal and malformed components.
 Changing a registered Rust path selects its contract, but does not add that path
 to the Python coverage source list. Such a mapping alone does not establish
 behavioral coverage of the Rust implementation.
