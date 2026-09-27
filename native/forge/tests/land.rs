@@ -56,6 +56,10 @@ impl Fixture {
         git(&root, &["clone", "--quiet", "remote.git", "work"]);
         let fixture = Self { root };
         let work = fixture.work();
+        // forge land must carry this identity into its clone: the runs
+        // below see no global git config.
+        git(&work, &["config", "user.name", "t"]);
+        git(&work, &["config", "user.email", "t@t"]);
         std::fs::create_dir_all(work.join(".forge")).unwrap();
         std::fs::write(
             work.join(".forge/land.toml"),
@@ -98,6 +102,11 @@ impl Fixture {
         Command::new(env!("CARGO_BIN_EXE_forge"))
             .args(["land", branch])
             .current_dir(self.work())
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env_remove("GIT_COMMITTER_NAME")
+            .env_remove("GIT_COMMITTER_EMAIL")
+            .env_remove("EMAIL")
             .output()
             .unwrap()
     }
@@ -130,12 +139,12 @@ fn text(out: &Output) -> String {
 #[test]
 fn a_green_branch_fast_forwards_the_target_and_is_deleted() {
     let f = Fixture::new("grep -q feat a.txt");
-    // Master moves after the branch forks: landing must rebase.
+    f.push_branch("feat", "a.txt", "feat: a\n\nAgent: t");
+    // Master moves after the branch forks: landing must rebase, which
+    // writes commits and so needs the invoker's identity in the clone.
     f.push_branch("side", "b.txt", "feat: side\n\nAgent: t");
     git(&f.work(), &["push", "--quiet", "origin", "side:master"]);
     git(&f.work(), &["push", "--quiet", "origin", ":side"]);
-    f.push_branch("feat", "a.txt", "feat: a\n\nAgent: t");
-    git(&f.work(), &["reset", "--quiet", "--hard", "HEAD~1"]);
     let before = f.remote_ref("master").unwrap();
     let out = f.land("feat");
     assert!(out.status.success(), "{}", text(&out));

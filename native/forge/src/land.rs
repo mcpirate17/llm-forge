@@ -157,7 +157,7 @@ pub fn run(args: LandArgs) -> Result<u8> {
     let boot = Config::parse(&text)?;
     let url = git(&here, &["remote", "get-url", &boot.remote])?;
     let _lock = acquire_lock(&boot.clone_dir)?;
-    let clone = prepare_clone(&boot, &url)?;
+    let clone = prepare_clone(&boot, &url, &here)?;
     let config = target_config(&clone, &boot)?.unwrap_or(boot);
     let landing = rebase(&clone, &config, &args.branch)?;
     let failed = run_steps(&clone, &config, &landing)?;
@@ -209,7 +209,7 @@ fn acquire_lock(clone_dir: &Path) -> Result<File> {
     Ok(file)
 }
 
-fn prepare_clone(config: &Config, url: &str) -> Result<PathBuf> {
+fn prepare_clone(config: &Config, url: &str, here: &Path) -> Result<PathBuf> {
     let clone = config.clone_dir.clone();
     if !clone.join(".git").exists() {
         let parent = clone.parent().context("clone_dir has no parent")?;
@@ -221,6 +221,13 @@ fn prepare_clone(config: &Config, url: &str) -> Result<PathBuf> {
         )?;
     }
     git(&clone, &["remote", "set-url", &config.remote, url])?;
+    // The rebase writes commits, so it needs the invoker's identity; a
+    // machine without a global one would otherwise fail every real rebase.
+    for key in ["user.name", "user.email"] {
+        let value = git(here, &["config", key])
+            .with_context(|| format!("{key} is unset where forge land was invoked"))?;
+        git(&clone, &["config", key, &value])?;
+    }
     // A previous landing killed mid-rebase leaves state behind; clear it.
     // `clean -fd` without `-x` keeps ignored state (venv, target/).
     let _ = git_ok(&clone, &["rebase", "--abort"]);
@@ -267,9 +274,9 @@ fn rebase(clone: &Path, config: &Config, branch: &str) -> Result<Landing> {
         clone,
         &["checkout", "--quiet", "-B", WORK_BRANCH, &branch_sha],
     )?;
-    if !git_ok(clone, &["rebase", "--quiet", &base]) {
+    if let Err(err) = git(clone, &["rebase", "--quiet", &base]) {
         let _ = git_ok(clone, &["rebase", "--abort"]);
-        bail!("{branch} does not rebase cleanly onto {target}; rebase it yourself and push");
+        bail!("{branch} does not rebase onto {target}; rebase it yourself and push\n{err:#}");
     }
     let head = git(clone, &["rev-parse", "HEAD"])?;
     let range = format!("{base}..{head}");
