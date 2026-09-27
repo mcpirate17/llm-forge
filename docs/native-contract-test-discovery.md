@@ -72,7 +72,7 @@ probes the selected Python executable for PyO3 instead of inheriting an
 unrelated `PYO3_CONFIG_FILE`. Cargo builds and tests stay offline with two
 jobs; the standalone runner applies a 900-second wall timeout to each build
 and test command. Rust integration contracts are reported separately from
-pytest files. The native-ablation and candidate-style contracts also build
+pytest files. The native-ablation, candidate-style, and reuse contracts also build
 the candidate's `slop-core` crate and stage `slop_core.so` ahead of installed
 packages. Their slop manifest must be a canonical regular file; an unrelated
 contract does not require it. Add future contracts importing `slop_core` to

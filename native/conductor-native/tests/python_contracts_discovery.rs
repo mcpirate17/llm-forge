@@ -420,10 +420,16 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_mutation_coverage",
             "python_contracts_mutation_receipt_encoding",
             "python_contracts_mutation_run_scope",
+            "python_contracts_mutation_support_host",
+            "python_contracts_mutation_support_process",
             "python_contracts_mutation_testing_core",
             "python_contracts_mutation_testing_evidence",
             "python_contracts_post_tool_parity",
             "python_contracts_post_tool_quiet",
+            "python_contracts_reuse_consolidation",
+            "python_contracts_reuse_file_families",
+            "python_contracts_reuse_inventory",
+            "python_contracts_reuse_roi",
             "python_contracts_session_brief",
         ]
     );

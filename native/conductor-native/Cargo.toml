@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.54"
+version = "0.1.55"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -25,6 +25,13 @@ bench = false
 [[bin]]
 name = "crg_venv_sync_child"
 path = "tests/fixtures/crg_venv_sync_child.rs"
+required-features = ["python-compat-tests"]
+test = false
+bench = false
+
+[[bin]]
+name = "mutation_support_child"
+path = "tests/fixtures/mutation_support_child.rs"
 required-features = ["python-compat-tests"]
 test = false
 bench = false

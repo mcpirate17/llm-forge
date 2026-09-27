@@ -230,6 +230,10 @@ fn slop_build_is_selected_only_for_observed_consumers() {
             ("python_contracts_probe", false),
             ("python_contracts_native_ablations", true),
             ("python_contracts_candidate_style", true),
+            ("python_contracts_reuse_inventory", true),
+            ("python_contracts_reuse_roi", true),
+            ("python_contracts_reuse_consolidation", true),
+            ("python_contracts_reuse_file_families", true),
         ] {
             let plan = native_runtime_plan(py, &root, &[target]).unwrap();
             let builds = plan["build_commands"].as_array().unwrap();

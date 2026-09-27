@@ -38,8 +38,10 @@ along with its campaign JSON and toy source/scope files. These are existing
 fixture bytes and remain unchanged. The tests create only temporary Git
 repositories and synthetic receipt data; they never apply the patch, run a
 mutation engine, or create a worktree. The separate 21-case
-`test_mutation_testing_support.py` suite exercises real process groups and is
-left for a dedicated bounded cohort.
+`test_mutation_testing_support.py` suite exercises real process groups; it was
+subsequently retired in the dedicated
+[`native-mutation-support-tests-migration.md`](native-mutation-support-tests-migration.md)
+cohort.
 
 Historical nodeids in `mutation_runner_lineage.json`, the candidate-review
 grandfathered inventory, fixture titles/docstrings, and graph-context string

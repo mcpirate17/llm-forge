@@ -10,9 +10,13 @@ const SLOP_MANIFEST: &str = "native/slop-core/Cargo.toml";
 
 // Keep this list aligned with contracts that import slop_core. Candidate
 // verification must build their extension from the selected source snapshot.
-const SLOP_CONSUMERS: [&str; 2] = [
+const SLOP_CONSUMERS: &[&str] = &[
     "python_contracts_candidate_style",
     "python_contracts_native_ablations",
+    "python_contracts_reuse_inventory",
+    "python_contracts_reuse_roi",
+    "python_contracts_reuse_consolidation",
+    "python_contracts_reuse_file_families",
 ];
 
 fn required_string<'a>(request: &'a Value, key: &str) -> Result<&'a str, String> {
