@@ -1,5 +1,27 @@
 # Native test migration
 
+At pinned commit `6ba68187ffedb4984f32f8f85b0c5a1370efefdc`, the separate
+Rust-test source milestone is **82.3393%**: 88,173 Rust test code lines and
+18,912 Python test code lines under the unchanged path and inline-test rules.
+The cost and attribution cohorts retired six Python suites and added 82 named
+Rust-owned contracts across six targets. The pinned tree retains 54 executable
+Python test suites; 32 static Python fixture inputs and the shared conftest are
+classified separately. Production remains **50.5489% native**. These are
+source-composition metrics, not behavioral coverage or a claim that all tests
+have been converted. The [full method and pinned evidence](native-migration.md#latest-verified-commit)
+record every counted input.
+
+At pinned commit `ab49a53a1ec3cef4a21f69370c1fe1ffd25089ba`, the separate
+Rust-test source milestone is **81.0229%**: 85,685 Rust test code lines and
+20,069 Python test code lines under the unchanged path and inline-test rules.
+The cohort retired three Python suites covering baseline merge, protected
+deletes, and commit snapshots; 60 executable Python suites remain in the
+pinned tree. The 32 static Python input fixtures and shared conftest are
+classified separately. Production remains **50.5489% native**. These are
+source-composition metrics, not behavioral coverage or a claim that all tests
+have been converted. The [pinned evidence](native-metrics/ab49a53-evidence.tar.gz)
+record every counted input.
+
 At pinned commit `4111905d2cdf6bca1e5855e6fcd56274c2d92a55`, the separate
 Rust-test source milestone is **80.6873%**: 85,038 Rust test code lines and
 20,354 Python test code lines under the unchanged path and inline-test rules.
@@ -8,7 +30,7 @@ Python dispatcher stub with a Rust fixture crate. The pinned tree retains 63
 executable Python suites; 32 static Python fixture inputs and the shared
 conftest are classified separately. Production remains **50.5489% native**.
 These are source-composition metrics, not behavioral coverage or a claim that
-all tests have been converted. The [full method and pinned evidence](native-migration.md#latest-verified-commit)
+all tests have been converted. The [pinned evidence](native-metrics/4111905-evidence.tar.gz)
 record every counted input.
 
 At pinned commit `a344b9ab8c1b432f2429fd01924b4d6c1bffb688`, the separate
