@@ -75,6 +75,10 @@ https://github.com/mcpirate17/llm-forge --rev d2d83d671977e464effcb44f52dcf47008
 --locked --root .tools forge`. Add the resulting `.tools/bin` to PATH. Keep all
 components pinned to the same reviewed revision when upgrading.
 
+The current Python extension requires the same shared SQLite library as Python's
+`_sqlite3` module. See [native SQLite setup](docs/native-sqlite.md) for build
+dependencies and compatibility checks. The standalone Forge binary bundles SQLite.
+
 ## Bootstrap a host project
 
 Using the current checkout's environment and native build above:

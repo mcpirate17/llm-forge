@@ -42,6 +42,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install shared SQLite build dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libsqlite3-dev pkg-config
       - run: uv sync --extra test
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -148,6 +152,10 @@ jobs:
       - uses: astral-sh/setup-uv@v3
         with:
           python-version: "3.12"
+      - name: Install shared SQLite build dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libsqlite3-dev pkg-config
       - run: uv sync --extra test
       - name: Repo-wide receipt decode canary
         run: uv run python -m conductor.mutation_coverage canary
@@ -177,6 +185,11 @@ jobs:
       - name: Enforce Python-free Forge builds
         if: matrix.crate == 'forge'
         run: echo 'PYO3_NO_PYTHON=1' >> "$GITHUB_ENV"
+      - name: Install shared SQLite build dependency
+        if: matrix.crate == 'conductor-native'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libsqlite3-dev pkg-config
       - name: cargo fmt --check
         working-directory: native/${{ matrix.crate }}
         run: cargo fmt --check

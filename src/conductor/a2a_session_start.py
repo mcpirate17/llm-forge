@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Provider-neutral A2A session bootstrap with a bounded inbox view.
 
 The transport and durable journal remain lossless.  This entrypoint starts the
@@ -196,11 +195,12 @@ def serve_command(
     *, identity: str, state_dir: Path, interpreter: str = sys.executable
 ) -> list[str]:
     """Build the detached endpoint command for one registered identity."""
+    from conductor.a2a_delivery import _forge_binary
 
+    del interpreter  # Kept for callers using the historical signature.
     return [
-        interpreter,
-        "-m",
-        "conductor.agent_a2a",
+        str(_forge_binary()),
+        "mailbox",
         "--state-dir",
         str(state_dir),
         "serve",
@@ -280,7 +280,7 @@ def ensure_serve(
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
-    except OSError as exc:
+    except (OSError, A2aError) as exc:
         raise SessionStartError(
             f"cannot start A2A serve for {identity!r}: {exc}"
         ) from exc

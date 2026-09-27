@@ -17,8 +17,9 @@ import shutil
 import subprocess
 import sys
 import textwrap
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Self
 
 import pytest
 
@@ -215,7 +216,7 @@ def patched_urlopen(
             def read(self) -> bytes:
                 return body
 
-            def __enter__(self) -> _Resp:
+            def __enter__(self) -> Self:
                 return self
 
             def __exit__(self, *args: object) -> None:
@@ -245,10 +246,6 @@ def patched_urlopen(
 # This list is debt, not architecture. Every entry is a place conductor reaches
 # outside its own boundary; the goal is for it to reach zero.
 HOST_PROJECT_TESTS: dict[str, str] = {
-    "test_candidate_review_cli_policy.py::test_latency_benchmark_uses_isolated_real_git_candidates": (
-        "the benchmark's subject is the host governance surface -- GOVERNANCE_PATHS "
-        "names .github/CODEOWNERS, AGENTS.md, the Makefile and research/notes"
-    ),
     "test_repo_index.py::test_the_index_resolves_every_import_the_ast_matcher_did": (
         "the thresholds describe the host tree's scale; a standalone install has no "
         "host tree to find and the guard has nothing to say"

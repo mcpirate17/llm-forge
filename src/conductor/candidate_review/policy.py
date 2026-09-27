@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import fnmatch
+import json
 import re
 import tomllib
-from dataclasses import dataclass
-from datetime import date, datetime, timezone
-from pathlib import Path, PurePosixPath
-from typing import Any, Collection, Iterable, Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
+from dataclasses import asdict, dataclass
+from datetime import UTC, date, datetime
+from pathlib import Path
+from typing import Any
 
 from conductor.candidate_review.model import (
     Change,
@@ -296,27 +298,26 @@ class Policy:
     tools: tuple[ToolPolicy, ...] = ()
 
     def classify_change(self, change: Change) -> Change:
-        candidate_paths = tuple(
-            path for path in (change.path, change.old_path) if path is not None
-        )
-        classes = set(_intrinsic_classes(change))
-        if change.old_path:
-            classes.update(
-                _intrinsic_classes(
-                    change,
-                    path_override=change.old_path,
-                    mode_override=change.old_mode,
-                )
+        from conductor._native import candidate_policy_classify_native
+
+        result = json.loads(
+            candidate_policy_classify_native(
+                json.dumps(
+                    {
+                        "path": change.path,
+                        "old_path": change.old_path,
+                        "new_mode": change.new_mode,
+                        "old_mode": change.old_mode,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "class_globs": self.class_globs,
+                        "generated_globs": self.generated_globs,
+                        "high_risk_globs": self.high_risk_globs,
+                    }
+                ),
             )
-        for class_name, patterns in self.class_globs.items():
-            if any(_matches_any(path, patterns) for path in candidate_paths):
-                classes.add(class_name)
-        if any(_matches_any(path, self.generated_globs) for path in candidate_paths):
-            classes.add("generated")
-        risk = (
-            "high"
-            if any(_matches_any(path, self.high_risk_globs) for path in candidate_paths)
-            else "normal"
         )
         return Change(
             status=change.status,
@@ -326,26 +327,156 @@ class Policy:
             new_mode=change.new_mode,
             old_oid=change.old_oid,
             new_oid=change.new_oid,
-            classes=tuple(sorted(classes)),
-            risk=risk,
+            classes=tuple(result["classes"]),
+            risk=result["risk"],
         )
 
     def active_checks(self, profile: str) -> tuple[CheckPolicy, ...]:
         return tuple(check for check in self.checks if profile in check.profiles)
 
 
-def _matches_any(path: str, patterns: Iterable[str]) -> bool:
-    return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
+def _native_json(raw: Any) -> str:
+    def convert(value: Any) -> str:
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        if isinstance(value, Path):
+            return str(value)
+        raise TypeError(f"unsupported policy value: {type(value).__name__}")
+
+    return json.dumps(raw, default=convert)
 
 
-def _is_test_path(rel_path: str) -> bool:
-    """The runtime test-path rule: tests/ segment, test_ prefix, or test suffix."""
+def _date(raw: str | None) -> date | None:
+    return None if raw is None else date.fromisoformat(raw)
 
-    path = PurePosixPath(rel_path)
-    return (
-        "test" in path.parts
-        or path.name.startswith("test_")
-        or path.name.endswith(TEST_NAME_SUFFIXES)
+
+def _check(raw: dict[str, Any]) -> CheckPolicy:
+    return CheckPolicy(
+        **{
+            **raw,
+            "severity": Severity(raw["severity"]),
+            **{
+                key: tuple(raw[key])
+                for key in (
+                    "profiles",
+                    "classes",
+                    "exclude_classes",
+                    "command",
+                    "version_command",
+                )
+            },
+        }
+    )
+
+
+def _exception(raw: dict[str, Any]) -> ExceptionPolicy:
+    return ExceptionPolicy(**{**raw, "expires": date.fromisoformat(raw["expires"])})
+
+
+def _waiver(raw: dict[str, Any]) -> MutationWaiverPolicy:
+    return MutationWaiverPolicy(
+        **{
+            **raw,
+            "expires": date.fromisoformat(raw["expires"]),
+            "sources": tuple(WaiverSourceBinding(**entry) for entry in raw["sources"]),
+        }
+    )
+
+
+def _value_waiver(raw: dict[str, Any]) -> ValueWaiverPolicy:
+    return ValueWaiverPolicy(
+        **{
+            **raw,
+            "nodeids": tuple(raw["nodeids"]),
+            "approved_on": date.fromisoformat(raw["approved_on"]),
+            "expires": _date(raw["expires"]),
+        }
+    )
+
+
+def _parse_value_waivers(raw: Any) -> tuple[ValueWaiverPolicy, ...]:
+    from conductor._native import candidate_value_waivers_parse_native
+
+    try:
+        rows = json.loads(candidate_value_waivers_parse_native(_native_json(raw)))
+    except ValueError as exc:
+        raise PolicyError(str(exc)) from exc
+    return tuple(_value_waiver(row) for row in rows)
+
+
+def _fragment(operation: str, raw: Any) -> Any:
+    from conductor._native import candidate_policy_fragment_native
+
+    try:
+        return json.loads(
+            candidate_policy_fragment_native(
+                operation, _native_json(raw), datetime.now(UTC).date().isoformat()
+            )
+        )
+    except ValueError as exc:
+        raise PolicyError(str(exc)) from exc
+
+
+def _attribution_value(value: Any, *, field: str) -> str:
+    return _fragment("attribution", {"value": value, "field": field})
+
+
+def _string_tuple(
+    value: Any, *, field: str, allow_empty: bool = True
+) -> tuple[str, ...]:
+    return tuple(
+        _fragment(
+            "strings", {"value": value, "field": field, "allow_empty": allow_empty}
+        )
+    )
+
+
+def _positive_int(value: Any, *, field: str, maximum: int | None = None) -> int:
+    return _fragment("positive", {"value": value, "field": field, "maximum": maximum})
+
+
+def _non_negative_int(value: Any, *, field: str, maximum: int | None = None) -> int:
+    return _fragment(
+        "nonnegative", {"value": value, "field": field, "maximum": maximum}
+    )
+
+
+def _float_percent(value: Any, *, field: str) -> float:
+    return _fragment("percent", {"value": value, "field": field})
+
+
+def _bool_value(value: Any, *, field: str) -> bool:
+    return _fragment("boolean", {"value": value, "field": field})
+
+
+def _date_value(value: Any, *, field: str) -> date:
+    return date.fromisoformat(_fragment("date", {"value": value, "field": field}))
+
+
+def _parse_check(check_id: str, raw: Any) -> CheckPolicy:
+    return _check(_fragment("check", {"id": check_id, "value": raw}))
+
+
+def _validate_exception_path(path: str) -> None:
+    _fragment("exception_path", path)
+
+
+def _parse_exception(raw: Any) -> ExceptionPolicy:
+    return _exception(_fragment("exception", raw))
+
+
+def _parse_baselines(raw: Any) -> tuple[BaselinePolicy, ...]:
+    return tuple(
+        BaselinePolicy(
+            **{
+                **row,
+                "classes": tuple(row["classes"]),
+                "required_profiles": tuple(row["required_profiles"]),
+            }
+        )
+        for row in _fragment("baselines", raw)
     )
 
 
@@ -355,562 +486,29 @@ def _intrinsic_classes(
     path_override: str | None = None,
     mode_override: str | None = None,
 ) -> set[str]:
-    path = PurePosixPath(path_override or change.path)
-    suffix = path.suffix.lower()
-    classes: set[str] = set()
-    if suffix in {".py", ".pyi"}:
-        classes.update({"python", "source"})
-    elif suffix == ".rs":
-        classes.update({"native", "source", "rust"})
-    elif suffix in {".c", ".cc", ".cpp", ".cxx", ".cu", ".cuh", ".h", ".hpp"}:
-        classes.update({"native", "source", "cfamily"})
-        # clang-format and clang-tidy parse C and C++; nvcc's CUDA dialect is
-        # theirs only with --cuda-gpu-arch and a CUDA toolkit, so .cu/.cuh get
-        # their own class and stay out of the C-family tool wrappers.
-        if suffix in {".cu", ".cuh"}:
-            classes.add("cuda")
-        else:
-            classes.add("cfamily_host")
-    elif suffix in {".js", ".jsx", ".ts", ".tsx", ".css"}:
-        classes.update({"source", "web"})
-    elif suffix in {".sh", ".bash"}:
-        classes.update({"source", "shell"})
-    elif suffix in {".md", ".rst", ".txt"}:
-        classes.add("docs")
-    elif suffix == ".ipynb":
-        classes.add("notebook")
-    elif suffix in {".toml", ".yaml", ".yml", ".json", ".ini", ".cfg"}:
-        classes.add("config")
-        if suffix == ".toml":
-            classes.add("toml")
-    if suffix in {".so", ".dll", ".dylib", ".a", ".o", ".pt", ".pth", ".bin"}:
-        classes.add("binary")
-    if path.name in {
-        "pyproject.toml",
-        "uv.lock",
-        "requirements.txt",
-        "requirements-dev.txt",
-    }:
-        classes.update({"dependency", "python_dependency"})
-    if path.name in {"package.json", "package-lock.json", "npm-shrinkwrap.json"}:
-        classes.update({"dependency", "node_dependency"})
-    if path.name in {"Cargo.toml", "Cargo.lock"}:
-        classes.update({"dependency", "rust_dependency"})
-    if _is_test_path(str(path)):
-        classes.add("test")
-    if (mode_override or change.new_mode) == "120000":
-        classes.add("symlink")
-    return classes
+    from conductor._native import candidate_policy_classify_native
 
-
-def _string_tuple(
-    value: Any, *, field: str, allow_empty: bool = True
-) -> tuple[str, ...]:
-    if not isinstance(value, list) or any(
-        not isinstance(item, str) or not item for item in value
-    ):
-        raise PolicyError(f"{field} must be an array of non-empty strings")
-    if not allow_empty and not value:
-        raise PolicyError(f"{field} must not be empty")
-    return tuple(value)
-
-
-def _positive_int(value: Any, *, field: str, maximum: int | None = None) -> int:
-    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-        raise PolicyError(f"{field} must be a positive integer")
-    if maximum is not None and value > maximum:
-        raise PolicyError(f"{field} must be <= {maximum}, got {value}")
-    return value
-
-
-def _non_negative_int(value: Any, *, field: str, maximum: int | None = None) -> int:
-    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-        raise PolicyError(f"{field} must be a non-negative integer")
-    if maximum is not None and value > maximum:
-        raise PolicyError(f"{field} must be <= {maximum}, got {value}")
-    return value
-
-
-def _float_percent(value: Any, *, field: str) -> float:
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
-        raise PolicyError(f"{field} must be numeric")
-    result = float(value)
-    if result < 0.0 or result > 100.0:
-        raise PolicyError(f"{field} must be between 0 and 100")
-    return result
-
-
-VALID_ATTRIBUTIONS = {"candidate", "diff"}
-
-
-def _attribution_value(value: Any, *, field: str) -> str:
-    """Validate a check's blocking-attribution mode.
-
-    Unknown values are refused rather than defaulted, because silently reading a
-    typo as "candidate" would quietly make a check block on inherited debt again --
-    the exact failure this field exists to end.
-    """
-    if not isinstance(value, str) or value not in VALID_ATTRIBUTIONS:
-        raise PolicyError(f"{field} must be one of {sorted(VALID_ATTRIBUTIONS)}")
-    return value
-
-
-def _bool_value(value: Any, *, field: str) -> bool:
-    if not isinstance(value, bool):
-        raise PolicyError(f"{field} must be a boolean")
-    return value
-
-
-def _date_value(value: Any, *, field: str) -> date:
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    if isinstance(value, str):
-        try:
-            return date.fromisoformat(value)
-        except ValueError as exc:
-            raise PolicyError(f"{field} must be an ISO date") from exc
-    raise PolicyError(f"{field} must be an ISO date")
-
-
-def _parse_check(check_id: str, raw: Any) -> CheckPolicy:
-    if not isinstance(raw, dict):
-        raise PolicyError(f"checks.{check_id} must be a table")
-    unknown = set(raw) - ALLOWED_CHECK_KEYS
-    if unknown:
-        raise PolicyError(f"checks.{check_id} has unknown keys: {sorted(unknown)}")
-    kind = raw.get("kind")
-    if kind not in {"builtin", "command"}:
-        raise PolicyError(f"checks.{check_id}.kind must be builtin or command")
-    profiles = _string_tuple(
-        raw.get("profiles"), field=f"checks.{check_id}.profiles", allow_empty=False
+    result = json.loads(
+        candidate_policy_classify_native(
+            json.dumps(
+                {
+                    "path": path_override or change.path,
+                    "new_mode": mode_override or change.new_mode,
+                }
+            ),
+            '{"class_globs":{},"generated_globs":[],"high_risk_globs":[]}',
+        )
     )
-    if set(profiles) - {"fast", "full"}:
-        raise PolicyError(f"checks.{check_id}.profiles contains an unknown profile")
-    classes = _string_tuple(raw.get("classes", []), field=f"checks.{check_id}.classes")
-    if set(classes) - VALID_CLASSES:
-        raise PolicyError(f"checks.{check_id}.classes contains an unknown class")
-    exclude_classes = _string_tuple(
-        raw.get("exclude_classes", []), field=f"checks.{check_id}.exclude_classes"
-    )
-    if set(exclude_classes) - VALID_CLASSES:
-        raise PolicyError(
-            f"checks.{check_id}.exclude_classes contains an unknown class"
-        )
-    command = _string_tuple(raw.get("command", []), field=f"checks.{check_id}.command")
-    version = _string_tuple(
-        raw.get("version_command", []), field=f"checks.{check_id}.version_command"
-    )
-    if kind == "command" and (not command or not version):
-        raise PolicyError(
-            f"command check {check_id} requires command and version_command"
-        )
-    try:
-        severity = Severity(str(raw.get("severity", "high")))
-    except ValueError as exc:
-        raise PolicyError(f"checks.{check_id}.severity is invalid") from exc
-    return CheckPolicy(
-        check_id=check_id,
-        kind=kind,
-        profiles=profiles,
-        classes=classes,
-        exclude_classes=exclude_classes,
-        command=command,
-        version_command=version,
-        severity=severity,
-        timeout_seconds=_positive_int(
-            raw.get("timeout_seconds", 60),
-            field=f"checks.{check_id}.timeout_seconds",
-            maximum=3600,
-        ),
-        memory_mb=_positive_int(
-            raw.get("memory_mb", 2048),
-            field=f"checks.{check_id}.memory_mb",
-            maximum=65536,
-        ),
-        attribution=_attribution_value(
-            raw.get("attribution", "candidate"), field=f"checks.{check_id}.attribution"
-        ),
-        always=_bool_value(raw.get("always", False), field=f"checks.{check_id}.always"),
-        cache=_bool_value(raw.get("cache", True), field=f"checks.{check_id}.cache"),
-        run_on_deletions=_bool_value(
-            raw.get("run_on_deletions", False),
-            field=f"checks.{check_id}.run_on_deletions",
-        ),
-        max_output_chars=_positive_int(
-            raw.get("max_output_chars", 12000),
-            field=f"checks.{check_id}.max_output_chars",
-        ),
-        shard_max_files=_non_negative_int(
-            raw.get("shard_max_files", 0),
-            field=f"checks.{check_id}.shard_max_files",
-        ),
-        shard_workers=_positive_int(
-            raw.get("shard_workers", 1),
-            field=f"checks.{check_id}.shard_workers",
-            maximum=32,
-        ),
-        wall_timeout_override=_non_negative_int(
-            raw.get("wall_timeout_seconds", 0),
-            field=f"checks.{check_id}.wall_timeout_seconds",
-        ),
-    )
+    return set(result["classes"])
 
 
-def _validate_exception_path(path: str) -> None:
-    if path in {"*", "**", "**/*", ".", "./*"} or path.startswith("/"):
-        raise PolicyError(f"exception path is a forbidden blanket scope: {path!r}")
-    literals = [
-        part for part in PurePosixPath(path).parts if not re.search(r"[*?\[]", part)
-    ]
-    if len(literals) < 2:
-        raise PolicyError(
-            f"exception path must have at least two literal segments: {path!r}"
-        )
-
-
-def _parse_exception(raw: Any) -> ExceptionPolicy:
-    if not isinstance(raw, dict):
-        raise PolicyError("each exceptions entry must be a table")
-    unknown = set(raw) - ALLOWED_EXCEPTION_KEYS
-    if unknown:
-        raise PolicyError(f"exception has unknown keys: {sorted(unknown)}")
-    required = {"id", "check", "path", "owner", "justification", "expires"}
-    missing = required - set(raw)
-    if missing:
-        raise PolicyError(f"exception is missing required keys: {sorted(missing)}")
-    path = str(raw["path"])
-    _validate_exception_path(path)
-    justification = str(raw["justification"]).strip()
-    owner = str(raw["owner"]).strip()
-    if len(justification) < 20 or len(owner) < 2:
-        raise PolicyError("exception owner/justification is not specific enough")
-    return ExceptionPolicy(
-        exception_id=str(raw["id"]),
-        check_id=str(raw["check"]),
-        rule_id=str(raw["rule"]) if raw.get("rule") else None,
-        path=path,
-        fingerprint=str(raw["fingerprint"]) if raw.get("fingerprint") else None,
-        owner=owner,
-        justification=justification,
-        expires=_date_value(raw["expires"], field="exceptions.expires"),
-    )
-
-
-def _parse_mutation_waiver(raw: Any) -> MutationWaiverPolicy:
-    if not isinstance(raw, dict):
-        raise PolicyError("each mutation_waivers entry must be a table")
-    unknown = set(raw) - ALLOWED_WAIVER_KEYS
-    if unknown:
-        raise PolicyError(f"mutation waiver has unknown keys: {sorted(unknown)}")
-    required = {
-        "id",
-        "path",
-        "owner",
-        "justification",
-        "expires",
-        "milestone",
-        "integration_base",
-        "source_anchor",
-        "sha256",
-        "binding_clause",
-    }
-    missing = required - set(raw)
-    if missing:
-        raise PolicyError(
-            f"mutation waiver is missing required keys: {sorted(missing)}"
-        )
-    waiver_id = raw["id"]
-    if not isinstance(waiver_id, str) or not waiver_id.strip():
-        raise PolicyError("mutation waiver id must be a non-empty string")
-    path = str(raw["path"])
-    parts = PurePosixPath(path).parts
-    if (
-        any(meta in path for meta in "*?[")
-        or path.startswith("/")
-        or "\\" in path
-        or any(ord(ch) < 32 or ord(ch) == 127 for ch in path)
-        or parts != tuple(path.split("/"))
-        or len(parts) < 2
-        or any(part in {".", ".."} for part in parts)
-        or not path.endswith(".py")
-        or not any(part == "tests" for part in parts[:-1])
-        or not parts[-1].startswith("test_")
-    ):
-        raise PolicyError(
-            f"mutation waiver path must be one exact repo-relative test file "
-            f"path (test_*.py) under a real tests/ directory with no glob "
-            f"metacharacters or traversal: {path!r}"
-        )
-    owner = str(raw["owner"]).strip()
-    justification = str(raw["justification"]).strip()
-    if len(owner) < 2 or len(justification) < 20:
-        raise PolicyError(
-            f"mutation waiver {raw['id']!r} owner/justification is not specific enough"
-        )
-    if str(raw["milestone"]) != W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE:
-        raise PolicyError(
-            f"mutation waiver {raw['id']!r} pins an unknown milestone; expected "
-            f"{W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE!r}"
-        )
-    if str(raw["integration_base"]) != MUTATION_WAIVER_INTEGRATION_BASE:
-        raise PolicyError(
-            f"mutation waiver {raw['id']!r} pins an unexpected integration base"
-        )
-    if str(raw["source_anchor"]) != MUTATION_WAIVER_SOURCE_ANCHOR:
-        raise PolicyError(
-            f"mutation waiver {raw['id']!r} pins an unexpected source anchor"
-        )
-    sha256_value = str(raw["sha256"])
-    if not WAIVER_SHA256_PATTERN.match(sha256_value):
-        raise PolicyError(
-            f"mutation waiver {raw['id']!r} sha256 must be 64 lowercase hex digits"
-        )
-    if str(raw["binding_clause"]) != MUTATION_WAIVER_BINDING_CLAUSE:
-        raise PolicyError(
-            f"mutation waiver {raw['id']!r} binding clause must match the canonical "
-            f"void-on-edit clause verbatim"
-        )
-    return MutationWaiverPolicy(
-        waiver_id=waiver_id,
-        path=path,
-        owner=owner,
-        justification=justification,
-        expires=_date_value(raw["expires"], field="mutation_waivers.expires"),
-        milestone=str(raw["milestone"]),
-        integration_base=str(raw["integration_base"]),
-        source_anchor=str(raw["source_anchor"]),
-        sha256=sha256_value,
-        binding_clause=str(raw["binding_clause"]),
-        sources=_parse_waiver_sources(raw.get("sources"), waiver_id=waiver_id),
-    )
-
-
-def _parse_waiver_sources(
-    raw: Any, *, waiver_id: str
-) -> tuple[WaiverSourceBinding, ...]:
-    if not isinstance(raw, list) or not raw:
-        raise PolicyError(
-            f"mutation waiver {waiver_id!r} requires sources: a non-empty array "
-            "of {path = ..., sha256 = ...} tables pinning its production inputs"
-        )
-    bindings: list[WaiverSourceBinding] = []
-    seen_paths: set[str] = set()
-    for entry in raw:
-        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
-            raise PolicyError(
-                f"mutation waiver {waiver_id!r} source entries need exactly "
-                f"path and sha256 keys"
-            )
-        src_path = str(entry["path"])
-        parts = PurePosixPath(src_path).parts
-        if (
-            any(meta in src_path for meta in "*?[")
-            or src_path.startswith("/")
-            or "\\" in src_path
-            or any(ord(ch) < 32 or ord(ch) == 127 for ch in src_path)
-            or parts != tuple(src_path.split("/"))
-            or len(parts) < 2
-            or any(part in {".", ".."} for part in parts)
-            or not src_path.endswith(".py")
-            or parts[-1].startswith("test_")
-            or "tests" in parts[:-1]
-        ):
-            raise PolicyError(
-                f"mutation waiver {waiver_id!r} source paths must be exact "
-                f"repo-relative non-test .py files: {src_path!r}"
-            )
-        if _is_test_path(src_path):
-            raise PolicyError(
-                f"mutation waiver {waiver_id!r} source path is test-shaped "
-                f"(tests/ segment, test_ prefix, or test suffix) and cannot be "
-                f"pinned as production source: {src_path!r}"
-            )
-        digest = str(entry["sha256"])
-        if not WAIVER_SHA256_PATTERN.match(digest):
-            raise PolicyError(
-                f"mutation waiver {waiver_id!r} source sha256 must be 64 lowercase "
-                f"hex digits"
-            )
-        if src_path in seen_paths:
-            raise PolicyError(
-                f"mutation waiver {waiver_id!r} pins duplicate source paths"
-            )
-        seen_paths.add(src_path)
-        bindings.append(WaiverSourceBinding(path=src_path, sha256=digest))
-    return tuple(bindings)
-
-
-def _parse_mutation_waivers(raw: Any) -> tuple[MutationWaiverPolicy, ...]:
-    if raw is None:
-        return ()
-    if not isinstance(raw, list):
-        raise PolicyError("mutation_waivers must be an array of tables")
-    waivers = tuple(_parse_mutation_waiver(entry) for entry in raw)
-    identifiers = [waiver.waiver_id for waiver in waivers]
-    duplicated = sorted({name for name in identifiers if identifiers.count(name) > 1})
-    if duplicated:
-        raise PolicyError(
-            "mutation waiver identifiers must be unique; duplicated: "
-            + ", ".join(duplicated)
-        )
-    paths = [waiver.path for waiver in waivers]
-    if len(paths) != len(set(paths)):
-        raise PolicyError(
-            "mutation waiver paths must be unique; split overlapping lanes into "
-            "separate exact-path entries"
-        )
-    return waivers
-
-
-VALUE_WAIVER_KEYS = frozenset(
-    {"integration_base", "nodeids", "reason", "approved_by", "approved_on", "expires"}
-)
-_COMMIT_OID = re.compile(r"[0-9a-f]{40}")
-
-
-def _parse_value_waiver_nodeids(raw: Any) -> tuple[str, ...]:
-    if not isinstance(raw, list) or not raw:
-        raise PolicyError("value_waivers.nodeids must be a non-empty array of nodeids")
-    nodeids: list[str] = []
-    for entry in raw:
-        if not isinstance(entry, str) or "::" not in entry or entry != entry.strip():
-            raise PolicyError(
-                "value_waivers.nodeids entries must be exact pytest nodeids "
-                f"(path::name): {entry!r}"
-            )
-        if any(meta in entry for meta in "*?["):
-            raise PolicyError(
-                f"value_waivers.nodeids are exact, never patterns: {entry!r}"
-            )
-        nodeids.append(entry)
-    if len(set(nodeids)) != len(nodeids):
-        raise PolicyError("value_waivers.nodeids must not repeat a nodeid")
-    return tuple(nodeids)
-
-
-def _parse_value_waiver(raw: Any) -> ValueWaiverPolicy:
-    if not isinstance(raw, dict):
-        raise PolicyError("each value_waivers entry must be a table")
-    unknown = set(raw) - VALUE_WAIVER_KEYS
-    if unknown:
-        raise PolicyError(f"value waiver has unknown keys: {sorted(unknown)}")
-    missing = VALUE_WAIVER_KEYS - {"expires"} - set(raw)
-    if missing:
-        raise PolicyError(f"value waiver is missing keys: {sorted(missing)}")
-    base = raw["integration_base"]
-    if not isinstance(base, str) or _COMMIT_OID.fullmatch(base) is None:
-        raise PolicyError(
-            "value_waivers.integration_base must be the full 40-hex commit oid "
-            f"of the integration base it binds to: {base!r}"
-        )
-    for key in ("reason", "approved_by"):
-        if not isinstance(raw[key], str) or not raw[key].strip():
-            raise PolicyError(f"value_waivers.{key} must be a non-empty string")
-    expires = raw.get("expires")
-    return ValueWaiverPolicy(
-        integration_base=base,
-        nodeids=_parse_value_waiver_nodeids(raw["nodeids"]),
-        reason=raw["reason"].strip(),
-        approved_by=raw["approved_by"].strip(),
-        approved_on=_date_value(raw["approved_on"], field="value_waivers.approved_on"),
-        expires=(
-            None
-            if expires is None
-            else _date_value(expires, field="value_waivers.expires")
-        ),
-    )
-
-
-def _parse_value_waivers(raw: Any) -> tuple[ValueWaiverPolicy, ...]:
-    if raw is None:
-        return ()
-    if not isinstance(raw, list):
-        raise PolicyError("value_waivers must be an array of tables")
-    waivers = tuple(_parse_value_waiver(entry) for entry in raw)
-    seen: set[str] = set()
-    for waiver in waivers:
-        overlap = seen.intersection(waiver.nodeids)
-        if overlap:
-            raise PolicyError(f"value waivers overlap on nodeids: {sorted(overlap)}")
-        seen.update(waiver.nodeids)
-    return waivers
-
-
-def _parse_tools(raw: Any) -> tuple[ToolPolicy, ...]:
-    """Parse the declared external tool set.
-
-    Every binary the gate depends on is declared here so `make gate` can refuse to
-    start when one is absent, instead of degrading. `command_runner` already fails
-    closed for policy `command` checks, but only mid-review -- and `prlimit` was
-    exempt even from that, silently dropping the CPU and address-space budget.
-    """
-    if raw is None:
-        return ()
-    if not isinstance(raw, dict):
-        raise PolicyError("tools must be a table")
-    required_keys = {
-        "executable",
-        "version_command",
-        "expected_version",
-        "required_profiles",
-        "provided_by",
-        "rationale",
-    }
-    tools: list[ToolPolicy] = []
-    for tool_id, value in raw.items():
-        if not isinstance(value, dict) or set(value) != required_keys:
-            raise PolicyError(
-                f"tools.{tool_id} has an invalid schema; required keys: {sorted(required_keys)}"
-            )
-        tools.append(
-            ToolPolicy(
-                tool_id=tool_id,
-                executable=str(value["executable"]),
-                version_command=_string_tuple(
-                    value["version_command"], field=f"tools.{tool_id}.version_command"
-                ),
-                expected_version=str(value["expected_version"]),
-                required_profiles=_string_tuple(
-                    value["required_profiles"],
-                    field=f"tools.{tool_id}.required_profiles",
-                ),
-                provided_by=str(value["provided_by"]),
-                rationale=str(value["rationale"]),
-            )
-        )
-    return tuple(tools)
-
-
-def _parse_baselines(raw: Any) -> tuple[BaselinePolicy, ...]:
-    if not isinstance(raw, dict):
-        raise PolicyError("baselines must be a table")
-    baselines: list[BaselinePolicy] = []
-    for baseline_id, value in raw.items():
-        if not isinstance(value, dict) or set(value) != {
-            "path",
-            "classes",
-            "required_profiles",
-        }:
-            raise PolicyError(f"baselines.{baseline_id} has an invalid schema")
-        baselines.append(
-            BaselinePolicy(
-                baseline_id=baseline_id,
-                path=str(value["path"]),
-                classes=_string_tuple(
-                    value["classes"], field=f"baselines.{baseline_id}.classes"
-                ),
-                required_profiles=_string_tuple(
-                    value["required_profiles"],
-                    field=f"baselines.{baseline_id}.required_profiles",
-                ),
-            )
-        )
-    return tuple(baselines)
+def _validate_policy(policy: Policy) -> None:
+    _fragment("validate", asdict(policy))
 
 
 def load_policy(path: Path) -> Policy:
+    from conductor._native import candidate_policy_parse_native
+
     try:
         raw_bytes = path.read_bytes()
     except OSError as exc:
@@ -921,128 +519,59 @@ def load_policy(path: Path) -> Policy:
         raw = tomllib.loads(raw_bytes.decode("utf-8"))
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise PolicyError(f"malformed candidate policy {path}: {exc}") from exc
-    unknown = set(raw) - ALLOWED_TOP_LEVEL
-    if unknown:
-        raise PolicyError(
-            f"candidate policy has unknown top-level keys: {sorted(unknown)}"
-        )
-    if raw.get("schema_version") != 1:
-        raise PolicyError(
-            f"unsupported policy schema_version: {raw.get('schema_version')!r}"
-        )
-    class_raw = raw.get("classes")
-    if not isinstance(class_raw, dict):
-        raise PolicyError("classes must be a table")
-    unknown_classes = set(class_raw) - VALID_CLASSES
-    if unknown_classes:
-        raise PolicyError(f"classes contains unknown names: {sorted(unknown_classes)}")
-    class_globs = {
-        name: _string_tuple(value, field=f"classes.{name}")
-        for name, value in class_raw.items()
-    }
-    risk_raw = raw.get("risk")
-    paths_raw = raw.get("paths")
-    checks_raw = raw.get("checks")
-    baselines_raw = raw.get("baselines", {})
-    if not isinstance(risk_raw, dict) or set(risk_raw) != {"high"}:
-        raise PolicyError("risk must contain exactly the high array")
-    if not isinstance(paths_raw, dict) or set(paths_raw) != {
-        "protected_deletes",
-        "hot",
-        "generated",
-    }:
-        raise PolicyError(
-            "paths must contain exactly protected_deletes, hot, and generated"
-        )
-    if not isinstance(checks_raw, dict) or not checks_raw:
-        raise PolicyError("checks must be a non-empty table")
-    exceptions_raw = raw.get("exceptions", [])
-    if not isinstance(exceptions_raw, list):
-        raise PolicyError("exceptions must be an array of tables")
     try:
-        block_at = Severity(str(raw["block_at"]))
-    except (KeyError, ValueError) as exc:
-        raise PolicyError("block_at must be a valid severity") from exc
-    policy = Policy(
+        parsed = json.loads(
+            candidate_policy_parse_native(
+                _native_json(raw), datetime.now(UTC).date().isoformat()
+            )
+        )
+    except ValueError as exc:
+        raise PolicyError(str(exc)) from exc
+    return Policy(
         path=path,
         digest=sha256_bytes(raw_bytes),
-        schema_version=1,
-        block_at=block_at,
-        max_workers=_positive_int(
-            raw.get("max_workers"), field="max_workers", maximum=16
+        schema_version=parsed["schema_version"],
+        block_at=Severity(parsed["block_at"]),
+        max_workers=parsed["max_workers"],
+        cache_ttl_days=parsed["cache_ttl_days"],
+        claim_max_age_hours=parsed["claim_max_age_hours"],
+        max_file_bytes=parsed["max_file_bytes"],
+        max_binary_bytes=parsed["max_binary_bytes"],
+        coverage_threshold=parsed["coverage_threshold"],
+        high_risk_coverage_threshold=parsed["high_risk_coverage_threshold"],
+        baseline_expires=date.fromisoformat(parsed["baseline_expires"]),
+        class_globs={
+            name: tuple(globs) for name, globs in parsed["class_globs"].items()
+        },
+        high_risk_globs=tuple(parsed["high_risk_globs"]),
+        protected_delete_globs=tuple(parsed["protected_delete_globs"]),
+        hot_path_globs=tuple(parsed["hot_path_globs"]),
+        generated_globs=tuple(parsed["generated_globs"]),
+        checks=tuple(_check(row) for row in parsed["checks"]),
+        baselines=tuple(
+            BaselinePolicy(
+                **{
+                    **row,
+                    "classes": tuple(row["classes"]),
+                    "required_profiles": tuple(row["required_profiles"]),
+                }
+            )
+            for row in parsed["baselines"]
         ),
-        cache_ttl_days=_positive_int(
-            raw.get("cache_ttl_days"), field="cache_ttl_days", maximum=365
+        exceptions=tuple(_exception(row) for row in parsed["exceptions"]),
+        mutation_waivers=tuple(_waiver(row) for row in parsed["mutation_waivers"]),
+        value_waivers=tuple(_value_waiver(row) for row in parsed["value_waivers"]),
+        tools=tuple(
+            ToolPolicy(
+                **{
+                    **row,
+                    "version_command": tuple(row["version_command"]),
+                    "required_profiles": tuple(row["required_profiles"]),
+                }
+            )
+            for row in parsed["tools"]
         ),
-        claim_max_age_hours=_positive_int(
-            raw.get("claim_max_age_hours"), field="claim_max_age_hours", maximum=720
-        ),
-        max_file_bytes=_positive_int(raw.get("max_file_bytes"), field="max_file_bytes"),
-        max_binary_bytes=_positive_int(
-            raw.get("max_binary_bytes"), field="max_binary_bytes"
-        ),
-        coverage_threshold=_float_percent(
-            raw.get("coverage_threshold"), field="coverage_threshold"
-        ),
-        high_risk_coverage_threshold=_float_percent(
-            raw.get("high_risk_coverage_threshold"),
-            field="high_risk_coverage_threshold",
-        ),
-        baseline_expires=_date_value(
-            raw.get("baseline_expires"), field="baseline_expires"
-        ),
-        class_globs=class_globs,
-        high_risk_globs=_string_tuple(risk_raw["high"], field="risk.high"),
-        protected_delete_globs=_string_tuple(
-            paths_raw["protected_deletes"], field="paths.protected_deletes"
-        ),
-        hot_path_globs=_string_tuple(paths_raw["hot"], field="paths.hot"),
-        generated_globs=_string_tuple(paths_raw["generated"], field="paths.generated"),
-        checks=tuple(
-            _parse_check(check_id, value) for check_id, value in checks_raw.items()
-        ),
-        baselines=_parse_baselines(baselines_raw),
-        exceptions=tuple(_parse_exception(value) for value in exceptions_raw),
-        mutation_waivers=_parse_mutation_waivers(raw.get("mutation_waivers")),
-        value_waivers=_parse_value_waivers(raw.get("value_waivers")),
-        tools=_parse_tools(raw.get("tools")),
     )
-    _validate_policy(policy)
-    return policy
-
-
-def _validate_policy(policy: Policy) -> None:
-    today = datetime.now(timezone.utc).date()
-    if policy.baseline_expires < today:
-        raise PolicyError(
-            f"policy baseline window expired on {policy.baseline_expires}; refresh and re-review it"
-        )
-    identifiers = [exception.exception_id for exception in policy.exceptions]
-    if len(identifiers) != len(set(identifiers)):
-        raise PolicyError("exception identifiers must be unique")
-    known_checks = {check.check_id for check in policy.checks}
-    for exception in policy.exceptions:
-        if exception.check_id not in known_checks:
-            raise PolicyError(
-                f"exception {exception.exception_id} names an unknown check"
-            )
-        if exception.expires < today:
-            raise PolicyError(
-                f"exception {exception.exception_id} expired on {exception.expires}"
-            )
-        if (exception.expires - today).days > 90:
-            raise PolicyError(
-                f"exception {exception.exception_id} expires more than 90 days out"
-            )
-    for waiver in policy.mutation_waivers:
-        if waiver.expires < today:
-            raise PolicyError(
-                f"mutation waiver {waiver.waiver_id} expired on {waiver.expires}"
-            )
-        if (waiver.expires - today).days > 90:
-            raise PolicyError(
-                f"mutation waiver {waiver.waiver_id} expires more than 90 days out"
-            )
 
 
 def baseline_receipts(

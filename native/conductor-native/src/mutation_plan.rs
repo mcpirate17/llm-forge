@@ -817,6 +817,8 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
     }))
 }
 
+include!("mutation_plan_refresh.rs");
+
 #[cfg(feature = "python")]
 fn value_error(message: impl Into<String>) -> PyErr {
     PyValueError::new_err(message.into())
@@ -832,8 +834,18 @@ pub fn mutation_plan_native(request_json: &str) -> PyResult<String> {
 }
 
 #[cfg(feature = "python")]
+#[pyfunction]
+pub fn mutation_refresh_native(request_json: &str) -> PyResult<String> {
+    let request: RefreshRequest = serde_json::from_str(request_json)
+        .map_err(|error| value_error(format!("invalid mutation refresh request: {error}")))?;
+    let result = compute_refresh(&request).map_err(value_error)?;
+    serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
+}
+
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(mutation_plan_native, module)?)?;
+    module.add_function(wrap_pyfunction!(mutation_refresh_native, module)?)?;
     Ok(())
 }
 

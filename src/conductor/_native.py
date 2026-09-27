@@ -105,6 +105,107 @@ SLOP_CORE_BUILD_HINT = (
 )
 
 
+def a2a_store_native(root: str, name: str) -> object:
+    from conductor_native import A2aSqliteStore
+
+    return A2aSqliteStore(root, name)
+
+
+def candidate_checks_native(operation: str, payload_json: str) -> str:
+    from conductor_native import candidate_checks_native as evaluate
+
+    return evaluate(operation, payload_json)
+
+
+def workspace_runtime_matrix_native(operation: str, payload_json: str) -> str:
+    from conductor_native import workspace_runtime_matrix_native as dispatch
+
+    return dispatch(operation, payload_json)
+
+
+def candidate_policy_parse_native(raw_json: str, today_iso: str) -> str:
+    from conductor_native import candidate_policy_parse_native as parse
+
+    return parse(raw_json, today_iso)
+
+
+def candidate_policy_classify_native(change_json: str, globs_json: str) -> str:
+    from conductor_native import candidate_policy_classify_native as classify
+
+    return classify(change_json, globs_json)
+
+
+def candidate_value_waivers_parse_native(raw_json: str) -> str:
+    from conductor_native import candidate_value_waivers_parse_native as parse
+
+    return parse(raw_json)
+
+
+def candidate_policy_fragment_native(
+    operation: str, raw_json: str, today_iso: str
+) -> str:
+    from conductor_native import candidate_policy_fragment_native as parse
+
+    return parse(operation, raw_json, today_iso)
+
+
+def mutation_refresh_native(request_json: str) -> str:
+    """Load native campaign refresh at its compatibility boundary."""
+    from conductor_native import mutation_refresh_native as refresh
+
+    return refresh(request_json)
+
+
+def project_paths_relative_native(raw: str, source: str) -> str:
+    from conductor_native import project_paths_relative_native as resolve
+
+    return resolve(raw, source)
+
+
+def project_paths_resolve_native(root: str) -> list[tuple[str, bool]]:
+    from conductor_native import project_paths_resolve_native as resolve
+
+    return resolve(root)
+
+
+def project_paths_integration_branch_native(root: str) -> str:
+    from conductor_native import project_paths_integration_branch_native as resolve
+
+    return resolve(root)
+
+
+def project_paths_retired_integration_branches_native(root: str) -> list[str]:
+    from conductor_native import (
+        project_paths_retired_integration_branches_native as resolve,
+    )
+
+    return resolve(root)
+
+
+def project_paths_worktree_patterns_native(root: str) -> list[str]:
+    from conductor_native import project_paths_worktree_patterns_native as resolve
+
+    return resolve(root)
+
+
+def project_paths_enclosing_repo_native(start: str) -> str | None:
+    from conductor_native import project_paths_enclosing_repo_native as resolve
+
+    return resolve(start)
+
+
+def project_paths_host_root_native(start: str | None = None) -> str:
+    from conductor_native import project_paths_host_root_native as resolve
+
+    return resolve(start)
+
+
+def project_paths_package_tree_root_native(package_dir: str) -> str:
+    from conductor_native import project_paths_package_tree_root_native as resolve
+
+    return resolve(package_dir)
+
+
 def guardrail_duplicate_candidates_native(
     files: list[list[str]], window: int
 ) -> tuple[list[tuple[int, int]], int, int]:
@@ -229,6 +330,7 @@ __all__ = [
     "a2a_compact_threads_native",
     "a2a_retention_evidence_native",
     "a2a_retention_manifests_native",
+    "a2a_store_native",
     "a2a_validate_coordination_v2_native",
     "admission_errors_native",
     "analyze_test_value_native",
@@ -237,7 +339,12 @@ __all__ = [
     "branch_policy_stamp_age_hours_native",
     "branch_policy_validate_bindings_native",
     "branch_policy_validate_name_native",
+    "candidate_checks_native",
+    "candidate_policy_classify_native",
+    "candidate_policy_fragment_native",
+    "candidate_policy_parse_native",
     "candidate_structure_facts_native",
+    "candidate_value_waivers_parse_native",
     "compare_duplicate_baseline_native",
     "context_telemetry_append_native",
     "context_telemetry_event_native",
@@ -284,6 +391,7 @@ __all__ = [
     "mutation_github_output_native",
     "mutation_patch_paths_native",
     "mutation_plan_native",
+    "mutation_refresh_native",
     "mutation_registry_patterns_native",
     "mutation_runner_lineage_accepts_native",
     "mutation_rust_test_surface_native",
@@ -301,6 +409,14 @@ __all__ = [
     "normalize_mutation_path_native",
     "plan_mutation_evidence_native",
     "project_context_parse_config_native",
+    "project_paths_enclosing_repo_native",
+    "project_paths_host_root_native",
+    "project_paths_integration_branch_native",
+    "project_paths_package_tree_root_native",
+    "project_paths_relative_native",
+    "project_paths_resolve_native",
+    "project_paths_retired_integration_branches_native",
+    "project_paths_worktree_patterns_native",
     "receipt_compact_directory_native",
     "receipt_expand_detail_native",
     "receipt_inventory_digest_native",
@@ -316,4 +432,5 @@ __all__ = [
     "validate_mutation_receipt_native",
     "verify_mutation_evidence_native",
     "verify_tree_receipt_native",
+    "workspace_runtime_matrix_native",
 ]

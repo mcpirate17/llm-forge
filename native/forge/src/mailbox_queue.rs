@@ -1,4 +1,4 @@
-//! Durable, asynchronous A2A enqueue. Delivery remains with the Python transport.
+//! Durable A2A enqueue shared by explicit queueing and native delivery.
 
 use super::store::{self, Store};
 use anyhow::{bail, ensure, Context, Result};
@@ -23,33 +23,28 @@ pub struct EnqueueArgs {
     /// UTF-8 message body, at most 262144 bytes.
     #[arg(
         long,
-        conflicts_with = "body_file",
-        required_unless_present = "body_file"
+        conflicts_with_all = ["body_file", "stdin"],
+        required_unless_present_any = ["body_file", "stdin"]
     )]
     body: Option<String>,
     /// Read the UTF-8 body from an existing file, at most 262144 bytes.
-    #[arg(long, conflicts_with = "body")]
+    #[arg(long, conflicts_with_all = ["body", "stdin"])]
     body_file: Option<PathBuf>,
+    /// Read a bounded UTF-8 body from standard input.
+    #[arg(long, conflicts_with_all = ["body", "body_file"])]
+    stdin: bool,
     /// Existing JSON object with a supported A2A data kind, at most 1 MiB.
     #[arg(long)]
     data_file: Option<PathBuf>,
 }
 
-pub struct PreparedMessage {
-    pub id: String,
+pub use conductor_native::a2a_store::PreparedMessage;
+
+pub(super) struct ValidatedMessage {
     pub sender: String,
     pub recipient: String,
     pub body: String,
     pub data_json: Option<String>,
-    pub created_at: String,
-    pub metadata: Value,
-}
-
-struct ValidatedMessage {
-    sender: String,
-    recipient: String,
-    body: String,
-    data_json: Option<String>,
 }
 
 fn read_bounded(path: &Path, max_bytes: usize, label: &str) -> Result<String> {
@@ -66,10 +61,22 @@ fn read_bounded(path: &Path, max_bytes: usize, label: &str) -> Result<String> {
 }
 
 fn body_text(args: &EnqueueArgs) -> Result<String> {
-    let body = match (&args.body, &args.body_file) {
-        (Some(body), None) => body.clone(),
-        (None, Some(path)) => read_bounded(path, MAX_BODY_BYTES, "body")?,
-        _ => bail!("exactly one of --body or --body-file is required"),
+    let body = match (&args.body, &args.body_file, args.stdin) {
+        (Some(body), None, false) => body.clone(),
+        (None, Some(path), false) => read_bounded(path, MAX_BODY_BYTES, "body")?,
+        (None, None, true) => {
+            let mut bytes = Vec::new();
+            std::io::stdin()
+                .take((MAX_BODY_BYTES + 1) as u64)
+                .read_to_end(&mut bytes)
+                .context("reading body from standard input")?;
+            ensure!(
+                bytes.len() <= MAX_BODY_BYTES,
+                "body exceeds {MAX_BODY_BYTES} bytes"
+            );
+            String::from_utf8(bytes).context("standard input body is not UTF-8")?
+        }
+        _ => bail!("exactly one of --body, --body-file or --stdin is required"),
     };
     ensure!(
         body.len() <= MAX_BODY_BYTES,
@@ -157,7 +164,7 @@ fn message_id() -> Result<String> {
     Ok(rendered)
 }
 
-fn validate_input(args: EnqueueArgs) -> Result<ValidatedMessage> {
+pub(super) fn validate_input(args: EnqueueArgs) -> Result<ValidatedMessage> {
     store::validate_identity(&args.from_name)?;
     store::validate_identity(&args.to)?;
     let body = body_text(&args)?;
@@ -170,7 +177,7 @@ fn validate_input(args: EnqueueArgs) -> Result<ValidatedMessage> {
     })
 }
 
-fn prepare(input: ValidatedMessage) -> Result<PreparedMessage> {
+pub(super) fn prepare(input: ValidatedMessage) -> Result<PreparedMessage> {
     let id = message_id()?;
     let created_at = crate::instant::isoformat_millis_utc(crate::instant::now());
     let row = json!({
@@ -192,10 +199,10 @@ fn prepare(input: ValidatedMessage) -> Result<PreparedMessage> {
     })
 }
 
-struct SenderLock(File);
+pub(super) struct SenderLock(File);
 
 impl SenderLock {
-    fn acquire(state_dir: &Path, sender: &str) -> Result<Self> {
+    pub(super) fn acquire(state_dir: &Path, sender: &str) -> Result<Self> {
         let path = state_dir.join(sender).join(".delivery.lock");
         let file = OpenOptions::new()
             .read(true)

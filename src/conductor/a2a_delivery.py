@@ -1,101 +1,73 @@
-"""Serialized, recoverable outbound delivery for the local A2A transport."""
+"""Compatibility calls into Forge's native local A2A delivery engine."""
 
 from __future__ import annotations
 
-import contextlib
-import fcntl
 import json
-import os
-import sqlite3
-import uuid
-from collections.abc import Iterator
+import subprocess
+import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-import httpx
-
-from conductor.a2a_registry import A2aError, AgentRecord, _utc_now, load_registry
-
-if TYPE_CHECKING:
-    from conductor.agent_a2a import A2aStore
+from conductor.a2a_registry import A2aError
 
 
-@contextlib.contextmanager
-def sender_lock(store: A2aStore) -> Iterator[None]:
-    """One in-flight sender; process exit releases the lock, including crashes."""
-    with (store.dir / ".delivery.lock").open("a+") as handle:
-        os.chmod(handle.name, 0o600)
-        try:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise A2aError(f"sender {store.dir.name!r} has an active delivery") from exc
-        try:
-            yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+def _forge_binary() -> Path:
+    from conductor.a2a_retention import _forge_binary as resolve
+
+    return resolve("delivery")
 
 
-def _attempt(
-    store: A2aStore,
-    record: AgentRecord,
-    row: sqlite3.Row,
+def _run(
+    state_dir: Path,
+    action: str,
+    args: list[str],
     *,
-    card: dict[str, Any] | None = None,
-) -> str:
-    from conductor import agent_a2a as transport
-
-    data = json.loads(row["data_json"]) if row["data_json"] else None
-    try:
-        transport._deliver_wire(
-            record, row["sender"], row["message_id"], row["body"], data, card=card
-        )
-    except httpx.TransportError as exc:
-        status, reason = "queued", f"peer unreachable: {exc}"
-    except (A2aError, httpx.HTTPError, ValueError) as exc:
-        status, reason = (
-            "failed",
-            f"peer rejected or returned an invalid response: {exc}",
-        )
-    else:
-        status, reason = "delivered", None
-    store.mark_outbound(
-        row["message_id"],
-        status,
-        reason[:500] if reason else None,
-        _utc_now() if status == "delivered" else None,
-    )
-    return status
-
-
-def _flush_store(
-    store: A2aStore, records: dict[str, AgentRecord], to_name: str | None, limit: int
-) -> list[dict[str, Any]]:
-    results: list[dict[str, Any]] = []
-    unreachable: set[str] = set()
-    while len(results) < limit:
-        pending = store.queued_outbound(to_name, limit=1, exclude=sorted(unreachable))
-        if not pending:
-            break
-        row = pending[0]
-        recipient = row["recipient"]
-        if recipient not in records:
-            store.mark_outbound(
-                row["message_id"], "failed", "recipient no longer registered", None
+    body: str | None = None,
+    data_payload: dict[str, Any] | None = None,
+) -> tuple[Any, int]:
+    command = [
+        str(_forge_binary()),
+        "mailbox",
+        "--state-dir",
+        str(state_dir),
+        action,
+        *args,
+    ]
+    # An unnamed temporary descriptor keeps structured data out of argv and
+    # leaves no path to clean up after a process crash.
+    with tempfile.TemporaryFile(mode="w+b") as data_file:
+        pass_fds: tuple[int, ...] = ()
+        if data_payload is not None:
+            try:
+                encoded = json.dumps(
+                    data_payload, ensure_ascii=False, sort_keys=True
+                ).encode("utf-8")
+            except (TypeError, ValueError) as exc:
+                raise A2aError(f"invalid A2A data payload: {exc}") from exc
+            if len(encoded) > 1_048_576:
+                raise A2aError("serialized data payload exceeds 1048576 bytes")
+            data_file.write(encoded)
+            data_file.flush()
+            data_file.seek(0)
+            command.extend(("--data-file", f"/proc/self/fd/{data_file.fileno()}"))
+            pass_fds = (data_file.fileno(),)
+        try:
+            completed = subprocess.run(
+                command,
+                input=body,
+                text=True,
+                capture_output=True,
+                check=False,
+                pass_fds=pass_fds,
             )
-            status = "failed"
-        else:
-            status = _attempt(store, records[recipient], row)
-        if status == "queued":
-            unreachable.add(recipient)
-        results.append(
-            {
-                "message_id": row["message_id"],
-                "sender": row["sender"],
-                "recipient": recipient,
-                "status": status,
-            }
-        )
-    return results
+        except OSError as exc:
+            raise A2aError(f"cannot run native A2A {action}: {exc}") from exc
+    if completed.returncode not in (0, 3):
+        raise A2aError(completed.stderr.strip() or f"native A2A {action} failed")
+    try:
+        return json.loads(completed.stdout), completed.returncode
+    except json.JSONDecodeError as exc:
+        raise A2aError(f"invalid native A2A {action} response: {exc}") from exc
 
 
 def send_message(
@@ -106,53 +78,21 @@ def send_message(
     state_dir: Path,
     queue_on_unreachable: bool = True,
 ) -> dict[str, Any]:
-    from conductor import agent_a2a as transport
-
-    records = load_registry(state_dir)
-    for role, name in (("sender", from_name), ("recipient", to_name)):
-        if name not in records:
-            raise A2aError(f"unknown {role} {name!r}; registered: {sorted(records)}")
-    if len(body.encode()) > transport.MAX_BODY_BYTES:
-        raise A2aError(f"body exceeds {transport.MAX_BODY_BYTES} bytes")
-    if data_payload is not None:
-        transport.validate_data_payload(data_payload)
-    card = transport._coordination_v2_card(records[to_name], data_payload)
-    store = transport.A2aStore(state_dir, from_name)
-    with sender_lock(store):
-        # Bounded recovery first. New messages never bypass an older queued or
-        # crash-left pending message, even when the peer recovers mid-flush.
-        _flush_store(store, records, to_name, 100)
-        waiting = bool(store.queued_outbound(to_name, limit=1))
-        message_id = str(uuid.uuid4())
-        store.record_outbound(
-            message_id,
-            from_name,
-            to_name,
-            body,
-            json.dumps(data_payload, ensure_ascii=False, sort_keys=True)
-            if data_payload is not None
-            else None,
-        )
-        if waiting:
-            status = "queued"
-            store.mark_outbound(
-                message_id, status, "waiting for earlier outbound messages", None
-            )
-        else:
-            status = _attempt(
-                store,
-                records[to_name],
-                store.message(message_id, "outbound"),
-                card=card,
-            )
-        if status == "queued" and not queue_on_unreachable:
-            reason = str(store.message(message_id, "outbound")["status_reason"])
-            reason += "; queue disabled"
-            store.mark_outbound(message_id, "failed", reason, None)
-            raise A2aError(reason)
-        if status == "failed":
-            raise A2aError(str(store.message(message_id, "outbound")["status_reason"]))
-        return transport._outbound_row(store, message_id)
+    """Store and attempt one send in native Forge, retaining the Python API."""
+    if not isinstance(body, str):
+        raise A2aError("body must be a string")
+    args = ["--from-name", from_name, "--to", to_name, "--stdin"]
+    if not queue_on_unreachable:
+        args.append("--no-queue")
+    payload, _ = _run(state_dir, "send", args, body=body, data_payload=data_payload)
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != 1
+        or payload.get("authority") != "a2a-delivery-receipt"
+        or payload.get("delivery_status") not in {"delivered", "queued"}
+    ):
+        raise A2aError("invalid native A2A send receipt")
+    return payload
 
 
 def flush_queued(
@@ -161,58 +101,36 @@ def flush_queued(
     to_name: str | None = None,
     max_messages: int = 100,
 ) -> list[dict[str, Any]]:
-    """Retry a bounded batch, including crash-left pending sends, oldest first."""
-    from conductor import agent_a2a as transport
-
-    if not 1 <= max_messages <= 1000:
-        raise A2aError("max_messages must be between 1 and 1000")
-    records = load_registry(state_dir)
-    if from_name is not None and from_name not in records:
-        raise A2aError(f"unknown sender {from_name!r}")
-    senders = (
-        [from_name]
-        if from_name
-        else sorted(
-            name for name in records if (state_dir / name / "store.sqlite").is_file()
-        )
-    )
-    results: list[dict[str, Any]] = []
-    for sender in senders:
-        if len(results) >= max_messages:
-            break
-        store = transport.A2aStore(state_dir, sender)
-        with sender_lock(store):
-            results.extend(
-                _flush_store(store, records, to_name, max_messages - len(results))
-            )
-    return results
+    """Retry a bounded batch through the native sender locks and store."""
+    args = ["--max-messages", str(max_messages)]
+    if from_name is not None:
+        args.extend(("--as-name", from_name))
+    if to_name is not None:
+        args.extend(("--to", to_name))
+    payload, _ = _run(state_dir, "flush", args)
+    if not isinstance(payload, list) or any(
+        not isinstance(row, dict)
+        or row.get("status") not in {"delivered", "queued", "failed"}
+        or not isinstance(row.get("message_id"), str)
+        for row in payload
+    ):
+        raise A2aError("invalid native A2A flush response")
+    return payload
 
 
 def history(
     state_dir: Path, identity: str, *, message_id: str | None = None, limit: int = 20
 ) -> dict[str, Any]:
-    """Read bounded delivery evidence without creating or migrating a store."""
-    if not 1 <= limit <= 1000:
-        raise A2aError("history limit must be between 1 and 1000")
-    if identity not in load_registry(state_dir):
-        raise A2aError(f"unknown identity {identity!r}")
-    path = state_dir / identity / "store.sqlite"
-    if not path.is_file():
-        return {"schema_version": 1, "available": False, "events": []}
-    with contextlib.closing(
-        sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
-    ) as connection:
-        connection.row_factory = sqlite3.Row
-        if not connection.execute(
-            "SELECT 1 FROM sqlite_master WHERE name='delivery_events'"
-        ).fetchone():
-            return {"schema_version": 1, "available": False, "events": []}
-        query = "SELECT event_id, message_id, occurred_at, status, reason FROM delivery_events"
-        params: list[Any] = []
-        if message_id:
-            query += " WHERE message_id=?"
-            params.append(message_id)
-        query += " ORDER BY event_id DESC LIMIT ?"
-        params.append(limit)
-        events = [dict(row) for row in connection.execute(query, params)]
-    return {"schema_version": 1, "available": True, "events": events}
+    """Read bounded native delivery evidence without creating a mailbox."""
+    args = ["--as-name", identity, "--limit", str(limit)]
+    if message_id is not None:
+        args.extend(("--message-id", message_id))
+    payload, _ = _run(state_dir, "history", args)
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != 1
+        or not isinstance(payload.get("available"), bool)
+        or not isinstance(payload.get("events"), list)
+    ):
+        raise A2aError("invalid native A2A history response")
+    return payload

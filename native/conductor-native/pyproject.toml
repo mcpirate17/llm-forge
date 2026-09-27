@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "conductor-native"
-version = "0.1.45"
+version = "0.1.46"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 requires-python = ">=3.12"
 
@@ -15,3 +15,6 @@ module-name = "conductor_native"
 # for anything installed. The crate's `extension-module` feature defaults off so the
 # unit tests can link; this turns it back on for the shipped artifact.
 features = ["extension-module"]
+# Python and the native store must share one SQLite runtime. Wheel repair must
+# not copy a second SQLite library into the wheel and change that identity.
+auditwheel = "skip"

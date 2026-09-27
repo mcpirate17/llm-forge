@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import contextlib
 import dataclasses
 import datetime as dt
-import fcntl
 import hashlib
 import json
 import os
 import re
-import secrets
 import stat
-from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor
+import subprocess
 from pathlib import Path
 from typing import Any, Final
 
@@ -80,21 +76,6 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
         tmp.unlink(missing_ok=True)
 
 
-@contextlib.contextmanager
-def _registry_lock(state_dir: Path) -> Iterator[None]:
-    """Serialize registry and liveness read-modify-write operations."""
-
-    state_dir.mkdir(parents=True, exist_ok=True)
-    lock_path = state_dir / ".registry.lock"
-    with lock_path.open("a+") as handle:
-        os.chmod(lock_path, stat.S_IRUSR | stat.S_IWUSR)
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-
-
 def _registry_payload(path: Path) -> dict[str, Any]:
     if not path.is_file():
         return {"schema_version": SCHEMA_VERSION, "agents": {}}
@@ -152,61 +133,6 @@ def load_registry(state_dir: Path) -> dict[str, AgentRecord]:
     return records
 
 
-def _select_registration_port(
-    agents: dict[str, Any], name: str, requested_port: int | None
-) -> tuple[int, dict[str, Any] | None]:
-    _validate_agent_name(name)
-    existing = agents.get(name)
-    if existing is not None and not isinstance(existing, dict):
-        raise A2aError(f"agent {name!r} entry must be an object")
-    if existing is not None:
-        existing_port = existing.get("port")
-        if not isinstance(existing_port, int) or isinstance(existing_port, bool):
-            raise A2aError(f"agent {name!r} has no usable port")
-        selected_port = existing_port if requested_port is None else requested_port
-        if requested_port is not None and requested_port != existing_port:
-            raise A2aError(
-                f"agent {name!r} already uses port {existing_port}; "
-                f"refusing requested port {requested_port}"
-            )
-    else:
-        selected_port = (
-            requested_port if requested_port is not None else KNOWN_AGENTS.get(name)
-        )
-        if selected_port is None:
-            raise A2aError(
-                f"unknown agent {name!r} requires --port; known port catalog: "
-                f"{sorted(KNOWN_AGENTS)}"
-            )
-    _validate_port(selected_port)
-    collision = next(
-        (
-            other
-            for other, entry in agents.items()
-            if other != name
-            and isinstance(entry, dict)
-            and entry.get("port") == selected_port
-        ),
-        None,
-    )
-    if collision is not None:
-        raise A2aError(
-            f"port {selected_port} is already assigned to agent {collision!r}"
-        )
-    return selected_port, existing
-
-
-def _serve_port(state_dir: Path, name: str, port: int | None) -> int:
-    """Resolve the port without mutating the registry."""
-
-    state_dir.mkdir(parents=True, exist_ok=True)
-    os.chmod(state_dir, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-    with _registry_lock(state_dir):
-        payload = _registry_payload(state_dir / "agents.json")
-        selected_port, _ = _select_registration_port(payload["agents"], name, port)
-        return selected_port
-
-
 def init_registry(
     state_dir: Path,
     name: str | None = None,
@@ -214,37 +140,43 @@ def init_registry(
     *,
     renew_generation: bool = False,
 ) -> dict[str, AgentRecord]:
-    """Create one requested identity and preserve existing entries."""
+    """Create one identity through the native registry and return the public records."""
 
-    state_dir.mkdir(parents=True, exist_ok=True)
-    os.chmod(state_dir, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    args: list[str] = []
+    if name is not None:
+        args.extend(("--name", name))
+    if port is not None:
+        args.extend(("--port", str(port)))
+    if renew_generation:
+        args.append("--renew-generation")
+    _run_native_registry(state_dir, "init", args)
     path = state_dir / "agents.json"
-    with _registry_lock(state_dir):
-        payload = _registry_payload(path)
-        agents: dict[str, Any] = payload["agents"]
-        if name is None and port is not None:
-            raise A2aError("--port requires --name")
-        if name is not None:
-            selected_port, existing = _select_registration_port(agents, name, port)
-            if existing is not None:
-                token = existing.get("token")
-                if not isinstance(token, str) or len(token) < 16:
-                    token = secrets.token_urlsafe(24)
-                generation = existing.get("generation")
-            else:
-                token = secrets.token_urlsafe(24)
-                generation = None
-            if renew_generation or not isinstance(generation, str) or not generation:
-                generation = secrets.token_hex(16)
-            agents[name] = {
-                "port": selected_port,
-                "token": token,
-                "generation": generation,
-            }
-        _atomic_json(path, payload)
-        if not agents:
-            return {}
-        return load_registry(state_dir)
+    if not _registry_payload(path)["agents"]:
+        return {}
+    return load_registry(state_dir)
+
+
+def _run_native_registry(state_dir: Path, action: str, args: list[str]) -> Any:
+    from conductor.a2a_delivery import _forge_binary
+
+    command = [
+        str(_forge_binary()),
+        "mailbox",
+        "--state-dir",
+        str(state_dir),
+        action,
+        *args,
+    ]
+    try:
+        completed = subprocess.run(command, text=True, capture_output=True, check=False)
+    except OSError as exc:
+        raise A2aError(f"cannot run native A2A {action}: {exc}") from exc
+    if completed.returncode:
+        raise A2aError(completed.stderr.strip() or f"native A2A {action} failed")
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise A2aError(f"invalid native A2A {action} response: {exc}") from exc
 
 
 def fetch_card(record: AgentRecord, timeout: float) -> dict[str, Any]:
@@ -291,65 +223,10 @@ def probe_peer(item: tuple[str, AgentRecord]) -> dict[str, Any]:
         }
 
 
-def _liveness_payload(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {"schema_version": LIVENESS_SCHEMA_VERSION, "agents": {}}
-    payload = json.loads(path.read_text())
-    if payload.get("schema_version") != LIVENESS_SCHEMA_VERSION:
-        raise A2aError(f"unsupported liveness schema {payload.get('schema_version')!r}")
-    agents = payload.get("agents")
-    if not isinstance(agents, dict):
-        raise A2aError("liveness agents must be an object")
-    return payload
-
-
-def _record_probe_results(
-    state_dir: Path, results: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
-    """Persist consecutive TCP/card probe failures outside the identity registry."""
-
-    path = state_dir / "liveness.json"
-    with _registry_lock(state_dir):
-        records = load_registry(state_dir)
-        payload = _liveness_payload(path)
-        states: dict[str, Any] = payload["agents"]
-        updated: list[dict[str, Any]] = []
-        now = _utc_now()
-        for result in results:
-            name = str(result["name"])
-            current = records.get(name)
-            if current is None or result.get(
-                "registration_fingerprint"
-            ) != _registration_fingerprint(current):
-                updated.append(
-                    {
-                        **result,
-                        "status": "stale",
-                        "reason": "registration changed while probe was in flight",
-                        "consecutive_failures": 0,
-                    }
-                )
-                continue
-            previous = states.get(name, {})
-            if not isinstance(previous, dict):
-                previous = {}
-            previous_failures = previous.get("consecutive_failures", 0)
-            if not isinstance(previous_failures, int) or previous_failures < 0:
-                previous_failures = 0
-            failures = 0 if result.get("status") == "up" else previous_failures + 1
-            states[name] = {
-                "consecutive_failures": failures,
-                "last_probe_at": now,
-                "registration_fingerprint": result["registration_fingerprint"],
-            }
-            updated.append({**result, "consecutive_failures": failures})
-        payload["agents"] = {name: states[name] for name in records if name in states}
-        _atomic_json(path, payload)
-        return updated
-
-
 def list_peers(state_dir: Path) -> list[dict[str, Any]]:
-    records = load_registry(state_dir)
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        results = list(pool.map(probe_peer, sorted(records.items())))
-    return _record_probe_results(state_dir, results)
+    result = _run_native_registry(state_dir, "peers", [])
+    if not isinstance(result, list) or any(
+        not isinstance(item, dict) for item in result
+    ):
+        raise A2aError("invalid native A2A peers response")
+    return result
