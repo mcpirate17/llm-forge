@@ -133,7 +133,7 @@ lockfile, tool hashes, and reproduction script. The archived source hashes also
 match an independent extraction of each committed blob. Evidence SHA-256:
 `6db0524bff8a9ae155af039270dd6b0b5c5f6e69808f9474c56d68ee5e50c4c7`.
 
-## Latest verified commit
+## Previous verified commit
 
 Commit `b2ec44f7cbb9c2f6eb42960e0c710fc4cc3e0169`, measured from a `git archive`
 with the same classification and inline Rust test treatment. The archive stream
@@ -164,6 +164,39 @@ source path manifests, source hashes independently checked against all 668 Git
 blobs, exact archive hash, raw Tokei JSON, inline AST ranges and counts, splitter
 source and lockfile, tool hashes, and reproduction script. Its SHA-256 is
 `bc5d354822e23abb4d602f1d53b9fc77c4c864d74be11b22dccd4496e62b8732`.
+
+## Latest verified commit
+
+Commit `8eb7c76b909f2da7e1d5e1847eb53904332fb293`, measured from a `git archive`
+with the same classification and inline-test treatment. The archive stream
+SHA-256 is
+`54009c888e1bd8411a185de800d0b0663a4ed7023394eb218c58b0e81249e96b`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,296 | 51,599 | 194 | **50.0529% native** |
+| Tests | 40,566 | 41,398 | 0 | **50.5075% Rust** |
+| All tracked source, including examples | 91,862 | 93,096 | 194 | 50.3392% native |
+
+The manifests contain 371 production files, 295 test files, and 668 source
+files total. The splitter identified 100 test-only ranges in 85 production
+Rust files. Those files contain 64,658 original Rust code lines and 51,599
+after masking, so the inline test delta is 13,059. The same delta added to
+28,339 separate Rust test lines gives 41,398 Rust test lines. The 99 example
+lines remain in the all-source view and outside both milestone scopes.
+
+Compared with `b2ec44f`, production native share increased 0.0165 percentage
+points and Rust test share increased 0.0471 points. Both independent 50% source
+SLOC milestones remain achieved. This hook serialization ordering fix changes
+the measured source composition only; these percentages do not measure runtime
+coverage, behavioral coverage, or performance.
+
+The [measurement evidence](native-metrics/8eb7c76-evidence.tar.gz) contains the
+source path manifests, source hashes independently checked against all 668 Git
+blobs, exact archive stream hash, raw Tokei JSON, inline AST ranges and counts,
+splitter source and lockfile, tool hashes, and reproduction script. Evidence
+SHA-256:
+`5c16894ce99d2cc0d9a99565e4cff122e046a2fe77f5fea592230196dd2c4a2b`.
 
 ## Behavioral migration
 
