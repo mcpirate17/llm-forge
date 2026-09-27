@@ -76,7 +76,7 @@ tool versions, path manifests, AST ranges and raw Tokei JSON with every update.
 Do not pad implementations, move live code into excluded paths, or remove needed
 behavior to raise these percentages.
 
-## Latest verified commit
+## Previous verified commit
 
 Commit `e70f2d9a816d76131dbf92f14158c0ec2f5a13d0`, measured from a `git archive`
 with the same path classification and inline Rust test treatment:
@@ -101,12 +101,38 @@ original and masked inline-file counts, AST splitter source and lockfile, and
 tool hashes. Its SHA-256 is
 `f2ff08f2c0c51c8160c65f6a20f70d169d2be6689d45e1c7038b8cb0147b06e3`.
 
+## Latest verified commit
+
+Commit `f2dcdf776e3cb167006bf5bdb20cd31c165cfe1f`, measured from a `git archive`
+with the same classification and inline-test treatment:
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 52,384 | 48,045 | 194 | **47.7475% native** |
+| Tests | 42,101 | 37,465 | 0 | **47.0867% Rust** |
+| All tracked source, including examples | 94,485 | 85,609 | 194 | 47.4846% native |
+
+The splitter identified 94 test-only ranges across 79 production Rust files.
+Those same files contain 40,889 original Rust code lines and 28,346 after
+masking, giving 12,543 inline test lines. Subtracting that delta from all 60,588
+raw production Rust lines gives 48,045. Adding it to 24,922 separate Rust test
+lines gives 37,465. The 99 example lines remain outside both milestone scopes.
+
+Production is up 4.4881 percentage points and Rust tests are up 10.1904 points
+from the previous verified commit. Both independent 50% milestones remain open.
+The new batch moves messaging transport/storage, candidate checks and policy,
+campaign refresh, project path decisions, and runtime receipt decisions into
+Rust. Test retirement maps are recorded in the corresponding migration documents.
+
+The [measurement evidence](native-metrics/f2dcdf7-evidence.tar.gz) contains the
+source manifests and hashes, raw Tokei JSON, AST ranges, splitter source and
+lockfile, tool hashes, and reproduction script. The archived source hashes also
+match an independent extraction of each committed blob. Evidence SHA-256:
+`6db0524bff8a9ae155af039270dd6b0b5c5f6e69808f9474c56d68ee5e50c4c7`.
+
 ## Behavioral migration
 
-The Forge-owned graph query CLI reads the code-review-graph SQLite index. The
-external indexer remains a separate dependency; it has not been rewritten.
-
-Forge now also has its own structural indexer: `forge graph index` parses host
+Forge has its own structural indexer: `forge graph index` parses host
 Python and Rust source and writes `.forge/graph.db`. The context and reference
 queries use this native snapshot, with explicit limits and stale-file checks.
 The index records only structurally resolved calls; it makes no semantic
