@@ -1,4 +1,8 @@
-"""Tests for deterministic, model-free A2A compaction receipts."""
+"""Python boundary checks for the Rust A2A compaction core.
+
+The protocol, receipt, and thread algorithms are tested directly in
+``native/conductor-native/src/a2a_compaction.rs``.
+"""
 
 from __future__ import annotations
 
@@ -7,234 +11,70 @@ import json
 import pytest
 
 from conductor.a2a_compaction import (
-    ACTIONABLE_STATUSES,
-    AUTHORITY,
-    COORDINATION_STATUSES,
-    MAX_COMPACT_SUMMARY_BYTES,
-    MAX_DATA_KIND_BYTES,
-    MAX_METADATA_BYTES,
-    MAX_PROTOCOL_SUMMARY_BYTES,
-    MAX_SUPERSEDES,
     CompactionError,
     compact_message,
     validate_coordination_v2,
 )
 
 
-def _row(
-    message_id: str = "m1",
-    *,
-    direction: str = "inbound",
-    body: str = "Please inspect the attached result.",
-    data: object | None = None,
-    created_at: str = "2026-08-30T12:00:00+00:00",
-    read_at: str | None = None,
-) -> dict[str, object]:
+def _row() -> dict[str, object]:
     return {
-        "message_id": message_id,
-        "direction": direction,
+        "message_id": "m1",
+        "direction": "inbound",
         "sender": "alice",
         "recipient": "bob",
-        "body": body,
-        "data_json": (
-            json.dumps(data, ensure_ascii=False, sort_keys=True)
-            if data is not None
-            else None
+        "body": "Please inspect the attached result.",
+        "data_json": json.dumps(
+            {
+                "kind": "coordination-v2",
+                "thread_id": "thread-1",
+                "summary": "Review the bounded evidence",
+                "status": "open",
+                "requires_response": False,
+                "supersedes": [],
+            }
         ),
-        "created_at": created_at,
+        "created_at": "2026-08-30T12:00:00+00:00",
         "received_at": "2026-08-30T12:00:01+00:00",
         "delivery_status": "delivered",
         "status_reason": None,
-        "read_at": read_at,
+        "read_at": None,
     }
 
 
-def _v2(**overrides: object) -> dict[str, object]:
-    payload: dict[str, object] = {
-        "kind": "coordination-v2",
-        "thread_id": "thread-1",
-        "summary": "Compact status",
-        "status": "open",
-        "requires_response": False,
-        "supersedes": [],
-    }
-    payload.update(overrides)
-    return payload
-
-
-def _assert_validate_coordination_v2_normalizes_only_summary_whitespace() -> None:
+def test_mapping_payload_reaches_native_core_and_returns_python_fields() -> None:
     result = validate_coordination_v2(
-        _v2(summary="  one\n  two  ", supersedes=["m-old", "m-older"])
+        {"kind": "coordination-v2", "summary": "  one\n  two  "}
     )
-
     assert result == {
         "kind": "coordination-v2",
-        "thread_id": "thread-1",
+        "thread_id": None,
         "summary": "one two",
-        "status": "open",
-        "requires_response": False,
-        "supersedes": ["m-old", "m-older"],
+        "status": None,
+        "requires_response": None,
+        "supersedes": [],
     }
 
-
-@pytest.mark.parametrize(
-    "payload",
-    [
-        None,
-        [],
-        {},
-        {1: "not-a-JSON-key"},
-        {"kind": "coordination"},
-        {"kind": "coordination-v2", "unknown": 1},
-        {"kind": "coordination-v2", "thread_id": "bad id"},
-        {"kind": "coordination-v2", "summary": "   "},
-        {"kind": "coordination-v2", "status": "done"},
-        {"kind": "coordination-v2", "requires_response": 1},
-        {"kind": "coordination-v2", "supersedes": "m1"},
-        {"kind": "coordination-v2", "supersedes": ["bad id"]},
-        {"kind": "coordination-v2", "supersedes": ["m1", "m1"]},
-    ],
-)
-def test_validate_coordination_v2_rejects_invalid_protocol(payload: object) -> None:
-    with pytest.raises(CompactionError):
-        validate_coordination_v2(payload)
-
-
-def test_validate_coordination_v2_enforces_utf8_summary_and_supersedes_bounds() -> None:
-    with pytest.raises(CompactionError, match="UTF-8 bytes"):
-        validate_coordination_v2(
-            {"kind": "coordination-v2", "summary": "é" * MAX_PROTOCOL_SUMMARY_BYTES}
-        )
-    with pytest.raises(CompactionError, match="at most"):
-        validate_coordination_v2(
-            {
-                "kind": "coordination-v2",
-                "supersedes": [f"m-{index}" for index in range(MAX_SUPERSEDES + 1)],
-            }
-        )
-    _assert_validate_coordination_v2_normalizes_only_summary_whitespace()
-    _assert_invalid_v2_shape_cannot_silently_fall_back_to_legacy()
-
-
-def _assert_compact_message_is_deterministic_and_contains_no_raw_payload() -> None:
-    row = _row(data=_v2(summary="Review the bounded evidence"))
-
-    first = compact_message(row)
-    second = compact_message(dict(reversed(list(row.items()))))
-
-    assert first == second
-    assert first["authority"] == AUTHORITY
-    assert first["summary"] == "Review the bounded evidence"
-    rendered = json.dumps(first, ensure_ascii=False)
-    raw_body = row["body"]
-    raw_data = row["data_json"]
-    assert isinstance(raw_body, str)
-    assert isinstance(raw_data, str)
-    assert raw_body not in rendered
-    assert raw_data not in rendered
-    assert len(first["source_sha256"]) == 64
-    assert len(first["receipt_sha256"]) == 64
-
-
-def test_legacy_fallback_is_conservative_bounded_and_model_free() -> None:
-    receipt = compact_message(
-        _row(body=("  legacy\nmessage  " * 100), data={"kind": "coordination"})
-    )
-
-    assert receipt["protocol"] == "legacy"
-    assert receipt["summary_source"] == "body-fallback"
-    assert len(receipt["summary"].encode("utf-8")) <= MAX_COMPACT_SUMMARY_BYTES
-    assert receipt["summary"].endswith("…")
-    assert receipt["status"] is None
-    assert receipt["requires_response"] is None
-    assert receipt["actionable"] is True
-    _assert_compact_message_is_deterministic_and_contains_no_raw_payload()
-    _assert_empty_legacy_body_uses_deterministic_label()
-    _assert_all_emitted_prose_labels_obey_utf8_byte_bounds()
-
-
-def _assert_empty_legacy_body_uses_deterministic_label() -> None:
-    receipt = compact_message(_row(body="", data={"kind": "gate-review-request"}))
-
-    assert receipt["summary"] == "gate-review-request message m1"
-    assert receipt["summary_source"] == "deterministic-label"
-
-
-@pytest.mark.parametrize("status", sorted(COORDINATION_STATUSES))
-@pytest.mark.parametrize("requires_response", [False, True])
-def test_actionability_preserves_status_and_requires_response_independently(
-    status: str, requires_response: bool
-) -> None:
-    receipt = compact_message(
-        _row(data=_v2(status=status, requires_response=requires_response))
-    )
-
-    assert receipt["status"] == status
-    assert receipt["requires_response"] is requires_response
-    assert receipt["actionable"] is (requires_response or status in ACTIONABLE_STATUSES)
-
-
-def test_missing_v2_status_fails_closed_as_actionable() -> None:
-    receipt = compact_message(
-        _row(data={"kind": "coordination-v2", "requires_response": False})
-    )
-
-    assert receipt["status"] is None
-    assert receipt["requires_response"] is False
-    assert receipt["actionable"] is True
-
-
-def _assert_invalid_v2_shape_cannot_silently_fall_back_to_legacy() -> None:
-    with pytest.raises(CompactionError, match="explicit kind"):
-        compact_message(_row(data={"summary": "looks like v2"}))
-    with pytest.raises(CompactionError, match="supersede itself"):
-        compact_message(_row(data=_v2(supersedes=["m1"])))
-
-
-def test_invalid_legacy_json_is_hashed_and_safely_summarized() -> None:
     row = _row()
-    row["data_json"] = "{not-json"
-
     receipt = compact_message(row)
-
-    assert receipt["protocol"] == "legacy"
-    assert receipt["data_json_valid"] is False
-    assert receipt["raw_data_bytes"] == len("{not-json".encode("utf-8"))
-    assert len(receipt["data_sha256"]) == 64
-    _assert_unicode_byte_accounting_is_exact()
-
-
-def _assert_unicode_byte_accounting_is_exact() -> None:
-    body = "é🙂"
-    data = {"kind": "coordination", "note": "雪"}
-    row = _row(body=body, data=data)
-
-    receipt = compact_message(row)
-
-    expected_body = len(body.encode("utf-8"))
-    expected_data = len(str(row["data_json"]).encode("utf-8"))
-    assert receipt["raw_body_bytes"] == expected_body
-    assert receipt["raw_data_bytes"] == expected_data
-    assert receipt["omitted_raw_bytes"] == expected_body + expected_data
+    assert compact_message(dict(reversed(list(row.items())))) == receipt
+    assert receipt["message_id"] == "m1"
+    assert receipt["summary"] == "Review the bounded evidence"
+    assert receipt["actionable"] is True
+    assert isinstance(receipt["receipt_sha256"], str)
 
 
-def _assert_all_emitted_prose_labels_obey_utf8_byte_bounds() -> None:
-    receipt = compact_message(
-        _row(
-            body="雪" * 1_000,
-            data={"kind": "分類" * 1_000},
-        )
-    )
-
-    assert len(receipt["summary"].encode("utf-8")) <= MAX_COMPACT_SUMMARY_BYTES
-    assert len(receipt["data_kind"].encode("utf-8")) <= MAX_DATA_KIND_BYTES
-    assert receipt["summary"].endswith("…")
-    assert receipt["data_kind"].endswith("…")
+def test_python_boundary_rejects_non_string_keys_and_non_json_values() -> None:
+    with pytest.raises(CompactionError, match="keys must be strings"):
+        validate_coordination_v2({1: "not-a-JSON-key"})
+    with pytest.raises(CompactionError, match="not JSON-compatible"):
+        validate_coordination_v2({"kind": "coordination-v2", "summary": object()})
 
 
-def test_oversized_row_metadata_fails_closed() -> None:
+def test_native_validation_error_maps_to_compaction_error() -> None:
+    with pytest.raises(CompactionError, match="must not be empty"):
+        validate_coordination_v2({"kind": "coordination-v2", "summary": "   "})
     row = _row()
-    row["sender"] = "é" * MAX_METADATA_BYTES
-
+    row["sender"] = "é" * 512
     with pytest.raises(CompactionError, match="sender"):
         compact_message(row)

@@ -1,8 +1,10 @@
 //! Bounded native graph context for a host checkout and concrete code references.
 //!
-//! The external `.code-review-graph/graph.db` remains owned by its indexer.
-//! This command only opens an existing database read-only and never rebuilds it.
+//! Forge writes its own `.forge/graph.db` via `graph index`; the external
+//! `.code-review-graph/graph.db` remains a read-only compatibility source.
 
+#[path = "graph_index.rs"]
+mod indexer;
 #[path = "graph_context_store.rs"]
 mod store;
 
@@ -26,15 +28,20 @@ const MAX_PATH_BYTES: usize = 1_024;
 
 #[derive(Args)]
 pub struct GraphArgs {
-    /// Existing host checkout containing `.code-review-graph/graph.db`.
+    /// Host checkout containing source and an optional graph database.
     #[arg(long, default_value = ".", global = true)]
     host: PathBuf,
+    /// Explicit graph database path (relative to host or absolute).
+    #[arg(long, global = true)]
+    db: Option<PathBuf>,
     #[command(subcommand)]
     action: GraphCommand,
 }
 
 #[derive(Subcommand)]
 enum GraphCommand {
+    /// Build a syntax-only Python/Rust graph in Forge-owned SQLite.
+    Index,
     /// Bounded source and indexed callers/callees for one file or symbol.
     Context(ContextArgs),
     /// Discover concrete code references in a bounded message prefix.
@@ -126,19 +133,21 @@ struct SourceFile {
 }
 
 pub fn run(args: GraphArgs) -> Result<u8> {
-    let host = args
-        .host
-        .canonicalize()
-        .with_context(|| format!("host directory not found: {}", args.host.display()))?;
+    let GraphArgs { host, db, action } = args;
+    let host = host.canonicalize().context("host directory not found")?;
     ensure!(host.is_dir(), "host is not a directory: {}", host.display());
-    match args.action {
-        GraphCommand::Context(args) => run_context(&host, args)?,
-        GraphCommand::Refs(args) => run_refs(&host, args)?,
+    match action {
+        GraphCommand::Index => {
+            let report = indexer::index(&host, db.as_deref())?;
+            println!("{}", serde_json::to_string(&report)?);
+        }
+        GraphCommand::Context(args) => run_context(&host, db.as_deref(), args)?,
+        GraphCommand::Refs(args) => run_refs(&host, db.as_deref(), args)?,
     }
     Ok(0)
 }
 
-fn run_context(host: &Path, args: ContextArgs) -> Result<()> {
+fn run_context(host: &Path, db: Option<&Path>, args: ContextArgs) -> Result<()> {
     ensure!(
         (1..=50).contains(&args.max_edges),
         "--max-edges must be between 1 and 50"
@@ -149,14 +158,14 @@ fn run_context(host: &Path, args: ContextArgs) -> Result<()> {
     );
     let symbol = validate_symbol(args.symbol.as_deref())?;
     let file = read_source(host, &args.file)?;
-    let store = GraphStore::open(host)?;
+    let store = GraphStore::open(host, db)?;
     let mut output = project_context(&store, host, &file, symbol, args.max_edges)?;
     fit_context(&mut output, args.max_bytes)?;
     println!("{}", serde_json::to_string(&output)?);
     Ok(())
 }
 
-fn run_refs(host: &Path, args: RefsArgs) -> Result<()> {
+fn run_refs(host: &Path, db: Option<&Path>, args: RefsArgs) -> Result<()> {
     ensure!(
         (1..=4).contains(&args.max_refs),
         "--max-refs must be between 1 and 4"
@@ -210,7 +219,7 @@ fn run_refs(host: &Path, args: RefsArgs) -> Result<()> {
             }
         };
         if store.is_none() {
-            store = Some(GraphStore::open(host)?);
+            store = Some(GraphStore::open(host, db)?);
         }
         let context = project_context(store.as_ref().unwrap(), host, &file, symbol, 3)?;
         let compact = compact_context(context);

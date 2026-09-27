@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import fcntl
-import json
 import hashlib
+import json
 import random
 from pathlib import Path
 
@@ -20,16 +20,6 @@ def _embedding_meta(*, dimension: int = 2, num_gpu: int = 0) -> dict[str, object
         "num_gpu": num_gpu,
         "num_ctx": 2048,
     }
-
-
-def test_chunk_text_splits_on_headings() -> None:
-    text = "# One\n" + ("a" * 500) + "\n## Two\n" + ("b" * 500)
-    chunks = memory_index.chunk_text(
-        text, source_id="notes", path=Path("x.md"), mode="heading"
-    )
-    assert len(chunks) >= 2
-    assert chunks[0]["source"] == "notes"
-    assert "One" in chunks[0]["title"] or "a" in chunks[0]["text"]
 
 
 def test_iter_source_files_respects_exclude(tmp_path: Path) -> None:
@@ -325,15 +315,6 @@ def test_path_matches_source_defaults_glob_to_markdown(tmp_path: Path) -> None:
     assert memory_index.path_matches_source(entry, target) is True
 
 
-def test_chunk_text_returns_empty_for_blank_input() -> None:
-    assert (
-        memory_index.chunk_text(
-            "   ", source_id="notes", path=Path("x.md"), mode="heading"
-        )
-        == []
-    )
-
-
 def test_rows_by_path_groups_by_source_and_path() -> None:
     rows = [
         {"source": "notes", "path": "a.md", "n": 1},
@@ -405,9 +386,11 @@ def test_index_write_lock_excludes_concurrent_holder_and_releases_on_exit(
     holder = lock_path.open("a+", encoding="utf-8")
     fcntl.flock(holder.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     try:
-        with pytest.raises(memory_index.RetrieveError, match="timed out"):
-            with memory_index.index_write_lock(index_path, timeout=0.2):
-                pass
+        with (
+            pytest.raises(memory_index.RetrieveError, match="timed out"),
+            memory_index.index_write_lock(index_path, timeout=0.2),
+        ):
+            pass
     finally:
         fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
         holder.close()
@@ -417,9 +400,11 @@ def test_index_write_lock_excludes_concurrent_holder_and_releases_on_exit(
         entered = True
     assert entered
 
-    with pytest.raises(RuntimeError, match="boom"):
-        with memory_index.index_write_lock(index_path, timeout=1.0):
-            raise RuntimeError("boom")
+    with (
+        pytest.raises(RuntimeError, match="boom"),
+        memory_index.index_write_lock(index_path, timeout=1.0),
+    ):
+        raise RuntimeError("boom")
 
     reacquired = False
     with memory_index.index_write_lock(index_path, timeout=1.0):
@@ -685,25 +670,6 @@ def test_chunk_text_exotic_boundaries_parity() -> None:
             assert got == want
 
 
-def test_chunk_text_heading_only_falls_back_to_file_name_title() -> None:
-    chunks = memory_index.chunk_text(
-        "# ###", source_id="s", path=Path("docs/n.md"), mode="chunk"
-    )
-    assert len(chunks) == 1
-    assert chunks[0]["title"] == "n.md"
-    assert chunks[0]["path"] == str(Path("docs/n.md"))
-
-
-def test_chunk_text_whole_mode_caps_at_3000() -> None:
-    document = "x" * 9000
-    chunks = memory_index.chunk_text(
-        document, source_id="s", path=Path("docs/n.md"), mode="whole"
-    )
-    assert len(chunks) == 1
-    assert chunks[0]["text"] == "x" * 3000
-    assert chunks[0]["title"] == "n.md"
-
-
 def test_chunk_text_maps_native_tuple_fields_into_dict_fields() -> None:
     chunks = memory_index.chunk_text(
         "body", source_id="src", path=Path("docs/n.md"), mode="whole"
@@ -730,9 +696,10 @@ def test_expand_root_resolves_relative_roots_against_the_workspace(
     assert memory_index._expand_root({"id": "notes", "root": "research/notes"}) == (
         tmp_path / "cards"
     )
-    assert memory_index._expand_root({"id": "tasks", "root": "tasks"}) == (
-        tmp_path / "tasks"
-    ).resolve()
+    assert (
+        memory_index._expand_root({"id": "tasks", "root": "tasks"})
+        == (tmp_path / "tasks").resolve()
+    )
 
 
 def test_expand_root_keeps_the_monorepo_default_for_a_host_so_configured(
@@ -745,6 +712,8 @@ def test_expand_root_keeps_the_monorepo_default_for_a_host_so_configured(
     assert memory_index._expand_root({"id": "notes", "root": "research/notes"}) == (
         tmp_path / "research/notes"
     )
+
+
 def test_catalog_indexes_the_canonical_auto_memory() -> None:
     """Auto-memory is indexed from the real files, not from the vault mirrors.
 
@@ -818,8 +787,7 @@ def test_host_catalog_path_falls_back_to_the_packaged_copy(
 ) -> None:
     monkeypatch.delenv("CONDUCTOR_MEMORY_SOURCES", raising=False)
     assert (
-        memory_index.host_catalog_path(tmp_path)
-        == memory_index.PACKAGED_SOURCES_PATH
+        memory_index.host_catalog_path(tmp_path) == memory_index.PACKAGED_SOURCES_PATH
     )
 
 

@@ -6,7 +6,9 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{walk_expr, walk_stmt, SourceOrderVisitor};
@@ -642,30 +644,166 @@ fn analyze_file(path: String, source: String, changed: bool) -> Option<FileFacts
     })
 }
 
+/// Parse the candidate's Python sources once and return serializable
+/// cross-module facts for the structure-audit policy.
+pub fn structure_facts_json(
+    records: Vec<(String, String)>,
+    changed_paths: Vec<String>,
+) -> Result<String, serde_json::Error> {
+    let changed = changed_paths.into_iter().collect::<HashSet<_>>();
+    let files = records
+        .into_iter()
+        .filter_map(|(path, source)| {
+            let is_changed = changed.contains(&path);
+            analyze_file(path, source, is_changed)
+        })
+        .collect::<Vec<_>>();
+    serde_json::to_string(&AuditFacts {
+        modules_indexed: files.len(),
+        files,
+    })
+}
+
+#[cfg(feature = "python")]
 #[pyfunction]
 fn candidate_structure_facts_native(
     py: Python<'_>,
     records: Vec<(String, String)>,
     changed_paths: Vec<String>,
 ) -> PyResult<String> {
-    let changed = changed_paths.into_iter().collect::<HashSet<_>>();
-    let files = py.detach(|| {
-        records
-            .into_iter()
-            .filter_map(|(path, source)| {
-                let is_changed = changed.contains(&path);
-                analyze_file(path, source, is_changed)
-            })
-            .collect::<Vec<_>>()
-    });
-    serde_json::to_string(&AuditFacts {
-        modules_indexed: files.len(),
-        files,
-    })
-    .map_err(|error| PyValueError::new_err(error.to_string()))
+    py.detach(|| structure_facts_json(records, changed_paths))
+        .map_err(|error| PyValueError::new_err(error.to_string()))
 }
 
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(candidate_structure_facts_native, module)?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{json, to_value};
+
+    fn facts(source: &str, changed: bool) -> serde_json::Value {
+        to_value(analyze_file("pkg/example.py".to_owned(), source.to_owned(), changed).unwrap())
+            .unwrap()
+    }
+
+    #[test]
+    fn unguarded_resource_release_is_reported_but_finally_and_with_are_not() {
+        let leaking = facts(
+            "import os\n\ndef read_locked(path):\n    handle = os.open(path)\n    payload = handle.read()\n    handle.close()\n    return payload\n",
+            true,
+        );
+        assert_eq!(leaking["leaks"].as_array().unwrap().len(), 1);
+        assert_eq!(leaking["leaks"][0]["function"], "read_locked");
+        assert_eq!(leaking["leaks"][0]["resource"], "handle");
+        assert_eq!(leaking["leaks"][0]["line"], 4);
+        assert_eq!(leaking["leaks"][0]["owned"], true);
+
+        for safe in [
+            "import os\n\ndef read_locked(path):\n    handle = os.open(path)\n    try:\n        return handle.read()\n    finally:\n        handle.close()\n",
+            "import os\n\ndef read_locked(path):\n    with os.open(path) as handle:\n        return handle.read()\n",
+            "import os\n\ndef acquire(path):\n    handle = os.open(path)\n    return handle\n",
+        ] {
+            assert_eq!(facts(safe, true)["leaks"], json!([]), "{safe}");
+        }
+    }
+
+    #[test]
+    fn connection_close_has_distinct_ownership_fact() {
+        let source = "import sqlite3\n\ndef query(path):\n    conn = sqlite3.connect(path)\n    rows = conn.execute('select 1').fetchall()\n    conn.close()\n    return rows\n";
+        let result = facts(source, true);
+        assert_eq!(result["leaks"].as_array().unwrap().len(), 1);
+        assert_eq!(result["leaks"][0]["acquire"], "connect");
+        assert_eq!(result["leaks"][0]["release"], "close");
+        assert_eq!(result["leaks"][0]["owned"], false);
+    }
+
+    #[test]
+    fn lock_order_facts_anchor_the_inner_acquisition() {
+        let forward = facts(
+            "import threading\nalpha_lock = threading.Lock()\nbeta_lock = threading.Lock()\ndef forward():\n    with alpha_lock:\n        with beta_lock:\n            return 1\n",
+            true,
+        );
+        let backward = facts(
+            "def backward():\n    with beta_lock:\n        with alpha_lock:\n            return 2\n",
+            false,
+        );
+        assert_eq!(
+            forward["lock_orders"],
+            json!([{
+                "outer": "alpha_lock", "inner": "beta_lock", "line": 6
+            }])
+        );
+        assert_eq!(
+            backward["lock_orders"],
+            json!([{
+                "outer": "beta_lock", "inner": "alpha_lock", "line": 3
+            }])
+        );
+    }
+
+    #[test]
+    fn nominal_abstraction_and_subclass_facts_exclude_protocol() {
+        let nominal = facts(
+            "from abc import ABC, abstractmethod\nclass Storage(ABC):\n    @abstractmethod\n    def load(self, key): ...\n    @abstractmethod\n    def store(self, key, value): ...\nclass Backend(Storage):\n    def load(self, key): return None\n    def store(self, key, value): return None\n",
+            true,
+        );
+        assert_eq!(nominal["abstractions"][0]["name"], "Storage");
+        assert_eq!(nominal["abstractions"][0]["methods"], 2);
+        assert!(nominal["subclasses"].as_array().unwrap().contains(&json!({
+            "base": "Storage",
+            "implementation": "pkg/example.py::Backend",
+        })));
+
+        let protocol = facts(
+            "from typing import Protocol\nfrom abc import abstractmethod\nclass Storage(Protocol):\n    @abstractmethod\n    def load(self, key): ...\n    @abstractmethod\n    def store(self, key, value): ...\n",
+            true,
+        );
+        assert_eq!(protocol["abstractions"], json!([]));
+    }
+
+    #[test]
+    fn configuration_facts_preserve_key_default_and_line() {
+        let result = facts(
+            "import os\nfrom pkg.constants import DEFAULT\nhost = os.getenv('SERVICE_HOST', DEFAULT)\nurl = os.environ.get('SERVICE_URL', 'http://localhost')\nignored = os.getenv('NO_DEFAULT')\n",
+            false,
+        );
+        assert_eq!(
+            result["configs"],
+            json!([
+                {"key": "SERVICE_HOST", "line": 3, "default": "DEFAULT"},
+                {"key": "SERVICE_URL", "line": 4, "default": "'http://localhost'"},
+            ])
+        );
+    }
+
+    #[test]
+    fn unbounded_cache_requires_growth_inside_changed_function_without_eviction() {
+        let growing = "_CACHE = {}\n\ndef lookup(key):\n    if key not in _CACHE:\n        _CACHE[key] = compute(key)\n    return _CACHE[key]\n";
+        let result = facts(growing, true);
+        assert_eq!(
+            result["unbounded"],
+            json!([{
+                "name": "_CACHE", "defined_line": 1, "growth_line": 5
+            }])
+        );
+        assert_eq!(facts(growing, false)["unbounded"], json!([]));
+
+        for bounded in [
+            "_CACHE = {}\ndef lookup(key):\n    if len(_CACHE) > 128:\n        _CACHE.clear()\n    _CACHE[key] = compute(key)\n",
+            "import collections\n_RECENT = collections.deque(maxlen=64)\ndef record(event):\n    _RECENT.append(event)\n",
+            "_REGISTRY = {}\n_REGISTRY['one'] = 1\ndef lookup(key):\n    return _REGISTRY[key]\n",
+        ] {
+            assert_eq!(facts(bounded, true)["unbounded"], json!([]), "{bounded}");
+        }
+    }
+
+    #[test]
+    fn parser_rejects_invalid_source_without_emitting_partial_facts() {
+        assert!(analyze_file("broken.py".to_owned(), "def f(:\n".to_owned(), true).is_none());
+    }
 }

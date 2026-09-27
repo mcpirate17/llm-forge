@@ -2,6 +2,8 @@
 
 #[path = "mailbox_queue.rs"]
 mod queue;
+#[path = "mailbox_retention.rs"]
+mod retention;
 #[path = "mailbox_store.rs"]
 mod store;
 #[path = "mailbox_view.rs"]
@@ -36,6 +38,8 @@ enum MailboxCommand {
     Read(MessageArgs),
     /// Read bounded outbound delivery events without creating or migrating stores.
     History(HistoryArgs),
+    /// Preview or explicitly apply bounded resolved-message retention.
+    Retention(retention::RetentionArgs),
 }
 
 #[derive(Args)]
@@ -114,9 +118,8 @@ fn print_json(value: &Value) -> Result<()> {
 }
 
 pub fn run(args: MailboxArgs) -> Result<u8> {
-    let state_dir = args
-        .state_dir
-        .unwrap_or_else(|| args.host.join(".agents/a2a"));
+    let host = args.host;
+    let state_dir = args.state_dir.unwrap_or_else(|| host.join(".agents/a2a"));
     match args.action {
         MailboxCommand::Enqueue(args) => {
             print_json(&queue::run(args, &state_dir)?)?;
@@ -194,6 +197,9 @@ pub fn run(args: MailboxArgs) -> Result<u8> {
                 None => serde_json::json!({"schema_version":1,"available":false,"events":[]}),
             };
             print_json(&payload).context("rendering delivery history")?;
+        }
+        MailboxCommand::Retention(args) => {
+            print_json(&retention::run(args, &state_dir, &host)?)?;
         }
     }
     Ok(0)

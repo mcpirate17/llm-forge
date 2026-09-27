@@ -5,6 +5,7 @@ import math
 import random
 import urllib.error
 from pathlib import Path
+from typing import Self
 
 import pytest
 
@@ -130,7 +131,7 @@ def test_broker_client_auto_starts_once_after_connection_refused(
                 }
             ).encode()
 
-        def __enter__(self) -> _Resp:
+        def __enter__(self) -> Self:
             return self
 
         def __exit__(self, *args: object) -> None:
@@ -447,24 +448,6 @@ def test_native_scoring_matches_builtin_sum_bit_for_bit() -> None:
         assert (hits[0].name, hits[0].path, hits[0].text) == ("c0", "n/c0.md", "t0")
 
 
-def test_native_scoring_keeps_index_order_on_ties() -> None:
-    cards = [
-        {"name": f"c{i}", "path": f"n/c{i}.md", "text": "t", "vector": [1.0, 0.0]}
-        for i in range(4)
-    ]
-    hits = _score_via_query_index([1.0, 0.0], cards, 4)
-    assert [hit.name for hit in hits] == ["c0", "c1", "c2", "c3"]
-
-
-def test_native_scoring_truncates_to_top_k() -> None:
-    cards = [
-        {"name": f"c{i}", "path": "n", "text": "t", "vector": [float(i + 1)]}
-        for i in range(10)
-    ]
-    hits = _score_via_query_index([1.0], cards, 3)
-    assert [hit.name for hit in hits] == ["c9", "c8", "c7"]
-
-
 def test_native_scoring_dim_mismatch_maps_to_retrieve_error() -> None:
     cards = [{"name": "c3", "path": "p", "text": "t", "vector": [1.0, 2.0]}]
     with pytest.raises(
@@ -511,6 +494,8 @@ def test_default_notes_dir_environment_overrides_the_table(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CONDUCTOR_NOTES_ROOT", "envnotes")
     assert kb_retrieve.default_notes_dir() == tmp_path / "envnotes"
+
+
 def test_every_embed_entry_point_budgets_for_a_cold_model_load() -> None:
     """A 120 s budget could not survive the 117 s cold load that was measured.
 
@@ -562,7 +547,7 @@ def test_malformed_json_is_not_reported_as_a_timeout(
         def read(self) -> bytes:
             return b"{not json"
 
-        def __enter__(self) -> _Resp:
+        def __enter__(self) -> Self:
             return self
 
         def __exit__(self, *args: object) -> None:

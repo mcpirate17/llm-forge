@@ -48,26 +48,11 @@ fn takeover_removes_only_full_events_python_entries() {
         .iter()
         .any(|c| c.contains("forge") && c.contains("hook PostToolUse")));
 
-    // PreToolUse (Partial: Edit/mcp graph tools still need Python):
-    // the Python entry must survive, narrowed to just those tools, and
-    // the forge entry must keep matcher `.*` (it still needs to see Bash).
+    // PreToolUse is fully native across Bash, Read, Edit and graph tools.
+    // The Python dispatcher entry is removed; forge keeps the catchall.
     let pre_list = &settings["hooks"]["PreToolUse"];
     let pre = commands_for(&settings, "PreToolUse");
-    assert!(pre.iter().any(|c| c.contains("dispatch.py PreToolUse")));
-    let python_entry = pre_list
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|entry| {
-            entry["hooks"][0]["command"]
-                .as_str()
-                .is_some_and(|c| c.contains("dispatch.py"))
-        })
-        .unwrap();
-    assert_eq!(
-        python_entry["matcher"],
-        "Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*"
-    );
+    assert!(!pre.iter().any(|c| c.contains("dispatch.py PreToolUse")));
     let forge_entry = pre_list
         .as_array()
         .unwrap()
@@ -93,8 +78,7 @@ fn takeover_removes_only_full_events_python_entries() {
     assert_eq!(settings["hooks"]["SomeoneElsesHook"][0]["matcher"], "Bash");
     assert_eq!(settings["unrelatedTopLevelKey"], true);
 
-    // The narrowed PreToolUse entry's ORIGINAL (`.*`) shape was
-    // recorded verbatim, same mechanism as the removed PostToolUse one.
+    // The removed PreToolUse entry's original shape is recorded for uninstall.
     let record: Value = serde_json::from_str(
         &std::fs::read_to_string(takeover::takeover_path(scratch.path())).unwrap(),
     )
@@ -148,8 +132,7 @@ fn uninstall_restores_the_exact_pre_takeover_python_entry() {
         restored["hooks"]["PostToolUse"][0],
         original["hooks"]["PostToolUse"][0]
     );
-    // The narrowed PreToolUse Python entry's matcher goes back to `.*`,
-    // in place (no duplicate row), and the forge entry stays alongside it.
+    // The removed PreToolUse Python entry is restored exactly once.
     let pre = restored["hooks"]["PreToolUse"].as_array().unwrap();
     let python_entries: Vec<&Value> = pre
         .iter()
@@ -160,12 +143,12 @@ fn uninstall_restores_the_exact_pre_takeover_python_entry() {
         })
         .collect();
     assert_eq!(python_entries.len(), 1, "no duplicate python row: {pre:?}");
-    assert_eq!(python_entries[0]["matcher"], ".*");
+    assert_eq!(*python_entries[0], original["hooks"]["PreToolUse"][0]);
     assert!(!takeover::takeover_path(scratch.path()).is_file());
 }
 
 #[test]
-fn a_second_narrowing_run_changes_nothing_more() {
+fn a_second_takeover_run_changes_nothing_more() {
     let scratch = ScratchDir::new("takeover-narrow-idempotent");
     scratch.write_settings(&dispatcher_settings());
     install(&takeover_args(scratch.path(), false)).unwrap();
@@ -177,7 +160,7 @@ fn a_second_narrowing_run_changes_nothing_more() {
 }
 
 #[test]
-fn narrowing_dry_run_writes_nothing() {
+fn pretooluse_takeover_dry_run_writes_nothing() {
     let scratch = ScratchDir::new("takeover-narrow-dry-run");
     scratch.write_settings(&dispatcher_settings());
     let before = scratch.settings_text();
@@ -193,17 +176,14 @@ fn narrowing_dry_run_writes_nothing() {
 }
 
 #[test]
-fn status_reports_the_narrowed_matcher() {
+fn status_reports_the_removed_pretooluse_entry() {
     let scratch = ScratchDir::new("takeover-narrow-status");
     scratch.write_settings(&dispatcher_settings());
     install(&takeover_args(scratch.path(), false)).unwrap();
     let (_, settings) = load_settings(scratch.path()).unwrap();
 
     let python = takeover::python_status(&settings, scratch.path(), "PreToolUse");
-    assert_eq!(
-        python,
-        "narrowed(Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*)"
-    );
+    assert_eq!(python, "taken-over");
 }
 
 #[test]

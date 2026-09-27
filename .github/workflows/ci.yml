@@ -43,7 +43,32 @@ jobs:
         with:
           node-version: "20"
       - run: uv sync --extra test
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/forge
+      - name: Build native CLI for legacy compatibility entrypoints
+        env:
+          PYO3_NO_PYTHON: "1"
+          CARGO_BUILD_JOBS: "2"
+        run: |
+          cargo build --locked --manifest-path native/forge/Cargo.toml
+          echo "FORGE_BIN=$GITHUB_WORKSPACE/native/forge/target/debug/forge" >> "$GITHUB_ENV"
+          echo "$GITHUB_WORKSPACE/native/forge/target/debug" >> "$GITHUB_PATH"
       - run: uv run python -m pytest src/conductor -q -p no:cacheprovider --timeout 600
+      - name: Legacy hook compatibility seams
+        run: uv run python -m pytest src/tooling/hooks -q -p no:cacheprovider --timeout 120
+      - name: Rust contracts for Python compatibility APIs
+        env:
+          CARGO_BUILD_JOBS: "2"
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
+        run: |
+          export PYO3_PYTHON="$GITHUB_WORKSPACE/.venv/bin/python"
+          export PYTHONPATH="$GITHUB_WORKSPACE/src:$GITHUB_WORKSPACE/.venv/lib/python3.12/site-packages"
+          export LD_LIBRARY_PATH="$(uv run --no-sync python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
+          uv run --no-sync cargo test --locked --manifest-path native/conductor-native/Cargo.toml \
+            --features python-compat-tests --test 'python_contracts_*' -- --test-threads=1
       # candidate-review's "full" profile needs jscpd and pmd on PATH (see
       # [tools.jscpd]/[tools.pmd] in candidate_policy.toml and README.md's
       # "Baselines" section). Both are pinned to the exact version the
@@ -167,4 +192,4 @@ jobs:
         env:
           PYO3_NO_PYTHON: "1"
           CARGO_BUILD_JOBS: "2"
-        run: cargo test --locked --no-default-features --lib -- --test-threads=1
+        run: cargo test --locked --no-default-features --features source-analysis -- --test-threads=1

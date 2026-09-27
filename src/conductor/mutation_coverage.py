@@ -28,21 +28,26 @@ from typing import Any
 
 from conductor._native import (
     is_mutation_test_path_native,
+    mutation_canary_verdict_native,
+    mutation_evidence_exit_code_native,
+    mutation_github_output_native,
     mutation_rust_test_surface_native,
     mutation_test_inventory_native,
     normalize_mutation_path_native,
     should_skip_mutation_path_native,
 )
-
 from conductor.mutation_testing import (
     CANONICAL_TEST_PATTERNS,
     REPO_ROOT,
     CampaignError,
     verify_evidence,
 )
-from conductor.project_paths import DEFAULT_MUTATION_REGISTRY, host_root
+from conductor.project_paths import (
+    DEFAULT_MUTATION_REGISTRY,
+    host_root,
+    registry_relative,
+)
 from conductor.project_paths import registry_path as host_registry_path
-from conductor.project_paths import registry_relative
 
 SKIP_DIRECTORY_NAMES = frozenset(
     {
@@ -68,13 +73,6 @@ SKIP_DIRECTORY_NAMES = frozenset(
 COVERAGE_SCHEMA = "llm.mutation-testing.coverage.v2"
 CHANGED_SCHEMA = "llm.mutation-testing.changed-evidence.v2"
 DEFAULT_REGISTRY = Path(DEFAULT_MUTATION_REGISTRY)
-# A rejection the validator itself could not get through: a receipt whose detail
-# does not decode, a shape it refuses, a manifest that will not load. Everything
-# else -- no campaign, a held ratchet, a superseded pointer, an older runner
-# era -- is debt for the PR body, and the exit codes keep the two apart.
-VALIDATOR_SIDE_KINDS = frozenset(
-    {"decode_error", "schema_error", "manifest_load_error"}
-)
 
 
 def _native_or_campaign[T](operation: Callable[..., T], *args: object) -> T:
@@ -224,31 +222,10 @@ def _json_print(payload: Mapping[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
-def _observed_kinds(result: Mapping[str, Any]) -> set[str]:
-    """Every rejection kind the result observed: per-row and aggregate.
-
-    The aggregate alone would miss nothing the rows carry, but reading both
-    keeps the decision honest when a result was recorded without rows.
-    """
-
-    kinds = {
-        kind for kind, count in result.get("rejection_counts", {}).items() if count
-    }
-    for row in result.get("missing_evidence", []):
-        kinds.add(row.get("reason_kind", "not_pass"))
-        for rejection in row.get("receipt_rejections", []):
-            kinds.add(rejection.get("kind", "schema_error"))
-    return kinds
-
-
 def evidence_exit_code(result: Mapping[str, Any]) -> int:
     """0 evidence everywhere, 6 debt only, 5 anything validator-side, never silent."""
 
-    if _observed_kinds(result) & VALIDATOR_SIDE_KINDS:
-        return 5
-    if result.get("missing_evidence"):
-        return 6
-    return 0
+    return _native_or_campaign(mutation_evidence_exit_code_native, json.dumps(result))
 
 
 def _github_output(result: Mapping[str, Any]) -> None:
@@ -258,44 +235,16 @@ def _github_output(result: Mapping[str, Any]) -> None:
     lands in ``$GITHUB_STEP_SUMMARY`` when Actions set it, and nowhere else.
     """
 
-    rows = []
-    for row in result.get("missing_evidence", []):
-        print(f"::warning file={row['path']}::{row['reason']}")
-        rejection_kinds = []
-        for rejection in row.get("receipt_rejections", []):
-            kind = rejection.get("kind")
-            if kind not in rejection_kinds:
-                rejection_kinds.append(kind)
-            if kind in VALIDATOR_SIDE_KINDS:
-                print(
-                    f"::error::{row['path']}: {rejection['receipt']}: "
-                    f"{rejection['detail']}"
-                )
-        kind = row.get("reason_kind", "not_pass")
-        if rejection_kinds:
-            kind = f"{kind} ({', '.join(sorted(rejection_kinds))})"
-        rows.append(
-            (
-                row["path"],
-                ", ".join(row.get("campaigns", [])) or "—",
-                row["reason"],
-                kind,
-            )
-        )
+    output = json.loads(
+        _native_or_campaign(mutation_github_output_native, json.dumps(result))
+    )
+    for annotation in output["annotations"]:
+        print(annotation)
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if not summary_path or not rows:
+    if not summary_path or not output["summary"]:
         return
-    lines = [
-        "",
-        "### Mutation evidence (changed tests)",
-        "",
-        "| path | campaign | status | kind |",
-        "|---|---|---|---|",
-    ]
-    for path, campaigns, status, kind in rows:
-        lines.append(f"| `{path}` | {campaigns} | {status} | {kind} |")
     with open(summary_path, "a", encoding="utf-8") as handle:
-        handle.write("\n".join(lines) + "\n")
+        handle.write(output["summary"])
 
 
 def canary_report(
@@ -312,30 +261,9 @@ def canary_report(
     """
 
     report = coverage_report(registry_path, repo_root=repo_root)
-    counts = report["rejection_counts"]
-    offending = sorted(kind for kind in VALIDATOR_SIDE_KINDS if counts.get(kind))
-    offenders = []
-    for row in report.get("missing_evidence", []):
-        for rejection in row.get("receipt_rejections", []):
-            if rejection.get("kind") in VALIDATOR_SIDE_KINDS:
-                offenders.append(
-                    {
-                        "path": row["path"],
-                        "receipt": rejection["receipt"],
-                        "kind": rejection["kind"],
-                        "detail": rejection["detail"],
-                    }
-                )
-    offenders.extend(
-        {"receipt": malformed, "kind": "decode_error", "detail": malformed}
-        for malformed in report.get("malformed_receipts", [])
+    return json.loads(
+        _native_or_campaign(mutation_canary_verdict_native, json.dumps(report))
     )
-    report["canary"] = {
-        "status": "FAIL" if offending else "PASS",
-        "offending_kinds": offending,
-        "offending_receipts": offenders,
-    }
-    return report
 
 
 def main(argv: list[str] | None = None) -> int:

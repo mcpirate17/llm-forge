@@ -9,15 +9,14 @@
 //! without compiling Python bindings or linking an interpreter.
 
 mod a2a_compaction;
-#[cfg(feature = "python")]
-mod a2a_retention;
+pub mod a2a_retention;
 #[cfg(feature = "python")]
 mod branch_policy;
-#[cfg(feature = "python")]
-mod candidate_structure;
+#[cfg(feature = "source-analysis")]
+pub mod candidate_structure;
 #[cfg(feature = "python")]
 mod context_telemetry;
-#[cfg(feature = "python")]
+#[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod dead_tests;
 #[cfg(feature = "python")]
 mod duplicate_bodies;
@@ -25,6 +24,8 @@ mod duplicate_bodies;
 mod fleet_status;
 #[cfg(feature = "python")]
 mod git_source;
+#[cfg(feature = "source-analysis")]
+pub mod graph_index;
 #[cfg(feature = "python")]
 mod guardrail_ast;
 #[cfg(feature = "python")]
@@ -32,30 +33,28 @@ mod guardrail_duplicates;
 pub mod hook_installer;
 #[cfg(feature = "python")]
 mod hook_merge;
-#[cfg(feature = "python")]
-mod kb_retrieve;
-#[cfg(feature = "python")]
-mod memory_chunking;
+pub mod kb_retrieve;
+pub mod memory_chunking;
 #[cfg(feature = "python")]
 mod memory_index;
 #[cfg(feature = "python")]
 mod memory_index_sidecar;
-#[cfg(feature = "python")]
-mod mutation_coverage;
+pub mod mutation_coverage;
 #[cfg(feature = "python")]
 mod mutation_evidence;
-#[cfg(feature = "python")]
+#[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod mutation_manifest;
 pub mod mutation_plan;
 #[cfg(feature = "python")]
 mod mutation_receipt;
 #[cfg(feature = "python")]
 mod mutation_value;
+pub mod mutation_value_inputs;
 #[cfg(feature = "python")]
 mod native_reuse;
 #[cfg(feature = "python")]
 mod project_context;
-#[cfg(feature = "python")]
+#[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod receipt_auth;
 pub mod receipt_slim;
 mod text_normalization;

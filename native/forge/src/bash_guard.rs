@@ -110,7 +110,7 @@ fn has_force(args: &[String]) -> bool {
 }
 
 /// Return a block reason for one command's argv, or `None` to allow.
-fn check_command(argv: &[String]) -> Option<String> {
+pub(crate) fn check_command(argv: &[String]) -> Option<String> {
     if argv.is_empty() {
         return None;
     }

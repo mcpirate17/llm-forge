@@ -7,39 +7,6 @@ from pathlib import Path
 import pytest
 
 from conductor import mutation_coverage
-from conductor.mutation_testing import CampaignError
-
-
-def _registry_patterns(registry_path: Path, repo_root: Path) -> tuple[str, ...]:
-    """Reach the registry-pattern native call the way production reaches it.
-
-    `discover_test_paths` folds patterns into `mutation_test_inventory_native`
-    since the 2026-08-31 Rust port (#136), which left named Python wrappers for
-    this and for `git` path listing with no caller; both were deleted 2026-09-06
-    and re-expressed here so these fail-closed cases keep their coverage.
-    """
-    from conductor._native import mutation_registry_patterns_native
-
-    return tuple(
-        mutation_coverage._native_or_campaign(
-            mutation_registry_patterns_native,
-            str(repo_root),
-            str(registry_path),
-            list(mutation_coverage.CANONICAL_TEST_PATTERNS),
-        )
-    )
-
-
-def _git_paths(repo_root: Path, args: list[str]) -> tuple[str, ...]:
-    from conductor._native import mutation_git_paths_native
-
-    return tuple(
-        mutation_coverage._native_or_campaign(
-            mutation_git_paths_native,
-            str(repo_root),
-            list(args),
-        )
-    )
 
 
 def _init_repo(path: Path) -> Path:
@@ -125,7 +92,9 @@ def test_discover_and_changed_paths_include_untracked_tests(tmp_path: Path) -> N
     repo = _init_repo(tmp_path / "repo")
     registry = _registry(repo)
     _commit_test_file(
-        repo, "research/tests/test_tracked.py", "def test_ok():\n    assert True\n",
+        repo,
+        "research/tests/test_tracked.py",
+        "def test_ok():\n    assert True\n",
         "tracked test",
     )
     untracked = repo / "research/tests/test_new.py"
@@ -142,74 +111,15 @@ def test_discover_and_changed_paths_include_untracked_tests(tmp_path: Path) -> N
     assert changed == ("research/tests/test_new.py",)
 
 
-def test_rust_test_surface_reads_the_file_not_the_name(tmp_path: Path) -> None:
-    repo = _init_repo(tmp_path / "repo")
-    src = repo / "crate/src"
-    src.mkdir(parents=True)
-    (src / "declares.rs").write_text(
-        "pub fn one() -> u8 { 1 }\n\n"
-        "#[cfg(test)]\nmod tests {\n"
-        "    #[test]\n    fn it_works() {}\n"
-        "    #[tokio::test]\n    async fn it_awaits() {}\n"
-        "}\n",
-        encoding="utf-8",
-    )
-    (src / "gates_only.rs").write_text(
-        "#[cfg(test)]\nuse std::fmt;\n"
-        "#[cfg_attr(test, derive(Debug))]\npub struct Thing;\n"
-        "// #[test] fn commented_out() {}\n",
-        encoding="utf-8",
-    )
-    (src / "plain.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
-
-    assert mutation_coverage.is_rust_test_surface(
-        "crate/src/declares.rs", repo_root=repo
-    )
-    # Gating attributes and a commented-out test declare nothing, and only Rust
-    # sources are asked the question at all.
-    assert not mutation_coverage.is_rust_test_surface(
-        "crate/src/gates_only.rs", repo_root=repo
-    )
-    assert not mutation_coverage.is_rust_test_surface(
-        "crate/src/plain.py", repo_root=repo
-    )
-    assert not mutation_coverage.is_rust_test_surface(
-        "crate/src/absent.rs", repo_root=repo
-    )
-
-
-def test_inventory_finds_rust_tests_no_glob_matches(tmp_path: Path) -> None:
-    repo = _init_repo(tmp_path / "repo")
-    registry = _registry(repo)
-    unit = repo / "tooling/native/demo/src/lib.rs"
-    unit.parent.mkdir(parents=True)
-    unit.write_text(
-        "pub fn one() -> u8 { 1 }\n\n#[cfg(test)]\nmod tests {\n"
-        "    #[test]\n    fn one_is_one() { assert_eq!(super::one(), 1); }\n}\n",
-        encoding="utf-8",
-    )
-    (repo / "tooling/native/demo/src/plumbing.rs").write_text(
-        "pub fn two() -> u8 { 2 }\n", encoding="utf-8"
-    )
-
-    patterns = _registry_patterns(registry, repo)
-    # The registry's globs are why this file needs a content predicate: none of
-    # them matches a Rust unit test living in the module it tests.
-    assert not mutation_coverage.is_test_path(
-        "tooling/native/demo/src/lib.rs", patterns
-    )
-    assert mutation_coverage.discover_test_paths(registry, repo_root=repo) == (
-        "tooling/native/demo/src/lib.rs",
-    )
-
-
 def test_coverage_report_uses_verify_evidence(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repo = _init_repo(tmp_path / "repo")
     registry = _registry(repo)
     _commit_test_file(
-        repo, "research/tests/test_tracked.py", "def test_ok():\n    assert True\n",
+        repo,
+        "research/tests/test_tracked.py",
+        "def test_ok():\n    assert True\n",
         "tracked test",
     )
 
@@ -239,43 +149,6 @@ def test_coverage_report_uses_verify_evidence(
     assert result["enforcement"] == "repository_inventory"
     assert result["schema_version"] == "llm.mutation-testing.coverage.v2"
     assert result["rejection_counts"] == {"no_campaign": 1}
-
-
-def test_safe_relative_path_and_registry_errors(tmp_path: Path) -> None:
-    with pytest.raises(CampaignError, match="normalized"):
-        mutation_coverage._safe_relative_path("../escape.py", "path")
-    with pytest.raises(CampaignError, match="normalized"):
-        mutation_coverage._safe_relative_path("/abs.py", "path")
-    with pytest.raises(CampaignError, match="non-empty"):
-        mutation_coverage._safe_relative_path("   ", "path")
-    outside = tmp_path / "outside.json"
-    outside.write_text("{}", encoding="utf-8")
-    with pytest.raises(CampaignError, match="inside the repository"):
-        _registry_patterns(outside, Path("/home/tim/Projects/LLM"))
-    repo = _init_repo(tmp_path / "repo")
-    bad = repo / "conductor/mutation_campaigns/registry.json"
-    bad.parent.mkdir(parents=True)
-    bad.write_text("not json", encoding="utf-8")
-    with pytest.raises(CampaignError, match="cannot load"):
-        _registry_patterns(bad, repo)
-    bad.write_text("[]\n", encoding="utf-8")
-    with pytest.raises(CampaignError, match="JSON object"):
-        _registry_patterns(bad, repo)
-    bad.write_text('{"test_patterns": []}\n', encoding="utf-8")
-    with pytest.raises(CampaignError, match="test_patterns"):
-        _registry_patterns(bad, repo)
-    bad.write_text('{"test_patterns": ["never-a-test"]}\n', encoding="utf-8")
-    with pytest.raises(CampaignError, match="canonical inventory"):
-        _registry_patterns(bad, repo)
-
-
-def test_git_failure_and_cache_skip(tmp_path: Path) -> None:
-    not_git = tmp_path / "not-git"
-    not_git.mkdir()
-    with pytest.raises(CampaignError, match="git"):
-        _git_paths(not_git, ["status"])
-    assert mutation_coverage._should_skip(Path("research/cache/foo/test_x.py"))
-    assert mutation_coverage._should_skip(Path(".venv/lib/test_x.py"))
 
 
 def _changed_result(
@@ -311,15 +184,25 @@ def test_changed_exit_codes_split_debt_from_defects(
                 "reason_kind": "not_pass",
                 "campaigns": ["c1"],
                 "receipt_rejections": [
-                    {"receipt": "r1.json", "kind": "superseded",
-                     "detail": "receipt superseded by r2.json"},
-                    {"receipt": "r0.json", "kind": "runner_map_mismatch",
-                     "detail": "runner component hash map mismatch"},
+                    {
+                        "receipt": "r1.json",
+                        "kind": "superseded",
+                        "detail": "receipt superseded by r2.json",
+                    },
+                    {
+                        "receipt": "r0.json",
+                        "kind": "runner_map_mismatch",
+                        "detail": "runner component hash map mismatch",
+                    },
                 ],
             },
         ],
-        rejection_counts={"no_campaign": 1, "not_pass": 1, "superseded": 1,
-                          "runner_map_mismatch": 1},
+        rejection_counts={
+            "no_campaign": 1,
+            "not_pass": 1,
+            "superseded": 1,
+            "runner_map_mismatch": 1,
+        },
     )
     defect = _changed_result(
         missing=[
@@ -329,8 +212,11 @@ def test_changed_exit_codes_split_debt_from_defects(
                 "reason_kind": "not_pass",
                 "campaigns": ["c1"],
                 "receipt_rejections": [
-                    {"receipt": "r1.json", "kind": "decode_error",
-                     "detail": "detail blob is not valid base64: oops"},
+                    {
+                        "receipt": "r1.json",
+                        "kind": "decode_error",
+                        "detail": "detail blob is not valid base64: oops",
+                    },
                 ],
             }
         ],
@@ -343,18 +229,6 @@ def test_changed_exit_codes_split_debt_from_defects(
     assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 5
     monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: covered)
     assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 0
-    capsys.readouterr()
-
-
-def test_changed_defect_bites_even_when_the_path_has_evidence(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    # A corrupt sibling receipt counts even though another receipt covers the
-    # path: the canary's rule, applied to the changed set too.
-    result = _changed_result(missing=[], rejection_counts={"superseded": 2})
-    assert mutation_coverage.evidence_exit_code(result) == 0
-    result["rejection_counts"] = {"schema_error": 1}
-    assert mutation_coverage.evidence_exit_code(result) == 5
     capsys.readouterr()
 
 
@@ -373,19 +247,23 @@ def test_changed_github_annotations_and_summary(
                 "reason_kind": "not_pass",
                 "campaigns": ["c1", "c2"],
                 "receipt_rejections": [
-                    {"receipt": "r1.json", "kind": "decode_error",
-                     "detail": "detail blob is not valid base64: oops"},
-                    {"receipt": "r0.json", "kind": "superseded",
-                     "detail": "receipt superseded by r1.json"},
+                    {
+                        "receipt": "r1.json",
+                        "kind": "decode_error",
+                        "detail": "detail blob is not valid base64: oops",
+                    },
+                    {
+                        "receipt": "r0.json",
+                        "kind": "superseded",
+                        "detail": "receipt superseded by r1.json",
+                    },
                 ],
             }
         ],
         rejection_counts={"not_pass": 1, "decode_error": 1, "superseded": 1},
     )
     monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: result)
-    assert mutation_coverage.main(
-        ["changed", "--registry", "r.json", "--github"]
-    ) == 5
+    assert mutation_coverage.main(["changed", "--registry", "r.json", "--github"]) == 5
     out = capsys.readouterr().out
     assert "::warning file=src/conductor/test_new.py::" in out
     assert "::error::src/conductor/test_new.py: r1.json:" in out
@@ -393,104 +271,6 @@ def test_changed_github_annotations_and_summary(
     assert "| path | campaign | status | kind |" in table
     assert "| `src/conductor/test_new.py` | c1, c2 |" in table
     assert "not_pass (decode_error, superseded)" in table
-
-
-def test_changed_rows_decide_when_counts_do_not_carry_the_kinds(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    # A result recorded without aggregate counts still reads its rows: the
-    # per-row reason and per-rejection kind are signal, not decoration.
-    rows_only = _changed_result(
-        missing=[
-            {
-                "path": "src/conductor/test_decode.py",
-                "reason": "no current complete PASS receipt",
-                "reason_kind": "decode_error",
-                "campaigns": [],
-                "receipt_rejections": [],
-            }
-        ],
-        rejection_counts={},
-    )
-    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: rows_only)
-    assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 5
-
-    # Rows predating reason_kind default to not_pass debt; rejections
-    # predating kind default to schema_error -- fail-closed, never silent.
-    legacy = _changed_result(
-        missing=[
-            {
-                "path": "src/conductor/test_legacy.py",
-                "reason": "no current complete PASS receipt",
-                "campaigns": [],
-                "receipt_rejections": [],
-            }
-        ],
-        rejection_counts={},
-    )
-    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: legacy)
-    assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 6
-    legacy["missing_evidence"][0]["receipt_rejections"] = [
-        {"receipt": "r9.json", "detail": "mutants must be a non-empty list"}
-    ]
-    assert mutation_coverage.main(["changed", "--registry", "r.json"]) == 5
-    # The default itself, not just the exit it produces: the kind is
-    # "not_pass", never a placeholder that happens to be non-validator-side.
-    assert mutation_coverage._observed_kinds(  # noqa: SLF001
-        {"missing_evidence": [{"receipt_rejections": []}], "rejection_counts": {}}
-    ) == {"not_pass"}
-    capsys.readouterr()
-
-
-def test_changed_github_table_renders_legacy_rows_and_writes_nothing_when_clean(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    summary = tmp_path / "summary.md"
-    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
-    legacy = _changed_result(
-        missing=[
-            {
-                "path": "src/conductor/test_legacy.py",
-                "reason": "no registered campaign ranks this test file",
-                "campaigns": [],
-                "receipt_rejections": [],
-            },
-            # A row whose reason_kind is present and not not_pass: the
-            # column reads the key, never the default.
-            {
-                "path": "src/conductor/test_plain.py",
-                "reason": "no registered campaign ranks this test file",
-                "reason_kind": "no_campaign",
-                "campaigns": [],
-                "receipt_rejections": [],
-            },
-        ],
-        rejection_counts={},
-    )
-    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: legacy)
-    assert mutation_coverage.main(
-        ["changed", "--registry", "r.json", "--github"]
-    ) == 6
-    capsys.readouterr()
-    table = summary.read_text(encoding="utf-8")
-    # No campaigns and no reason_kind: the em-dash placeholder and the
-    # not_pass default render verbatim.
-    assert "| `src/conductor/test_legacy.py` | — |" in table
-    assert "| not_pass |" in table
-    assert "| `src/conductor/test_plain.py` | — |" in table
-    assert "| no_campaign |" in table
-
-    # A clean result writes no table at all: the summary keeps whatever
-    # earlier steps left there.
-    covered = _changed_result(missing=[], rejection_counts={})
-    monkeypatch.setattr(mutation_coverage, "verify_changed", lambda *_a, **_k: covered)
-    assert mutation_coverage.main(
-        ["changed", "--registry", "r.json", "--github"]
-    ) == 0
-    capsys.readouterr()
-    assert summary.read_text(encoding="utf-8") == table
 
 
 def test_coverage_subcommand_exits_on_report_status(
@@ -505,37 +285,6 @@ def test_coverage_subcommand_exits_on_report_status(
     )
     assert mutation_coverage.main(["coverage", "--registry", "r.json"]) == 5
     capsys.readouterr()
-
-
-def test_changed_base_reaches_the_merge_base_inventory(tmp_path: Path) -> None:
-    repo = _init_repo(tmp_path / "repo")
-    registry = _registry(repo)
-    _commit_test_file(
-        repo, "research/tests/test_base_only.py",
-        "def test_base():\n    assert True\n", "base",
-    )
-    base = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
-    ).stdout.strip()
-    subprocess.run(["git", "checkout", "-qb", "branch"], cwd=repo, check=True)
-    _commit_test_file(
-        repo, "research/tests/test_branch_only.py",
-        "def test_branch():\n    assert True\n", "branch",
-    )
-
-    # The native path end to end on a temp repo: only the branch's file is in
-    # the merge-base diff, so only it needs evidence in CI.
-    changed = mutation_coverage.git_changed_test_paths(
-        registry, repo_root=repo, base=base
-    )
-    assert changed == ("research/tests/test_branch_only.py",)
-    # The local shape still diffs the working tree.
-    assert mutation_coverage.git_changed_test_paths(registry, repo_root=repo) == ()
-    # A base that does not resolve refuses loudly rather than diffing nothing.
-    with pytest.raises(CampaignError, match="no-such-ref"):
-        mutation_coverage.git_changed_test_paths(
-            registry, repo_root=repo, base="no-such-ref"
-        )
 
 
 def test_canary_exit_paths(
@@ -577,18 +326,26 @@ def test_canary_exit_paths(
                 "reason_kind": "not_pass",
                 "campaigns": ["c1"],
                 "receipt_rejections": [
-                    {"receipt": "r1.json", "kind": "decode_error",
-                     "detail": "detail blob does not decompress: frame error"},
+                    {
+                        "receipt": "r1.json",
+                        "kind": "decode_error",
+                        "detail": "detail blob does not decompress: frame error",
+                    },
                     # Debt rejections ride along untouched: only the
                     # validator-side ones name offenders.
-                    {"receipt": "r0.json", "kind": "superseded",
-                     "detail": "receipt superseded by r1.json"},
+                    {
+                        "receipt": "r0.json",
+                        "kind": "superseded",
+                        "detail": "receipt superseded by r1.json",
+                    },
                 ],
             }
         ],
         "malformed_receipts": ["receipts/gone.json: Expecting value"],
     }
-    monkeypatch.setattr(mutation_coverage, "coverage_report", lambda *_a, **_k: unreadable)
+    monkeypatch.setattr(
+        mutation_coverage, "coverage_report", lambda *_a, **_k: unreadable
+    )
     assert mutation_coverage.main(["canary", "--registry", "r.json"]) == 5
     out = capsys.readouterr().out
     assert '"offending_kinds": [' in out
@@ -624,7 +381,10 @@ def test_mutation_testing_cli_inspect_verify_and_refuse(
     # KB note on the split). `mutation_testing.main` resolves every campaign
     # relative to the fixed `REPO_ROOT`, so these two schema-valid fixtures
     # live under the repo-relative `testdata/` tree rather than `tmp_path`.
-    campaign = mutation_testing.REPO_ROOT / "src/conductor/testdata/coverage/claude_bash_quiet.json"
+    campaign = (
+        mutation_testing.REPO_ROOT
+        / "src/conductor/testdata/coverage/claude_bash_quiet.json"
+    )
     assert mutation_testing.main(["inspect", str(campaign)]) == 0
     assert (
         mutation_testing.main(
@@ -677,7 +437,8 @@ def test_inspect_cli_returns_not_ready(tmp_path: Path) -> None:
 
     payload = json.loads(
         (
-            mutation_testing.REPO_ROOT / "src/conductor/testdata/coverage/claude_bash_quiet.json"
+            mutation_testing.REPO_ROOT
+            / "src/conductor/testdata/coverage/claude_bash_quiet.json"
         ).read_text(encoding="utf-8")
     )
     payload["mutations"] = []

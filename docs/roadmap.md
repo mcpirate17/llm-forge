@@ -231,11 +231,12 @@ agent tokens. Stop porting; finish Phase 3, then install.
    Python hook bodies should retain ordinary dispatch and exclude those hooks
    from `FORGE_NATIVE_HOOKS`; an empty value restores Python dispatch throughout.
 
-   Edit/Write/NotebookEdit and graph-tool mark/verify/wait handlers still use
-   the host dispatcher. The earlier residual measurement was 36–37 ms per call
-   and roughly 80 calls per session; it predates the Read port. The native-only
-   `tests/native_read.rs` target includes an opt-in 80-call timing probe, with
-   no fixed timing threshold or interpreter execution.
+   Edit/Write/NotebookEdit and graph-tool mark/verify/wait now have native
+   handlers too, including ordered claim checks and refresh notices. Native
+   takeover removes the shipped catchall dispatcher entry and uninstall
+   restores it. The detached graph indexing worker still uses the external
+   Python indexer. Native `tests/native_read.rs` and `tests/native_pre_edit.rs`
+   include opt-in timing probes with no fixed timing threshold.
 2. Warn-mode hook install in the LLM monorepo (step 2b's settings.json
    wiring, `FORGE_MODE=warn`): done and live on this machine since
    2026-09-13, but not reproducible from a clean clone -- the LLM

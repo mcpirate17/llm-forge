@@ -8,7 +8,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::PyBytes;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -42,6 +44,7 @@ struct SourceRead {
     reason: String,
 }
 
+#[cfg(feature = "python")]
 fn value_error(message: impl Into<String>) -> PyErr {
     pyo3::exceptions::PyValueError::new_err(message.into())
 }
@@ -341,18 +344,21 @@ fn verify(
     Ok(verdict(&receipt, repo_root, tree_oid, checks, failures))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 pub fn load_tree_receipt_native(path: &str) -> PyResult<String> {
     let receipt = load_receipt(&PathBuf::from(path)).map_err(value_error)?;
     serde_json::to_string(&receipt).map_err(|error| value_error(error.to_string()))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 pub fn receipt_manifest_pins_native(blob: &[u8], manifest: &str) -> PyResult<String> {
     let pins = manifest_pins(blob, manifest).map_err(value_error)?;
     serde_json::to_string(&pins).map_err(|error| value_error(error.to_string()))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 pub fn receipt_inventory_digest_native(pins: Vec<(String, String)>) -> String {
     inventory_digest(
@@ -361,11 +367,13 @@ pub fn receipt_inventory_digest_native(pins: Vec<(String, String)>) -> String {
     )
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 pub fn receipt_sha256_native(blob: &[u8]) -> String {
     sha256_hex(blob)
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (
     receipt_json,
@@ -414,6 +422,7 @@ pub fn verify_tree_receipt_native(
     serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
 }
 
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(load_tree_receipt_native, module)?)?;
     module.add_function(wrap_pyfunction!(receipt_manifest_pins_native, module)?)?;
@@ -421,4 +430,158 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(receipt_sha256_native, module)?)?;
     module.add_function(wrap_pyfunction!(verify_tree_receipt_native, module)?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MANIFEST: &str = "conductor/mutation_campaigns/campaign.json";
+    const SOURCE: &str = "src/module.py";
+
+    fn fixture() -> (
+        TargetTreeReceipt,
+        Vec<u8>,
+        BTreeMap<String, SourceRead>,
+        String,
+    ) {
+        let content = b"def add(a, b):\n    return a + b\n";
+        let pinned = sha256_hex(content);
+        let manifest =
+            serde_json::to_vec(&json!({"source_sha256": {"src/module.py": pinned}})).unwrap();
+        let receipt = TargetTreeReceipt {
+            path: "receipt.json".to_owned(),
+            schema_version: Some("llm.mutation-testing.receipt.v3".to_owned()),
+            manifest: MANIFEST.to_owned(),
+            manifest_sha256: sha256_hex(&manifest),
+            source_sha256: BTreeMap::from([(SOURCE.to_owned(), pinned.clone())]),
+        };
+        let reads = BTreeMap::from([(
+            SOURCE.to_owned(),
+            SourceRead {
+                sha256: Some(pinned.clone()),
+                reason: String::new(),
+            },
+        )]);
+        (receipt, manifest, reads, pinned)
+    }
+
+    fn check<'a>(verdict: &'a Value, part: &str) -> &'a Value {
+        &verdict["checks"][part]
+    }
+
+    #[test]
+    fn four_parts_pass_with_the_tree_blobs() {
+        let (receipt, manifest, reads, _) = fixture();
+        let actual = verify(receipt, "/repo", "tree-oid", Some(&manifest), "", &reads).unwrap();
+        assert_eq!(actual["status"], "PASS");
+        assert_eq!(actual["repo_root"], "/repo");
+        assert_eq!(actual["tree_oid"], "tree-oid");
+        for part in [PART1, PART2, PART3, PART4] {
+            assert_eq!(check(&actual, part)["status"], "PASS", "{part}");
+        }
+        assert_eq!(check(&actual, PART3)["checked"], 1);
+        assert_eq!(check(&actual, PART4)["pins"], 1);
+    }
+
+    #[test]
+    fn missing_manifest_blocks_all_dependent_checks() {
+        let (receipt, _, reads, _) = fixture();
+        let actual = verify(receipt, "/repo", "tree-oid", None, "missing path", &reads).unwrap();
+        assert_eq!(actual["status"], "FAIL");
+        assert_eq!(check(&actual, PART1)["status"], "FAIL");
+        for part in [PART2, PART3, PART4] {
+            assert_eq!(check(&actual, part)["status"], "BLOCKED", "{part}");
+        }
+        assert!(actual["failures"][0].as_str().unwrap().contains(MANIFEST));
+    }
+
+    #[test]
+    fn manifest_hash_lie_only_fails_part_two() {
+        let (mut receipt, manifest, reads, _) = fixture();
+        receipt.manifest_sha256 = sha256_hex(b"other manifest bytes");
+        let recorded = receipt.manifest_sha256.clone();
+        let actual = verify(receipt, "/repo", "tree-oid", Some(&manifest), "", &reads).unwrap();
+        assert_eq!(check(&actual, PART1)["status"], "PASS");
+        assert_eq!(check(&actual, PART2)["status"], "FAIL");
+        assert_eq!(check(&actual, PART2)["recorded"], recorded);
+        assert_eq!(check(&actual, PART2)["actual"], sha256_hex(&manifest));
+        assert_eq!(check(&actual, PART3)["status"], "PASS");
+        assert_eq!(check(&actual, PART4)["status"], "PASS");
+    }
+
+    #[test]
+    fn drifted_source_fails_pins_and_inventory() {
+        let (receipt, manifest, mut reads, pinned) = fixture();
+        let drifted = sha256_hex(b"def add(a, b):\n    return a - b\n");
+        reads.get_mut(SOURCE).unwrap().sha256 = Some(drifted.clone());
+        let actual = verify(receipt, "/repo", "tree-oid", Some(&manifest), "", &reads).unwrap();
+        assert_eq!(check(&actual, PART3)["status"], "FAIL");
+        let failure = check(&actual, PART3)["failures"][0].as_str().unwrap();
+        assert!(
+            failure.contains(SOURCE) && failure.contains(&pinned) && failure.contains(&drifted)
+        );
+        assert_eq!(check(&actual, PART4)["status"], "FAIL");
+        assert_eq!(
+            check(&actual, PART4)["divergence"]["hash_mismatch"],
+            json!([SOURCE])
+        );
+    }
+
+    #[test]
+    fn unreadable_source_blocks_inventory_reproduction() {
+        let (receipt, manifest, mut reads, pinned) = fixture();
+        reads.get_mut(SOURCE).unwrap().sha256 = None;
+        reads.get_mut(SOURCE).unwrap().reason = "not in tree".to_owned();
+        let actual = verify(receipt, "/repo", "tree-oid", Some(&manifest), "", &reads).unwrap();
+        let failure = check(&actual, PART3)["failures"][0].as_str().unwrap();
+        assert!(failure.contains(SOURCE) && failure.contains(&pinned));
+        assert!(failure.contains("not in tree"));
+        assert_eq!(check(&actual, PART4)["status"], "BLOCKED");
+    }
+
+    #[test]
+    fn receipt_map_lie_fails_only_inventory_reproduction() {
+        let (mut receipt, manifest, reads, _) = fixture();
+        receipt
+            .source_sha256
+            .insert(SOURCE.to_owned(), sha256_hex(b"never these bytes"));
+        let recorded = inventory_digest(
+            receipt
+                .source_sha256
+                .iter()
+                .map(|(p, d)| (p.as_str(), d.as_str())),
+        );
+        let actual = verify(receipt, "/repo", "tree-oid", Some(&manifest), "", &reads).unwrap();
+        for part in [PART1, PART2, PART3] {
+            assert_eq!(check(&actual, part)["status"], "PASS", "{part}");
+        }
+        assert_eq!(check(&actual, PART4)["status"], "FAIL");
+        assert_eq!(check(&actual, PART4)["recorded_digest"], recorded);
+        assert_eq!(
+            check(&actual, PART4)["divergence"]["hash_mismatch"],
+            json!([SOURCE])
+        );
+    }
+
+    #[test]
+    fn inventory_digest_matches_independent_hash_sorted_lines() {
+        let pins = [
+            ("z/last.py", sha256_hex(b"alpha\n")),
+            ("a/first.py", sha256_hex(b"omega\n")),
+            ("m/mid.py", sha256_hex(b"alpha\n")),
+        ];
+        let mut lines = pins
+            .iter()
+            .map(|(path, digest)| format!("{digest}  {path}\n"))
+            .collect::<Vec<_>>();
+        let unsorted = sha256_hex(lines.concat().as_bytes());
+        lines.sort();
+        let expected = sha256_hex(lines.concat().as_bytes());
+        assert_ne!(unsorted, expected);
+        assert_eq!(
+            inventory_digest(pins.iter().map(|(p, d)| (*p, d.as_str()))),
+            expected
+        );
+    }
 }

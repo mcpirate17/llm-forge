@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import subprocess
 from pathlib import Path
 
@@ -120,87 +119,6 @@ def test_json_out_relative_path_resolves_against_root(tmp_path: Path) -> None:
     assert (target / "tasks" / "audit" / "dead_tests.json").is_file()
 
 
-def test_resolver_resolve_untracked_honours_explicit_root(tmp_path: Path) -> None:
-    target = tmp_path / "target"
-    decoy = tmp_path / "decoy"
-    _init_repo(target)
-    _init_repo(decoy)
-    _write(decoy, "pkg/helper.py", "value = 1\n")
-    resolver = dead_tests.Resolver(["main.py"], root=target)
-
-    # helper.py exists on disk under decoy, not target: the resolver must not
-    # find it when scoped to target -- proof it uses the passed root, not
-    # some other tree.
-    assert resolver.resolve_untracked("pkg.helper", "main.py") is None
-
-    _write(target, "pkg/helper.py", "value = 1\n")
-    assert resolver.resolve_untracked("pkg.helper", "main.py") == "pkg/helper.py"
-
-
-def test_native_scan_preserves_relative_guarded_and_native_imports(
-    tmp_path: Path,
-) -> None:
-    repo = tmp_path / "repo"
-    _write(repo, "pkg/__init__.py", "")
-    _write(repo, "pkg/dep.py", "VALUE = 1\n")
-    _write(repo, "pkg/dynamic.py", "VALUE = 2\n")
-    _write(repo, "pkg/native.rs", "pub fn marker() {}\n")
-    _write(
-        repo,
-        "pkg/sub/module.py",
-        """from typing import TYPE_CHECKING
-from .. import dep
-import pkg.native
-if FLAG:
-    import pkg.hard_missing
-if TYPE_CHECKING:
-    import pkg.type_missing
-if typing.TYPE_CHECKING:
-    import pkg.attribute_missing
-if __name__ == "__main__":
-    import pkg.main_missing
-try:
-    import pkg.try_missing
-except ImportError:
-    pass
-def lazy():
-    import pkg.lazy_missing
-async def async_lazy():
-    import pkg.async_missing
-"pkg.dynamic"
-"loader.py"
-""",
-    )
-    tracked = [
-        "pkg/__init__.py",
-        "pkg/dep.py",
-        "pkg/dynamic.py",
-        "pkg/native.rs",
-        "pkg/sub/module.py",
-    ]
-
-    module = dead_tests.scan_module(
-        "pkg/sub/module.py", dead_tests.Resolver(tracked, root=repo), root=repo
-    )
-
-    assert module == dead_tests.Module(
-        path="pkg/sub/module.py",
-        has_main=True,
-        basenames={"loader.py"},
-        deps={"pkg/dep.py", "pkg/dynamic.py"},
-        missing={"pkg.hard_missing"},
-        soft_missing={
-            "pkg.async_missing",
-            "pkg.attribute_missing",
-            "pkg.lazy_missing",
-            "pkg.main_missing",
-            "pkg.try_missing",
-            "pkg.type_missing",
-        },
-        untracked=set(),
-    )
-
-
 def test_native_analysis_preserves_classification_precedence_and_order(
     tmp_path: Path,
 ) -> None:
@@ -272,25 +190,6 @@ def test_native_analysis_preserves_classification_precedence_and_order(
     )
 
 
-def test_native_closure_handles_ten_thousand_module_cycle_deterministically() -> None:
-    count = 10_000
-    modules = {
-        f"pkg/module_{index:05d}.py": dead_tests.Module(
-            path=f"pkg/module_{index:05d}.py",
-            deps={f"pkg/module_{(index + 1) % count:05d}.py"},
-        )
-        for index in range(count)
-    }
-    modules["pkg/module_09999.py"].missing.add("pkg.gone")
-    modules["pkg/module_05000.py"].untracked.add("pkg/local_only.py")
-
-    first = dead_tests.closure("pkg/module_00000.py", modules)
-    second = dead_tests.closure("pkg/module_00000.py", dict(reversed(modules.items())))
-
-    assert first == ({"pkg.gone"}, {"pkg/local_only.py"})
-    assert second == first
-
-
 def test_native_scan_parse_error_remains_dead_tests_error(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _write(repo, "pkg/__init__.py", "")
@@ -311,19 +210,3 @@ def test_native_closure_preserves_missing_module_key_error() -> None:
 
     with pytest.raises(KeyError, match="pkg/absent.py"):
         dead_tests.closure("test_probe.py", modules)
-
-
-def test_native_module_payload_is_json_deterministic(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _write(repo, "pkg/__init__.py", "")
-    _write(repo, "pkg/b.py", "VALUE = 1\n")
-    _write(repo, "pkg/a.py", "import pkg.b\n")
-    resolver = dead_tests.Resolver(
-        ["pkg/b.py", "pkg/a.py", "pkg/__init__.py"], root=repo
-    )
-
-    first = resolver._native.scan_module("pkg/a.py", str(repo))
-    second = resolver._native.scan_module("pkg/a.py", str(repo))
-
-    assert first == second
-    assert json.loads(first)["deps"] == ["pkg/b.py"]

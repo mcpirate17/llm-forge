@@ -229,7 +229,7 @@ pub const GRAPH_SUFFIXES: &[&str] = &[
 /// `crg_gate._target_paths`: the write targets a payload names -- the five
 /// path keys of `tool_input`, plus every `*** Add/Update/Delete File:` header
 /// inside a patch-shaped string field.
-fn target_paths(payload: &Value) -> Vec<String> {
+pub(crate) fn target_paths(payload: &Value) -> Vec<String> {
     let mut paths = Vec::new();
     let empty = serde_json::Map::new();
     let tool_input = payload
@@ -279,7 +279,7 @@ fn target_paths(payload: &Value) -> Vec<String> {
 /// an existing path canonicalizes; a missing leaf resolves against its
 /// canonical parent; only when even the parent is missing does the path stay
 /// lexical (normalized `.`/`..` components, never above the root).
-fn resolve_like_python(path: &Path) -> PathBuf {
+pub(crate) fn resolve_like_python(path: &Path) -> PathBuf {
     if let Ok(canonical) = std::fs::canonicalize(path) {
         return canonical;
     }
@@ -533,6 +533,69 @@ pub fn failure_output(event: &str, repo_root: &Path) -> Value {
     })
 }
 
+/// `crg_refresh_state.wait_for_fresh`: a graph query waits until neither a
+/// pending marker nor a worker lock remains. An orphaned pending marker gets
+/// one respawn attempt; a live worker is never interrupted. The default hook
+/// limit is three seconds, polled every 20 ms, matching the Python store.
+fn wait_for_fresh<F>(
+    store: &Path,
+    timeout: std::time::Duration,
+    poll: std::time::Duration,
+    mut respawn: F,
+) -> std::io::Result<bool>
+where
+    F: FnMut() -> std::io::Result<()>,
+{
+    let deadline = std::time::Instant::now() + timeout;
+    let mut respawned = false;
+    loop {
+        let pending = marker_path(store, "refresh.pending").exists();
+        let alive = worker_alive(store)?;
+        if !pending && !alive {
+            return Ok(true);
+        }
+        if pending && !alive && !respawned {
+            respawn()?;
+            respawned = true;
+        }
+        if std::time::Instant::now() >= deadline {
+            return Ok(false);
+        }
+        std::thread::sleep(poll);
+    }
+}
+
+pub fn wait_output(repo_root: &Path, timeout: std::time::Duration) -> std::io::Result<Value> {
+    use std::time::Duration;
+
+    let store = store_dir(repo_root);
+    std::fs::create_dir_all(&store)?;
+    let store = store.canonicalize()?;
+    let fresh = wait_for_fresh(&store, timeout, Duration::from_millis(20), || {
+        // `_queue([])` checks availability before trying to restart a worker.
+        if which_code_review_graph().is_some() {
+            request(&store, &[], &worker_command(repo_root), repo_root)?;
+        }
+        Ok(())
+    })?;
+    if fresh {
+        Ok(Value::Null)
+    } else {
+        let message = format!(
+            "WARNING: a code-review-graph refresh was still running after {:.0}s; \
+                 this query may read a STALE graph.",
+            timeout.as_secs_f64()
+        );
+        Ok(json!({
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "additionalContext": message,
+                },
+                "systemMessage": message,
+        }))
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -587,6 +650,72 @@ pub(crate) mod tests {
         let dir = repo.join(".code-review-graph");
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("refresh.failed"), lines.join("\n") + "\n").unwrap();
+    }
+
+    #[test]
+    fn wait_times_out_while_worker_holds_the_lock() {
+        use std::os::fd::AsRawFd;
+        let tmp = ScratchDir::new("wait-held");
+        let lock = open_flock_target(&tmp.path().join("refresh.lock")).unwrap();
+        assert_eq!(unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) }, 0);
+        let started = std::time::Instant::now();
+        let fresh = wait_for_fresh(
+            tmp.path(),
+            std::time::Duration::from_millis(35),
+            std::time::Duration::from_millis(5),
+            || Ok(()),
+        )
+        .unwrap();
+        assert!(!fresh);
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    }
+
+    #[test]
+    fn wait_respawns_once_then_returns_fresh_when_pending_clears() {
+        let tmp = ScratchDir::new("wait-orphan");
+        let pending = tmp.path().join("refresh.pending");
+        fs::write(&pending, "a.py\n").unwrap();
+        let mut calls = 0;
+        let fresh = wait_for_fresh(
+            tmp.path(),
+            std::time::Duration::from_millis(100),
+            std::time::Duration::from_millis(1),
+            || {
+                calls += 1;
+                fs::remove_file(&pending)
+            },
+        )
+        .unwrap();
+        assert!(fresh);
+        assert_eq!(calls, 1);
+    }
+
+    #[test]
+    fn wait_output_warns_on_timeout_and_is_quiet_after_worker_exits() {
+        use std::os::fd::AsRawFd;
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let tmp = ScratchDir::new("wait-output");
+        let store = tmp.path().join("store");
+        fs::create_dir_all(&store).unwrap();
+        let saved = std::env::var_os("CRG_DATA_DIR");
+        std::env::set_var("CRG_DATA_DIR", &store);
+        let lock = open_flock_target(&store.join("refresh.lock")).unwrap();
+        assert_eq!(unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) }, 0);
+        let warning = wait_output(tmp.path(), std::time::Duration::from_millis(40)).unwrap();
+        assert_eq!(warning["hookSpecificOutput"]["hookEventName"], "PreToolUse");
+        assert!(warning["systemMessage"].as_str().unwrap().contains("STALE"));
+        drop(lock);
+        assert_eq!(
+            wait_output(tmp.path(), std::time::Duration::from_millis(40)).unwrap(),
+            Value::Null
+        );
+        if let Some(value) = saved {
+            std::env::set_var("CRG_DATA_DIR", value);
+        } else {
+            std::env::remove_var("CRG_DATA_DIR");
+        }
     }
 
     #[test]

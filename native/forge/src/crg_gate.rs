@@ -1,8 +1,5 @@
-//! Native port of `crg_gate.py`'s `verify_bash` path only -- the
-//! `crg_gate_verify_bash` hook's session-scoped claim+graph-use gate on Bash
-//! commands that write repo files. `start`/`mark`/`verify` (the Edit/Write
-//! path, and the two state-writing subcommands `pre_bash` never reaches) stay
-//! Python; nothing here changes their behavior.
+//! Native graph-use and claim gate for Bash, Edit, Write and NotebookEdit.
+//! The session marker format and claim store are shared with the legacy hook.
 //!
 //! Fail-open, exactly like the Python: a bug in command parsing must not deny
 //! every Bash call in the fleet, so any internal error here resolves to "no
@@ -13,6 +10,8 @@ use crate::ownership;
 use crate::write_targets::{repo_write_targets, OPAQUE_WRITE};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::io::Write;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
 const STATE_TTL_SECONDS: u64 = 2 * 24 * 60 * 60;
@@ -125,9 +124,17 @@ fn state_dir() -> PathBuf {
     PathBuf::from(raw)
 }
 
+fn ensure_state_dir() -> std::io::Result<PathBuf> {
+    let dir = state_dir();
+    std::fs::create_dir_all(&dir)?;
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
+    Ok(dir)
+}
+
 fn state_key(payload: &Value) -> Option<String> {
     let session_id = payload
         .get("session_id")
+        .filter(|value| value.as_str().is_some_and(|text| !text.is_empty()))
         .or_else(|| payload.get("sessionId"))
         .and_then(Value::as_str)?;
     if session_id.is_empty() {
@@ -140,6 +147,84 @@ fn state_key(payload: &Value) -> Option<String> {
 
 fn state_path(dir: &Path, key: &str, suffix: &str) -> PathBuf {
     dir.join(format!("{key}.{suffix}"))
+}
+
+fn write_state(path: &Path) -> std::io::Result<()> {
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    writeln!(file, "{:.6}", crate::instant::now())
+}
+
+fn prune_stale_state(dir: &Path) -> std::io::Result<()> {
+    let cutoff = std::time::SystemTime::now()
+        .checked_sub(std::time::Duration::from_secs(STATE_TTL_SECONDS))
+        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+    for entry in std::fs::read_dir(dir)? {
+        let Ok(entry) = entry else { continue };
+        let path = entry.path();
+        let matches = path.extension().and_then(|s| s.to_str()) == Some("pending")
+            || path.to_string_lossy().ends_with(".graph-used");
+        if !matches {
+            continue;
+        }
+        if let Ok(meta) = path.metadata() {
+            if meta.is_file() && meta.modified().is_ok_and(|modified| modified < cutoff) {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// SessionStart's `crg_gate.py start`: create a pending marker and prune only
+/// stale gate markers. The existing SessionStart body still invokes this as a
+/// legacy command; the format is intentionally interoperable.
+pub fn start(payload: &Value) -> std::io::Result<()> {
+    let dir = ensure_state_dir()?;
+    prune_stale_state(&dir)?;
+    if let Some(key) = state_key(payload) {
+        write_state(&state_path(&dir, &key, "pending"))?;
+    }
+    Ok(())
+}
+
+/// Record a graph tool call before it queries the graph. `mark` has no
+/// decision of its own; I/O errors become visible hook errors at dispatch.
+pub(crate) fn is_graph_tool_name(name: &str) -> bool {
+    [
+        "mcp__code-review-graph__",
+        "mcp__code-review_graph__",
+        "mcp__code_review-graph__",
+        "mcp__code_review_graph__",
+    ]
+    .iter()
+    .any(|prefix| name.starts_with(prefix))
+}
+
+pub fn mark(payload: &Value) -> std::io::Result<()> {
+    let name = payload
+        .get("tool_name")
+        .filter(|value| value.as_str().is_some_and(|text| !text.is_empty()))
+        .or_else(|| payload.get("toolName"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if !is_graph_tool_name(name) {
+        return Ok(());
+    }
+    let Some(key) = state_key(payload) else {
+        return Ok(());
+    };
+    let dir = ensure_state_dir()?;
+    write_state(&state_path(&dir, &key, "graph-used"))?;
+    match std::fs::remove_file(state_path(&dir, &key, "pending")) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err),
+    }
 }
 
 /// Python's `repr()` for a plain string, as `_claim_allows`'s `f"{x!r}"`
@@ -178,6 +263,42 @@ fn enforce_worktrees() -> bool {
     !raw.is_empty() && raw != "0"
 }
 
+fn record_exposure(
+    common_dir: Option<&Path>,
+    owner: &str,
+    target: &str,
+    tool: &str,
+    checkout: &str,
+) {
+    let Some(common_dir) = common_dir else { return };
+    let directory = common_dir.join("governance");
+    if std::fs::create_dir_all(&directory).is_err() {
+        return;
+    }
+    let path = directory.join("claim-gate-exposure.jsonl");
+    if path
+        .metadata()
+        .is_ok_and(|meta| meta.len() > 4 * 1024 * 1024)
+    {
+        return;
+    }
+    let line = serde_json::json!({
+        "at": crate::instant::now(),
+        "owner": owner,
+        "tool": tool,
+        "checkout": checkout,
+        "path": target,
+    });
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .mode(0o600)
+        .open(path)
+    {
+        let _ = writeln!(file, "{line}");
+    }
+}
+
 /// `_claim_allows`: whether `owner` may write `target`, and a detail message
 /// (the reason when denied; the store digest -- unused by `verify_bash`'s
 /// caller -- when allowed).
@@ -185,6 +306,7 @@ fn claim_allows(
     owner: &str,
     target: &str,
     repo_root: &Path,
+    repo_common_dir: Option<&Path>,
     env: &HashMap<String, String>,
 ) -> (bool, String) {
     if owner.is_empty() {
@@ -228,8 +350,13 @@ fn claim_allows(
         }
         if mine {
             if by_vendor {
-                // Exposure recording for a vendor-legacy match is best-effort
-                // and out of scope for `verify_bash`'s read path.
+                record_exposure(
+                    repo_common_dir,
+                    owner,
+                    target,
+                    &format!("vendor-claim:{}", claim.owner),
+                    &repo_root.to_string_lossy(),
+                );
             }
             let _ = ownership::touch_claim(repo_root, &claim.claim_id, now);
             return (true, digest);
@@ -324,13 +451,18 @@ pub fn verify_bash(
         );
     }
     for target in &targets {
-        let (allowed, detail) = claim_allows(owner, target, repo_root, env);
+        let (allowed, detail) = claim_allows(owner, target, repo_root, repo_common_dir, env);
         if allowed {
             continue;
         }
         if in_sibling {
-            // Exposure recording for a fail-open sibling-worktree write is
-            // best-effort telemetry, out of scope for this native port.
+            record_exposure(
+                repo_common_dir,
+                owner,
+                target,
+                "Bash",
+                &base.to_string_lossy(),
+            );
             if !enforce_worktrees() {
                 continue;
             }
@@ -344,9 +476,107 @@ pub fn verify_bash(
     Value::Null
 }
 
-#[allow(dead_code)]
-fn unused_constants_reference() -> u64 {
-    STATE_TTL_SECONDS
+/// Resolve Edit/Write/NotebookEdit targets into this checkout or a sibling
+/// worktree sharing the same Git common directory. Scratch and other repos
+/// have no claim in this gate.
+pub(crate) fn classify_targets(
+    payload: &Value,
+    repo_root: &Path,
+    repo_common_dir: Option<&Path>,
+) -> (Vec<String>, Vec<(PathBuf, String)>) {
+    let mut local = Vec::new();
+    let mut sibling = Vec::new();
+    for raw in crate::crg_refresh::target_paths(payload) {
+        let path = Path::new(&raw);
+        let absolute = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            repo_root.join(path)
+        };
+        let target = crate::crg_refresh::resolve_like_python(&absolute);
+        if let Ok(relative) = target.strip_prefix(repo_root) {
+            local.push(relative.to_string_lossy().into_owned());
+            continue;
+        }
+        let Some((root, common)) = checkout_of(&target) else {
+            continue;
+        };
+        if Some(common.as_path()) == repo_common_dir {
+            if let Ok(relative) = target.strip_prefix(&root) {
+                sibling.push((root, relative.to_string_lossy().into_owned()));
+            }
+        }
+    }
+    (local, sibling)
+}
+
+/// Edit/Write/NotebookEdit claim gate. Missing graph use or an unverifiable
+/// target denies before any claim reads. Unlike Bash, errors in this hook are
+/// fail-closed by its registry entry (`crg_gate_verify`).
+pub fn verify(
+    payload: &Value,
+    owner: &str,
+    repo_root: &Path,
+    repo_common_dir: Option<&Path>,
+    env: &HashMap<String, String>,
+) -> std::io::Result<Value> {
+    let protocol = crate::current_work_guard::hook_protocol(payload);
+    let dir = ensure_state_dir()?;
+    let graph_used =
+        state_key(payload).is_some_and(|key| state_path(&dir, &key, "graph-used").is_file());
+    if !graph_used {
+        return Ok(crate::current_work_guard::hook_response(
+            Some("BLOCKED: call a code-review-graph MCP tool before editing or writing in this session."),
+            protocol,
+            None,
+        ));
+    }
+    if crate::crg_refresh::target_paths(payload).is_empty() {
+        return Ok(crate::current_work_guard::hook_response(
+            Some("BLOCKED: edit target is missing; live claim cannot be verified."),
+            protocol,
+            None,
+        ));
+    }
+    let (local, sibling) = classify_targets(payload, repo_root, repo_common_dir);
+    for target in &local {
+        let (allowed, detail) = claim_allows(owner, target, repo_root, repo_common_dir, env);
+        if !allowed {
+            return Ok(crate::current_work_guard::hook_response(
+                Some(&format!("BLOCKED: {detail}. {REMEDY}")),
+                protocol,
+                None,
+            ));
+        }
+    }
+    let tool = payload
+        .get("tool_name")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    for (checkout, target) in sibling {
+        let (allowed, detail) = claim_allows(owner, &target, repo_root, repo_common_dir, env);
+        if allowed {
+            continue;
+        }
+        record_exposure(
+            repo_common_dir,
+            owner,
+            &target,
+            tool,
+            &checkout.to_string_lossy(),
+        );
+        if enforce_worktrees() {
+            return Ok(crate::current_work_guard::hook_response(
+                Some(&format!(
+                    "BLOCKED: {detail} (in worktree {}). {REMEDY}",
+                    checkout.display()
+                )),
+                protocol,
+                None,
+            ));
+        }
+    }
+    Ok(Value::Null)
 }
 
 #[cfg(test)]
@@ -438,6 +668,20 @@ pub(crate) mod tests {
         verify_bash(payload, owner, &repo.root, Some(&common), &HashMap::new())
     }
 
+    fn run_edit(repo: &ScratchRepo, owner: &str, payload: &Value) -> Value {
+        let _dir_guard = with_state_dir(&repo.state_dir);
+        let common = repo.common_dir();
+        verify(payload, owner, &repo.root, Some(&common), &HashMap::new()).unwrap()
+    }
+
+    fn edit_payload(path: &str) -> Value {
+        json!({
+            "session_id": "edit-session",
+            "tool_name": "Edit",
+            "tool_input": {"file_path": path},
+        })
+    }
+
     /// `CRG_GATE_STATE_DIR` is process-global; serialize every test that sets it.
     fn with_state_dir(dir: &Path) -> impl Drop {
         struct Guard(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
@@ -451,6 +695,104 @@ pub(crate) mod tests {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::env::set_var("CRG_GATE_STATE_DIR", dir);
         Guard(guard)
+    }
+
+    #[test]
+    fn graph_mark_replaces_session_pending_state_and_edit_checks_it() {
+        let repo = ScratchRepo::new("mark-edit");
+        repo.write_claim("claude", &["b.py"]);
+        let graph = json!({"session_id": "edit-session", "tool_name":
+            "mcp__code_review_graph__query_graph"});
+        {
+            let _dir_guard = with_state_dir(&repo.state_dir);
+            start(&graph).unwrap();
+            let key = state_key(&graph).unwrap();
+            assert!(state_path(&repo.state_dir, &key, "pending").is_file());
+            mark(&graph).unwrap();
+            assert!(state_path(&repo.state_dir, &key, "graph-used").is_file());
+            assert!(!state_path(&repo.state_dir, &key, "pending").exists());
+        }
+        assert_eq!(
+            run_edit(&repo, "claude", &edit_payload("b.py")),
+            Value::Null
+        );
+    }
+
+    #[test]
+    fn edit_denies_before_graph_call_and_without_a_target() {
+        let repo = ScratchRepo::new("edit-preconditions");
+        let payload = edit_payload("a.py");
+        let denied = run_edit(&repo, "claude", &payload);
+        assert!(denied["hookSpecificOutput"]["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .contains("call a code-review-graph MCP tool"));
+        let missing = json!({"session_id": "edit-session", "tool_name": "Write", "tool_input": {}});
+        repo.mark_graph_used(&missing);
+        let denied = run_edit(&repo, "claude", &missing);
+        assert!(denied["hookSpecificOutput"]["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .contains("edit target is missing"));
+    }
+
+    #[test]
+    fn edit_denies_another_owner_with_the_holder_and_remedy() {
+        let repo = ScratchRepo::new("edit-held");
+        repo.write_claim("codex-phase22", &["a.py"]);
+        let payload = edit_payload("a.py");
+        repo.mark_graph_used(&payload);
+        let denied = run_edit(&repo, "claude", &payload);
+        let reason = denied["hookSpecificOutput"]["permissionDecisionReason"]
+            .as_str()
+            .unwrap();
+        assert!(reason.starts_with("BLOCKED: path 'a.py' is held by codex-phase22"));
+        assert!(reason.contains("make governance-claim"));
+    }
+
+    #[test]
+    fn edit_allows_scratch_targets_after_graph_use() {
+        let repo = ScratchRepo::new("edit-scratch");
+        let outside = std::env::temp_dir().join(format!("forge-outside-{}", std::process::id()));
+        let payload = edit_payload(&outside.to_string_lossy());
+        repo.mark_graph_used(&payload);
+        assert_eq!(run_edit(&repo, "claude", &payload), Value::Null);
+    }
+
+    #[test]
+    fn sibling_target_is_claim_relevant_and_denial_is_recorded() {
+        let repo = ScratchRepo::new("edit-sibling");
+        repo.write_claim("codex-phase22", &["a.py"]);
+        let linked = repo.root.with_extension("linked");
+        let gitdir = repo.root.join(".git/worktrees/side");
+        std::fs::create_dir_all(&linked).unwrap();
+        std::fs::create_dir_all(&gitdir).unwrap();
+        std::fs::write(gitdir.join("commondir"), "../..\n").unwrap();
+        std::fs::write(
+            linked.join(".git"),
+            format!("gitdir: {}\n", gitdir.display()),
+        )
+        .unwrap();
+        std::fs::write(linked.join("a.py"), "A = 1\n").unwrap();
+        let payload = edit_payload(&linked.join("a.py").to_string_lossy());
+        repo.mark_graph_used(&payload);
+        let (local, sibling) = classify_targets(&payload, &repo.root, Some(&repo.common_dir()));
+        assert!(local.is_empty());
+        assert_eq!(sibling, vec![(linked.clone(), "a.py".to_string())]);
+        let denied = run_edit(&repo, "claude", &payload);
+        assert!(denied["hookSpecificOutput"]["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .contains(&format!("(in worktree {})", linked.display())));
+        let log = std::fs::read_to_string(
+            repo.common_dir()
+                .join("governance/claim-gate-exposure.jsonl"),
+        )
+        .unwrap();
+        let record: Value = serde_json::from_str(log.lines().last().unwrap()).unwrap();
+        assert_eq!(record["path"], "a.py");
+        assert_eq!(record["checkout"], linked.to_string_lossy().as_ref());
+        let _ = std::fs::remove_dir_all(linked);
     }
 
     #[test]

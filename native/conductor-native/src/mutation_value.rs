@@ -7,6 +7,8 @@ use pyo3::prelude::*;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{Map, Value};
 
+use crate::mutation_value_inputs::{self as inputs, JunitAdapter};
+
 const VALUE_SCHEMA: &str = "llm.mutation-testing.test-value.v1";
 const ADAPTERS: [&str; 3] = ["pytest-junit", "ctest-junit", "cargo-libtest"];
 const CLASSIFICATIONS: [&str; 4] = [
@@ -821,6 +823,34 @@ fn analyze_test_value_native(
 }
 
 #[pyfunction]
+fn analyze_test_value_reports_native(
+    spec_json: &str,
+    baseline_reports_json: &str,
+    mutant_reports_json: &str,
+    mutant_outcomes_json: &str,
+) -> PyResult<String> {
+    let spec: ValueSpec = serde_json::from_str(spec_json)
+        .map_err(|error| value_error(format!("invalid value spec: {error}")))?;
+    let baselines = serde_json::from_str(baseline_reports_json)
+        .map_err(|error| value_error(format!("invalid baseline reports: {error}")))?;
+    let reports = parse_json(mutant_reports_json, "mutant reports")?;
+    let outcomes = parse_json(mutant_outcomes_json, "mutant outcomes")?;
+    let ranked = spec
+        .tests
+        .iter()
+        .map(|test| test.nodeid.clone())
+        .collect::<Vec<_>>();
+    let evidence =
+        inputs::collect_mutant_evidence(&ranked, &spec.mutation_contracts, &reports, &outcomes)
+            .into_iter()
+            .map(serde_json::from_value)
+            .collect::<Result<Vec<MutantEvidence>, _>>()
+            .map_err(|error| value_error(error.to_string()))?;
+    serde_json::to_string(&analyze(spec, baselines, evidence))
+        .map_err(|error| value_error(error.to_string()))
+}
+
+#[pyfunction]
 fn admission_errors_native(
     value_json: &str,
     required_nodeids: Vec<String>,
@@ -918,11 +948,68 @@ fn test_value_receipt_errors_native(
     Ok(errors)
 }
 
+#[pyfunction]
+fn mutation_value_pytest_identity_native(nodeid: &str) -> PyResult<(String, String)> {
+    inputs::pytest_identity(nodeid).map_err(value_error)
+}
+
+#[pyfunction]
+fn mutation_value_cargo_identity_native(nodeid: &str) -> PyResult<String> {
+    inputs::cargo_identity(nodeid).map_err(value_error)
+}
+
+#[pyfunction]
+fn mutation_value_ctest_identity_native(nodeid: &str) -> PyResult<String> {
+    inputs::ctest_identity(nodeid).map_err(value_error)
+}
+
+#[pyfunction]
+fn mutation_value_attribution_supported_native(adapter: &str, ranked: Vec<String>) -> bool {
+    inputs::attribution_supported(adapter, &ranked)
+}
+
+#[pyfunction]
+fn mutation_value_parse_junit_native(
+    path: &str,
+    adapter: &str,
+    ranked: Vec<String>,
+) -> PyResult<String> {
+    let adapter = JunitAdapter::from_name(adapter).map_err(value_error)?;
+    let result = inputs::parse_junit_file(std::path::Path::new(path), adapter, &ranked)
+        .map_err(value_error)?;
+    serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
+}
+
+#[pyfunction]
+fn mutation_value_parse_cargo_native(stdout: &str, ranked: Vec<String>) -> PyResult<String> {
+    let result = inputs::parse_cargo_libtest(stdout, &ranked).map_err(value_error)?;
+    serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
+}
+
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(load_value_analysis_native, module)?)?;
     module.add_function(wrap_pyfunction!(analyze_test_value_native, module)?)?;
+    module.add_function(wrap_pyfunction!(analyze_test_value_reports_native, module)?)?;
     module.add_function(wrap_pyfunction!(admission_errors_native, module)?)?;
     module.add_function(wrap_pyfunction!(test_value_receipt_errors_native, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        mutation_value_pytest_identity_native,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        mutation_value_cargo_identity_native,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        mutation_value_ctest_identity_native,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        mutation_value_attribution_supported_native,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(mutation_value_parse_junit_native, module)?)?;
+    module.add_function(wrap_pyfunction!(mutation_value_parse_cargo_native, module)?)?;
     Ok(())
 }
 

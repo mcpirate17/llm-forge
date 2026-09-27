@@ -20,7 +20,7 @@
 //! * **Read**: the refresh report, protected-file guard and whole-file read
 //!   guard all run natively when their three names are enabled. Generic tools
 //!   such as Grep/Glob need only the refresh report. Edit and graph tools
-//!   retain their Python gates.
+//!   run their claim, mark and wait hooks natively as well.
 //! * **Partial coverage**: the Python child still runs,
 //!   but is told via two env vars -- `FORGE_NATIVE_HOOKS` (which hook names
 //!   forge already answered) and `FORGE_NATIVE_ANSWERS` (their precomputed
@@ -188,6 +188,13 @@ fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
         telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
         return print_native_answer(&answer);
     }
+    if let Some(payload) = parsed.as_ref().filter(|payload| {
+        crate::pre_edit::is_edit_payload(payload) || crate::pre_edit::is_graph_payload(payload)
+    }) {
+        let answer = crate::pre_edit::run_fully_native(payload);
+        telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+        return print_native_answer(&answer);
+    }
     if let Some(payload) = parsed.as_ref() {
         let answer = handlers::run_generic_pretooluse_fully_native(payload);
         telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
@@ -253,7 +260,11 @@ fn run_pre_tool_use(event: &str) -> Result<u8> {
     let native_answers = parsed
         .as_ref()
         .map(|payload| {
-            if handlers::is_read_payload(payload) {
+            if crate::pre_edit::is_edit_payload(payload)
+                || crate::pre_edit::is_graph_payload(payload)
+            {
+                crate::pre_edit::native_answers(payload, &native_hooks)
+            } else if handlers::is_read_payload(payload) {
                 handlers::native_answers_for_read(payload, &native_hooks)
             } else {
                 handlers::native_answers_for_bash(payload, &native_hooks)
@@ -266,11 +277,14 @@ fn run_pre_tool_use(event: &str) -> Result<u8> {
 }
 
 /// Only complete matching-hook coverage can bypass the dispatcher. Unknown
-/// input shapes and the edit/graph families continue through delegation.
+/// input shapes continue through delegation.
 fn native_pretool_answer(
     payload: &Value,
     native_hooks: &std::collections::HashSet<String>,
 ) -> Option<Value> {
+    if crate::pre_edit::fully_native(payload, native_hooks) {
+        return Some(crate::pre_edit::run_fully_native(payload));
+    }
     if handlers::is_read_payload(payload) && handlers::read_pretooluse_fully_native(native_hooks) {
         return Some(handlers::run_read_pretooluse_fully_native(payload));
     }

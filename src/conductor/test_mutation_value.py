@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 import copy
-import json
-from pathlib import Path
 import sys
+from collections.abc import Sequence
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -268,24 +267,6 @@ def test_junit_attribution_maps_parameterized_failures_and_incomplete_reports(
     assert attribution["status"] == "INCOMPLETE"
 
 
-def test_collect_pytest_batch_reports_all_fail_closed_fields(tmp_path: Path) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_alpha"
-    report = tmp_path / "missing" / "report.xml"
-    result, attribution = mutation_value.collect_pytest_junit_batch(
-        argv=("pytest",),
-        report_path=report,
-        ranked_nodeids=[nodeid],
-        run_command=lambda _argv: "ran",
-    )
-    assert result == "ran"
-    assert attribution["status"] == "INCOMPLETE"
-    assert attribution["tests"] == {}
-    assert attribution["failed_nodeids"] == []
-    assert attribution["missing_nodeids"] == [nodeid]
-    assert attribution["unmapped_cases"] == []
-    assert "error" in attribution
-
-
 def test_pytest_attribution_support_rejects_unmappable_batches() -> None:
     nodeid = "conductor/test_mutation_value.py::test_alpha"
     assert mutation_value.pytest_attribution_supported(("pytest",), [nodeid])
@@ -296,202 +277,6 @@ def test_pytest_attribution_support_rejects_unmappable_batches() -> None:
     assert not mutation_value.pytest_attribution_supported(
         ("pytest",), ["native_test.cpp::test_alpha"]
     )
-
-
-def test_junit_parser_preserves_skipped_and_unmapped_outcomes(tmp_path: Path) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_skip"
-    report = tmp_path / "report.xml"
-    report.write_text(
-        """<testsuite>
-<testcase classname="conductor.test_mutation_value" name="test_skip[a]" time="bad"><skipped /></testcase>
-<testcase classname="other" name="test_other" time="0"><failure /></testcase>
-</testsuite>""",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_pytest_junit(report, [nodeid])
-    assert parsed["status"] == "INCOMPLETE"
-    assert parsed["tests"][nodeid] == {
-        "outcome": "SKIPPED",
-        "duration_seconds": 0.0,
-        "cases": 1,
-    }
-    assert parsed["unmapped_cases"] == [{"classname": "other", "name": "test_other"}]
-
-
-def test_junit_parser_aggregates_precedence_and_failed_nodeids(tmp_path: Path) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_alpha"
-    report = tmp_path / "report.xml"
-    report.write_text(
-        """<testsuite>
-<testcase classname="conductor.test_mutation_value" name="test_alpha[a]" time="1.25" />
-<testcase classname="conductor.test_mutation_value" name="test_alpha[b]" time="bad"><failure /></testcase>
-<testcase classname="conductor.test_mutation_value" name="test_alpha[c]" time="0"><error /></testcase>
-</testsuite>""",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_pytest_junit(report, [nodeid])
-    assert parsed["status"] == "COMPLETE"
-    assert parsed["tests"][nodeid] == {
-        "outcome": "ERROR",
-        "duration_seconds": 1.25,
-        "cases": 3,
-    }
-    assert parsed["failed_nodeids"] == [nodeid]
-
-
-def test_ctest_parser_maps_disabled_notrun_and_failure_statuses(tmp_path: Path) -> None:
-    disabled = "tests/reset.c::test_disabled"
-    notrun = "tests/reset.c::test_notrun"
-    failed = "tests/reset.c::test_failed"
-    report = tmp_path / "ctest-status.xml"
-    report.write_text(
-        """<testsuite>
-<testcase name="reset.test_disabled" status="disabled" time="1" />
-<testcase name="reset.test_notrun" status="notrun" time="2" />
-<testcase name="reset.test_failed" status="fail" time="3" />
-</testsuite>""",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_ctest_junit(report, [disabled, notrun, failed])
-    assert parsed["tests"][disabled]["outcome"] == "SKIPPED"
-    assert parsed["tests"][notrun]["outcome"] == "SKIPPED"
-    assert parsed["tests"][failed]["outcome"] == "FAILED"
-    assert parsed["failed_nodeids"] == [failed]
-
-
-def test_collect_ctest_batch_reports_all_fail_closed_fields(tmp_path: Path) -> None:
-    _assert_unrun_ctest_batch_cannot_inherit_report(tmp_path)
-    nodeid = "tests/reset.c::test_reset"
-    report = tmp_path / "missing" / "ctest.xml"
-    result, attribution = mutation_value.collect_ctest_junit_batch(
-        argv=("ctest",),
-        report_path=report,
-        ranked_nodeids=[nodeid],
-        run_command=lambda _argv: "ran",
-    )
-    assert result == "ran"
-    assert attribution["status"] == "INCOMPLETE"
-    assert attribution["tests"] == {}
-    assert attribution["failed_nodeids"] == []
-    assert attribution["missing_nodeids"] == [nodeid]
-    assert attribution["unmapped_cases"] == []
-    assert attribution["unranked_failures"] == []
-    assert "error" in attribution
-
-
-def test_ctest_parser_preserves_xml_markers_and_rounds_duration(tmp_path: Path) -> None:
-    _assert_ctest_repeated_status_and_unranked_failure(tmp_path)
-    failed = "tests/reset.c::test_failed"
-    skipped = "tests/reset.c::test_skipped"
-    report = tmp_path / "ctest-markers.xml"
-    report.write_text(
-        """<testsuite>
-<testcase name="reset.test_failed" time="1.1234567"><failure /></testcase>
-<testcase name="reset.test_skipped" time="0"><skipped /></testcase>
-<testcase name="" time="0"><error /></testcase>
-</testsuite>""",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_ctest_junit(report, [failed, skipped])
-    assert parsed["tests"][failed] == {
-        "outcome": "FAILED",
-        "duration_seconds": 1.123457,
-        "cases": 1,
-    }
-    assert parsed["tests"][skipped]["outcome"] == "SKIPPED"
-    assert parsed["unranked_failures"] == [""]
-    assert set(parsed) == {
-        "status",
-        "tests",
-        "failed_nodeids",
-        "missing_nodeids",
-        "unmapped_cases",
-        "unranked_failures",
-    }
-
-
-def test_junit_parser_distinguishes_pass_defaults_and_unmapped_defaults(
-    tmp_path: Path,
-) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_alpha"
-    report = tmp_path / "report.xml"
-    report.write_text(
-        """<testsuite>
-<testcase classname="conductor.test_mutation_value" name="test_alpha" />
-<testcase />
-</testsuite>""",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_pytest_junit(report, [nodeid])
-    assert parsed["tests"][nodeid] == {
-        "outcome": "PASSED",
-        "duration_seconds": 0.0,
-        "cases": 1,
-    }
-    assert parsed["unmapped_cases"] == [{"classname": "", "name": ""}]
-
-
-def test_junit_parser_skipped_then_passed_is_passed(tmp_path: Path) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_alpha"
-    report = tmp_path / "report.xml"
-    report.write_text(
-        """<testsuite>
-<testcase classname="conductor.test_mutation_value" name="test_alpha[a]"><skipped /></testcase>
-<testcase classname="conductor.test_mutation_value" name="test_alpha[b]" />
-</testsuite>""",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_pytest_junit(report, [nodeid])
-    assert parsed["tests"][nodeid]["outcome"] == "PASSED"
-
-
-def test_junit_parser_error_and_failed_precedence_is_stable(tmp_path: Path) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_alpha"
-    for first, second, expected in (
-        ("error", "failure", "ERROR"),
-        ("failure", "error", "ERROR"),
-        ("skipped", "failure", "FAILED"),
-    ):
-        report = tmp_path / f"{first}-{second}.xml"
-        report.write_text(
-            f"""<testsuite>
-<testcase classname="conductor.test_mutation_value" name="test_alpha[a]"><{first} /></testcase>
-<testcase classname="conductor.test_mutation_value" name="test_alpha[b]"><{second} /></testcase>
-</testsuite>""",
-            encoding="utf-8",
-        )
-        parsed = mutation_value.parse_pytest_junit(report, [nodeid])
-        assert parsed["tests"][nodeid]["outcome"] == expected
-
-
-def test_junit_parser_failed_and_skipped_precedence_is_stable(tmp_path: Path) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_alpha"
-    report = tmp_path / "failed-skipped.xml"
-    report.write_text(
-        """<testsuite>
-<testcase classname="conductor.test_mutation_value" name="test_alpha[a]"><failure /></testcase>
-<testcase classname="conductor.test_mutation_value" name="test_alpha[b]"><skipped /></testcase>
-</testsuite>""",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_pytest_junit(report, [nodeid])
-    assert parsed["tests"][nodeid]["outcome"] == "FAILED"
-
-
-def test_junit_parser_keeps_scanning_after_unmapped_case(tmp_path: Path) -> None:
-    nodeid = "conductor/test_mutation_value.py::test_alpha"
-    report = tmp_path / "report.xml"
-    report.write_text(
-        """<testsuite>
-<testcase classname="other" name="test_other" />
-<testcase classname="conductor.test_mutation_value" name="test_alpha" />
-</testsuite>""",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_pytest_junit(report, [nodeid])
-    assert parsed["status"] == "INCOMPLETE"
-    assert parsed["tests"][nodeid]["outcome"] == "PASSED"
-    assert parsed["unmapped_cases"] == [{"classname": "other", "name": "test_other"}]
 
 
 def test_value_analysis_selects_core_and_flags_merge_and_delete_candidates() -> None:
@@ -812,33 +597,6 @@ def _assert_undeclared_rust_killer_is_misattributed() -> None:
     }
 
 
-def test_cargo_parser_keeps_scanning_after_unranked_and_preserves_failure() -> None:
-    alpha = "tooling/native/conductor-native/src/mutation_receipt.rs::test_alpha"
-    parsed = mutation_value.parse_cargo_libtest(
-        "test other::tests::test_blunt ... FAILED\n"
-        "test receipt::tests::test_alpha ... ok\n"
-        "test receipt::tests::test_alpha ... FAILED\n",
-        [alpha],
-    )
-    assert parsed["status"] == "COMPLETE"
-    assert parsed["tests"][alpha] == {"outcome": "FAILED", "cases": 2}
-    assert parsed["unranked_failures"] == ["other::tests::test_blunt"]
-    assert set(parsed) == {
-        "status",
-        "tests",
-        "missing_nodeids",
-        "ambiguous_nodeids",
-        "unmapped_cases",
-        "unranked_failures",
-    }
-    retained = mutation_value.parse_cargo_libtest(
-        "test receipt::tests::test_alpha ... FAILED\n"
-        "test receipt::tests::test_alpha ... ok\n",
-        [alpha],
-    )
-    assert retained["tests"][alpha]["outcome"] == "FAILED"
-
-
 # Shared inert campaign fields for adapter-routing fixtures.
 _ROUTING_PROBE_FIELDS: dict[str, Any] = {
     "manifest_sha256": "0" * 64,
@@ -900,15 +658,15 @@ def _assert_value_analysis_reaches_native_collectors(tmp_path: Path) -> None:
             stdout_sink("test manifest::tests::test_alpha ... FAILED\n")
         return "result"
 
-    original = mutation_testing._run_command  # noqa: SLF001
-    mutation_testing._run_command = fake_run_command  # noqa: SLF001
+    original = mutation_testing._run_command
+    mutation_testing._run_command = fake_run_command
     try:
         # A cargo batch that declares value analysis reaches the libtest collector
         # and comes back with the matrix, instead of being refused.
         campaign = _routing_campaign(
             manifest, [rust], ("cargo", "test"), _routing_spec("cargo-libtest", rust)
         )
-        _, report = mutation_testing._run_campaign_command(  # noqa: SLF001
+        _, report = mutation_testing._run_campaign_command(
             campaign, snapshot_root=tmp_path, report_name="batch"
         )
         assert report["tests"][rust]["outcome"] == "FAILED"
@@ -919,7 +677,7 @@ def _assert_value_analysis_reaches_native_collectors(tmp_path: Path) -> None:
             manifest, [rust], ("cargo", "test"), _routing_spec("pytest-junit", rust)
         )
         with pytest.raises(mutation_testing.CampaignError, match="cargo-libtest"):
-            mutation_testing._run_campaign_command(  # noqa: SLF001
+            mutation_testing._run_campaign_command(
                 mislabelled, snapshot_root=tmp_path, report_name="batch"
             )
 
@@ -930,11 +688,11 @@ def _assert_value_analysis_reaches_native_collectors(tmp_path: Path) -> None:
             manifest, [opaque], ("npm", "test"), _routing_spec("pytest-junit", opaque)
         )
         with pytest.raises(mutation_testing.CampaignError, match="attributes failures"):
-            mutation_testing._run_campaign_command(  # noqa: SLF001
+            mutation_testing._run_campaign_command(
                 blind, snapshot_root=tmp_path, report_name="batch"
             )
     finally:
-        mutation_testing._run_command = original  # noqa: SLF001
+        mutation_testing._run_command = original
 
 
 def _assert_rust_batch_routes_to_libtest(tmp_path: Path) -> None:
@@ -952,11 +710,11 @@ def _assert_rust_batch_routes_to_libtest(tmp_path: Path) -> None:
             stdout_sink("test manifest::tests::test_alpha ... FAILED\n")
         return "result"
 
-    original = mutation_testing._run_command  # noqa: SLF001
-    mutation_testing._run_command = fake_run_command  # noqa: SLF001
+    original = mutation_testing._run_command
+    mutation_testing._run_command = fake_run_command
     try:
         rust = _routing_campaign(manifest, [alpha], ("cargo", "test"))
-        result, report = mutation_testing._run_campaign_command(  # noqa: SLF001
+        result, report = mutation_testing._run_campaign_command(
             rust, snapshot_root=tmp_path, report_name="batch"
         )
         assert result == "result"
@@ -967,13 +725,13 @@ def _assert_rust_batch_routes_to_libtest(tmp_path: Path) -> None:
         # A batch that fits neither collector still runs, and reports NO
         # attribution rather than an empty one that would read as COMPLETE.
         other = _routing_campaign(manifest, ["tests/suite.js"], ("npm", "test"))
-        result, report = mutation_testing._run_campaign_command(  # noqa: SLF001
+        result, report = mutation_testing._run_campaign_command(
             other, snapshot_root=tmp_path, report_name="batch"
         )
         assert (result, report) == ("result", None)
         assert calls[-1] == (("npm", "test"), False)
     finally:
-        mutation_testing._run_command = original  # noqa: SLF001
+        mutation_testing._run_command = original
 
 
 _CTEST_JUNIT = """<?xml version="1.0" encoding="UTF-8"?>
@@ -988,37 +746,6 @@ _CTEST_JUNIT = """<?xml version="1.0" encoding="UTF-8"?>
   </testcase>
 </testsuite>
 """
-
-
-def test_a_ctest_nodeid_maps_onto_the_name_cmake_registers() -> None:
-    """Map path-qualified nodeids to CMake's flat `<stem>.<function>` names."""
-
-    nodeid = "research/runtime/native/tests/test_profiler.c::test_memory_events"
-    assert (
-        mutation_value._ctest_identity(nodeid)  # noqa: SLF001
-        == "test_profiler.test_memory_events"
-    )
-    for rejected in (
-        "research/runtime/native/src/profiler.c",  # no function
-        "conductor/test_mutation_value.py::test_x",  # not a C file
-        "tests/test_a.c::mod::test_x",  # ctest names carry no module path
-        "tests/test_a.c::",  # empty function
-    ):
-        with pytest.raises(mutation_value.ValueEvidenceError):
-            mutation_value._ctest_identity(rejected)  # noqa: SLF001
-
-
-def test_ctest_attribution_refuses_names_it_cannot_separate() -> None:
-    """Same-stem files collide in CTest's flat namespace; refuse ambiguous kills."""
-
-    assert mutation_value.ctest_attribution_supported(
-        ["a/test_profiler.c::test_reset", "b/test_kernels.c::test_reset"]
-    )
-    assert not mutation_value.ctest_attribution_supported(
-        ["a/test_profiler.c::test_reset", "b/test_profiler.c::test_reset"]
-    )
-    assert not mutation_value.ctest_attribution_supported([])
-    assert not mutation_value.ctest_attribution_supported(["tests/suite.rs::test_x"])
 
 
 def test_a_ctest_report_separates_the_declared_killer_from_collateral(
@@ -1053,34 +780,6 @@ def test_a_ctest_report_separates_the_declared_killer_from_collateral(
     assert partial["missing_nodeids"] == [absent]
 
 
-def _assert_unrun_ctest_batch_cannot_inherit_report(
-    tmp_path: Path,
-) -> None:
-    """A build failure must not inherit the previous mutant's CTest report."""
-
-    report_path = tmp_path / ".mutation-value" / "ctest.xml"
-    report_path.parent.mkdir(parents=True)
-    report_path.write_text(_CTEST_JUNIT, encoding="utf-8")
-    reset = "research/runtime/native/tests/test_profiler.c::test_reset_clears_all"
-
-    result, report = mutation_value.collect_ctest_junit_batch(
-        argv=("sh", "-c", "false"),
-        report_path=report_path,
-        ranked_nodeids=[reset],
-        run_command=lambda argv: "build failed",
-    )
-    assert result == "build failed"
-    assert report["status"] == "INCOMPLETE"
-    assert report["missing_nodeids"] == [reset]
-    assert report["tests"] == {}
-    assert "cannot parse ctest JUnit report" in report["error"]
-    assert not report_path.exists()
-
-    mutation = SimpleNamespace(expected_killers=[reset])
-    verdict = mutation_testing.killer_verdict(mutation, report, "KILLED")
-    assert verdict["status"] == "UNATTRIBUTED"
-
-
 def test_a_c_batch_is_routed_to_the_ctest_collector(tmp_path: Path) -> None:
     """Route by C nodeids even when argv runs a build shell before ctest."""
 
@@ -1103,14 +802,14 @@ def test_a_c_batch_is_routed_to_the_ctest_collector(tmp_path: Path) -> None:
         )
         return "result"
 
-    original = mutation_testing._run_command  # noqa: SLF001
-    mutation_testing._run_command = fake_run_command  # noqa: SLF001
+    original = mutation_testing._run_command
+    mutation_testing._run_command = fake_run_command
     try:
-        result, report = mutation_testing._run_campaign_command(  # noqa: SLF001
+        result, report = mutation_testing._run_campaign_command(
             campaign, snapshot_root=tmp_path, report_name="batch"
         )
     finally:
-        mutation_testing._run_command = original  # noqa: SLF001
+        mutation_testing._run_command = original
     assert result == "result"
     assert report["tests"][reset]["outcome"] == "FAILED"
     # The ctest path must not rewrite argv the way the pytest one does.
@@ -1145,103 +844,18 @@ def _assert_capable_unattributed_kill_refuses_campaign() -> None:
     assert wrong["status"] == "REFUSED" and wrong["misattributed"] == ["a"]
 
 
-def _assert_ctest_repeated_status_and_unranked_failure(
-    tmp_path: Path,
-) -> None:
-    reset = "tests/reset.c::test_reset"
-    report = tmp_path / "ctest.xml"
-    report.write_text(
-        """<testsuite>
-<testcase name="reset.test_reset" time="1.25"><error /></testcase>
-<testcase name="reset.test_reset" time="bad"><failure /></testcase>
-<testcase name="reset.test_reset" status="disabled" time="0" />
-<testcase name="other.test_fail" status="fail" time="0" />
-</testsuite>""",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_ctest_junit(report, [reset])
-    assert parsed["status"] == "COMPLETE"
-    assert parsed["tests"][reset] == {
-        "outcome": "SKIPPED",
-        "duration_seconds": 0.0,
-        "cases": 1,
-    }
-    assert parsed["failed_nodeids"] == []
-    assert parsed["unranked_failures"] == ["other.test_fail"]
-
-
-def test_ctest_parser_reports_error_and_bad_duration_fail_closed(
-    tmp_path: Path,
-) -> None:
-    nodeid = "tests/reset.c::test_reset"
-    report = tmp_path / "ctest-error.xml"
-    report.write_text(
-        '<testsuite><testcase name="reset.test_reset" time="bad"><error /></testcase></testsuite>',
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_ctest_junit(report, [nodeid])
-    assert parsed["tests"][nodeid] == {
-        "outcome": "ERROR",
-        "duration_seconds": 0.0,
-        "cases": 1,
-    }
-    assert parsed["failed_nodeids"] == [nodeid]
-
-
-def test_ctest_parser_defaults_missing_attributes_without_fabricating_duration(
-    tmp_path: Path,
-) -> None:
-    nodeid = "tests/reset.c::test_reset"
-    report = tmp_path / "ctest-missing-attributes.xml"
-    report.write_text(
-        '<testsuite><testcase name="reset.test_reset" />'
-        "<testcase><error /></testcase></testsuite>",
-        encoding="utf-8",
-    )
-    parsed = mutation_value.parse_ctest_junit(report, [nodeid])
-    assert parsed["tests"][nodeid] == {
-        "outcome": "PASSED",
-        "duration_seconds": 0.0,
-        "cases": 1,
-    }
-    assert parsed["unranked_failures"] == [""]
-
-
-def test_value_analysis_uses_explicit_failed_nodeids_for_killers(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_value_analysis_uses_explicit_failed_nodeids_for_killers() -> None:
     _assert_capable_unattributed_kill_refuses_campaign()
     nodeid = "conductor/test_mutation_value.py::test_contract"
     spec = _spec()
-    complete = {
-        "status": "COMPLETE",
-        "tests": {nodeid: {"outcome": "PASSED"}},
-        "failed_nodeids": [nodeid],
-    }
-    clean = {
-        "status": "COMPLETE",
-        "tests": {nodeid: {"outcome": "PASSED"}},
-        "failed_nodeids": [],
-    }
-    captured: dict[str, Any] = {}
-
-    def fake_native(spec_json: str, baseline_json: str, evidence_json: str) -> str:
-        captured["evidence"] = json.loads(evidence_json)
-        return json.dumps({"status": "PASS", "killers_by_mutant": {"mutant": [nodeid]}})
-
-    monkeypatch.setattr(mutation_value, "analyze_test_value_native", fake_native)
+    clean = _report({nodeid: ("PASSED", 0.1)})
+    complete = _report({nodeid: ("PASSED", 0.1)})
+    complete["failed_nodeids"] = [nodeid]
     result = mutation_value.analyze_test_value(
         spec,
         baseline_reports=[clean, clean],
         mutant_reports={"mutant": complete},
         mutant_outcomes={"mutant": "KILLED"},
     )
+    assert result["status"] == "PASS"
     assert result["killers_by_mutant"] == {"mutant": [nodeid]}
-    assert captured["evidence"] == [
-        {
-            "mutation_id": "mutant",
-            "outcome": "KILLED",
-            "report_state": "COMPLETE",
-            "killers": [nodeid],
-        }
-    ]
