@@ -39,6 +39,7 @@ pub struct Case {
 
 impl Case {
     pub fn new() -> Self {
+        Python::initialize();
         let process_state = PROCESS_STATE.lock().expect("test process-state lock");
         let mut env = EnvRestore::default();
         for name in PROJECT_ENV {
