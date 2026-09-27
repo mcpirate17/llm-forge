@@ -6,6 +6,14 @@ use std::path::{Path, PathBuf};
 
 const NATIVE_MANIFEST: &str = "native/conductor-native/Cargo.toml";
 const FORGE_MANIFEST: &str = "native/forge/Cargo.toml";
+const SLOP_MANIFEST: &str = "native/slop-core/Cargo.toml";
+
+// Keep this list aligned with contracts that import slop_core. Candidate
+// verification must build their extension from the selected source snapshot.
+const SLOP_CONSUMERS: [&str; 2] = [
+    "python_contracts_candidate_style",
+    "python_contracts_native_ablations",
+];
 
 fn required_string<'a>(request: &'a Value, key: &str) -> Result<&'a str, String> {
     request[key]
@@ -88,6 +96,21 @@ pub fn plan(request: &Value) -> Result<Value, String> {
         &target_dir.join("debug/libconductor_native.so"),
         &extension,
     )];
+    if targets
+        .iter()
+        .any(|target| SLOP_CONSUMERS.contains(&target.as_str()))
+    {
+        crate::test_contracts::require_regular_file(&root, SLOP_MANIFEST).map_err(|error| {
+            format!("selected contracts require candidate slop_core: {error:#}")
+        })?;
+        build.push(build_step(
+            &root,
+            SLOP_MANIFEST,
+            &["--features", "extension-module", "--lib"],
+            &target_dir.join("debug/libslop_core.so"),
+            &extension_dir.join("slop_core.so"),
+        ));
+    }
     let mut env = json!({
         "CARGO_TARGET_DIR": target_dir,
         "CARGO_BUILD_JOBS": "2",

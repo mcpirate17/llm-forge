@@ -62,6 +62,21 @@ fn candidate_imports_and_binary_are_used() {
 }
 "#;
 
+const SLOP_PROVENANCE_TEST: &str = r#"
+#[test]
+fn candidate_slop_extension_is_used() {
+    use std::process::Command;
+    let python = std::env::var("PYO3_PYTHON").unwrap();
+    let script = "import slop_core; print(slop_core.marker()); print(slop_core.__file__)";
+    let imported = Command::new(python).args(["-c", script]).output().unwrap();
+    assert!(imported.status.success(), "{}", String::from_utf8_lossy(&imported.stderr));
+    let lines = String::from_utf8(imported.stdout).unwrap();
+    let lines: Vec<_> = lines.lines().collect();
+    assert_eq!(lines[0], "CANDIDATE_SLOP");
+    assert!(lines[1].ends_with("/contract-extension/slop_core.so"));
+}
+"#;
+
 fn generate_lock(root: &Path, manifest: &str) {
     let output = Command::new("cargo")
         .args([
@@ -123,6 +138,28 @@ fn runtime_fixture(case: &Case) -> PathBuf {
     root
 }
 
+fn slop_runtime_fixture(case: &Case) -> PathBuf {
+    let root = runtime_fixture(case);
+    case.write(
+        "candidate_ws/native/slop-core/Cargo.toml",
+        "[package]\nname='slop-core'\nversion='0.1.0'\nedition='2021'\n[lib]\nname='slop_core'\ncrate-type=['cdylib']\n[features]\nextension-module=['pyo3/extension-module']\n[dependencies]\npyo3={version='0.29'}\n",
+    );
+    case.write(
+        "candidate_ws/native/slop-core/src/lib.rs",
+        "use pyo3::prelude::*;\nuse pyo3::types::PyModule;\n#[pyfunction] fn marker() -> &'static str { \"CANDIDATE_SLOP\" }\n#[pymodule] fn slop_core(module: &Bound<'_, PyModule>) -> PyResult<()> { module.add_function(wrap_pyfunction!(marker, module)?)?; Ok(()) }\n",
+    );
+    case.write(
+        "candidate_ws/native/conductor-native/tests/python_contracts_native_ablations.rs",
+        SLOP_PROVENANCE_TEST,
+    );
+    case.write(
+        "candidate_ws/native/conductor-native/src/python_contract_targets.tsv",
+        "src/conductor/candidate_probe.py\tpython_contracts_native_ablations\n",
+    );
+    generate_lock(&root, "native/slop-core/Cargo.toml");
+    root
+}
+
 fn conflicting_ambient(case: &mut Case) {
     case.write(
         "ambient/conductor/__init__.py",
@@ -139,6 +176,10 @@ fn conflicting_ambient(case: &mut Case) {
     case.write(
         "ambient/conductor_native.py",
         "def marker(): return 'AMBIENT_EXTENSION'\n",
+    );
+    case.write(
+        "ambient/slop_core.py",
+        "def marker(): return 'AMBIENT_SLOP'\n",
     );
     case.write("ambient/forge", "#!/bin/sh\necho AMBIENT_FORGE\n");
     let ambient_path = case.root().join("ambient").display().to_string();
@@ -164,6 +205,88 @@ fn runtime_contract_plan<'py>(py: Python<'py>, root: &Path) -> Bound<'py, PyAny>
         .unwrap()
         .call1((raw,))
         .unwrap()
+}
+
+fn native_runtime_plan(py: Python<'_>, root: &Path, targets: &[&str]) -> PyResult<Value> {
+    let request = json!({
+        "snapshot": root,
+        "runtime_dir": root.join("runtime"),
+        "python_executable": text(&module(py, "sys").getattr("executable").unwrap()),
+        "targets": targets,
+    });
+    let response: String = module(py, "conductor._native")
+        .getattr("candidate_verification_native")?
+        .call1(("contract_runtime_plan", request.to_string()))?
+        .extract()?;
+    Ok(serde_json::from_str(&response).unwrap())
+}
+
+#[test]
+fn slop_build_is_selected_only_for_observed_consumers() {
+    let case = Case::new();
+    let root = slop_runtime_fixture(&case);
+    Python::attach(|py| {
+        for (target, expected) in [
+            ("python_contracts_probe", false),
+            ("python_contracts_native_ablations", true),
+            ("python_contracts_candidate_style", true),
+        ] {
+            let plan = native_runtime_plan(py, &root, &[target]).unwrap();
+            let builds = plan["build_commands"].as_array().unwrap();
+            assert_eq!(builds.len(), if expected { 3 } else { 2 });
+            let slop = builds.iter().find(|step| {
+                step["argv"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|arg| arg == "native/slop-core/Cargo.toml")
+            });
+            assert_eq!(slop.is_some(), expected);
+            if let Some(step) = slop {
+                assert_eq!(
+                    step["artifact"],
+                    json!(root.join("runtime/contract-cargo-target/debug/libslop_core.so"))
+                );
+                assert_eq!(
+                    step["destination"],
+                    json!(root.join("runtime/contract-extension/slop_core.so"))
+                );
+                let argv = step["argv"].as_array().unwrap();
+                for arg in [
+                    "--offline",
+                    "--locked",
+                    "--jobs",
+                    "2",
+                    "--features",
+                    "extension-module",
+                    "--lib",
+                ] {
+                    assert!(argv.iter().any(|value| value == arg));
+                }
+            }
+        }
+    });
+}
+
+#[test]
+fn selected_slop_requires_a_regular_candidate_manifest() {
+    let case = Case::new();
+    let root = slop_runtime_fixture(&case);
+    let manifest = root.join("native/slop-core/Cargo.toml");
+    std::fs::remove_file(&manifest).unwrap();
+    Python::attach(|py| {
+        let error =
+            native_runtime_plan(py, &root, &["python_contracts_native_ablations"]).unwrap_err();
+        assert!(error.to_string().contains("candidate slop_core"));
+        assert!(native_runtime_plan(py, &root, &["python_contracts_probe"]).is_ok());
+    });
+    let outside = case.write("outside-slop.toml", "[package]\nname='outside'\n");
+    std::os::unix::fs::symlink(outside, &manifest).unwrap();
+    Python::attach(|py| {
+        let error =
+            native_runtime_plan(py, &root, &["python_contracts_candidate_style"]).unwrap_err();
+        assert!(error.to_string().contains("candidate slop_core"));
+    });
 }
 
 fn runtime_check<'py>(py: Python<'py>) -> Bound<'py, PyAny> {
@@ -666,6 +789,76 @@ fn candidate_runner_executes_candidate_python_extension_and_forge() {
 fn standalone_runner_executes_selected_source_and_binaries() {
     let mut case = Case::new();
     let root = runtime_fixture(&case);
+    conflicting_ambient(&mut case);
+    Python::attach(|py| {
+        let plan = runtime_contract_plan(py, &root);
+        let options = PyDict::new(py);
+        options.set_item("contract_plan", plan).unwrap();
+        let code = module(py, "conductor.graph_test_select")
+            .getattr("run_tests")
+            .unwrap()
+            .call((path(py, &root), PyList::empty(py)), Some(&options))
+            .unwrap()
+            .extract::<i32>()
+            .unwrap();
+        assert_eq!(code, 0);
+    });
+}
+
+#[test]
+fn candidate_runner_uses_candidate_slop_over_conflicting_ambient() {
+    let mut case = Case::new();
+    let root = slop_runtime_fixture(&case);
+    conflicting_ambient(&mut case);
+    let runtime_dir = case.mkdir("candidate_slop_runtime");
+    Python::attach(|py| {
+        let plan = runtime_contract_plan(py, &root);
+        let args = PyDict::new(py);
+        args.set_item("repo", path(py, &root)).unwrap();
+        args.set_item("snapshot", path(py, &root)).unwrap();
+        args.set_item("runtime_dir", path(py, &runtime_dir))
+            .unwrap();
+        let ctx = module(py, "types")
+            .getattr("SimpleNamespace")
+            .unwrap()
+            .call((), Some(&args))
+            .unwrap();
+        let selection = module(py, "conductor.candidate_review.checks")
+            .getattr("TestSelection")
+            .unwrap()
+            .call1((
+                PyTuple::empty(py),
+                PyDict::new(py),
+                PyTuple::empty(py),
+                plan,
+            ))
+            .unwrap();
+        let options = PyDict::new(py);
+        options.set_item("coverage", false).unwrap();
+        let result = module(py, "conductor.candidate_review.verification")
+            .getattr("run_targeted_tests")
+            .unwrap()
+            .call((&ctx, selection, runtime_check(py)), Some(&options))
+            .unwrap();
+        assert_eq!(
+            text(&result.getattr("status").unwrap()),
+            "passed",
+            "findings: {} stderr: {}",
+            result.getattr("findings").unwrap().repr().unwrap(),
+            text(&result.getattr("stderr_tail").unwrap()),
+        );
+        assert!(runtime_dir
+            .join("contract-extension/slop_core.so")
+            .is_file());
+        assert!(text(&result.getattr("stdout_tail").unwrap())
+            .contains("candidate_slop_extension_is_used ... ok"));
+    });
+}
+
+#[test]
+fn standalone_runner_uses_candidate_slop_over_conflicting_ambient() {
+    let mut case = Case::new();
+    let root = slop_runtime_fixture(&case);
     conflicting_ambient(&mut case);
     Python::attach(|py| {
         let plan = runtime_contract_plan(py, &root);

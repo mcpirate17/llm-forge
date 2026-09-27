@@ -16,8 +16,12 @@ const REGISTRY_PATH: &str = "native/conductor-native/src/python_contract_targets
 const COMPILED_REGISTRY: &str = include_str!("python_contract_targets.tsv");
 
 fn native_source(path: &str) -> bool {
-    path.strip_prefix("native/conductor-native/src/")
-        .is_some_and(|name| name.ends_with(".rs") && !name.contains('/'))
+    ["native/conductor-native/src/", "native/slop-core/src/"]
+        .iter()
+        .any(|prefix| {
+            path.strip_prefix(*prefix)
+                .is_some_and(|name| name.ends_with(".rs") && !name.contains('/'))
+        })
 }
 
 fn fixture_source(path: &str) -> bool {
@@ -26,6 +30,10 @@ fn fixture_source(path: &str) -> bool {
 
 fn corpus_source(path: &str) -> bool {
     path.starts_with("native/forge/tests/fixtures/") && path.ends_with(".json")
+}
+
+fn patch_fixture_source(path: &str) -> bool {
+    path.starts_with("src/conductor/testdata/") && path.ends_with(".patch")
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -73,7 +81,8 @@ fn parse_registry(contents: &str) -> Result<Registry> {
             || helper
             || native_source(source)
             || fixture_source(source)
-            || corpus_source(source))
+            || corpus_source(source)
+            || patch_fixture_source(source))
             || source.contains("..")
             || source.contains('\\')
             || source.chars().any(char::is_control)
@@ -280,7 +289,7 @@ fn validate_selected_helpers(root: &Path, target: &str, entries: &Registry) -> R
         }
     }
     for (fixture, targets) in &entries.by_source {
-        if corpus_source(fixture) && targets.contains(target) {
+        if (corpus_source(fixture) || patch_fixture_source(fixture)) && targets.contains(target) {
             require_regular_file(root, fixture)?;
         }
         if fixture_source(fixture)
