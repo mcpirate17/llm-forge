@@ -423,6 +423,7 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
                 "python_contracts_active_state",
                 "python_contracts_crg_workspace_tools",
                 "python_contracts_inplace_handoff",
+                "python_contracts_local_ai_policy",
                 "python_contracts_memory_vectors",
                 "python_contracts_session_preamble"
             ]
@@ -434,7 +435,7 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
                 .unwrap()
                 .extract::<usize>()
                 .unwrap(),
-            5
+            6
         );
     });
 }
