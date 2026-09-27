@@ -1,55 +1,17 @@
 //! Real CLI and storage checks for durable task execution and read-only health.
 
+mod support;
+
 #[path = "../src/task_store.rs"]
 mod task_store;
 
 use serde_json::{json, Value};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Barrier,
-};
+use std::path::Path;
+use std::process::Command;
+use std::sync::{Arc, Barrier};
 use std::time::Instant;
+use support::Host;
 use task_store::{Completion, State, Store, Task};
-
-struct Host(PathBuf);
-impl Host {
-    fn new() -> Self {
-        static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let path = std::env::temp_dir().join(format!(
-            "forge-tasks-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        std::fs::create_dir_all(path.join(".git")).unwrap();
-        Self(path)
-    }
-    fn cli(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_forge"))
-            .args(args)
-            .current_dir(&self.0)
-            .env_remove("CONDUCTOR_HOST_ROOT")
-            .env_remove("CLAUDE_PROJECT_DIR")
-            .env("LEDGER_ROOT", self.0.join("ledger"))
-            .output()
-            .unwrap()
-    }
-    fn ok(&self, args: &[&str]) -> Value {
-        let result = self.cli(args);
-        assert!(
-            result.status.success(),
-            "{}",
-            String::from_utf8_lossy(&result.stderr)
-        );
-        serde_json::from_slice(&result.stdout).unwrap()
-    }
-}
-impl Drop for Host {
-    fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.0).unwrap();
-    }
-}
 
 fn example(id: &str, now: i64) -> Task {
     Task {
@@ -157,8 +119,8 @@ fn invalid_ids_and_terminal_transitions_are_rejected_without_partial_events() {
     assert_eq!(store.events("cancel", 100).unwrap().len(), 3);
 }
 
-fn create_command(host: &Host, id: &str, program: &str) {
-    host.ok(&[
+fn create_command(host: &Host, id: &str, workload: &[&str]) {
+    let mut args = vec![
         "task",
         "create",
         "--id",
@@ -172,10 +134,10 @@ fn create_command(host: &Host, id: &str, program: &str) {
         "--message",
         "message-1",
         "--",
-        "python3",
-        "-c",
-        program,
-    ]);
+        support::task_worker().to_str().unwrap(),
+    ];
+    args.extend_from_slice(workload);
+    host.ok(&args);
 }
 
 fn receipt(host: &Host, task: &Value) -> Value {
@@ -187,11 +149,7 @@ fn receipt(host: &Host, task: &Value) -> Value {
 #[test]
 fn real_command_has_bounded_logs_and_a_content_bound_receipt() {
     let host = Host::new();
-    create_command(
-        &host,
-        "output",
-        "import sys; sys.stdout.write('x'*8192); sys.stderr.write('error detail')",
-    );
+    create_command(&host, "output", &["output"]);
     let task = host.ok(&[
         "task",
         "run",
@@ -227,7 +185,7 @@ fn real_command_has_bounded_logs_and_a_content_bound_receipt() {
 #[test]
 fn failed_commands_resume_explicitly_and_exhaust_the_budget() {
     let host = Host::new();
-    create_command(&host, "failure", "raise SystemExit(7)");
+    create_command(&host, "failure", &["exit", "7"]);
     for attempt in 1..=3 {
         let mut args = vec!["task", "run", "failure", "--owner", "agent"];
         if attempt > 1 {
@@ -248,7 +206,7 @@ fn failed_commands_resume_explicitly_and_exhaust_the_budget() {
 #[test]
 fn deadline_stops_the_command_and_records_timeout() {
     let host = Host::new();
-    create_command(&host, "timeout", "import time; time.sleep(20)");
+    create_command(&host, "timeout", &["sleep", "20000"]);
     let began = Instant::now();
     let output = host.cli(&[
         "task",
@@ -326,8 +284,8 @@ fn malformed_state_is_an_error_never_a_clean_zero() {
 #[test]
 fn status_joins_only_host_session_totals_without_double_counting_tasks() {
     let host = Host::new();
-    create_command(&host, "one", "pass");
-    create_command(&host, "two", "pass");
+    create_command(&host, "one", &["exit", "0"]);
+    create_command(&host, "two", &["exit", "0"]);
     let directory = host.0.join("ledger/session_rollup");
     std::fs::create_dir_all(&directory).unwrap();
     let row =
@@ -364,7 +322,7 @@ fn wait_for_child_pid(host: &Host) -> i32 {
 #[test]
 fn supervisor_sigterm_kills_its_child_and_records_failure() {
     let host = Host::new();
-    create_command(&host, "signal", "import os,time,pathlib; pathlib.Path('child.pid').write_text(str(os.getpid())); time.sleep(20)");
+    create_command(&host, "signal", &["pid-sleep", "20000"]);
     let mut runner = Command::new(env!("CARGO_BIN_EXE_forge"))
         .args(["task", "run", "signal", "--owner", "agent"])
         .current_dir(&host.0)
@@ -391,7 +349,7 @@ fn supervisor_sigterm_kills_its_child_and_records_failure() {
 #[test]
 fn sqlite_contention_cannot_extend_command_execution_or_report_success() {
     let host = Host::new();
-    create_command(&host, "locked", "import os,time,pathlib; pathlib.Path('child.pid').write_text(str(os.getpid())); time.sleep(4)");
+    create_command(&host, "locked", &["pid-sleep", "4000"]);
     let mut runner = Command::new(env!("CARGO_BIN_EXE_forge"))
         .args([
             "task",

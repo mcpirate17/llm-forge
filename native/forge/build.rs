@@ -6,22 +6,34 @@
 use std::path::Path;
 use std::process::Command;
 
-fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
-    // .git/HEAD changes on every checkout and commit, so the rev follows
-    // the tree instead of freezing at the first build. In a build without
-    // a checkout (e.g. `cargo install` from a tarball) the path is absent
-    // and is simply not tracked.
-    if Path::new("../../.git/HEAD").exists() {
-        println!("cargo:rerun-if-changed=../../.git/HEAD");
-    }
-    let rev = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
+fn git_text(args: &[&str]) -> Option<String> {
+    Command::new("git")
+        .args(args)
         .output()
         .ok()
         .filter(|out| out.status.success())
         .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
-        .filter(|rev| !rev.is_empty())
-        .unwrap_or_else(|| "unknown".to_string());
+        .filter(|value| !value.is_empty())
+}
+
+fn watch_git_path(name: &str) {
+    if let Some(path) = git_text(&["rev-parse", "--git-path", name]) {
+        if Path::new(&path).exists() {
+            println!("cargo:rerun-if-changed={path}");
+        }
+    }
+}
+
+fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+    // HEAD names the branch; commits and fast-forwards update its ref instead.
+    // Resolve Git paths so packed refs and git-dir indirection also work.
+    for name in ["HEAD", "packed-refs"] {
+        watch_git_path(name);
+    }
+    if let Some(branch) = git_text(&["symbolic-ref", "--quiet", "HEAD"]) {
+        watch_git_path(&branch);
+    }
+    let rev = git_text(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "unknown".into());
     println!("cargo:rustc-env=FORGE_GIT_REV={rev}");
 }
