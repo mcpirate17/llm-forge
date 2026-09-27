@@ -285,6 +285,9 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
         [
             "python_contracts_agent_a2a",
             "python_contracts_bash_pretooluse_parity",
+            "python_contracts_crg_response_shim",
+            "python_contracts_crg_server",
+            "python_contracts_crg_server_wiring",
             "python_contracts_dispatch_doctor",
             "python_contracts_dispatch_main",
             "python_contracts_dispatch_merge",

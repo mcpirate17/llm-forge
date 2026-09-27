@@ -317,7 +317,7 @@ dependencies = [
 
 [[package]]
 name = "conductor-native"
-version = "0.1.50"
+version = "0.1.51"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
