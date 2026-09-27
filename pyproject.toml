@@ -53,8 +53,9 @@ dependencies = [
 
 [project.optional-dependencies]
 # pytest-timeout backs only the `--timeout` flag used to invoke the test suite; no
-# shipped conductor module imports or shells out to it.
-test = ["pytest>=8.0", "pytest-timeout>=2.3"]
+# shipped conductor module imports or shells out to it. The native equivalence
+# probe executes Torch programs and must fail loudly when the test extra is absent.
+test = ["pytest>=8.0", "pytest-timeout>=2.3", "torch>=2.4.1"]
 # fest refuses to mutate anything until it has a coverage map, and it collects one
 # by running the campaign's own pytest command under pytest-cov. Kept out of `test`
 # because it is the mutation engine's prerequisite, not the suite's.
@@ -85,6 +86,12 @@ packages = ["src/conductor", "src/tooling"]
 conductor-native = { path = "native/conductor-native" }
 slop-core = { path = "native/slop-core" }
 forge-cli = { path = "native/forge" }
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 # Three Rust sources are runner components: `mutation_testing.py` hashes them into
 # every receipt's `runner_components_sha256`, which is what binds a receipt to the code

@@ -4,6 +4,62 @@ Earlier source-pinned measurements and their evidence links. The current baselin
 counting rules, latest verified commit, and behavioral notes remain in
 [the native migration overview](native-migration.md).
 
+## Verified `8d71bca` cohort
+
+Commit `8d71bca853c0e3f83d0747ea9bb317338356df48`, measured from a
+plain `git archive` with the unchanged path classification, Tokei 15.0.0,
+and syn-based inline Rust test treatment. The archive stream SHA-256 is
+`c82e8f99bd198ab70dc001f0c8e4482935cd3d362602382bf9f8037a6981d407`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,633 | 53,727 | 204 | **50.8952% native** |
+| Tests | 10,727 | 105,977 | 0 | **90.8084% Rust** |
+| All tracked source, including examples | 62,360 | 159,803 | 204 | 71.8645% native |
+
+The manifests contain 378 production files, 373 test files, and two Rust
+examples, or 753 counted source files. The examples contribute 99 Rust code
+lines only to the all-source view. The splitter found 102 test-only ranges in
+87 production Rust files: 43,893 original code lines become 30,789 after
+masking. The 13,104-line delta belongs to tests. Production Rust is 66,831
+raw lines minus 13,104 = 53,727; Rust tests are 92,873 separate lines plus
+13,104 = 105,977.
+
+Compared with verified `650b7f1`, production native share rose 0.0014
+percentage points and Rust test share rose 2.4589 points. This cohort retired
+nine executable Python suites containing 126 named and 134 statically expanded
+cases. Nine Rust contract targets contain 134 corresponding test functions.
+The pinned tree retains 17 executable Python test suites with 408 named and
+461 statically expanded cases, plus 34 Python fixture inputs and shared
+`conftest.py`. In the current Forge environment, 427 of those cases collect:
+the 34-case `test_equivalence_probe.py` module calls
+`pytest.importorskip("torch")`, and torch is absent. Those cases still need
+an environment with torch for execution. Static case counts and collected
+runtime cases are distinct measures.
+
+A matched test-harness comparison ran each original Python suite and its Rust
+contract against the same unchanged production Python APIs and installed
+`conductor-native` 0.1.66 extension. Compilation was excluded; after warmups,
+three alternating paired rounds passed 134 cases in both arms. Median outer
+process wall time was 1.53 seconds for Python and 2.35 seconds for Rust, so the
+Rust harness was 53.6% slower in this small cohort. Median peak RSS was
+54,788 KiB for Python and 45,764 KiB for Rust, 16.5% lower for Rust. The
+Rust harness source is the new 0.1.67 crate, while its installed extension
+remained 0.1.66 for both arms. These timings do not measure production
+throughput. The required full local gate was pending when this evidence was
+assembled.
+
+The [measurement evidence](native-metrics/8d71bca-evidence.tar.gz) contains
+classified path manifests and hashes independently checked against all 753
+counted Git blobs and a second archive extraction, per-file Tokei reports,
+inline AST ranges and verification of all 87 masked and extracted copies,
+tool hashes, the Python retirement inventory, the exact 134-case Rust map,
+matched benchmark inputs and logs, reproduction scripts, and scoped validation
+logs. The SHA-256 of its source-content manifest is
+`8baf05f8728edcf26f03842b9dc5ac69f8730e8e786229d9938f450d33e74563`;
+the evidence archive SHA-256 is
+`626d886c69e05d7fb7dc7b6cd20153c009d5c77fa9af0d12b0ecebf50dfc7a9f`.
+
 ## Verified `650b7f1` cohort
 
 Commit `650b7f1205b8200b1494590ba2cde3c45e5dbf4c`, measured from a

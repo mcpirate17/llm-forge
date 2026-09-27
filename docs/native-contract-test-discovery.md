@@ -5,7 +5,11 @@ test selectors cannot run those Rust files. `test_contracts::plan` maps changed
 production Python paths to Cargo integration-test targets. It reads the
 source-and-helper-to-target registry from the selected repository or candidate
 snapshot at
-`native/conductor-native/src/python_contract_targets.tsv`; every present
+`native/conductor-native/src/python_contract_targets.tsv`. A declared
+`# include: python_contract_targets_extra.tsv` line loads the second checked-in
+shard; both shards are parsed together, so duplicate rows and unsafe paths
+fail the same validation. Existing one-file candidate snapshots remain valid.
+Changing either shard selects every registered target. Every present
 `python_contracts_*` target must appear there, including targets whose name
 does not match the Python module or which cover a reexport. Helper rows mirror
 the targets' `#[path]` includes. When a cohort adds a target, add its production
@@ -14,6 +18,10 @@ JSON templates, shell bodies, and the exact dispatch launcher path.
 Rust child fixture programs under `tests/fixtures/` also map to their contract
 targets. Selected fixture programs must be canonical regular files within the
 snapshot, with no external module or source-splicing includes.
+Registered Python programs under `tests/fixtures/` or `src/conductor/testdata/`
+are bounded fixture inputs and select their targets; shipped `src/*.toml`
+configuration files can also select contracts. Rust `#[path]` fixture modules
+must have a row for each target that includes them.
 Explicitly registered JSON inputs receive canonical regular-file checks before
 their targets run. Inputs can live anywhere inside the snapshot, so configured
 campaign registries need no hardcoded path in the discovery implementation.

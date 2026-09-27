@@ -108,13 +108,29 @@ timeout_s = 900
 [[check]]
 name = "python-conductor"
 paths = ['^src/', '^native/(conductor-native|slop-core)/', '^(pyproject.toml|uv.lock|candidate_policy.toml)$', '^campaigns/', '^\.forge/local-check\.toml$']
-run = 'python -m pytest src/conductor -q -p no:cacheprovider --timeout 600'
+run = '''
+set -eu
+test_files=$(git ls-files -- ':(glob)src/conductor/**/test_*.py' ':(glob)src/conductor/**/*_test.py' ':(exclude)src/conductor/testdata/**')
+if [ -n "$test_files" ]; then
+  python -m pytest src/conductor -q -p no:cacheprovider --timeout 600
+else
+  echo 'No tracked Python conductor suites remain; Rust contracts run in python-contracts-rust.'
+fi
+'''
 timeout_s = 2400
 
 [[check]]
 name = "python-hooks"
 paths = ['^src/', '^native/(conductor-native|slop-core|forge)/', '^(pyproject.toml|uv.lock)$', '^\.forge/local-check\.toml$']
-run = 'python -m pytest src/tooling/hooks -q -p no:cacheprovider --timeout 120'
+run = '''
+set -eu
+test_files=$(git ls-files -- ':(glob)src/tooling/hooks/**/test_*.py' ':(glob)src/tooling/hooks/**/*_test.py')
+if [ -n "$test_files" ]; then
+  python -m pytest src/tooling/hooks -q -p no:cacheprovider --timeout 120
+else
+  echo 'No tracked Python hook suites remain; Rust contracts run in python-contracts-rust.'
+fi
+'''
 timeout_s = 1200
 
 [[check]]

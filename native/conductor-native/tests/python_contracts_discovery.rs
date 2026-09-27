@@ -11,6 +11,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 const TEST_DIR: &str = "native/conductor-native/tests";
 const REGISTRY_PATH: &str = "native/conductor-native/src/python_contract_targets.tsv";
+const REGISTRY_EXTENSION_PATH: &str =
+    "native/conductor-native/src/python_contract_targets_extra.tsv";
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
 fn repo_root() -> PathBuf {
@@ -44,11 +46,22 @@ impl Fixture {
             include_str!("../src/python_contract_targets.tsv"),
         )
         .unwrap();
+        fs::write(
+            root.join(REGISTRY_EXTENSION_PATH),
+            include_str!("../src/python_contract_targets_extra.tsv"),
+        )
+        .unwrap();
         for target in registered_targets().unwrap() {
             let relative = format!("{TEST_DIR}/{target}.rs");
             fs::copy(repo_root().join(&relative), root.join(relative)).unwrap();
         }
-        for line in include_str!("../src/python_contract_targets.tsv").lines() {
+        for line in format!(
+            "{}\n{}",
+            include_str!("../src/python_contract_targets.tsv"),
+            include_str!("../src/python_contract_targets_extra.tsv")
+        )
+        .lines()
+        {
             let Some((helper, _)) = line.split_once('\t') else {
                 continue;
             };
@@ -57,6 +70,7 @@ impl Fixture {
                 || helper.ends_with(".json")
                 || (helper.starts_with("src/conductor/testdata/")
                     && (helper.ends_with(".patch") || helper.ends_with(".py")))
+                || (helper.starts_with(&format!("{TEST_DIR}/fixtures/")) && helper.ends_with(".py"))
             {
                 fs::create_dir_all(root.join(helper).parent().unwrap()).unwrap();
                 fs::copy(repo_root().join(helper), root.join(helper)).unwrap();
@@ -119,6 +133,79 @@ fn native_fixture_source_selects_contract_and_must_stay_local() {
     fs::remove_file(&file).unwrap();
     fs::write(&file, "include!(\"../outside.rs\");").unwrap();
     assert!(plan(&fixture.root, &[relative]).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn python_fixture_and_toml_provider_select_their_contracts_and_stay_safe() {
+    let root = repo_root();
+    let python_fixture =
+        "native/conductor-native/tests/fixtures/equivalence_probe/replay_subjects.py";
+    let selected = plan(&root, &[python_fixture.to_owned()]).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_equivalence_probe"]);
+    assert_eq!(selected.source_paths, [python_fixture]);
+    let selected = plan(&root, &["src/conductor/embedding_routes.toml".to_owned()]).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_cpu_embed"]);
+    assert!(selected.source_paths.is_empty());
+
+    let fixture = Fixture::new();
+    let file = fixture.root.join(python_fixture);
+    fs::remove_file(&file).unwrap();
+    assert!(plan(&fixture.root, &[python_fixture.to_owned()])
+        .unwrap_err()
+        .to_string()
+        .contains("mapped contract file missing"));
+    std::os::unix::fs::symlink(repo_root().join(python_fixture), &file).unwrap();
+    assert!(plan(&fixture.root, &[python_fixture.to_owned()])
+        .unwrap_err()
+        .to_string()
+        .contains("resolves outside repository"));
+
+    let registry = fixture.root.join(REGISTRY_EXTENSION_PATH);
+    let mut rows = fs::read_to_string(&registry).unwrap();
+    rows.push_str(
+        "native/conductor-native/tests/fixtures/../escape.py\tpython_contracts_equivalence_probe\n",
+    );
+    fs::write(registry, rows).unwrap();
+    assert!(plan(&fixture.root, &[REGISTRY_EXTENSION_PATH.to_owned()])
+        .unwrap_err()
+        .to_string()
+        .contains("invalid contract registry"));
+}
+
+#[test]
+fn rust_fixture_include_selects_the_corpus_and_requires_its_registry_row() {
+    let fixture = Fixture::new();
+    let path = "native/conductor-native/tests/fixtures/workspace_exposure_corpus.rs";
+    let selected = plan(&fixture.root, &[path.to_owned()]).unwrap();
+    assert_eq!(
+        selected.targets,
+        ["python_contracts_workspace_exposure_corpus"]
+    );
+    let file = fixture.root.join(path);
+    fs::remove_file(&file).unwrap();
+    assert!(plan(&fixture.root, &[path.to_owned()])
+        .unwrap_err()
+        .to_string()
+        .contains("mapped contract file missing"));
+    fs::copy(repo_root().join(path), &file).unwrap();
+    let registry = fixture.root.join(REGISTRY_EXTENSION_PATH);
+    let rows = fs::read_to_string(&registry).unwrap();
+    fs::write(
+        &registry,
+        rows.lines()
+            .filter(|line| !line.starts_with(path))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    )
+    .unwrap();
+    assert!(plan(
+        &fixture.root,
+        &["src/conductor/workspace_hygiene.py".to_owned()]
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("contract fixture include missing from registry"));
 }
 
 #[test]
@@ -817,6 +904,22 @@ fn slop_consuming_contract_stages_candidate_extension_before_ambient_sites() {
     let slop = fixture.root.join("native/slop-core/Cargo.toml");
     fs::create_dir_all(slop.parent().unwrap()).unwrap();
     fs::write(&slop, "[package]\nname='slop-core'\n").unwrap();
+    let probe_request = serde_json::json!({
+        "snapshot": fixture.root, "runtime_dir": "/tmp/contract-runtime",
+        "python_executable": "/usr/bin/python3",
+        "python_sites": ["/ambient/site-packages"],
+        "targets": ["python_contracts_equivalence_probe"],
+    });
+    let probe_plan =
+        conductor_native::candidate_verification::decide("contract_runtime_plan", &probe_request)
+            .unwrap();
+    assert!(probe_plan["build_commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|build| {
+            build["destination"] == "/tmp/contract-runtime/contract-extension/slop_core.so"
+        }));
     let plan = runtime().unwrap();
     let builds = plan["build_commands"].as_array().unwrap();
     assert_eq!(builds.len(), 3);
@@ -846,6 +949,12 @@ fn slop_consuming_contract_stages_candidate_extension_before_ambient_sites() {
     fs::remove_file(&slop).unwrap();
     std::os::unix::fs::symlink(repo_root().join("native/slop-core/Cargo.toml"), &slop).unwrap();
     assert!(runtime().unwrap_err().contains("not regular"));
+    assert!(conductor_native::candidate_verification::decide(
+        "contract_runtime_plan",
+        &probe_request,
+    )
+    .unwrap_err()
+    .contains("not regular"));
 }
 
 #[cfg(unix)]
@@ -906,6 +1015,26 @@ fn registry_only_change_selects_every_registered_target() {
     assert_eq!(selected.commands.len(), 1);
     assert_eq!(selected.commands[0].targets, selected.targets);
     assert_eq!(selected.commands[0].test_paths, selected.test_paths);
+}
+
+#[test]
+fn declared_registry_extension_is_required_and_rejects_cross_shard_duplicates() {
+    let fixture = Fixture::new();
+    let extension = fixture.root.join(REGISTRY_EXTENSION_PATH);
+    let original = fs::read_to_string(&extension).unwrap();
+    fs::remove_file(&extension).unwrap();
+    let error = plan(&fixture.root, &[REGISTRY_EXTENSION_PATH.to_owned()])
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("mapped contract file missing"), "{error}");
+    let main = fs::read_to_string(fixture.root.join(REGISTRY_PATH)).unwrap();
+    let duplicate = main.lines().find(|line| line.contains('\t')).unwrap();
+    fs::write(&extension, format!("{original}{duplicate}\n")).unwrap();
+    let error = format!(
+        "{:#}",
+        plan(&fixture.root, &[REGISTRY_EXTENSION_PATH.to_owned()]).unwrap_err()
+    );
+    assert!(error.contains("duplicate contract mapping"), "{error}");
 }
 
 #[test]

@@ -13,7 +13,11 @@ use syn::visit::Visit;
 const MANIFEST: &str = "native/conductor-native/Cargo.toml";
 const TEST_DIR: &str = "native/conductor-native/tests";
 const REGISTRY_PATH: &str = "native/conductor-native/src/python_contract_targets.tsv";
+const REGISTRY_EXTENSION_PATH: &str =
+    "native/conductor-native/src/python_contract_targets_extra.tsv";
+const REGISTRY_EXTENSION_DIRECTIVE: &str = "# include: python_contract_targets_extra.tsv";
 const COMPILED_REGISTRY: &str = include_str!("python_contract_targets.tsv");
+const COMPILED_REGISTRY_EXTENSION: &str = include_str!("python_contract_targets_extra.tsv");
 
 fn native_source(path: &str) -> bool {
     ["native/conductor-native/src/", "native/slop-core/src/"]
@@ -40,7 +44,9 @@ fn patch_fixture_source(path: &str) -> bool {
 }
 
 fn python_fixture_source(path: &str) -> bool {
-    path.starts_with("src/conductor/testdata/") && path.ends_with(".py")
+    (path.starts_with("src/conductor/testdata/")
+        || path.starts_with(&format!("{TEST_DIR}/fixtures/")))
+        && path.ends_with(".py")
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -77,7 +83,7 @@ fn parse_registry(contents: &str) -> Result<Registry> {
             .with_context(|| format!("contract registry line {} has no tab", index + 1))?;
         let source_file = (source.starts_with("src/")
             && !python_fixture_source(source)
-            && [".py", ".json", ".sh"]
+            && [".py", ".json", ".sh", ".toml"]
                 .iter()
                 .any(|suffix| source.ends_with(suffix)))
             || source == ".claude/hooks/dispatch.py";
@@ -130,7 +136,9 @@ fn parse_registry(contents: &str) -> Result<Registry> {
 }
 
 fn registry() -> Result<Registry> {
-    parse_registry(COMPILED_REGISTRY)
+    parse_registry(&format!(
+        "{COMPILED_REGISTRY}\n{COMPILED_REGISTRY_EXTENSION}"
+    ))
 }
 
 fn registry_at(root: &Path, changed_paths: &[String]) -> Result<Registry> {
@@ -140,6 +148,23 @@ fn registry_at(root: &Path, changed_paths: &[String]) -> Result<Registry> {
             require_regular_file(root, REGISTRY_PATH)?;
             let contents = fs::read_to_string(&file)
                 .with_context(|| format!("cannot read contract registry: {}", file.display()))?;
+            let contents = if contents
+                .lines()
+                .any(|line| line == REGISTRY_EXTENSION_DIRECTIVE)
+            {
+                require_regular_file(root, REGISTRY_EXTENSION_PATH)?;
+                let extension = fs::read_to_string(root.join(REGISTRY_EXTENSION_PATH))
+                    .context("cannot read contract registry extension")?;
+                format!("{contents}\n{extension}")
+            } else {
+                if changed_paths
+                    .iter()
+                    .any(|path| path == REGISTRY_EXTENSION_PATH)
+                {
+                    bail!("contract registry extension is not declared: {REGISTRY_EXTENSION_PATH}");
+                }
+                contents
+            };
             parse_registry(&contents)
                 .with_context(|| format!("invalid contract registry: {}", file.display()))
         }
@@ -153,6 +178,7 @@ fn registry_at(root: &Path, changed_paths: &[String]) -> Result<Registry> {
             if crate_present
                 || changed_paths.iter().any(|path| {
                     path == REGISTRY_PATH
+                        || path == REGISTRY_EXTENSION_PATH
                         || known.by_source.contains_key(path)
                         || path.starts_with(&format!("{TEST_DIR}/python_contracts_"))
                         || path.starts_with(&format!("{TEST_DIR}/python_contracts/"))
@@ -263,25 +289,33 @@ fn source_module_paths(root: &Path, relative: &str) -> Result<Vec<String>> {
     Ok(includes.paths)
 }
 
-fn target_helpers(root: &Path, target: &str) -> Result<BTreeSet<String>> {
-    let mut helpers = BTreeSet::new();
+fn target_modules(root: &Path, target: &str) -> Result<BTreeSet<String>> {
+    let mut modules = BTreeSet::new();
     for helper in source_module_paths(root, &format!("{TEST_DIR}/{target}.rs"))? {
-        if !helper.starts_with("python_contracts/")
+        let local_helper = helper.starts_with("python_contracts/")
+            && !helper.trim_start_matches("python_contracts/").contains('/');
+        let fixture = helper.starts_with("fixtures/")
+            && !helper.trim_start_matches("fixtures/").contains('/');
+        if !(local_helper || fixture)
             || !helper.ends_with(".rs")
             || helper.contains("..")
             || helper.contains('\\')
             || helper.chars().any(char::is_control)
-            || helper.trim_start_matches("python_contracts/").contains('/')
         {
             bail!("unsupported contract helper path: {helper}");
         }
-        helpers.insert(format!("{TEST_DIR}/{helper}"));
+        modules.insert(format!("{TEST_DIR}/{helper}"));
     }
-    Ok(helpers)
+    Ok(modules)
 }
 
 fn validate_selected_helpers(root: &Path, target: &str, entries: &Registry) -> Result<()> {
-    let included = target_helpers(root, target)?;
+    let included = target_modules(root, target)?;
+    let included_helpers = included
+        .iter()
+        .filter(|path| !fixture_source(path))
+        .cloned()
+        .collect::<BTreeSet<_>>();
     let registered = entries
         .by_source
         .iter()
@@ -290,8 +324,17 @@ fn validate_selected_helpers(root: &Path, target: &str, entries: &Registry) -> R
         })
         .map(|(path, _)| path.clone())
         .collect::<BTreeSet<_>>();
-    if included != registered {
+    if included_helpers != registered {
         bail!("contract helper registry differs from target include directives: {target}");
+    }
+    for fixture in included.iter().filter(|path| fixture_source(path)) {
+        if !entries
+            .by_source
+            .get(fixture)
+            .is_some_and(|targets| targets.contains(target))
+        {
+            bail!("contract fixture include missing from registry: {fixture}");
+        }
     }
     for helper in registered {
         if !source_module_paths(root, &helper)?.is_empty() {
@@ -438,7 +481,7 @@ pub fn plan(root: &Path, changed_paths: &[String]) -> Result<ContractPlan> {
     let mut targets = BTreeSet::new();
     let mut source_paths = BTreeSet::new();
     for relative in &changed_paths {
-        if relative == REGISTRY_PATH {
+        if relative == REGISTRY_PATH || relative == REGISTRY_EXTENSION_PATH {
             targets.extend(entries.targets.iter().cloned());
             continue;
         }
@@ -457,7 +500,10 @@ pub fn plan(root: &Path, changed_paths: &[String]) -> Result<ContractPlan> {
             validate_selected_helpers(&root, target, &entries)?;
         }
     }
-    if changed_paths.iter().any(|path| path == REGISTRY_PATH) {
+    if changed_paths
+        .iter()
+        .any(|path| path == REGISTRY_PATH || path == REGISTRY_EXTENSION_PATH)
+    {
         validate_target_inventory(&root, &entries)?;
     }
     let test_paths = targets

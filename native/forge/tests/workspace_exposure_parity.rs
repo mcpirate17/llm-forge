@@ -12,24 +12,23 @@
 //! repository states from the same recipes, and compares Rust's own
 //! computation against it directly.
 //!
-//! `src/tooling/hooks/claude/test_workspace_exposure_parity_corpus.py` is the
-//! Python-side twin: it loads the SAME two fixtures, independently rebuilds
-//! the states via its own builder, and asserts Python still matches the same
-//! frozen lines. Together the two tests pin both implementations to one
-//! shared ground truth instead of comparing them to each other at test time,
-//! following the same shape as `tool_quiet_parity.rs`/its Python twin.
+//! `python_contracts_workspace_exposure_corpus.rs` checks the shipped Python
+//! implementation against the same expected lines. Both Rust tests rebuild
+//! the recipes with one shared fixture. The original Python test remains
+//! active until the test-selection policy retires it.
 //!
 //! This crate has no lib target: `workspace_hygiene.rs` is pulled in via
 //! `#[path]`, the same way every other parity test in this crate includes its
 //! module under test.
 
+#[path = "../../conductor-native/tests/fixtures/workspace_exposure_corpus.rs"]
+mod corpus_fixture;
 #[path = "../src/workspace_hygiene.rs"]
 mod workspace_hygiene;
 
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 
@@ -65,169 +64,6 @@ impl Drop for ScratchDir {
     }
 }
 
-fn git(cwd: &Path, args: &[&str]) {
-    let done = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .unwrap();
-    assert!(
-        done.status.success(),
-        "git {} in {cwd:?}: {}",
-        args.join(" "),
-        String::from_utf8_lossy(&done.stderr)
-    );
-}
-
-fn write(path: &Path, text: &str) {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).unwrap();
-    }
-    std::fs::write(path, text).unwrap();
-}
-
-/// Pin a file's mtime exactly as the Python twin does: a fixed epoch via
-/// `touch -d`, "now" left alone (the file was just written).
-fn apply_mtime(repo: &Path, relative: &str, mtime: &Value) {
-    if mtime.as_str() == Some("now") {
-        return;
-    }
-    let epoch = mtime
-        .as_i64()
-        .unwrap_or_else(|| panic!("mtime must be an epoch or \"now\", got {mtime:?}"));
-    let done = Command::new("touch")
-        .args(["-d", &format!("@{epoch}"), relative])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    assert!(
-        done.status.success(),
-        "touch -d @{epoch} {relative}: {}",
-        String::from_utf8_lossy(&done.stderr)
-    );
-}
-
-/// Rebuild one corpus case's repository state from its recipe -- the same
-/// semantics as the Python twin's `build_case`, implemented independently so
-/// agreement is evidence about the implementations, not the builders.
-fn build_case(scratch: &Path, case: &Value) -> PathBuf {
-    let branch = case["branch"].as_str().unwrap();
-    let id = case["id"].as_str().unwrap();
-    let repo = scratch.join(format!("{id}-repo"));
-    if case["origin"].as_bool().unwrap() {
-        git(
-            scratch,
-            &[
-                "init",
-                "--quiet",
-                "--bare",
-                "-b",
-                branch,
-                &scratch
-                    .join(format!("{id}-origin.git"))
-                    .display()
-                    .to_string(),
-            ],
-        );
-    }
-    git(
-        scratch,
-        &["init", "--quiet", "-b", branch, &repo.display().to_string()],
-    );
-    git(&repo, &["config", "user.email", "parity@example.invalid"]);
-    git(&repo, &["config", "user.name", "parity"]);
-    write(&repo.join("seed.txt"), "seed\n");
-    if let Some(integration) = case["integration"].as_str() {
-        write(
-            &repo.join("pyproject.toml"),
-            &format!("[tool.conductor]\nintegration_branch = \"{integration}\"\n"),
-        );
-        git(&repo, &["add", "pyproject.toml"]);
-    }
-    git(&repo, &["add", "seed.txt"]);
-    git(&repo, &["commit", "--quiet", "-m", "seed"]);
-    if case["origin"].as_bool().unwrap() {
-        git(
-            &repo,
-            &[
-                "remote",
-                "add",
-                "origin",
-                &scratch
-                    .join(format!("{id}-origin.git"))
-                    .display()
-                    .to_string(),
-            ],
-        );
-        git(&repo, &["push", "--quiet", "origin", branch]);
-    }
-    if let Some(head) = case["origin_head"].as_str() {
-        git(
-            &repo,
-            &[
-                "symbolic-ref",
-                "refs/remotes/origin/HEAD",
-                &format!("refs/remotes/origin/{head}"),
-            ],
-        );
-    }
-    for commit_name in case["commits"].as_array().unwrap() {
-        let name = commit_name.as_str().unwrap();
-        write(&repo.join(name), &format!("{name}\n"));
-        git(&repo, &["add", name]);
-        git(&repo, &["commit", "--quiet", "-m", name]);
-    }
-    for entry in case["files"].as_array().unwrap() {
-        let relative = entry["path"].as_str().unwrap();
-        let target = repo.join(relative);
-        if entry["kind"].as_str() == Some("modify_tracked") {
-            write(&target, "modified\n");
-        } else {
-            write(&target, "untracked\n");
-        }
-        apply_mtime(&repo, relative, &entry["mtime"]);
-    }
-    for (index, worktree) in case["worktrees"].as_array().unwrap().iter().enumerate() {
-        let wt_branch = worktree["branch"].as_str().unwrap();
-        let wt_path = scratch.join(format!("{id}-wt{index}"));
-        // "pushed" registers the worktree at the line that was already pushed
-        // (a merged feature tree while main moved on); the default is HEAD.
-        let start = if worktree["at"].as_str() == Some("pushed") {
-            format!("origin/{branch}")
-        } else {
-            "HEAD".to_string()
-        };
-        git(
-            &repo,
-            &[
-                "worktree",
-                "add",
-                "--quiet",
-                "-b",
-                wt_branch,
-                &wt_path.display().to_string(),
-                &start,
-            ],
-        );
-        if let Some(commit_name) = worktree["commit"].as_str() {
-            write(&wt_path.join(commit_name), &format!("{commit_name}\n"));
-            git(&wt_path, &["add", commit_name]);
-            git(&wt_path, &["commit", "--quiet", "-m", commit_name]);
-        }
-        if worktree["pruned_upstream"].as_bool().unwrap() {
-            git(&wt_path, &["push", "--quiet", "-u", "origin", wt_branch]);
-            git(
-                &wt_path,
-                &["push", "--quiet", "origin", "--delete", wt_branch],
-            );
-        }
-        if worktree["dirty"].as_bool().unwrap() {
-            write(&wt_path.join("leftover.txt"), "leftover\n");
-        }
-    }
-    repo
-}
-
 #[test]
 fn workspace_exposure_native_line_matches_the_frozen_corpus() {
     let _guard = ENV_LOCK
@@ -256,7 +92,7 @@ fn workspace_exposure_native_line_matches_the_frozen_corpus() {
     for case in &corpus {
         let id = case["id"].as_str().unwrap();
         let scratch = ScratchDir::new(id);
-        let repo = build_case(scratch.path(), case);
+        let repo = corpus_fixture::build_case(scratch.path(), case);
         let actual = workspace_hygiene::exposure_line(&repo);
         let expected_line = expected
             .get(id)
