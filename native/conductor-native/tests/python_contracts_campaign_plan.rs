@@ -130,6 +130,10 @@ fn public_plan_matches_all_fifteen_frozen_python_cases() {
             let root = case.root().join(&name);
             copy_tree(&fixture.join("tree"), &root);
             let request: Value = serde_json::from_slice(&fs::read(request_path).unwrap()).unwrap();
+            assert_eq!(
+                request["campaigns_root"], "conductor/mutation_campaigns",
+                "{name}: frozen fixture assumes the default campaigns root"
+            );
             let actual = plan(py, &campaign, &root, &request);
             let error_path = fixture.join("expected_error.txt");
             if error_path.is_file() {
