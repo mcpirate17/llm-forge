@@ -24,6 +24,8 @@ mod land_exec;
 mod ledger;
 mod legacy_hook_api;
 mod local_ai_policy;
+mod local_check;
+mod local_check_receipt;
 mod mailbox;
 mod merge;
 mod mutation_plan;
@@ -90,6 +92,10 @@ enum Command {
     /// rebase, run the host's `.forge/land.toml` checks bounded, fast-forward
     /// push, delete the branch. No CI service involved.
     Land(land::LandArgs),
+    /// Run repository checks against the clean, committed current checkout.
+    Check(local_check::CheckArgs),
+    /// Validate a local check receipt against the current checkout and policy.
+    Verify(local_check::VerifyArgs),
     /// Run a hook event with native handlers and delegate remaining hooks to the
     /// configured host dispatcher.
     Hook {
@@ -256,6 +262,8 @@ fn main() -> ExitCode {
         }
         Command::Task(args) => command_exit("task", tasks::run(args), 1),
         Command::Land(args) => command_exit("land", land::run(args), 2),
+        Command::Check(args) => command_exit("check", local_check::run(args), 2),
+        Command::Verify(args) => command_exit("verify", local_check::verify(args), 2),
         Command::Status(args) => command_exit("status", status::run(args), 1),
         Command::Mailbox(args) => command_exit("mailbox", mailbox::run(args), 2),
         Command::Graph(args) => command_exit("graph", graph_context::run(args), 2),

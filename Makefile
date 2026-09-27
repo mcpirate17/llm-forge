@@ -26,6 +26,7 @@ PYTEST_ARGS ?=
 GATE_REF ?= HEAD
 GATE_BASE ?= origin/main
 GATE_PROFILE ?= full
+LOCAL_CHECK_ARGS ?= --all
 
 REVIEW_PROFILE ?= full
 REVIEW_ARGS ?=
@@ -52,7 +53,7 @@ BASELINE_EXPIRES ?= $(shell $(UV) run python -c \
   'import tomllib; from conductor.project_paths import project_paths; \
    print(tomllib.loads(project_paths(".").policy_path.read_text(encoding="utf-8"))["baseline_expires"])')
 
-.PHONY: install test native gate candidate-review \
+.PHONY: install test native gate candidate-review local-check local-verify \
 	mutation-plan mutation-generate mutation-engine-run mutation-evidence \
 	mutation-canary mutation-coverage baselines baseline-jscpd baseline-pmd \
 	baseline-complexity baseline-vulture help
@@ -116,6 +117,12 @@ test:  ## Run the conductor test suite
 
 native:  ## Force-rebuild all three native runtimes, then precompile test targets
 	$(MAKE) install INSTALL_REINSTALL='--reinstall-package forge-cli --reinstall-package conductor-native --reinstall-package slop-core'
+
+local-check:  ## Check the committed checkout before opening or merging a PR (full by default)
+	CARGO_BUILD_JOBS=2 cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- check $(LOCAL_CHECK_ARGS)
+
+local-verify:  ## Revalidate the latest source-bound full local-check receipt
+	CARGO_BUILD_JOBS=2 cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- verify --require-all
 
 gate:  ## The governance gate: config self-check plus the CI-identical review
 	$(UV) run python -m conductor.gate \

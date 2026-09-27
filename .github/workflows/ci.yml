@@ -1,9 +1,9 @@
 name: ci
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  # Full clean-host fallback on request. Routine PR validation runs locally
+  # through `make local-check` and `make local-verify` on the committed tree.
+  workflow_dispatch:
 
 jobs:
   python:
@@ -12,8 +12,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           # Full history, not the default shallow depth-1 clone: the
-          # baselines step below needs a real merge base with the PR's base
-          # branch to compute the changed-file diff, and a depth-1 checkout
+          # baselines step below needs a real merge base with main to compute
+          # the changed-file diff, and a depth-1 checkout
           # has no ancestry to compute one from (`git diff base...HEAD` then
           # fails with "no merge base", exit 128).
           fetch-depth: 0
@@ -113,15 +113,13 @@ jobs:
           export PATH="/tmp/pmd-dist/pmd-bin-7.27.0/bin:$PATH"
           jscpd --version
           pmd --version
-          # base candidate order: PR base sha, then the pre-push sha (push
-          # events), then HEAD~1 as a last resort for a push with no `before`
-          # (e.g. a repo's very first push on a ref). fetch-depth: 0 above
-          # means the base's ancestry is already in the local object store,
-          # so no extra fetch is needed -- and none is attempted, so a
-          # missing object fails loud here instead of a swallowed `|| true`
-          # silently diffing against stale or wrong data.
-          base="${{ github.event.pull_request.base.sha || github.event.before }}"
-          base="${base:-HEAD~1}"
+          # Manual branch runs compare against main; a manual main run checks
+          # its latest commit. Full history above supplies the merge base.
+          if [ "${{ github.ref_name }}" = main ]; then
+            base=HEAD~1
+          else
+            base=origin/main
+          fi
           if ! merge_base="$(git merge-base "$base" HEAD)"; then
             echo "::error::no merge base between '$base' and HEAD -- checkout fetch-depth is probably too shallow again" >&2
             exit 1

@@ -1,0 +1,187 @@
+# Current-checkout, source-bound gate for Forge PRs. The target branch's copy
+# governs after this file lands on main; receipts live in .git/forge-checks.
+base_ref = "origin/main"
+path_prepend = [".venv/bin"]
+# Only unrelated research drafts may remain untracked during a check.
+allowed_untracked_prefixes = ["research/"]
+
+[env]
+CUDA_VISIBLE_DEVICES = ""
+CARGO_BUILD_JOBS = "2"
+UV_CONCURRENT_BUILDS = "1"
+OMP_NUM_THREADS = "1"
+OPENBLAS_NUM_THREADS = "1"
+RUSTUP_TOOLCHAIN = "1.98.0"
+
+[[setup]]
+name = "resource-preflight"
+run = '''
+set -eu
+test "$(nproc)" -ge 2 || { echo 'forge check needs at least 2 available CPUs' >&2; exit 2; }
+if [ -r /sys/fs/cgroup/cpu.max ]; then
+  read -r quota period < /sys/fs/cgroup/cpu.max
+  if [ "$quota" != max ] && [ "$((quota / period))" -lt 2 ]; then
+    echo 'forge check needs a 2-CPU cgroup quota' >&2; exit 2
+  fi
+fi
+awk '/^MemAvailable:/ { if ($2 < 8388608) { print "forge check needs 8 GiB available RAM" > "/dev/stderr"; exit 2 } found=1 } END { if (!found) exit 2 }' /proc/meminfo
+if [ -r /sys/fs/cgroup/memory.max ] && [ -r /sys/fs/cgroup/memory.current ]; then
+  memory_max=$(cat /sys/fs/cgroup/memory.max)
+  if [ "$memory_max" != max ]; then
+    memory_current=$(cat /sys/fs/cgroup/memory.current)
+    test "$((memory_max - memory_current))" -ge 8589934592 || { echo 'forge check needs 8 GiB cgroup RAM headroom' >&2; exit 2; }
+  fi
+fi
+df -Pk . | awk 'NR==2 { if ($4 < 10485760) { print "forge check needs 10 GiB free disk" > "/dev/stderr"; exit 2 } found=1 } END { if (!found) exit 2 }'
+test "$CUDA_VISIBLE_DEVICES" = ""
+if command -v nvidia-smi >/dev/null 2>&1; then
+  nvidia-smi --query-gpu=memory.free,memory.total --format=csv,noheader,nounits || echo 'GPU telemetry unavailable; checks remain CPU-only'
+else
+  echo 'no NVIDIA telemetry; checks remain CPU-only'
+fi
+'''
+timeout_s = 30
+
+[[setup]]
+name = "install"
+paths = ['^src/', '^native/', '^campaigns/', '^(pyproject.toml|uv.lock|candidate_policy.toml)$', '^\.forge/', '^\.github/workflows/', '^(Makefile|conductor.mk|AGENTS.md)$']
+run = '''
+set -eu
+if ! pkg-config --exists sqlite3 && [ -z "${SQLITE3_LIB_DIR:-}" ]; then
+  echo 'SQLite development library unavailable: install libsqlite3-dev or set SQLITE3_LIB_DIR' >&2
+  exit 2
+fi
+set --
+if [ "$FORGE_CHECK_ALL" = 1 ] || grep -Eq '^native/(conductor-native|slop-core)/|^(pyproject.toml|uv.lock)$' "$FORGE_CHECK_CHANGED"; then
+  set -- "$@" --reinstall-package conductor-native --reinstall-package slop-core
+fi
+if [ "$FORGE_CHECK_ALL" = 1 ] || grep -Eq '^native/forge/|^(pyproject.toml|uv.lock)$' "$FORGE_CHECK_CHANGED"; then
+  set -- "$@" --reinstall-package forge-cli
+fi
+make install INSTALL_REINSTALL="$*"
+'''
+timeout_s = 1800
+
+[[setup]]
+name = "python-compileall"
+paths = ['^src/', '^(pyproject.toml|uv.lock)$', '^\.forge/local-check\.toml$']
+run = '''
+python -m compileall -q src/conductor src/tooling
+'''
+timeout_s = 300
+
+[[setup]]
+name = "baseline-tools"
+paths = ['^src/', '^native/(conductor-native|slop-core)/', '^(pyproject.toml|uv.lock|candidate_policy.toml)$', '^\.forge/local-check\.toml$', '^\.github/workflows/ci\.yml$']
+run = '''
+set -eu
+mkdir -p "$FORGE_CHECK_TOOLS"
+if [ ! -x "$FORGE_CHECK_TOOLS/node_modules/.bin/jscpd" ]; then
+  npm install --prefix "$FORGE_CHECK_TOOLS" --no-save --ignore-scripts --no-audit --no-fund jscpd@4.2.1
+fi
+if [ ! -x "$FORGE_CHECK_TOOLS/pmd-bin-7.27.0/bin/pmd" ]; then
+  curl -fsSL -o "$FORGE_CHECK_TOOLS/pmd.zip" https://github.com/pmd/pmd/releases/download/pmd_releases/7.27.0/pmd-dist-7.27.0-bin.zip
+  unzip -q "$FORGE_CHECK_TOOLS/pmd.zip" -d "$FORGE_CHECK_TOOLS"
+  rm "$FORGE_CHECK_TOOLS/pmd.zip"
+fi
+jscpd --version | grep -Fx '4.2.1'
+pmd --version | grep -F '7.27.0'
+'''
+timeout_s = 900
+
+[[check]]
+name = "git-diff-check"
+run = 'git diff --check "$FORGE_CHECK_BASE" HEAD'
+timeout_s = 30
+
+[[check]]
+name = "installed-runtime"
+paths = ['^native/', '^src/', '^(pyproject.toml|uv.lock)$', '^Makefile$', '^\.forge/local-check\.toml$']
+run = '''
+FORGE_INSTALL_SMOKE_VENV="$PWD/.venv" PYO3_NO_PYTHON=1 FORGE_BIN="$PWD/.venv/bin/forge" \
+  cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml \
+  --test install_packaging -- --ignored --test-threads=1
+'''
+timeout_s = 900
+
+[[check]]
+name = "python-conductor"
+paths = ['^src/', '^native/(conductor-native|slop-core)/', '^(pyproject.toml|uv.lock|candidate_policy.toml)$', '^campaigns/', '^\.forge/local-check\.toml$']
+run = 'python -m pytest src/conductor -q -p no:cacheprovider --timeout 600'
+timeout_s = 2400
+
+[[check]]
+name = "python-hooks"
+paths = ['^src/', '^native/(conductor-native|slop-core|forge)/', '^(pyproject.toml|uv.lock)$', '^\.forge/local-check\.toml$']
+run = 'python -m pytest src/tooling/hooks -q -p no:cacheprovider --timeout 120'
+timeout_s = 1200
+
+[[check]]
+name = "python-contracts-rust"
+paths = ['^src/', '^native/(conductor-native|slop-core)/', '^(pyproject.toml|uv.lock)$', '^\.forge/local-check\.toml$']
+run = '''
+set -eu
+export PYO3_PYTHON="$PWD/.venv/bin/python"
+export PYTHONPATH="$PWD/src:$($PYO3_PYTHON -c 'import site; print(site.getsitepackages()[0])')"
+export LD_LIBRARY_PATH="$($PYO3_PYTHON -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
+cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml \
+  --features python-compat-tests --test 'python_contracts_*' -- --test-threads=1
+'''
+timeout_s = 2400
+
+[[check]]
+name = "candidate-baselines"
+paths = ['^src/', '^native/(conductor-native|slop-core)/', '^(pyproject.toml|uv.lock|candidate_policy.toml)$', '^\.forge/local-check\.toml$']
+run = '''
+set -eu
+jscpd --version | grep -Fx '4.2.1'
+pmd --version | grep -F '7.27.0'
+python -m conductor.run_duplicate_audit --tool jscpd --check --changed-files-from "$FORGE_CHECK_CHANGED_PY"
+python -m conductor.run_duplicate_audit --tool pmd-python --check --changed-files-from "$FORGE_CHECK_CHANGED_PY"
+python -m conductor.radon_complexity check --baseline src/conductor/radon_complexity_baseline.json --path src
+python -m conductor.candidate_review.vulture_audit --baseline src/conductor/vulture_baseline.json \
+  --changed-files-from "$FORGE_CHECK_CHANGED_PY" src
+'''
+timeout_s = 1200
+
+[[check]]
+name = "mutation-tooling"
+paths = ['^src/', '^campaigns/', '^native/(conductor-native|slop-core)/', '^(pyproject.toml|uv.lock)$', '^\.forge/local-check\.toml$']
+run = '''
+python -m conductor.mutation_coverage canary && make mutation-retention
+'''
+timeout_s = 600
+
+[[check]]
+name = "rust-forge"
+paths = ['^native/forge/', '^native/conductor-native/', '^src/tooling/', '^\.forge/local-check\.toml$', '^Makefile$', '^docs/routing\.md$', '^ledger/']
+run = '''
+set -eu
+cargo +1.98.0 fmt --manifest-path native/forge/Cargo.toml --check
+PYO3_NO_PYTHON=1 cargo +1.98.0 clippy --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml --all-targets -- -D warnings
+PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml
+'''
+timeout_s = 1800
+
+[[check]]
+name = "rust-conductor-native"
+paths = ['^native/conductor-native/', '^src/conductor/', '^\.forge/local-check\.toml$']
+run = '''
+set -eu
+cargo +1.98.0 fmt --manifest-path native/conductor-native/Cargo.toml --check
+PYO3_PYTHON="$PWD/.venv/bin/python" cargo +1.98.0 clippy --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --all-targets -- -D warnings
+PYO3_PYTHON="$PWD/.venv/bin/python" cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml
+PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --no-default-features --features source-analysis -- --test-threads=1
+'''
+timeout_s = 1800
+
+[[check]]
+name = "rust-slop-core"
+paths = ['^native/slop-core/', '^\.forge/local-check\.toml$']
+run = '''
+set -eu
+cargo +1.98.0 fmt --manifest-path native/slop-core/Cargo.toml --check
+cargo +1.98.0 clippy --offline --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml --all-targets -- -D warnings
+cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml
+'''
+timeout_s = 1800
