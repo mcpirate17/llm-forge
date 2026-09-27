@@ -1,6 +1,7 @@
 //! Compatibility API for installed Python hook bodies. The computation lives
 //! in the same native modules used by `forge hook`; Python only forwards JSON.
 
+use std::collections::HashMap;
 use std::io::{self, Read};
 use std::path::Path;
 
@@ -151,6 +152,18 @@ pub fn evaluate(operation: &str, request: &Value) -> Result<Value> {
         "gate-start" => {
             crg_gate::start(value(request, "payload")?)?;
             Ok(Value::Null)
+        }
+        "gate-verify-bash" => {
+            let repo_root = Path::new(field(request, "repo_root")?);
+            let common_dir = crg_gate::checkout_of(repo_root).map(|(_root, common)| common);
+            let env: HashMap<String, String> = std::env::vars().collect();
+            Ok(crg_gate::verify_bash(
+                value(request, "payload")?,
+                field(request, "owner")?,
+                repo_root,
+                common_dir.as_deref(),
+                &env,
+            ))
         }
         other => bail!("unknown legacy hook operation {other:?}"),
     }
