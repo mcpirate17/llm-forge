@@ -366,7 +366,7 @@ the archive stream hash, raw Tokei JSON, inline AST ranges and counts, splitter
 source and lockfile, tool hashes, and reproduction script. Evidence SHA-256:
 `15c360f18b83de0bddf95885eb0153ca6a3bc6f1b668b7f7817ea038273ac8ed`.
 
-## Latest verified commit
+## Previous verified commit
 
 Commit `18e296e81793d12ca1041a7cc8bf3d47ec719c84`, measured from a `git archive`
 with the same classification and inline-test treatment. The archive stream
@@ -400,6 +400,44 @@ blobs, the archive stream hash, raw Tokei JSON, inline AST ranges and counts,
 splitter source and lockfile, tool hashes, and reproduction script. Evidence
 SHA-256:
 `d2b85d62034586e719cf4110609ee62cfa69534adc78b964a64ca1f11f1172e8`.
+
+## Latest verified commit
+
+Commit `908d572d3e4cbfe646c4e0e888f0a0853b7df751`, measured from a `git archive`
+with the same path classification and inline-test treatment. The archive
+stream SHA-256 is
+`43073b13a3abceb8118f606c254f1a11797f75e1d491976aac04ae981c5de5d2`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,296 | 52,303 | 194 | **50.3916% native** |
+| Tests | 33,391 | 55,171 | 0 | **62.2965% Rust** |
+| All tracked source, including examples | 84,687 | 107,573 | 194 | 55.8954% native |
+
+The manifests contain 372 production files, 296 test files, and 670 source
+files total; the all-source view includes two Rust example files totaling 99
+code lines outside the production and test scopes. The splitter identified
+100 test-only ranges in 85 production Rust files. Those files contain 43,180
+original Rust code lines and 30,121 after masking, so the inline test delta is
+13,059. Production Rust is 65,362 raw lines minus 13,059 = 52,303. Adding the
+same delta to 42,112 separate Rust test lines gives 55,171 Rust test lines.
+
+Since `18e296e`, native hook command-cwd source work added 704 production Rust
+code lines and 386 Rust test code lines on this measure. Python and shell
+counts are unchanged; the native production share increased 0.3387 percentage
+points and the Rust test share increased 0.1651 points. Both independent 50%
+source-SLOC milestones remain achieved. Dirty graph-selection and
+communication test ports in the shared checkout are excluded from this
+committed snapshot. These figures measure source composition, not runtime
+coverage, behavioral coverage, or performance.
+
+The [measurement evidence](native-metrics/908d572-evidence.tar.gz) contains
+source path manifests and hashes independently checked against all 670 Git
+blobs, the archive stream hash, raw Tokei JSON, inline AST ranges and counts,
+splitter source and lockfile, tool hashes, and reproduction script. A separate
+splitter and Tokei run reproduced the ranges and per-file reports. Evidence
+SHA-256:
+`c9cd6468ea318a245eb0f81eb5feecc9c107caade86ff7a15464497520d424c6`.
 
 ## Behavioral migration
 
