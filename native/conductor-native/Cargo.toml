@@ -36,6 +36,13 @@ required-features = ["python-compat-tests"]
 test = false
 bench = false
 
+[[bin]]
+name = "hook_project_seam_child"
+path = "tests/fixtures/hook_project_seam_child.rs"
+required-features = ["python-compat-tests"]
+test = false
+bench = false
+
 [dependencies]
 anyhow = "1"
 base64 = "0.22"

@@ -859,3 +859,11 @@ native/conductor-native/src/forge_binary.rs	python_contracts_project_init_manife
 native/conductor-native/src/lib.rs	python_contracts_project_init_manifest
 src/conductor/project_paths.py	python_contracts_project_init_manifest
 src/tooling/hooks/dispatch/registry.py	python_contracts_project_init_manifest
+src/tooling/hooks/claude/_append_context.py	python_contracts_hook_project_seam
+src/tooling/hooks/claude/_identity.sh	python_contracts_hook_project_seam
+src/tooling/hooks/claude/_prune.sh	python_contracts_hook_project_seam
+src/tooling/hooks/claude/obsidian_sync.py	python_contracts_hook_project_seam
+src/tooling/hooks/claude/session-start.sh	python_contracts_hook_project_seam
+native/conductor-native/tests/python_contracts/hook_project_seam_support.rs	python_contracts_hook_project_seam
+native/conductor-native/tests/python_contracts/support.rs	python_contracts_hook_project_seam
+native/conductor-native/tests/fixtures/hook_project_seam_child.rs	python_contracts_hook_project_seam
