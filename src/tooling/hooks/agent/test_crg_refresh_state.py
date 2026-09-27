@@ -188,7 +188,8 @@ def test_hook_output_queues_only_graph_files(body, monkeypatch):
 # ── doctor ───────────────────────────────────────────────────────────────────
 
 
-def test_status_and_doctor_report_a_stuck_lock(store: Store, held_lock, monkeypatch):
+@pytest.mark.usefixtures("held_lock")
+def test_status_and_doctor_report_a_stuck_lock(store: Store, monkeypatch):
     from tooling.hooks.dispatch import doctor
 
     monkeypatch.setenv("CRG_DATA_DIR", str(store.root))
