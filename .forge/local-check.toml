@@ -18,7 +18,7 @@ RUSTUP_TOOLCHAIN = "1.98.0"
 name = "resource-preflight"
 run = '''
 set -eu
-test "$(nproc)" -ge 2 || { echo 'forge check needs at least 2 available CPUs' >&2; exit 2; }
+test "$(env -u OMP_NUM_THREADS -u OMP_THREAD_LIMIT nproc)" -ge 2 || { echo 'forge check needs at least 2 available CPUs' >&2; exit 2; }
 if [ -r /sys/fs/cgroup/cpu.max ]; then
   read -r quota period < /sys/fs/cgroup/cpu.max
   if [ "$quota" != max ] && [ "$((quota / period))" -lt 2 ]; then
