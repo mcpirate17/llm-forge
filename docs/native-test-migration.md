@@ -1,13 +1,21 @@
 # Native test migration
 
-At pinned commit `bc8fdefa1ed6fcc405d3b90237489a89883317fe`, the separate
-Rust-test source milestone is **69.9620%**: 67,216 Rust test code lines and
-28,859 Python test code lines under the unchanged path and inline-test rules.
-The cohort retired 12 Python test modules and added 134 named Rust-owned
-contract tests across 13 targets; the post-tool and Bash parity tests also
-exercise 44 and 64 fixture rows. This is source composition, not behavioral
-coverage. The [full method and pinned evidence](native-migration.md#latest-verified-commit)
-record the independent production metric and all counted inputs.
+At pinned commit `4da207110e81697b1591a08285285598f7b8991a`, the separate
+Rust-test source milestone is **71.3662%**: 69,657 Rust test code lines and
+27,948 Python test code lines under the unchanged path and inline-test rules.
+This cohort retired four Python test modules and added 60 named Rust-owned
+contracts across five targets, preserving 69 expanded pytest baseline cases.
+Production remains **50.5276% native**. These are source-composition metrics,
+not behavioral coverage. The [full method and pinned evidence](native-migration.md#latest-verified-commit)
+record every counted input.
+
+At the preceding pinned commit `bc8fdefa1ed6fcc405d3b90237489a89883317fe`,
+the separate Rust-test source milestone was **69.9620%**: 67,216 Rust test code
+lines and 28,859 Python test code lines under the same path and inline-test
+rules. That cohort retired 12 Python test modules and added 134 named
+Rust-owned contract tests across 13 targets; the post-tool and Bash parity
+tests also exercise 44 and 64 fixture rows. Its separate production and test
+evidence remains in the [pinned archive](native-metrics/bc8fdef-evidence.tar.gz).
 
 ## Mutation value parsers
 

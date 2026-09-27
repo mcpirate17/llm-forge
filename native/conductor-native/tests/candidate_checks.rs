@@ -158,12 +158,12 @@ fn scans_preserve_rule_order_line_numbers_and_messages() {
 }
 
 #[test]
-fn crg_server_test_sentinel_does_not_match_native_secret_patterns() {
-    let text = include_str!("../../../src/conductor/test_crg_server.py");
+fn crg_server_contract_sentinel_does_not_match_native_secret_patterns() {
+    let text = include_str!("python_contracts_crg_server.rs");
     let scanned = evaluate(
         "secret-scan",
         &json!({
-            "files": [{"path": "src/conductor/test_crg_server.py", "text": text}]
+            "files": [{"path": "native/conductor-native/tests/python_contracts_crg_server.rs", "text": text}]
         }),
     )
     .unwrap();
