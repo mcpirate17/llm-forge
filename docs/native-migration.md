@@ -180,9 +180,10 @@ SHA-256 is
 
 The manifests contain 371 production files, 295 test files, and 668 source
 files total. The splitter identified 100 test-only ranges in 85 production
-Rust files. Those files contain 64,658 original Rust code lines and 51,599
-after masking, so the inline test delta is 13,059. The same delta added to
-28,339 separate Rust test lines gives 41,398 Rust test lines. The 99 example
+Rust files. Those files contain 43,010 original Rust code lines and 29,951
+after masking, so the inline test delta is 13,059. Subtracting that delta from
+all 64,658 raw production Rust lines gives 51,599. Adding it to 28,339 separate
+Rust test lines gives 41,398 Rust test lines. The 99 example
 lines remain in the all-source view and outside both milestone scopes.
 
 Compared with `b2ec44f`, production native share increased 0.0165 percentage
