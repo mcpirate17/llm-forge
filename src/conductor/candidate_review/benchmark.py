@@ -10,10 +10,10 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Sequence
 
 from conductor.candidate_review.model import write_json_atomic
 from conductor.candidate_review.ownership import create_claim
@@ -42,7 +42,6 @@ GOVERNANCE_PATHS = (
     "conductor/guardrail_audit.py",
     "conductor/run_duplicate_audit.py",
     "conductor/test_candidate_review.py",
-    "conductor/test_candidate_review_cli_policy.py",
     "conductor/test_guardrail_audit.py",
     "conductor/test_ref_aware_governance.py",
     "conductor/test_run_duplicate_audit.py",
@@ -61,7 +60,6 @@ BENCHMARK_CLAIM_PATHS = (
     "conductor/guardrail_audit.py",
     "conductor/run_duplicate_audit.py",
     "conductor/test_candidate_review.py",
-    "conductor/test_candidate_review_cli_policy.py",
     "conductor/test_guardrail_audit.py",
     "conductor/test_ref_aware_governance.py",
     "conductor/test_run_duplicate_audit.py",

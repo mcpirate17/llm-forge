@@ -2,10 +2,16 @@
 
 #[path = "mailbox_queue.rs"]
 mod queue;
+#[path = "mailbox_registry.rs"]
+mod registry;
 #[path = "mailbox_retention.rs"]
 mod retention;
+#[path = "mailbox_server.rs"]
+mod server;
 #[path = "mailbox_store.rs"]
 mod store;
+#[path = "mailbox_transport.rs"]
+mod transport;
 #[path = "mailbox_view.rs"]
 mod view;
 
@@ -28,6 +34,18 @@ pub struct MailboxArgs {
 
 #[derive(Subcommand)]
 enum MailboxCommand {
+    /// Initialize one registered local A2A identity.
+    Init(InitArgs),
+    /// Serve one local Agent Card and authenticated SendMessage endpoint.
+    Serve(server::ServeArgs),
+    /// Probe registered identities and update liveness counters.
+    Peers,
+    /// Remove identities after bounded consecutive failed card probes.
+    Reap(ReapArgs),
+    /// Send one outbound message with durable retry and a bounded peer attempt.
+    Send(transport::SendArgs),
+    /// Retry a bounded batch of queued or crash-left pending messages.
+    Flush(transport::FlushArgs),
     /// Queue one outbound message durably for a later transport flush.
     Enqueue(queue::EnqueueArgs),
     /// Read bounded inbox summaries without marking anything read or presented.
@@ -46,6 +64,22 @@ enum MailboxCommand {
 struct IdentityArgs {
     #[arg(long)]
     as_name: String,
+}
+
+#[derive(Args)]
+struct InitArgs {
+    #[arg(long)]
+    name: Option<String>,
+    #[arg(long)]
+    port: Option<u16>,
+    #[arg(long)]
+    renew_generation: bool,
+}
+
+#[derive(Args)]
+struct ReapArgs {
+    #[arg(long, default_value_t = 3)]
+    consecutive_failures: u64,
 }
 
 #[derive(Args)]
@@ -121,6 +155,30 @@ pub fn run(args: MailboxArgs) -> Result<u8> {
     let host = args.host;
     let state_dir = args.state_dir.unwrap_or_else(|| host.join(".agents/a2a"));
     match args.action {
+        MailboxCommand::Init(args) => {
+            let records = registry::init(
+                &state_dir,
+                args.name.as_deref(),
+                args.port,
+                args.renew_generation,
+            )?;
+            print_json(&registry::summary(&state_dir, &records))?;
+        }
+        MailboxCommand::Serve(args) => server::serve(args, state_dir)?,
+        MailboxCommand::Peers => print_json(&serde_json::json!(registry::peers(&state_dir)?))?,
+        MailboxCommand::Reap(args) => {
+            print_json(&registry::reap(&state_dir, args.consecutive_failures)?)?
+        }
+        MailboxCommand::Send(args) => {
+            let (receipt, exit) = transport::send(args, &state_dir)?;
+            print_json(&receipt)?;
+            return Ok(exit);
+        }
+        MailboxCommand::Flush(args) => {
+            let (results, exit) = transport::flush(args, &state_dir)?;
+            print_json(&results)?;
+            return Ok(exit);
+        }
         MailboxCommand::Enqueue(args) => {
             print_json(&queue::run(args, &state_dir)?)?;
         }

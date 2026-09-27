@@ -12,7 +12,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import replace
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -24,20 +24,22 @@ from conductor.candidate_review import sharding as review_sharding
 from conductor.candidate_review import verification as review_verification
 from conductor.candidate_review.checks import (
     ReviewContext,
-    TestSelection as ReviewTestSelection,
     check_candidate_integrity,
     check_config_and_notebooks,
     check_dependency_integrity,
     check_duplicate_function_bodies,
+    check_mutation_evidence,
     check_native_source,
     check_ownership,
     check_performance_evidence,
     check_python_ast,
     check_research_evidence,
-    check_mutation_evidence,
     check_secrets,
     files_for_policy,
     run_builtin,
+)
+from conductor.candidate_review.checks import (
+    TestSelection as ReviewTestSelection,
 )
 from conductor.candidate_review.command_runner import (
     _environment,
@@ -86,14 +88,14 @@ from conductor.candidate_review.ownership import (
 )
 from conductor.candidate_review.policy import (
     MUTATION_WAIVER_BINDING_CLAUSE,
-    CheckPolicy,
     MUTATION_WAIVER_INTEGRATION_BASE,
     MUTATION_WAIVER_SOURCE_ANCHOR,
+    W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
+    CheckPolicy,
     MutationWaiverPolicy,
     Policy,
     PolicyError,
     WaiverSourceBinding,
-    W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
     load_policy,
 )
 from conductor.candidate_review.policy_path import resolve_policy_path
@@ -334,7 +336,7 @@ def test_ownership_claim_is_independent_of_ignored_worktree_ledger(
     policy_path.parent.mkdir(parents=True)
     policy_path.write_text(
         _minimal_policy_text(
-            baseline_expires=(datetime.now(timezone.utc) + timedelta(days=30))
+            baseline_expires=(datetime.now(UTC) + timedelta(days=30))
             .date()
             .isoformat()
         ),
@@ -420,7 +422,7 @@ def test_ci_empty_range_fails_closed_with_clean_index(tmp_path: Path) -> None:
     policy_path = repo / "conductor" / "candidate_policy.toml"
     policy_path.write_text(
         _minimal_policy_text(
-            baseline_expires=(datetime.now(timezone.utc) + timedelta(days=30))
+            baseline_expires=(datetime.now(UTC) + timedelta(days=30))
             .date()
             .isoformat()
         ),
@@ -458,7 +460,7 @@ def test_local_and_ci_policy_findings_are_parity_bound(tmp_path: Path) -> None:
     policy_path = repo / "conductor" / "candidate_policy.toml"
     policy_path.write_text(
         _minimal_policy_text(
-            baseline_expires=(datetime.now(timezone.utc) + timedelta(days=30))
+            baseline_expires=(datetime.now(UTC) + timedelta(days=30))
             .date()
             .isoformat()
         ),
@@ -519,7 +521,7 @@ def test_analyzer_git_mutation_cannot_rebind_shared_worktree(tmp_path: Path) -> 
             candidate=candidate,
             entries=entries,
             policy=load_policy(
-                _write_fixture_policy(repo, datetime.now(timezone.utc).date())
+                _write_fixture_policy(repo, datetime.now(UTC).date())
             ),
             surface="pre-commit",
             profile="fast",
@@ -831,8 +833,10 @@ def test_analyzer_reporting_includes_stdout_alongside_warning_stderr(
             command=(
                 sys.executable,
                 "-c",
-                "import sys; print('FINDINGS LIVE ON STDOUT'); "
-                "sys.stderr.write('UserWarning: stale warning\\n'); sys.exit(3)",
+                (
+                    "import sys; print('FINDINGS LIVE ON STDOUT'); "
+                    "sys.stderr.write('UserWarning: stale warning\\n'); sys.exit(3)"
+                ),
             ),
             version_command=(sys.executable, "--version"),
         )
@@ -847,12 +851,6 @@ def test_analyzer_reporting_includes_stdout_alongside_warning_stderr(
         "UserWarning"
     )
     assert result.exit_code == 3
-
-
-def test_crg_test_sentinel_literal_avoids_secret_scan_trip() -> None:
-    text = Path(__file__).with_name("test_crg_server.py").read_text(encoding="utf-8")
-    for pattern in review_checks.SECRET_PATTERNS.values():
-        assert not pattern.search(text)
 
 
 def test_command_cache_mutex_and_attestation_contracts(tmp_path: Path) -> None:
@@ -923,10 +921,12 @@ def test_command_cache_mutex_and_attestation_contracts(tmp_path: Path) -> None:
     assert (
         loaded and loaded.cache_hit and loaded.findings[0].message == "cache round trip"
     )
-    with governance_lock(repo, exclusive=True):
-        with pytest.raises(TimeoutError, match="mutex remained busy"):
-            with governance_lock(repo, exclusive=True, timeout_seconds=0):
-                pass
+    with (
+        governance_lock(repo, exclusive=True),
+        pytest.raises(TimeoutError, match="mutex remained busy"),
+        governance_lock(repo, exclusive=True, timeout_seconds=0),
+    ):
+        pass
 
     receipt = _receipt()
     receipt.surface = "pre-commit"
@@ -1330,7 +1330,7 @@ def test_rename_retains_old_path_risk_and_policy_classes(tmp_path: Path) -> None
     _git(repo, "mv", "sensitive/mechanism.py", "moved.py")
     candidate = resolve_candidate(repo, kind="index")
     policy_text = _minimal_policy_text(
-        baseline_expires=(datetime.now(timezone.utc) + timedelta(days=30))
+        baseline_expires=(datetime.now(UTC) + timedelta(days=30))
         .date()
         .isoformat()
     ).replace(
@@ -1370,9 +1370,11 @@ def test_materialize_tree_allows_internal_symlink_and_rejects_escape(
     os.symlink("../outside.txt", repo / "escape")
     escape_commit = _commit_all(repo, "escaping link")
     unsafe = resolve_candidate(repo, kind="commit", target_ref=escape_commit)
-    with pytest.raises(GitSourceError, match="symlink escapes candidate snapshot"):
-        with materialize_tree(repo, unsafe.tree_oid):
-            pass
+    with (
+        pytest.raises(GitSourceError, match="symlink escapes candidate snapshot"),
+        materialize_tree(repo, unsafe.tree_oid),
+    ):
+        pass
 
 
 def test_materialize_tree_rejects_blob_before_loading_over_budget(
@@ -1383,9 +1385,11 @@ def test_materialize_tree_rejects_blob_before_loading_over_budget(
     commit = _commit_all(repo, "payload")
     candidate = resolve_candidate(repo, kind="commit", target_ref=commit)
 
-    with pytest.raises(GitSourceError, match="blob exceeds materialization limit"):
-        with materialize_tree(repo, candidate.tree_oid, max_blob_bytes=9):
-            pass
+    with (
+        pytest.raises(GitSourceError, match="blob exceeds materialization limit"),
+        materialize_tree(repo, candidate.tree_oid, max_blob_bytes=9),
+    ):
+        pass
 
 
 def test_gitlink_is_represented_without_materializing_foreign_tree(
@@ -1447,7 +1451,7 @@ def test_malformed_policy_fails_closed(tmp_path: Path) -> None:
 
 
 def test_expired_policy_fails_closed(tmp_path: Path) -> None:
-    yesterday = datetime.now(timezone.utc).date() - timedelta(days=1)
+    yesterday = datetime.now(UTC).date() - timedelta(days=1)
     policy_path = tmp_path / "candidate_policy.toml"
     policy_path.write_text(
         _minimal_policy_text(baseline_expires=yesterday.isoformat()),
@@ -1459,7 +1463,7 @@ def test_expired_policy_fails_closed(tmp_path: Path) -> None:
 
 
 def test_blanket_exception_scope_fails_closed(tmp_path: Path) -> None:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     policy_path = tmp_path / "candidate_policy.toml"
     exception = f"""\
 [[exceptions]]
@@ -1942,7 +1946,7 @@ def _waiver_entry(**overrides: object) -> str:
         "justification": (
             "bounded legacy lane stabilization before w7 linear integration lands"
         ),
-        "expires": (date.today() + timedelta(days=7)).isoformat(),
+        "expires": (datetime.now().astimezone().date() + timedelta(days=7)).isoformat(),
         "milestone": W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
         "integration_base": MUTATION_WAIVER_INTEGRATION_BASE,
         "source_anchor": MUTATION_WAIVER_SOURCE_ANCHOR,
@@ -1967,7 +1971,7 @@ def _waiver_policy(
     tmp_path: Path, tables: list[str], *, today_offset_days: int = 30
 ) -> Policy:
     text = _minimal_policy_text(
-        baseline_expires=(date.today() + timedelta(days=today_offset_days)).isoformat(),
+        baseline_expires=(datetime.now().astimezone().date() + timedelta(days=today_offset_days)).isoformat(),
         mutation_waivers="\n\n".join(tables),
     )
     index = len(list(tmp_path.iterdir()))
@@ -1982,10 +1986,10 @@ def _waiver_entry_cases(anchored_sha: str) -> dict[str, dict[str, object]]:
     return {
         "glob-path": {"path": "*.py"},
         "single-segment-path": {"path": "probe.py"},
-        "expired-date": {"expires": (date.today() - timedelta(days=1)).isoformat()},
+        "expired-date": {"expires": (datetime.now().astimezone().date() - timedelta(days=1)).isoformat()},
         "far-expiry": {
             "expires": (
-                datetime.now(timezone.utc).date() + timedelta(days=91)
+                datetime.now(UTC).date() + timedelta(days=91)
             ).isoformat()
         },
         "wrong-milestone": {"milestone": "other-milestone"},
@@ -2343,7 +2347,7 @@ def _runtime_waiver_context(
         justification=(
             "bounded legacy lane stabilization before w7 linear integration lands"
         ),
-        expires=date.today() + timedelta(days=7),
+        expires=datetime.now().astimezone().date() + timedelta(days=7),
         milestone=W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
         integration_base=MUTATION_WAIVER_INTEGRATION_BASE,
         source_anchor=MUTATION_WAIVER_SOURCE_ANCHOR,
@@ -2491,7 +2495,7 @@ def test_mutation_waiver_source_binding_conditions(
     anchored_bytes = b"def test_bound():\n    assert True\n"
     _empty_payload(monkeypatch, "conductor/test_waived_probe.py")
     good_source = (
-        "# legacy dependency frozen at the integration base\nVALUE = 1\n".encode()
+        b"# legacy dependency frozen at the integration base\nVALUE = 1\n"
     )
     source_binding = WaiverSourceBinding(
         path="research/tools/legacy_dep.py",
@@ -2559,46 +2563,46 @@ def test_inherited_lock_descriptor_validation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo = _init_repo(tmp_path / "repo")
-    lock_path = review_engine._governance_lock_path(repo)  # noqa: SLF001
-    assert review_engine._is_ancestor_process(os.getppid())  # noqa: SLF001
-    assert not review_engine._is_ancestor_process(-1)  # noqa: SLF001
+    lock_path = review_engine._governance_lock_path(repo)
+    assert review_engine._is_ancestor_process(os.getppid())
+    assert not review_engine._is_ancestor_process(-1)
     lock_path.parent.mkdir(parents=True)
     lock_path.touch()
 
     monkeypatch.delenv(review_engine.INHERITED_LOCK_FD_ENV, raising=False)
-    assert review_engine._inherited_lock_fd(lock_path) is None  # noqa: SLF001
+    assert review_engine._inherited_lock_fd(lock_path) is None
     monkeypatch.setenv(review_engine.INHERITED_LOCK_FD_ENV, "not-an-integer")
-    assert review_engine._inherited_lock_fd(lock_path) is None  # noqa: SLF001
+    assert review_engine._inherited_lock_fd(lock_path) is None
     monkeypatch.setenv(review_engine.INHERITED_LOCK_FD_ENV, "1")
-    assert review_engine._inherited_lock_fd(lock_path) is None  # noqa: SLF001
+    assert review_engine._inherited_lock_fd(lock_path) is None
 
     unrelated = tmp_path / "unrelated.lock"
     with unrelated.open("w", encoding="utf-8") as handle:
         monkeypatch.setenv(review_engine.INHERITED_LOCK_FD_ENV, str(handle.fileno()))
-        assert review_engine._inherited_lock_fd(lock_path) is None  # noqa: SLF001
+        assert review_engine._inherited_lock_fd(lock_path) is None
 
     with lock_path.open("a+", encoding="utf-8") as handle:
         monkeypatch.setenv(review_engine.INHERITED_LOCK_FD_ENV, str(handle.fileno()))
         assert (
-            review_engine._inherited_lock_fd(lock_path)  # noqa: SLF001
+            review_engine._inherited_lock_fd(lock_path)
             == handle.fileno()
         )
 
     monkeypatch.setenv(review_engine.INHERITED_LOCK_TOKEN_ENV, "short")
-    assert not review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001
+    assert not review_engine._inherited_lock_token_valid(lock_path)
     token = "a" * 64
     monkeypatch.setenv(review_engine.INHERITED_LOCK_TOKEN_ENV, token)
     lock_path.write_text("not json\n", encoding="utf-8")
-    assert not review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001
+    assert not review_engine._inherited_lock_token_valid(lock_path)
     lock_path.write_text(
         json.dumps({"pid": os.getpid(), "token": "b" * 64}), encoding="utf-8"
     )
-    assert not review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001
+    assert not review_engine._inherited_lock_token_valid(lock_path)
 
-    with review_engine._held_governance_lock(  # noqa: SLF001
+    with review_engine._held_governance_lock(
         repo, exclusive=True, timeout_seconds=1.0, lease_token=token
     ):
-        assert review_engine._inherited_lock_token_valid(lock_path)  # noqa: SLF001
+        assert review_engine._inherited_lock_token_valid(lock_path)
 
 
 def test_shard_thread_environment_gives_each_worker_a_fair_share(

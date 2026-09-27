@@ -1,25 +1,23 @@
 """Generated contracts must survive the Python compatibility boundary intact."""
 
-from dataclasses import asdict, replace
 import json
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
 
 from conductor import mutation_campaign_model as model
-from conductor.mutation_campaign_generate import fest_manifest
+from conductor.mutation_campaign_generate import plan
 from conductor.mutation_testing import _native_campaign_contract
 
 
 def generated_manifest(root: Path) -> Path:
     (root / "subject.py").write_text("def subject():\n    return 1\n")
     (root / "test_subject.py").write_text("def test_subject():\n    assert True\n")
-    payload = fest_manifest(
-        {"source": "subject.py", "tests": ["test_subject.py"]},
-        campaign_id="fixture",
-        repo_root=root,
-        run_timeout_seconds=30,
-    )
+    payload = plan("python", repo_root=root, day="20260910", run_timeout_seconds=30)[
+        "manifests"
+    ][0]
+    payload["campaign_id"] = "fixture"
     path = root / "campaign.json"
     path.write_text(json.dumps(payload))
     return path

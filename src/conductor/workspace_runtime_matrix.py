@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Behavior-backed workspace reliability matrix with fail-closed receipts."""
 
 from __future__ import annotations
@@ -14,13 +13,15 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Final, Iterable
+from typing import Any, Final
 
 from conductor import workspace_launcher_smokes as _launcher_smokes
 from conductor import workspace_runtime_support as _runtime_support
+from conductor._native import workspace_runtime_matrix_native
 from conductor.active_state import save_active_state
 from conductor.audit_root import (
     AuditRootError,
@@ -44,25 +45,6 @@ CLERK_NUM_CTX: Final[int] = 2048
 CLERK_NUM_GPU: Final[int] = 99
 CLERK_NUM_PREDICT: Final[int] = 32
 PROHIBITED_MODEL_FRAGMENTS: Final[tuple[str, ...]] = ("qwen3.8", "27b")
-NOVEL_GPU_CLAIM_PATH_PREFIXES: Final[tuple[str, ...]] = (
-    "component_fab/",
-    "research/scientist/",
-    "research/synthesis/",
-    "research/tools/",
-)
-NOVEL_GPU_CLAIM_SIGNALS: Final[tuple[str, ...]] = (
-    "avo",
-    "cuda",
-    "gpu",
-    "optimizer",
-    "throughput",
-    "training",
-)
-NON_RESEARCH_GPU_PROCESS_FRAGMENTS: Final[tuple[str, ...]] = (
-    "gnome-remote-desktop",
-    "gnome-shell",
-    "xorg",
-)
 REQUIRED_LAUNCHERS: Final[tuple[str, ...]] = (
     "codex",
     "claude",
@@ -126,6 +108,17 @@ class ClerkAttempt:
     request_error: str
 
 
+def _matrix_native(operation: str, payload: Any) -> Any:
+    """Cross the native policy boundary with JSON-shaped captured evidence."""
+    return json.loads(workspace_runtime_matrix_native(operation, json.dumps(payload)))
+
+
+def _cell_native(operation: str, payload: Any) -> CellReceipt:
+    result = _matrix_native(operation, payload)
+    result["status"] = ReceiptStatus(result["status"])
+    return CellReceipt(**result)
+
+
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -135,12 +128,15 @@ def _sha256_path(path: Path) -> str:
 
 
 def aggregate_status(cells: Iterable[CellReceipt]) -> ReceiptStatus:
-    required = [cell for cell in cells if cell.required]
-    if any(cell.status is ReceiptStatus.FAIL_CLOSED for cell in required):
-        return ReceiptStatus.FAIL_CLOSED
-    if any(cell.status is ReceiptStatus.NOT_READY for cell in required):
-        return ReceiptStatus.NOT_READY
-    return ReceiptStatus.PASS
+    return ReceiptStatus(
+        _matrix_native(
+            "aggregate_status",
+            [
+                {"status": cell.status.value, "required": cell.required}
+                for cell in cells
+            ],
+        )
+    )
 
 
 def _run(
@@ -172,22 +168,18 @@ def check_active_state(repo: Path = ROOT) -> CellReceipt:
             ReceiptStatus.FAIL_CLOSED,
             f"state or live claim source failed: {exc}",
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     live_ids = sorted(claim.claim_id for claim in claims if claim.active(now))
     cached_ids = sorted(str(claim.get("claim_id")) for claim in state.active_claims)
     age = (now - datetime.fromisoformat(state.last_updated)).total_seconds()
-    ok = live_ids == cached_ids and -60.0 <= age <= 30.0
-    return CellReceipt(
-        "active-state-live-claims",
-        ReceiptStatus.PASS if ok else ReceiptStatus.FAIL_CLOSED,
-        "fresh atomic cache agrees with live claim store"
-        if ok
-        else f"cached={cached_ids}, live={live_ids}, age={age:.3f}s",
-        evidence={
+    return _cell_native(
+        "check_active_state",
+        {
+            "live_ids": live_ids,
+            "cached_ids": cached_ids,
+            "age_seconds": age,
             "active_state_sha256": _sha256_path(state_path),
             "claim_store_sha256": digest,
-            "claim_ids": live_ids,
-            "age_seconds": round(age, 6),
         },
     )
 
@@ -195,66 +187,12 @@ def check_active_state(repo: Path = ROOT) -> CellReceipt:
 def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError(f"expected JSON object: {path}")
+        raise ValueError(f"expected JSON object: {path}")  # noqa: TRY004 - public API
     return payload
 
 
 def check_hook_configs(repo: Path = ROOT) -> CellReceipt:
-    paths = {
-        "codex": repo / ".codex" / "hooks.json",
-        "claude": repo / ".claude" / "settings.json",
-        "qwen": repo / ".qwen" / "settings.json",
-        "grok": repo / ".grok" / "hooks" / "workspace.json",
-    }
-    expected = {
-        "codex": (
-            "pre-edit.sh",
-            "crg_gate.py verify",
-            '"Read"',
-            "GOVERNANCE_OWNER",
-        ),
-        "claude": (
-            "pre-edit.sh",
-            "crg_gate.py verify",
-            '"Read"',
-            "GOVERNANCE_OWNER",
-        ),
-        "qwen": (
-            "pre-edit.sh",
-            "crg_gate.py verify",
-            "read_file",
-            "run_shell_command",
-        ),
-        "grok": (
-            "pre-edit.sh",
-            "crg_gate.py verify",
-            "read_file",
-            "run_shell_command",
-        ),
-    }
-    errors: list[str] = []
-    hashes: dict[str, str] = {}
-    for launcher, path in paths.items():
-        try:
-            payload = _load_json(path)
-            serialized = json.dumps(payload.get("hooks", {}), sort_keys=True)
-        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
-            errors.append(f"{launcher}:{exc}")
-            continue
-        hashes[launcher] = _sha256_path(path)
-        missing = [
-            fragment for fragment in expected[launcher] if fragment not in serialized
-        ]
-        if missing:
-            errors.append(f"{launcher}:missing={missing}")
-    return CellReceipt(
-        "hook-config-contract",
-        ReceiptStatus.FAIL_CLOSED if errors else ReceiptStatus.PASS,
-        "; ".join(errors)
-        if errors
-        else "native configs bind read, shell, graph, and owner gates",
-        evidence={"config_sha256": hashes},
-    )
+    return _cell_native("check_hook_configs", {"root": str(repo)})
 
 
 def _hook_call(
@@ -322,54 +260,21 @@ def _check_preamble_and_grok(
 
 def check_hook_programs(root: Path = ROOT) -> CellReceipt:
     """Exercise the hook suites rooted at ``root`` against the control matrix."""
-    cases: tuple[tuple[str, dict[str, Any], bool], ...] = (
-        (
-            "codex-read-deny",
-            {"tool_name": "Read", "tool_input": {"file_path": ".current_work.md"}},
-            True,
-        ),
-        (
-            "grok-read-deny",
-            {
-                "hookEventName": "pre_tool_use",
-                "toolName": "read_file",
-                "toolInput": {"filePath": ".current_work.md"},
-            },
-            True,
-        ),
-        (
-            "shell-read-deny",
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": "sed -n '1,10p' .current_work.md"},
-            },
-            True,
-        ),
-        (
-            "safe-read-allow",
-            {"tool_name": "Read", "tool_input": {"file_path": "README.md"}},
-            False,
-        ),
-        (
-            "handoff-allow",
-            {
-                "tool_name": "Bash",
-                "tool_input": {
-                    "command": "python -m conductor.handoff append --owner x --title y --body z"
-                },
-            },
-            False,
-        ),
-    )
-    failures: list[str] = []
-    evidence: dict[str, Any] = {}
+    results = []
     program = root / ".codex" / "hooks" / "pre-edit.sh"
-    for name, payload, expect_deny in cases:
-        result = _hook_call(payload, program)
-        denied = "BLOCKED:" in result.stdout
-        evidence[name] = {"returncode": result.returncode, "denied": denied}
-        if result.returncode != 0 or denied is not expect_deny:
-            failures.append(name)
+    for case in _matrix_native("hook_program_cases", {}):
+        result = _hook_call(case["payload"], program)
+        results.append(
+            {
+                "name": case["name"],
+                "expect_deny": case["expect_deny"],
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+            }
+        )
+    verdict = _matrix_native("hook_program_verdict", results)
+    failures: list[str] = verdict["failures"]
+    evidence: dict[str, Any] = verdict["evidence"]
     _check_hook_sources(root, failures, evidence)
     _check_hook_noops(root, failures, evidence)
     _check_preamble_and_grok(root, failures, evidence)
@@ -398,12 +303,7 @@ def check_launcher_programs() -> CellReceipt:
             versions[launcher] = (
                 (result.stdout or result.stderr).strip().splitlines()[0]
             )
-    return CellReceipt(
-        "launcher-programs",
-        ReceiptStatus.NOT_READY if missing else ReceiptStatus.PASS,
-        f"unavailable={missing}" if missing else "all five launcher binaries responded",
-        evidence={"versions": versions},
-    )
+    return _cell_native("check_launchers", {"missing": missing, "versions": versions})
 
 
 def _http_json(
@@ -422,7 +322,7 @@ def _http_json(
     with open_http(urllib.request.urlopen, request, timeout=timeout) as response:
         result = json.loads(response.read().decode())
     if not isinstance(result, dict):
-        raise ValueError(f"expected JSON object from {url}")
+        raise ValueError(f"expected JSON object from {url}")  # noqa: TRY004 - public API
     return result
 
 
@@ -432,15 +332,14 @@ def _ollama_ps() -> str:
 
 
 def _ollama_model_rows(raw: str) -> tuple[str, ...]:
-    lines = raw.splitlines()
-    if not lines or not lines[0].lstrip().startswith("NAME"):
-        raise RuntimeError(f"unexpected ollama ps output: {raw!r}")
-    return tuple(line for line in lines[1:] if line.strip())
+    try:
+        return tuple(_matrix_native("ollama_model_rows", raw))
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
 
 
 def _nonnegative_int(payload: dict[str, Any], key: str) -> int:
-    value = payload.get(key)
-    return value if type(value) is int and value >= 0 else -1
+    return _matrix_native("nonnegative_int", {"payload": payload, "key": key})
 
 
 def _gpu_compute_processes() -> tuple[GpuComputeProcess, ...]:
@@ -457,62 +356,47 @@ def _gpu_compute_processes() -> tuple[GpuComputeProcess, ...]:
             "nvidia-smi compute-process query failed: "
             f"exit={result.returncode}, stderr={result.stderr.strip()!r}"
         )
-    processes: list[GpuComputeProcess] = []
-    for line in result.stdout.splitlines():
-        if not line.strip():
-            continue
-        parts = [part.strip() for part in line.rsplit(",", maxsplit=2)]
-        if len(parts) != 3:
-            raise RuntimeError(f"unexpected nvidia-smi process row: {line!r}")
-        try:
-            pid = int(parts[0])
-            used_memory_mib = int(parts[2])
-        except ValueError as exc:
-            raise RuntimeError(f"invalid nvidia-smi process row: {line!r}") from exc
-        processes.append(
-            GpuComputeProcess(
-                pid=pid,
-                process_name=parts[1],
-                used_memory_mib=used_memory_mib,
+    try:
+        return tuple(
+            GpuComputeProcess(**process)
+            for process in _matrix_native(
+                "parse_gpu_processes", {"stdout": result.stdout}
             )
         )
-    return tuple(processes)
-
-
-def _claim_reserves_novel_gpu(claim: Any) -> bool:
-    paths = tuple(str(path).casefold() for path in claim.paths)
-    if not any(path.startswith(NOVEL_GPU_CLAIM_PATH_PREFIXES) for path in paths):
-        return False
-    text = " ".join((str(claim.owner), str(claim.justification), *paths)).casefold()
-    return any(signal in text for signal in NOVEL_GPU_CLAIM_SIGNALS)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
 
 
 def clerk_gpu_preflight(repo: Path = ROOT) -> ClerkGpuPreflight:
     """Refuse a 9B load while novel research may own the accelerator."""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claims, _digest = load_claims(repo)
-    blocking_claims = tuple(
-        sorted(
-            claim.claim_id
-            for claim in claims
-            if claim.active(now) and _claim_reserves_novel_gpu(claim)
-        )
+    active_claims = [
+        {
+            "claim_id": claim.claim_id,
+            "owner": str(claim.owner),
+            "justification": str(claim.justification),
+            "paths": [str(path) for path in claim.paths],
+        }
+        for claim in claims
+        if claim.active(now)
+    ]
+    result = _matrix_native(
+        "gpu_preflight",
+        {
+            "claims": active_claims,
+            "processes": [asdict(process) for process in _gpu_compute_processes()],
+            "ollama_ps": _ollama_ps(),
+        },
     )
-    blocking_processes = tuple(
-        process
-        for process in _gpu_compute_processes()
-        if not any(
-            fragment in process.process_name.casefold()
-            for fragment in NON_RESEARCH_GPU_PROCESS_FRAGMENTS
-        )
-    )
-    loaded_models = _ollama_model_rows(_ollama_ps())
     return ClerkGpuPreflight(
-        ready=not blocking_claims and not blocking_processes and not loaded_models,
-        blocking_claim_ids=blocking_claims,
-        blocking_processes=blocking_processes,
-        loaded_models=loaded_models,
+        ready=result["ready"],
+        blocking_claim_ids=tuple(result["blocking_claim_ids"]),
+        blocking_processes=tuple(
+            GpuComputeProcess(**row) for row in result["blocking_processes"]
+        ),
+        loaded_models=tuple(result["loaded_models"]),
     )
 
 
@@ -534,36 +418,13 @@ def check_embedding_canary() -> CellReceipt:
         isinstance(value, (int, float)) and math.isfinite(float(value))
         for value in vector
     )
-    processes = _ollama_ps()
-    prohibited = [
-        fragment
-        for fragment in PROHIBITED_MODEL_FRAGMENTS
-        if fragment in processes.casefold()
-    ]
-    ok = (
-        health.get("ok") is True
-        and health.get("model") == EMBED_MODEL
-        and health.get("num_ctx") == 2048
-        and health.get("keep_alive") == 0
-        and finite
-        and len(vector) == 1024
-        and EMBED_MODEL not in processes
-        and not prohibited
-    )
-    return CellReceipt(
-        "embedding-canary",
-        ReceiptStatus.PASS if ok else ReceiptStatus.FAIL_CLOSED,
-        "finite 1024-d vector with bound policy and unload"
-        if ok
-        else "embedding policy or unload failed",
-        evidence={
-            "model": health.get("model"),
-            "num_ctx": health.get("num_ctx"),
-            "num_gpu": health.get("num_gpu"),
-            "keep_alive": health.get("keep_alive"),
+    return _cell_native(
+        "check_embedding",
+        {
+            "health": health,
+            "processes": _ollama_ps(),
             "dimension": len(vector) if isinstance(vector, list) else None,
             "finite": finite,
-            "prohibited_loaded": prohibited,
         },
     )
 
@@ -582,84 +443,19 @@ def check_retrievers() -> CellReceipt:
             "8",
         ],
     }
-    evidence: dict[str, Any] = {}
-    unavailable: list[str] = []
-    invalid: list[str] = []
+    results: dict[str, Any] = {}
     for name, argv in commands.items():
         try:
             result = _run(argv, timeout=120)
         except subprocess.TimeoutExpired:
-            unavailable.append(f"{name}:timeout")
+            results[name] = {"timeout": True}
             continue
-        if result.returncode != 0:
-            unavailable.append(f"{name}:exit={result.returncode}")
-            continue
-        try:
-            payload = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            invalid.append(f"{name}:malformed")
-            continue
-        if not isinstance(payload, list) or not payload:
-            invalid.append(f"{name}:empty")
-            continue
-        evidence[name] = {
-            "hit_count": len(payload),
-            "top_path": payload[0].get("path")
-            if isinstance(payload[0], dict)
-            else None,
-            "stdout_sha256": _sha256_bytes(result.stdout.encode()),
-        }
-    status = (
-        ReceiptStatus.FAIL_CLOSED
-        if invalid
-        else ReceiptStatus.NOT_READY
-        if unavailable
-        else ReceiptStatus.PASS
-    )
-    return CellReceipt(
-        "retriever-runtime",
-        status,
-        f"unavailable={unavailable}, invalid={invalid}"
-        if unavailable or invalid
-        else "both retrievers returned non-empty JSON",
-        evidence=evidence,
-    )
-
-
-def _token_total(value: Any) -> int:
-    if isinstance(value, dict):
-        total = value.get("total_tokens")
-        if isinstance(total, (int, float)):
-            return int(total)
-        candidates: list[int] = []
-        for input_key, output_key in (
-            ("input_tokens", "output_tokens"),
-            ("prompt_tokens", "completion_tokens"),
-        ):
-            input_tokens = value.get(input_key)
-            output_tokens = value.get(output_key)
-            if isinstance(input_tokens, (int, float)) and isinstance(
-                output_tokens, (int, float)
-            ):
-                # Cached and reasoning counts are breakdowns, not extra tokens.
-                candidates.append(int(input_tokens) + int(output_tokens))
-        candidates.extend(_token_total(item) for item in value.values())
-        return max(candidates, default=0)
-    if isinstance(value, list):
-        return max((_token_total(item) for item in value), default=0)
-    return 0
+        results[name] = {"returncode": result.returncode, "stdout": result.stdout}
+    return _cell_native("check_retrievers", results)
 
 
 def extract_reported_tokens(output: str) -> int:
-    totals: list[int] = []
-    for line in output.splitlines():
-        try:
-            totals.append(_token_total(json.loads(line)))
-        except json.JSONDecodeError:
-            continue
-    # Each launcher emits a cumulative terminal usage object. Taking the maximum
-    # avoids summing intermediate snapshots and repeated final summaries.
-    return max(totals, default=0)
+    return _matrix_native("extract_reported_tokens", output)
 
 
 def launcher_specs(root: Path = ROOT) -> tuple[LauncherSpec, ...]:
@@ -705,49 +501,26 @@ def reconcile_receipt(output_dir: Path, repo: Path = ROOT) -> dict[str, Any]:
     if not archive.exists():
         write_json_atomic(archive, payload)
     archive_sha256 = _sha256_path(archive)
-    replacements = {
-        cell.cell_id: cell
-        for cell in (
-            check_hook_configs(repo),
-            check_hook_programs(repo),
-            reconcile_launcher_logs(output_dir),
-        )
-    }
-    cells = payload.get("cells")
-    if not isinstance(cells, list):
-        raise ValueError("receipt cells must be a list")
-    present_ids = {str(cell.get("cell_id")) for cell in cells if isinstance(cell, dict)}
-    if "launcher-real-smokes" not in present_ids:
-        raise ValueError("launcher-real-smokes cell missing")
-    replacements = {
-        cell_id: cell
-        for cell_id, cell in replacements.items()
-        if cell_id in present_ids
-    }
-    for index, cell in enumerate(cells):
-        cell_id = cell.get("cell_id") if isinstance(cell, dict) else None
-        replacement = replacements.pop(str(cell_id), None)
-        if replacement is None:
-            continue
-        replacement_dict = asdict(replacement)
-        replacement_dict["status"] = replacement.status.value
-        cells[index] = replacement_dict
-    if replacements:
-        raise ValueError(f"receipt replacement failed: {sorted(replacements)}")
-    required_statuses = [
-        ReceiptStatus(cell["status"])
-        for cell in cells
-        if isinstance(cell, dict) and cell.get("required", True)
+    replacements = [
+        check_hook_configs(repo),
+        check_hook_programs(repo),
+        reconcile_launcher_logs(output_dir),
     ]
-    payload["status"] = aggregate_status(
-        CellReceipt("cell", status, "reconciled") for status in required_statuses
-    ).value
-    provenance = payload.setdefault("provenance", {})
-    if not isinstance(provenance, dict):
-        raise ValueError("receipt provenance must be an object")
+    payload = _matrix_native(
+        "replace_receipt_cells",
+        {
+            "receipt": payload,
+            "require_launcher": True,
+            "replacements": {
+                cell.cell_id: {**asdict(cell), "status": cell.status.value}
+                for cell in replacements
+            },
+        },
+    )
+    provenance = payload["provenance"]
     provenance.update(
         {
-            "launcher_usage_reconciled_at": datetime.now(timezone.utc).isoformat(),
+            "launcher_usage_reconciled_at": datetime.now(UTC).isoformat(),
             "hook_programs_rechecked": True,
             "pre_reconcile_receipt_sha256": archive_sha256,
             "pre_reconcile_receipt": str(archive),
@@ -770,31 +543,20 @@ def _reconcile_cell(
     archive = output_dir / archive_name
     if not archive.exists():
         write_json_atomic(archive, payload)
-    cells = payload.get("cells")
-    if not isinstance(cells, list):
-        raise ValueError("receipt cells must be a list")
-    found = False
-    for index, cell in enumerate(cells):
-        if not isinstance(cell, dict) or cell.get("cell_id") != replacement.cell_id:
-            continue
-        replacement_dict = asdict(replacement)
-        replacement_dict["status"] = replacement.status.value
-        cells[index] = replacement_dict
-        found = True
-        break
-    if not found:
-        raise ValueError(f"{replacement.cell_id} cell missing")
-    required_statuses = [
-        ReceiptStatus(cell["status"])
-        for cell in cells
-        if isinstance(cell, dict) and cell.get("required", True)
-    ]
-    payload["status"] = aggregate_status(
-        CellReceipt("cell", status, "reconciled") for status in required_statuses
-    ).value
-    provenance = payload.setdefault("provenance", {})
-    if not isinstance(provenance, dict):
-        raise ValueError("receipt provenance must be an object")
+    payload = _matrix_native(
+        "replace_receipt_cells",
+        {
+            "receipt": payload,
+            "single_cell": replacement.cell_id,
+            "replacements": {
+                replacement.cell_id: {
+                    **asdict(replacement),
+                    "status": replacement.status.value,
+                }
+            },
+        },
+    )
+    provenance = payload["provenance"]
     provenance.update(
         {
             **provenance_update,
@@ -818,7 +580,7 @@ def reconcile_graph_evidence(
         archive_name="receipt.pre_graph_reconcile.json",
         archive_provenance_prefix="graph_reconcile",
         provenance_update={
-            "graph_evidence_reconciled_at": datetime.now(timezone.utc).isoformat(),
+            "graph_evidence_reconciled_at": datetime.now(UTC).isoformat(),
             "graph_evidence": str(graph_evidence),
             "graph_evidence_sha256": _sha256_path(graph_evidence),
         },
@@ -826,45 +588,19 @@ def reconcile_graph_evidence(
 
 
 def _clerk_schema() -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": {
-            "status": {"type": "string", "enum": ["PASS"]},
-            "cells": {"type": "integer", "const": 5},
-        },
-        "required": ["status", "cells"],
-        "additionalProperties": False,
-    }
+    return _matrix_native("clerk_schema", {})
 
 
 def _clerk_payload(schema: dict[str, Any]) -> dict[str, Any]:
     schema_text = json.dumps(schema, sort_keys=True, separators=(",", ":"))
-    return {
-        "model": CLERK_MODEL,
-        "messages": [
-            {"role": "system", "content": CLERK_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    "Return only compact JSON matching this schema exactly: "
-                    f"{schema_text}. The only valid object is "
-                    '{"status":"PASS","cells":5}.'
-                ),
-            },
-        ],
-        "format": schema,
-        "stream": False,
-        "think": False,
-        "keep_alive": "30s",
-        "options": {
-            "num_ctx": CLERK_NUM_CTX,
-            "num_gpu": CLERK_NUM_GPU,
-            "num_predict": CLERK_NUM_PREDICT,
-            "presence_penalty": 0,
-            "seed": 0,
-            "temperature": 0,
+    return _matrix_native(
+        "clerk_payload",
+        {
+            "schema": schema,
+            "schema_text": schema_text,
+            "system_prompt": CLERK_SYSTEM_PROMPT,
         },
-    }
+    )
 
 
 def _execute_clerk_canary(payload: dict[str, Any]) -> ClerkAttempt:
@@ -896,17 +632,15 @@ def _clerk_unavailable_evidence(
     preflight: ClerkGpuPreflight,
     attempt: ClerkAttempt,
 ) -> dict[str, Any]:
-    try:
-        after_rows = _ollama_model_rows(attempt.after_processes)
-        unloaded = all(CLERK_MODEL not in row for row in after_rows)
-    except RuntimeError:
-        unloaded = False
-    return {
-        "preflight": preflight.to_evidence(),
-        "request_error": attempt.request_error,
-        "stop_returncode": attempt.stop_returncode,
-        "unloaded": unloaded,
-    }
+    return _matrix_native(
+        "clerk_unavailable",
+        {
+            "preflight": preflight.to_evidence(),
+            "after_processes": attempt.after_processes,
+            "request_error": attempt.request_error,
+            "stop_returncode": attempt.stop_returncode,
+        },
+    )
 
 
 def _adjudicate_clerk_attempt(
@@ -915,70 +649,20 @@ def _adjudicate_clerk_attempt(
 ) -> tuple[bool, dict[str, Any]]:
     if attempt.response is None:
         raise ValueError("cannot adjudicate a missing clerk response")
-    response = attempt.response
-    message = response.get("message")
-    content = message.get("content") if isinstance(message, dict) else None
-    thinking = message.get("thinking") if isinstance(message, dict) else None
-    try:
-        parsed = json.loads(content) if isinstance(content, str) else None
-    except json.JSONDecodeError:
-        parsed = None
-    prompt_tokens = _nonnegative_int(response, "prompt_eval_count")
-    eval_tokens = _nonnegative_int(response, "eval_count")
-    tokens = prompt_tokens + eval_tokens
-    try:
-        resident_rows = _ollama_model_rows(attempt.resident_processes)
-        after_rows = _ollama_model_rows(attempt.after_processes)
-        ollama_ps_valid = True
-    except RuntimeError:
-        resident_rows = ()
-        after_rows = ("invalid ollama ps output",)
-        ollama_ps_valid = False
-    gpu_resident = any(CLERK_MODEL in row and "GPU" in row for row in resident_rows)
-    unloaded = all(CLERK_MODEL not in row for row in after_rows)
-    prohibited = [
-        fragment
-        for fragment in PROHIBITED_MODEL_FRAGMENTS
-        if fragment in attempt.resident_processes.casefold()
-    ]
-    generation_bounded = 0 < eval_tokens <= CLERK_NUM_PREDICT
-    schema_valid = parsed == {"status": "PASS", "cells": 5}
-    ok = (
-        response.get("model") == CLERK_MODEL
-        and schema_valid
-        and response.get("done") is True
-        and response.get("done_reason") == "stop"
-        and not thinking
-        and ollama_ps_valid
-        and gpu_resident
-        and attempt.stop_returncode == 0
-        and unloaded
-        and not prohibited
-        and tokens > 0
-        and generation_bounded
+    result = _matrix_native(
+        "clerk_adjudicate",
+        {
+            "preflight": preflight.to_evidence(),
+            "response": attempt.response,
+            "resident_processes": attempt.resident_processes,
+            "after_processes": attempt.after_processes,
+            "stop_returncode": attempt.stop_returncode,
+            "response_sha256": _sha256_bytes(
+                json.dumps(attempt.response, sort_keys=True).encode()
+            ),
+        },
     )
-    evidence = {
-        "preflight": preflight.to_evidence(),
-        "model": response.get("model"),
-        "schema_valid": schema_valid,
-        "reported_tokens": tokens,
-        "prompt_eval_count": prompt_tokens,
-        "eval_count": eval_tokens,
-        "done_reason": response.get("done_reason"),
-        "thinking_disabled": True,
-        "thinking_suppressed": not thinking,
-        "num_ctx": CLERK_NUM_CTX,
-        "num_gpu": CLERK_NUM_GPU,
-        "num_predict": CLERK_NUM_PREDICT,
-        "generation_bounded": generation_bounded,
-        "ollama_ps_valid": ollama_ps_valid,
-        "gpu_resident": gpu_resident,
-        "unloaded": unloaded,
-        "stop_returncode": attempt.stop_returncode,
-        "prohibited_loaded": prohibited,
-        "response_sha256": _sha256_bytes(json.dumps(response, sort_keys=True).encode()),
-    }
-    return ok, evidence
+    return result["ok"], result["evidence"]
 
 
 def run_clerk_canary(output_dir: Path, *, root: Path = ROOT) -> CellReceipt:
@@ -1028,72 +712,18 @@ def reconcile_clerk_evidence(output_dir: Path, *, root: Path = ROOT) -> dict[str
         archive_name="receipt.pre_clerk_reconcile.json",
         archive_provenance_prefix="clerk_reconcile",
         provenance_update={
-            "clerk_evidence_reconciled_at": datetime.now(timezone.utc).isoformat(),
+            "clerk_evidence_reconciled_at": datetime.now(UTC).isoformat(),
             "clerk_evidence": str(output_dir / "local_clerk.json"),
         },
     )
 
 
 def load_graph_evidence(path: Path | None) -> CellReceipt:
-    if path is None or not path.is_file():
-        return CellReceipt(
-            "graph-semantic-runtime",
-            ReceiptStatus.NOT_READY,
-            "no graph evidence supplied",
-        )
-    try:
-        payload = _load_json(path)
-    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
-        return CellReceipt(
-            "graph-semantic-runtime",
-            ReceiptStatus.FAIL_CLOSED,
-            f"graph evidence malformed: {exc}",
-        )
-    provider = payload.get("provider")
-    backend_fingerprint = payload.get("backend_fingerprint")
-    query_trace = payload.get("query_trace")
-    live_nodes = payload.get("live_non_file_node_count")
-    embedded_nodes = payload.get("embedded_node_count")
-    ok = (
-        isinstance(provider, str)
-        and provider.startswith("workspace:")
-        and isinstance(backend_fingerprint, str)
-        and backend_fingerprint.startswith("sha256:")
-        and isinstance(payload.get("model"), str)
-        and bool(payload["model"])
-        and isinstance(payload.get("dimension"), int)
-        and payload["dimension"] > 0
-        and isinstance(payload.get("paid"), bool)
-        and payload.get("stored_provider") == provider
-        and payload.get("search_mode") in {"semantic", "hybrid"}
-        and isinstance(payload.get("result_count"), int)
-        and payload["result_count"] > 0
-        and isinstance(payload.get("node_count"), int)
-        and payload["node_count"] > 0
-        and isinstance(live_nodes, int)
-        and live_nodes > 0
-        and embedded_nodes == live_nodes
-        and payload.get("missing_embedding_count") == 0
-        and payload.get("mixed_provider_live_count") == 0
-        and payload.get("orphan_embedding_count") == 0
-        and payload.get("expected_result_found") is True
-        and isinstance(query_trace, dict)
-        and query_trace.get("provider_name") == provider
-        and query_trace.get("backend_fingerprint") == backend_fingerprint
-        and query_trace.get("purpose") == "query"
-        and query_trace.get("vector_count") == 1
-        and isinstance(query_trace.get("broker_calls"), int)
-        and query_trace["broker_calls"] > 0
-        and query_trace.get("dimension") == payload["dimension"]
-        and query_trace.get("paid") == payload["paid"]
-    )
-    return CellReceipt(
-        "graph-semantic-runtime",
-        ReceiptStatus.PASS if ok else ReceiptStatus.FAIL_CLOSED,
-        "fingerprint-bound semantic graph query covered the live graph"
-        if ok
-        else "graph fallback or mismatch",
-        evidence={**payload, "source_sha256": _sha256_path(path)},
+    return _cell_native(
+        "check_graph_evidence",
+        {
+            "path": None if path is None else str(path),
+        },
     )
 
 
@@ -1128,7 +758,7 @@ def build_receipt(
     head = _run(["git", "rev-parse", "HEAD"], timeout=10, cwd=root).stdout.strip()
     return WorkspaceReceipt(
         schema_version=1,
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        generated_at=datetime.now(UTC).isoformat(),
         status=aggregate_status(cells),
         cells=tuple(cells),
         provenance={

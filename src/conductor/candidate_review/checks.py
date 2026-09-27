@@ -4,15 +4,12 @@ from __future__ import annotations
 
 import ast
 import fnmatch
-import io
 import json
 import os
-import re
 import time
-import tokenize
 import tomllib
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -34,22 +31,6 @@ from conductor.candidate_review.model import (
 from conductor.candidate_review.ownership import OwnershipError, load_claims
 from conductor.candidate_review.policy import CheckPolicy, Policy
 from conductor.candidate_review.scan_ledger import ScanLedger
-
-SECRET_PATTERNS = {
-    "private-key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
-    "aws-access-key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
-    "github-token": re.compile(r"\bgh[psoru]_[A-Za-z0-9_]{30,}\b"),
-    "generic-api-key": re.compile(
-        r"(?i)(?:api[_-]?key|secret|token|password)\s*[:=]\s*['\"][A-Za-z0-9_./+=-]{20,}['\"]"
-    ),
-}
-SOFTMAX_FALLBACK = re.compile(
-    r"(?i)(?:fallback.{0,80}(?:softmax|attention)|(?:softmax|attention).{0,80}fallback|"
-    r"scaled_dot_product_attention|MultiheadAttention)"
-)
-STUB_COMMENT = re.compile(r"\b(?:TODO|FIXME|XXX)\b|pragma:\s*no cover")
-RANDOM_TEXT = re.compile(r"\b(?:random\.|np\.random|torch\.rand|torch\.randn)")
-SEED_TEXT = re.compile(r"\b(?:seed|manual_seed|Generator)\b")
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,186 +90,75 @@ def _changed_files(ctx: ReviewContext, classes: Iterable[str] = ()) -> list[str]
     ]
 
 
+def _native_eval(operation: str, payload: dict[str, object]) -> dict[str, object]:
+    from conductor._native import candidate_checks_native
+
+    return json.loads(candidate_checks_native(operation, json.dumps(payload)))
+
+
+def _native_findings(payload: dict[str, object]) -> list[Finding]:
+    return [
+        Finding(**{**item, "severity": Severity(item["severity"])})
+        for item in payload["findings"]
+    ]
+
+
+def _native_entries(entries: Sequence[TreeEntry]) -> list[dict[str, str]]:
+    return [
+        {
+            "path": entry.path,
+            "mode": entry.mode,
+            "folded": entry.path.casefold(),
+            "repr": repr(entry.path),
+        }
+        for entry in entries
+    ]
+
+
 def _tree_integrity_findings(
     ctx: ReviewContext,
 ) -> tuple[list[Finding], dict[str, TreeEntry]]:
-    findings: list[Finding] = []
-    folded_paths: dict[str, str] = {}
-    entry_by_path = {entry.path: entry for entry in ctx.entries}
-    for entry in ctx.entries:
-        folded = entry.path.casefold()
-        other = folded_paths.get(folded)
-        if other and other != entry.path:
-            findings.append(
-                Finding(
-                    check_id="candidate-integrity",
-                    rule_id="case-collision",
-                    severity=Severity.CRITICAL,
-                    path=entry.path,
-                    message=(
-                        "case-colliding tree paths are not portable: "
-                        f"{other!r} and {entry.path!r}"
-                    ),
-                )
-            )
-        folded_paths[folded] = entry.path
-        if entry.mode not in {"100644", "100755", "120000", "160000"}:
-            findings.append(
-                Finding(
-                    check_id="candidate-integrity",
-                    rule_id="unsupported-git-mode",
-                    severity=Severity.CRITICAL,
-                    path=entry.path,
-                    message=f"unsupported Git mode {entry.mode} in candidate tree",
-                )
-            )
-    return findings, entry_by_path
+    native = _native_eval("tree-integrity", {"entries": _native_entries(ctx.entries)})
+    return _native_findings(native), {entry.path: entry for entry in ctx.entries}
 
 
-def _protected_change_findings(ctx: ReviewContext, change: Change) -> list[Finding]:
-    protected_old = change.old_path or change.path
-    was_protected = any(
-        fnmatch.fnmatchcase(protected_old, pattern)
-        for pattern in ctx.policy.protected_delete_globs
-    )
-    stays_protected = any(
-        fnmatch.fnmatchcase(change.path, pattern)
-        for pattern in ctx.policy.protected_delete_globs
-    )
-    findings: list[Finding] = []
-    if was_protected and (change.deleted or not stays_protected):
-        findings.append(
-            Finding(
-                check_id="candidate-integrity",
-                rule_id="protected-delete-or-move",
-                severity=Severity.CRITICAL,
-                path=protected_old,
-                message=(
-                    "protected artifact is deleted or moved out of protection: "
-                    f"{protected_old}"
-                ),
-                evidence={"destination": None if change.deleted else change.path},
-            )
-        )
-    if was_protected and change.status.startswith("M"):
-        findings.append(
-            Finding(
-                check_id="candidate-integrity",
-                rule_id="protected-overwrite",
-                severity=Severity.HIGH,
-                path=change.path,
-                message="protected artifact overwrite requires a bound regeneration receipt",
-            )
-        )
-    return findings
-
-
-def _materialized_change_findings(
-    ctx: ReviewContext,
-    change: Change,
-    entry_by_path: dict[str, TreeEntry],
-) -> list[Finding]:
-    if change.deleted:
-        return []
-    entry = entry_by_path.get(change.path)
-    path = ctx.snapshot / change.path
-    if entry is None or not os.path.lexists(path):
-        return [
-            Finding(
-                check_id="candidate-integrity",
-                rule_id="incomplete-snapshot",
-                severity=Severity.CRITICAL,
-                path=change.path,
-                message="candidate path was not materialized from its Git object",
-            )
-        ]
-    if entry.mode == "120000":
-        return [
-            Finding(
-                check_id="candidate-integrity",
-                rule_id="symlink-admission",
-                severity=Severity.MEDIUM,
-                path=change.path,
-                message=(
-                    "tracked symlink requires explicit review; "
-                    "target is confined to the snapshot"
-                ),
-                evidence={"target": os.readlink(path)},
-            )
-        ]
-    size = path.stat().st_size
-    limit = (
-        ctx.policy.max_binary_bytes
-        if "binary" in change.classes
-        else ctx.policy.max_file_bytes
-    )
-    findings: list[Finding] = []
-    if size > limit:
-        findings.append(
-            Finding(
-                check_id="candidate-integrity",
-                rule_id="oversized-artifact",
-                severity=Severity.HIGH,
-                path=change.path,
-                message=f"candidate file is {size} bytes; policy limit is {limit}",
-                evidence={"size_bytes": size, "limit_bytes": limit},
-            )
-        )
-    if "binary" in change.classes and change.status.startswith("A"):
-        findings.append(
-            Finding(
-                check_id="candidate-integrity",
-                rule_id="binary-admission",
-                severity=Severity.HIGH,
-                path=change.path,
-                message=(
-                    "new binary/model artifact is forbidden without "
-                    "an owned narrow exception"
-                ),
-            )
-        )
-    return findings
+def _native_integrity_changes(ctx: ReviewContext) -> list[dict[str, object]]:
+    entries = {entry.path: entry for entry in ctx.entries}
+    changes: list[dict[str, object]] = []
+    for change in ctx.candidate.changes:
+        row: dict[str, object] = {**asdict(change), "deleted": change.deleted}
+        entry = entries.get(change.path)
+        if not change.deleted and entry is not None:
+            path = ctx.snapshot / change.path
+            row["exists"] = os.path.lexists(path)
+            if row["exists"]:
+                if entry.mode == "120000":
+                    row["target"] = os.readlink(path)
+                else:
+                    row["size"] = path.stat().st_size
+        changes.append(row)
+    return changes
 
 
 def check_candidate_integrity(ctx: ReviewContext) -> CheckResult:
     started = time.perf_counter()
-    findings, entry_by_path = _tree_integrity_findings(ctx)
-    if not ctx.candidate.changes and ctx.surface == "ci":
-        findings.append(
-            Finding(
-                check_id="candidate-integrity",
-                rule_id="empty-ci-range",
-                severity=Severity.CRITICAL,
-                message="CI candidate range is empty; refusing a no-op governance pass.",
-                help="Resolve and pass an explicit merge-base-to-candidate range.",
-            )
-        )
-    for change in ctx.candidate.changes:
-        if change.new_mode == "160000":
-            findings.append(
-                Finding(
-                    check_id="candidate-integrity",
-                    rule_id="submodule-admission",
-                    severity=Severity.HIGH,
-                    path=change.path,
-                    message=(
-                        "new or modified submodule/gitlink requires "
-                        "a narrow owned exception"
-                    ),
-                    evidence={"gitlink_oid": change.new_oid},
-                )
-            )
-        findings.extend(_protected_change_findings(ctx, change))
-        findings.extend(_materialized_change_findings(ctx, change, entry_by_path))
+    native = _native_eval(
+        "candidate-integrity",
+        {
+            "entries": _native_entries(ctx.entries),
+            "changes": _native_integrity_changes(ctx),
+            "surface": ctx.surface,
+            "protected_globs": ctx.policy.protected_delete_globs,
+            "max_file_bytes": ctx.policy.max_file_bytes,
+            "max_binary_bytes": ctx.policy.max_binary_bytes,
+        },
+    )
     return _result(
         "candidate-integrity",
         started,
-        findings,
+        _native_findings(native),
         files=[change.path for change in ctx.candidate.changes],
-        metrics={
-            "tree_entries": len(ctx.entries),
-            "changes": len(ctx.candidate.changes),
-        },
+        metrics=native["metrics"],
     )
 
 
@@ -358,8 +228,7 @@ def _validate_notebook(rel: str, payload: object, findings: list[Finding]) -> No
 
 def check_secrets(ctx: ReviewContext) -> CheckResult:
     started = time.perf_counter()
-    findings: list[Finding] = []
-    files: list[str] = []
+    files: list[dict[str, str]] = []
     for change in ctx.live_changes:
         path = ctx.snapshot / change.path
         if (
@@ -372,225 +241,40 @@ def check_secrets(ctx: ReviewContext) -> CheckResult:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        files.append(change.path)
-        for rule_id, pattern in SECRET_PATTERNS.items():
-            for match in pattern.finditer(text):
-                findings.append(
-                    Finding(
-                        check_id="secret-scan",
-                        rule_id=rule_id,
-                        severity=Severity.CRITICAL,
-                        path=change.path,
-                        line=text.count("\n", 0, match.start()) + 1,
-                        message="candidate contains secret-like credential material",
-                        help="Remove and rotate the credential; do not baseline live secrets.",
-                    )
-                )
-    return _result("secret-scan", started, findings, files=files)
-
-
-DEVICE_KERNEL_DECORATORS = frozenset(
-    {
-        "triton.jit",
-        "jit",
-        "triton.autotune",
-        "triton.heuristics",
-        "numba.njit",
-        "numba.jit",
-        "numba.cuda.jit",
-    }
-)
-"""Decorators whose function body is compiled to native or device code.
-
-A ``for`` inside one of these is not a Python loop. ``tl.static_range`` is a
-compile-time unroll that lowers to straight-line GPU code, and a ``numba`` loop
-is machine code by the time it runs, so `nested-loop-hotpath` there tells the
-author to go write the native path they are already standing in. Every kernel
-in ``research/synthesis/triton_scale_wavelet_features.py`` was flagged for the
-crime of being Triton, and the file-scoped exception that would have silenced
-it would equally have silenced a real Python loop in the same file.
-"""
-
-
-def _decorator_name(node: ast.expr) -> str:
-    """Dotted name of a decorator, whether or not it is applied with arguments."""
-    return _call_name(node.func if isinstance(node, ast.Call) else node)
+        files.append({"path": change.path, "text": text})
+    native = _native_eval("secret-scan", {"files": files})
+    return _result(
+        "secret-scan",
+        started,
+        _native_findings(native),
+        files=[item["path"] for item in files],
+    )
 
 
 class _PythonVisitor(ast.NodeVisitor):
+    """Compatibility seam for direct visitor callers; rules live in Rust."""
+
     def __init__(self, rel: str, lines: list[str], hot_path: bool) -> None:
         self.rel = rel
         self.lines = lines
         self.hot_path = hot_path
         self.findings: list[Finding] = []
-        self.loop_depth = 0
-        self.protocol_depth = 0
-        self.kernel_depth = 0
 
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self._visit_function(node)
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self._visit_function(node)
-
-    def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-        length = (node.end_lineno or node.lineno) - node.lineno + 1
-        if length > 100:
-            self._add(
-                "oversized-function",
-                Severity.HIGH,
-                node,
-                f"function is {length} lines (>100)",
-            )
-        body = node.body
-        if len(body) == 1 and isinstance(body[0], ast.Pass):
-            self._add(
-                "pass-stub",
-                Severity.HIGH,
-                body[0],
-                "pass-only function is a partial implementation",
-            )
-        if (
-            len(body) == 1
-            and isinstance(body[0], ast.Expr)
-            and isinstance(body[0].value, ast.Constant)
-            and body[0].value.value is Ellipsis
-            and not self.protocol_depth
-        ):
-            self._add(
-                "ellipsis-stub",
-                Severity.HIGH,
-                body[0],
-                "ellipsis-only function is a stub",
-            )
-        if any(
-            _decorator_name(decorator) in DEVICE_KERNEL_DECORATORS
-            for decorator in node.decorator_list
-        ):
-            self.kernel_depth += 1
-            self.generic_visit(node)
-            self.kernel_depth -= 1
-            return
-        self.generic_visit(node)
-
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        enclosing = self.protocol_depth
-        if any(
-            _call_name(base).rsplit(".", 1)[-1] == "Protocol" for base in node.bases
-        ):
-            self.protocol_depth = 1
-        else:
-            self.protocol_depth = 0
-        self.generic_visit(node)
-        self.protocol_depth = enclosing
-
-    def visit_For(self, node: ast.For) -> None:
-        self.loop_depth += 1
-        if self.loop_depth >= 2 and self.hot_path and not self.kernel_depth:
-            self._add(
-                "nested-loop-hotpath",
-                Severity.MEDIUM,
-                node,
-                "nested Python loop in a high-risk path needs a measured complexity budget or vectorized/native path",
-            )
-        self.generic_visit(node)
-        self.loop_depth -= 1
-
-    def visit_While(self, node: ast.While) -> None:
-        self.loop_depth += 1
-        self.generic_visit(node)
-        self.loop_depth -= 1
-
-    def visit_Call(self, node: ast.Call) -> None:
-        name = _call_name(node.func)
-        if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec"}:
-            flagged = node.func.id
-        elif name == "os.system":
-            flagged = name
-        else:
-            flagged = None
-        if flagged is not None:
-            self._add(
-                "dynamic-execution",
-                Severity.CRITICAL,
-                node,
-                f"unsafe dynamic execution via {flagged}",
-            )
-        if name in {"pickle.load", "pickle.loads", "dill.load", "dill.loads"}:
-            self._add(
-                "unsafe-deserialization",
-                Severity.CRITICAL,
-                node,
-                f"unsafe deserialization via {name}",
-            )
-        if name == "yaml.load" and not any(
-            keyword.arg == "Loader" for keyword in node.keywords
-        ):
-            self._add(
-                "unsafe-yaml",
-                Severity.CRITICAL,
-                node,
-                "yaml.load without an explicit safe loader",
-            )
-        if name in {
-            "subprocess.run",
-            "subprocess.call",
-            "subprocess.Popen",
-            "os.popen",
-        }:
-            shell_true = any(
-                keyword.arg == "shell"
-                and isinstance(keyword.value, ast.Constant)
-                and keyword.value.value is True
-                for keyword in node.keywords
-            )
-            if shell_true or name == "os.popen":
-                self._add(
-                    "unsafe-shell",
-                    Severity.HIGH,
-                    node,
-                    "shell execution is injection-prone",
-                )
-        repeated_in_nested_loop = self.loop_depth >= 2 and name in {
-            "json.load",
-            "json.loads",
-            "Path.read_text",
-            "Path.read_bytes",
-            "open",
-        }
-        repeated_compile = self.loop_depth >= 1 and name == "re.compile"
-        if repeated_in_nested_loop or repeated_compile:
-            self._add(
-                "repeated-parsing-io",
-                Severity.HIGH if self.hot_path else Severity.MEDIUM,
-                node,
-                f"{name} inside a loop causes repeated parsing or I/O",
-            )
-        self.generic_visit(node)
-
-    def visit_Raise(self, node: ast.Raise) -> None:
-        raised = node.exc.func if isinstance(node.exc, ast.Call) else node.exc
-        if raised is not None and _call_name(raised) == "NotImplementedError":
-            self._add(
-                "not-implemented-stub",
-                Severity.HIGH,
-                node,
-                "NotImplementedError is a partial implementation",
-            )
-        self.generic_visit(node)
-
-    def _add(self, rule: str, severity: Severity, node: ast.AST, message: str) -> None:
-        self.findings.append(
-            Finding(
-                check_id="python-ast",
-                rule_id=rule,
-                severity=severity,
-                path=self.rel,
-                line=getattr(node, "lineno", None),
-                column=getattr(node, "col_offset", None),
-                message=message,
-            )
+    def visit(self, node: ast.AST) -> None:
+        if not isinstance(node, ast.Module):
+            raise TypeError("candidate Python visitor requires a module AST")
+        native = _native_eval(
+            "python-ast",
+            {
+                "path": self.rel,
+                "text": "\n".join(self.lines),
+                "lines": self.lines,
+                "changed_lines": [],
+                "classes": [],
+                "hot": self.hot_path,
+            },
         )
+        self.findings.extend(_native_findings(native))
 
 
 def _call_name(node: ast.expr) -> str:
@@ -616,24 +300,6 @@ def _call_name(node: ast.expr) -> str:
     return ""
 
 
-def _changed_stub_comment_lines(text: str, changed: set[int]) -> list[int]:
-    markers: list[int] = []
-    for token in tokenize.generate_tokens(io.StringIO(text).readline):
-        if (
-            token.type == tokenize.COMMENT
-            and token.start[0] in changed
-            and STUB_COMMENT.search(token.string)
-        ):
-            markers.append(token.start[0])
-    return markers
-
-
-def _changed_text(lines: list[str], changed: set[int]) -> str:
-    return "\n".join(
-        lines[number - 1] for number in sorted(changed) if number <= len(lines)
-    )
-
-
 def check_python_ast(ctx: ReviewContext) -> CheckResult:
     started = time.perf_counter()
     findings: list[Finding] = []
@@ -644,7 +310,7 @@ def check_python_ast(ctx: ReviewContext) -> CheckResult:
         path = ctx.snapshot / rel
         try:
             text = path.read_text(encoding="utf-8")
-            tree = ast.parse(text, filename=rel)
+            ast.parse(text, filename=rel)
         except (OSError, UnicodeDecodeError, SyntaxError) as exc:
             findings.append(
                 Finding(
@@ -657,120 +323,40 @@ def check_python_ast(ctx: ReviewContext) -> CheckResult:
                 )
             )
             continue
-        lines = text.splitlines()
-        if len(lines) > 1250:
-            findings.append(
-                Finding(
-                    check_id="python-ast",
-                    rule_id="oversized-module",
-                    severity=Severity.HIGH,
-                    path=rel,
-                    message=f"module is {len(lines)} lines (>1250)",
-                )
-            )
-        hot_path = any(
-            fnmatch.fnmatchcase(rel, pattern) for pattern in ctx.policy.hot_path_globs
+        native = _native_eval(
+            "python-ast",
+            {
+                "path": rel,
+                "text": text,
+                "lines": text.splitlines(),
+                "changed_lines": sorted(line_map.get(rel, set())),
+                "classes": changes[rel].classes,
+                "hot": any(
+                    fnmatch.fnmatchcase(rel, pattern)
+                    for pattern in ctx.policy.hot_path_globs
+                ),
+            },
         )
-        visitor = _PythonVisitor(rel, lines, hot_path)
-        visitor.visit(tree)
-        findings.extend(visitor.findings)
-        changed_text = _changed_text(lines, line_map.get(rel, set()))
-        stub_lines = _changed_stub_comment_lines(text, line_map.get(rel, set()))
-        if "test" not in changes[rel].classes and stub_lines:
-            findings.append(
-                Finding(
-                    check_id="python-ast",
-                    rule_id="partial-implementation-marker",
-                    severity=Severity.HIGH,
-                    path=rel,
-                    line=stub_lines[0],
-                    message="changed production code contains TODO/stub/coverage-bypass scaffolding",
-                )
-            )
-        if "novel" in changes[rel].classes and "test" not in changes[rel].classes:
-            match = SOFTMAX_FALLBACK.search(changed_text)
-            if match:
-                findings.append(
-                    Finding(
-                        check_id="python-ast",
-                        rule_id="softmax-shaped-fallback",
-                        severity=Severity.CRITICAL,
-                        path=rel,
-                        line=changed_text.count("\n", 0, match.start()) + 1,
-                        message=(
-                            "novel-mechanism path adds an attention/softmax-shaped fallback; "
-                            "fix the novel branch instead of masking it"
-                        ),
-                    )
-                )
-        if RANDOM_TEXT.search(changed_text) and not SEED_TEXT.search(text):
-            findings.append(
-                Finding(
-                    check_id="python-ast",
-                    rule_id="nondeterministic-research",
-                    severity=Severity.HIGH,
-                    path=rel,
-                    message="randomized changed code has no explicit deterministic seed path",
-                )
-            )
-        if (
-            any(
-                token in rel
-                for token in ("promotion", "program_write", "result_record")
-            )
-            and "stage1_passed" in changed_text
-            and not all(
-                metric in text
-                for metric in ("wikitext", "hellaswag", "blimp", "binding")
-            )
-        ):
-            findings.append(
-                Finding(
-                    check_id="python-ast",
-                    rule_id="partial-promotion-write",
-                    severity=Severity.CRITICAL,
-                    path=rel,
-                    message="promotion/write path changes stage-1 success without the complete metric contract",
-                )
-            )
+        findings.extend(_native_findings(native))
     return _result("python-ast", started, findings, files=files)
 
 
 def check_dependency_integrity(ctx: ReviewContext) -> CheckResult:
     started = time.perf_counter()
-    changes = [
-        change for change in ctx.candidate.changes if "dependency" in change.classes
-    ]
-    findings: list[Finding] = []
-    paths = {change.path for change in changes}
-    pairs = [
-        ("pyproject.toml", "uv.lock"),
-        ("package.json", "package-lock.json"),
-        ("Cargo.toml", "Cargo.lock"),
-    ]
-    for manifest, lock in pairs:
-        touched_manifests = [
-            path for path in paths if path == manifest or path.endswith(f"/{manifest}")
-        ]
-        for touched in touched_manifests:
-            prefix = touched[: -len(manifest)]
-            expected = f"{prefix}{lock}"
-            if expected not in paths and not (ctx.snapshot / expected).is_file():
-                findings.append(
-                    Finding(
-                        check_id="dependency-integrity",
-                        rule_id="missing-lockfile",
-                        severity=Severity.CRITICAL,
-                        path=touched,
-                        message=f"dependency manifest has no candidate lockfile: {expected}",
-                    )
-                )
+    paths = {
+        change.path
+        for change in ctx.candidate.changes
+        if "dependency" in change.classes
+    }
+    native = _native_eval(
+        "dependency-integrity", {"paths": list(paths), "snapshot": str(ctx.snapshot)}
+    )
     return _result(
         "dependency-integrity",
         started,
-        findings,
+        _native_findings(native),
         files=paths,
-        metrics={"dependency_files": len(paths)},
+        metrics=native["metrics"],
     )
 
 
@@ -888,66 +474,42 @@ def check_performance_evidence(
     ctx: ReviewContext, selection: TestSelection
 ) -> CheckResult:
     started = time.perf_counter()
-    hot_changes = [
-        change
-        for change in ctx.live_changes
-        if any(
-            fnmatch.fnmatchcase(change.path, pattern)
-            for pattern in ctx.policy.hot_path_globs
-        )
-        and "test" not in change.classes
-    ]
-    if not hot_changes:
+    chosen = _native_eval(
+        "performance-selection",
+        {
+            "changes": [asdict(change) for change in ctx.live_changes],
+            "hot_globs": ctx.policy.hot_path_globs,
+        },
+    )
+    hot_paths = chosen["hot_paths"]
+    if not hot_paths:
         return _result("performance-evidence", started)
-    evidence_paths = [
-        change.path
-        for change in ctx.live_changes
-        if re.search(r"(?i)(?:bench|perf|throughput|complexity|memory)", change.path)
-    ]
+    evidence_paths = chosen["evidence_paths"]
+    hot_changes = [change for change in ctx.live_changes if change.path in hot_paths]
     evidence_text = ""
     for test in selection.tests:
         try:
             evidence_text += (ctx.snapshot / test).read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-    findings: list[Finding] = []
-    if not evidence_paths and not re.search(
-        r"(?i)(?:benchmark|runtime|latency|throughput|max_rss|memory|complexity)",
-        evidence_text,
-    ):
-        findings.append(
-            Finding(
-                check_id="performance-evidence",
-                rule_id="missing-performance-budget",
-                severity=Severity.HIGH,
-                message="hot-path change has no changed benchmark/budget or selected performance regression test",
-                evidence={"hot_paths": [change.path for change in hot_changes]},
-            )
-        )
+    rows: list[dict[str, object]] = []
     for change in hot_changes:
-        if "python" not in change.classes or "native" in change.classes:
-            continue
-        try:
-            text = (ctx.snapshot / change.path).read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        if "performance-critical" in text and not re.search(
-            r"(?i)(?:numpy|torch\.|numba|triton|native|vectori[sz])", text
-        ):
-            findings.append(
-                Finding(
-                    check_id="performance-evidence",
-                    rule_id="python-only-hotpath",
-                    severity=Severity.HIGH,
-                    path=change.path,
-                    message="declared performance-critical path has no vectorized, compiled, or native execution route",
-                )
-            )
+        row: dict[str, object] = {"path": change.path, "classes": change.classes}
+        if "python" in change.classes and "native" not in change.classes:
+            try:
+                row["text"] = (ctx.snapshot / change.path).read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                pass
+        rows.append(row)
+    native = _native_eval(
+        "performance-evidence",
+        {"hot_changes": rows, "evidence_paths": evidence_paths, "evidence_text": evidence_text},
+    )
     return _result(
         "performance-evidence",
         started,
-        findings,
-        files=[change.path for change in hot_changes] + evidence_paths,
+        _native_findings(native),
+        files=hot_paths + evidence_paths,
     )
 
 
@@ -1006,7 +568,6 @@ def check_research_evidence(
     ]
     if not novel_changes:
         return _result("research-integrity", started)
-    findings: list[Finding] = []
     test_text = ""
     for test in selection.tests:
         try:
@@ -1015,40 +576,19 @@ def check_research_evidence(
             continue
     changed_text, evidence_text, diff_error = _research_texts(ctx, novel_changes)
     combined = evidence_text + "\n" + test_text
-    if re.search(r"(?i)(?:promot|baseline|metric|score|receipt)", changed_text):
-        missing = [
-            token
-            for token in ("baseline", "seed", "config", "fingerprint")
-            if token not in combined.casefold()
-        ]
-        if missing:
-            findings.append(
-                Finding(
-                    check_id="research-integrity",
-                    rule_id="incomplete-result-provenance",
-                    severity=Severity.HIGH,
-                    message="research decision path lacks exact identity/provenance fields: "
-                    + ", ".join(missing),
-                    evidence={
-                        "changed_paths": [change.path for change in novel_changes]
-                    },
-                )
-            )
-    if re.search(
-        r"(?i)(?:dtype|device|numerical|stability|finite|nan|inf)", changed_text
-    ) and not re.search(r"(?i)(?:dtype|device|isfinite|nan|raises|error)", test_text):
-        findings.append(
-            Finding(
-                check_id="research-integrity",
-                rule_id="missing-numerical-device-tests",
-                severity=Severity.HIGH,
-                message="numerical/device-sensitive research change lacks selected dtype/device/finiteness tests",
-            )
-        )
+    native = _native_eval(
+        "research-integrity",
+        {
+            "changed_text": changed_text,
+            "combined_casefold": combined.casefold(),
+            "test_text": test_text,
+            "changed_paths": [change.path for change in novel_changes],
+        },
+    )
     return _result(
         "research-integrity",
         started,
-        findings,
+        _native_findings(native),
         files=[change.path for change in novel_changes] + list(selection.tests),
         metrics={
             "armed_on": "whole-files" if diff_error else "changed-lines",
@@ -1059,28 +599,17 @@ def check_research_evidence(
 
 def check_native_source(ctx: ReviewContext) -> CheckResult:
     started = time.perf_counter()
-    findings: list[Finding] = []
     files = _changed_files(ctx, {"native"})
-    dangerous = re.compile(r"\b(?:gets|strcpy|strcat|sprintf|system|popen)\s*\(")
     # Every file this check reads is one the candidate changed, so an unreadable
     # one is not a gap in some background corpus -- it is the check declaring a
     # PASS over native source nobody scanned for unsafe APIs.
     ledger = ScanLedger("native-source")
+    records: list[dict[str, str]] = []
     for rel in files:
-        text = ledger.read_text(ctx.snapshot, rel)
-        if text is None:
-            continue
-        for match in dangerous.finditer(text):
-            findings.append(
-                Finding(
-                    check_id="native-source",
-                    rule_id="unsafe-native-api",
-                    severity=Severity.CRITICAL,
-                    path=rel,
-                    line=text.count("\n", 0, match.start()) + 1,
-                    message=f"unsafe native API admitted: {match.group(0).strip()}",
-                )
-            )
+        if (text := ledger.read_text(ctx.snapshot, rel)) is not None:
+            records.append({"path": rel, "text": text})
+    native = _native_eval("native-source", {"files": records})
+    findings = _native_findings(native)
     findings.extend(
         ledger.incomplete_findings(
             adjudicated=set(files),
@@ -1206,16 +735,16 @@ BUILTIN_CHECKS["equivalence-probe"] = check_equivalence_probe
 
 
 def files_for_policy(ctx: ReviewContext, check: CheckPolicy) -> list[str]:
-    class_filter = set(check.classes)
-    excluded = set(check.exclude_classes)
-    files = [
-        change.path
-        for change in ctx.candidate.changes
-        if (check.run_on_deletions or not change.deleted)
-        and (not class_filter or class_filter.intersection(change.classes))
-        and not excluded.intersection(change.classes)
-    ]
-    return sorted(set(files))
+    native = _native_eval(
+        "files-for-policy",
+        {
+            "changes": [asdict(change) for change in ctx.candidate.changes],
+            "classes": check.classes,
+            "exclude_classes": check.exclude_classes,
+            "run_on_deletions": check.run_on_deletions,
+        },
+    )
+    return native["files"]
 
 
 def run_builtin(ctx: ReviewContext, check: CheckPolicy) -> CheckResult:

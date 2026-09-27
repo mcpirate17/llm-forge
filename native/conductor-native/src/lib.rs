@@ -10,8 +10,13 @@
 
 mod a2a_compaction;
 pub mod a2a_retention;
+pub mod a2a_store;
+#[cfg(feature = "python")]
+mod a2a_store_py;
 #[cfg(feature = "python")]
 mod branch_policy;
+pub mod candidate_checks;
+pub mod candidate_policy;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_structure;
 #[cfg(feature = "python")]
@@ -54,12 +59,14 @@ pub mod mutation_value_inputs;
 mod native_reuse;
 #[cfg(feature = "python")]
 mod project_context;
+pub mod project_paths;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod receipt_auth;
 pub mod receipt_slim;
 mod text_normalization;
 #[cfg(feature = "python")]
 mod tooling_boundary;
+pub mod workspace_runtime_matrix;
 
 pub use a2a_compaction::{
     compact_message_value as compact_a2a_message, compact_threads_value as compact_a2a_threads,
@@ -76,6 +83,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     a2a_compaction::register(module)?;
     a2a_retention::register(module)?;
     branch_policy::register(module)?;
+    candidate_checks::register(module)?;
     candidate_structure::register(module)?;
     context_telemetry::register(module)?;
     dead_tests::register(module)?;
@@ -96,8 +104,12 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     mutation_value::register(module)?;
     native_reuse::register(module)?;
     project_context::register(module)?;
+    project_paths::register_py(module)?;
+    candidate_policy::register(module)?;
+    a2a_store_py::register(module)?;
     receipt_auth::register(module)?;
     receipt_slim::register(module)?;
     tooling_boundary::register(module)?;
+    workspace_runtime_matrix::register(module)?;
     Ok(())
 }

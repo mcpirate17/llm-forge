@@ -63,7 +63,7 @@ def _reordered(mapping: Mapping[str, Any], order: Sequence[str]) -> dict[str, An
 
 
 def _canonical_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
-    """Restore the exact key order `fest_manifest`/`cargo_manifest` build."""
+    """Restore the key order of the historical Python manifest format."""
     generator_order = (
         _CARGO_GENERATOR_ORDER
         if manifest.get("mutation_engine") == "cargo-mutants"
@@ -83,7 +83,7 @@ def _canonical_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
 def plan_native(
     language: str, repo_root: Path, ctx: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Call `mutation_plan_native`: same output as the pure-Python `plan()`, native speed."""
+    """Call `mutation_plan_native` and restore the historical output order."""
     request = {
         "language": language,
         "repo_root": str(repo_root),

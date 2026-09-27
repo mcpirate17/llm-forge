@@ -17,13 +17,11 @@ the caller that needs it.
 
 from __future__ import annotations
 
-import os
-import re
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, NoReturn
 
 DEFAULT_CANDIDATE_POLICY = PurePosixPath("conductor/candidate_policy.toml")
 DEFAULT_MUTATION_REGISTRY = PurePosixPath("conductor/mutation_campaigns/registry.json")
@@ -144,59 +142,26 @@ class ProjectPathError(RuntimeError):
     """A host project path is configured but unusable."""
 
 
+def _raise_native_error(exc: RuntimeError) -> NoReturn:
+    message = str(exc)
+    prefix = "PROJECT_PATHS_MANIFEST_ERROR:"
+    if message.startswith(prefix):
+        root = Path(message[len(prefix) :])
+        conductor_table(root)  # Preserve tomllib and OS exception types on failure.
+        message = f"native TOML parser refused {root / 'pyproject.toml'}"
+    raise ProjectPathError(message) from exc
+
+
 def _relative(raw: object, source: str) -> PurePosixPath:
-    """A configured value as a root-relative posix path, or a loud refusal."""
+    """Compatibility return type for native root-relative validation."""
     if not isinstance(raw, str):
         raise ProjectPathError(f"{source} must be a string, got {type(raw).__name__}")
-    text = raw.strip()
-    if not text:
-        raise ProjectPathError(f"{source} must not be empty")
-    path = PurePosixPath(text.replace("\\", "/"))
-    if path.is_absolute() or ".." in path.parts or not path.parts:
-        raise ProjectPathError(f"{source} must be repo-root-relative: {text!r}")
-    return path
+    from conductor._native import project_paths_relative_native
 
-
-def _branch_name(raw: object, source: str) -> str:
-    """A configured value as a non-empty branch name, or a loud refusal."""
-    if not isinstance(raw, str):
-        raise ProjectPathError(f"{source} must be a string, got {type(raw).__name__}")
-    text = raw.strip()
-    if not text:
-        raise ProjectPathError(f"{source} must not be empty")
-    return text
-
-
-def _branch_name_tuple(raw: object, source: str) -> tuple[str, ...]:
-    """A configured value as a tuple of non-empty branch names, or a loud refusal."""
-    if not isinstance(raw, (list, tuple)):
-        raise ProjectPathError(
-            f"{source} must be a list of strings, got {type(raw).__name__}"
-        )
-    return tuple(_branch_name(item, f"{source}[{i}]") for i, item in enumerate(raw))
-
-
-def _regex_pattern(raw: object, source: str) -> str:
-    """A configured value as a non-empty, compilable regex source, or a loud refusal."""
-    if not isinstance(raw, str):
-        raise ProjectPathError(f"{source} must be a string, got {type(raw).__name__}")
-    text = raw.strip()
-    if not text:
-        raise ProjectPathError(f"{source} must not be empty")
     try:
-        re.compile(text)
-    except re.error as exc:
-        raise ProjectPathError(f"{source} is not a valid regex: {exc}") from exc
-    return text
-
-
-def _regex_pattern_tuple(raw: object, source: str) -> tuple[str, ...]:
-    """A configured value as a tuple of regex sources, or a loud refusal."""
-    if not isinstance(raw, (list, tuple)):
-        raise ProjectPathError(
-            f"{source} must be a list of strings, got {type(raw).__name__}"
-        )
-    return tuple(_regex_pattern(item, f"{source}[{i}]") for i, item in enumerate(raw))
+        return PurePosixPath(project_paths_relative_native(raw, source))
+    except RuntimeError as exc:
+        _raise_native_error(exc)
 
 
 def conductor_table(root: Path) -> Mapping[str, Any]:
@@ -213,75 +178,6 @@ def conductor_table(root: Path) -> Mapping[str, Any]:
     if not isinstance(table, Mapping):
         raise ProjectPathError(f"[tool.conductor] in {manifest} is not a table")
     return table
-
-
-def _configured(root: Path, key: str, env: str) -> tuple[PurePosixPath, bool]:
-    """(relative path, whether the host named it) for one key."""
-    raw = os.environ.get(env, "").strip()
-    if raw:
-        return _relative(raw, f"${env}"), True
-    table = conductor_table(root)
-    if key in table:
-        source = f"[tool.conductor].{key} in {Path(root) / 'pyproject.toml'}"
-        return _relative(table[key], source), True
-    return DEFAULTS[key], False
-
-
-def _configured_integration_branch(root: Path) -> tuple[str, bool]:
-    """(branch name, whether the host named it), env then ``[tool.conductor]``."""
-    raw = os.environ.get(INTEGRATION_BRANCH_ENV, "").strip()
-    if raw:
-        return raw, True
-    table = conductor_table(root)
-    if INTEGRATION_BRANCH_KEY in table:
-        source = (
-            f"[tool.conductor].{INTEGRATION_BRANCH_KEY} in "
-            f"{Path(root) / 'pyproject.toml'}"
-        )
-        return _branch_name(table[INTEGRATION_BRANCH_KEY], source), True
-    return DEFAULT_INTEGRATION_BRANCH, False
-
-
-def _configured_retired_integration_branches(
-    root: Path,
-) -> tuple[tuple[str, ...], bool]:
-    """(retired branch names, whether the host named them). No env override.
-
-    Unlike ``integration_branch``, a retired line is host history, not a single
-    current answer worth overriding per-invocation -- it belongs in the committed
-    ``pyproject.toml`` alongside the branch it retired.
-    """
-    table = conductor_table(root)
-    if RETIRED_INTEGRATION_BRANCHES_KEY in table:
-        source = (
-            f"[tool.conductor].{RETIRED_INTEGRATION_BRANCHES_KEY} in "
-            f"{Path(root) / 'pyproject.toml'}"
-        )
-        return (
-            _branch_name_tuple(table[RETIRED_INTEGRATION_BRANCHES_KEY], source),
-            True,
-        )
-    return DEFAULT_RETIRED_INTEGRATION_BRANCHES, False
-
-
-def _configured_worktree_patterns(root: Path) -> tuple[tuple[str, ...], bool]:
-    """(worktree regex sources, whether the host named them). No env override.
-
-    Unlike ``integration_branch``, a worktree layout is host history, not a
-    single current answer worth overriding per-invocation -- it belongs in the
-    committed ``pyproject.toml`` alongside the rest of this host's paths.
-    """
-    table = conductor_table(root)
-    if WORKTREE_PATTERNS_KEY in table:
-        source = (
-            f"[tool.conductor].{WORKTREE_PATTERNS_KEY} in "
-            f"{Path(root) / 'pyproject.toml'}"
-        )
-        return (
-            _regex_pattern_tuple(table[WORKTREE_PATTERNS_KEY], source),
-            True,
-        )
-    return DEFAULT_WORKTREE_PATTERNS, False
 
 
 @dataclass(frozen=True)
@@ -378,64 +274,25 @@ class ProjectPaths:
 def project_paths(root: Path | str) -> ProjectPaths:
     """Resolve every host path against ``root``. Not cached: hosts differ per call."""
     base = Path(root)
-    policy, named_policy = _configured(base, CANDIDATE_POLICY_KEY, CANDIDATE_POLICY_ENV)
-    registry, named_reg = _configured(
-        base, MUTATION_REGISTRY_KEY, MUTATION_REGISTRY_ENV
-    )
-    package, named_pkg = _configured(base, PACKAGE_ROOT_KEY, PACKAGE_ROOT_ENV)
-    receipt_root, named_receipt_root = _configured(
-        base, MUTATION_RECEIPT_ROOT_KEY, MUTATION_RECEIPT_ROOT_ENV
-    )
-    notes, named_notes = _configured(base, NOTES_ROOT_KEY, NOTES_ROOT_ENV)
-    notes_db, named_notes_db = _configured(base, NOTES_DB_KEY, NOTES_DB_ENV)
-    allowlist, named_allowlist = _configured(
-        base, GUARDRAIL_ALLOWLIST_KEY, GUARDRAIL_ALLOWLIST_ENV
-    )
-    memory_sources, named_memory_sources = _configured(
-        base, MEMORY_SOURCES_KEY, MEMORY_SOURCES_ENV
-    )
-    crate_roster, named_crate_roster = _configured(
-        base, CRATE_ROSTER_KEY, CRATE_ROSTER_ENV
-    )
-    native_root, named_native_root = _configured(base, NATIVE_ROOT_KEY, NATIVE_ROOT_ENV)
-    radon_baseline, named_radon_baseline = _configured(
-        base, RADON_BASELINE_KEY, RADON_BASELINE_ENV
-    )
+    from conductor._native import project_paths_resolve_native
+
+    try:
+        values = project_paths_resolve_native(str(base))
+    except RuntimeError as exc:
+        _raise_native_error(exc)
     return ProjectPaths(
         base,
-        policy,
-        registry,
-        package,
-        receipt_root,
-        notes,
-        notes_db,
-        allowlist,
-        memory_sources,
-        crate_roster,
-        native_root,
-        radon_baseline,
-        named_policy,
-        named_reg,
-        named_pkg,
-        named_receipt_root,
-        named_notes,
-        named_notes_db,
-        named_allowlist,
-        named_memory_sources,
-        named_crate_roster,
-        named_native_root,
-        named_radon_baseline,
+        *(PurePosixPath(value) for value, _configured in values),
+        *(_configured for _value, _configured in values),
     )
 
 
 def enclosing_repo(start: Path) -> Path | None:
     """The nearest ancestor (inclusive) holding ``.git`` -- a dir or a worktree file."""
-    for candidate in (start, *start.parents):
-        if candidate == candidate.parent:
-            break  # the filesystem root is never a repo; do not probe /.git
-        if (candidate / ".git").exists():
-            return candidate
-    return None
+    from conductor._native import project_paths_enclosing_repo_native
+
+    result = project_paths_enclosing_repo_native(str(start))
+    return Path(result) if result is not None else None
 
 
 def host_root(start: Path | None = None) -> Path:
@@ -453,16 +310,14 @@ def host_root(start: Path | None = None) -> Path:
     3. The nearest ``.git`` ancestor of the current working directory,
        else the cwd itself.
     """
-    env_value = os.environ.get("CONDUCTOR_HOST_ROOT")
-    if env_value:
-        candidate = Path(env_value)
-        if not candidate.is_absolute() or not candidate.exists():
-            raise ProjectPathError(
-                f"CONDUCTOR_HOST_ROOT={env_value!r} must be an absolute, existing path"
-            )
-        return candidate.resolve()
-    base = (start or Path.cwd()).resolve()
-    return enclosing_repo(base) or base
+    from conductor._native import project_paths_host_root_native
+
+    try:
+        return Path(
+            project_paths_host_root_native(str(start) if start is not None else None)
+        )
+    except RuntimeError as exc:
+        _raise_native_error(exc)
 
 
 def registry_relative(root: Path | str) -> PurePosixPath:
@@ -611,7 +466,12 @@ def radon_baseline_path(root: Path | str) -> Path:
 
 def integration_branch(root: Path | str) -> str:
     """This host's integration line: env override, then ``[tool.conductor]``, else ``main``."""
-    return _configured_integration_branch(Path(root))[0]
+    from conductor._native import project_paths_integration_branch_native
+
+    try:
+        return project_paths_integration_branch_native(str(root))
+    except RuntimeError as exc:
+        _raise_native_error(exc)
 
 
 def retired_integration_branches(root: Path | str) -> tuple[str, ...]:
@@ -622,7 +482,12 @@ def retired_integration_branches(root: Path | str) -> tuple[str, ...]:
     remote. Defaults to empty: that history is host-specific and belongs in the host's
     own ``pyproject.toml``, never baked into the package.
     """
-    return _configured_retired_integration_branches(Path(root))[0]
+    from conductor._native import project_paths_retired_integration_branches_native
+
+    try:
+        return tuple(project_paths_retired_integration_branches_native(str(root)))
+    except RuntimeError as exc:
+        _raise_native_error(exc)
 
 
 def worktree_patterns(root: Path | str) -> tuple[str, ...]:
@@ -633,7 +498,25 @@ def worktree_patterns(root: Path | str) -> tuple[str, ...]:
     A host with another layout names its own patterns via ``[tool.conductor]``;
     there is no environment override, matching ``retired_integration_branches``.
     """
-    return _configured_worktree_patterns(Path(root))[0]
+    import re
+
+    from conductor._native import project_paths_worktree_patterns_native
+
+    try:
+        patterns = project_paths_worktree_patterns_native(str(root))
+    except RuntimeError as exc:
+        _raise_native_error(exc)
+    for index, pattern in enumerate(patterns):
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            source = (
+                f"[tool.conductor].worktree_patterns in {Path(root) / 'pyproject.toml'}"
+            )
+            raise ProjectPathError(
+                f"{source}[{index}] is not a valid regex: {exc}"
+            ) from exc
+    return tuple(patterns)
 
 
 def integration_branches(root: Path | str) -> tuple[str, ...]:
@@ -658,17 +541,12 @@ def package_tree_root(package_dir: Path) -> Path:
     nearest ancestor whose own configuration resolves back onto the same directory;
     when no ancestor claims it at all, that is a refusal, not a guess.
     """
-    resolved = Path(package_dir).resolve()
-    repo = enclosing_repo(resolved)
-    candidates = list(resolved.parents)
-    if repo is not None:
-        candidates.insert(0, repo)
-    for candidate in candidates:
-        if project_paths(candidate).package_path.resolve() == resolved:
-            return candidate
-    raise ProjectPathError(
-        f"no tree root above {resolved} resolves its configured package root back to it"
-    )
+    from conductor._native import project_paths_package_tree_root_native
+
+    try:
+        return Path(project_paths_package_tree_root_native(str(package_dir)))
+    except RuntimeError as exc:
+        _raise_native_error(exc)
 
 
 def registry_path(root: Path | str) -> Path:

@@ -40,7 +40,11 @@ pub struct Case {
 impl Case {
     pub fn new() -> Self {
         Python::initialize();
-        let process_state = PROCESS_STATE.lock().expect("test process-state lock");
+        // Case and attribute guards restore state while a failed assertion
+        // unwinds. Let later cases run so that one failure does not mask others.
+        let process_state = PROCESS_STATE
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut env = EnvRestore::default();
         for name in PROJECT_ENV {
             env.remove(name);

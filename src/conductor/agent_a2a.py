@@ -37,21 +37,17 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import hashlib
 import hmac
 import json
-import os
 import re
-import socket
 import sqlite3
-import stat
+import subprocess
 import uuid
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any, Final
 
 import httpx
-import uvicorn
 from a2a.helpers.proto_helpers import (
     MessageToDict,
     get_data_parts,
@@ -88,7 +84,6 @@ from starlette.responses import JSONResponse
 
 from conductor.a2a_compaction import (
     CompactionError,
-    compact_message,
     validate_coordination_v2,
 )
 from conductor.a2a_registry import (
@@ -103,12 +98,7 @@ from conductor.a2a_registry import (
     SCHEMA_VERSION,
     A2aError,
     AgentRecord,
-    _atomic_json,
-    _liveness_payload,
-    _registration_fingerprint,
-    _registry_lock,
-    _registry_payload,
-    _serve_port,
+    _run_native_registry,
     _utc_now,
     fetch_card,
     init_registry,
@@ -119,6 +109,7 @@ from conductor.a2a_registry import (
 
 # Registry symbols remain part of the public transport facade after extraction.
 __all__ = [
+    "AGENT_CARD_WELL_KNOWN_PATH",
     "BIND_HOST",
     "DATA_KINDS",
     "DEFAULT_COMPACT_MESSAGES",
@@ -179,11 +170,14 @@ class A2aStore:
     """Per-agent durable message journal (inbox + outbound terminal status)."""
 
     def __init__(self, state_dir: Path, name: str) -> None:
+        from conductor._native import a2a_store_native
+
         self.dir = state_dir / name
-        self.dir.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.dir, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
         self.path = self.dir / "store.sqlite"
-        self._migrate()
+        try:
+            self._native = a2a_store_native(str(state_dir), name)
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
     @contextlib.contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
@@ -198,195 +192,6 @@ class A2aStore:
         finally:
             connection.close()
 
-    def _migrate(self) -> None:
-        with self.connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS messages (
-                    message_id TEXT NOT NULL,
-                    direction TEXT NOT NULL CHECK(direction IN ('inbound','outbound')),
-                    sender TEXT NOT NULL,
-                    recipient TEXT NOT NULL,
-                    body TEXT NOT NULL,
-                    data_json TEXT,
-                    created_at TEXT NOT NULL,
-                    received_at TEXT,
-                    delivery_status TEXT NOT NULL,
-                    status_reason TEXT,
-                    read_at TEXT,
-                    -- Self-sends journal one outbound and one inbound fact for
-                    -- the same message_id; the direction disambiguates them.
-                    PRIMARY KEY (direction, message_id)
-                );
-                CREATE INDEX IF NOT EXISTS messages_inbox
-                    ON messages(direction, read_at, created_at);
-                CREATE TABLE IF NOT EXISTS delivery_events (
-                    event_id INTEGER PRIMARY KEY,
-                    message_id TEXT NOT NULL,
-                    occurred_at TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    reason TEXT
-                );
-                CREATE TABLE IF NOT EXISTS message_state (
-                    direction TEXT NOT NULL,
-                    message_id TEXT NOT NULL,
-                    thread_id TEXT NOT NULL,
-                    summary TEXT NOT NULL,
-                    protocol_status TEXT NOT NULL,
-                    requires_response INTEGER NOT NULL
-                        CHECK(requires_response IN (0, 1)),
-                    retention_class TEXT NOT NULL
-                        CHECK(retention_class IN ('pinned', 'operational')),
-                    resolved_at TEXT,
-                    superseded_at TEXT,
-                    hold_reason TEXT,
-                    tombstoned_at TEXT,
-                    body_sha256 TEXT NOT NULL,
-                    body_bytes INTEGER NOT NULL,
-                    data_sha256 TEXT,
-                    data_bytes INTEGER NOT NULL,
-                    PRIMARY KEY (direction, message_id),
-                    FOREIGN KEY (direction, message_id)
-                        REFERENCES messages(direction, message_id)
-                        ON DELETE CASCADE
-                );
-                CREATE INDEX IF NOT EXISTS message_state_context
-                    ON message_state(direction, thread_id);
-                CREATE INDEX IF NOT EXISTS message_state_retention
-                    ON message_state(
-                        retention_class, hold_reason, tombstoned_at,
-                        resolved_at, superseded_at
-                    );
-                CREATE TABLE IF NOT EXISTS retention_events (
-                    event_id TEXT PRIMARY KEY,
-                    direction TEXT NOT NULL,
-                    message_id TEXT NOT NULL,
-                    policy_version INTEGER NOT NULL,
-                    manifest_json TEXT NOT NULL,
-                    manifest_sha256 TEXT NOT NULL,
-                    compacted_at TEXT NOT NULL,
-                    UNIQUE(direction, message_id),
-                    FOREIGN KEY (direction, message_id)
-                        REFERENCES messages(direction, message_id)
-                        ON DELETE RESTRICT
-                );
-                CREATE TABLE IF NOT EXISTS message_presentations (
-                    direction TEXT NOT NULL,
-                    message_id TEXT NOT NULL,
-                    presented_at TEXT NOT NULL,
-                    PRIMARY KEY (direction, message_id),
-                    FOREIGN KEY (direction, message_id)
-                        REFERENCES messages(direction, message_id)
-                        ON DELETE CASCADE
-                );
-                """
-            )
-        os.chmod(self.path, stat.S_IRUSR | stat.S_IWUSR)
-
-    @staticmethod
-    def _legacy_state(
-        *, message_id: str, sender: str, body: str, data_json: str | None
-    ) -> dict[str, Any]:
-        collapsed = " ".join(body.split())
-        summary = (
-            collapsed[:237].rstrip() + "..." if len(collapsed) > 240 else collapsed
-        )
-        body_encoded = body.encode("utf-8")
-        data_encoded = data_json.encode("utf-8") if data_json is not None else b""
-        return {
-            "thread_id": f"legacy:{sender}",
-            "summary": summary or f"message {message_id}",
-            "protocol_status": "open",
-            "requires_response": 1,
-            # Existing/unstructured content may be durable authentication
-            # evidence. It is view-compactable but never retention-eligible.
-            "retention_class": "pinned",
-            "body_sha256": hashlib.sha256(body_encoded).hexdigest(),
-            "body_bytes": len(body_encoded),
-            "data_sha256": (
-                hashlib.sha256(data_encoded).hexdigest()
-                if data_json is not None
-                else None
-            ),
-            "data_bytes": len(data_encoded),
-        }
-
-    @staticmethod
-    def _protocol_state(
-        *,
-        message_id: str,
-        direction: str,
-        sender: str,
-        recipient: str,
-        body: str,
-        data_json: str | None,
-        created_at: str,
-        received_at: str | None,
-        delivery_status: str,
-    ) -> dict[str, Any]:
-        try:
-            receipt = compact_message(
-                {
-                    "message_id": message_id,
-                    "direction": direction,
-                    "sender": sender,
-                    "recipient": recipient,
-                    "body": body,
-                    "data_json": data_json,
-                    "created_at": created_at,
-                    "received_at": received_at,
-                    "delivery_status": delivery_status,
-                    "status_reason": None,
-                    "read_at": None,
-                }
-            )
-        except CompactionError as exc:
-            raise A2aError(f"message compaction metadata is invalid: {exc}") from exc
-        protocol_v2 = receipt["protocol"] == "coordination-v2"
-        return {
-            "thread_id": receipt["thread_id"],
-            "summary": receipt["summary"],
-            "protocol_status": receipt["status"] or "open",
-            "requires_response": int(receipt["actionable"]),
-            "retention_class": "operational" if protocol_v2 else "pinned",
-            "body_sha256": receipt["body_sha256"],
-            "body_bytes": receipt["raw_body_bytes"],
-            "data_sha256": receipt["data_sha256"],
-            "data_bytes": receipt["raw_data_bytes"],
-            "supersedes": receipt["supersedes"],
-        }
-
-    @staticmethod
-    def _insert_state(
-        connection: sqlite3.Connection,
-        *,
-        direction: str,
-        message_id: str,
-        state: dict[str, Any],
-    ) -> None:
-        connection.execute(
-            """
-            INSERT INTO message_state (
-                direction, message_id, thread_id, summary, protocol_status,
-                requires_response, retention_class, body_sha256, body_bytes,
-                data_sha256, data_bytes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                direction,
-                message_id,
-                state["thread_id"],
-                state["summary"],
-                state["protocol_status"],
-                state["requires_response"],
-                state["retention_class"],
-                state["body_sha256"],
-                state["body_bytes"],
-                state["data_sha256"],
-                state["data_bytes"],
-            ),
-        )
-
     def record_inbound(
         self,
         message_id: str,
@@ -396,70 +201,13 @@ class A2aStore:
         data_json: str | None,
         state: dict[str, Any] | None = None,
     ) -> None:
-        now = _utc_now()
-        with self.connect() as connection:
-            cursor = connection.execute(
-                """
-                INSERT OR IGNORE INTO messages (
-                    message_id, direction, sender, recipient, body, data_json,
-                    created_at, received_at, delivery_status
-                ) VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, 'delivered')
-                """,
-                (
-                    message_id,
-                    sender,
-                    recipient,
-                    body,
-                    data_json,
-                    now,
-                    now,
-                ),
+        selected = json.dumps(state, ensure_ascii=False) if state else None
+        try:
+            self._native.record_inbound(
+                message_id, sender, recipient, body, data_json, _utc_now(), selected
             )
-            if cursor.rowcount == 1:
-                selected_state = state or self._protocol_state(
-                    message_id=message_id,
-                    direction="inbound",
-                    sender=sender,
-                    recipient=recipient,
-                    body=body,
-                    data_json=data_json,
-                    created_at=now,
-                    received_at=now,
-                    delivery_status="delivered",
-                )
-                self._insert_state(
-                    connection,
-                    direction="inbound",
-                    message_id=message_id,
-                    state=selected_state,
-                )
-                for superseded_id in selected_state.get("supersedes", []):
-                    superseded = connection.execute(
-                        """
-                        UPDATE message_state
-                        SET superseded_at=COALESCE(superseded_at, ?),
-                            protocol_status='superseded'
-                        WHERE direction='inbound' AND message_id=?
-                          AND thread_id=? AND tombstoned_at IS NULL
-                          AND EXISTS (
-                              SELECT 1 FROM messages AS prior
-                              WHERE prior.direction='inbound'
-                                AND prior.message_id=message_state.message_id
-                                AND prior.sender=?
-                          )
-                        """,
-                        (
-                            now,
-                            superseded_id,
-                            selected_state["thread_id"],
-                            sender,
-                        ),
-                    )
-                    if superseded.rowcount != 1:
-                        raise A2aError(
-                            f"supersedes target {superseded_id!r} is missing or "
-                            "belongs to another sender/thread"
-                        )
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
     def record_outbound(
         self,
@@ -470,34 +218,13 @@ class A2aStore:
         data_json: str | None,
         state: dict[str, Any] | None = None,
     ) -> None:
-        now = _utc_now()
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO messages (
-                    message_id, direction, sender, recipient, body, data_json,
-                    created_at, delivery_status
-                ) VALUES (?, 'outbound', ?, ?, ?, ?, ?, 'pending')
-                """,
-                (message_id, sender, recipient, body, data_json, now),
+        selected = json.dumps(state, ensure_ascii=False) if state else None
+        try:
+            self._native.record_outbound(
+                message_id, sender, recipient, body, data_json, _utc_now(), selected
             )
-            self._insert_state(
-                connection,
-                direction="outbound",
-                message_id=message_id,
-                state=state
-                or self._protocol_state(
-                    message_id=message_id,
-                    direction="outbound",
-                    sender=sender,
-                    recipient=recipient,
-                    body=body,
-                    data_json=data_json,
-                    created_at=now,
-                    received_at=None,
-                    delivery_status="pending",
-                ),
-            )
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
     def mark_outbound(
         self,
@@ -508,47 +235,19 @@ class A2aStore:
     ) -> None:
         if status not in ("delivered", "failed", "queued"):
             raise A2aError(f"unknown outbound status {status!r}")
-        with self.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE messages
-                SET delivery_status=?, status_reason=?, received_at=?
-                WHERE message_id=? AND direction='outbound'
-                """,
-                (status, reason, received_at, message_id),
+        try:
+            self._native.mark_outbound(
+                message_id, status, reason, received_at, _utc_now()
             )
-            if cursor.rowcount != 1:
-                raise A2aError(f"unknown outbound message {message_id!r}")
-            connection.execute(
-                "INSERT INTO delivery_events(message_id, occurred_at, status, reason) "
-                "VALUES (?, ?, ?, ?)",
-                (message_id, _utc_now(), status, reason),
-            )
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
-    def mark_read(self, message_id: str) -> sqlite3.Row:
-        with self.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE messages SET read_at=?
-                WHERE message_id=? AND direction='inbound' AND read_at IS NULL
-                """,
-                (_utc_now(), message_id),
-            )
-            if cursor.rowcount != 1:
-                raise A2aError(f"no unread inbound message {message_id!r}")
-            return self._fetch(connection, message_id, "inbound")
-
-    @staticmethod
-    def _fetch(
-        connection: sqlite3.Connection, message_id: str, direction: str
-    ) -> sqlite3.Row:
-        row = connection.execute(
-            "SELECT * FROM messages WHERE message_id=? AND direction=?",
-            (message_id, direction),
-        ).fetchone()
-        if row is None:
-            raise A2aError(f"unknown message {message_id!r}")
-        return row
+    def mark_read(self, message_id: str) -> dict[str, Any]:
+        try:
+            self._native.mark_read(message_id, _utc_now())
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
+        return self.message(message_id)
 
     def queued_outbound(
         self,
@@ -556,33 +255,18 @@ class A2aStore:
         *,
         limit: int | None = None,
         exclude: Sequence[str] = (),
-    ) -> list[sqlite3.Row]:
+    ) -> list[dict[str, Any]]:
         """Outbound messages awaiting redelivery, oldest first."""
-        query = (
-            "SELECT * FROM messages "
-            "WHERE direction='outbound' AND delivery_status IN ('queued', 'pending')"
-        )
-        params: list[Any] = []
-        if to_name is not None:
-            query += " AND recipient=?"
-            params.append(to_name)
-        if exclude:
-            query += " AND recipient NOT IN (" + ",".join("?" for _ in exclude) + ")"
-            params.extend(exclude)
-        query += " ORDER BY created_at, rowid"
-        if limit is not None:
-            query += " LIMIT ?"
-            params.append(limit)
-        with self.connect() as connection:
-            return list(connection.execute(query, params).fetchall())
+        try:
+            return json.loads(self._native.queued_rows(to_name, list(exclude), limit))
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
-    def rows(self, unread_only: bool, limit: int) -> list[sqlite3.Row]:
-        query = "SELECT * FROM messages WHERE direction='inbound'"
-        if unread_only:
-            query += " AND read_at IS NULL"
-        query += " ORDER BY created_at DESC LIMIT ?"
-        with self.connect() as connection:
-            return list(connection.execute(query, (limit,)).fetchall())
+    def rows(self, unread_only: bool, limit: int) -> list[dict[str, Any]]:
+        try:
+            return json.loads(self._native.inbound_rows(unread_only, limit))
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
     def preview_rows(
         self,
@@ -593,140 +277,48 @@ class A2aStore:
         preview_chars: int,
     ) -> tuple[list[dict[str, Any]], int]:
         """Read bounded inbox envelopes without materializing full bodies."""
+        try:
+            rows, total = json.loads(
+                self._native.preview_rows(
+                    unread_only, unpresented_only, limit, preview_chars
+                )
+            )
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
+        return rows, total
 
-        where = "m.direction='inbound'"
-        if unread_only:
-            where += " AND m.read_at IS NULL"
-        if unpresented_only:
-            where += " AND p.message_id IS NULL"
-        query = f"""
-            SELECT
-                m.message_id, m.direction, m.sender, m.recipient,
-                m.created_at, m.received_at, m.delivery_status, m.read_at,
-                substr(replace(replace(m.body, char(10), ' '), char(13), ' '),
-                       1, ?) AS body,
-                length(CAST(m.body AS BLOB)) AS body_bytes,
-                COALESCE(s.thread_id, 'legacy:' || m.sender) AS thread_id,
-                COALESCE(NULLIF(substr(s.summary, 1, ?), ''),
-                         substr(replace(replace(m.body, char(10), ' '), char(13), ' '),
-                                1, ?)) AS summary,
-                COALESCE(s.protocol_status, 'open') AS protocol_status,
-                COALESCE(s.requires_response, 1) AS requires_response,
-                COALESCE(s.retention_class, 'pinned') AS retention_class,
-                p.presented_at,
-                s.resolved_at, s.superseded_at, s.hold_reason,
-                COALESCE(s.body_sha256, '') AS body_sha256,
-                COALESCE(s.data_bytes, length(CAST(m.data_json AS BLOB)), 0)
-                    AS data_bytes,
-                SUM(
-                    length(CAST(m.body AS BLOB))
-                    + COALESCE(length(CAST(m.data_json AS BLOB)), 0)
-                ) OVER () AS total_raw_bytes,
-                COUNT(*) OVER () AS total_count
-            FROM messages AS m
-            LEFT JOIN message_state AS s
-              ON s.direction=m.direction AND s.message_id=m.message_id
-            LEFT JOIN message_presentations AS p
-              ON p.direction=m.direction AND p.message_id=m.message_id
-            WHERE {where}
-            ORDER BY m.created_at DESC, m.message_id DESC
-            LIMIT ?
-        """
-        with self.connect() as connection:
-            fetched = connection.execute(
-                query, (preview_chars, preview_chars, preview_chars, limit)
-            ).fetchall()
-        total = int(fetched[0]["total_count"]) if fetched else 0
-        return ([dict(row) for row in fetched], total)
-
-    def message(self, message_id: str, direction: str = "inbound") -> sqlite3.Row:
-        with self.connect() as connection:
-            return self._fetch(connection, message_id, direction)
+    def message(
+        self, message_id: str, direction: str = "inbound"
+    ) -> dict[str, Any]:
+        try:
+            return json.loads(self._native.fetch_row(message_id, direction))
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
     def mark_presented(self, message_ids: Sequence[str]) -> int:
-        if not message_ids:
-            return 0
-        presented_at = _utc_now()
-        with self.connect() as connection:
-            before = connection.total_changes
-            connection.executemany(
-                """
-                INSERT OR IGNORE INTO message_presentations (
-                    direction, message_id, presented_at
-                ) VALUES ('inbound', ?, ?)
-                """,
-                ((message_id, presented_at) for message_id in message_ids),
-            )
-            return connection.total_changes - before
+        try:
+            return self._native.mark_presented(list(message_ids), _utc_now())
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
-    def resolve(self, message_id: str) -> sqlite3.Row:
+    def resolve(self, message_id: str) -> dict[str, Any]:
         """Mark one read inbound message resolved without changing its body."""
-
-        with self.connect() as connection:
-            row = self._fetch(connection, message_id, "inbound")
-            if row["read_at"] is None:
-                raise A2aError(f"cannot resolve unread message {message_id!r}")
-            state = connection.execute(
-                """
-                SELECT 1 FROM message_state
-                WHERE direction='inbound' AND message_id=?
-                """,
-                (message_id,),
-            ).fetchone()
-            if state is None:
-                self._insert_state(
-                    connection,
-                    direction="inbound",
-                    message_id=message_id,
-                    state=self._legacy_state(
-                        message_id=message_id,
-                        sender=row["sender"],
-                        body=row["body"],
-                        data_json=row["data_json"],
-                    ),
-                )
-            connection.execute(
-                """
-                UPDATE message_state
-                SET resolved_at=COALESCE(resolved_at, ?),
-                    protocol_status='resolved'
-                WHERE direction='inbound' AND message_id=?
-                """,
-                (_utc_now(), message_id),
-            )
-            return self._fetch(connection, message_id, "inbound")
+        try:
+            return json.loads(self._native.resolve(message_id, _utc_now()))
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
     def set_hold(self, message_id: str, reason: str | None) -> None:
-        if reason is not None:
-            reason = " ".join(reason.split())
-            if not reason or len(reason) > 240:
-                raise A2aError("hold reason must be 1..240 characters")
-        with self.connect() as connection:
-            self._fetch(connection, message_id, "inbound")
-            cursor = connection.execute(
-                """
-                UPDATE message_state SET hold_reason=?
-                WHERE direction='inbound' AND message_id=?
-                """,
-                (reason, message_id),
-            )
-            if cursor.rowcount != 1:
-                raise A2aError(
-                    f"message {message_id!r} has no lifecycle metadata; "
-                    "legacy messages remain pinned"
-                )
+        try:
+            self._native.set_hold(message_id, reason)
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
     def counts(self) -> dict[str, int]:
-        with self.connect() as connection:
-            return {
-                row["status"]: row["count"]
-                for row in connection.execute(
-                    """
-                    SELECT delivery_status AS status, COUNT(*) AS count
-                    FROM messages GROUP BY delivery_status
-                    """
-                )
-            }
+        try:
+            return json.loads(self._native.counts())
+        except ValueError as exc:
+            raise A2aError(str(exc)) from exc
 
 
 def validate_data_payload(payload: Any) -> str:
@@ -893,49 +485,29 @@ def build_app(record: AgentRecord, store: A2aStore) -> Starlette:
 
 
 def serve(name: str, state_dir: Path, port: int | None = None) -> None:
-    # Bind first. A port collision must never leave a fresh identity in the
-    # registry. The generation rotates only after the endpoint owns its socket,
-    # allowing liveness/reap to reject stale probe results across restarts.
-    selected_port = _serve_port(state_dir, name, port)
-    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        listener.bind((BIND_HOST, selected_port))
-        listener.listen(socket.SOMAXCONN)
-    except OSError as exc:
-        listener.close()
-        raise A2aError(
-            f"cannot bind {name!r} to {BIND_HOST}:{selected_port}: {exc}"
-        ) from exc
+    """Keep the public Python entry point while Forge owns the live endpoint."""
+    from conductor.a2a_delivery import _forge_binary
 
+    command = [
+        str(_forge_binary()),
+        "mailbox",
+        "--state-dir",
+        str(state_dir),
+        "serve",
+        "--name",
+        name,
+    ]
+    if port is not None:
+        command.extend(("--port", str(port)))
     try:
-        records = init_registry(
-            state_dir,
-            name=name,
-            port=selected_port,
-            renew_generation=True,
+        completed = subprocess.run(command, check=False, stderr=subprocess.PIPE, text=True)
+    except OSError as exc:
+        raise A2aError(f"cannot start native A2A serve: {exc}") from exc
+    if completed.returncode:
+        raise A2aError(
+            completed.stderr.strip()
+            or f"native A2A serve exited with status {completed.returncode}"
         )
-        record = records[name]
-        store = A2aStore(state_dir, name)
-        app = build_app(record, store)
-        print(
-            json.dumps(
-                {
-                    "name": record.name,
-                    "port": record.port,
-                    "generation": record.generation,
-                    "card_url": f"{record.base_url}{AGENT_CARD_WELL_KNOWN_PATH}",
-                    "rpc_url": f"{record.base_url}{DEFAULT_RPC_URL}",
-                    "pid": os.getpid(),
-                },
-                sort_keys=True,
-            ),
-            flush=True,
-        )
-        config = uvicorn.Config(app, log_level="warning", lifespan="off")
-        uvicorn.Server(config).run(sockets=[listener])
-    finally:
-        listener.close()
 
 
 def _require_coordination_v2_skill(record: AgentRecord, card: dict[str, Any]) -> None:
@@ -1058,76 +630,17 @@ def flush_queued(
     return implementation(state_dir, from_name, to_name, max_messages)
 
 
-def _outbound_row(store: A2aStore, message_id: str) -> dict[str, Any]:
-    with store.connect() as connection:
-        row = connection.execute(
-            """
-            SELECT m.message_id, m.sender, m.recipient, m.created_at,
-                   m.received_at, m.delivery_status, m.status_reason,
-                   s.thread_id, s.summary, s.protocol_status,
-                   s.requires_response, s.body_sha256, s.body_bytes,
-                   s.data_sha256, s.data_bytes
-            FROM messages AS m
-            JOIN message_state AS s
-              ON s.direction=m.direction AND s.message_id=m.message_id
-            WHERE m.message_id=? AND m.direction='outbound'
-            """,
-            (message_id,),
-        ).fetchone()
-    if row is None:
-        raise A2aError(f"unknown outbound message {message_id!r}")
-    return {
-        "schema_version": 1,
-        "authority": "a2a-delivery-receipt",
-        **dict(row),
-    }
-
-
 def reap_registry(
     state_dir: Path, consecutive_failures: int = DEFAULT_REAP_FAILURES
 ) -> dict[str, Any]:
-    """Probe peers and remove identities down for the requested failure streak."""
+    """Apply native generation-guarded reaping through the public facade."""
 
-    if consecutive_failures < 1:
-        raise A2aError("--consecutive-failures must be at least 1")
-    peers = list_peers(state_dir)
-    candidates = {
-        item["name"]: item["registration_fingerprint"]
-        for item in peers
-        if item.get("status") == "down"
-        and item.get("consecutive_failures", 0) >= consecutive_failures
-    }
-    registry_path = state_dir / "agents.json"
-    liveness_path = state_dir / "liveness.json"
-    removed: list[str] = []
-    with _registry_lock(state_dir):
-        payload = _registry_payload(registry_path)
-        agents: dict[str, Any] = payload["agents"]
-        records = load_registry(state_dir)
-        liveness = _liveness_payload(liveness_path)
-        removed = sorted(
-            name
-            for name, fingerprint in candidates.items()
-            if name in agents
-            and name in records
-            and _registration_fingerprint(records[name]) == fingerprint
-            and isinstance(liveness["agents"].get(name), dict)
-            and liveness["agents"][name].get("registration_fingerprint") == fingerprint
-            and liveness["agents"][name].get("consecutive_failures", 0)
-            >= consecutive_failures
-        )
-        for name in removed:
-            del agents[name]
-        if removed:
-            _atomic_json(registry_path, payload)
-            for name in removed:
-                liveness["agents"].pop(name, None)
-            _atomic_json(liveness_path, liveness)
-    return {
-        "consecutive_failures": consecutive_failures,
-        "probed": peers,
-        "reaped": removed,
-    }
+    result = _run_native_registry(
+        state_dir, "reap", ["--consecutive-failures", str(consecutive_failures)]
+    )
+    if not isinstance(result, dict) or not isinstance(result.get("reaped"), list):
+        raise A2aError("invalid native A2A reap response")
+    return result
 
 
 def _row_dict(row: sqlite3.Row) -> dict[str, Any]:
