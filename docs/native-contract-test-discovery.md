@@ -16,6 +16,11 @@ targets. Selected fixture programs must be canonical regular files within the
 snapshot, with no external module or source-splicing includes.
 Checked-in JSON corpora under `native/forge/tests/fixtures/` map to the same
 targets and receive canonical regular-file checks before those targets run.
+Contracts can also register top-level Rust source dependencies under
+`native/conductor-native/src/` when a test reads or checks those inputs.
+Changing a registered Rust path selects its contract, but does not add that path
+to the Python coverage source list. Such a mapping alone does not establish
+behavioral coverage of the Rust implementation.
 
 The PyO3 entry point is `contract_test_plan_native(repo_root, changed_paths)`.
 It returns JSON with sorted, deduplicated matched Python `source_paths`, Cargo

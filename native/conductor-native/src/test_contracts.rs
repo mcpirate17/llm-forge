@@ -15,6 +15,11 @@ const TEST_DIR: &str = "native/conductor-native/tests";
 const REGISTRY_PATH: &str = "native/conductor-native/src/python_contract_targets.tsv";
 const COMPILED_REGISTRY: &str = include_str!("python_contract_targets.tsv");
 
+fn native_source(path: &str) -> bool {
+    path.strip_prefix("native/conductor-native/src/")
+        .is_some_and(|name| name.ends_with(".rs") && !name.contains('/'))
+}
+
 fn fixture_source(path: &str) -> bool {
     path.starts_with(&format!("{TEST_DIR}/fixtures/")) && path.ends_with(".rs")
 }
@@ -64,7 +69,11 @@ fn parse_registry(contents: &str) -> Result<Registry> {
             && !source
                 .trim_start_matches(&format!("{TEST_DIR}/python_contracts/"))
                 .contains('/');
-        if !(source_file || helper || fixture_source(source) || corpus_source(source))
+        if !(source_file
+            || helper
+            || native_source(source)
+            || fixture_source(source)
+            || corpus_source(source))
             || source.contains("..")
             || source.contains('\\')
             || source.chars().any(char::is_control)

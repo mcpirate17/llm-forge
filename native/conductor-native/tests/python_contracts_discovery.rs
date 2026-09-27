@@ -94,6 +94,38 @@ fn native_fixture_source_selects_contract_and_must_stay_local() {
     assert!(plan(&fixture.root, &[relative]).is_err());
 }
 
+#[test]
+fn native_provider_paths_select_contracts_without_becoming_python_sources() {
+    let fixture = Fixture::new();
+    let relative = "native/conductor-native/src/dependency_probe.rs";
+    fs::write(fixture.root.join(relative), "fn probe() {}\n").unwrap();
+    let registry = fixture.root.join(REGISTRY_PATH);
+    let mut rows = fs::read_to_string(&registry).unwrap();
+    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+    fs::write(registry, rows).unwrap();
+    let selected = plan(&fixture.root, &[relative.to_owned()]).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert!(selected.source_paths.is_empty());
+    assert_eq!(selected.commands[0].targets, selected.targets);
+    let unrelated = plan(
+        &fixture.root,
+        &["native/conductor-native/src/unmapped.rs".to_owned()],
+    )
+    .unwrap();
+    assert!(unrelated.targets.is_empty());
+    let registry = fixture.root.join(REGISTRY_PATH);
+    let mut rows = fs::read_to_string(&registry).unwrap();
+    rows.push_str(
+        "native/conductor-native/src/nested/provider.rs\tpython_contracts_memory_vectors\n",
+    );
+    fs::write(registry, rows).unwrap();
+    let error = plan(&fixture.root, &[relative.to_owned()]).unwrap_err();
+    assert!(
+        format!("{error:#}").contains("invalid contract path"),
+        "{error:#}"
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn corpus_dependencies_select_contract_and_are_validated_when_source_changes() {
@@ -166,7 +198,13 @@ fn registry_covers_every_present_contract_target_and_each_source_exists() {
 fn production_sources_select_nonconvention_and_reexport_contracts() {
     let root = repo_root();
     let memory = plan(&root, &["src/conductor/memory_vectors.py".to_owned()]).unwrap();
-    assert_eq!(memory.targets, ["python_contracts_memory_vectors"]);
+    assert_eq!(
+        memory.targets,
+        [
+            "python_contracts_crg_workspace_tools",
+            "python_contracts_memory_vectors"
+        ]
+    );
     let active = plan(&root, &["src/conductor/active_state.py".to_owned()]).unwrap();
     assert_eq!(
         active.targets,
@@ -285,9 +323,11 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
         [
             "python_contracts_agent_a2a",
             "python_contracts_bash_pretooluse_parity",
+            "python_contracts_crg_mcp_probe",
             "python_contracts_crg_response_shim",
             "python_contracts_crg_server",
             "python_contracts_crg_server_wiring",
+            "python_contracts_crg_workspace_tools",
             "python_contracts_dispatch_doctor",
             "python_contracts_dispatch_main",
             "python_contracts_dispatch_merge",
@@ -617,7 +657,13 @@ fn absolute_changed_path_accepts_the_given_symlinked_repo_root() {
     let selected = plan(&alias, &[changed.display().to_string()]).unwrap();
     fs::remove_file(alias).unwrap();
     assert_eq!(selected.source_paths, ["src/conductor/memory_vectors.py"]);
-    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert_eq!(
+        selected.targets,
+        [
+            "python_contracts_crg_workspace_tools",
+            "python_contracts_memory_vectors"
+        ]
+    );
 }
 
 #[test]
@@ -685,11 +731,17 @@ fn python_binding_returns_targets_paths_and_argv_as_data() {
         let value: serde_json::Value = serde_json::from_str(&response).unwrap();
         assert_eq!(
             value["targets"],
-            serde_json::json!(["python_contracts_memory_vectors"])
+            serde_json::json!([
+                "python_contracts_crg_workspace_tools",
+                "python_contracts_memory_vectors"
+            ])
         );
         assert_eq!(
             value["test_paths"],
-            serde_json::json!(["native/conductor-native/tests/python_contracts_memory_vectors.rs"])
+            serde_json::json!([
+                "native/conductor-native/tests/python_contracts_crg_workspace_tools.rs",
+                "native/conductor-native/tests/python_contracts_memory_vectors.rs"
+            ])
         );
         assert_eq!(value["commands"][0]["argv"][0], "cargo");
         assert_eq!(
