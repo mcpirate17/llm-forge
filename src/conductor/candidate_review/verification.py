@@ -819,6 +819,58 @@ def check_test_evidence(ctx: ReviewContext) -> tuple[CheckResult, TestSelection]
     return result, selection
 
 
+def _targeted_commands(
+    selection: TestSelection,
+    check: CheckPolicy,
+    coverage_file: Path,
+    coverage: bool,
+) -> tuple[list[list[str]], list[Path], list[list[str]], int]:
+    """Keep pytest command construction separate from Rust process arguments."""
+    shards = (
+        shard_tests(selection.tests, check.shard_max_files) if selection.tests else []
+    )
+    pytest_shard_count = len(shards)
+    contract_commands = (selection.contract_plan or {}).get("commands", [])
+    shards.extend(command["test_paths"] for command in contract_commands)
+    shard_files = [
+        shard_data_file(coverage_file, index, pytest_shard_count)
+        for index in range(pytest_shard_count)
+    ]
+    commands = [
+        _pytest_command(tests, shard_files[index] if coverage else None)
+        for index, tests in enumerate(shards[:pytest_shard_count])
+    ]
+    commands.extend(command["argv"] for command in contract_commands)
+    return shards, shard_files, commands, pytest_shard_count
+
+
+def _targeted_coverage(
+    ctx: ReviewContext,
+    check: CheckPolicy,
+    coverage_file: Path,
+    shard_files: list[Path],
+    pytest_shard_count: int,
+    contract_plan: ContractPlan | None,
+    findings: list[Finding],
+    metrics: dict[str, object],
+) -> None:
+    """Evaluate available Python coverage and report the native coverage gap."""
+    if not findings and pytest_shard_count:
+        if pytest_shard_count > 1:
+            combine_finding = combine_coverage(ctx, coverage_file, shard_files, check)
+            if combine_finding is not None:
+                findings.append(combine_finding)
+        if not findings:
+            coverage_findings, coverage_metrics = _evaluate_changed_coverage(
+                ctx, coverage_file
+            )
+            findings.extend(coverage_findings)
+            metrics.update(coverage_metrics)
+    if contract_plan and contract_plan["test_paths"]:
+        metrics["python_coverage_scope"] = "pytest-only"
+        findings.append(_contract_coverage_finding(check, contract_plan))
+
+
 def run_targeted_tests(
     ctx: ReviewContext,
     selection: TestSelection,
@@ -837,22 +889,10 @@ def run_targeted_tests(
             skipped_reason="no selected tests",
         )
     coverage_file = ctx.runtime_dir / ".coverage-targeted"
-    shards = (
-        shard_tests(selection.tests, check.shard_max_files) if selection.tests else []
+    shards, shard_files, commands, pytest_shard_count = _targeted_commands(
+        selection, check, coverage_file, coverage
     )
-    pytest_shard_count = len(shards)
-    contract_commands = contract_plan["commands"] if contract_plan else []
-    shards.extend(command["test_paths"] for command in contract_commands)
     total = len(shards)
-    shard_files = [
-        shard_data_file(coverage_file, index, pytest_shard_count)
-        for index in range(pytest_shard_count)
-    ]
-    commands = [
-        _pytest_command(tests, shard_files[index] if coverage else None)
-        for index, tests in enumerate(shards[:pytest_shard_count])
-    ]
-    commands.extend(command["argv"] for command in contract_commands)
     selected_files = [*selection.tests, *contract_paths]
     try:
         completed_raw, timed_out = _run_selected_shards(
@@ -890,20 +930,17 @@ def run_targeted_tests(
         metrics["shard_count"] = total
         metrics["shard_workers"] = min(check.shard_workers, total)
         metrics["shard_exit_codes"] = exit_codes
-    if not findings and coverage and pytest_shard_count:
-        if pytest_shard_count > 1:
-            combine_finding = combine_coverage(ctx, coverage_file, shard_files, check)
-            if combine_finding is not None:
-                findings.append(combine_finding)
-        if not findings:
-            coverage_findings, coverage_metrics = _evaluate_changed_coverage(
-                ctx, coverage_file
-            )
-            findings.extend(coverage_findings)
-            metrics.update(coverage_metrics)
-    if coverage and contract_plan and contract_paths:
-        metrics["python_coverage_scope"] = "pytest-only"
-        findings.append(_contract_coverage_finding(check, contract_plan))
+    if coverage:
+        _targeted_coverage(
+            ctx,
+            check,
+            coverage_file,
+            shard_files,
+            pytest_shard_count,
+            contract_plan,
+            findings,
+            metrics,
+        )
     result = _result(
         check.check_id, started, findings, files=selected_files, metrics=metrics
     )
