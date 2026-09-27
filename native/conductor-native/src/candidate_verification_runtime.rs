@@ -12,6 +12,7 @@ const SLOP_MANIFEST: &str = "native/slop-core/Cargo.toml";
 // verification must build their extension from the selected source snapshot.
 const SLOP_CONSUMERS: &[&str] = &[
     "python_contracts_candidate_style",
+    "python_contracts_equivalence_probe",
     "python_contracts_native_ablations",
     "python_contracts_policy_engine_crash",
     "python_contracts_probe_budget",

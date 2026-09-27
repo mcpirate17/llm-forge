@@ -23,6 +23,12 @@ contracts run one at a time). jscpd 4.2.1 and PMD 7.27.0 are installed once unde
 `.git/forge-tools` when their checks are selected. The initial run may need
 network access and the system SQLite library required by the native crates.
 
+The Python stages inspect tracked pytest suite paths before invoking pytest;
+the conductor inventory excludes its `testdata/` inputs. A stage with no
+remaining Python suites reports that inventory and leaves the Rust contracts
+to their separate stage. While Python suites remain, every pytest exit status
+is preserved, including a failure to collect any cases.
+
 The receipt and step logs are under `.git/forge-checks/run-*/`. `forge verify`
 requires the latest attempt to have passed and rechecks log hashes, committed
 HEAD/tree, the `origin/main` tip and merge base, changed paths, and the policy
