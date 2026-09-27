@@ -211,28 +211,31 @@ fn the_index_over_this_repository_resolves_it_at_scale() {
     // wrong tree reports a clean, meaningless answer.
     let root = repo_root();
     let tests = walk_tests(&root);
-    // The floor is derived from the tree actually under test (an independent walk),
-    // not a constant pinned to one particular checkout's size -- a smaller
-    // standalone tree is not "wrong", an empty or misresolved root is.
-    assert!(
-        !tests.is_empty(),
-        "resolved root {} yielded no test files -- wrong tree",
-        root.display()
-    );
     let idx = build(&root);
     assert_eq!(idx.file_count(), tests.len());
-    assert!(
-        idx.import_key_count() > tests.len(),
-        "{} import keys over {} test files",
-        idx.import_key_count(),
-        tests.len()
-    );
 
-    // The module whose own driver test the old matcher could not see.
+    // Keep a known Python driver in a temporary copy of the live input corpus.
+    // The repository's own drivers migrate to Rust, so neither a Python-suite
+    // count floor nor a particular live Python test path is a stable contract.
+    let corpus = Tree::new("repository-scale");
+    for relative in &tests {
+        corpus.write(
+            relative.to_str().unwrap(),
+            &std::fs::read_to_string(root.join(relative)).unwrap(),
+        );
+    }
+    let driver = "conductor/test_native_index_reference.py";
+    assert!(!root.join(driver).exists());
+    corpus.write(driver, "from conductor import slop_gate\n");
+    let reference = build(corpus.path());
+    assert_eq!(reference.file_count(), tests.len() + 1);
+    assert!(reference.import_key_count() >= idx.import_key_count());
+    // The import form whose bound name the old matcher could not see.
     assert!(
-        idx.drivers_for("conductor/slop_gate.py")
-            .contains(&"conductor/test_slop_gate.py".to_string()),
-        "the gate's own driver test is still unresolved"
+        reference
+            .drivers_for("conductor/slop_gate.py")
+            .contains(&driver.to_owned()),
+        "the known Python driver is still unresolved"
     );
 }
 

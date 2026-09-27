@@ -297,6 +297,12 @@ fn inbound_rejection(py: Python<'_>, a2a: &Bound<'_, PyModule>, root: &Path, kin
     assert!(payload.get("error").is_some());
     if kind == "legacy" {
         assert_eq!(payload["error"]["code"], -32601);
+    } else if kind == "invalid" {
+        assert_eq!(payload["error"]["code"], -32602);
+        assert_eq!(
+            payload["error"]["message"],
+            "gate-review-request requires integer gate in {1, 2, 3, 4, 5, 7}"
+        );
     }
     assert_eq!(rows(&journal, kind == "version"), json!([]));
     close_client(&client);

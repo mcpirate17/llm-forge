@@ -47,6 +47,11 @@ make install INSTALL_SYNC_ARGS='--extra mutation --extra graph'
 export PATH="$PWD/.venv/bin:$PATH"
 ```
 
+Before opening or merging a pull request, commit the changes and run
+`make local-check` followed by `make local-verify`. The Rust runner checks the
+committed source locally and records a source-bound receipt. GitHub CI is an
+explicit manual fallback. See [local checks](docs/local-checks.md).
+
 `make install` installs the checkout's Python package in editable mode, compiles
 `conductor_native`, `slop_core`, and `forge` into the environment, then prebuilds
 the Rust test executables and reusable test fixtures. Plain `uv sync` installs
@@ -209,7 +214,7 @@ test` respectively.
 
 PMD has no packaged distribution, so this repo pins the release zip instead
 of a system package. Do not `apt install pmd` — install the exact pinned
-version so your baseline matches what CI checks against:
+version so your baseline matches the local checks and manual CI fallback:
 
 ```sh
 mkdir -p .tools
@@ -222,26 +227,24 @@ pmd --version   # PMD 7.27.0
 ```
 
 `.tools/` is gitignored. `[tools.pmd]` in `candidate_policy.toml` pins the
-same `7.27.0` version; CI downloads it the same way (see
-`.github/workflows/ci.yml`) rather than generating the PMD baseline itself --
-baselines are measurements a human regenerates deliberately after a real
-refactor, not something CI writes.
+same `7.27.0` version. `make local-check` caches this release and jscpd under
+`.git/forge-tools`; the manual CI workflow installs the same versions.
+Baselines are measurements a human regenerates deliberately after a refactor.
 
 ### Staleness
 
 `candidate_policy.toml`'s `baseline_expires` gates all four baselines at
 once: the whole review refuses once that date lapses, so a baseline can't
-silently rot forever unnoticed. Within that window, CI's "duplication,
-complexity and dead-code baselines" step re-runs the same jscpd/PMD-CPD/
-complexity/vulture checks `candidate-review` uses against every PR's changed
-Python files, so drift between the tree and a committed baseline (a new
-duplicate pair, a worse complexity block, a new dead-code finding) fails CI
-red rather than only surfacing when someone happens to run `make
-candidate-review` locally. There is no full-tree hash-based staleness check
+silently rot forever unnoticed. Within that window, `make local-check` runs
+the same jscpd/PMD-CPD/complexity/vulture checks before PR integration. Changed
+Python files select duplicate and dead-code checks, while complexity is
+checked across `src`. New findings fail the local run and prevent a passing
+receipt. The manual CI workflow retains the same baseline checks.
+There is no full-tree hash-based staleness check
 for any of the four baselines today (jscpd/PMD-CPD tolerate baseline entries
 that no longer exist in the tree without complaint, and vulture's
 `generated_from_tree` field is format-checked but never compared against the
-current tree) -- `baseline_expires` plus the CI diff-check above are the
+current tree) -- `baseline_expires` plus the local diff-check above are the
 mechanisms this repo has.
 
 ## History

@@ -58,6 +58,7 @@ from a2a.helpers.proto_helpers import (
     new_text_part,
 )
 from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.context import ServerCallContext
 from a2a.server.events import EventQueue
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
@@ -70,6 +71,8 @@ from a2a.types import (
     Message,
     Part,
     Role,
+    SendMessageRequest,
+    Task,
 )
 from a2a.utils.constants import (
     AGENT_CARD_WELL_KNOWN_PATH,
@@ -78,6 +81,7 @@ from a2a.utils.constants import (
     VERSION_HEADER,
     TransportProtocol,
 )
+from a2a.utils.errors import InvalidParamsError
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -402,12 +406,7 @@ class InboxExecutor(AgentExecutor):
         message = context.message
         if message is None:
             raise A2aError("message/send requires a message")
-        body = get_message_text(message)
-        if len(body.encode()) > MAX_BODY_BYTES:
-            raise A2aError(f"body exceeds {MAX_BODY_BYTES} bytes")
-        payloads = get_data_parts(message.parts)
-        for payload in payloads:
-            validate_data_payload(payload)
+        body, payloads = _validated_message_parts(message)
         # protobuf Struct has no .get(); convert it before applying dict semantics.
         sender = MessageToDict(message.metadata).get("sender", "unknown")
         message_id = message.message_id or str(uuid.uuid4())
@@ -436,6 +435,31 @@ class InboxExecutor(AgentExecutor):
         raise A2aError("message delivery cannot be cancelled")
 
 
+def _validated_message_parts(message: Message) -> tuple[str, list[Any]]:
+    body = get_message_text(message)
+    if len(body.encode()) > MAX_BODY_BYTES:
+        raise A2aError(f"body exceeds {MAX_BODY_BYTES} bytes")
+    payloads = get_data_parts(message.parts)
+    for payload in payloads:
+        validate_data_payload(payload)
+    return body, payloads
+
+
+class ValidatingRequestHandler(DefaultRequestHandler):
+    """Map rejected message input to the SDK's JSON-RPC invalid-params error."""
+
+    async def on_message_send(
+        self, params: SendMessageRequest, context: ServerCallContext
+    ) -> Message | Task:
+        try:
+            if not params.HasField("message"):
+                raise A2aError("message/send requires a message")
+            _validated_message_parts(params.message)
+        except A2aError as exc:
+            raise InvalidParamsError(str(exc)) from exc
+        return await super().on_message_send(params, context)
+
+
 class TokenMiddleware(BaseHTTPMiddleware):
     """Rejects unauthenticated writes to the JSON-RPC endpoint; card stays public."""
 
@@ -459,7 +483,7 @@ class TokenMiddleware(BaseHTTPMiddleware):
 
 
 def build_app(record: AgentRecord, store: A2aStore) -> Starlette:
-    handler = DefaultRequestHandler(
+    handler = ValidatingRequestHandler(
         agent_executor=InboxExecutor(record, store),
         task_store=InMemoryTaskStore(),
         agent_card=build_agent_card(record.name, record.port),

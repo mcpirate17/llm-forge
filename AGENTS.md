@@ -28,6 +28,12 @@ Branches are temporary. A branch exists to carry one piece of work to `main` and
 deleted on merge. Never open a second branch for the same work. Nothing lands on `main`
 except through a pull request.
 
+After committing a branch, run `make local-check` (full check by default) and
+`make local-verify` before opening or merging its PR. The receipt binds the
+current committed tree and `origin/main`; rerun after either changes. See
+[`docs/local-checks.md`](docs/local-checks.md). GitHub's full CI workflow is a
+manual clean-host fallback, not a per-commit gate.
+
 **No worktrees, ever.** Not `git worktree add`, not a leased tree, not a scratch clone
 standing next to the checkout. Work in the checkout you have. The only worktrees this
 repository knows about are the disposable snapshots `mutation_engine_generated` creates
