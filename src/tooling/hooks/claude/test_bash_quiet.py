@@ -45,5 +45,6 @@ def test_legacy_shell_entrypoint_honors_codex_output_field(tmp_path: Path) -> No
         env=env,
         check=True,
     )
-    assert "[elided" in json.loads(proc.stdout)["hookSpecificOutput"]
-    assert "updatedMCPToolOutput" in json.loads(proc.stdout)["hookSpecificOutput"]
+    output = json.loads(proc.stdout)["hookSpecificOutput"]
+    assert "[elided" in output["updatedMCPToolOutput"]["stdout"]
+    assert "updatedToolOutput" not in output

@@ -68,7 +68,7 @@ fn quiet_result(request: &Value, bash: bool, envelope: bool) -> Result<Value> {
         let (answer, warning) =
             tool_quiet::rewrite_envelope_tool(response, limit, disabled, &config);
         if let Some(warning) = warning {
-            eprintln!("{warning}");
+            eprintln!("post-tool-quiet: unrecognized tool_response shape ({warning}); passing through unbounded");
         }
         return Ok(answer);
     }

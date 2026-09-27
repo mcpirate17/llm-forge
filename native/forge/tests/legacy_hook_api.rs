@@ -139,6 +139,39 @@ fn quiet_cli_bounds_and_spills_using_the_shared_native_kernel() {
 }
 
 #[test]
+fn quiet_cli_preserves_codex_field_and_malformed_shape_diagnostic() {
+    let scratch = Scratch::new("quiet-wire-contract");
+    let mut request = json!({
+        "payload": {"tool_response": {"stdout": "x\n".repeat(9000), "stderr": ""}},
+        "repo_root": scratch.path(), "save_dir": scratch.path().join("spill"),
+        "stamp": "20260926T120000", "output_field": "updatedMCPToolOutput",
+        "limit_bytes": 8000,
+    });
+    let (result, warning) = call("bash-quiet-envelope", &request, &[]);
+    assert!(warning.is_empty());
+    assert!(
+        result["hookSpecificOutput"]["updatedMCPToolOutput"]["stdout"]
+            .as_str()
+            .unwrap()
+            .contains("[elided")
+    );
+    assert!(result["hookSpecificOutput"]
+        .get("updatedToolOutput")
+        .is_none());
+
+    request["payload"] = json!({"tool_response": {"unknown": true}});
+    let (result, warning) = call("tool-quiet-envelope", &request, &[]);
+    assert_eq!(
+        result,
+        json!({"hookSpecificOutput": {"hookEventName": "PostToolUse"}})
+    );
+    assert_eq!(
+        warning,
+        "post-tool-quiet: unrecognized tool_response shape (dict); passing through unbounded\n"
+    );
+}
+
+#[test]
 fn nonpositive_quiet_cap_disables_legacy_rewrite() {
     let scratch = Scratch::new("quiet-off");
     let request = json!({
