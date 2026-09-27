@@ -532,6 +532,73 @@ fn registry_covers_every_present_contract_target_and_each_source_exists() {
 }
 
 #[test]
+fn final_candidate_helpers_select_their_exact_rust_targets() {
+    let root = repo_root();
+    let candidate = [
+        "python_contracts_candidate_review_flow_a",
+        "python_contracts_candidate_review_flow_b",
+        "python_contracts_candidate_review_evidence",
+        "python_contracts_candidate_review_waivers",
+        "python_contracts_candidate_review_hardening",
+        "python_contracts_candidate_review_scan",
+        "python_contracts_candidate_runtime_a",
+        "python_contracts_candidate_runtime_b",
+    ];
+    let audit = [
+        "python_contracts_mutation_patch_audit_a",
+        "python_contracts_mutation_patch_audit_b",
+        "python_contracts_mutation_patch_audit_c",
+    ];
+    let all = candidate
+        .iter()
+        .copied()
+        .chain(["python_contracts_candidate_call_evidence"])
+        .chain(audit)
+        .collect::<std::collections::BTreeSet<_>>();
+    for (helper, expected) in [
+        ("candidate_review_support.rs", candidate.as_slice()),
+        ("git_fixture_support.rs", candidate.as_slice()),
+        ("candidate_runtime_support.rs", &candidate[6..]),
+        ("mutation_audit_support.rs", audit.as_slice()),
+        ("support.rs", &[][..]),
+    ] {
+        let relative = format!("{TEST_DIR}/python_contracts/{helper}");
+        let selected = plan(&root, &[relative]).unwrap();
+        let selected = selected
+            .targets
+            .iter()
+            .map(String::as_str)
+            .filter(|target| all.contains(target))
+            .collect::<std::collections::BTreeSet<_>>();
+        let expected = if helper == "support.rs" {
+            all.clone()
+        } else {
+            expected.iter().copied().collect()
+        };
+        assert_eq!(selected, expected, "{helper}");
+    }
+}
+
+#[test]
+fn benchmark_native_and_python_providers_select_its_contract() {
+    let root = repo_root();
+    for provider in [
+        "src/conductor/candidate_review/benchmark.py",
+        "src/conductor/_native.py",
+        "native/conductor-native/src/candidate_benchmark.rs",
+        "native/conductor-native/src/lib.rs",
+    ] {
+        let selected = plan(&root, &[provider.to_owned()]).unwrap();
+        assert!(
+            selected
+                .targets
+                .contains(&"python_contracts_candidate_benchmark".to_owned()),
+            "{provider}"
+        );
+    }
+}
+
+#[test]
 fn production_sources_select_nonconvention_and_reexport_contracts() {
     let root = repo_root();
     let memory = plan(&root, &["src/conductor/memory_vectors.py".to_owned()]).unwrap();

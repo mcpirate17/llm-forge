@@ -46,6 +46,9 @@ timeout_seconds = 10
 memory_mb = 128
 max_output_chars = 1000
 "#;
+const PYTHON_MARKER: &[u8] =
+    b"\"\"\"Reproducible latency benchmarks using only temporary repositories and indexes.\"\"\"";
+const PYTHON_PROBE: &[u8] = b"\"\"\"Reproducible latency benchmarks using only temporary repositories and indexes. Python benchmark probe.\"\"\"";
 
 fn git(repo: &Path, args: &[&str]) -> String {
     let output = Command::new("git")
@@ -60,6 +63,21 @@ fn git(repo: &Path, args: &[&str]) -> String {
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8(output.stdout).unwrap().trim().to_owned()
+}
+
+fn git_blob(repo: &Path, tree: &str, relative: &str) -> Vec<u8> {
+    let output = Command::new("git")
+        .current_dir(repo)
+        .arg("show")
+        .arg(format!("{tree}:{relative}"))
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git show {tree}:{relative}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    output.stdout
 }
 
 fn source_content(relative: &str) -> Vec<u8> {
@@ -225,6 +243,105 @@ fn benchmark_uses_isolated_real_git_candidates_and_preserves_cold_warm_identity(
             error,
             &benchmark.getattr("BenchmarkError").unwrap(),
             "unknown",
+        );
+    });
+}
+
+#[test]
+fn benchmark_python_scenarios_change_only_the_shipped_module() {
+    let case = Case::new();
+    Python::attach(|py| {
+        let benchmark = module(py, "conductor.candidate_review.benchmark");
+        let source = source(&case, py, benchmark.as_any());
+        for retired in [
+            "test_candidate_review.py",
+            "test_guardrail_audit.py",
+            "test_ref_aware_governance.py",
+            "test_run_duplicate_audit.py",
+            "test_vulture_audit.py",
+        ] {
+            assert!(!source.join("conductor").join(retired).exists());
+        }
+        let fixture = benchmark
+            .getattr("_prepare_fixture")
+            .unwrap()
+            .call1((path(py, &source), path(py, case.root())))
+            .unwrap();
+        let repo = PathBuf::from(text(&fixture.getattr("repo").unwrap()));
+        let baseline_tree = text(&fixture.getattr("baseline_tree").unwrap());
+        let relative = "conductor/candidate_review/benchmark.py";
+        let original = fs::read(source.join(relative)).unwrap();
+        let mut scenario_trees = Vec::new();
+        for scenario in ["small-python", "full-review"] {
+            let index = benchmark
+                .getattr("_scenario_index")
+                .unwrap()
+                .call1((&fixture, path(py, case.root()), scenario))
+                .unwrap();
+            let kwargs = PyDict::new(py);
+            kwargs.set_item("index", index).unwrap();
+            let candidate_tree = text(
+                &benchmark
+                    .getattr("_git")
+                    .unwrap()
+                    .call((path(py, &repo), vec!["write-tree"]), Some(&kwargs))
+                    .unwrap(),
+            );
+            assert_eq!(
+                git(
+                    &repo,
+                    &["diff", "--name-only", &baseline_tree, &candidate_tree]
+                ),
+                relative
+            );
+            let changed = git_blob(&repo, &candidate_tree, relative);
+            assert_ne!(changed, original);
+            assert!(changed.starts_with(PYTHON_PROBE));
+            assert_eq!(
+                &changed[PYTHON_PROBE.len()..],
+                &original[PYTHON_MARKER.len()..]
+            );
+            scenario_trees.push(candidate_tree);
+        }
+        assert_eq!(scenario_trees[0], scenario_trees[1]);
+    });
+}
+
+#[test]
+fn benchmark_python_marker_drift_fails_before_staging() {
+    let case = Case::new();
+    Python::attach(|py| {
+        let benchmark = module(py, "conductor.candidate_review.benchmark");
+        let source = source(&case, py, benchmark.as_any());
+        let fixture = benchmark
+            .getattr("_prepare_fixture")
+            .unwrap()
+            .call1((path(py, &source), path(py, case.root())))
+            .unwrap();
+        let target = source.join("conductor/candidate_review/benchmark.py");
+        fs::write(&target, b"\"\"\"Marker removed\"\"\"\n").unwrap();
+        let error = benchmark
+            .getattr("_scenario_index")
+            .unwrap()
+            .call1((&fixture, path(py, case.root()), "small-python"))
+            .unwrap_err();
+        support::assert_error(
+            py,
+            error,
+            &benchmark.getattr("BenchmarkError").unwrap(),
+            "marker was not found",
+        );
+        fs::remove_file(target).unwrap();
+        let error = benchmark
+            .getattr("_scenario_index")
+            .unwrap()
+            .call1((&fixture, path(py, case.root()), "full-review"))
+            .unwrap_err();
+        support::assert_error(
+            py,
+            error,
+            &benchmark.getattr("BenchmarkError").unwrap(),
+            "missing or unreadable",
         );
     });
 }

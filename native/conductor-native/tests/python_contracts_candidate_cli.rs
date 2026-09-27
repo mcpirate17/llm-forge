@@ -1,6 +1,12 @@
 #![cfg(feature = "python-compat-tests")]
 //! Rust-owned candidate review CLI, receipt, and ownership contracts.
 
+#[path = "python_contracts/candidate_review_support.rs"]
+#[allow(dead_code)]
+mod candidate_review_support;
+#[path = "python_contracts/git_fixture_support.rs"]
+#[allow(dead_code)]
+mod git_fixture_support;
 #[path = "python_contracts/support.rs"]
 #[allow(dead_code)]
 mod support;
@@ -282,11 +288,7 @@ fn cli_failure_paths_write_a_sealed_failure_and_refuse_unbound_inputs() {
             ),
             1
         );
-        let receipt = module(py, "conductor.test_candidate_review")
-            .getattr("_receipt")
-            .unwrap()
-            .call0()
-            .unwrap();
+        let receipt = candidate_review_support::fixture_receipt(py);
         let unbound = case.root().join("unbound-receipt.json");
         module(py, "conductor.candidate_review.model")
             .getattr("write_json_atomic")

@@ -117,6 +117,12 @@ def a2a_store_native(root: str, name: str) -> object:
     return A2aSqliteStore(root, name)
 
 
+def candidate_benchmark_python_input_native(source_dir: str) -> tuple[str, bytes]:
+    from conductor_native import candidate_benchmark_python_input_native as prepare
+
+    return prepare(source_dir)
+
+
 def candidate_checks_native(operation: str, payload_json: str) -> str:
     from conductor_native import candidate_checks_native as evaluate
 

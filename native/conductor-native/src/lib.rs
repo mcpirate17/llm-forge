@@ -15,6 +15,8 @@ pub mod a2a_store;
 mod a2a_store_py;
 #[cfg(feature = "python")]
 mod branch_policy;
+#[cfg(feature = "python")]
+mod candidate_benchmark;
 pub mod candidate_checks;
 pub mod candidate_policy;
 #[cfg(feature = "source-analysis")]
@@ -89,6 +91,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     a2a_compaction::register(module)?;
     a2a_retention::register(module)?;
     branch_policy::register(module)?;
+    candidate_benchmark::register(module)?;
     candidate_checks::register(module)?;
     candidate_structure::register(module)?;
     candidate_verification::register(module)?;

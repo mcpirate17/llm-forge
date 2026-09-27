@@ -14,8 +14,8 @@ make local-verify
 
 `local-check` runs every step in [`.forge/local-check.toml`](../.forge/local-check.toml):
 resource preflight, the cached `make install` with fresh native extensions,
-Python compilation and tests, Rust Python-compatibility contracts, installed
-runtime smoke, pinned duplicate/complexity/dead-code baselines, mutation
+Python compilation, inventory-aware legacy Python suites, Rust compatibility
+contracts, installed runtime smoke, pinned duplicate/complexity/dead-code baselines, mutation
 tooling canary and retention dry-run, and fmt/Clippy/tests for all three Rust
 crates including the Python-free native core. It masks CUDA, caps Cargo at
 two jobs, and limits each Rust harness to two concurrent tests (the Python
@@ -26,8 +26,12 @@ network access and the system SQLite library required by the native crates.
 The Python stages inspect tracked pytest suite paths before invoking pytest;
 the conductor inventory excludes its `testdata/` inputs. A stage with no
 remaining Python suites reports that inventory and leaves the Rust contracts
-to their separate stage. While Python suites remain, every pytest exit status
-is preserved, including a failure to collect any cases.
+to their separate stage. Once the final suites are retired, both stages skip.
+While Python suites remain, every pytest exit status is preserved, including
+a failure to collect any cases. `make test` runs the native compatibility
+contracts and all three crates' default tests, including the core's Python-free
+source-analysis configuration. It uses the installed venv, masks CUDA, caps
+Cargo at two jobs, and runs Python compatibility contracts serially.
 
 The receipt and step logs are under `.git/forge-checks/run-*/`. `forge verify`
 requires the latest attempt to have passed and rechecks log hashes, committed
@@ -51,4 +55,5 @@ is cooperative evidence on this trusted machine; GitHub does not attest it
 or enforce it as a required status check.
 
 To run the clean-host fallback manually, use the GitHub Actions `ci` workflow
-on the branch. Its five jobs still cover the old independent environments.
+on the branch. It runs the Rust compatibility contracts and crate tests in
+their own jobs; the retired Python suites are no longer invoked there.

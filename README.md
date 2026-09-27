@@ -43,7 +43,7 @@ To use the current checkout, including changes that have not been published:
 cd /path/to/llm-forge
 uv venv .venv --python 3.12
 make install INSTALL_SYNC_ARGS='--extra mutation --extra graph'
-.venv/bin/python -m pytest src/conductor -q
+make test
 export PATH="$PWD/.venv/bin:$PATH"
 ```
 
@@ -54,7 +54,8 @@ explicit manual fallback. See [local checks](docs/local-checks.md).
 
 `make install` installs the checkout's Python package in editable mode, compiles
 `conductor_native`, `slop_core`, and `forge` into the environment, then prebuilds
-the Rust test executables and reusable test fixtures. Plain `uv sync` installs
+the Rust test executables for the compatibility, default, and Python-free
+source-analysis configurations, plus reusable test fixtures. Plain `uv sync` installs
 the three runtime artifacts. Install needs Rust and SQLite development headers;
 installed commands do not need a compiler. The provider selection,
 explicit native interpreter binding, coordination, and delivery changes described

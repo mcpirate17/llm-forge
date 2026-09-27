@@ -46,7 +46,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libsqlite3-dev pkg-config
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
@@ -67,12 +67,10 @@ jobs:
             --test install_packaging -- --ignored --test-threads=1
           echo "FORGE_BIN=$GITHUB_WORKSPACE/.venv/bin/forge" >> "$GITHUB_ENV"
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
-      - run: uv run python -m pytest src/conductor -q -p no:cacheprovider --timeout 600
-      - name: Legacy hook compatibility seams
-        run: uv run python -m pytest src/tooling/hooks -q -p no:cacheprovider --timeout 120
       - name: Rust contracts for Python compatibility APIs
         env:
           CARGO_BUILD_JOBS: "2"
+          CUDA_VISIBLE_DEVICES: ""
           OMP_NUM_THREADS: "1"
           OPENBLAS_NUM_THREADS: "1"
         run: |
@@ -162,7 +160,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libsqlite3-dev pkg-config
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
       - name: Install Python package and all three native runtimes
         env:
           CARGO_BUILD_JOBS: "2"
@@ -182,12 +180,18 @@ jobs:
 
   rust:
     runs-on: ubuntu-latest
+    env:
+      CARGO_BUILD_JOBS: "2"
+      RUST_TEST_THREADS: "2"
+      CUDA_VISIBLE_DEVICES: ""
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
     strategy:
       matrix:
         crate: [conductor-native, slop-core, forge]
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2

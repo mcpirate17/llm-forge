@@ -41,11 +41,6 @@ GOVERNANCE_PATHS = (
     "conductor/check_protected_deletes.py",
     "conductor/guardrail_audit.py",
     "conductor/run_duplicate_audit.py",
-    "conductor/test_candidate_review.py",
-    "conductor/test_guardrail_audit.py",
-    "conductor/test_ref_aware_governance.py",
-    "conductor/test_run_duplicate_audit.py",
-    "conductor/test_vulture_audit.py",
     "conductor/tooling_boundary.py",
     "conductor/vulture_baseline.json",
     "research/notes/unified_candidate_review_architecture_2026-08-16.md",
@@ -59,11 +54,6 @@ BENCHMARK_CLAIM_PATHS = (
     "conductor/check_protected_deletes.py",
     "conductor/guardrail_audit.py",
     "conductor/run_duplicate_audit.py",
-    "conductor/test_candidate_review.py",
-    "conductor/test_guardrail_audit.py",
-    "conductor/test_ref_aware_governance.py",
-    "conductor/test_run_duplicate_audit.py",
-    "conductor/test_vulture_audit.py",
 )
 
 
@@ -224,15 +214,12 @@ def _scenario_index(fixture: Fixture, root: Path, scenario: str) -> Path:
             "100644",
         )
     elif scenario in {"small-python", "full-review"}:
-        relative = "conductor/test_candidate_review.py"
-        content = (fixture.source / relative).read_bytes()
-        changed = content.replace(
-            b"candidate-bound governance review.",
-            b"candidate-bound governance review benchmark.",
-            1,
-        )
-        if changed == content:
-            raise BenchmarkError("small Python benchmark marker was not found")
+        from conductor._native import candidate_benchmark_python_input_native
+
+        try:
+            relative, changed = candidate_benchmark_python_input_native(str(fixture.source))
+        except ValueError as error:
+            raise BenchmarkError(str(error)) from error
         _insert(index, fixture.repo, relative, changed, "100644")
     elif scenario == "native-code":
         _insert(
