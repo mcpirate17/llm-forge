@@ -29,7 +29,7 @@ fn fixture_source(path: &str) -> bool {
 }
 
 fn corpus_source(path: &str) -> bool {
-    path.starts_with("native/forge/tests/fixtures/") && path.ends_with(".json")
+    path.ends_with(".json")
 }
 
 fn patch_fixture_source(path: &str) -> bool {

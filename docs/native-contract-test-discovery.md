@@ -14,8 +14,9 @@ JSON templates, shell bodies, and the exact dispatch launcher path.
 Rust child fixture programs under `tests/fixtures/` also map to their contract
 targets. Selected fixture programs must be canonical regular files within the
 snapshot, with no external module or source-splicing includes.
-Checked-in JSON corpora under `native/forge/tests/fixtures/` map to the same
-targets and receive canonical regular-file checks before those targets run.
+Explicitly registered JSON inputs receive canonical regular-file checks before
+their targets run. Inputs can live anywhere inside the snapshot, so configured
+campaign registries need no hardcoded path in the discovery implementation.
 Historical `.patch` fixture inputs under `src/conductor/testdata/` can also
 select their registered contracts and must be canonical regular files before
 those contracts run. They are data inputs, never applied by discovery.
