@@ -82,3 +82,29 @@ environment and single-thread runner as above.
 
 `python_contracts_mutation_patch_apply` passed all five grouped Rust tests under
 the same offline single-thread Cargo command.
+
+| Python case | Rust replacement and contract |
+| --- | --- |
+| `test_mutation_campaign_model.py::test_generated_native_contract_roundtrip_keeps_identity_and_test_pins` | `python_contracts_mutation_campaign_model::generated_native_roundtrip_keeps_identity_test_pins_defaults_and_drift`: generated identity, tuple fields, native pin parity, restored contract, changed-test drift, independent dataclass defaults, and both mismatched source/test pin directions. |
+| `test_mutation_campaign_model.py::test_nonempty_native_baseline_keeps_immutable_python_shape` | `python_contracts_mutation_campaign_model::nonempty_native_baseline_keeps_immutable_python_shape`: injected native baseline is a tuple in `Campaign` and `asdict`. |
+| `test_mutation_campaign_model.py::test_legacy_scope_retains_nodeid_selection_and_inventory` | `python_contracts_mutation_campaign_model::legacy_scope_retains_nodeid_selection_and_inventory`: exact path, mode, inventory, nodeid tuple, and selection. |
+| `test_mutation_campaign_model.py::test_malformed_native_campaign_names_its_contract` | `python_contracts_mutation_campaign_model::malformed_native_campaign_names_its_contract`: list-shaped native response raises typed `CampaignError` naming the contract. |
+| `test_mutation_campaign_model.py::test_invalid_optional_value_analysis_is_not_silently_discarded` | `python_contracts_mutation_campaign_model::invalid_optional_value_analysis_is_not_discarded`: non-object optional metadata raises the specific typed error. |
+| `test_mutation_campaign_model.py::test_drift_boundary_requires_a_list_of_objects` (empty tuple and list with string parameter rows) | `python_contracts_mutation_campaign_model::drift_boundary_requires_a_list_of_objects_for_both_bad_shapes`: both native response shapes raise typed `CampaignError`. |
+| `test_mutation_campaign_model.py::test_runner_component_root_resolves_this_repository_to_src` | `python_contracts_mutation_campaign_model::runner_component_root_resolves_this_src_layout`: package parent and runner-component path resolve to the same source. |
+| `test_mutation_campaign_model.py::test_runner_component_root_is_the_repo_root_under_a_flat_layout` | `python_contracts_mutation_campaign_model::runner_component_root_is_repo_root_in_flat_layout`: package in a flat Git tree yields that exact root. |
+| `test_mutation_campaign_model.py::test_lineage_accepts_reads_the_lineage_file_relative_to_package_root` | `python_contracts_mutation_campaign_model::lineage_reads_record_relative_to_package_root_only`: accepted map is found below package root; sibling root without a lineage file refuses it. |
+| `test_mutation_campaign_model.py::test_lineage_accepts_refuses_a_map_the_file_does_not_declare` | `python_contracts_mutation_campaign_model::lineage_refuses_undeclared_map_and_none`: undeclared digest and absent map both refuse. |
+| `test_dead_tests.py::test_explicit_root_scans_the_named_repo_not_cwd` | `python_contracts_dead_tests::explicit_root_scans_target_instead_of_cwd`: broken target returns check failure while cwd is a clean decoy. |
+| `test_dead_tests.py::test_default_root_uses_cwd_toplevel_not_module_location` | `python_contracts_dead_tests::default_root_uses_cwd_worktree_instead_of_module_checkout`: broken fixture repo under cwd returns check failure. |
+| `test_dead_tests.py::test_cwd_outside_worktree_refuses_rather_than_falling_back` | `python_contracts_dead_tests::cwd_outside_worktree_returns_audit_error`: non-worktree cwd returns 2. |
+| `test_dead_tests.py::test_resolved_root_is_printed` | `python_contracts_dead_tests::resolved_root_is_printed_and_explicit_json_is_written_there`: stdout names canonical target and explicit relative JSON exists there. |
+| `test_dead_tests.py::test_root_mismatch_warns` | `python_contracts_dead_tests::root_mismatch_warns_with_the_target_path`: stderr warning names canonical target when cwd is a different worktree. |
+| `test_dead_tests.py::test_json_out_relative_path_resolves_against_root` | `python_contracts_dead_tests::default_json_path_resolves_against_explicit_root`: default `tasks/audit/dead_tests.json` is written under the explicit root. |
+| `test_dead_tests.py::test_native_analysis_preserves_classification_precedence_and_order` | `python_contracts_dead_tests::native_analysis_preserves_classification_precedence_and_order`: exact broken, untracked dependency/importer, orphan, stale import, untracked-test rows; configured, dynamic, and live tests stay out of orphan results. |
+| `test_dead_tests.py::test_native_scan_parse_error_remains_dead_tests_error` | `python_contracts_dead_tests::native_parse_error_remains_typed_dead_tests_error`: malformed module raises typed `DeadTestsError` with file and parser location. |
+| `test_dead_tests.py::test_native_closure_preserves_missing_module_key_error` | `python_contracts_dead_tests::native_closure_preserves_missing_module_key_error`: absent transitive module raises `KeyError` naming its path. |
+
+`python_contracts_mutation_campaign_model` passed 10/10, including both drift
+parameter rows, and `python_contracts_dead_tests` passed 9/9 with offline locked
+Cargo, the `python-compat-tests` feature, and single-threaded CPU-only execution.

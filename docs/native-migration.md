@@ -233,7 +233,7 @@ splitter source and lockfile, tool hashes, and reproduction script. Evidence
 SHA-256:
 `c3d66d18c9eaa07fa5f5a13a36d45b67bc159bfbec136bf4656ec4550b08ce33`.
 
-## Latest verified commit
+## Previous verified commit
 
 Commit `67976735870c79a94b8968255ce8e82a200e16b3`, measured from a `git archive`
 with the same classification and inline-test treatment. The archive stream
@@ -265,6 +265,39 @@ blobs, exact archive stream hash, raw Tokei JSON, inline AST ranges and counts,
 splitter source and lockfile, tool hashes, and reproduction script. Evidence
 SHA-256:
 `6a36afa8c3a460d301895f1e987fd8d92744fcfa3e7ae98682be0347d458d5c2`.
+
+## Latest verified commit
+
+Commit `1422203b47bd72798af6b6c0d6adff47df69c5d1`, measured from a `git archive`
+with the same classification and inline-test treatment. The archive stream
+SHA-256 is
+`c15a19e57eb466ad360f9fdbb9d0661785bc01294db9925cf52c526ff010e929`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,296 | 51,599 | 194 | **50.0529% native** |
+| Tests | 36,780 | 48,361 | 0 | **56.8011% Rust** |
+| All tracked source, including examples | 88,076 | 100,059 | 194 | 53.1299% native |
+
+The manifests contain 371 production files, 288 test files, and 661 source
+files total; the all-source view also contains two Rust example files outside
+the production and test scopes. The splitter identified 100 test-only ranges
+in 85 production Rust files. Those files contain 43,010 original Rust code
+lines and 29,951 after masking, so the inline test delta is 13,059. Production
+Rust is 64,658 raw lines minus 13,059 = 51,599. Adding the same delta to 35,302
+separate Rust test lines gives 48,361 Rust test lines.
+
+This commit retires 15 Python test modules. Production counts and the native
+share are unchanged from `6797673`; the Rust test share increased 3.2691
+percentage points. Both independent 50% source SLOC milestones remain
+achieved. These percentages do not measure runtime coverage, behavioral
+coverage, or performance.
+
+The [measurement evidence](native-metrics/1422203-evidence.tar.gz) contains
+source manifests and hashes independently checked against all 661 Git blobs,
+the archive stream hash, raw Tokei JSON, inline AST ranges and counts, splitter
+source and lockfile, tool hashes, and reproduction script. Evidence SHA-256:
+`941a2a8ddd27cd62c750b4ea81e8c0d576fcbcf405f21916ac64e4d1f8611abb`.
 
 ## Behavioral migration
 
