@@ -17,8 +17,9 @@ resource preflight, the cached `make install` with fresh native extensions,
 Python compilation and tests, Rust Python-compatibility contracts, installed
 runtime smoke, pinned duplicate/complexity/dead-code baselines, mutation
 tooling canary and retention dry-run, and fmt/Clippy/tests for all three Rust
-crates including the Python-free native core. It masks CUDA and caps Cargo at
-two jobs. jscpd 4.2.1 and PMD 7.27.0 are installed once under
+crates including the Python-free native core. It masks CUDA, caps Cargo at
+two jobs, and limits each Rust harness to two concurrent tests (the Python
+contracts run one at a time). jscpd 4.2.1 and PMD 7.27.0 are installed once under
 `.git/forge-tools` when their checks are selected. The initial run may need
 network access and the system SQLite library required by the native crates.
 
