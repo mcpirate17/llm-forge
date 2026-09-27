@@ -54,7 +54,7 @@ impl Fixture {
             };
             if helper.starts_with(&format!("{TEST_DIR}/python_contracts/"))
                 || helper.starts_with(&format!("{TEST_DIR}/fixtures/"))
-                || helper.starts_with("native/forge/tests/fixtures/")
+                || helper.ends_with(".json")
                 || (helper.starts_with("src/conductor/testdata/") && helper.ends_with(".patch"))
             {
                 fs::create_dir_all(root.join(helper).parent().unwrap()).unwrap();
@@ -130,31 +130,40 @@ fn native_provider_paths_select_contracts_without_becoming_python_sources() {
 #[cfg(unix)]
 #[test]
 fn corpus_dependencies_select_contract_and_are_validated_when_source_changes() {
-    let fixture = Fixture::new();
-    let relative = "native/forge/tests/fixtures/corpus_probe.json";
-    let file = fixture.root.join(relative);
-    fs::create_dir_all(file.parent().unwrap()).unwrap();
-    fs::write(&file, "[]").unwrap();
-    let registry = fixture.root.join(REGISTRY_PATH);
-    let mut rows = fs::read_to_string(&registry).unwrap();
-    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
-    fs::write(registry, rows).unwrap();
-    assert_eq!(
-        plan(&fixture.root, &[relative.to_owned()]).unwrap().targets,
-        ["python_contracts_memory_vectors"]
-    );
-    let changed = ["src/conductor/memory_vectors.py".to_owned()];
-    fs::remove_file(&file).unwrap();
-    assert!(plan(&fixture.root, &changed).is_err());
-    std::os::unix::fs::symlink(
-        repo_root().join("native/forge/tests/fixtures/bash_pretooluse_corpus.json"),
-        &file,
-    )
-    .unwrap();
-    assert!(plan(&fixture.root, &changed)
-        .unwrap_err()
-        .to_string()
-        .contains("not regular"));
+    for relative in [
+        "native/forge/tests/fixtures/corpus_probe.json",
+        "src/conductor/testdata/mull/corpus_probe.json",
+        "config/custom-campaigns/corpus_probe.json",
+    ] {
+        let fixture = Fixture::new();
+        let file = fixture.root.join(relative);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, "[]").unwrap();
+        let registry = fixture.root.join(REGISTRY_PATH);
+        let mut rows = fs::read_to_string(&registry).unwrap();
+        rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+        fs::write(registry, rows).unwrap();
+        assert_eq!(
+            plan(&fixture.root, &[relative.to_owned()]).unwrap().targets,
+            ["python_contracts_memory_vectors"]
+        );
+        let changed = ["src/conductor/memory_vectors.py".to_owned()];
+        assert!(plan(&fixture.root, &changed)
+            .unwrap()
+            .targets
+            .contains(&"python_contracts_memory_vectors".to_owned()));
+        fs::remove_file(&file).unwrap();
+        assert!(plan(&fixture.root, &changed).is_err());
+        std::os::unix::fs::symlink(
+            repo_root().join("native/forge/tests/fixtures/bash_pretooluse_corpus.json"),
+            &file,
+        )
+        .unwrap();
+        assert!(plan(&fixture.root, &changed)
+            .unwrap_err()
+            .to_string()
+            .contains("not regular"));
+    }
 }
 
 #[test]
@@ -418,6 +427,9 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_harness_provisioning",
             "python_contracts_local_clerk",
             "python_contracts_mutation_coverage",
+            "python_contracts_mutation_engine_mull_args",
+            "python_contracts_mutation_engine_mull_rows",
+            "python_contracts_mutation_engine_mull_run",
             "python_contracts_mutation_generated_core",
             "python_contracts_mutation_generated_manifest",
             "python_contracts_mutation_generated_receipt",
