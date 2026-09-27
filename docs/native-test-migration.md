@@ -1,5 +1,14 @@
 # Native test migration
 
+At pinned commit `6dd9fc8d31daab114cf856b744ceb20d64cdd7a3`, the separate
+Rust-test source milestone is **78.1709%**: 80,835 Rust test code lines and
+22,573 Python test code lines under the unchanged path and inline-test rules.
+This cohort retired three Python test modules and added 38 named Rust-owned
+contracts across five targets. Production is **50.5475% native**. These are
+source-composition metrics, not behavioral coverage or a claim that all tests
+have been converted. The [full method and pinned evidence](native-migration.md#latest-verified-commit)
+record every counted input.
+
 At pinned commit `1f4459ceb368eb495068032f61fe6d83bc133509`, the separate
 Rust-test source milestone is **77.0656%**: 78,795 Rust test code lines and
 23,449 Python test code lines under the unchanged path and inline-test rules.
