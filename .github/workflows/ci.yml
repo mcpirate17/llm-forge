@@ -149,6 +149,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native/${{ matrix.crate }}
+      - name: Enforce Python-free Forge builds
+        if: matrix.crate == 'forge'
+        run: echo 'PYO3_NO_PYTHON=1' >> "$GITHUB_ENV"
       - name: cargo fmt --check
         working-directory: native/${{ matrix.crate }}
         run: cargo fmt --check
@@ -158,3 +161,10 @@ jobs:
       - name: cargo test
         working-directory: native/${{ matrix.crate }}
         run: cargo test
+      - name: Native core without Python bindings
+        if: matrix.crate == 'conductor-native'
+        working-directory: native/conductor-native
+        env:
+          PYO3_NO_PYTHON: "1"
+          CARGO_BUILD_JOBS: "2"
+        run: cargo test --locked --no-default-features --lib -- --test-threads=1

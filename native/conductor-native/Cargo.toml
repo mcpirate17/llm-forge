@@ -10,15 +10,15 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 base64 = "0.22"
-pyo3 = { version = "0.29" }
-ruff_python_ast = { package = "rustpython-ruff_python_ast", version = "0.15.8" }
-ruff_python_parser = { package = "rustpython-ruff_python_parser", version = "0.15.8" }
-ruff_text_size = { package = "rustpython-ruff_text_size", version = "0.15.8" }
-memmap2 = "0.9"
+pyo3 = { version = "0.29", optional = true }
+ruff_python_ast = { package = "rustpython-ruff_python_ast", version = "0.15.8", optional = true }
+ruff_python_parser = { package = "rustpython-ruff_python_parser", version = "0.15.8", optional = true }
+ruff_text_size = { package = "rustpython-ruff_text_size", version = "0.15.8", optional = true }
+memmap2 = { version = "0.9", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 sha2 = "0.10"
-toml = "0.8"
+toml = { version = "0.8", optional = true }
 zstd = "0.13"
 
 # `extension-module` tells pyo3 not to link libpython, which is right for the
@@ -26,10 +26,12 @@ zstd = "0.13"
 # Left on unconditionally, the unit tests in this crate cannot even build: they
 # fail at link with `undefined symbol: PyObject_CallNoArgs`. The wheel turns it
 # back on via `features` in pyproject.toml, so the shipped artifact is unchanged.
-# Same split research-runtime and slop-core use.
+# Native consumers disable default features to build the shared core without
+# Python bindings or a Python interpreter available during the build.
 [features]
-default = []
-extension-module = ["pyo3/extension-module"]
+default = ["python"]
+python = ["dep:pyo3", "dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:memmap2", "dep:toml"]
+extension-module = ["python", "pyo3/extension-module"]
 
 [profile.release]
 opt-level = 3

@@ -13,7 +13,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -815,10 +817,12 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
     }))
 }
 
+#[cfg(feature = "python")]
 fn value_error(message: impl Into<String>) -> PyErr {
     PyValueError::new_err(message.into())
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 pub fn mutation_plan_native(request_json: &str) -> PyResult<String> {
     let request: PlanRequest = serde_json::from_str(request_json)
@@ -827,6 +831,7 @@ pub fn mutation_plan_native(request_json: &str) -> PyResult<String> {
     serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
 }
 
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(mutation_plan_native, module)?)?;
     Ok(())

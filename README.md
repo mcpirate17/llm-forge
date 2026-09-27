@@ -12,10 +12,26 @@ Rust crates under `native/`:
   and sandbox management.
 - `src/tooling/hooks/` — the generic agent hooks (Claude, Codex, dispatch adapters) a
   host project wires into its own `.claude/hooks/` or `.agent_hooks/`.
-- `native/conductor-native/` — the `conductor_native` PyO3 extension behind
-  `conductor/_native.py`.
+- `native/conductor-native/` — shared Rust algorithms and the optional
+  `conductor_native` PyO3 extension behind `conductor/_native.py`.
 - `native/slop-core/` — the slop scanner.
-- `native/forge/` — the native hook runtime, installer, routing, and coordination CLI.
+- `native/forge/` — the native hook runtime, installer, routing, mailbox, and coordination CLI.
+
+## Standalone Rust build
+
+The Forge CLI builds without a Python interpreter or Python development libraries:
+
+```sh
+cargo build --release --locked --manifest-path native/forge/Cargo.toml
+native/forge/target/release/forge --help
+```
+
+Forge uses `conductor-native` with default features disabled, sharing its planning,
+receipt and shell parsing algorithms. The default `python` feature and
+`extension-module` feature preserve the existing package bindings. Native task and
+mailbox commands run directly in Rust; hook events with remaining legacy handlers
+still use their configured host dispatcher. See [mailbox operations](docs/messaging.md)
+and [resource-aware task execution](docs/coordination.md).
 
 ## Install
 

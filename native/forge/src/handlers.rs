@@ -30,6 +30,11 @@
 //! hatch back to the pre-port, all-Python behaviour; unset means "use the
 //! native default", not "opt out" -- see `native_hook_names_from_env`.
 //!
+//! Read has the same full/partial contract with `READ_PRETOOLUSE_HOOK_NAMES`:
+//! the refresh report, current-work guard and whole-file read-size guard.
+//! Other tools without specialized registry gates need only the native
+//! refresh report; edit and graph tools remain delegated.
+//!
 //! `PostToolUse` lives in `crate::post_tool` (same registry, same
 //! env-var contract): the nine ported names splice partially like the Bash
 //! set above, and together they are *every* hook Python's registry matches
@@ -256,6 +261,42 @@ impl NativeHandler for CurrentWorkGuardBash {
     }
 }
 
+/// The same protected-file guard under the registry's Read-specific name.
+pub struct CurrentWorkGuardRead;
+
+impl NativeHandler for CurrentWorkGuardRead {
+    fn name(&self) -> &'static str {
+        "current_work_guard_read"
+    }
+    fn event(&self) -> &'static str {
+        "PreToolUse"
+    }
+    fn run(&self, payload: &Value) -> Result<Value> {
+        Ok(current_work_guard::run(payload))
+    }
+}
+
+/// Whole-file code reads keep their original denial and context accounting.
+pub struct PreReadSkeleton;
+
+impl NativeHandler for PreReadSkeleton {
+    fn name(&self) -> &'static str {
+        "pre_read_skeleton"
+    }
+    fn event(&self) -> &'static str {
+        "PreToolUse"
+    }
+    fn run(&self, payload: &Value) -> Result<Value> {
+        let output = crate::pre_read::hook_output(payload)?;
+        let session_id = payload
+            .get("session_id")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        crate::context_telemetry::record_hook_context("pre-read-skeleton", &output, session_id);
+        Ok(output)
+    }
+}
+
 /// `workspace_exposure_session`: the SessionStart EXPOSED summary line
 /// (`adapters.workspace_exposure`, exactly `workspace_hygiene.exposure_line`).
 /// The repo it reports on is the session's checkout
@@ -291,6 +332,8 @@ pub fn registry() -> Vec<Box<dyn NativeHandler>> {
         Box::new(CrgRefreshReportPre),
         Box::new(CrgGateVerifyBash),
         Box::new(CurrentWorkGuardBash),
+        Box::new(CurrentWorkGuardRead),
+        Box::new(PreReadSkeleton),
         Box::new(PostBashQuiet),
         Box::new(PostToolQuiet),
         Box::new(CrgRefreshReportPost),
@@ -317,6 +360,95 @@ pub const BASH_PRETOOLUSE_HOOK_NAMES: [&str; 4] = [
     "pre_bash",
     "current_work_guard_bash",
 ];
+
+/// Every Read hook, in the Python registry's merge order.
+pub const READ_PRETOOLUSE_HOOK_NAMES: [&str; 3] = [
+    "crg_refresh_report_pre",
+    "current_work_guard_read",
+    "pre_read_skeleton",
+];
+
+pub fn read_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
+    READ_PRETOOLUSE_HOOK_NAMES
+        .iter()
+        .all(|name| native_hooks.contains(*name))
+}
+
+/// Preserve the dispatcher's camel-case alias without expanding other ports.
+pub fn is_read_payload(payload: &Value) -> bool {
+    payload
+        .get("tool_name")
+        .filter(|value| crate::pre_read::truthy(value))
+        .or_else(|| payload.get("toolName"))
+        .and_then(Value::as_str)
+        == Some("Read")
+}
+
+/// Conservative registry matcher: never skip an edit or graph gate.
+pub fn generic_pretooluse_tool(tool_name: &str) -> bool {
+    !tool_name.is_empty()
+        && !matches!(
+            tool_name,
+            "Bash" | "Agent" | "Read" | "Edit" | "Write" | "NotebookEdit"
+        )
+        && ![
+            "mcp__code-review-graph__",
+            "mcp__code-review_graph__",
+            "mcp__code_review-graph__",
+            "mcp__code_review_graph__",
+        ]
+        .iter()
+        .any(|prefix| tool_name.starts_with(prefix))
+}
+
+pub fn generic_pretooluse_fully_native(tool_name: &str, native_hooks: &HashSet<String>) -> bool {
+    generic_pretooluse_tool(tool_name) && native_hooks.contains("crg_refresh_report_pre")
+}
+
+/// Failed native adapters remain for Python to execute on partial coverage,
+/// matching the existing Bash splice contract.
+pub fn native_answers_for_read(
+    payload: &Value,
+    native_hooks: &HashSet<String>,
+) -> HashMap<String, Value> {
+    let mut answers = HashMap::new();
+    if !is_read_payload(payload) {
+        return answers;
+    }
+    let handlers = registry();
+    for name in READ_PRETOOLUSE_HOOK_NAMES {
+        if native_hooks.contains(name) {
+            let handler =
+                find_handler(&handlers, name, "PreToolUse").expect("every Read hook is registered");
+            if let Ok(output) = handler.run(payload) {
+                answers.insert(name.to_string(), output);
+            }
+        }
+    }
+    answers
+}
+
+pub fn run_read_pretooluse_fully_native(payload: &Value) -> Value {
+    let handlers = registry();
+    let outcomes: Vec<_> = READ_PRETOOLUSE_HOOK_NAMES
+        .iter()
+        .map(|name| {
+            let handler =
+                find_handler(&handlers, name, "PreToolUse").expect("every Read hook is registered");
+            let (output, error) = match handler.run(payload) {
+                Ok(output) => (output, None),
+                Err(err) => (Value::Null, Some(format!("{err:#}"))),
+            };
+            HookOutcome {
+                name: (*name).to_string(),
+                output,
+                error,
+                fail_closed: false,
+            }
+        })
+        .collect();
+    merge::merge("PreToolUse", &outcomes)
+}
 
 /// The exact hook name, in the Python registry's own order, that a
 /// `SessionStart` call matches and this crate serves: the EXPOSED summary
@@ -412,11 +544,11 @@ fn crg_refresh_report_pre_outcome(payload: &Value) -> HookOutcome {
     }
 }
 
-/// The standalone `PreToolUse` answer for any `tool_name` that is neither
-/// `Bash` nor `Agent` (Grep, Glob, WebFetch, TodoWrite, Task, ...): under
+/// The generic `PreToolUse` answer (Grep, Glob, WebFetch, TodoWrite, Task,
+/// ...), also used by standalone for remaining residual tools: under
 /// `--takeover` the host's Python `PreToolUse` entry is narrowed away from
-/// `.*` down to the five-tool residual
-/// (`Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*`), so
+/// `.*` down to the edit/graph residual
+/// (`Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*`), so
 /// Python no longer sees these calls at all even though
 /// `crg_refresh_report_pre`'s own matcher is `.*` and would otherwise fire
 /// for every one of them. Running it here, alone, is what keeps a staged
@@ -439,6 +571,7 @@ fn default_native_hook_names() -> HashSet<String> {
         .map(|s| s.to_string())
         .collect();
     names.insert("bash_write_targets".to_string());
+    names.extend(READ_PRETOOLUSE_HOOK_NAMES.iter().map(|s| s.to_string()));
     names.extend(POST_TOOL_USE_HOOK_NAMES.iter().map(|s| s.to_string()));
     names.extend(SESSIONSTART_HOOK_NAMES.iter().map(|s| s.to_string()));
     names
@@ -623,10 +756,9 @@ pub(crate) mod tests {
 
     #[test]
     fn registry_covers_every_bash_pretooluse_hook_plus_write_targets() {
-        // 5 Bash PreToolUse handlers (4 real HookSpec names plus
-        // bash_write_targets) + the 6 PostToolUse names + the SessionStart
-        // exposure line.
-        assert_eq!(registry().len(), 15);
+        // Five Bash handlers, two additional Read handlers, nine PostToolUse
+        // handlers and the SessionStart exposure line.
+        assert_eq!(registry().len(), 17);
         assert!(bash_pretooluse_fully_native(&all_four()));
         let mut missing_one = all_four();
         missing_one.remove("current_work_guard_bash");

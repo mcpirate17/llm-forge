@@ -10,13 +10,38 @@ The registry lives at `<host>/.agents/a2a/agents.json`; each registered identity
 registry tokens private. Provision identities explicitly with `init --name NAME
 --port PORT`; serving one identity does not launch an AI agent.
 
-## Deliver and inspect
+## Inspect and acknowledge with Rust
+
+`forge mailbox` opens the same SQLite stores directly. It needs no Python
+interpreter and performs no network operations:
+
+```sh
+forge mailbox --host /path/to/project inbox --as-name recipient --compact --json
+forge mailbox --host /path/to/project show --as-name recipient MESSAGE_ID --json
+forge mailbox --host /path/to/project read --as-name recipient MESSAGE_ID
+forge mailbox --host /path/to/project history --as-name sender --limit 20
+```
+
+`inbox` uses the existing `bounded-a2a-inbox` JSON schema and bounds the number of
+messages, preview characters and total rendered characters. It does not mark
+messages read. `show` retrieves one complete message explicitly, with a default
+1 MiB limit (`--max-bytes`, maximum 16 MiB); larger records are refused rather
+than silently truncated. Use `--direction outbound` to inspect an outbound fact.
+`read` atomically acknowledges an unread inbound message; repeated acknowledgment
+fails, and a self-send's outbound record is preserved.
+
+`--state-dir` selects an existing alternative state directory. Inspection never
+creates a database or migrates its schema. Missing mailbox stores and corrupt
+stores produce errors for inbox, show and read. These commands can inspect a
+retained store after its registry entry is removed. `history` requires a registered
+identity and reports unavailable history when its store or event table is absent.
+Lifecycle and presentation state remain owned by the transport.
+
+## Deliver through the transport
 
 ```sh
 python -m conductor.agent_a2a send --from-name sender --to recipient --body-file message.txt
 python -m conductor.agent_a2a flush --as-name sender --max-messages 100
-python -m conductor.agent_a2a history --as-name sender --limit 20
-python -m conductor.agent_a2a inbox --as-name recipient --compact --json
 ```
 
 Structured `coordination-v2` sends can queue while the peer is offline. A reachable

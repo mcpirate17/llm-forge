@@ -4,9 +4,14 @@
 //! the pure decision core: POSIX-ish shlex tokenizing/quoting, managed-hook
 //! detection, the hook-tree transform, and the install merge.
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
-use serde_json::{Map, Value};
+#[cfg(feature = "python")]
+use serde_json::Map;
+#[cfg(any(feature = "python", test))]
+use serde_json::Value;
 
 fn shlex_whitespace(c: char) -> bool {
     matches!(c, ' ' | '\t' | '\r' | '\n')
@@ -88,6 +93,7 @@ pub fn shlex_join(parts: &[String]) -> String {
 }
 
 /// True when ``parts`` contains the adjacent pair ``["-m", managed_module]``.
+#[cfg(any(feature = "python", test))]
 fn is_managed_command(parts: &[String], managed_module: &str) -> bool {
     if parts.len() < 2 {
         return false;
@@ -95,6 +101,7 @@ fn is_managed_command(parts: &[String], managed_module: &str) -> bool {
     (0..parts.len() - 1).any(|index| parts[index] == "-m" && parts[index + 1] == managed_module)
 }
 
+#[cfg(any(feature = "python", test))]
 fn is_managed_hook(value: &Value, managed_module: &str) -> bool {
     let Some(object) = value.as_object() else {
         return false;
@@ -109,6 +116,7 @@ fn is_managed_hook(value: &Value, managed_module: &str) -> bool {
 }
 
 /// Mirror ``hook_installer._without_managed_hooks``.
+#[cfg(any(feature = "python", test))]
 fn without_managed_hooks(config: &mut Value, managed_module: &str) -> Result<(), String> {
     let root_is_object = config.is_object();
     if !root_is_object {
@@ -179,22 +187,26 @@ fn without_managed_hooks(config: &mut Value, managed_module: &str) -> Result<(),
     Ok(())
 }
 
+#[cfg(feature = "python")]
 fn parse_payload(payload: &str, what: &str) -> Result<Value, String> {
     serde_json::from_str(payload).map_err(|error| format!("invalid {what}: {error}"))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (command))]
 fn hook_installer_shlex_split_native(command: &str) -> PyResult<Vec<String>> {
     shlex_split(command).map_err(PyValueError::new_err)
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (parts))]
 fn hook_installer_shlex_join_native(parts: Vec<String>) -> String {
     shlex_join(&parts)
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (command, managed_module))]
 fn hook_installer_is_managed_native(command: &str, managed_module: &str) -> bool {
@@ -204,6 +216,7 @@ fn hook_installer_is_managed_native(command: &str, managed_module: &str) -> bool
     }
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (config_json, managed_module))]
 fn hook_installer_without_managed_native(
@@ -217,6 +230,7 @@ fn hook_installer_without_managed_native(
 }
 
 /// Mirror ``hook_installer.merge_install``: exactly one managed hook per spec.
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (config_json, spec_json, command, managed_name, managed_module))]
 fn hook_installer_merge_install_native(
@@ -282,6 +296,7 @@ fn hook_installer_merge_install_native(
     Ok(config.to_string())
 }
 
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(hook_installer_shlex_split_native, module)?)?;
     module.add_function(wrap_pyfunction!(hook_installer_shlex_join_native, module)?)?;
@@ -421,6 +436,7 @@ mod tests {
         assert_eq!(groups[0]["custom"], 1);
     }
 
+    #[cfg(feature = "python")]
     #[test]
     fn merge_install_appends_one_group_and_is_idempotent() {
         let spec = serde_json::json!({"event": "SessionStart", "timeout": 15,
@@ -450,6 +466,7 @@ mod tests {
         let _ = &mut config;
     }
 
+    #[cfg(feature = "python")]
     #[test]
     fn merge_refuses_non_object_roots_and_bad_hooks() {
         let spec = serde_json::json!({"event": "SessionStart", "timeout": 15});

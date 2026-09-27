@@ -12,6 +12,8 @@ use pyo3::prelude::*;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
+use crate::text_normalization::{normalized_text, python_whitespace};
+
 const SCHEMA_VERSION: u64 = 1;
 const AUTHORITY: &str = "deterministic-a2a-compaction";
 const MAX_PROTOCOL_SUMMARY_BYTES: usize = 1_024;
@@ -93,20 +95,6 @@ fn canonical_bytes(value: &Value) -> Result<Vec<u8>, String> {
 
 fn canonical_sha256(value: &Value) -> Result<String, String> {
     Ok(sha256(&canonical_bytes(value)?))
-}
-
-// Python's regular-expression `\s` includes the four ASCII information
-// separators in addition to Unicode White_Space. Keep that exact behavior.
-fn python_whitespace(value: char) -> bool {
-    value.is_whitespace() || ('\u{001c}'..='\u{001f}').contains(&value)
-}
-
-fn normalized_text(value: &str) -> String {
-    value
-        .split(python_whitespace)
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 fn fit_utf8(value: &str, max_bytes: usize) -> Result<String, String> {

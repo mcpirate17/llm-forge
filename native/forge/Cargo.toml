@@ -1,6 +1,6 @@
 [package]
 name = "forge"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Native hooks, resource-aware task execution, audit and cost tooling for AI agents"
 
@@ -24,12 +24,9 @@ toml = "0.8"
 # it -- `forge notes index|search` (notes_index.rs) needs FTS5 and its own
 # `fts5_is_available` test fails loud if it is ever missing.
 rusqlite = { version = "0.32", features = ["bundled"] }
-# `forge mutation plan` calls `compute_plan` directly -- no pyo3 boundary, no
-# Python interpreter. conductor-native's default build (no `extension-module`
-# feature) still links libpython so its own `cargo test` can run; pulling that
-# link into this binary too is an accepted tradeoff over duplicating the
-# ~400-line plan algorithm in a second, drift-prone copy (see mutation_plan.rs).
-conductor-native = { path = "../conductor-native" }
+# Share the native plan, receipt and shell-argument algorithms without building
+# Python bindings or requiring interpreter discovery during a Forge build.
+conductor-native = { path = "../conductor-native", default-features = false }
 
 [profile.release]
 opt-level = 3
