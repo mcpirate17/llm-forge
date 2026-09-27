@@ -15,6 +15,14 @@ const TEST_DIR: &str = "native/conductor-native/tests";
 const REGISTRY_PATH: &str = "native/conductor-native/src/python_contract_targets.tsv";
 const COMPILED_REGISTRY: &str = include_str!("python_contract_targets.tsv");
 
+fn fixture_source(path: &str) -> bool {
+    path.starts_with(&format!("{TEST_DIR}/fixtures/")) && path.ends_with(".rs")
+}
+
+fn corpus_source(path: &str) -> bool {
+    path.starts_with("native/forge/tests/fixtures/") && path.ends_with(".json")
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CargoCommand {
     pub cwd: String,
@@ -56,7 +64,7 @@ fn parse_registry(contents: &str) -> Result<Registry> {
             && !source
                 .trim_start_matches(&format!("{TEST_DIR}/python_contracts/"))
                 .contains('/');
-        if !(source_file || helper)
+        if !(source_file || helper || fixture_source(source) || corpus_source(source))
             || source.contains("..")
             || source.contains('\\')
             || source.chars().any(char::is_control)
@@ -260,6 +268,17 @@ fn validate_selected_helpers(root: &Path, target: &str, entries: &Registry) -> R
     for helper in registered {
         if !source_module_paths(root, &helper)?.is_empty() {
             bail!("nested contract helper modules are unsupported: {helper}");
+        }
+    }
+    for (fixture, targets) in &entries.by_source {
+        if corpus_source(fixture) && targets.contains(target) {
+            require_regular_file(root, fixture)?;
+        }
+        if fixture_source(fixture)
+            && targets.contains(target)
+            && !source_module_paths(root, fixture)?.is_empty()
+        {
+            bail!("external modules in contract fixture programs are unsupported: {fixture}");
         }
     }
     Ok(())
