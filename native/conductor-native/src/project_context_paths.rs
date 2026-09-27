@@ -37,7 +37,9 @@ pub(super) fn decode_hex(text: &str) -> NativeResult<Vec<u8>> {
         ));
     }
     bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| match (hex_nibble(pair[0]), hex_nibble(pair[1])) {
             (Some(high), Some(low)) => Ok((high << 4) | low),
             _ => Err(NativeError::new(

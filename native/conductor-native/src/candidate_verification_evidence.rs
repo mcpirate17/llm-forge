@@ -3,17 +3,65 @@
 use super::finding;
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeSet, HashMap, HashSet};
+use unicode_general_category::{get_general_category, GeneralCategory};
 
 const MISSING_HELP: &str = "A changed test requires a current registered PASS receipt before it can land. The only permitted route is an automatic engine -- `make mutation-generate MUTATION_GENERATE_ARGS='--only SRC'` then `make mutation-engine-run MUTATION_CAMPAIGN=...`. Hand-authored mutants, manifests, patches and receipts are forbidden, and the tooling that produced them has been removed.";
 const VALUE_HELP: &str = "Mutation waivers exempt only legacy receipt debt; new test definitions still need a value-classified PASS receipt.";
 const ADMISSION_HELP: &str = "Bind the new test to a critical/high active-source contract, record batch-level per-test attribution, and retain it as CORE or explicitly justified INTENTIONAL_REDUNDANCY.";
+
+fn py_string_repr(text: &str) -> String {
+    let quote = if text.contains('\'') && !text.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push(quote);
+    for ch in text.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            ch if ch == quote => {
+                out.push('\\');
+                out.push(ch);
+            }
+            ch if ch != ' '
+                && matches!(
+                    get_general_category(ch),
+                    GeneralCategory::Control
+                        | GeneralCategory::Format
+                        | GeneralCategory::PrivateUse
+                        | GeneralCategory::Surrogate
+                        | GeneralCategory::Unassigned
+                        | GeneralCategory::SpaceSeparator
+                        | GeneralCategory::LineSeparator
+                        | GeneralCategory::ParagraphSeparator
+                ) =>
+            {
+                let point = ch as u32;
+                if point <= 0xff {
+                    out.push_str(&format!("\\x{point:02x}"));
+                } else if point <= 0xffff {
+                    out.push_str(&format!("\\u{point:04x}"));
+                } else {
+                    out.push_str(&format!("\\U{point:08x}"));
+                }
+            }
+            ch => out.push(ch),
+        }
+    }
+    out.push(quote);
+    out
+}
 
 fn py_repr(value: &Value) -> String {
     match value {
         Value::Null => "None".into(),
         Value::Bool(true) => "True".into(),
         Value::Bool(false) => "False".into(),
-        Value::String(text) => format!("'{}'", text.replace('\\', "\\\\").replace('\'', "\\'")),
+        Value::String(text) => py_string_repr(text),
         Value::Array(rows) => format!(
             "[{}]",
             rows.iter().map(py_repr).collect::<Vec<_>>().join(", ")
@@ -21,7 +69,7 @@ fn py_repr(value: &Value) -> String {
         Value::Object(rows) => format!(
             "{{{}}}",
             rows.iter()
-                .map(|(key, value)| { format!("{}: {}", py_repr(&json!(key)), py_repr(value)) })
+                .map(|(key, value)| { format!("{}: {}", py_string_repr(key), py_repr(value)) })
                 .collect::<Vec<_>>()
                 .join(", ")
         ),

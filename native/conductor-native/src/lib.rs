@@ -23,6 +23,7 @@ pub mod candidate_structure;
 pub mod candidate_verification;
 #[cfg(feature = "python")]
 mod context_telemetry;
+pub mod context_telemetry_aggregate;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod dead_tests;
 #[cfg(feature = "python")]
@@ -31,6 +32,7 @@ mod duplicate_bodies;
 mod fleet_status;
 #[cfg(feature = "python")]
 mod git_source;
+pub mod graph_context;
 #[cfg(feature = "source-analysis")]
 pub mod graph_index;
 #[cfg(feature = "python")]
@@ -64,6 +66,7 @@ pub mod project_paths;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod receipt_auth;
 pub mod receipt_slim;
+pub mod reuse_consolidation;
 mod text_normalization;
 #[cfg(feature = "python")]
 mod tooling_boundary;
@@ -91,6 +94,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     dead_tests::register(module)?;
     duplicate_bodies::register(module)?;
     fleet_status::register(module)?;
+    graph_context::register(module)?;
     guardrail_ast::register(module)?;
     guardrail_duplicates::register(module)?;
     hook_installer::register(module)?;
@@ -111,6 +115,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     a2a_store_py::register(module)?;
     receipt_auth::register(module)?;
     receipt_slim::register(module)?;
+    reuse_consolidation::register(module)?;
     tooling_boundary::register(module)?;
     workspace_runtime_matrix::register(module)?;
     Ok(())

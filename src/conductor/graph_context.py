@@ -9,22 +9,22 @@ from __future__ import annotations
 
 import argparse
 import ast
-import contextlib
 import json
-import os
-import re
-import shutil
-import sqlite3
-import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any, Final
 
+from conductor._native import graph_context_native
 from conductor.candidate_review.git_source import repository_root
 from conductor.project_paths import host_root
 
 ROOT: Final[Path] = host_root()
+
+
+def _graph_native(operation: str, payload: dict[str, Any]) -> Any:
+    """Decode a deterministic graph decision from the native core."""
+    return json.loads(graph_context_native(operation, json.dumps(payload)))
 
 
 class GraphContextError(RuntimeError):
@@ -87,7 +87,9 @@ class SignatureStubifier(ast.NodeTransformer):
         body.append(ast.Expr(value=ast.Constant(value=...)))
         return body
 
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST | None:
+    def _visit_function(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> ast.AST | None:
         self.found_symbols.append(node.name)
         if self.target_symbol and node.name != self.target_symbol:
             return None
@@ -95,7 +97,7 @@ class SignatureStubifier(ast.NodeTransformer):
         docstring = ast.get_docstring(node)
         new_body = self._stubify_body(docstring)
         return ast.copy_location(
-            ast.FunctionDef(
+            type(node)(
                 name=node.name,
                 args=node.args,
                 body=new_body,
@@ -105,25 +107,12 @@ class SignatureStubifier(ast.NodeTransformer):
             ),
             node,
         )
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST | None:
+        return self._visit_function(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AST | None:
-        self.found_symbols.append(node.name)
-        if self.target_symbol and node.name != self.target_symbol:
-            return None
-
-        docstring = ast.get_docstring(node)
-        new_body = self._stubify_body(docstring)
-        return ast.copy_location(
-            ast.AsyncFunctionDef(
-                name=node.name,
-                args=node.args,
-                body=new_body,
-                decorator_list=node.decorator_list,
-                returns=node.returns,
-                type_comment=node.type_comment,
-            ),
-            node,
-        )
+        return self._visit_function(node)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> ast.AST | None:
         self.found_symbols.append(node.name)
@@ -146,9 +135,7 @@ class SignatureStubifier(ast.NodeTransformer):
                 res = self.visit(item)
                 if res is not None:
                     new_body.append(res)  # type: ignore[arg-type]
-            elif isinstance(item, ast.AnnAssign):
-                new_body.append(item)
-            elif isinstance(item, ast.Assign):
+            elif isinstance(item, (ast.AnnAssign, ast.Assign)):
                 new_body.append(item)
 
         if not new_body:
@@ -223,193 +210,42 @@ def extract_ast_skeleton(
     return skeleton, stubifier.found_symbols
 
 
-def _rel_path(repo: Path, path_str: str) -> str:
-    """Make path relative to repository root if possible."""
-    p = Path(path_str)
-    if p.is_absolute():
-        try:
-            return str(p.relative_to(repo.resolve()))
-        except ValueError:
-            return path_str
-    return path_str
-
-
-def _ripgrep_hits(repo: Path, pattern: str) -> list[tuple[str, int]] | None:
-    """``(file, line)`` hits from ripgrep, or ``None`` when it timed out."""
-    try:
-        proc = subprocess.run(
-            ["rg", "-n", "--glob", "*.py", pattern, "."],
-            cwd=repo,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        return None
-    hits: list[tuple[str, int]] = []
-    for line in proc.stdout.splitlines():
-        parts = line.split(":", 2)
-        if len(parts) >= 2:
-            hits.append(
-                (PurePosixPath(parts[0].lstrip("./")).as_posix(), int(parts[1]))
-            )
-    return hits
-
-
-def _scan_hits(repo: Path, regex: re.Pattern[str]) -> list[tuple[str, int]]:
-    """``(file, line)`` hits from a walk of ``*.py`` files under ``repo``.
-
-    Hidden directories (``.git``, ``.venv``, ``.code-review-graph``) are pruned,
-    matching ripgrep's default.
-    """
-    hits: list[tuple[str, int]] = []
-    for dirpath, dirnames, filenames in os.walk(repo):
-        dirnames[:] = sorted(name for name in dirnames if not name.startswith("."))
-        for name in sorted(filenames):
-            if not name.endswith(".py"):
-                continue
-            path = Path(dirpath, name)
-            relative = path.relative_to(repo).as_posix()
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-            hits.extend(
-                (relative, lineno)
-                for lineno, line in enumerate(lines, 1)
-                if regex.search(line)
-            )
-    return hits
+def _relations(rows: list[dict[str, str]]) -> list[GraphRelationship]:
+    return [GraphRelationship(**row) for row in rows]
 
 
 def find_syntactic_callers(
     repo: Path, symbol_name: str, target_file_rel: str
 ) -> list[GraphRelationship]:
-    """Call sites the graph index missed: ripgrep when installed, else a file scan."""
-    norm_target = PurePosixPath(target_file_rel).as_posix()
-    pattern = rf"\b{re.escape(symbol_name)}\("
-    hits = _ripgrep_hits(repo, pattern) if shutil.which("rg") else None
-    if hits is None:
-        hits = _scan_hits(repo, re.compile(pattern))
-    return [
-        GraphRelationship(
-            qualified_name=f"{file_path}:{lineno}",
-            kind="calls (syntactic)",
-            file_path=file_path,
-        )
-        for file_path, lineno in hits
-        if file_path != norm_target and not file_path.startswith(".venv/")
-    ]
+    """Find syntax-only callers through the native bounded scanner."""
+    rows = _graph_native(
+        "syntactic_callers",
+        {
+            "repo": str(repo),
+            "symbol_name": symbol_name,
+            "target_file_rel": target_file_rel,
+        },
+    )
+    return _relations(rows)
 
 
 def query_graph_relationships(
     repo: Path, file_path_str: str, target_symbol: str | None = None
 ) -> tuple[list[GraphRelationship], list[GraphRelationship], str]:
-    """Query .code-review-graph/graph.db for immediate callers and callees."""
-    db_path = repo / ".code-review-graph" / "graph.db"
-    if not db_path.is_file():
-        status = "unavailable (graph.db missing)"
-        callers: list[GraphRelationship] = []
-        if target_symbol:
-            callers = find_syntactic_callers(repo, target_symbol, file_path_str)
-        return callers, [], status
-
-    abs_path = str((repo / file_path_str).resolve())
-    norm_path = PurePosixPath(file_path_str).as_posix()
-
-    callers: list[GraphRelationship] = []
-    callees: list[GraphRelationship] = []
-    seen_callers: set[str] = set()
-
-    try:
-        # `closing`, not a bare assignment and not `with conn:`. The connection was
-        # closed on the last line of this block, so any failure while executing or
-        # fetching -- a corrupt page, a schema written by a newer graph build, a
-        # query interrupted mid-fetch -- jumped straight to the handler below and
-        # leaked the handle. `with conn:` would not have fixed it either: that is a
-        # TRANSACTION context, and it commits or rolls back without ever closing.
-        with contextlib.closing(
-            sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-        ) as conn:
-            callers, callees = _read_relationships(
-                conn, repo, abs_path, norm_path, target_symbol, seen_callers
-            )
-        status = "ok"
-    except sqlite3.Error as exc:
-        status = f"unavailable (sqlite error: {exc})"
-
-    # Supplement with syntactic callers for symbols to close graph resolution gaps
-    if target_symbol:
-        for syn_rel in find_syntactic_callers(repo, target_symbol, file_path_str):
-            if syn_rel.file_path not in seen_callers:
-                callers.append(syn_rel)
-                seen_callers.add(syn_rel.file_path)
-
-    return callers, callees, status
-
-
-def _read_relationships(
-    conn: sqlite3.Connection,
-    repo: Path,
-    abs_path: str,
-    norm_path: str,
-    target_symbol: str | None,
-    seen_callers: set[str],
-) -> tuple[list[GraphRelationship], list[GraphRelationship]]:
-    """Immediate callers and callees for one file, read from an open connection.
-
-    Split out so the caller owns the connection's lifetime and nothing in here can
-    return past a close.
-    """
-    callers: list[GraphRelationship] = []
-    callees: list[GraphRelationship] = []
-    cursor = conn.cursor()
-    target_clause = "WHERE target.file_path IN (?, ?) "
-    params: list[Any] = [abs_path, norm_path]
-    if target_symbol:
-        target_clause += "AND target.name = ? "
-        params.append(target_symbol)
-
-    caller_sql = f"""
-        SELECT DISTINCT source.qualified_name, edge.kind, source.file_path
-        FROM nodes AS target
-        JOIN edges AS edge ON edge.target_qualified = target.qualified_name
-        JOIN nodes AS source ON source.qualified_name = edge.source_qualified
-        {target_clause}
-        AND edge.kind != 'contains'
-        ORDER BY source.qualified_name
-        LIMIT 50
-    """
-    for qname, kind, fpath in cursor.execute(caller_sql, params).fetchall():
-        rel_qname = _rel_path(repo, qname)
-        rel_fpath = _rel_path(repo, fpath or "")
-        seen_callers.add(rel_fpath)
-        callers.append(
-            GraphRelationship(qualified_name=rel_qname, kind=kind, file_path=rel_fpath)
-        )
-
-    source_clause = "WHERE source.file_path IN (?, ?) "
-    callee_params: list[Any] = [abs_path, norm_path]
-    if target_symbol:
-        source_clause += "AND source.name = ? "
-        callee_params.append(target_symbol)
-
-    callee_sql = f"""
-        SELECT DISTINCT target.qualified_name, edge.kind, target.file_path
-        FROM nodes AS source
-        JOIN edges AS edge ON edge.source_qualified = source.qualified_name
-        JOIN nodes AS target ON target.qualified_name = edge.target_qualified
-        {source_clause}
-        AND edge.kind != 'contains'
-        ORDER BY target.qualified_name
-        LIMIT 50
-    """
-    for qname, kind, fpath in cursor.execute(callee_sql, callee_params).fetchall():
-        rel_qname = _rel_path(repo, qname)
-        rel_fpath = _rel_path(repo, fpath or "")
-        callees.append(
-            GraphRelationship(qualified_name=rel_qname, kind=kind, file_path=rel_fpath)
-        )
-
-    return callers, callees
+    """Read graph edges and syntax-only caller fallback through the native core."""
+    result = _graph_native(
+        "relationships",
+        {
+            "repo": str(repo),
+            "file_path": file_path_str,
+            "target_symbol": target_symbol,
+        },
+    )
+    return (
+        _relations(result["callers"]),
+        _relations(result["callees"]),
+        result["status"],
+    )
 
 
 def get_file_context(
@@ -447,62 +283,13 @@ def get_file_context(
 
 
 def _is_test_path(path: str) -> bool:
-    """True only for genuine test files (test_*.py / *_test.py or a tests/ dir).
-
-    A substring check would misbin every relationship of files like
-    ``mutation_testing.py`` into Tested By.
-    """
-    parts = PurePosixPath(path).parts
-    name = parts[-1] if parts else ""
-    return (
-        name.startswith("test_") or name.endswith("_test.py") or "tests" in parts[:-1]
-    )
+    """Classify a graph relationship path using native policy."""
+    return bool(_graph_native("is_test_path", {"path": path}))
 
 
 def format_markdown_context(summary: FileContextSummary) -> str:
-    """Format file context summary as a compact Markdown block."""
-    lines = [
-        f"### AST Context: `{summary.file_path}`",
-        "```python",
-        summary.skeleton.strip(),
-        "```",
-    ]
-    if summary.graph_status.startswith("unavailable"):
-        lines.append(f"\n*Notice: code-review-graph {summary.graph_status}*")
-
-    # Group callers and callees cleanly by role
-    calls: list[str] = []
-    called_by: list[str] = []
-    tested_by: list[str] = []
-
-    for c in summary.callers:
-        label = f"`{c.qualified_name}`"
-        if "test" in c.kind.lower() or _is_test_path(c.file_path):
-            tested_by.append(label)
-        else:
-            called_by.append(f"{label} ({c.kind})")
-
-    for c in summary.callees:
-        label = f"`{c.qualified_name}`"
-        if "test" in c.kind.lower() or _is_test_path(c.file_path):
-            tested_by.append(label)
-        else:
-            calls.append(f"{label} ({c.kind})")
-
-    if called_by:
-        lines.append("\n**Called By (Inbound Call Sites):**")
-        for item in called_by[:15]:
-            lines.append(f"- {item}")
-    if calls:
-        lines.append("\n**Calls (Outbound Dependencies):**")
-        for item in calls[:15]:
-            lines.append(f"- {item}")
-    if tested_by:
-        lines.append("\n**Tested By (Test Suites / Invariants):**")
-        for item in set(tested_by[:15]):
-            lines.append(f"- {item}")
-
-    return "\n".join(lines) + "\n"
+    """Format file context with native role classification and output bounds."""
+    return str(_graph_native("markdown", summary.to_dict()))
 
 
 def main(argv: list[str] | None = None) -> int:

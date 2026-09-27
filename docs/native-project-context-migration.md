@@ -33,8 +33,8 @@ codes and messages at the Python boundary.
 
 The strict TOML schema parser was already native. Its parser is now a pure Rust
 function, with the original PyO3 export translating its schema and parse errors
-for callers. The descriptor-based config read remains in Python with its FIFO
-and ancestor-swap tests. No path is created by these native operations.
+for callers. The descriptor read and its FIFO and ancestor-swap tests are now
+native. No path is created by these native operations.
 
 | Behavior | Native test | Existing Python contract |
 | --- | --- | --- |
@@ -58,6 +58,5 @@ five descriptor filesystem integration tests, and eight PyO3 public contracts
 after rebuilding the extension. Scoped Clippy passed with warnings denied for
 the library and both context test targets.
 
-Validation for this cohort: 14 native unit tests and 8 Python-contract tests
-passed with the rebuilt extension. The native tests include real child
-processes for stdout overflow, stderr overflow, timeout, kill, and reap.
+The bounded Git tests include real child processes for stdout overflow,
+stderr overflow, timeout, kill, and reap.

@@ -4,18 +4,15 @@
 //! owns normalization, event construction, bounded locked storage, rotation, and
 //! NDJSON aggregation.
 
-use std::cmp::Reverse;
-use std::collections::HashMap;
 use std::env;
-use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
+use std::fs::{self, OpenOptions};
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use pyo3::exceptions::{PyOSError, PyValueError};
+use pyo3::exceptions::{PyOSError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBool, PyDict, PyInt, PyString};
-use serde::Serialize;
-use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 const MAX_PROVIDER_CHARS: usize = 32;
 const MAX_TOOL_CHARS: usize = 100;
@@ -401,19 +398,25 @@ fn context_telemetry_event_native<'py>(
     Ok(result)
 }
 
-#[pyfunction]
-fn context_telemetry_hook_event_native<'py>(
+fn hook_event<'py>(
     py: Python<'py>,
     hook: &str,
     hook_json: &Bound<'py, PyAny>,
     event_name: &str,
     timestamp: &str,
+    include_hash: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
     let mapping = mapping_type(py)?;
     let mut context = String::new();
+    let mut hash_text = String::new();
     let mut selected_event = event_name.to_owned();
     if let Ok(payload) = hook_json.cast::<PyDict>() {
         if let Some(specific) = payload.get_item("hookSpecificOutput")? {
+            if include_hash {
+                if let Ok(strict) = specific.cast::<PyDict>() {
+                    hash_text = injected_context_text(strict)?;
+                }
+            }
             if is_mapping(&specific, &mapping)? {
                 for key in ["additionalContext", "permissionDecisionReason"] {
                     let value = mapping_get(&specific, key)?;
@@ -458,7 +461,61 @@ fn context_telemetry_hook_event_native<'py>(
         "hook-additional-context-bytes",
     )?;
     result.set_item("output_bounded", false)?;
+    if !hash_text.is_empty() {
+        let digest = Sha256::digest(hash_text.as_bytes());
+        result.set_item("content_hash", format!("{digest:x}")[..16].to_owned())?;
+    }
     Ok(result)
+}
+
+#[pyfunction]
+fn context_telemetry_hook_event_native<'py>(
+    py: Python<'py>,
+    hook: &str,
+    hook_json: &Bound<'py, PyAny>,
+    event_name: &str,
+    timestamp: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    hook_event(py, hook, hook_json, event_name, timestamp, false)
+}
+
+#[pyfunction]
+fn context_telemetry_hook_event_with_hash_native<'py>(
+    py: Python<'py>,
+    hook: &str,
+    hook_json: &Bound<'py, PyAny>,
+    event_name: &str,
+    timestamp: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    hook_event(py, hook, hook_json, event_name, timestamp, true)
+}
+
+fn injected_context_text(specific: &Bound<'_, PyDict>) -> PyResult<String> {
+    if let Some(context) = specific.get_item("additionalContext")? {
+        if context.is_instance_of::<PyString>() && context.is_truthy()? {
+            return context.extract();
+        }
+    }
+    if let Some(reason) = specific.get_item("permissionDecisionReason")? {
+        if reason.is_instance_of::<PyString>() {
+            return reason.extract();
+        }
+    }
+    Ok(String::new())
+}
+
+#[pyfunction]
+fn context_telemetry_injected_context_native(hook_json: &Bound<'_, PyAny>) -> PyResult<String> {
+    let Ok(payload) = hook_json.cast::<PyDict>() else {
+        return Ok(String::new());
+    };
+    let Some(specific) = payload.get_item("hookSpecificOutput")? else {
+        return Ok(String::new());
+    };
+    let Ok(strict) = specific.cast::<PyDict>() else {
+        return Ok(String::new());
+    };
+    injected_context_text(strict)
 }
 
 fn append_bytes(path: &Path, encoded: &[u8], max_log_bytes: u64) -> std::io::Result<bool> {
@@ -529,110 +586,61 @@ fn context_telemetry_record_native(
     Ok(Some(target.to_string_lossy().into_owned()))
 }
 
-#[derive(Debug, Default, Serialize)]
-struct SummaryRow {
-    event: String,
-    tool: String,
-    count: u128,
-    output_bytes: u128,
-    output_tokens_estimate: u128,
-    over_bound: u128,
-    over_bound_bytes: u128,
-    share: f64,
-}
-
-fn json_nonnegative(value: Option<&Value>) -> u128 {
-    let Some(value) = value else {
-        return 0;
-    };
-    match value {
-        Value::Number(number) => number.to_string().parse().unwrap_or(0),
-        Value::String(text) if text.chars().all(|character| character.is_ascii_digit()) => {
-            text.parse().unwrap_or(0)
+fn report_error(error: crate::context_telemetry_aggregate::ReportError) -> PyErr {
+    match error {
+        crate::context_telemetry_aggregate::ReportError::Io(error) => io_error(error),
+        crate::context_telemetry_aggregate::ReportError::NaiveTimestamp(error) => {
+            PyTypeError::new_err(format!(
+                "can't compare offset-naive and offset-aware datetimes: {error}"
+            ))
         }
-        _ => 0,
+        error => PyValueError::new_err(error.to_string()),
     }
-}
-
-fn summarize(paths: &[String], bound_bytes: i128) -> std::io::Result<Value> {
-    let mut positions: HashMap<(String, String), usize> = HashMap::new();
-    let mut rows: Vec<SummaryRow> = Vec::new();
-    for path in paths {
-        let mut reader = BufReader::new(File::open(path)?);
-        let mut line = Vec::new();
-        while reader.read_until(b'\n', &mut line)? != 0 {
-            let Ok(Value::Object(item)) = serde_json::from_slice::<Value>(&line) else {
-                line.clear();
-                continue;
-            };
-            let event = item.get("event").map_or_else(
-                || "?".to_owned(),
-                |value| match value {
-                    Value::String(text) => text.clone(),
-                    Value::Null => "None".to_owned(),
-                    other => other.to_string(),
-                },
-            );
-            let tool = item.get("tool").map_or_else(
-                || "?".to_owned(),
-                |value| match value {
-                    Value::String(text) => text.clone(),
-                    Value::Null => "None".to_owned(),
-                    other => other.to_string(),
-                },
-            );
-            let key = (event.clone(), tool.clone());
-            let index = *positions.entry(key).or_insert_with(|| {
-                rows.push(SummaryRow {
-                    event,
-                    tool,
-                    ..SummaryRow::default()
-                });
-                rows.len() - 1
-            });
-            let row = &mut rows[index];
-            let output_bytes = json_nonnegative(item.get("output_bytes"));
-            row.count += 1;
-            row.output_bytes += output_bytes;
-            row.output_tokens_estimate += json_nonnegative(item.get("output_tokens_estimate"));
-            if (output_bytes as i128) > bound_bytes {
-                row.over_bound += 1;
-                row.over_bound_bytes += ((output_bytes as i128) - bound_bytes) as u128;
-            }
-            line.clear();
-        }
-    }
-    rows.sort_by_key(|row| Reverse(row.output_bytes));
-    let total: u128 = rows.iter().map(|row| row.output_bytes).sum();
-    for row in &mut rows {
-        row.share = if total == 0 {
-            0.0
-        } else {
-            ((row.output_bytes as f64 / total as f64) * 10_000.0).round() / 10_000.0
-        };
-    }
-    let hook_context_bytes: u128 = rows
-        .iter()
-        .filter(|row| row.event == "HookContext")
-        .map(|row| row.output_bytes)
-        .sum();
-    let events: u128 = rows.iter().map(|row| row.count).sum();
-    let output_bytes: u128 = rows.iter().map(|row| row.output_bytes).sum();
-    Ok(json!({
-        "schema_version": "llm.context-telemetry.summary.v1",
-        "files": paths,
-        "bound_bytes": bound_bytes,
-        "events": events,
-        "output_bytes": output_bytes,
-        "hook_context_bytes": hook_context_bytes,
-        "rows": rows,
-    }))
 }
 
 #[pyfunction]
 fn context_telemetry_summarize_native(paths: Vec<String>, bound_bytes: i128) -> PyResult<String> {
-    let summary = summarize(&paths, bound_bytes).map_err(io_error)?;
+    let summary =
+        crate::context_telemetry_aggregate::summarize(&paths, bound_bytes).map_err(io_error)?;
     serde_json::to_string(&summary).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn context_telemetry_parse_since_native(since: &str, now_iso: &str) -> PyResult<String> {
+    crate::context_telemetry_aggregate::parse_since(since, now_iso).map_err(report_error)
+}
+
+#[pyfunction]
+fn context_telemetry_report_native(
+    paths: Vec<String>,
+    bound_bytes: i128,
+    since: Option<String>,
+    top: i64,
+    now_iso: &str,
+    report_file: &str,
+) -> PyResult<String> {
+    let report = crate::context_telemetry_aggregate::summarize_report(
+        &paths,
+        bound_bytes,
+        since.as_deref(),
+        top,
+        now_iso,
+        report_file,
+    )
+    .map_err(report_error)?;
+    serde_json::to_string(&report).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn context_telemetry_format_summary_native(report_json: &str, rich: bool) -> PyResult<String> {
+    let report = serde_json::from_str(report_json)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    if rich {
+        crate::context_telemetry_aggregate::format_rich_summary(&report)
+    } else {
+        crate::context_telemetry_aggregate::format_summary(&report)
+    }
+    .map_err(PyValueError::new_err)
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -645,11 +653,28 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         context_telemetry_hook_event_native,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(
+        context_telemetry_hook_event_with_hash_native,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        context_telemetry_injected_context_native,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(context_telemetry_append_native, module)?)?;
     module.add_function(wrap_pyfunction!(context_telemetry_rotate_native, module)?)?;
     module.add_function(wrap_pyfunction!(context_telemetry_record_native, module)?)?;
     module.add_function(wrap_pyfunction!(
         context_telemetry_summarize_native,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        context_telemetry_parse_since_native,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(context_telemetry_report_native, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        context_telemetry_format_summary_native,
         module
     )?)?;
     Ok(())
@@ -685,7 +710,11 @@ mod tests {
             b"{\"event\":\"PostToolUse\",\"tool\":\"B\",\"output_bytes\":4,\"output_tokens_estimate\":1}\nnot json\n{\"event\":\"HookContext\",\"tool\":\"A\",\"output_bytes\":4,\"output_tokens_estimate\":1}\n",
         )
         .expect("write events");
-        let result = summarize(&[path.to_string_lossy().into_owned()], 3).expect("summary");
+        let result = crate::context_telemetry_aggregate::summarize(
+            &[path.to_string_lossy().into_owned()],
+            3,
+        )
+        .expect("summary");
         assert_eq!(result["events"], 2);
         assert_eq!(result["hook_context_bytes"], 4);
         assert_eq!(result["rows"][0]["tool"], "B");

@@ -49,11 +49,12 @@ type FsResult<T> = Result<T, FsError>;
 
 fn decode_path(payload: &Value, field: &str) -> FsResult<PathBuf> {
     let text = payload[field].as_str().ok_or_else(FsError::io)?;
-    let pairs = text.as_bytes().chunks_exact(2);
-    if !pairs.remainder().is_empty() {
+    let (pairs, remainder) = text.as_bytes().as_chunks::<2>();
+    if !remainder.is_empty() {
         return Err(FsError::io());
     }
     let bytes = pairs
+        .iter()
         .map(|pair| {
             let digit = |byte: u8| (byte as char).to_digit(16);
             match (digit(pair[0]), digit(pair[1])) {

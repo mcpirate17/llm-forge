@@ -22,13 +22,20 @@ import argparse
 import ast
 import json
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from conductor.audit_root import resolve_audit_root
 from conductor.duplicate_audit_config import DEFAULT_SOURCE_DIRS
 from conductor.reuse import _support
 from conductor.reuse import core as slop_core
+
+
+def _native_decide(operation: str, payload: object) -> object:
+    from conductor._native import reuse_consolidation_native
+
+    return json.loads(reuse_consolidation_native(operation, json.dumps(payload)))
+
 
 DEFAULT_MIN_LINES = 6
 DEFAULT_BATCH_SIZE = 8
@@ -245,34 +252,13 @@ def ingest_token_clones(repo: Path) -> list[Cluster]:
 
 
 def _clusters_from_jscpd(data: dict) -> list[Cluster]:
-    clusters: list[Cluster] = []
-    for dup in data.get("duplicates", []):
-        first = dup.get("firstFile") or {}
-        second = dup.get("secondFile") or {}
-        if not first or not second:
-            continue
-        tokens = dup.get("tokens") or dup.get("lines") or 0
-        sites = [
-            FuncRecord(
-                file=first["name"],
-                line_start=first["start"],
-                line_end=first["end"],
-                name="<clone>",
-                node_hash="",
-                tokens=tokens,
-                source="",
-            ),
-            FuncRecord(
-                file=second["name"],
-                line_start=second["start"],
-                line_end=second["end"],
-                name="<clone>",
-                node_hash="",
-                tokens=tokens,
-                source="",
-            ),
-        ]
-        cluster = Cluster(kind="token", tokens=tokens, sites=sites)
+    clusters = []
+    for row in _native_decide("token_clones", data):
+        cluster = Cluster(
+            kind=row["kind"],
+            tokens=row["tokens"],
+            sites=[FuncRecord(**site) for site in row["sites"]],
+        )
         _cluster_evidence(cluster)
         clusters.append(cluster)
     return clusters
@@ -284,29 +270,10 @@ def _clusters_from_jscpd(data: dict) -> list[Cluster]:
 
 
 def cluster_to_dict(cluster: Cluster) -> dict:
-    return {
-        "id": cluster.id,
-        "kind": cluster.kind,
-        "tokens": cluster.tokens,
-        "n_sites": cluster.n_sites,
-        "est_bytes": cluster.est_bytes,
-        "confidence": cluster.confidence,
-        "value_score": cluster.value_score,
-        "risk": cluster.risk,
-        "disposition": cluster.disposition,
-        "rationale": cluster.rationale,
-        "batch": cluster.batch,
-        "suggested_home": _suggested_home(cluster.sites),
-        "sites": [
-            {
-                "file": s.file,
-                "line_start": s.line_start,
-                "line_end": s.line_end,
-                "name": s.name,
-            }
-            for s in cluster.sites
-        ],
-    }
+    return _native_decide(
+        "cluster_dicts",
+        {"clusters": [asdict(cluster)], "homes": [_suggested_home(cluster.sites)]},
+    )[0]
 
 
 def build_output(
@@ -318,21 +285,16 @@ def build_output(
     files_unparsable: int,
     functions_considered: int,
 ) -> dict:
-    actionable = [cluster for cluster in clusters if cluster.disposition == "auto"]
-    n_batches = len({cluster.batch for cluster in actionable})
-    summary = {
-        "n_clusters": len(clusters),
-        "n_actionable": len(actionable),
-        "n_validate": sum(c.disposition == "validate" for c in clusters),
-        "n_ignored": sum(c.disposition == "ignore" for c in clusters),
-        "n_batches": n_batches,
-        "total_redundant_bytes": sum(c.est_bytes for c in clusters),
-        "actionable_redundant_bytes": sum(c.est_bytes for c in actionable),
-        "actionable_value_score": sum(c.value_score for c in actionable),
+    rows = [asdict(cluster) for cluster in clusters]
+    payload = {
+        "clusters": rows,
+        "homes": [_suggested_home(cluster.sites) for cluster in clusters],
         "files_scanned": files_scanned,
         "files_unparsable": files_unparsable,
         "functions_considered": functions_considered,
     }
+    summary = _native_decide("report_summary", payload)
+    cluster_rows = _native_decide("cluster_dicts", payload)
     return _support.generated_output(
         base={
             "targets": targets,
@@ -341,50 +303,17 @@ def build_output(
             "summary": summary,
         },
         items_key="clusters",
-        items=clusters,
-        serialize=cluster_to_dict,
+        items=cluster_rows,
+        serialize=lambda row: row,
     )
 
 
 def write_markdown(path: Path, data: dict) -> None:
-    s = data["summary"]
-    rows = [_markdown_row(cluster) for cluster in data["clusters"]]
-    _support.write_markdown_table(
-        path,
-        title=f"# Consolidation report — generated {data['generated_at']}",
-        summary=(
-            f"{s['n_clusters']} clusters across {s['n_batches']} batches; "
-            f"{s['n_actionable']} auto-actionable, {s['n_validate']} require validation; "
-            f"~{s['total_redundant_bytes']} redundant AST-node-units; "
-            f"{s['files_scanned']} files scanned ({s['files_unparsable']} unparsable), "
-            f"{s['functions_considered']} functions considered."
-        ),
-        columns=[
-            "id",
-            "batch",
-            "kind",
-            "disposition",
-            "confidence",
-            "value",
-            "n_sites",
-            "est_bytes",
-            "suggested_home",
-            "sites (file:line, ...)",
-        ],
-        rows=rows,
-    )
+    path.write_text(_native_decide("markdown", data), encoding="utf-8")
 
 
 def _markdown_row(cluster: dict) -> str:
-    site_strs = [f"{s['file']}:{s['line_start']}" for s in cluster["sites"]]
-    site_field = _support.plus_more_list(site_strs, show=6)
-    return (
-        f"| {cluster['id']} | {cluster['batch']} | {cluster['kind']} | "
-        f"{cluster['disposition']} | {cluster['confidence']:.2f} | "
-        f"{cluster['value_score']} | "
-        f"{cluster['n_sites']} | {cluster['est_bytes']} | "
-        f"{cluster['suggested_home'] or 'review required'} | {site_field} |"
-    )
+    return _native_decide("markdown_row", cluster)
 
 
 # --------------------------------------------------------------------------------

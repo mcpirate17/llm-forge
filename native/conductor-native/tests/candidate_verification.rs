@@ -193,6 +193,59 @@ fn evidence_rows_fail_closed_without_losing_order_or_metrics() {
 }
 
 #[test]
+fn malformed_receipt_row_uses_python_repr_for_controls_quotes_and_unicode() {
+    let findings = decide(
+        "receipt_findings",
+        &json!({
+            "payload": {"missing_evidence": [
+                "line\nreturn\r\ttab\u{0000}\u{001f}\u{007f}\u{0085}",
+                "it's", "say \"hi\"", "both'\"", "café 😀 中",
+                "e\u{0301}", "\u{00a0}\u{200b}\u{2028}",
+                "\u{e000}\u{f0000}"
+            ]},
+            "waived": []
+        }),
+    )
+    .unwrap();
+    let rows = findings.as_array().unwrap();
+    let prefix = "malformed mutation receipt row (not an object): ";
+    let expected = [
+        "'line\\nreturn\\r\\ttab\\x00\\x1f\\x7f\\x85'",
+        "\"it's\"",
+        "'say \"hi\"'",
+        "'both\\'\"'",
+        "'café 😀 中'",
+        "'e\u{0301}'",
+        "'\\xa0\\u200b\\u2028'",
+        "'\\ue000\\U000f0000'",
+    ];
+    assert_eq!(rows.len(), expected.len());
+    for (row, expected_repr) in rows.iter().zip(expected) {
+        assert_eq!(row["message"], format!("{prefix}{expected_repr}"));
+        assert!(!row["message"].as_str().unwrap().contains('\n'));
+        assert!(!row["message"].as_str().unwrap().contains('\0'));
+    }
+}
+
+#[test]
+fn malformed_evidence_row_recurses_through_nested_values_and_map_keys() {
+    let indexed = decide(
+        "evidence_index",
+        &json!({"evidence_rows": [
+            {"bad\n": ["x\u{0000}", {"a'": "😀"}, null, true, 23]}
+        ]}),
+    )
+    .unwrap();
+    assert_eq!(indexed["index"], json!({}));
+    assert_eq!(indexed["findings"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        indexed["findings"][0]["message"],
+        "evidence row 1 is malformed (needs an object with a string 'path'); \
+         the row cannot be evaluated: {'bad\\n': ['x\\x00', {\"a'\": '😀'}, None, True, 23]}"
+    );
+}
+
+#[test]
 fn waiver_decision_preserves_base_file_and_source_failure_reasons() {
     let states = decide("waiver_states", &json!({
         "base":"integration", "waivers":[
