@@ -1,15 +1,22 @@
 # Native test migration
 
-At pinned commit `c0ab4e080f661443085628d8035122b4e2823e92`, the separate
-Rust-test source milestone is **72.7724%**: 71,993 Rust test code lines and
-26,936 Python test code lines under the unchanged path and inline-test rules.
-This cohort retired four Python test modules and added 53 named Rust-owned
-contracts across four targets plus a test-only Rust stdio fixture. Production
-is **50.5314% native**. These are source-composition metrics,
+At pinned commit `f8a1af1a4194eaec77e7dfcc0e7a997d47c69e95`, the separate
+Rust-test source milestone is **73.9463%**: 73,774 Rust test code lines and
+25,993 Python test code lines under the unchanged path and inline-test rules.
+This cohort retired three Python test modules and added 46 named Rust-owned
+contracts across four targets plus a test-only Rust interpreter fixture.
+Production remains **50.5314% native**. These are source-composition metrics,
 not behavioral coverage. The [full method and pinned evidence](native-migration.md#latest-verified-commit)
 record every counted input.
 
-At the preceding pinned commit `4da207110e81697b1591a08285285598f7b8991a`,
+At the preceding pinned commit `c0ab4e080f661443085628d8035122b4e2823e92`,
+the separate Rust-test source milestone was **72.7724%**: 71,993 Rust test code
+lines and 26,936 Python test code lines. That cohort retired four Python test
+modules and added 53 named Rust-owned contracts across four targets plus a
+test-only Rust stdio fixture. Its [pinned evidence](native-metrics/c0ab4e0-evidence.tar.gz)
+remains available.
+
+At the earlier pinned commit `4da207110e81697b1591a08285285598f7b8991a`,
 the separate Rust-test source milestone was **71.3662%**: 69,657 Rust test code
 lines and 27,948 Python test code lines. That cohort retired four Python test
 modules and added 60 named Rust-owned contracts across five targets, preserving
@@ -175,9 +182,11 @@ native cases:
 
 Python still checks its distinct host seams: dead-test CLI root and error
 translation, KB retrieval embedding/index and exact CPython floating-point
-parity, mutation-coverage `changed`/`canary` dispatch and GitHub summary-file
-writes, and receipt verifier CLI and subprocess behavior. The Rust mutation
+parity, and receipt verifier CLI and subprocess behavior. The Rust mutation
 inventory test now includes a file with inline Rust tests that no test glob
 matches, along with the Git failure case; this completes the former Python
-inventory assertion. The mutation-testing CLI cases in
-`test_mutation_coverage.py` exercise a separate host workflow and remain.
+inventory assertion. The former mutation-coverage `changed`/`canary` dispatch,
+GitHub summary-file, and mutation-testing CLI cases now run in the Rust-owned
+contracts mapped in [the coverage and run-scope migration](native-mutation-coverage-scope-tests-migration.md);
+`test_mutation_coverage.py` has been retired. This does not imply that all
+remaining Python tests or host seams have been converted.
