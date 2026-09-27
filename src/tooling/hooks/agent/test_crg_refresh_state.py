@@ -101,7 +101,8 @@ def test_request_spawns_one_worker_then_queues(store: Store, tmp_path: Path):
     assert not store.pending.exists()
 
 
-def test_drain_refuses_while_another_worker_holds_the_lock(store: Store, held_lock):
+@pytest.mark.usefixtures("held_lock")
+def test_drain_refuses_while_another_worker_holds_the_lock(store: Store):
     store.pending.write_text("a.py\n", encoding="utf-8")
     calls: list[list[str]] = []
     assert drain(store, calls.append, debounce=0.0, sleep=lambda _s: None) == 0
