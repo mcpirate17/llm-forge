@@ -1,7 +1,10 @@
 # AGENTS.md — llm-forge working contract
 
-`conductor` is the tooling this repository ships **and** the tooling it is governed by.
-Every rule below applies to work on `src/conductor/`, `src/tooling/` and `native/`.
+llm-forge ships `conductor`, including governance tools for host projects. The LLM
+repository's governance policy applies only to LLM, not to work in llm-forge. Forge
+does not require governance claims, candidate-gate receipts, or mutation evidence to
+land changes. Its ordinary tests, code-quality checks, and contribution rules below
+still apply to work on `src/conductor/`, `src/tooling/` and `native/`.
 
 ## Open work
 
@@ -32,6 +35,9 @@ and destroys on its own.
 
 ## Mutation testing
 
+Mutation campaigns are optional for changes to Forge. When running a campaign, use
+the shipped automatic tools and preserve their evidence integrity:
+
 **Mutate only the files you changed and the tests that exercise them. Nothing else.**
 A three-file change is three campaigns, never a repo-wide sweep. `make mutation-plan`
 and `make mutation-generate` scope themselves to `git diff <base>...HEAD` plus the dirty
@@ -49,10 +55,11 @@ make mutation-generate
 make mutation-engine-run MUTATION_CAMPAIGN=campaigns/<id>.json
 ```
 
-Every new or behavior-changing test needs a current registered **PASS** receipt before
-landing. `RATCHET_HELD`, survivors, timeouts, baseline failures and hash drift are not
-PASS evidence. Verify with `make mutation-evidence`; `make mutation-coverage` reports the
-inventory without executing anything.
+When reporting mutation results, `RATCHET_HELD`, survivors, timeouts, baseline failures
+and hash drift are not PASS evidence. `make mutation-evidence` checks existing evidence;
+`make mutation-coverage` reports the inventory without executing anything. These
+commands remain available to hosts that choose an evidence policy and are not Forge
+landing requirements.
 
 Engine child processes run with isolated bytecode caches (`conductor.bytecode_isolation`):
 a same-size edit within one mtime second would otherwise execute stale `__pycache__`

@@ -238,6 +238,62 @@ def _canonical_settings() -> dict[str, Any]:
     return payload
 
 
+def _check_effective_values(
+    project_settings: dict[str, Any], user_settings: dict[str, Any]
+) -> list[Finding]:
+    """Check merged values and attribute repairs to each value's owning scope."""
+    findings: list[Finding] = []
+    effective = {**user_settings, **project_settings}
+    user_env = user_settings.get("env", {})
+    project_env = project_settings.get("env", {})
+    if not isinstance(user_env, dict) or not isinstance(project_env, dict):
+        raise SettingsSchemaError("settings env must be a JSON object")
+    effective["env"] = {**user_env, **project_env}
+    for key, check in ((TTL_KEY, _check_ttl), (MODEL_KEY, _check_model)):
+        scope = (
+            "project" if key in project_settings or key not in user_settings else "user"
+        )
+        findings.append(check(scope, effective))
+    limit_scope = (
+        "project"
+        if LIMIT_ENV_KEY in project_env or LIMIT_ENV_KEY not in user_env
+        else "user"
+    )
+    findings.append(_check_limit(limit_scope, effective))
+    return findings
+
+
+def _check_effective_hooks(
+    project_settings: dict[str, Any],
+    user_settings: dict[str, Any],
+    *,
+    project_exists: bool,
+) -> list[Finding]:
+    """Check both active hook scopes and find events missing from their union."""
+    findings: list[Finding] = []
+    for scope, payload in (("project", project_settings), ("user", user_settings)):
+        if payload:
+            findings.append(_check_hooks(scope, payload, require_wiring=False))
+    project_commands = _declared_commands(project_settings)
+    user_commands = _declared_commands(user_settings)
+    missing = [
+        event
+        for event in registry.EVENTS
+        if not (project_commands.get(event) or user_commands.get(event))
+    ]
+    if missing and project_exists:
+        findings.append(
+            Finding(
+                "project",
+                CHECK_HOOKS,
+                "FAIL",
+                f"no effective dispatcher wiring for {', '.join(missing)}",
+                "write missing dispatcher events in project settings",
+            )
+        )
+    return findings
+
+
 def diagnose(
     project: Path, home: Path
 ) -> tuple[list[Finding], Path | None, Path | None]:
@@ -267,48 +323,12 @@ def diagnose(
         findings.append(
             Finding("user", CHECK_FILE, "SKIP", f"no user settings at {user_path}")
         )
-    effective = {**user_settings, **project_settings}
-    user_env = user_settings.get("env", {})
-    project_env = project_settings.get("env", {})
-    if not isinstance(user_env, dict) or not isinstance(project_env, dict):
-        raise SettingsSchemaError("settings env must be a JSON object")
-    effective["env"] = {**user_env, **project_env}
-    for key, check in ((TTL_KEY, _check_ttl), (MODEL_KEY, _check_model)):
-        scope = (
-            "project" if key in project_settings or key not in user_settings else "user"
+    findings.extend(_check_effective_values(project_settings, user_settings))
+    findings.extend(
+        _check_effective_hooks(
+            project_settings, user_settings, project_exists=project_target is not None
         )
-        findings.append(check(scope, effective))
-    limit_scope = (
-        "project"
-        if LIMIT_ENV_KEY in project_env or LIMIT_ENV_KEY not in user_env
-        else "user"
     )
-    findings.append(_check_limit(limit_scope, effective))
-    for scope, payload in (("project", project_settings), ("user", user_settings)):
-        if payload:
-            findings.append(_check_hooks(scope, payload, require_wiring=False))
-    wired = set(_declared_commands(project_settings)) | set(
-        _declared_commands(user_settings)
-    )
-    missing = [
-        event
-        for event in registry.EVENTS
-        if event not in wired
-        or not (
-            _declared_commands(project_settings).get(event)
-            or _declared_commands(user_settings).get(event)
-        )
-    ]
-    if missing and project_target is not None:
-        findings.append(
-            Finding(
-                "project",
-                CHECK_HOOKS,
-                "FAIL",
-                f"no effective dispatcher wiring for {', '.join(missing)}",
-                "write missing dispatcher events in project settings",
-            )
-        )
     return findings, project_target, user_target
 
 

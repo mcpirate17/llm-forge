@@ -25,6 +25,10 @@ def _write(root: Path, payload: Mapping[str, object]) -> Path:
     return path
 
 
+def _read_settings(root: Path) -> dict[str, Any]:
+    return json.loads((root / ".claude/settings.json").read_text(encoding="utf-8"))
+
+
 def _run(
     project: Path,
     home: Path,
@@ -65,9 +69,7 @@ def test_short_prompt_cache_ttl_fails_and_fix_sets_one_hour(tmp_path: Path) -> N
     payload["subagentPromptCacheTtl"] = "5m"
     assert _run(project, home, payload=payload, home_payload=_healthy()) == 1
     assert _run(project, home, "--fix", payload=None) == 0
-    fixed = json.loads(
-        (project / ".claude" / "settings.json").read_text(encoding="utf-8")
-    )
+    fixed = _read_settings(project)
     assert fixed["subagentPromptCacheTtl"] == "1h"
 
 
@@ -94,9 +96,7 @@ def test_stray_hook_command_fails_and_fix_canonicalizes(tmp_path: Path) -> None:
     )
     assert _run(project, home, payload=payload, home_payload=_healthy()) == 1
     assert _run(project, home, "--fix") == 0
-    fixed = json.loads(
-        (project / ".claude" / "settings.json").read_text(encoding="utf-8")
-    )
+    fixed = _read_settings(project)
     assert fixed["hooks"] == registry.settings_block()["hooks"]
 
 
@@ -157,9 +157,7 @@ def test_unset_bash_quiet_limit_inherits_the_user_default(tmp_path: Path) -> Non
     payload["env"] = {}
     assert _run(project, home, payload=payload, home_payload=_healthy()) == 0
     assert _run(project, home, "--fix") == 0
-    fixed = json.loads(
-        (project / ".claude" / "settings.json").read_text(encoding="utf-8")
-    )
+    fixed = _read_settings(project)
     assert fixed["env"] == {}
 
 
@@ -179,9 +177,7 @@ def test_foreign_model_id_fails_and_fix_removes_the_key(tmp_path: Path) -> None:
     payload["model"] = "glm-5.3-flash"
     assert _run(project, home, payload=payload, home_payload=_healthy()) == 1
     assert _run(project, home, "--fix") == 0
-    fixed = json.loads(
-        (project / ".claude" / "settings.json").read_text(encoding="utf-8")
-    )
+    fixed = _read_settings(project)
     assert "model" not in fixed
 
 
@@ -267,9 +263,7 @@ def test_missing_project_settings_fails_and_fix_writes_the_canonical_block(
         )
         == 0
     )
-    created = json.loads(
-        (project / ".claude" / "settings.json").read_text(encoding="utf-8")
-    )
+    created = _read_settings(project)
     assert created["hooks"] == registry.settings_block()["hooks"]
     assert created["subagentPromptCacheTtl"] == "1h"
     assert created["env"]["BASH_QUIET_LIMIT_BYTES"] == "8000"

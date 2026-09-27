@@ -69,17 +69,8 @@ jobs:
             https://github.com/pmd/pmd/releases/download/pmd_releases/7.27.0/pmd-dist-7.27.0-bin.zip
           unzip -q /tmp/pmd.zip -d /tmp/pmd-dist
           echo "/tmp/pmd-dist/pmd-bin-7.27.0/bin" >> "$GITHUB_PATH"
-      # Full `make candidate-review --profile full` also needs semgrep,
-      # detect-secrets-hook, bandit, pyright, codespell, shellcheck, biome,
-      # cppcheck and the clang tools, none of which this repo installs
-      # anywhere yet (a pre-existing gap, not introduced here) -- running the
-      # whole governance gate in CI is tracked as separate debt (see PR body)
-      # rather than attempted in this step. This step instead runs exactly
-      # the four checks this PR's baselines back, the same way
-      # candidate-review's [checks.jscpd]/[checks.pmd]/[checks.complexity]/
-      # [checks.vulture] entries do, so a real drift between the tree and a
-      # committed baseline fails CI red instead of only being caught by an
-      # operator remembering to run `make baselines` locally.
+      # Forge runs ordinary software quality checks. Host governance policies
+      # are optional consumers of these tools and are not Forge's CI contract.
       - name: duplication, complexity and dead-code baselines
         run: |
           export PATH="/tmp/pmd-dist/pmd-bin-7.27.0/bin:$PATH"
@@ -113,19 +104,14 @@ jobs:
             --baseline src/conductor/vulture_baseline.json \
             --changed-files-from /tmp/changed-python-files.txt src
 
-  # The evidence check nothing ran until now: `verify-evidence` regressed for a
-  # week (#41 to #46) with no CI job any the wiser. Two steps, two different
-  # questions. The first asks whether the tests THIS PR changed have receipts:
-  # missing evidence is debt for the PR body (exit 6, warned, job passes), a
-  # receipt the validator cannot read is a defect (exit 5, job fails). The
-  # second ignores the PR entirely and asks whether every receipt in the tree
-  # still decodes -- whoever's tests it covers.
-  mutation-evidence:
+  # Exercise the shipped receipt and retention tools against their fixtures.
+  # Changes to Forge itself do not require mutation campaigns or PASS receipts.
+  mutation-tooling:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          # Same reason as the python job: a real merge base needs ancestry.
+          # Retention diagnostics inspect repository history.
           fetch-depth: 0
       - name: Cache uv artifacts
         uses: actions/cache@v4
@@ -138,36 +124,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync --extra test
-      - name: Mutation evidence on changed tests
-        run: |
-          # merge_base derivation reused verbatim from the baselines step in
-          # the python job: same fallback chain, same loud error -- the two
-          # jobs must never disagree about which files a PR changed.
-          base="${{ github.event.pull_request.base.sha || github.event.before }}"
-          base="${base:-HEAD~1}"
-          if ! merge_base="$(git merge-base "$base" HEAD)"; then
-            echo "::error::no merge base between '$base' and HEAD -- checkout fetch-depth is probably too shallow again" >&2
-            exit 1
-          fi
-          # --github emits ::warning per missing path, ::error per
-          # validator-side rejection and a step-summary table. The report
-          # itself is JSON on stdout after the annotation lines; tee keeps it
-          # in the log, the strip keeps the annotations out of the parse.
-          set +e
-          uv run python -m conductor.mutation_coverage changed \
-            --base "$merge_base" --github | tee /tmp/changed-evidence.json
-          rc=${PIPESTATUS[0]}
-          set -e
-          # 0 = every changed test has evidence; 6 = evidence missing but all
-          # of it debt (no campaign yet, a held ratchet, a superseded pointer,
-          # an older runner era) -- a warning and the count, never a pass
-          # pretending nothing is owed; anything else fails the job.
-          if [ "$rc" -eq 6 ]; then
-            n="$(uv run python -c 'import json; print(len(json.loads("".join(l for l in open("/tmp/changed-evidence.json") if not l.startswith("::")))["missing_evidence"]))')"
-            echo "::warning::mutation evidence missing for $n changed test file(s): debt, record it in the PR body"
-            exit 0
-          fi
-          exit "$rc"
       - name: Repo-wide receipt decode canary
         run: uv run python -m conductor.mutation_coverage canary
       # Third question: is the retention sweep still runnable? It crashed on

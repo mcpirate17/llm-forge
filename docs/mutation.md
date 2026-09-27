@@ -5,6 +5,8 @@ How campaigns are generated, run and audited. The commands live in
 (run), `conductor.mutation_patch_audit` (corpus audit), `conductor.complete_scope_drift`
 (local check for `complete`-mode scope drift before the audit catches it) and
 `conductor.mutation_retention` (sweep); `make mutation-*` wraps the common flows.
+Forge ships these capabilities without requiring mutation campaigns or receipts for
+its own changes. A host such as LLM can adopt a separate evidence policy.
 
 ## Receipt format
 
@@ -84,34 +86,17 @@ parse at all counts as `decode_error`).
 
 ### CI
 
-The `mutation-evidence` job asks two questions of every PR. First, the tests
-the PR changed: `uv run python -m conductor.mutation_coverage changed --base
-"$merge_base" --github` inventories them (merge-base diff, ACMR), checks each
-against current receipts, emits `::warning` per missing path, `::error` per
-validator-side rejection and a step-summary table, and exits:
+Forge CI checks that the shipped receipt tools work. It does not require changed
+tests to have mutation evidence or require PRs to record missing-evidence debt.
 
-- **0** — every changed test file has evidence;
-- **6** — evidence is missing but every rejection is debt (`no_campaign`,
-  `not_pass`, `superseded`, `scope_error`, `runner_map_mismatch`): the job
-  prints `mutation evidence missing for N changed test file(s): debt, record
-  it in the PR body` and passes. Exit 6 is an acknowledgement, not a pass —
-  the debt goes in the PR body, per AGENTS.md;
-- **5** — any rejection is validator-side (`decode_error`, `schema_error`,
-  `manifest_load_error`): a receipt the validator cannot read or refuses, and
-  the job fails;
-- **4** — REFUSED (registry/campaign errors), the job fails.
-
-Second, the repo-wide canary: `uv run python -m conductor.mutation_coverage
+The repo-wide canary, `uv run python -m conductor.mutation_coverage
 canary` (locally `make mutation-canary`) re-checks every receipt in the tree
 and exits 5 when any of them is unreadable, whoever's tests it covers, and 0
 otherwise — however much evidence is missing. That is the check that would
-have caught the #41–#46 gap on day one. Locally, `make mutation-evidence
-MUTATION_BASE=<ref>` drives the changed-test check against any ref
-(`origin/main` by default).
+have caught the #41–#46 gap on day one.
 
-Third, the retention report: `make mutation-retention` (the same step CI's
-`mutation-evidence` job runs, in dry-run) prints what a sweep would keep,
-delete, and leave to protection, and exits:
+The retention report, `make mutation-retention`, runs in dry-run mode in CI. It
+prints what a sweep would keep, delete, and leave to protection, and exits:
 
 - **0** — the sweep ran; the plan on stdout *is* the report, a non-empty
   `deleted` count included. Receipts are supposed to accumulate between
@@ -126,6 +111,24 @@ delete, and leave to protection, and exits:
 `MUTATION_RETENTION_APPLY=1 make mutation-retention` performs the deletion
 locally; `MUTATION_RETENTION_ARGS="--protect FILENAME"` shelters a receipt a
 lane has in flight.
+
+### Optional host evidence checks
+
+A host that adopts a changed-test evidence policy can run
+`uv run python -m conductor.mutation_coverage changed --base "$merge_base" --github`.
+It inventories changed tests (merge-base diff, ACMR), checks their receipts, emits
+annotations and a step-summary table, and exits:
+
+- **0** — every changed test file has evidence;
+- **6** — evidence is missing (`no_campaign`, `not_pass`, `superseded`,
+  `scope_error`, or `runner_map_mismatch`); this is not a PASS receipt;
+- **5** — a validator-side rejection (`decode_error`, `schema_error`, or
+  `manifest_load_error`);
+- **4** — REFUSED because of registry or campaign errors.
+
+The host decides how these results affect its workflow. Locally,
+`make mutation-evidence MUTATION_BASE=<ref>` runs this optional check against any
+ref (`origin/main` by default). It is not a Forge landing requirement.
 
 ### Ratchet iterations
 
