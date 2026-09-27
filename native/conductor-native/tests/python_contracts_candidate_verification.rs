@@ -154,10 +154,7 @@ fn selection_adapter_preserves_graph_failure_and_structured_finding() {
             ))
             .unwrap();
         let changes = PyTuple::new(py, [change]).unwrap();
-        let replace = PyModule::import(py, "dataclasses")
-            .unwrap()
-            .getattr("replace")
-            .unwrap();
+        let replace = module(py, "dataclasses").getattr("replace").unwrap();
         let candidate_kwargs = PyDict::new(py);
         candidate_kwargs.set_item("changes", changes).unwrap();
         let candidate = replace
@@ -221,5 +218,151 @@ fn selection_adapter_preserves_graph_failure_and_structured_finding() {
             "no-targeted-tests"
         );
         monkeypatch.call_method0("undo").unwrap();
+    });
+}
+
+#[test]
+fn missing_evidence_preserves_malformed_blocking_waiver_and_later_rows() {
+    let _case = Case::new();
+    Python::attach(|py| {
+        let verification = module(py, "conductor.candidate_review.verification");
+        let missing = verification.getattr("_missing_evidence_findings").unwrap();
+        let json = module(py, "json");
+        let loads = json.getattr("loads").unwrap();
+        let kwargs = PyDict::new(py);
+        kwargs
+            .set_item("waived", PySet::empty(py).unwrap())
+            .unwrap();
+        let malformed_row = loads
+            .call1((r#"{"missing_evidence":["not-a-dict"]}"#,))
+            .unwrap();
+        let findings = missing.call((malformed_row,), Some(&kwargs)).unwrap();
+        assert_eq!(findings.len().unwrap(), 1);
+        let finding = findings.get_item(0).unwrap();
+        assert_eq!(attr_text(&finding, "rule_id"), "malformed-mutation-receipt");
+        assert_eq!(attr_text(&finding, "severity"), "critical");
+
+        let bad_container = loads.call1((r#"{"missing_evidence":{}}"#,)).unwrap();
+        let findings = missing.call((bad_container,), Some(&kwargs)).unwrap();
+        let finding = findings.get_item(0).unwrap();
+        assert_eq!(
+            attr_text(&finding, "rule_id"),
+            "malformed-evidence-container"
+        );
+        assert_eq!(attr_text(&finding, "severity"), "critical");
+        assert!(attr_text(&finding, "message").contains("not a list"));
+
+        let missing_fields = loads
+            .call1((r#"{"missing_evidence":[{"receipt_rejections":["stale runner pin"]}]}"#,))
+            .unwrap();
+        let findings = missing.call((missing_fields,), Some(&kwargs)).unwrap();
+        let finding = findings.get_item(0).unwrap();
+        assert_eq!(attr_text(&finding, "severity"), "critical");
+        assert!(finding.getattr("path").unwrap().is_none());
+        assert!(
+            attr_text(&finding, "message").contains("current automatic PASS evidence is required")
+        );
+        assert_eq!(
+            finding
+                .getattr("evidence")
+                .unwrap()
+                .get_item("receipt_rejections")
+                .unwrap()
+                .get_item(0)
+                .unwrap()
+                .extract::<String>()
+                .unwrap(),
+            "stale runner pin"
+        );
+
+        let row = loads.call1((r#"{"missing_evidence":[{"path":"conductor/example.py","reason":"no PASS receipt"}]}"#,)).unwrap();
+        let findings = missing.call((row,), Some(&kwargs)).unwrap();
+        let finding = findings.get_item(0).unwrap();
+        assert_eq!(attr_text(&finding, "rule_id"), "missing-mutation-receipt");
+        assert_eq!(
+            attr_text(&finding, "message"),
+            "conductor/example.py: no PASS receipt -- current automatic PASS evidence is required"
+        );
+        let help = attr_text(&finding, "help");
+        assert!(help.contains("make mutation-generate MUTATION_GENERATE_ARGS='--only SRC'"));
+        assert!(!help.contains("MUTATION_SOURCE"));
+        assert!(help.contains("Hand-authored") && help.contains("forbidden"));
+        kwargs
+            .set_item("waived", PySet::new(py, ["conductor/example.py"]).unwrap())
+            .unwrap();
+        assert_eq!(missing.call((loads.call1((r#"{"missing_evidence":[{"path":"conductor/example.py","reason":"no receipt"}]}"#,)).unwrap(),), Some(&kwargs)).unwrap().len().unwrap(), 0);
+
+        kwargs
+            .set_item("waived", PySet::new(py, ["waived.py"]).unwrap())
+            .unwrap();
+        let mixed = loads.call1((r#"{"missing_evidence":["malformed",{"path":"waived.py","reason":"old debt"},{"path":"active.py","reason":"needs generated evidence"}]}"#,)).unwrap();
+        let findings = missing.call((mixed,), Some(&kwargs)).unwrap();
+        assert_eq!(findings.len().unwrap(), 2);
+        assert_eq!(
+            attr_text(&findings.get_item(0).unwrap(), "rule_id"),
+            "malformed-mutation-receipt"
+        );
+        assert!(findings
+            .get_item(0)
+            .unwrap()
+            .getattr("path")
+            .unwrap()
+            .is_none());
+        assert_eq!(
+            attr_text(&findings.get_item(1).unwrap(), "rule_id"),
+            "missing-mutation-receipt"
+        );
+        assert_eq!(
+            attr_text(&findings.get_item(1).unwrap(), "path"),
+            "active.py"
+        );
+    });
+}
+
+#[test]
+fn slim_receipt_detail_still_admits_classified_new_test() {
+    let case = Case::new();
+    Python::attach(|py| {
+        let json = module(py, "json");
+        let loads = json.getattr("loads").unwrap();
+        let payload = loads.call1((r#"{"campaign_id":"c-slim","status":"PASS","generated_at":"2026-09-13T00:00:00+00:00","test_value":{"schema_version":"llm.mutation-testing.test-value.v1","status":"PASS","tests":[{"nodeid":"t.py::test_new","classification":"CORE"}]}}"#,)).unwrap();
+        let mutants = pyo3::types::PyList::empty(py);
+        for index in 0..80 {
+            let mutant = PyDict::new(py);
+            mutant.set_item("id", format!("m{index}")).unwrap();
+            mutant.set_item("outcome", "KILLED").unwrap();
+            mutants.append(mutant).unwrap();
+        }
+        payload.set_item("mutants", mutants).unwrap();
+        let slim = module(py, "conductor.mutation_receipt_slim")
+            .getattr("slim_receipt")
+            .unwrap()
+            .call1((payload,))
+            .unwrap();
+        assert!(!slim.contains("test_value").unwrap());
+        let encoded = json
+            .getattr("dumps")
+            .unwrap()
+            .call1((&slim,))
+            .unwrap()
+            .extract::<String>()
+            .unwrap();
+        case.write("receipt.json", &encoded);
+        let evidence = loads
+            .call1((
+                r#"{"evidence":[{"path":"t.py","receipt":"receipt.json","campaign_id":"c-slim"}]}"#,
+            ))
+            .unwrap();
+        let nodeids = loads.call1((r#"{"t.py":["t.py::test_new"]}"#,)).unwrap();
+        let namespace = module(py, "types").getattr("SimpleNamespace").unwrap();
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("snapshot", path(py, case.root())).unwrap();
+        let context = namespace.call((), Some(&kwargs)).unwrap();
+        let findings = module(py, "conductor.candidate_review.verification")
+            .getattr("_new_test_value_findings")
+            .unwrap()
+            .call1((context, evidence, nodeids))
+            .unwrap();
+        assert_eq!(findings.len().unwrap(), 0);
     });
 }
