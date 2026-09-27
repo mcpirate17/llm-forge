@@ -1,5 +1,16 @@
 # Native test migration
 
+At pinned commit `4111905d2cdf6bca1e5855e6fcd56274c2d92a55`, the separate
+Rust-test source milestone is **80.6873%**: 85,038 Rust test code lines and
+20,354 Python test code lines under the unchanged path and inline-test rules.
+The cohort retired three Python test suites and replaced the executable
+Python dispatcher stub with a Rust fixture crate. The pinned tree retains 63
+executable Python suites; 32 static Python fixture inputs and the shared
+conftest are classified separately. Production remains **50.5489% native**.
+These are source-composition metrics, not behavioral coverage or a claim that
+all tests have been converted. The [full method and pinned evidence](native-migration.md#latest-verified-commit)
+record every counted input.
+
 At pinned commit `a344b9ab8c1b432f2429fd01924b4d6c1bffb688`, the separate
 Rust-test source milestone is **79.9377%**: 83,694 Rust test code lines and
 21,005 Python test code lines under the unchanged path and inline-test rules.

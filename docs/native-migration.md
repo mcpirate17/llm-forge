@@ -782,6 +782,42 @@ verification scripts. Its SHA-256 is
 
 ## Latest verified commit
 
+Commit `4111905d2cdf6bca1e5855e6fcd56274c2d92a55`, measured from a
+`git archive` with the unchanged path classification, Tokei 15.0.0, and
+syn-based inline Rust test treatment. The archive stream SHA-256 is
+`50b3b1f4b3a731ee384ac86533e4f2ed46e62d176f8f8be1ca7c9d02f576d270`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,610 | 52,954 | 194 | **50.5489% native** |
+| Tests | 20,354 | 85,038 | 0 | **80.6873% Rust** |
+| All tracked source, including examples | 71,964 | 138,091 | 194 | 65.6797% native |
+
+The manifests contain 375 production files, 346 test files, and 723 counted
+source files. Two Rust examples contribute 99 code lines only to the all-source
+view. The splitter found 100 test-only ranges in 85 production Rust files:
+43,180 original Rust code lines become 30,121 after masking. The 13,059-line
+delta belongs to tests. Production Rust is 66,013 raw lines minus 13,059 =
+52,954; Rust tests are 71,979 separate lines plus 13,059 = 85,038.
+
+Since `a344b9a`, this pinned cohort retired three Python test suites for
+import-ablation, duplicate-body, and guardrail-AST behavior and replaced the
+executable Python dispatcher test stub with a nested Rust fixture crate.
+Production source counts and its 50.5489% native share are unchanged. Rust
+test share rose 0.7496 percentage points. The longer-term all-Rust-test target
+remains open: these are source-composition metrics, not behavioral coverage or
+performance. Uncommitted work in the shared checkout is excluded.
+
+The [measurement evidence](native-metrics/4111905-evidence.tar.gz) contains
+source path manifests and hashes independently checked against all 723 counted
+Git blobs and a second archive extraction, the repeated archive stream hash,
+raw Tokei JSON and independently reproduced per-file reports, inline AST
+ranges and verification of all 85 masked and extracted source copies, tool
+hashes, and both measurement and verification scripts. Its SHA-256 is
+`77eb166f8c3e69bcdf20330ff022692764c26f6640ed8192d5b9f9085ef32f49`.
+
+## Earlier verified commit
+
 Commit `a344b9ab8c1b432f2429fd01924b4d6c1bffb688`, measured from a
 `git archive` with the unchanged path classification, Tokei 15.0.0, and
 syn-based inline Rust test treatment. The archive stream SHA-256 is
