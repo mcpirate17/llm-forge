@@ -26,7 +26,7 @@ impl Project {
         let sentinel = path.join("dispatcher-sentinel");
         fs::write(
             &sentinel,
-            "#!/bin/sh\nprintf '%s' \"$FORGE_NATIVE_HOOKS\" > \"$CLAUDE_PROJECT_DIR/delegated.names\"\nprintf '{\"delegated\":true}\\n'\nexit 17\n",
+            "#!/bin/sh\ncat >/dev/null\nprintf '%s' \"$FORGE_NATIVE_HOOKS\" > \"$CLAUDE_PROJECT_DIR/delegated.names\"\nprintf '{\"delegated\":true}\\n'\nexit 17\n",
         )
         .unwrap();
         use std::os::unix::fs::PermissionsExt;
@@ -150,7 +150,7 @@ fn partial_native_selection_delegates_and_names_only_answered_hooks() {
         Some("crg_refresh_report_pre,current_work_guard_edit"),
         false,
     );
-    assert_eq!(output.status.code(), Some(17));
+    assert_eq!(output.status.code(), Some(17), "{output:?}");
     let names = fs::read_to_string(project.path().join("delegated.names")).unwrap();
     assert!(names.contains("current_work_guard_edit"));
     assert!(!names.contains("crg_gate_verify"));
