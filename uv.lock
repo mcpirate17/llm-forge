@@ -439,7 +439,7 @@ wheels = [
 
 [[package]]
 name = "conductor-native"
-version = "0.1.61"
+version = "0.1.62"
 source = { directory = "native/conductor-native" }
 
 [[package]]
@@ -454,6 +454,7 @@ dependencies = [
     { name = "coverage" },
     { name = "defusedxml" },
     { name = "fest-mutate" },
+    { name = "forge-cli" },
     { name = "httpx" },
     { name = "numpy" },
     { name = "pydantic" },
@@ -488,6 +489,7 @@ requires-dist = [
     { name = "coverage", specifier = ">=7.0" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "fest-mutate", specifier = ">=0.1.3" },
+    { name = "forge-cli", directory = "native/forge" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pydantic", specifier = ">=2" },
@@ -817,6 +819,10 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/95/59/51ab024b4cd1b2ee61573c9417c1cd02a72574ebe18b7f737d19e9de9ecb/fest_mutate-0.1.3-py3-none-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:d6e71b84b5c8fda7a7b7c22ff6d86cdbb49b4097c889b6ef393b1227588b0754", size = 3158185, upload-time = "2026-03-14T09:03:49.393Z" },
     { url = "https://files.pythonhosted.org/packages/fb/ba/818ab6c6741afdc7624c38a7e809fe67841577cab13f8baecbe0fdf1b8bc/fest_mutate-0.1.3-py3-none-win_amd64.whl", hash = "sha256:98b68e7080485915f9c30f917d05af1b4a663eec9e47cf12b99b0a17a07627ea", size = 2921279, upload-time = "2026-03-14T09:03:51.032Z" },
 ]
+
+[[package]]
+name = "forge-cli"
+source = { directory = "native/forge" }
 
 [[package]]
 name = "google-api-core"

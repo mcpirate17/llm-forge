@@ -135,6 +135,17 @@ def contract_test_plan_native(repo_root: str, changed_paths: list[str]) -> str:
     return plan(repo_root, changed_paths)
 
 
+def resolve_forge_binary_native(
+    project_dir: str,
+    python_executable: str,
+    configured: str | None,
+    path_forge: str | None,
+) -> str | None:
+    from conductor_native import resolve_forge_binary_native as resolve
+
+    return resolve(project_dir, python_executable, configured, path_forge)
+
+
 def candidate_verification_ast_native(source: str, path: str) -> str:
     from conductor_native import candidate_verification_ast_native as definitions
 

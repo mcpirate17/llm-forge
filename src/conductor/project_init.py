@@ -209,22 +209,19 @@ def _render_merged(
     return _dump_json(merged)
 
 
-def resolve_forge_binary(project_dir: Path) -> Path | None:
-    """A ``forge`` binary this project can wire hooks to, or ``None``.
+def resolve_forge_binary(
+    project_dir: Path, python: Path | None = None
+) -> Path | None:
+    """Return the executable selected by the native Forge binary policy."""
+    from conductor._native import resolve_forge_binary_native
 
-    Checked project-local build first (``.tools/bin/forge``, what ``make
-    forge-build``/``cargo install --path native/forge --root .tools`` produces),
-    then an ambient ``forge`` on ``PATH``. The project-local build wins when both
-    exist: it is guaranteed to match this checkout's ``native/forge`` source, an
-    ambient one on PATH is not. Neither existing means every hook still runs
-    through the Python dispatcher -- native hook handling is opt-in by presence,
-    never required.
-    """
-    local = project_dir / ".tools" / "bin" / "forge"
-    if local.is_file() and os.access(local, os.X_OK):
-        return local
-    found = shutil.which("forge")
-    return Path(found) if found else None
+    selected = resolve_forge_binary_native(
+        str(project_dir),
+        str(python or sys.executable),
+        os.environ.get("FORGE_BIN"),
+        shutil.which("forge"),
+    )
+    return Path(selected) if selected is not None else None
 
 
 def _hooks_block(
@@ -573,7 +570,7 @@ def _provider_actions(config: InitConfig) -> list[FileAction]:
                         render_settings(
                             _read(root, SETTINGS),
                             config.force,
-                            resolve_forge_binary(root),
+                            resolve_forge_binary(root, config.python),
                             config.python,
                         ),
                     ),

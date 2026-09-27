@@ -21,9 +21,20 @@ REPO_ROOT="${PROJECT_DIR:-$(dirname \
     "$(dirname "$HOOK_DIR")")")}"
 PYTHON="${HOOK_PYTHON:-$REPO_ROOT/.venv/bin/python}"
 if [[ ! -x "$PYTHON" ]]; then PYTHON="$(command -v python3)"; fi
-# The Rust preamble pair when forge resolves; set-but-empty FORGE_BIN forces
-# the Python stages (the tests' lever, same convention as FORGE_NATIVE_HOOKS).
-FORGE_BIN="${FORGE_BIN-$(command -v forge || true)}"
+# The Rust preamble pair when forge resolves. An explicitly set FORGE_BIN,
+# including the empty value that forces Python stages, remains authoritative.
+# A venv Python is often a symlink: look beside its lexical path, not its target.
+if [[ ! ${FORGE_BIN+x} ]]; then
+  INSTALLED_FORGE="$(dirname "$PYTHON")/forge"
+  LOCAL_FORGE="$REPO_ROOT/.tools/bin/forge"
+  if [[ -f "$INSTALLED_FORGE" && -x "$INSTALLED_FORGE" ]]; then
+    FORGE_BIN="$INSTALLED_FORGE"
+  elif [[ -f "$LOCAL_FORGE" && -x "$LOCAL_FORGE" ]]; then
+    FORGE_BIN="$LOCAL_FORGE"
+  else
+    FORGE_BIN="$(command -v forge || true)"
+  fi
+fi
 export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 cd "$REPO_ROOT"
 PROJECT_HOOK_DIR="${PROJECT_HOOK_DIR:-$REPO_ROOT/.claude/hooks/project}"

@@ -15,6 +15,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
+#[path = "support/prebuilt.rs"]
+mod prebuilt;
+
 static NEXT: AtomicU64 = AtomicU64::new(0);
 static STUB_BIN: OnceLock<PathBuf> = OnceLock::new();
 
@@ -50,6 +53,26 @@ fn stub_binary() -> &'static Path {
     STUB_BIN.get_or_init(|| {
         let fixture =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/stub_dispatch/Cargo.toml");
+        let fixture_root = fixture.parent().expect("fixture manifest parent");
+        let build_target = std::env::var("CARGO_BUILD_TARGET")
+            .ok()
+            .or_else(|| option_env!("CARGO_BUILD_TARGET").map(str::to_owned));
+        let stub_profile =
+            build_target.map_or_else(|| "debug".to_owned(), |target| format!("{target}/debug"));
+        if let Some(binary) = prebuilt::verified_prebuilt(
+            &format!(
+                "stub-dispatch-target/{stub_profile}/forge-test-stub-dispatch{}",
+                std::env::consts::EXE_SUFFIX
+            ),
+            "stub_dispatch.sha256",
+            &[
+                fixture.clone(),
+                fixture_root.join("Cargo.lock"),
+                fixture_root.join("src/main.rs"),
+            ],
+        ) {
+            return binary;
+        }
         let target = Path::new(env!("CARGO_TARGET_TMPDIR")).join("stub-dispatch-target");
         fs::create_dir_all(&target).expect("create fixture build target");
         let stdout_path = target.join(format!("build-{}-stdout.log", std::process::id()));

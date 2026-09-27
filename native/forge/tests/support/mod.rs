@@ -8,6 +8,8 @@ use std::sync::{
     OnceLock,
 };
 
+mod prebuilt;
+
 pub struct Host(pub PathBuf);
 
 impl Host {
@@ -57,12 +59,19 @@ impl Drop for Host {
 pub fn task_worker() -> &'static Path {
     static WORKER: OnceLock<PathBuf> = OnceLock::new();
     WORKER.get_or_init(|| {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/support/task_worker.rs");
+        if let Some(binary) = prebuilt::verified_prebuilt(
+            &format!("task-worker{}", std::env::consts::EXE_SUFFIX),
+            "task_worker.sha256",
+            std::slice::from_ref(&source),
+        ) {
+            return binary;
+        }
         let directory = Path::new(env!("CARGO_TARGET_TMPDIR"))
             .join(format!("forge-task-worker-{}", std::process::id()));
         std::fs::create_dir_all(&directory).unwrap();
         let executable = directory.join(format!("worker{}", std::env::consts::EXE_SUFFIX));
         let compiler = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/support/task_worker.rs");
         let output = Command::new(compiler)
             .args(["--edition=2021", "--crate-name=forge_task_test_worker"])
             .args(["-C", "codegen-units=1", "-C", "debuginfo=0"])
