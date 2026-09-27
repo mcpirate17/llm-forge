@@ -11,6 +11,11 @@ does not match the Python module or which cover a reexport. Helper rows mirror
 the targets' `#[path]` includes. When a cohort adds a target, add its production
 source and helper rows in the same change. Hook contracts also register their
 JSON templates, shell bodies, and the exact dispatch launcher path.
+Rust child fixture programs under `tests/fixtures/` also map to their contract
+targets. Selected fixture programs must be canonical regular files within the
+snapshot, with no external module or source-splicing includes.
+Checked-in JSON corpora under `native/forge/tests/fixtures/` map to the same
+targets and receive canonical regular-file checks before those targets run.
 
 The PyO3 entry point is `contract_test_plan_native(repo_root, changed_paths)`.
 It returns JSON with sorted, deduplicated matched Python `source_paths`, Cargo

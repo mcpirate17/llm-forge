@@ -11,10 +11,10 @@
 //! (kind, payload, env overrides, seed state) and this file rebuilds that
 //! state fresh, in Rust, for every case, then compares the live-computed
 //! result against the frozen `post_tool_expected.json` -- no interpreter
-//! involved. `src/tooling/hooks/claude/test_post_tool_parity_corpus.py` is
-//! the Python-side twin: it loads the SAME two fixtures, rebuilds the SAME
-//! state with the real Python hook modules, and asserts they still match the
-//! same frozen values -- both implementations pinned to one shared ground
+//! involved. `native/conductor-native/tests/python_contracts_post_tool_parity.rs`
+//! is the Python-side PyO3 twin: it loads the SAME two fixtures, rebuilds the
+//! SAME state with the real Python hook modules, and asserts they still match
+//! the same frozen values -- both implementations pinned to one shared ground
 //! truth instead of compared to each other at test time (the shape
 //! `bash_pretooluse_hooks_parity.rs` established).
 //!

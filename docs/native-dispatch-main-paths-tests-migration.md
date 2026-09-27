@@ -27,7 +27,7 @@ Path comparisons and None identity remain explicit. The telemetry failure
 callback accepts arbitrary arguments, matching its original fixture.
 
 The original private fixture helpers have no external test consumers.
-`test_runner.py` still tests the production entrypoint and remains active;
+The production entrypoint cases formerly in `test_runner.py` now run in the Rust-owned dispatch-runner contracts;
 the registry migration retires the dispatch conftest's sole launcher skip rule. Historical campaign records
 and older migration notes retain original filenames as provenance.
 

@@ -82,8 +82,7 @@ Python tests remain to check installed entrypoint binding and shell wiring.
 | `test_bash_quiet.py`, `test_post_tool_quiet.py` split, cap, shape and spill cases | `native/forge/src/tool_quiet.rs` (six unit tests), `native/forge/tests/tool_quiet_parity.rs`, `native/forge/tests/legacy_hook_api.rs` (`quiet_cli_bounds_and_spills_using_the_shared_native_kernel`) |
 | `test_read_budget.py` traversal, step and tally cases | `native/forge/src/read_budget.rs` (five unit tests), `native/forge/tests/legacy_hook_api.rs` (`read_budget_and_gate_start_write_native_state`) |
 
-`test_pre_bash_e2e.py` remains because it checks the installed shell
-entrypoint. `legacy_shell_propagates_native_guard_and_impact_failures` checks
+The installed shell entrypoint cases formerly in `test_pre_bash_e2e.py` now run in the Rust-owned Claude pre-Bash contract. `legacy_shell_propagates_native_guard_and_impact_failures` checks
 the shell's error handling with a native test and a fake `python3` executable;
 it runs no Python interpreter. Narrow Python smoke cases in the four retained
 test modules check that those entrypoints reach forge and preserve their output

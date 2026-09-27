@@ -52,13 +52,76 @@ impl Fixture {
             let Some((helper, _)) = line.split_once('\t') else {
                 continue;
             };
-            if helper.starts_with(&format!("{TEST_DIR}/python_contracts/")) {
+            if helper.starts_with(&format!("{TEST_DIR}/python_contracts/"))
+                || helper.starts_with(&format!("{TEST_DIR}/fixtures/"))
+                || helper.starts_with("native/forge/tests/fixtures/")
+            {
                 fs::create_dir_all(root.join(helper).parent().unwrap()).unwrap();
                 fs::copy(repo_root().join(helper), root.join(helper)).unwrap();
             }
         }
         Self { root }
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn native_fixture_source_selects_contract_and_must_stay_local() {
+    let fixture = Fixture::new();
+    let relative = format!("{TEST_DIR}/fixtures/fixture_probe.rs");
+    let file = fixture.root.join(&relative);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "fn main() {}\n").unwrap();
+    let registry = fixture.root.join(REGISTRY_PATH);
+    let mut rows = fs::read_to_string(&registry).unwrap();
+    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+    fs::write(registry, rows).unwrap();
+    let selected = plan(&fixture.root, std::slice::from_ref(&relative)).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    fs::remove_file(&file).unwrap();
+    assert!(plan(&fixture.root, std::slice::from_ref(&relative)).is_err());
+    std::os::unix::fs::symlink(
+        repo_root().join("native/conductor-native/src/lib.rs"),
+        &file,
+    )
+    .unwrap();
+    assert!(plan(&fixture.root, std::slice::from_ref(&relative))
+        .unwrap_err()
+        .to_string()
+        .contains("resolves outside repository"));
+    fs::remove_file(&file).unwrap();
+    fs::write(&file, "include!(\"../outside.rs\");").unwrap();
+    assert!(plan(&fixture.root, &[relative]).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn corpus_dependencies_select_contract_and_are_validated_when_source_changes() {
+    let fixture = Fixture::new();
+    let relative = "native/forge/tests/fixtures/corpus_probe.json";
+    let file = fixture.root.join(relative);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "[]").unwrap();
+    let registry = fixture.root.join(REGISTRY_PATH);
+    let mut rows = fs::read_to_string(&registry).unwrap();
+    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+    fs::write(registry, rows).unwrap();
+    assert_eq!(
+        plan(&fixture.root, &[relative.to_owned()]).unwrap().targets,
+        ["python_contracts_memory_vectors"]
+    );
+    let changed = ["src/conductor/memory_vectors.py".to_owned()];
+    fs::remove_file(&file).unwrap();
+    assert!(plan(&fixture.root, &changed).is_err());
+    std::os::unix::fs::symlink(
+        repo_root().join("native/forge/tests/fixtures/bash_pretooluse_corpus.json"),
+        &file,
+    )
+    .unwrap();
+    assert!(plan(&fixture.root, &changed)
+        .unwrap_err()
+        .to_string()
+        .contains("not regular"));
 }
 
 impl Drop for Fixture {
@@ -105,7 +168,14 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
     let memory = plan(&root, &["src/conductor/memory_vectors.py".to_owned()]).unwrap();
     assert_eq!(memory.targets, ["python_contracts_memory_vectors"]);
     let active = plan(&root, &["src/conductor/active_state.py".to_owned()]).unwrap();
-    assert_eq!(active.targets, ["python_contracts_active_state"]);
+    assert_eq!(
+        active.targets,
+        [
+            "python_contracts_active_state",
+            "python_contracts_inplace_handoff",
+            "python_contracts_session_preamble"
+        ]
+    );
     let close = plan(&root, &["src/conductor/session_close.py".to_owned()]).unwrap();
     assert_eq!(close.targets, ["python_contracts_session_close"]);
     let graph = plan(&root, &["src/conductor/graph_context.py".to_owned()]).unwrap();
@@ -214,9 +284,16 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
         helper.targets,
         [
             "python_contracts_agent_a2a",
+            "python_contracts_bash_pretooluse_parity",
+            "python_contracts_dispatch_doctor",
             "python_contracts_dispatch_main",
+            "python_contracts_dispatch_merge",
+            "python_contracts_dispatch_runner_execution",
+            "python_contracts_dispatch_runner_protocol",
             "python_contracts_handoff",
             "python_contracts_local_clerk",
+            "python_contracts_post_tool_parity",
+            "python_contracts_post_tool_quiet",
             "python_contracts_session_brief",
         ]
     );

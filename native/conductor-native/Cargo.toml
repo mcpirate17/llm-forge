@@ -1,12 +1,19 @@
 [package]
 name = "conductor-native"
-version = "0.1.49"
+version = "0.1.50"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
 [lib]
 name = "conductor_native"
 crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "crg_refresh_child"
+path = "tests/fixtures/crg_refresh_child.rs"
+required-features = ["python-compat-tests"]
+test = false
+bench = false
 
 [dependencies]
 anyhow = "1"

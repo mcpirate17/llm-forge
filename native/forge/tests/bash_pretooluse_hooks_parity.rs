@@ -11,13 +11,11 @@
 //! Rust, for every case, then compares the live-computed verdict against the
 //! frozen `bash_pretooluse_expected.json` -- no interpreter involved.
 //!
-//! `src/tooling/hooks/claude/test_bash_pretooluse_hooks_parity_corpus.py` is
-//! the Python-side twin: it loads the SAME two fixtures, independently
-//! rebuilds the SAME filesystem state in Python, and asserts Python's own
-//! hook implementations still match the same frozen expected values. Together
-//! the two tests pin both implementations to one shared ground truth instead
-//! of comparing them to each other at test time, so this crate no longer
-//! needs a Python interpreter (or a project `.venv`) to run `cargo test`.
+//! `native/conductor-native/tests/python_contracts_bash_pretooluse_parity.rs`
+//! tests the Python hook implementations against the same frozen fixtures.
+//! It independently builds the scratch state in Rust and calls the Python
+//! production APIs through PyO3. This native Forge target remains independent
+//! of a Python interpreter or project `.venv` when run with `cargo test`.
 //!
 //! Claim timestamps in the corpus are fixed absolute dates, not offsets from
 //! "now": `ownership::Claim::active` treats a claim dated entirely in the far
