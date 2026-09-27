@@ -16,6 +16,9 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
+#[path = "ordered_write_targets.rs"]
+mod ordered_write_targets;
+
 /// Sentinel target for a write whose path is not statically knowable.
 pub const OPAQUE_WRITE: &str = "<opaque-interpreter-write>";
 
@@ -264,12 +267,166 @@ pub mod posix_shlex {
         }
     }
 
-    // The three `state = St::Start` assignments immediately before a `break` in
-    // the `Punct` arm mirror cpython's `self.state = ' '` in the same spots
-    // (`Lib/shlex.py`'s `read_token`, state `'c'`) -- kept for fidelity to the
-    // reference even though this function's `state` is local and never read
-    // again after `break`.
-    #[allow(unused_assignments)]
+    struct Scan<'a, 'b> {
+        chars: &'a [char],
+        pos: &'b mut usize,
+        pushback: &'b mut Option<char>,
+        punctuation_chars: &'a str,
+        comments_enabled: bool,
+        token: String,
+        quoted: bool,
+        state: St,
+        escapedstate: St,
+    }
+
+    impl Scan<'_, '_> {
+        fn next_char(&mut self) -> Option<char> {
+            next_char(self.chars, self.pos, self.pushback)
+        }
+
+        fn step_start(&mut self, next: Option<char>) -> bool {
+            match next {
+                None => true,
+                Some(c) if is_ws(c) => !self.token.is_empty() || self.quoted,
+                Some('#') if self.comments_enabled => {
+                    consume_comment(self.chars, self.pos);
+                    false
+                }
+                Some('\\') => {
+                    self.escapedstate = St::Word;
+                    self.state = St::Escape;
+                    false
+                }
+                Some(c) if is_wordchar(c) => {
+                    self.token.push(c);
+                    self.state = St::Word;
+                    false
+                }
+                Some(c) if is_punct(c, self.punctuation_chars) => {
+                    self.token.push(c);
+                    self.state = St::Punct;
+                    false
+                }
+                Some(c) if is_quote(c) => {
+                    self.state = St::Quote(c);
+                    false
+                }
+                Some(c) => {
+                    self.token.push(c);
+                    self.state = St::Word;
+                    false
+                }
+            }
+        }
+
+        fn step_quote(&mut self, quote: char, next: Option<char>) -> Result<bool, &'static str> {
+            self.quoted = true;
+            match next {
+                None => Err("No closing quotation"),
+                Some(c) if c == quote => {
+                    self.state = St::Word;
+                    Ok(false)
+                }
+                Some('\\') if quote == '"' => {
+                    self.escapedstate = St::Quote(quote);
+                    self.state = St::Escape;
+                    Ok(false)
+                }
+                Some(c) => {
+                    self.token.push(c);
+                    Ok(false)
+                }
+            }
+        }
+
+        fn step_escape(&mut self, next: Option<char>) -> Result<bool, &'static str> {
+            let Some(c) = next else {
+                return Err("No escaped character");
+            };
+            if let St::Quote(quote) = self.escapedstate {
+                if c != '\\' && c != quote {
+                    self.token.push('\\');
+                }
+                self.token.push(c);
+            } else {
+                self.token.push(c);
+            }
+            self.state = self.escapedstate;
+            Ok(false)
+        }
+
+        fn step_word(&mut self, next: Option<char>) -> bool {
+            match next {
+                None => true,
+                Some(c) if is_ws(c) => {
+                    self.state = St::Start;
+                    !self.token.is_empty() || self.quoted
+                }
+                Some('#') if self.comments_enabled => {
+                    consume_comment(self.chars, self.pos);
+                    self.state = St::Start;
+                    !self.token.is_empty() || self.quoted
+                }
+                Some(c) if is_quote(c) => {
+                    self.state = St::Quote(c);
+                    false
+                }
+                Some('\\') => {
+                    self.escapedstate = St::Word;
+                    self.state = St::Escape;
+                    false
+                }
+                Some(c) if !is_punct(c, self.punctuation_chars) => {
+                    self.token.push(c);
+                    false
+                }
+                Some(c) => {
+                    *self.pushback = Some(c);
+                    self.state = St::Start;
+                    !self.token.is_empty() || self.quoted
+                }
+            }
+        }
+
+        fn step_punct(&mut self, next: Option<char>) -> bool {
+            match next {
+                None => true,
+                Some(c) if is_ws(c) => {
+                    self.state = St::Start;
+                    true
+                }
+                Some('#') if self.comments_enabled => {
+                    consume_comment(self.chars, self.pos);
+                    self.state = St::Start;
+                    true
+                }
+                Some(c) if is_punct(c, self.punctuation_chars) => {
+                    self.token.push(c);
+                    false
+                }
+                Some(c) => {
+                    if !is_ws(c) {
+                        *self.pushback = Some(c);
+                    }
+                    self.state = St::Start;
+                    true
+                }
+            }
+        }
+
+        fn step(&mut self, next: Option<char>) -> Result<bool, &'static str> {
+            match self.state {
+                St::Start => Ok(self.step_start(next)),
+                St::Quote(quote) => self.step_quote(quote, next),
+                St::Escape => self.step_escape(next),
+                St::Word => Ok(self.step_word(next)),
+                St::Punct => Ok(self.step_punct(next)),
+            }
+        }
+    }
+
+    // Keep CPython's state transitions in the Scan methods above. The loop
+    // here only coordinates one character and one transition at a time.
     fn read_token(
         chars: &[char],
         pos: &mut usize,
@@ -277,141 +434,27 @@ pub mod posix_shlex {
         punctuation_chars: &str,
         comments_enabled: bool,
     ) -> Result<Option<String>, &'static str> {
-        let mut token = String::new();
-        let mut quoted = false;
-        let mut state = St::Start;
-        // Only ever Word or Quote(_): where an escape returns to.
-        let mut escapedstate = St::Word;
-
+        let mut scan = Scan {
+            chars,
+            pos,
+            pushback,
+            punctuation_chars,
+            comments_enabled,
+            token: String::new(),
+            quoted: false,
+            state: St::Start,
+            escapedstate: St::Word,
+        };
         loop {
-            let nextchar = next_char(chars, pos, pushback);
-            match state {
-                St::Start => match nextchar {
-                    None => break,
-                    Some(c) if is_ws(c) => {
-                        if !token.is_empty() || quoted {
-                            break;
-                        }
-                        continue;
-                    }
-                    Some('#') if comments_enabled => {
-                        consume_comment(chars, pos);
-                        continue;
-                    }
-                    Some('\\') => {
-                        escapedstate = St::Word;
-                        state = St::Escape;
-                    }
-                    Some(c) if is_wordchar(c) => {
-                        token.push(c);
-                        state = St::Word;
-                    }
-                    Some(c) if is_punct(c, punctuation_chars) => {
-                        token.push(c);
-                        state = St::Punct;
-                    }
-                    Some(c) if is_quote(c) => {
-                        state = St::Quote(c);
-                    }
-                    Some(c) => {
-                        // whitespace_split catches everything else.
-                        token.push(c);
-                        state = St::Word;
-                    }
-                },
-                St::Quote(q) => {
-                    quoted = true;
-                    match nextchar {
-                        None => return Err("No closing quotation"),
-                        Some(c) if c == q => {
-                            state = St::Word;
-                        }
-                        Some('\\') if q == '"' => {
-                            escapedstate = St::Quote(q);
-                            state = St::Escape;
-                        }
-                        Some(c) => token.push(c),
-                    }
-                }
-                St::Escape => match nextchar {
-                    None => return Err("No escaped character"),
-                    Some(c) => {
-                        if let St::Quote(q) = escapedstate {
-                            if c != '\\' && c != q {
-                                token.push('\\');
-                            }
-                            token.push(c);
-                        } else {
-                            token.push(c);
-                        }
-                        state = escapedstate;
-                    }
-                },
-                St::Word => match nextchar {
-                    None => break,
-                    Some(c) if is_ws(c) => {
-                        state = St::Start;
-                        if !token.is_empty() || quoted {
-                            break;
-                        }
-                        continue;
-                    }
-                    Some('#') if comments_enabled => {
-                        consume_comment(chars, pos);
-                        state = St::Start;
-                        if !token.is_empty() || quoted {
-                            break;
-                        }
-                        continue;
-                    }
-                    Some(c) if is_quote(c) => {
-                        state = St::Quote(c);
-                    }
-                    Some('\\') => {
-                        escapedstate = St::Word;
-                        state = St::Escape;
-                    }
-                    Some(c) if !is_punct(c, punctuation_chars) => {
-                        // wordchars, quotes (handled above) or
-                        // (whitespace_split && not punctuation_chars).
-                        token.push(c);
-                    }
-                    Some(c) => {
-                        *pushback = Some(c);
-                        state = St::Start;
-                        if !token.is_empty() || quoted {
-                            break;
-                        }
-                        continue;
-                    }
-                },
-                St::Punct => match nextchar {
-                    None => break,
-                    Some(c) if is_ws(c) => {
-                        state = St::Start;
-                        break;
-                    }
-                    Some('#') if comments_enabled => {
-                        consume_comment(chars, pos);
-                        state = St::Start;
-                        break;
-                    }
-                    Some(c) if is_punct(c, punctuation_chars) => token.push(c),
-                    Some(c) => {
-                        if !is_ws(c) {
-                            *pushback = Some(c);
-                        }
-                        state = St::Start;
-                        break;
-                    }
-                },
+            let next = scan.next_char();
+            if scan.step(next)? {
+                break;
             }
         }
-
-        if token.is_empty() && !quoted {
+        if scan.token.is_empty() && !scan.quoted {
             Ok(None)
         } else {
-            Ok(Some(token))
+            Ok(Some(scan.token))
         }
     }
 }
@@ -428,6 +471,12 @@ pub mod posix_shlex {
 /// pattern in this crate.
 #[allow(dead_code)]
 fn unused_from_some_test_binaries() -> Result<Vec<String>, &'static str> {
+    // Some #[path]-included test binaries exercise only the legacy parser;
+    // keep the native gate's ordered entrypoints visible to their dead-code
+    // analysis without executing them.
+    let root = Path::new("/");
+    let _ = absolute_write_targets("", root);
+    let _ = repo_write_targets_from("", root, root);
     posix_shlex::tokenize_no_comments("", posix_shlex::PUNCTUATION_CHARS_NARROW)
 }
 
@@ -936,9 +985,16 @@ pub fn working_directory(command: &str, repo_root: &Path) -> Option<PathBuf> {
     Some(current)
 }
 
-/// Write targets that land inside `repo_root`, as repo-relative paths. Paths
-/// outside the repo (the session scratchpad, `/tmp`) have nothing to claim
-/// and are dropped. `OPAQUE_WRITE` is preserved verbatim.
+/// Resolve literal writes against the command's effective cwd, including
+/// literal `cd` operations. Keep absolute paths so the caller can classify
+/// each target against its protected checkout and linked worktrees.
+/// `OPAQUE_WRITE` is preserved verbatim.
+pub fn absolute_write_targets(command: &str, command_cwd: &Path) -> Vec<String> {
+    ordered_write_targets::resolve(command, command_cwd)
+}
+
+/// Write targets inside `repo_root`, as repo-relative paths. This compatibility
+/// entrypoint starts commands in the protected checkout itself.
 pub fn repo_write_targets(command: &str, repo_root: &Path) -> Vec<String> {
     let base = working_directory(command, repo_root);
     let mut resolved = Vec::new();
@@ -967,9 +1023,26 @@ pub fn repo_write_targets(command: &str, repo_root: &Path) -> Vec<String> {
     resolved
 }
 
+/// Compatibility filtering with an explicit shell cwd and protected root.
+pub fn repo_write_targets_from(command: &str, command_cwd: &Path, repo_root: &Path) -> Vec<String> {
+    absolute_write_targets(command, command_cwd)
+        .into_iter()
+        .filter_map(|target| {
+            if target == OPAQUE_WRITE {
+                return Some(target);
+            }
+            let normalized = normalize_lexically(Path::new(&target));
+            normalized
+                .strip_prefix(repo_root)
+                .ok()
+                .map(|rel| rel.to_string_lossy().replace('\\', "/"))
+        })
+        .collect()
+}
+
 /// Lexical `..`/`.` collapse (no filesystem access), mirroring `Path.resolve()`
 /// closely enough for repo-relative targets that need not exist on disk yet.
-fn normalize_lexically(path: &Path) -> PathBuf {
+pub(crate) fn normalize_lexically(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
     for component in path.components() {
         use std::path::Component;

@@ -7,9 +7,9 @@
 
 use crate::identity;
 use crate::ownership;
-use crate::write_targets::{repo_write_targets, OPAQUE_WRITE};
+use crate::write_targets::{absolute_write_targets, normalize_lexically, OPAQUE_WRITE};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
@@ -90,24 +90,81 @@ pub fn session_checkout(
     }
 }
 
-/// `_bash_checkout`: `(checkout to resolve write targets against, is a
-/// sibling worktree)`.
-fn bash_checkout(
-    payload: &Value,
-    repo_root: &Path,
-    repo_common_dir: Option<&Path>,
-) -> (PathBuf, bool) {
-    let root = session_checkout(payload, repo_root, repo_common_dir);
-    let sibling = root != repo_root;
-    (root, sibling)
-}
-
 fn tool_input(payload: &Value) -> &Value {
     payload
         .get("tool_input")
         .or_else(|| payload.get("toolInput"))
         .filter(|v| v.is_object())
         .unwrap_or(&Value::Null)
+}
+
+/// The shell tool's own directory takes priority over the session directory.
+/// A relative workdir is interpreted from the session cwd, as a tool runner
+/// would; this path never changes the protected checkout.
+pub(crate) fn command_cwd(payload: &Value, repo_root: &Path) -> PathBuf {
+    let session = payload
+        .get("cwd")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .map(|path| {
+            if path.is_absolute() {
+                path
+            } else {
+                repo_root.join(path)
+            }
+        })
+        .unwrap_or_else(|| repo_root.to_path_buf());
+    let input = tool_input(payload);
+    let workdir = ["workdir", "cwd"]
+        .iter()
+        .filter_map(|key| input.get(*key).and_then(Value::as_str))
+        .find(|s| !s.is_empty());
+    match workdir {
+        Some(raw) if Path::new(raw).is_absolute() => PathBuf::from(raw),
+        Some(raw) => session.join(raw),
+        None => session,
+    }
+}
+
+/// Resolve through the longest existing prefix. `install -D` and similar
+/// commands may create several missing directories below a symlink, so an
+/// immediate-parent-only resolution would lose the protected destination.
+fn resolve_existing_prefix(path: &Path) -> Option<PathBuf> {
+    let mut unresolved = path.to_path_buf();
+    for _ in 0..32 {
+        let mut prefix = unresolved.as_path();
+        loop {
+            if let Ok(canonical) = prefix.canonicalize() {
+                let suffix = unresolved.strip_prefix(prefix).ok()?;
+                return Some(normalize_lexically(&canonical.join(suffix)));
+            }
+            if let Ok(link) = std::fs::read_link(prefix) {
+                let destination = if link.is_absolute() {
+                    link
+                } else {
+                    prefix.parent()?.join(link)
+                };
+                unresolved = destination.join(unresolved.strip_prefix(prefix).ok()?);
+                break;
+            }
+            prefix = prefix.parent()?;
+        }
+    }
+    None
+}
+
+/// Preserve the directory entry as well as the destination reached by
+/// following its final symlink. `rm`/`mv` unlink the entry, while writes
+/// through the link affect the destination.
+fn target_views(path: &Path) -> Option<[PathBuf; 3]> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("/"));
+    let entry = resolve_existing_prefix(parent)?.join(path.file_name().unwrap_or_default());
+    Some([
+        normalize_lexically(path),
+        normalize_lexically(&entry),
+        resolve_existing_prefix(path)?,
+    ])
 }
 
 fn bash_command(payload: &Value) -> String {
@@ -403,6 +460,52 @@ fn claim_allows(
     )
 }
 
+fn bash_target_views(
+    command: &str,
+    cwd: &Path,
+    repo_root: &Path,
+    repo_common_dir: Option<&Path>,
+) -> Vec<(String, Option<PathBuf>)> {
+    let mut targets = Vec::new();
+    let mut seen = HashSet::new();
+    for raw in absolute_write_targets(command, cwd) {
+        if raw == OPAQUE_WRITE {
+            if seen.insert((raw.clone(), None)) {
+                targets.push((raw, None));
+            }
+            continue;
+        }
+        let Some(views) = target_views(Path::new(&raw)) else {
+            if seen.insert((OPAQUE_WRITE.to_string(), None)) {
+                targets.push((OPAQUE_WRITE.to_string(), None));
+            }
+            continue;
+        };
+        for absolute in views {
+            let classified = if let Ok(relative) = absolute.strip_prefix(repo_root) {
+                Some((relative.to_string_lossy().into_owned(), None))
+            } else if let Some((checkout, common)) = checkout_of(&absolute) {
+                if Some(common.as_path()) == repo_common_dir {
+                    absolute
+                        .strip_prefix(&checkout)
+                        .ok()
+                        .map(|relative| (relative.to_string_lossy().into_owned(), Some(checkout)))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            if let Some(target) = classified {
+                if seen.insert(target.clone()) {
+                    targets.push(target);
+                }
+            }
+        }
+    }
+    targets
+}
+
 /// `verify_bash`: `Value::Null` for "no contribution" (allow), else the
 /// protocol-correct deny response `crg_gate.py`'s `_deny` prints.
 ///
@@ -420,13 +523,13 @@ pub fn verify_bash(
     if command.is_empty() {
         return Value::Null;
     }
-    let (base, in_sibling) = bash_checkout(payload, repo_root, repo_common_dir);
-    let targets = repo_write_targets(&command, &base);
+    let cwd = command_cwd(payload, repo_root);
+    let targets = bash_target_views(&command, &cwd, repo_root, repo_common_dir);
     if targets.is_empty() {
         return Value::Null;
     }
     let protocol = crate::current_work_guard::hook_protocol(payload);
-    if targets.iter().any(|t| t == OPAQUE_WRITE) {
+    if targets.iter().any(|(target, _)| target == OPAQUE_WRITE) {
         return crate::current_work_guard::hook_response(
             Some(
                 "BLOCKED: this Bash command writes repo files through an interpreter \
@@ -444,24 +547,28 @@ pub fn verify_bash(
             Some(&format!(
                 "BLOCKED: call a code-review-graph MCP tool before writing repo files \
                  in this session (this command writes {}).",
-                targets.join(", ")
+                targets
+                    .iter()
+                    .map(|(target, _)| target.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )),
             protocol,
             None,
         );
     }
-    for target in &targets {
+    for (target, sibling) in &targets {
         let (allowed, detail) = claim_allows(owner, target, repo_root, repo_common_dir, env);
         if allowed {
             continue;
         }
-        if in_sibling {
+        if let Some(checkout) = sibling {
             record_exposure(
                 repo_common_dir,
                 owner,
                 target,
                 "Bash",
-                &base.to_string_lossy(),
+                &checkout.to_string_lossy(),
             );
             if !enforce_worktrees() {
                 continue;

@@ -174,7 +174,8 @@ impl NativeHandler for BashWriteTargets {
             return Ok(Value::Null);
         };
         let root = crate::interpreter::project_root();
-        let targets = write_targets::repo_write_targets(command, &root);
+        let cwd = crg_gate::command_cwd(payload, &root);
+        let targets = write_targets::repo_write_targets_from(command, &cwd, &root);
         if targets.is_empty() {
             return Ok(Value::Null);
         }

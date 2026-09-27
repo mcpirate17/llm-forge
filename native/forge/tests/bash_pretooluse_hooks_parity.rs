@@ -216,11 +216,17 @@ fn run_gate_case(case: &Value) -> Value {
         case["command"].as_str().unwrap(),
     );
     let owner = case["owner"].as_str().unwrap();
+    let common_dir = common_dir_of(root.path());
+    assert_eq!(
+        crg_gate::session_checkout(&payload, root.path(), Some(&common_dir)),
+        root.path(),
+        "absent cwd metadata preserves the protected session checkout"
+    );
     crg_gate::verify_bash(
         &payload,
         owner,
         root.path(),
-        Some(&common_dir_of(root.path())),
+        Some(&common_dir),
         &HashMap::new(),
     )
 }
