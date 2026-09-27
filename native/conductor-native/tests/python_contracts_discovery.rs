@@ -153,6 +153,44 @@ fn native_provider_paths_select_contracts_without_becoming_python_sources() {
     );
 }
 
+#[test]
+fn forge_provider_paths_select_contracts_across_nested_modules() {
+    for relative in [
+        "native/forge/src/provider.rs",
+        "native/forge/src/ledger/provider.rs",
+    ] {
+        let fixture = Fixture::new();
+        let file = fixture.root.join(relative);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(file, "fn provider() {}\n").unwrap();
+        let registry = fixture.root.join(REGISTRY_PATH);
+        let rows = fs::read_to_string(&registry).unwrap();
+        fs::write(
+            &registry,
+            format!("{rows}{relative}\tpython_contracts_memory_vectors\n"),
+        )
+        .unwrap();
+        let selected = plan(&fixture.root, &[relative.to_owned()]).unwrap();
+        assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+        assert_eq!(selected.commands[0].targets, selected.targets);
+        assert!(selected.source_paths.is_empty());
+        for invalid in [
+            "native/forge/src/ledger/provider.py",
+            "native/forge/src/../provider.rs",
+            "native/forge/src/ledger//provider.rs",
+            "native/forge/tests/provider.rs",
+        ] {
+            fs::write(
+                &registry,
+                format!("{rows}{invalid}\tpython_contracts_memory_vectors\n"),
+            )
+            .unwrap();
+            let error = plan(&fixture.root, &[relative.to_owned()]).unwrap_err();
+            assert!(format!("{error:#}").contains("invalid contract path"));
+        }
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn corpus_dependencies_select_contract_and_are_validated_when_source_changes() {

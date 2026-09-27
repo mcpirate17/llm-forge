@@ -22,6 +22,9 @@ fn native_source(path: &str) -> bool {
             path.strip_prefix(*prefix)
                 .is_some_and(|name| name.ends_with(".rs") && !name.contains('/'))
         })
+        || path
+            .strip_prefix("native/forge/src/")
+            .is_some_and(|name| name.ends_with(".rs"))
 }
 
 fn fixture_source(path: &str) -> bool {
