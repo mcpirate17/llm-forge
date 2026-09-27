@@ -236,13 +236,6 @@ fn the_index_over_this_repository_resolves_it_at_scale() {
     );
 }
 
-// The superset property -- that binding the imported names can add a driver and
-// never remove one -- is checked in conductor/test_native_ablations.py, against the
-// genuine `ast` matcher. A reference implementation written here would be a line
-// scan, and a line scan cannot tell an import from an import quoted inside a test
-// fixture; the first attempt at this test failed on exactly that and was wrong where
-// the index was right.
-
 #[test]
 fn an_empty_directory_indexes_to_nothing_rather_than_guessing() {
     // The Python surface refuses a root that is not a directory; a real but empty

@@ -16,8 +16,12 @@ targets. Selected fixture programs must be canonical regular files within the
 snapshot, with no external module or source-splicing includes.
 Checked-in JSON corpora under `native/forge/tests/fixtures/` map to the same
 targets and receive canonical regular-file checks before those targets run.
+Historical `.patch` fixture inputs under `src/conductor/testdata/` can also
+select their registered contracts and must be canonical regular files before
+those contracts run. They are data inputs, never applied by discovery.
 Contracts can also register top-level Rust source dependencies under
-`native/conductor-native/src/` when a test reads or checks those inputs.
+`native/conductor-native/src/` or `native/slop-core/src/` when a test exercises,
+reads, or checks those inputs.
 Changing a registered Rust path selects its contract, but does not add that path
 to the Python coverage source list. Such a mapping alone does not establish
 behavioral coverage of the Rust implementation.
@@ -68,7 +72,14 @@ probes the selected Python executable for PyO3 instead of inheriting an
 unrelated `PYO3_CONFIG_FILE`. Cargo builds and tests stay offline with two
 jobs; the standalone runner applies a 900-second wall timeout to each build
 and test command. Rust integration contracts are reported separately from
-pytest files. When both run under a coverage check, pytest changed-line
+pytest files. The native-ablation and candidate-style contracts also build
+the candidate's `slop-core` crate and stage `slop_core.so` ahead of installed
+packages. Their slop manifest must be a canonical regular file; an unrelated
+contract does not require it. Add future contracts importing `slop_core` to
+`SLOP_CONSUMERS` in `candidate_verification_runtime.rs` so they receive the
+same isolated build.
+When both Rust contracts and pytest run under a coverage check,
+pytest changed-line
 coverage is still evaluated and labeled `pytest-only`; a separate finding
 states that Python coverage cannot measure the embedded Rust PyO3 calls.
 The native percentages in [native migration](native-migration.md) measure

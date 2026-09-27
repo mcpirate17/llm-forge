@@ -55,6 +55,7 @@ impl Fixture {
             if helper.starts_with(&format!("{TEST_DIR}/python_contracts/"))
                 || helper.starts_with(&format!("{TEST_DIR}/fixtures/"))
                 || helper.starts_with("native/forge/tests/fixtures/")
+                || (helper.starts_with("src/conductor/testdata/") && helper.ends_with(".patch"))
             {
                 fs::create_dir_all(root.join(helper).parent().unwrap()).unwrap();
                 fs::copy(repo_root().join(helper), root.join(helper)).unwrap();
@@ -154,6 +155,82 @@ fn corpus_dependencies_select_contract_and_are_validated_when_source_changes() {
         .unwrap_err()
         .to_string()
         .contains("not regular"));
+}
+
+#[test]
+fn slop_core_provider_paths_select_contracts_within_the_declared_crate() {
+    let fixture = Fixture::new();
+    let relative = "native/slop-core/src/provider.rs";
+    let file = fixture.root.join(relative);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(file, "fn provider() {}\n").unwrap();
+    let registry = fixture.root.join(REGISTRY_PATH);
+    let mut rows = fs::read_to_string(&registry).unwrap();
+    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+    fs::write(&registry, &rows).unwrap();
+    let selected = plan(&fixture.root, &[relative.to_owned()]).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert!(selected.source_paths.is_empty());
+    for invalid in [
+        "native/slop-core/src/nested/provider.rs",
+        "native/unknown/src/provider.rs",
+    ] {
+        fs::write(
+            &registry,
+            format!("{rows}{invalid}\tpython_contracts_memory_vectors\n"),
+        )
+        .unwrap();
+        let error = plan(&fixture.root, &[relative.to_owned()]).unwrap_err();
+        assert!(
+            format!("{error:#}").contains("invalid contract path"),
+            "{error:#}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn patch_fixture_dependencies_are_bounded_and_required_for_selected_targets() {
+    let fixture = Fixture::new();
+    let relative = "src/conductor/testdata/probe/fixture.patch";
+    let file = fixture.root.join(relative);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "historical fixture bytes\n").unwrap();
+    let registry = fixture.root.join(REGISTRY_PATH);
+    let mut rows = fs::read_to_string(&registry).unwrap();
+    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+    fs::write(&registry, &rows).unwrap();
+    let selected = plan(&fixture.root, &[relative.to_owned()]).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert!(selected.source_paths.is_empty());
+    let changed = ["src/conductor/memory_vectors.py".to_owned()];
+    fs::remove_file(&file).unwrap();
+    assert!(plan(&fixture.root, &changed).is_err());
+    std::os::unix::fs::symlink(
+        repo_root().join("native/conductor-native/Cargo.toml"),
+        &file,
+    )
+    .unwrap();
+    let error = plan(&fixture.root, &changed).unwrap_err();
+    assert!(format!("{error:#}").contains("not regular"), "{error:#}");
+    fs::remove_file(&file).unwrap();
+    fs::create_dir(&file).unwrap();
+    assert!(plan(&fixture.root, &changed).is_err());
+    for invalid in [
+        "src/conductor/outside.patch",
+        "src/conductor/testdata/../outside.patch",
+    ] {
+        fs::write(
+            &registry,
+            format!("{rows}{invalid}\tpython_contracts_memory_vectors\n"),
+        )
+        .unwrap();
+        let error = plan(&fixture.root, &changed).unwrap_err();
+        assert!(
+            format!("{error:#}").contains("invalid contract path"),
+            "{error:#}"
+        );
+    }
 }
 
 impl Drop for Fixture {
@@ -323,6 +400,8 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
         [
             "python_contracts_agent_a2a",
             "python_contracts_bash_pretooluse_parity",
+            "python_contracts_bash_quiet_legacy",
+            "python_contracts_branch_policy_native",
             "python_contracts_crg_mcp_probe",
             "python_contracts_crg_response_shim",
             "python_contracts_crg_server",
@@ -336,9 +415,13 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_dispatch_runner_execution",
             "python_contracts_dispatch_runner_protocol",
             "python_contracts_handoff",
+            "python_contracts_harness_provisioning",
             "python_contracts_local_clerk",
             "python_contracts_mutation_coverage",
+            "python_contracts_mutation_receipt_encoding",
             "python_contracts_mutation_run_scope",
+            "python_contracts_mutation_testing_core",
+            "python_contracts_mutation_testing_evidence",
             "python_contracts_post_tool_parity",
             "python_contracts_post_tool_quiet",
             "python_contracts_session_brief",
