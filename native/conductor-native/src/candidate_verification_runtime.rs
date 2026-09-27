@@ -13,6 +13,7 @@ const SLOP_MANIFEST: &str = "native/slop-core/Cargo.toml";
 const SLOP_CONSUMERS: &[&str] = &[
     "python_contracts_candidate_style",
     "python_contracts_native_ablations",
+    "python_contracts_policy_engine_crash",
     "python_contracts_reuse_inventory",
     "python_contracts_reuse_roi",
     "python_contracts_reuse_consolidation",

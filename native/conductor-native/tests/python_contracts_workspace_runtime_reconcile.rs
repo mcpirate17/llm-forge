@@ -1,12 +1,15 @@
 #![cfg(feature = "python-compat-tests")]
 //! Receipt reconciliation contracts, including preserved expensive evidence.
 
-#[path = "python_contracts/workspace_runtime_fixture.rs"]
-mod fixture;
+#[path = "python_contracts/hook_matrix_fixture.rs"]
+mod hook_matrix_fixture;
 #[path = "python_contracts/support.rs"]
 #[allow(dead_code)]
 mod support;
+#[path = "python_contracts/workspace_source_fixture.rs"]
+mod workspace_source_fixture;
 
+use hook_matrix_fixture::HookMatrix;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde_json::{json, Value};
@@ -69,14 +72,15 @@ fn assert_preserved(payload: &Bound<'_, PyAny>) {
 
 #[test]
 fn hook_program_controls_pass_in_generated_foreign_repository() {
-    let case = Case::new();
+    let mut case = Case::new();
     Python::attach(|py| {
-        let hooks = fixture::HookRepo::new(py, case.root());
+        let hooks = HookMatrix::new(py, &mut case);
+        workspace_source_fixture::install(py, hooks.root());
         let matrix = module(py, "conductor.workspace_runtime_matrix");
         let cell = matrix
             .getattr("check_hook_programs")
             .unwrap()
-            .call1((hooks.root(py),))
+            .call1((path(py, hooks.root()),))
             .unwrap();
         assert_eq!(
             attr_text(&cell, "status"),
@@ -89,7 +93,7 @@ fn hook_program_controls_pass_in_generated_foreign_repository() {
 
 #[test]
 fn launcher_reconciliation_uses_preserved_terminal_usage() {
-    let case = Case::new();
+    let mut case = Case::new();
     let launchers = case.mkdir("launchers");
     let names = ["codex", "claude", "glm", "qwen", "grok"];
     for (index, name) in names.iter().enumerate() {
@@ -112,10 +116,11 @@ fn launcher_reconciliation_uses_preserved_terminal_usage() {
         &receipt("launcher-real-smokes", None).to_string(),
     );
     Python::attach(|py| {
-        let hooks = fixture::HookRepo::new(py, case.root());
+        let hooks = HookMatrix::new(py, &mut case);
+        workspace_source_fixture::install(py, hooks.root());
         let matrix = module(py, "conductor.workspace_runtime_matrix");
         let kwargs = PyDict::new(py);
-        kwargs.set_item("repo", hooks.root(py)).unwrap();
+        kwargs.set_item("repo", path(py, hooks.root())).unwrap();
         let payload = matrix
             .getattr("reconcile_receipt")
             .unwrap()
