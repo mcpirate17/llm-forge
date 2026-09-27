@@ -3,28 +3,18 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
 
 from conductor.a2a_registry import A2aError
-from conductor.project_init import resolve_forge_binary
-from conductor.project_paths import host_root
 
 
 def _forge_binary() -> Path:
-    explicit = os.environ.get("FORGE_BIN")
-    if explicit:
-        path = Path(explicit)
-        if not path.is_file() or not os.access(path, os.X_OK):
-            raise A2aError(f"FORGE_BIN is not an executable file: {path}")
-        return path
-    found = resolve_forge_binary(host_root())
-    if found is None:
-        raise A2aError("forge binary is required for A2A delivery")
-    return found
+    from conductor.a2a_retention import _forge_binary as resolve
+
+    return resolve("delivery")
 
 
 def _run(

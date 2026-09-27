@@ -45,7 +45,7 @@ class RetentionResult:
     event_sha256: list[str]
 
 
-def _forge_binary() -> Path:
+def _forge_binary(purpose: str = "retention") -> Path:
     explicit = os.environ.get("FORGE_BIN")
     if explicit:
         path = Path(explicit)
@@ -54,7 +54,7 @@ def _forge_binary() -> Path:
         return path
     found = resolve_forge_binary(host_root())
     if found is None:
-        raise A2aError("forge binary is required for A2A retention")
+        raise A2aError(f"forge binary is required for A2A {purpose}")
     return found
 
 

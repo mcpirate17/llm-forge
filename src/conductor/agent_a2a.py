@@ -44,8 +44,9 @@ import sqlite3
 import subprocess
 import uuid
 from collections.abc import Iterator, Sequence
+from functools import partialmethod
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import httpx
 from a2a.helpers.proto_helpers import (
@@ -106,6 +107,9 @@ from conductor.a2a_registry import (
     load_registry,
     probe_peer,
 )
+
+if TYPE_CHECKING:
+    from conductor.a2a_cli import compact_inbox_payload
 
 # Registry symbols remain part of the public transport facade after extraction.
 __all__ = [
@@ -192,8 +196,9 @@ class A2aStore:
         finally:
             connection.close()
 
-    def record_inbound(
+    def _record_message(
         self,
+        method: str,
         message_id: str,
         sender: str,
         recipient: str,
@@ -203,28 +208,14 @@ class A2aStore:
     ) -> None:
         selected = json.dumps(state, ensure_ascii=False) if state else None
         try:
-            self._native.record_inbound(
+            getattr(self._native, method)(
                 message_id, sender, recipient, body, data_json, _utc_now(), selected
             )
         except ValueError as exc:
             raise A2aError(str(exc)) from exc
 
-    def record_outbound(
-        self,
-        message_id: str,
-        sender: str,
-        recipient: str,
-        body: str,
-        data_json: str | None,
-        state: dict[str, Any] | None = None,
-    ) -> None:
-        selected = json.dumps(state, ensure_ascii=False) if state else None
-        try:
-            self._native.record_outbound(
-                message_id, sender, recipient, body, data_json, _utc_now(), selected
-            )
-        except ValueError as exc:
-            raise A2aError(str(exc)) from exc
+    record_inbound = partialmethod(_record_message, "record_inbound")
+    record_outbound = partialmethod(_record_message, "record_outbound")
 
     def mark_outbound(
         self,
@@ -287,9 +278,7 @@ class A2aStore:
             raise A2aError(str(exc)) from exc
         return rows, total
 
-    def message(
-        self, message_id: str, direction: str = "inbound"
-    ) -> dict[str, Any]:
+    def message(self, message_id: str, direction: str = "inbound") -> dict[str, Any]:
         try:
             return json.loads(self._native.fetch_row(message_id, direction))
         except ValueError as exc:
@@ -500,7 +489,9 @@ def serve(name: str, state_dir: Path, port: int | None = None) -> None:
     if port is not None:
         command.extend(("--port", str(port)))
     try:
-        completed = subprocess.run(command, check=False, stderr=subprocess.PIPE, text=True)
+        completed = subprocess.run(
+            command, check=False, stderr=subprocess.PIPE, text=True
+        )
     except OSError as exc:
         raise A2aError(f"cannot start native A2A serve: {exc}") from exc
     if completed.returncode:
@@ -655,29 +646,13 @@ def _compact_json(value: Any) -> str:
     return implementation(value)
 
 
-def compact_inbox_payload(
-    store: A2aStore,
-    *,
-    agent: str,
-    unread_only: bool,
-    unpresented_only: bool,
-    max_messages: int,
-    preview_chars: int,
-    max_chars: int,
-) -> tuple[dict[str, Any], list[str]]:
-    """Build one structurally valid, character-bounded inbox envelope."""
+def __getattr__(name: str) -> Any:
+    """Expose the canonical callable after the CLI finishes its circular import."""
+    if name == "compact_inbox_payload":
+        from conductor.a2a_cli import compact_inbox_payload
 
-    from conductor.a2a_cli import compact_inbox_payload as implementation
-
-    return implementation(
-        store,
-        agent=agent,
-        unread_only=unread_only,
-        unpresented_only=unpresented_only,
-        max_messages=max_messages,
-        preview_chars=preview_chars,
-        max_chars=max_chars,
-    )
+        return compact_inbox_payload
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def render_compact_inbox(payload: dict[str, Any]) -> str:

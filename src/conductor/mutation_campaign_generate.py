@@ -196,28 +196,39 @@ def _load_generated_cargo_campaign(
     return path, existing
 
 
-def refresh_python_campaign(campaign: str, *, repo_root: Path = REPO_ROOT) -> str:
-    """Regenerate one generated Python campaign while retaining its engine baseline."""
-
-    path, existing = _load_generated_cargo_campaign(campaign, repo_root)
-    if existing.get("mutation_engine") != "fest":
-        raise CampaignError(f"{path} is not a generated fest campaign")
-    generator = existing.get("generator") or {}
+def _refresh_generated_campaign(
+    path: Path, existing: dict[str, Any], repo_root: Path, **options: Any
+) -> str:
+    """Marshal one native refresh request and write its returned manifest."""
     refreshed = _native_json_call(
         "mutation_refresh_native",
         {
-            "language": "python",
             "repo_root": str(repo_root),
             "manifest_path": str(path),
             "campaign_id": str(existing.get("campaign_id") or path.stem),
             "existing": existing,
-            "run_timeout_seconds": int(generator.get("run_timeout_seconds", 1800)),
+            **options,
         },
     )
     path.write_text(
         json.dumps(refreshed, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return path.relative_to(repo_root).as_posix()
+
+
+def refresh_python_campaign(campaign: str, *, repo_root: Path = REPO_ROOT) -> str:
+    """Regenerate one generated Python campaign while retaining its engine baseline."""
+    path, existing = _load_generated_cargo_campaign(campaign, repo_root)
+    if existing.get("mutation_engine") != "fest":
+        raise CampaignError(f"{path} is not a generated fest campaign")
+    generator = existing.get("generator") or {}
+    return _refresh_generated_campaign(
+        path,
+        existing,
+        repo_root,
+        language="python",
+        run_timeout_seconds=int(generator.get("run_timeout_seconds", 1800)),
+    )
 
 
 def refresh_rust_campaign(
@@ -238,23 +249,15 @@ def refresh_rust_campaign(
     if existing.get("mutation_engine") != "cargo-mutants":
         raise CampaignError(f"{path} is not a cargo-mutants generated campaign")
     generator = existing.get("generator") or {}
-    refreshed = _native_json_call(
-        "mutation_refresh_native",
-        {
-            "language": "rust",
-            "repo_root": str(repo_root),
-            "manifest_path": str(path),
-            "campaign_id": str(existing.get("campaign_id") or path.stem),
-            "existing": existing,
-            "sources": list(sources),
-            "jobs": int(generator.get("jobs", 4)),
-            "run_timeout_seconds": int(generator.get("run_timeout_seconds", 1800)),
-        },
+    return _refresh_generated_campaign(
+        path,
+        existing,
+        repo_root,
+        language="rust",
+        sources=list(sources),
+        jobs=int(generator.get("jobs", 4)),
+        run_timeout_seconds=int(generator.get("run_timeout_seconds", 1800)),
     )
-    path.write_text(
-        json.dumps(refreshed, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    return path.relative_to(repo_root).as_posix()
 
 
 def _summarise(result: Mapping[str, Any], *, verbose: bool) -> dict[str, Any]:
