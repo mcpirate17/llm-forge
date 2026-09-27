@@ -15,7 +15,7 @@ or invoked from Rust.
 | `test_from_package_import_module_is_resolved` | `from_package_import_module_is_resolved` asserts exact driver sets for separate direct, multiple/aliased, from-module, from-package, nested, and relative imports; no import form is masked by another in the same test file. |
 | `test_named_by_agrees_with_the_git_grep_it_replaces` | `named_by_agrees_with_the_whole_word_reference` checks a fixed whole-word/substring pair, then samples 25 sorted live production function names with Python `Random(11)` and compares each indexed result with Python `re` over the independently walked live test files. |
 | `test_a_package_is_named_by_its_directory` | `a_package_is_named_by_its_directory` retains all four `dotted_for` path-to-name assertions. |
-| `test_the_index_is_not_degenerate` | `the_index_is_not_degenerate` checks an exact five-test fixture inventory, fixture import/name keys and queries, the independent nonempty live inventory and its exact indexed file count, and the original live import/name-key richness ratios. |
+| `test_the_index_is_not_degenerate` | `the_index_is_not_degenerate` checks an exact five-test fixture inventory, fixture import/name keys and queries, the independent live inventory and its exact indexed file count, and the original live import/name-key richness ratios while Python tests remain. An empty live inventory must have zero keys. |
 | `test_the_gate_asks_the_index_and_gets_the_same_answer` | `the_gate_asks_the_index_and_gets_the_same_answer` compares `slop_gate.drivers_for` with the same supplied index on the fixed from-package module. |
 | `test_the_cli_reports_the_root_it_actually_resolved` | `the_cli_reports_the_root_it_actually_resolved` passes a lexical `pkg/..` root and checks the printed canonical root, `TestIndex`, and zero status. |
 | `test_the_index_sees_untracked_tests_and_git_grep_does_not` | `the_index_sees_untracked_tests_and_git_grep_does_not` initializes Git only in a disposable fixture, verifies Git can find a staged control test, then checks the index finds an untracked probe that `git grep` does not. Git configuration is isolated from the host. |
@@ -31,6 +31,12 @@ replacement retains exhaustive live mapping and independently guards the
 resolved root and indexed inventory, so further Python-test retirement does
 not require changing a size constant.
 
+The all-Rust endpoint is also supported: once the live Python test inventory is
+empty, its indexed file/key counts and AST-oracle counts must be zero. The fixed
+five-test fixture and source-root guards remain mandatory. A separate regression
+case checks an existing tree containing production Python but no Python tests;
+it must produce an empty index rather than a wrong-root error.
+
 There are no active imports of the retired test module or its helpers.
 `src/conductor/conftest.py` retains two inert historical node-id strings in
 `HOST_PROJECT_TESTS`; native candidate-policy fixtures and a slop-core test
@@ -39,7 +45,8 @@ the retired Python test. No production Python module or shared fixture was
 changed for this migration.
 
 The new target is discovered by CI's `python_contracts_*` Cargo pattern. It
-passes all 11 tests with one test thread, CUDA masked, and two Cargo jobs.
+passes all 11 migrated tests plus the empty-inventory regression with one test
+thread, CUDA masked, and two Cargo jobs.
 `FORGE_BIN` pointed to the preserved Forge 0.8.0 release, although this target
 does not invoke that binary. Scoped Clippy with warnings
 denied, exact-file rustfmt, and file/function size checks pass. The Forge issue

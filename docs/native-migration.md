@@ -401,7 +401,7 @@ splitter source and lockfile, tool hashes, and reproduction script. Evidence
 SHA-256:
 `d2b85d62034586e719cf4110609ee62cfa69534adc78b964a64ca1f11f1172e8`.
 
-## Latest verified commit
+## Previous verified commit
 
 Commit `908d572d3e4cbfe646c4e0e888f0a0853b7df751`, measured from a `git archive`
 with the same path classification and inline-test treatment. The archive
@@ -438,6 +438,43 @@ splitter source and lockfile, tool hashes, and reproduction script. A separate
 splitter and Tokei run reproduced the ranges and per-file reports. Evidence
 SHA-256:
 `c9cd6468ea318a245eb0f81eb5feecc9c107caade86ff7a15464497520d424c6`.
+
+## Latest verified commit
+
+Commit `d8ddc76cbebb2e6a321d1a758b3f6fd423a2714b`, measured from a
+`git archive` with the same path classification, Tokei 15.0.0, and AST
+inline-test treatment. The archive stream SHA-256 is
+`1aac265a112f97c7d19b63808384e3d88ba83ae711c93fb093f973553fe624b0`.
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 51,296 | 52,303 | 194 | **50.3916% native** |
+| Tests | 32,080 | 58,105 | 0 | **64.4287% Rust** |
+| All tracked source, including examples | 83,376 | 110,507 | 194 | 56.9398% native |
+
+The manifests contain 372 production files, 299 test files, and 673 source
+files total. Two Rust example files contribute 99 code lines to the all-source
+view but are outside production and test scopes. The splitter identified 100
+test-only ranges in 85 production Rust files. They account for 13,059 Rust
+code lines: production Rust is 65,362 raw lines minus 13,059 = 52,303; Rust
+tests are 45,046 separate lines plus 13,059 = 58,105.
+
+Since `908d572`, production counts and the native production share are
+unchanged. Retiring the graph-selection and communication Python tests, adding
+their Rust contracts, and updating the repo-index regression reduced Python
+test code by 1,311 lines and added 2,934 Rust test lines. The Rust test share
+increased 2.1322 percentage points. Dirty native API, targeted-runner, and
+active-state/session-close work in the shared checkout is excluded from this
+committed snapshot. These are source
+composition figures, not runtime coverage, behavioral coverage, or
+performance claims.
+
+The [measurement evidence](native-metrics/d8ddc76-evidence.tar.gz) includes
+source path manifests and hashes independently checked against all 673 counted
+Git blobs, the archive stream hash, raw and independently reproduced per-file
+Tokei reports, AST inline ranges and source copies, tool hashes, and the
+reproduction script. Evidence SHA-256:
+`bcf055fc0b82df951dbd7b73014c4ef07dbccedeb4a5a49a124e042d3f09e7c6`.
 
 ## Behavioral migration
 
