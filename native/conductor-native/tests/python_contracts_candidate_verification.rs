@@ -1,6 +1,12 @@
 #![cfg(feature = "python-compat-tests")]
 //! The Python adapter keeps its public Finding and TestSelection shapes.
 
+#[path = "python_contracts/candidate_review_support.rs"]
+#[allow(dead_code)]
+mod candidate_review_support;
+#[path = "python_contracts/git_fixture_support.rs"]
+#[allow(dead_code)]
+mod git_fixture_support;
 #[path = "python_contracts/support.rs"]
 #[allow(dead_code)]
 mod support;
@@ -125,18 +131,13 @@ fn value_admission_reads_slim_receipt_and_blocks_malformed_envelopes() {
 fn selection_adapter_preserves_graph_failure_and_structured_finding() {
     let case = Case::new();
     Python::attach(|py| {
-        let monkeypatch = module(py, "pytest")
-            .getattr("MonkeyPatch")
-            .unwrap()
-            .call0()
-            .unwrap();
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("inventory", PyDict::new(py)).unwrap();
-        let context = module(py, "conductor.test_candidate_review_hardening")
-            .getattr("_gate_context")
-            .unwrap()
-            .call((monkeypatch.clone(), path(py, case.root())), Some(&kwargs))
-            .unwrap();
+        let (context, _anchor) = candidate_review_support::gate_context(
+            py,
+            case.root(),
+            case.root(),
+            &[],
+            &"c".repeat(40),
+        );
         let model = module(py, "conductor.candidate_review.model");
         let change = model
             .getattr("Change")
@@ -217,7 +218,6 @@ fn selection_adapter_preserves_graph_failure_and_structured_finding() {
             attr_text(&findings.get_item(1).unwrap(), "rule_id"),
             "no-targeted-tests"
         );
-        monkeypatch.call_method0("undo").unwrap();
     });
 }
 

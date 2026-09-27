@@ -21,6 +21,64 @@ fn manifest(path: &Path) -> toml::Value {
         .expect("parse package manifest")
 }
 
+fn make_dry_run(root: &Path, target: &str) -> String {
+    let output = Command::new("make")
+        .args(["--dry-run", target])
+        .current_dir(root)
+        .output()
+        .expect("render Makefile target");
+    assert!(
+        output.status.success(),
+        "make --dry-run {target}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .expect("UTF-8 Makefile plan")
+        .replace("\\\n", " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[test]
+fn developer_install_precompiles_every_native_test_configuration() {
+    let root = source_root();
+    let install = make_dry_run(&root, "install");
+    assert!(install.contains("RUSTUP_TOOLCHAIN=1.98.0"));
+    assert!(install.contains("OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1"));
+    assert!(install.contains("export PATH=\"$venv/bin:$PATH\""));
+    for command in [
+        "cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml --locked --jobs 2 --all-targets --features python-compat-tests --no-run",
+        "cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml --locked --jobs 2 --all-targets --no-run",
+        "PYO3_NO_PYTHON=1 cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml --locked --jobs 2 --all-targets --no-default-features --features source-analysis --no-run",
+        "cargo +1.98.0 test --manifest-path native/slop-core/Cargo.toml --locked --jobs 2 --all-targets --no-run",
+        "PYO3_NO_PYTHON=1 cargo +1.98.0 test --manifest-path native/forge/Cargo.toml --locked --jobs 2 --all-targets --no-run",
+        "cargo +1.98.0 build --manifest-path native/conductor-native/Cargo.toml --locked --jobs 2 --bins --features python-compat-tests",
+        "rustc +1.98.0 --edition=2021 --crate-name=forge_task_test_worker",
+        "cargo +1.98.0 build --manifest-path native/forge/tests/fixtures/stub_dispatch/Cargo.toml --locked --jobs 2",
+    ] {
+        assert!(install.contains(command), "install omits {command}");
+    }
+}
+
+#[test]
+fn developer_test_runs_every_native_configuration() {
+    let root = source_root();
+    let tests = make_dry_run(&root, "test");
+    assert!(tests.contains("CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2"));
+    assert!(tests.contains("OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1"));
+    assert!(tests.contains("export PATH=\"$venv/bin:$PATH\""));
+    for command in [
+        "cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features python-compat-tests --test 'python_contracts_*' -- --test-threads=1",
+        "cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml;",
+        "PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --no-default-features --features source-analysis -- --test-threads=1",
+        "PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml;",
+        "cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml",
+    ] {
+        assert!(tests.contains(command), "test omits {command}");
+    }
+}
+
 #[test]
 fn local_install_declares_cli_and_both_extension_wheels() {
     let root = source_root();

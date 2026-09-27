@@ -51,16 +51,23 @@ project. The current local-source example is in the [README](../README.md).
 ## Developer installation
 
 `make install` performs the runtime sync and precompiles all three crates' test
-targets, including the Python compatibility contracts and their child binaries.
-It also compiles the standalone task worker and nested dispatcher fixture. The
+targets: the core's Python compatibility, default, and Python-free
+source-analysis configurations, plus Forge and slop-core. It also builds the
+compatibility child binaries, standalone task worker, and nested dispatcher fixture. The
 dispatcher keeps its own Cargo dependency graph so its arbitrary-precision JSON
 feature cannot change the production CLI's JSON behavior.
 
-Installation runs sequentially with two Cargo workers and GPU visibility masked,
-even under `make -j`. `UV_PROJECT_ENVIRONMENT` selects an isolated venv;
+Installation pins Rust 1.98.0, runs sequentially with two Cargo workers, and
+masks GPU visibility even under `make -j`. `UV_PROJECT_ENVIRONMENT` selects an isolated venv;
 `CARGO_TARGET_DIR` selects an alternate Cargo output directory. Optional package
 extras can be passed as `INSTALL_SYNC_ARGS='--extra mutation --extra graph'`.
 `make native` deliberately rebuilds all three runtimes and repeats the prebuild.
+
+`make test` runs the precompiled Rust compatibility contracts with one test
+thread, then the core's default and Python-free source-analysis tests and the
+Forge and slop-core tests. It binds PyO3 to the installed venv, caps Cargo at
+two jobs, and masks GPU visibility. Focused development can still use Cargo's
+`--test` selector directly.
 
 Tests reuse fixture binaries only when their source, manifest/lockfile where
 applicable, executable permissions, and binary hashes match. Missing or stale
@@ -81,7 +88,8 @@ embedded routing policy or calibration data selected a Forge CLI reinstall;
 touching conductor-native source selected both conductor-native and Forge CLI.
 These were isolated cache-selection checks; they did not modify checkout source.
 
-The isolated `make install` also passed, including all Rust test targets and
-reusable fixtures. Direct execution of the dispatcher JSON-contract case and
+An earlier isolated `make install` passed for the then-configured Rust targets
+and reusable fixtures. The additional default and Python-free core prebuilds
+above still need the final local gate. Direct execution of the dispatcher JSON-contract case and
 task GPU-masking case reused the prebuilt binaries. Their `strace` execution
 records contained no Cargo or rustc launches.

@@ -8,22 +8,37 @@ path_prepend = [".venv/bin"]
 
 [env]
 CUDA_VISIBLE_DEVICES = ""
+CARGO_BUILD_JOBS = "2"
+RUST_TEST_THREADS = "2"
+RUSTUP_TOOLCHAIN = "1.98.0"
+OMP_NUM_THREADS = "1"
+OPENBLAS_NUM_THREADS = "1"
 
 [[setup]]
-name = "uv-sync"
-run = "uv sync --frozen --extra test"
-timeout_s = 900
+name = "install"
+run = "make install"
+timeout_s = 1800
 
-# Path-source crates keep their cached wheel under a plain sync.
+# Refresh changed path-source wheels after the incremental install prebuild.
 [[check]]
 name = "native-reinstall"
-run = "uv sync --frozen --extra test --reinstall-package conductor-native --reinstall-package slop-core"
-paths = ['^native/(conductor-native|slop-core)/', '^pyproject\.toml$', '^uv\.lock$']
+run = '''
+set -eu
+set --
+if grep -Eq '^native/(conductor-native|slop-core)/|^(pyproject[.]toml|uv[.]lock)$' "$FORGE_LAND_CHANGED"; then
+  set -- "$@" --reinstall-package conductor-native --reinstall-package slop-core
+fi
+if grep -Eq '^native/(conductor-native|forge)/|^(pyproject[.]toml|uv[.]lock)$' "$FORGE_LAND_CHANGED"; then
+  set -- "$@" --reinstall-package forge-cli
+fi
+uv sync --frozen --extra test "$@"
+'''
+paths = ['^native/(conductor-native|slop-core|forge)/', '^pyproject\.toml$', '^uv\.lock$']
 timeout_s = 1200
 
 [[check]]
-name = "pytest"
-run = "python -m pytest src/conductor -q -p no:cacheprovider --timeout 600"
+name = "native-tests"
+run = "make test"
 paths = ['^src/', '^native/(conductor-native|slop-core)/', '^pyproject\.toml$', '^uv\.lock$', '^campaigns/', '^candidate_policy\.toml$']
 timeout_s = 2400
 

@@ -3,8 +3,8 @@
 Rust owns fixtures, process and Git setup, callbacks, control flow, and
 assertions. PyO3 calls the shipped Python APIs directly. The two Conductor
 Python test files (49 cases) retired after the native target selection was
-registered. The hook corpus Python file (2 cases) remains active
-until the later local-check policy transition permits its retirement.
+registered. The hook corpus Python file (2 cases) retired when the local-check
+policy switched to Rust-owned test selection.
 
 ## Case map
 

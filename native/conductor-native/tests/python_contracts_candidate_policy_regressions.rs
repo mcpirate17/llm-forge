@@ -1,6 +1,12 @@
 #![cfg(feature = "python-compat-tests")]
 //! Rust assertions replacing policy exception and value-waiver Python cases.
 
+#[path = "python_contracts/candidate_review_support.rs"]
+#[allow(dead_code)]
+mod candidate_review_support;
+#[path = "python_contracts/git_fixture_support.rs"]
+#[allow(dead_code)]
+mod git_fixture_support;
 #[path = "python_contracts/support.rs"]
 #[allow(dead_code)]
 mod support;
@@ -993,21 +999,18 @@ fn mutation_result_uses_integration_base_expiry_and_waived_pass_promotion() {
 fn mutation_gate_fixture<'py>(
     py: Python<'py>,
     case: &Case,
-) -> (Bound<'py, PyAny>, Bound<'py, PyAny>, support::AttrPatch) {
-    let monkeypatch = module(py, "pytest")
-        .getattr("MonkeyPatch")
-        .unwrap()
-        .call0()
-        .unwrap();
-    let inventory = PyDict::new(py);
-    inventory.set_item(PROBE, ["test_probe_legacy"]).unwrap();
-    let kwargs = PyDict::new(py);
-    kwargs.set_item("inventory", inventory).unwrap();
-    let context = module(py, "conductor.test_candidate_review_hardening")
-        .getattr("_gate_context")
-        .unwrap()
-        .call((monkeypatch.clone(), path(py, case.root())), Some(&kwargs))
-        .unwrap();
+) -> (
+    Bound<'py, PyAny>,
+    Vec<support::AttrPatch>,
+    support::AttrPatch,
+) {
+    let (context, anchor) = candidate_review_support::gate_context(
+        py,
+        case.root(),
+        case.root(),
+        &[(PROBE, &["test_probe_legacy"])],
+        &"c".repeat(40),
+    );
     let snapshot = std::path::PathBuf::from(text(&context.getattr("snapshot").unwrap()));
     let schema = module(py, "conductor.mutation_value")
         .getattr("VALUE_SCHEMA")
@@ -1042,14 +1045,14 @@ fn mutation_gate_fixture<'py>(
         "verify_evidence",
         &mocked,
     );
-    (context, monkeypatch, verify)
+    (context, anchor, verify)
 }
 
 #[test]
 fn mutation_gate_names_new_nodeids_and_applies_only_active_integration_waivers() {
     let case = Case::new();
     Python::attach(|py| {
-        let (context, monkeypatch, _verify) = mutation_gate_fixture(py, &case);
+        let (context, _anchor, _verify) = mutation_gate_fixture(py, &case);
         let integration = pyo3::types::PyString::new(py, &"f".repeat(40));
         let candidate = replace_field(
             py,
@@ -1131,6 +1134,5 @@ fn mutation_gate_names_new_nodeids_and_applies_only_active_integration_waivers()
                 active
             );
         }
-        monkeypatch.call_method0("undo").unwrap();
     });
 }
