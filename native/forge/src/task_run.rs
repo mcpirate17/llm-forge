@@ -1,6 +1,8 @@
 //! Explicit, bounded command execution for the native task journal. This is
 //! process supervision, not a filesystem/network sandbox or approval authority.
 
+use crate::task_limits::{LimitScope, LimitsReport};
+use crate::task_resources::{child_exit_status, ResourceRequest, ResourceSnapshot};
 use crate::task_store::{Completion, State, Store, Task};
 use crate::tasks::{self, RunArgs};
 use anyhow::{ensure, Context, Result};
@@ -23,6 +25,13 @@ struct LogSummary {
 }
 
 #[derive(Serialize)]
+struct ResourceEvidence {
+    requested: ResourceRequest,
+    available: ResourceSnapshot,
+    enforcement: Option<LimitsReport>,
+}
+
+#[derive(Serialize)]
 struct Outcome {
     schema_version: u32,
     task_id: String,
@@ -35,12 +44,19 @@ struct Outcome {
     finished_at: i64,
     exit_code: Option<i32>,
     timed_out: bool,
+    succeeded: bool,
     detail: String,
-    stdout: LogSummary,
-    stderr: LogSummary,
+    resources: ResourceEvidence,
+    stdout: Option<LogSummary>,
+    stderr: Option<LogSummary>,
 }
 
-struct ManagedChild(Child, bool);
+struct ManagedChild {
+    child: Child,
+    group_stopped: bool,
+    scope_stopped: bool,
+    scope: Option<LimitScope>,
+}
 
 static INTERRUPTED: AtomicBool = AtomicBool::new(false);
 
@@ -101,14 +117,32 @@ impl Drop for SignalGuard {
 
 impl ManagedChild {
     fn stop(&mut self) -> Result<()> {
-        if self.1 {
+        // A detached descendant may outlive both the command and its wrapper.
+        let scope_result = if self.scope_stopped {
+            Ok(None)
+        } else {
+            self.scope.as_ref().map(LimitScope::stop).transpose()
+        };
+        self.scope_stopped = scope_result.is_ok();
+        let group_result = self.stop_group();
+        match (scope_result, group_result) {
+            (Err(scope), Err(group)) => {
+                anyhow::bail!("scope cleanup: {scope:#}; group cleanup: {group:#}")
+            }
+            (Err(error), _) | (_, Err(error)) => Err(error),
+            _ => Ok(()),
+        }
+    }
+
+    fn stop_group(&mut self) -> Result<()> {
+        if self.group_stopped {
             return Ok(());
         }
         #[cfg(unix)]
         {
             // The child was created in its own process group, so killing its
             // descendants cannot affect the caller's shell or another task.
-            let result = unsafe { libc::kill(-(self.0.id() as i32), libc::SIGKILL) };
+            let result = unsafe { libc::kill(-(self.child.id() as i32), libc::SIGKILL) };
             if result != 0 {
                 let error = std::io::Error::last_os_error();
                 if error.raw_os_error() != Some(libc::ESRCH) {
@@ -117,11 +151,11 @@ impl ManagedChild {
             }
         }
         #[cfg(not(unix))]
-        if self.0.try_wait()?.is_none() {
-            self.0.kill()?;
+        if self.child.try_wait()?.is_none() {
+            self.child.kill()?;
         }
-        self.0.wait()?;
-        self.1 = true;
+        self.child.wait()?;
+        self.group_stopped = true;
         Ok(())
     }
 }
@@ -201,21 +235,35 @@ fn output_file(directory: &Path, name: &str) -> Result<File> {
         .with_context(|| format!("creating task output {name}"))
 }
 
-fn spawn(host: &Path, task: &Task, owner: &str) -> Result<ManagedChild> {
+fn spawn(
+    host: &Path,
+    task: &Task,
+    args: &RunArgs,
+    directory: &Path,
+    available: &ResourceSnapshot,
+    mut scope: Option<LimitScope>,
+) -> Result<ManagedChild> {
     let (program, arguments) = task
         .command
         .split_first()
         .context("task has no stored command")?;
-    let mut command = Command::new(program);
+    let mut command = match scope.as_mut() {
+        Some(scope) => scope.command(program, arguments, directory),
+        None => {
+            let mut command = Command::new(program);
+            command.args(arguments);
+            command
+        }
+    };
+    args.resources.configure_command(&mut command, available)?;
     command
-        .args(arguments)
         .current_dir(host)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .env("FORGE_TASK_ID", &task.id)
         .env("FORGE_TASK_ATTEMPT", task.attempt.to_string())
-        .env("FORGE_TASK_OWNER", owner);
+        .env("FORGE_TASK_OWNER", &args.lease.task.owner);
     if let Some(session) = &task.session_id {
         command.env("FORGE_SESSION_ID", session);
     }
@@ -242,12 +290,18 @@ fn spawn(host: &Path, task: &Task, owner: &str) -> Result<ManagedChild> {
             }
         }
     }
-    Ok(ManagedChild(
-        command
+    ensure!(
+        !INTERRUPTED.load(Ordering::Acquire),
+        "task interrupted before launch"
+    );
+    Ok(ManagedChild {
+        child: command
             .spawn()
             .with_context(|| format!("spawning task executable {program:?}"))?,
-        false,
-    ))
+        group_stopped: false,
+        scope_stopped: false,
+        scope,
+    })
 }
 
 fn monitor(
@@ -290,7 +344,9 @@ fn monitor(
             !INTERRUPTED.load(Ordering::Acquire),
             "task interrupted by signal"
         );
-        if let Some(status) = child.0.try_wait()? {
+        // Keep the exited leader unreaped until cleanup, pinning the process
+        // group identity while scope management commands finish.
+        if let Some(status) = child_exit_status(&child.child)? {
             return Ok((status.code(), false));
         }
         std::thread::sleep(Duration::from_millis(50));
@@ -303,12 +359,15 @@ fn execute(
     task: &Task,
     args: &RunArgs,
     directory: &Path,
+    available: &ResourceSnapshot,
+    scope: Option<LimitScope>,
 ) -> Result<Outcome> {
+    let mut outcome = initial_outcome(task, args, available, scope.as_ref());
     let out = output_file(directory, "stdout.log")?;
     let err = output_file(directory, "stderr.log")?;
-    let mut child = spawn(host, task, &args.lease.task.owner)?;
-    let stdout_pipe = child.0.stdout.take().context("task stdout pipe")?;
-    let stderr_pipe = child.0.stderr.take().context("task stderr pipe")?;
+    let mut child = spawn(host, task, args, directory, available, scope)?;
+    let stdout_pipe = child.child.stdout.take().context("task stdout pipe")?;
+    let stderr_pipe = child.child.stderr.take().context("task stderr pipe")?;
     #[cfg(unix)]
     {
         nonblocking(&stdout_pipe)?;
@@ -318,19 +377,93 @@ fn execute(
     let stdout = output_thread(stdout_pipe, out, args.log_bytes, done.clone());
     let stderr = output_thread(stderr_pipe, err, args.log_bytes, done.clone());
     let result = monitor(host, store, task, &mut child, args);
+    // Scope teardown uses several bounded management probes. Reserve enough
+    // lease time to stop descendants and bind the receipt even with a 2s lease.
+    let completion_lease = if child.scope.is_some() {
+        store
+            .set_busy_timeout(Duration::from_millis(200))
+            .and_then(|()| {
+                store.heartbeat(
+                    &task.id,
+                    &args.lease.task.owner,
+                    task.attempt,
+                    args.lease.lease_seconds.max(30),
+                    tasks::now(),
+                )
+            })
+            .map(|_| ())
+    } else {
+        Ok(())
+    };
     // Also close inherited pipes held by descendants after the leader exits.
     let stopped = child.stop();
     done.store(true, Ordering::Release);
-    let stdout = stdout
+    match result {
+        Ok((exit_code, timed_out)) => {
+            outcome.exit_code = exit_code;
+            outcome.timed_out = timed_out;
+            outcome.succeeded = exit_code == Some(0) && !timed_out;
+            outcome.detail = if timed_out {
+                "wall-clock deadline exceeded".into()
+            } else {
+                format!(
+                    "command exited {}",
+                    exit_code.map_or("by signal".into(), |code| code.to_string())
+                )
+            };
+        }
+        Err(error) => outcome.detail = format!("execution failed: {error:#}"),
+    }
+    if let Err(error) = completion_lease {
+        record_failure(&mut outcome, "completion lease", error);
+    }
+    outcome.stdout = join_output(stdout, "stdout", &mut outcome);
+    outcome.stderr = join_output(stderr, "stderr", &mut outcome);
+    if let Err(error) = stopped {
+        record_failure(&mut outcome, "cleanup", error);
+    }
+    if let Some(scope) = &child.scope {
+        match scope.report() {
+            Ok(report) => outcome.resources.enforcement = Some(report),
+            Err(error) => record_failure(&mut outcome, "resource verification", error),
+        }
+    }
+    outcome.finished_at = tasks::now();
+    Ok(outcome)
+}
+
+fn record_failure(outcome: &mut Outcome, operation: &str, error: anyhow::Error) {
+    outcome.succeeded = false;
+    outcome
+        .detail
+        .push_str(&format!("; {operation} failed: {error:#}"));
+}
+
+fn join_output(
+    reader: JoinHandle<Result<LogSummary>>,
+    name: &str,
+    outcome: &mut Outcome,
+) -> Option<LogSummary> {
+    match reader
         .join()
-        .map_err(|_| anyhow::anyhow!("stdout reader panicked"))?;
-    let stderr = stderr
-        .join()
-        .map_err(|_| anyhow::anyhow!("stderr reader panicked"))?;
-    stopped?;
-    let (exit_code, timed_out) = result?;
-    Ok(Outcome {
-        schema_version: 1,
+        .unwrap_or_else(|_| Err(anyhow::anyhow!("reader panicked")))
+    {
+        Ok(summary) => Some(summary),
+        Err(error) => {
+            record_failure(outcome, name, error);
+            None
+        }
+    }
+}
+
+fn initial_outcome(
+    task: &Task,
+    args: &RunArgs,
+    available: &ResourceSnapshot,
+    scope: Option<&LimitScope>,
+) -> Outcome {
+    Outcome {
+        schema_version: 2,
         task_id: task.id.clone(),
         attempt: task.attempt,
         owner: args.lease.task.owner.clone(),
@@ -339,19 +472,18 @@ fn execute(
         message_id: task.message_id.clone(),
         started_at: task.updated_at,
         finished_at: tasks::now(),
-        exit_code,
-        timed_out,
-        detail: if timed_out {
-            "wall-clock deadline exceeded".into()
-        } else {
-            format!(
-                "command exited {}",
-                exit_code.map_or("by signal".into(), |code| code.to_string())
-            )
+        exit_code: None,
+        timed_out: false,
+        succeeded: false,
+        detail: "execution did not start".into(),
+        resources: ResourceEvidence {
+            requested: args.resources.clone(),
+            available: available.clone(),
+            enforcement: scope.map(LimitScope::unverified_report),
         },
-        stdout: stdout?,
-        stderr: stderr?,
-    })
+        stdout: None,
+        stderr: None,
+    }
 }
 
 fn persist(directory: &Path, outcome: &Outcome) -> Result<PathBuf> {
@@ -364,10 +496,27 @@ fn persist(directory: &Path, outcome: &Outcome) -> Result<PathBuf> {
     Ok(path)
 }
 
+fn completion(outcome: Outcome, receipt: crate::task_store::Receipt) -> (Completion, u8) {
+    let success = outcome.succeeded;
+    (
+        Completion {
+            state: if success {
+                State::Succeeded
+            } else {
+                State::Failed
+            },
+            exit_code: outcome.exit_code,
+            detail: Some(outcome.detail),
+            receipt: Some(receipt),
+        },
+        if success { 0 } else { 1 },
+    )
+}
+
 pub fn run(host: &Path, store: &mut Store, args: RunArgs) -> Result<u8> {
     ensure!(
-        cfg!(unix),
-        "supervised task execution currently requires Unix process groups and pipes"
+        cfg!(target_os = "linux"),
+        "supervised task execution currently requires Linux resource admission and process groups"
     );
     let _signals = SignalGuard::install()?;
     ensure!(
@@ -384,6 +533,20 @@ pub fn run(host: &Path, store: &mut Store, args: RunArgs) -> Result<u8> {
         "task has no command; use start/finish for external work"
     );
     tasks::validate_claim(host, &before, &args.lease.task.owner)?;
+    // Admission and backend readiness precede retry/start: refusals do not spend
+    // an attempt or alter a failed task's recovery state.
+    let available = args.resources.admit()?;
+    let scope = LimitScope::prepare(
+        host,
+        &before.id,
+        &args.resources,
+        &available,
+        args.timeout_seconds,
+    )?;
+    ensure!(
+        !INTERRUPTED.load(Ordering::Acquire),
+        "task interrupted during resource preflight"
+    );
     if args.resume {
         store.retry(&before.id, &args.lease.task.owner, tasks::now())?;
     }
@@ -399,27 +562,20 @@ pub fn run(host: &Path, store: &mut Store, args: RunArgs) -> Result<u8> {
         .join(task.attempt.to_string());
     let outcome = (|| {
         std::fs::create_dir_all(&directory)?;
-        let outcome = execute(host, store, &task, &args, &directory)?;
+        let fallback = initial_outcome(&task, &args, &available, scope.as_ref());
+        let outcome = match execute(host, store, &task, &args, &directory, &available, scope) {
+            Ok(outcome) => outcome,
+            Err(error) => Outcome {
+                finished_at: tasks::now(),
+                detail: format!("execution failed: {error:#}"),
+                ..fallback
+            },
+        };
         let receipt = tasks::bind_receipt(host, &persist(&directory, &outcome)?)?;
         Ok::<_, anyhow::Error>((outcome, receipt))
     })();
     let (completion, code) = match outcome {
-        Ok((outcome, receipt)) => {
-            let success = outcome.exit_code == Some(0) && !outcome.timed_out;
-            (
-                Completion {
-                    state: if success {
-                        State::Succeeded
-                    } else {
-                        State::Failed
-                    },
-                    exit_code: outcome.exit_code,
-                    detail: Some(outcome.detail),
-                    receipt: Some(receipt),
-                },
-                if success { 0 } else { 1 },
-            )
-        }
+        Ok((outcome, receipt)) => completion(outcome, receipt),
         Err(error) => (
             Completion {
                 state: State::Failed,

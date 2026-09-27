@@ -19,6 +19,8 @@ pub struct TaskArgs {
 
 #[derive(Subcommand)]
 enum TaskCommand {
+    /// Inspect resource availability and validate a budget without starting work.
+    Resources(crate::task_resources::ResourceRequest),
     /// Persist a task; an owner makes it assigned, otherwise it is queued.
     Create(CreateArgs),
     /// List the latest tasks (JSON includes total counts and truncation).
@@ -127,6 +129,8 @@ pub struct RunArgs {
     /// Maximum retained bytes per output stream; excess is drained/discarded.
     #[arg(long, default_value_t = 1_048_576)]
     pub log_bytes: u64,
+    #[command(flatten)]
+    pub resources: crate::task_resources::ResourceRequest,
 }
 
 pub fn now() -> i64 {
@@ -203,6 +207,9 @@ fn create(args: CreateArgs, store: &mut Store) -> Result<Task> {
 
 fn readonly(action: &TaskCommand, host: &Path) -> Result<Option<serde_json::Value>> {
     match action {
+        TaskCommand::Resources(request) => Ok(Some(
+            json!({"requested":request,"available":request.admit()?,"admitted":true}),
+        )),
         TaskCommand::List { limit } => {
             ensure!((1..=1000).contains(limit), "limit must be 1..1000");
             match Store::open(host, false)? {

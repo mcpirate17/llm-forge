@@ -39,6 +39,8 @@ mod status;
 mod subagent_stop;
 mod subagent_transcript;
 mod takeover;
+mod task_limits;
+mod task_resources;
 mod task_run;
 mod task_store;
 mod tasks;
@@ -65,6 +67,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    #[command(hide = true)]
+    TaskLimitExec(task_limits::LimitExecArgs),
     /// Durable assignment, execution, receipts, retries and lease recovery.
     Task(tasks::TaskArgs),
     /// Read-only health across tasks, claims, messaging, hooks and ledger paths.
@@ -216,30 +220,25 @@ fn resolve_agent_route(subagent_type: Option<&str>) -> ledger::agent_upsert::Age
     }
 }
 
+fn command_exit(label: &str, result: anyhow::Result<u8>, failure: u8) -> ExitCode {
+    match result {
+        Ok(code) => ExitCode::from(code),
+        Err(error) => {
+            eprintln!("forge {label}: {error:#}");
+            ExitCode::from(failure)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
-        Command::Task(args) => match tasks::run(args) {
-            Ok(code) => ExitCode::from(code),
-            Err(error) => {
-                eprintln!("forge task: {error:#}");
-                ExitCode::from(1)
-            }
-        },
-        Command::Land(args) => match land::run(args) {
-            Ok(code) => ExitCode::from(code),
-            Err(error) => {
-                eprintln!("forge land: {error:#}");
-                ExitCode::from(2)
-            }
-        },
-        Command::Status(args) => match status::run(args) {
-            Ok(code) => ExitCode::from(code),
-            Err(error) => {
-                eprintln!("forge status: {error:#}");
-                ExitCode::from(1)
-            }
-        },
+        Command::TaskLimitExec(args) => {
+            command_exit("task limits", task_limits::run_guard(args), 1)
+        }
+        Command::Task(args) => command_exit("task", tasks::run(args), 1),
+        Command::Land(args) => command_exit("land", land::run(args), 2),
+        Command::Status(args) => command_exit("status", status::run(args), 1),
         Command::Hook { event } => match dispatch::run_hook(&event) {
             Ok(code) => ExitCode::from(code),
             Err(err) => {
@@ -309,69 +308,73 @@ fn main() -> ExitCode {
                 ExitCode::from(1)
             }
         },
-        Command::Ledger { action } => match action {
-            LedgerCommand::Read(args) => match ledger::run(args) {
-                Ok(code) => ExitCode::from(code as u8),
-                Err(err) => {
-                    eprintln!("forge ledger read: {err:#}");
-                    ExitCode::from(1)
-                }
-            },
-            LedgerCommand::Rollup(args) => match ledger::rollup::run(args) {
-                Ok(code) => ExitCode::from(code as u8),
-                Err(err) => {
-                    eprintln!("forge ledger rollup: {err:#}");
-                    ExitCode::from(1)
-                }
-            },
-            LedgerCommand::Landed(args) => match ledger::landed::run(args) {
-                Ok(code) => ExitCode::from(code as u8),
-                Err(err) => {
-                    eprintln!("forge ledger landed: {err:#}");
-                    ExitCode::from(1)
-                }
-            },
-            LedgerCommand::Audit(args) => match ledger::audit::run(args) {
-                Ok(code) => ExitCode::from(code as u8),
-                Err(err) => {
-                    eprintln!("forge ledger audit: {err:#}");
-                    ExitCode::from(1)
-                }
-            },
-            LedgerCommand::Prune(args) => match ledger::prune::run(args) {
-                Ok(code) => ExitCode::from(code as u8),
-                Err(err) => {
-                    eprintln!("forge ledger prune: {err:#}");
-                    ExitCode::from(1)
-                }
-            },
-            LedgerCommand::Calibrate { action } => match action {
-                ledger::calibrate::CalibrateCommand::Sample(args) => {
-                    match ledger::calibrate::run_sample(args) {
-                        Ok(code) => ExitCode::from(code as u8),
-                        Err(err) => {
-                            eprintln!("forge ledger calibrate sample: {err:#}");
-                            ExitCode::from(1)
-                        }
-                    }
-                }
-            },
-            LedgerCommand::RollupAgent(args) => {
-                match ledger::agent_upsert::run(args, resolve_agent_route) {
+        Command::Ledger { action } => run_ledger(action),
+    }
+}
+
+fn run_ledger(action: LedgerCommand) -> ExitCode {
+    match action {
+        LedgerCommand::Read(args) => match ledger::run(args) {
+            Ok(code) => ExitCode::from(code as u8),
+            Err(err) => {
+                eprintln!("forge ledger read: {err:#}");
+                ExitCode::from(1)
+            }
+        },
+        LedgerCommand::Rollup(args) => match ledger::rollup::run(args) {
+            Ok(code) => ExitCode::from(code as u8),
+            Err(err) => {
+                eprintln!("forge ledger rollup: {err:#}");
+                ExitCode::from(1)
+            }
+        },
+        LedgerCommand::Landed(args) => match ledger::landed::run(args) {
+            Ok(code) => ExitCode::from(code as u8),
+            Err(err) => {
+                eprintln!("forge ledger landed: {err:#}");
+                ExitCode::from(1)
+            }
+        },
+        LedgerCommand::Audit(args) => match ledger::audit::run(args) {
+            Ok(code) => ExitCode::from(code as u8),
+            Err(err) => {
+                eprintln!("forge ledger audit: {err:#}");
+                ExitCode::from(1)
+            }
+        },
+        LedgerCommand::Prune(args) => match ledger::prune::run(args) {
+            Ok(code) => ExitCode::from(code as u8),
+            Err(err) => {
+                eprintln!("forge ledger prune: {err:#}");
+                ExitCode::from(1)
+            }
+        },
+        LedgerCommand::Calibrate { action } => match action {
+            ledger::calibrate::CalibrateCommand::Sample(args) => {
+                match ledger::calibrate::run_sample(args) {
                     Ok(code) => ExitCode::from(code as u8),
                     Err(err) => {
-                        eprintln!("forge ledger rollup-agent: {err:#}");
+                        eprintln!("forge ledger calibrate sample: {err:#}");
                         ExitCode::from(1)
                     }
                 }
             }
-            LedgerCommand::Report(args) => match ledger::report::run(args) {
+        },
+        LedgerCommand::RollupAgent(args) => {
+            match ledger::agent_upsert::run(args, resolve_agent_route) {
                 Ok(code) => ExitCode::from(code as u8),
                 Err(err) => {
-                    eprintln!("forge ledger report: {err:#}");
+                    eprintln!("forge ledger rollup-agent: {err:#}");
                     ExitCode::from(1)
                 }
-            },
+            }
+        }
+        LedgerCommand::Report(args) => match ledger::report::run(args) {
+            Ok(code) => ExitCode::from(code as u8),
+            Err(err) => {
+                eprintln!("forge ledger report: {err:#}");
+                ExitCode::from(1)
+            }
         },
     }
 }
