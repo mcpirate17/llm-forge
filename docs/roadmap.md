@@ -174,13 +174,13 @@ agent tokens. Stop porting; finish Phase 3, then install.
    `current_work_guard_bash`) itself instead of silently deferring, so
    `PreToolUse`+`Bash` is Full coverage; `--takeover` narrows (not
    removes) the host's `PreToolUse` `.*` Python entry down to
-   `Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*` --
+   `Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*` --
    the tools still needing Python -- and `uninstall` restores it to
    `.*` in place. `crg_refresh_report_pre`'s own matcher is `.*`, so
    Python ran it for every tool before narrowing; closed the resulting
    gap by having standalone `PreToolUse` run it alone
    (`handlers::run_generic_pretooluse_fully_native`) for any `tool_name`
-   that is neither `Bash` nor `Agent`, so a staged background-refresh
+   that does not have a specialized native guard, so a staged background-refresh
    failure still reports for Grep/Glob/WebFetch/TodoWrite/Task/etc.
    Measured on a synthetic Bash deny payload, 20+ runs, median/mean wall
    time:
@@ -219,7 +219,23 @@ agent tokens. Stop porting; finish Phase 3, then install.
    549 chunks, a 490 KB CodexVault daily note). Port nothing; index
    more often, or move to chunk-hash reuse for append-only files as a
    deliberate follow-up. DONE PR #69 (docs only).
-2j. (Claude) residual PreToolUse Python (crg_gate_mark/verify, crg_refresh_wait, current_work_guard_edit/read, pre_read_skeleton for Read|Edit|Write|NotebookEdit|MCP graph) NOT ported: measured 36-37 ms per call, ~80 such calls per session (~3 s) vs 8.7K Bash calls now native; scraps -- stop here, the hook path is done.
+2j. Generic `PreToolUse` and Read now run natively in ordinary dispatch as well
+   as takeover mode. Read combines refresh notices, the existing protected-file
+   guard and a streaming whole-file size guard in registry order. It preserves
+   sliced-read behavior, denial text and context telemetry. Explicit empty or
+   partial `FORGE_NATIVE_HOOKS` selections still control ordinary dispatch;
+   takeover owns the complete Read guard and removes Read from the residual
+   Python matcher. Uninstall restores the original matcher.
+
+   Native handlers implement the shipped hook semantics. Hosts with customized
+   Python hook bodies should retain ordinary dispatch and exclude those hooks
+   from `FORGE_NATIVE_HOOKS`; an empty value restores Python dispatch throughout.
+
+   Edit/Write/NotebookEdit and graph-tool mark/verify/wait handlers still use
+   the host dispatcher. The earlier residual measurement was 36–37 ms per call
+   and roughly 80 calls per session; it predates the Read port. The native-only
+   `tests/native_read.rs` target includes an opt-in 80-call timing probe, with
+   no fixed timing threshold or interpreter execution.
 2. Warn-mode hook install in the LLM monorepo (step 2b's settings.json
    wiring, `FORGE_MODE=warn`): done and live on this machine since
    2026-09-13, but not reproducible from a clean clone -- the LLM

@@ -48,7 +48,7 @@ fn takeover_removes_only_full_events_python_entries() {
         .iter()
         .any(|c| c.contains("forge") && c.contains("hook PostToolUse")));
 
-    // PreToolUse (Partial: Read/Edit/mcp graph tools still need Python):
+    // PreToolUse (Partial: Edit/mcp graph tools still need Python):
     // the Python entry must survive, narrowed to just those tools, and
     // the forge entry must keep matcher `.*` (it still needs to see Bash).
     let pre_list = &settings["hooks"]["PreToolUse"];
@@ -66,7 +66,7 @@ fn takeover_removes_only_full_events_python_entries() {
         .unwrap();
     assert_eq!(
         python_entry["matcher"],
-        "Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*"
+        "Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*"
     );
     let forge_entry = pre_list
         .as_array()
@@ -202,7 +202,7 @@ fn status_reports_the_narrowed_matcher() {
     let python = takeover::python_status(&settings, scratch.path(), "PreToolUse");
     assert_eq!(
         python,
-        "narrowed(Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*)"
+        "narrowed(Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*)"
     );
 }
 

@@ -22,6 +22,7 @@ mod land;
 mod land_exec;
 mod ledger;
 mod local_ai_policy;
+mod mailbox;
 mod merge;
 mod mutation_plan;
 mod notes_index;
@@ -29,6 +30,7 @@ mod obsidian_sync;
 mod ownership;
 mod post_edit_audit;
 mod post_tool;
+mod pre_read;
 mod read_budget;
 mod receipt_show;
 mod route;
@@ -73,12 +75,14 @@ enum Command {
     Task(tasks::TaskArgs),
     /// Read-only health across tasks, claims, messaging, hooks and ledger paths.
     Status(status::StatusArgs),
+    /// Inspect and acknowledge existing local mailboxes without a Python process.
+    Mailbox(mailbox::MailboxArgs),
     /// Land a branch on the integration line from a persistent local clone:
     /// rebase, run the host's `.forge/land.toml` checks bounded, fast-forward
     /// push, delete the branch. No CI service involved.
     Land(land::LandArgs),
-    /// Run one Claude Code hook event: read the payload on stdin, delegate to the
-    /// Python dispatcher, forward its stdout/stderr/exit code unchanged.
+    /// Run a hook event with native handlers and delegate remaining hooks to the
+    /// configured host dispatcher.
     Hook {
         /// The event name, e.g. PreToolUse, PostToolUse, SessionStart, SessionEnd.
         event: String,
@@ -239,6 +243,7 @@ fn main() -> ExitCode {
         Command::Task(args) => command_exit("task", tasks::run(args), 1),
         Command::Land(args) => command_exit("land", land::run(args), 2),
         Command::Status(args) => command_exit("status", status::run(args), 1),
+        Command::Mailbox(args) => command_exit("mailbox", mailbox::run(args), 2),
         Command::Hook { event } => match dispatch::run_hook(&event) {
             Ok(code) => ExitCode::from(code),
             Err(err) => {

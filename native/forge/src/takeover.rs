@@ -16,37 +16,16 @@
 //! `Full` name against those constants so the two files cannot silently
 //! drift apart.
 //!
-//! `PreToolUse` is the one that surprises, twice over. First:
-//! `dispatch::run_pre_tool_use` (the non-standalone path) only
-//! special-cases `tool_name == "Bash"` and `tool_name == "Agent"`, so a host
-//! settings entry with matcher `".*"` (the real shape in every project seen
-//! so far -- Python's own per-tool filtering happens inside the dispatcher,
-//! not in settings.json) still needs Python for `Read`, `Edit`, `Write`,
-//! `NotebookEdit` and the `mcp__code_review_graph__*` tools. That makes
-//! `PreToolUse` `Partial` at the `".*"` matcher even though the `Bash` and
-//! `Agent` cases it is built from would each look `Full` in isolation.
-//!
-//! Second, and no longer a surprise as of the standalone Bash guard slice:
-//! `--takeover` always implies `--standalone` (`FORGE_HOOK_STANDALONE=1`),
-//! and the standalone path is a *different* function --
-//! `dispatch::run_pre_tool_use_standalone` -- which used to have nothing to
-//! say for Bash at all. It now special-cases `tool_name == "Bash"` the same
-//! way the non-standalone fully-native branch does
-//! (`handlers::run_bash_pretooluse_fully_native`), so a literal `"Bash"`
-//! matcher is `Full` here: the guard denials `BASH_PRETOOLUSE_HOOK_NAMES`
-//! promises are live in the one mode `--takeover` ever runs forge in.
-//! `".*"` (the real host shape) is still `Partial`, though narrower than
-//! before -- `Read`, `Edit|Write|NotebookEdit` and the graph-tool matcher
-//! still have no native twin and still need Python; `residual_python_matcher`
-//! below gives the alternation of just those matchers so `--takeover` can
-//! narrow the Python entry's own matcher down to them instead of leaving it
-//! at `".*"` (which would re-run Python on every Bash call for nothing).
-//! `"Agent"` is unaffected: `run_pre_tool_use_standalone` already
-//! special-cased `tool_name == "Agent"` before this slice and its routing
-//! verdict was already confirmed live under standalone.
+//! Both ordinary and standalone dispatch serve Bash, Agent, Read and generic
+//! tools natively. Takeover implies standalone, so the guards must exist in
+//! that path before removing a host's Python entry. Edit/Write/NotebookEdit
+//! and graph MCP tools still need Python: catchall coverage stays Partial,
+//! and its residual matcher retains exactly those tools. Literal generic
+//! tool names can be Full, while arbitrary regex matchers stay conservative.
 
 use crate::handlers::{
-    AGENT_PRETOOLUSE_HOOK_NAMES, BASH_PRETOOLUSE_HOOK_NAMES, POST_TOOL_USE_HOOK_NAMES,
+    generic_pretooluse_tool, AGENT_PRETOOLUSE_HOOK_NAMES, BASH_PRETOOLUSE_HOOK_NAMES,
+    POST_TOOL_USE_HOOK_NAMES, READ_PRETOOLUSE_HOOK_NAMES,
 };
 
 /// Native coverage for one `(event, tool_matcher)` pair.
@@ -60,17 +39,8 @@ pub enum Coverage {
     Partial { missing: Vec<&'static str> },
 }
 
-/// `registry.py` `PreToolUse` hooks that match only `Read`
-/// (`current_work_guard_read`, `pre_read_skeleton`), only
-/// `Edit|Write|NotebookEdit` (`crg_gate_verify`, `current_work_guard_edit`)
-/// or only the graph-tool matcher (`crg_gate_mark`, `crg_refresh_wait`) --
-/// none has a native twin (absent from every `*_HOOK_NAMES` list in
-/// `handlers.rs`), and `dispatch::run_pre_tool_use` never special-cases
-/// their tools, so any `PreToolUse` matcher other than exactly `"Bash"` or
-/// exactly `"Agent"` is missing all six.
-const PRETOOLUSE_NON_BASH_NON_AGENT_ONLY: [&str; 6] = [
-    "current_work_guard_read",
-    "pre_read_skeleton",
+/// Unported registry gates: edit authorization and graph mark/wait.
+const PRETOOLUSE_MISSING: [&str; 4] = [
     "crg_gate_verify",
     "current_work_guard_edit",
     "crg_gate_mark",
@@ -109,8 +79,20 @@ pub fn coverage(event: &str, tool_matcher: &str) -> Coverage {
             "Agent" => Coverage::Full {
                 native: AGENT_PRETOOLUSE_HOOK_NAMES.to_vec(),
             },
+            "Read" => Coverage::Full {
+                native: READ_PRETOOLUSE_HOOK_NAMES.to_vec(),
+            },
+            name if name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"_-".contains(&byte))
+                && generic_pretooluse_tool(name) =>
+            {
+                Coverage::Full {
+                    native: AGENT_PRETOOLUSE_HOOK_NAMES.to_vec(),
+                }
+            }
             _ => Coverage::Partial {
-                missing: PRETOOLUSE_NON_BASH_NON_AGENT_ONLY.to_vec(),
+                missing: PRETOOLUSE_MISSING.to_vec(),
             },
         },
         "PostToolUse" => Coverage::Full {
@@ -126,13 +108,11 @@ pub fn coverage(event: &str, tool_matcher: &str) -> Coverage {
     }
 }
 
-/// The tool matcher each `PRETOOLUSE_NON_BASH_NON_AGENT_ONLY` name's own
-/// `HookSpec` carries in `registry.py`'s `HOOKS` tuple: `Read` for the two
-/// read guards, `Edit|Write|NotebookEdit` for the two edit guards, the
+/// The tool matcher each `PRETOOLUSE_MISSING` name's own
+/// `HookSpec` carries in `registry.py`'s `HOOKS` tuple:
+/// `Edit|Write|NotebookEdit` for the two edit guards, the
 /// graph-tool alternation for the two graph-wait/mark hooks.
-const PRETOOLUSE_MISSING_MATCHERS: [(&str, &str); 6] = [
-    ("current_work_guard_read", "Read"),
-    ("pre_read_skeleton", "Read"),
+const PRETOOLUSE_MISSING_MATCHERS: [(&str, &str); 4] = [
     ("crg_gate_verify", "Edit|Write|NotebookEdit"),
     ("current_work_guard_edit", "Edit|Write|NotebookEdit"),
     ("crg_gate_mark", "mcp__code[-_]review[-_]graph__.*"),
@@ -143,7 +123,7 @@ const PRETOOLUSE_MISSING_MATCHERS: [(&str, &str); 6] = [
 /// `None` when nothing is missing (`coverage(event, ".*")` is `Full`, e.g.
 /// `PostToolUse`, or the event's missing names carry no matcher of their
 /// own, e.g. `SessionStart`/`SessionEnd`). For `PreToolUse` today:
-/// `Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*` -- exactly
+/// `Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*` -- exactly
 /// what `--takeover` narrows a `".*"` Python entry down to instead of
 /// leaving it wide open.
 pub fn residual_python_matcher(event: &str) -> Option<String> {
@@ -190,7 +170,7 @@ mod tests {
             residual_python_matcher("PreToolUse").expect("PreToolUse still has missing tools");
         assert_eq!(
             residual,
-            "Read|Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*"
+            "Edit|Write|NotebookEdit|mcp__code[-_]review[-_]graph__.*"
         );
     }
 
@@ -214,12 +194,53 @@ mod tests {
         let Coverage::Partial { missing } = coverage("PreToolUse", ".*") else {
             panic!("expected Partial for the real host matcher shape");
         };
-        assert!(missing.contains(&"current_work_guard_read"));
+        assert!(!missing.contains(&"current_work_guard_read"));
+        assert!(!missing.contains(&"pre_read_skeleton"));
         assert!(missing.contains(&"crg_gate_verify"));
         assert!(missing.contains(&"crg_gate_mark"));
         // Never claim Bash/Agent's own native names are missing.
         for name in BASH_PRETOOLUSE_HOOK_NAMES {
             assert!(!missing.contains(&name));
+        }
+    }
+
+    #[test]
+    fn pretooluse_read_and_literal_generic_matchers_are_full() {
+        assert_eq!(
+            coverage("PreToolUse", "Read"),
+            Coverage::Full {
+                native: READ_PRETOOLUSE_HOOK_NAMES.to_vec(),
+            }
+        );
+        for name in ["Grep", "Glob", "WebFetch", "mcp__other__lookup"] {
+            assert_eq!(
+                coverage("PreToolUse", name),
+                Coverage::Full {
+                    native: AGENT_PRETOOLUSE_HOOK_NAMES.to_vec(),
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn arbitrary_matchers_and_specialized_gates_remain_partial() {
+        for matcher in [
+            "",
+            ".*",
+            "Read|Edit",
+            "G.*",
+            "Edit",
+            "Write",
+            "NotebookEdit",
+            "mcp__code-review-graph__query",
+            "mcp__code-review_graph__query",
+            "mcp__code_review-graph__query",
+            "mcp__code_review_graph__query",
+        ] {
+            assert!(
+                matches!(coverage("PreToolUse", matcher), Coverage::Partial { .. }),
+                "{matcher}"
+            );
         }
     }
 

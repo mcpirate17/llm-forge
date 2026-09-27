@@ -17,7 +17,11 @@
 //!   verdict Python's own `merge()` would produce across all four
 //!   Bash-matching `HookSpec`s, forge prints it to stdout itself, and the
 //!   Python dispatcher never starts for this call.
-//! * **Partially native or non-Bash**: the Python child still always runs,
+//! * **Read**: the refresh report, protected-file guard and whole-file read
+//!   guard all run natively when their three names are enabled. Generic tools
+//!   such as Grep/Glob need only the refresh report. Edit and graph tools
+//!   retain their Python gates.
+//! * **Partial coverage**: the Python child still runs,
 //!   but is told via two env vars -- `FORGE_NATIVE_HOOKS` (which hook names
 //!   forge already answered) and `FORGE_NATIVE_ANSWERS` (their precomputed
 //!   JSON verdicts) -- to splice those answers back in at their normal
@@ -121,14 +125,15 @@ fn run_hook_standalone(event: &str) -> Result<u8> {
 /// for a fully-opted-in call -- Bash is the hottest tool and this is now the
 /// only place its guard denials come from under standalone, so there is no
 /// Python fallback to check `bash_pretooluse_fully_native` against first;
-/// an `Agent` call gets forge's routing verdict alone (`route::
+/// a `Read` call gets the complete native Read guard set; an `Agent`
+/// call gets forge's routing verdict alone (`route::
 /// hook_outcome_for_agent`, run through `merge::merge` on its own so a
 /// malformed embedded policy still fails closed the same way the merged,
 /// non-standalone path does); every other parsed `tool_name` (Grep, Glob,
 /// WebFetch, TodoWrite, Task, ...) still gets `crg_refresh_report_pre`
 /// alone (`handlers::run_generic_pretooluse_fully_native`) -- that hook's
 /// own matcher is `.*`, so Python ran it for every tool before `--takeover`
-/// narrowed the host's Python `PreToolUse` entry down to a five-tool
+/// narrowed the host's Python `PreToolUse` entry down to the edit/graph
 /// residual, and without this branch a staged refresh-failure report would
 /// go silently unreported for everything outside that residual plus Bash.
 fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
@@ -162,14 +167,7 @@ fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
         let native_hooks = handlers::native_hook_names_from_env();
         let answer = handlers::run_bash_pretooluse_fully_native(payload, &native_hooks);
         telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
-        let mut stdout = std::io::stdout();
-        stdout
-            .write_all(answer.to_string().as_bytes())
-            .context("failed to write the standalone hook verdict to stdout")?;
-        stdout
-            .write_all(b"\n")
-            .context("failed to write the standalone hook verdict to stdout")?;
-        return Ok(0);
+        return print_native_answer(&answer);
     }
     if tool_name == Some("Agent") {
         let payload = parsed.as_ref().expect("tool_name implies parsed payload");
@@ -178,26 +176,22 @@ fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
             &[crate::route::hook_outcome_for_agent(payload)],
         );
         telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
-        let mut stdout = std::io::stdout();
-        stdout
-            .write_all(answer.to_string().as_bytes())
-            .context("failed to write the standalone hook verdict to stdout")?;
-        stdout
-            .write_all(b"\n")
-            .context("failed to write the standalone hook verdict to stdout")?;
-        return Ok(0);
+        return print_native_answer(&answer);
+    }
+    if let Some(payload) = parsed
+        .as_ref()
+        .filter(|payload| handlers::is_read_payload(payload))
+    {
+        // Like standalone Bash, takeover owns the complete native gate set:
+        // there is no remaining Python Read entry to supply missing guards.
+        let answer = handlers::run_read_pretooluse_fully_native(payload);
+        telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+        return print_native_answer(&answer);
     }
     if let Some(payload) = parsed.as_ref() {
         let answer = handlers::run_generic_pretooluse_fully_native(payload);
         telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
-        let mut stdout = std::io::stdout();
-        stdout
-            .write_all(answer.to_string().as_bytes())
-            .context("failed to write the standalone hook verdict to stdout")?;
-        stdout
-            .write_all(b"\n")
-            .context("failed to write the standalone hook verdict to stdout")?;
-        return Ok(0);
+        return print_native_answer(&answer);
     }
 
     telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
@@ -247,63 +241,58 @@ fn run_pre_tool_use(event: &str) -> Result<u8> {
         }
     }
 
-    let tool_name = parsed
+    let start = Instant::now();
+    if let Some(answer) = parsed
         .as_ref()
-        .and_then(|payload| payload.get("tool_name"))
-        .and_then(Value::as_str);
-    let is_bash = tool_name == Some("Bash");
-    let is_agent = tool_name == Some("Agent");
-
-    if is_bash && handlers::bash_pretooluse_fully_native(&native_hooks) {
-        let payload = parsed.as_ref().expect("is_bash implies parsed payload");
-        let start = Instant::now();
-        let answer = handlers::run_bash_pretooluse_fully_native(payload, &native_hooks);
-        let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
-        telemetry::record_native(event, elapsed_ms);
-
-        let mut stdout = std::io::stdout();
-        stdout
-            .write_all(answer.to_string().as_bytes())
-            .context("failed to write the native hook verdict to stdout")?;
-        stdout
-            .write_all(b"\n")
-            .context("failed to write the native hook verdict to stdout")?;
-        return Ok(0);
-    }
-
-    // `Agent` `PreToolUse`: the routing policy (`docs/roadmap.md` Phase 3
-    // step 2) decides the dispatch's tier natively. `crg_refresh_report_pre`
-    // (matcher `.*`) is the only Python-registered `HookSpec` that also
-    // matches `Agent`; once it is opted in, forge has full native coverage
-    // for the call and never starts Python, exactly like the Bash fast path
-    // above. Short of that (the `FORGE_NATIVE_HOOKS` escape hatch), routing
-    // is silently skipped here and the call delegates to Python unchanged --
-    // same behaviour as an opted-out Bash call.
-    if is_agent && handlers::agent_pretooluse_fully_native(&native_hooks) {
-        let payload = parsed.as_ref().expect("is_agent implies parsed payload");
-        let start = Instant::now();
-        let answer = handlers::run_agent_pretooluse_fully_native(payload);
-        let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
-        telemetry::record_native(event, elapsed_ms);
-
-        let mut stdout = std::io::stdout();
-        stdout
-            .write_all(answer.to_string().as_bytes())
-            .context("failed to write the native hook verdict to stdout")?;
-        stdout
-            .write_all(b"\n")
-            .context("failed to write the native hook verdict to stdout")?;
-        return Ok(0);
+        .and_then(|payload| native_pretool_answer(payload, &native_hooks))
+    {
+        telemetry::record_native(event, start.elapsed().as_secs_f64() * 1000.0);
+        return print_native_answer(&answer);
     }
 
     let native_answers = parsed
         .as_ref()
-        .filter(|_| is_bash)
-        .map(|payload| handlers::native_answers_for_bash(payload, &native_hooks))
+        .map(|payload| {
+            if handlers::is_read_payload(payload) {
+                handlers::native_answers_for_read(payload, &native_hooks)
+            } else {
+                handlers::native_answers_for_bash(payload, &native_hooks)
+            }
+        })
         .unwrap_or_default();
 
     let extra_env = env_for_answers(&native_answers)?;
     delegate(event, Some(input.as_bytes()), &extra_env)
+}
+
+/// Only complete matching-hook coverage can bypass the dispatcher. Unknown
+/// input shapes and the edit/graph families continue through delegation.
+fn native_pretool_answer(
+    payload: &Value,
+    native_hooks: &std::collections::HashSet<String>,
+) -> Option<Value> {
+    if handlers::is_read_payload(payload) && handlers::read_pretooluse_fully_native(native_hooks) {
+        return Some(handlers::run_read_pretooluse_fully_native(payload));
+    }
+    let tool_name = payload.get("tool_name").and_then(Value::as_str)?;
+    match tool_name {
+        "Bash" if handlers::bash_pretooluse_fully_native(native_hooks) => Some(
+            handlers::run_bash_pretooluse_fully_native(payload, native_hooks),
+        ),
+        "Agent" if handlers::agent_pretooluse_fully_native(native_hooks) => {
+            Some(handlers::run_agent_pretooluse_fully_native(payload))
+        }
+        name if handlers::generic_pretooluse_fully_native(name, native_hooks) => {
+            Some(handlers::run_generic_pretooluse_fully_native(payload))
+        }
+        _ => None,
+    }
+}
+
+fn print_native_answer(answer: &Value) -> Result<u8> {
+    let mut stdout = std::io::stdout();
+    writeln!(stdout, "{answer}").context("failed to write the native hook verdict to stdout")?;
+    Ok(0)
 }
 
 /// Prints one `cap_enforce` verdict as the hook's whole stdout answer and

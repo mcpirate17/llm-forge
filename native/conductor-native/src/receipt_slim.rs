@@ -24,6 +24,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde_json::{json, Map, Value};
 
@@ -335,6 +336,7 @@ fn base64_decode(text: &str) -> Result<Vec<u8>, String> {
         .map_err(|error| error.to_string())
 }
 
+#[cfg(feature = "python")]
 fn json_round_trip(
     py: Python<'_>,
     payload_json: &str,
@@ -349,16 +351,19 @@ fn json_round_trip(
         .map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn receipt_slim_detail_native(py: Python<'_>, receipt_json: &str) -> PyResult<String> {
     json_round_trip(py, receipt_json, |receipt| Ok(slim_receipt(receipt)))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn receipt_expand_detail_native(py: Python<'_>, receipt_json: &str) -> PyResult<String> {
     json_round_trip(py, receipt_json, expand_receipt)
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn receipt_compact_directory_native(
     py: Python<'_>,
@@ -379,6 +384,7 @@ fn receipt_compact_directory_native(
     }
 }
 
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(receipt_slim_detail_native, module)?)?;
     module.add_function(wrap_pyfunction!(receipt_expand_detail_native, module)?)?;
@@ -539,7 +545,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "python"))]
 mod evidence_gate_tests {
     //! The evidence gate meets slim receipts on disk. These tests drive the real
     //! validation rule (`receipt_errors`, not just the decoder above) through
