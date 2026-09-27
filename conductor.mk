@@ -382,9 +382,9 @@ notebooklm-research-bundle:  ## Build a research-focused NotebookLM upload bundl
 	$(PYTHON) -m conductor.notebooklm_bundle --out "$(CONDUCTOR_HOST_ROOT)/$(NOTEBOOKLM_RESEARCH_OUT)"
 
 # ── Native crates: per-crate cargo test ──────────────────────────────────
-# `native` (in Makefile) rebuilds and installs both crates via `uv sync
-# --reinstall-package`; these run each crate's own Rust test suite without
-# touching the installed extension.
+# In Forge's own Makefile, `install` syncs all three native runtimes and compiles
+# the test targets; `native` forces their reinstall. These per-crate targets
+# remain available to a host including conductor.mk.
 
 test-conductor-native:  ## cargo test the conductor-native crate
 	cd "$(CONDUCTOR_HOST_ROOT)/native/conductor-native" && cargo test
@@ -395,11 +395,9 @@ test-slop-core:  ## cargo test the slop-core crate
 test-forge:  ## cargo test the forge crate (native hook launcher, step 1 of the Rust hook port)
 	cd "$(CONDUCTOR_HOST_ROOT)/native/forge" && cargo test
 
-# Installs to .tools/bin/forge, where project_init.resolve_forge_binary looks for
-# it: the next `conductor init`/`conductor.bootstrap` run then wires
-# .claude/settings.json hooks to `forge hook <Event>` instead of the Python
-# launcher script. No hook logic is native yet (step 1 of the port) -- forge just
-# delegates whole to the same Python dispatcher, so this is safe to build early.
-forge-build:  ## Build forge and install it to .tools/bin
+# Standalone host install into .tools/bin; Forge developers use `make install`
+# for the uv-managed .venv/bin/forge and complete precompiled test targets.
+forge-build:  ## Build forge and install it to .tools/bin for a host project
 	cd "$(CONDUCTOR_HOST_ROOT)/native/forge" && \
-		cargo install --path . --root "$(CONDUCTOR_HOST_ROOT)/.tools" --force
+		CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 cargo install --path . --locked \
+			--jobs 2 --root "$(CONDUCTOR_HOST_ROOT)/.tools" --force

@@ -30,6 +30,7 @@ mod dead_tests;
 mod duplicate_bodies;
 #[cfg(feature = "python")]
 mod fleet_status;
+pub mod forge_binary;
 #[cfg(feature = "python")]
 mod git_source;
 pub mod graph_context;
@@ -95,6 +96,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     dead_tests::register(module)?;
     duplicate_bodies::register(module)?;
     fleet_status::register(module)?;
+    forge_binary::register(module)?;
     graph_context::register(module)?;
     guardrail_ast::register(module)?;
     guardrail_duplicates::register(module)?;

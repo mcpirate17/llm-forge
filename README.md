@@ -42,14 +42,16 @@ To use the current checkout, including changes that have not been published:
 ```sh
 cd /path/to/llm-forge
 uv venv .venv --python 3.12
-uv sync --extra test --extra mutation --extra graph
+make install INSTALL_SYNC_ARGS='--extra mutation --extra graph'
 .venv/bin/python -m pytest src/conductor -q
-make forge-build
-export PATH="$PWD/.tools/bin:$PATH"
+export PATH="$PWD/.venv/bin:$PATH"
 ```
 
-`uv sync` installs the checkout's Python package in editable mode; `make forge-build`
-builds the same checkout's native executable locally. The provider selection,
+`make install` installs the checkout's Python package in editable mode, compiles
+`conductor_native`, `slop_core`, and `forge` into the environment, then prebuilds
+the Rust test executables and reusable test fixtures. Plain `uv sync` installs
+the three runtime artifacts. Install needs Rust and SQLite development headers;
+installed commands do not need a compiler. The provider selection,
 explicit native interpreter binding, coordination, and delivery changes described
 below require this current source build until a reviewed revision containing them
 is published.
@@ -66,10 +68,12 @@ conductor-native = { git = "https://github.com/mcpirate17/llm-forge", rev = "d2d
 slop-core = { git = "https://github.com/mcpirate17/llm-forge", rev = "d2d83d671977e464effcb44f52dcf470089f655f", subdirectory = "native/slop-core" }
 ```
 
-Declare all three packages in the host's dependencies so these source pins apply.
+Declare all three packages in the host's dependencies so these historical source
+pins apply.
 Select `conductor-tooling[graph,mutation]` for graph retrieval and Python mutation
 campaigns; `test` adds the platform's pytest tools. Native packages build from source
-and require a Rust toolchain. The `forge` executable is installed separately with
+and require a Rust toolchain. This older pinned revision predates the Forge CLI
+wheel, so its `forge` executable is installed separately with
 `make forge-build` in this checkout, or `cargo install --git
 https://github.com/mcpirate17/llm-forge --rev d2d83d671977e464effcb44f52dcf470089f655f
 --locked --root .tools forge`. Add the resulting `.tools/bin` to PATH. Keep all
@@ -125,13 +129,15 @@ To use the current local source, replace the published-snapshot source entries w
 conductor-tooling = { path = "/path/to/llm-forge", editable = true }
 conductor-native = { path = "/path/to/llm-forge/native/conductor-native" }
 slop-core = { path = "/path/to/llm-forge/native/slop-core" }
+forge-cli = { path = "/path/to/llm-forge/native/forge" }
 ```
 
-With all three dependencies declared as above, run `uv sync` from the host, then
-build its matching executable with `cargo install --path
-/path/to/llm-forge/native/forge --locked --root /path/to/host-project/.tools`.
+With `conductor-tooling`, `conductor-native`, `slop-core`, and `forge-cli`
+declared as dependencies, `uv sync` from the host compiles and installs all
+three native runtimes. The CLI lands in the host venv's `bin/forge`.
 Rebuild the native packages after Rust changes with `uv sync --reinstall-package
-conductor-native --reinstall-package slop-core`. The Git pins above remain an
+conductor-native --reinstall-package slop-core --reinstall-package forge-cli`.
+The Git pins above remain an
 alternative for the older published snapshot; advance them together only after the
 desired changes have been reviewed and published.
 

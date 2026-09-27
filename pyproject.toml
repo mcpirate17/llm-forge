@@ -14,6 +14,7 @@ dependencies = [
   "a2a-sdk[http-server]>=1.1.2",
   "conductor-native",
   "slop-core",
+  "forge-cli",
   "coverage>=7.0",
   "defusedxml>=0.7.1",
   # conductor/mutation_engine_fest.py shells out to the `fest` binary this wheel
@@ -60,7 +61,7 @@ test = ["pytest>=8.0", "pytest-timeout>=2.3"]
 mutation = ["pytest-cov>=5.0"]
 # The code-review-graph MCP server that `conductor init` wires into .mcp.json.
 graph = ["code-review-graph==2.3.8"]
-# Both Rust crates live under native/ and are path sources below. slop-core (the
+# The three native crates live under native/ and are path sources below. slop-core (the
 # ablation engine and test index behind the equivalence probe) is reached only through
 # conductor/_native.py, which decides its absence once at import time.
 
@@ -83,6 +84,7 @@ packages = ["src/conductor", "src/tooling"]
 [tool.uv.sources]
 conductor-native = { path = "native/conductor-native" }
 slop-core = { path = "native/slop-core" }
+forge-cli = { path = "native/forge" }
 
 # Three Rust sources are runner components: `mutation_testing.py` hashes them into
 # every receipt's `runner_components_sha256`, which is what binds a receipt to the code

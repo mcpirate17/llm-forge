@@ -46,19 +46,27 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libsqlite3-dev pkg-config
-      - run: uv sync --extra test
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: native/forge
-      - name: Build native CLI for legacy compatibility entrypoints
+          workspaces: |
+            native/conductor-native
+            native/slop-core
+            native/forge
+      - name: Install native runtimes and precompile developer tests
         env:
-          PYO3_NO_PYTHON: "1"
           CARGO_BUILD_JOBS: "2"
+        run: make install
+      - name: Verify installed native runtimes without a runtime compiler
+        env:
+          CARGO_BUILD_JOBS: "2"
+          FORGE_INSTALL_SMOKE_VENV: ${{ github.workspace }}/.venv
+          PYO3_NO_PYTHON: "1"
         run: |
-          cargo build --locked --manifest-path native/forge/Cargo.toml
-          echo "FORGE_BIN=$GITHUB_WORKSPACE/native/forge/target/debug/forge" >> "$GITHUB_ENV"
-          echo "$GITHUB_WORKSPACE/native/forge/target/debug" >> "$GITHUB_PATH"
+          cargo test --locked --jobs 2 --manifest-path native/forge/Cargo.toml \
+            --test install_packaging -- --ignored --test-threads=1
+          echo "FORGE_BIN=$GITHUB_WORKSPACE/.venv/bin/forge" >> "$GITHUB_ENV"
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - run: uv run python -m pytest src/conductor -q -p no:cacheprovider --timeout 600
       - name: Legacy hook compatibility seams
         run: uv run python -m pytest src/tooling/hooks -q -p no:cacheprovider --timeout 120
@@ -156,7 +164,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libsqlite3-dev pkg-config
-      - run: uv sync --extra test
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Python package and all three native runtimes
+        env:
+          CARGO_BUILD_JOBS: "2"
+          UV_CONCURRENT_BUILDS: "1"
+        run: uv sync --frozen --extra test
       - name: Repo-wide receipt decode canary
         run: uv run python -m conductor.mutation_coverage canary
       # Third question: is the retention sweep still runnable? It crashed on

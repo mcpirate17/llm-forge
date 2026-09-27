@@ -18,3 +18,12 @@ module-name = "slop_core"
 # Without this the wheel links libpython, which is right for `cargo test` and wrong
 # for anything installed.
 features = ["extension-module"]
+
+[tool.uv]
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "Cargo.toml" },
+  { file = "Cargo.lock" },
+  { file = "build.rs" },
+  { file = "src/**/*" },
+]

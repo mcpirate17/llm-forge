@@ -52,27 +52,70 @@ BASELINE_EXPIRES ?= $(shell $(UV) run python -c \
   'import tomllib; from conductor.project_paths import project_paths; \
    print(tomllib.loads(project_paths(".").policy_path.read_text(encoding="utf-8"))["baseline_expires"])')
 
-.PHONY: test native gate candidate-review \
+.PHONY: install test native gate candidate-review \
 	mutation-plan mutation-generate mutation-engine-run mutation-evidence \
 	mutation-canary mutation-coverage baselines baseline-jscpd baseline-pmd \
 	baseline-complexity baseline-vulture help
 
+INSTALL_REINSTALL ?=
+INSTALL_SYNC_ARGS ?=
+
+install:  ## Sync the developer venv and precompile all native test targets
+	@set -eu; \
+	export CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 UV_CONCURRENT_BUILDS=1; \
+	$(UV) sync --frozen --extra test $(INSTALL_SYNC_ARGS) $(INSTALL_REINSTALL); \
+	unset PYO3_CONFIG_FILE PYO3_NO_PYTHON; \
+	venv=$${UV_PROJECT_ENVIRONMENT:-$(CURDIR)/.venv}; \
+	case "$$venv" in /*) ;; *) venv="$(CURDIR)/$$venv" ;; esac; \
+	test -x "$$venv/bin/python"; \
+	test -x "$$venv/bin/forge"; \
+	export PYO3_PYTHON="$$venv/bin/python" FORGE_BIN="$$venv/bin/forge"; \
+	cargo test --manifest-path native/conductor-native/Cargo.toml \
+		--locked --jobs 2 --all-targets --features python-compat-tests --no-run; \
+	cargo build --manifest-path native/conductor-native/Cargo.toml \
+		--locked --jobs 2 --bins --features python-compat-tests; \
+	cargo test --manifest-path native/slop-core/Cargo.toml \
+		--locked --jobs 2 --all-targets --no-run; \
+	cargo test --manifest-path native/forge/Cargo.toml \
+		--locked --jobs 2 --all-targets --no-run; \
+	target_dir=$${CARGO_TARGET_DIR:-native/forge/target}; \
+	if [ -n "$${CARGO_BUILD_TARGET:-}" ]; then target_dir="$$target_dir/$$CARGO_BUILD_TARGET"; fi; \
+	fixture_dir="$$target_dir/debug/prebuilt-fixtures"; \
+	mkdir -p "$$fixture_dir"; \
+	rm -f "$$fixture_dir/task_worker.sha256"; \
+	sha256sum native/forge/tests/support/task_worker.rs \
+		> "$$fixture_dir/task_worker.inputs"; \
+	rustc --edition=2021 --crate-name=forge_task_test_worker \
+		-C codegen-units=1 -C debuginfo=0 \
+		native/forge/tests/support/task_worker.rs \
+		-o "$$fixture_dir/task-worker"; \
+	sha256sum -c "$$fixture_dir/task_worker.inputs"; \
+	sha256sum "$$fixture_dir/task-worker" >> "$$fixture_dir/task_worker.inputs"; \
+	awk '{print $$1}' "$$fixture_dir/task_worker.inputs" \
+		> "$$fixture_dir/task_worker.sha256.tmp"; \
+	mv "$$fixture_dir/task_worker.sha256.tmp" "$$fixture_dir/task_worker.sha256"; \
+	rm -f "$$fixture_dir/stub_dispatch.sha256"; \
+	sha256sum native/forge/tests/fixtures/stub_dispatch/Cargo.toml \
+		native/forge/tests/fixtures/stub_dispatch/Cargo.lock \
+		native/forge/tests/fixtures/stub_dispatch/src/main.rs \
+		> "$$fixture_dir/stub_dispatch.inputs"; \
+	cargo build --manifest-path native/forge/tests/fixtures/stub_dispatch/Cargo.toml \
+		--locked --jobs 2 --target-dir "$$fixture_dir/stub-dispatch-target"; \
+	stub_profile=$${CARGO_BUILD_TARGET:+$$CARGO_BUILD_TARGET/}debug; \
+	sha256sum -c "$$fixture_dir/stub_dispatch.inputs"; \
+	sha256sum \
+		"$$fixture_dir/stub-dispatch-target/$$stub_profile/forge-test-stub-dispatch" \
+		>> "$$fixture_dir/stub_dispatch.inputs"; \
+	awk '{print $$1}' "$$fixture_dir/stub_dispatch.inputs" \
+		> "$$fixture_dir/stub_dispatch.sha256.tmp"; \
+	mv "$$fixture_dir/stub_dispatch.sha256.tmp" "$$fixture_dir/stub_dispatch.sha256"
+
 test:  ## Run the conductor test suite
-	@# --timeout needs pytest-timeout, which nothing in pyproject declares yet, so
-	@# this target fails loud with "unrecognized arguments: --timeout 600" until the
-	@# test extra carries it. Deliberate: a suite with no per-test timeout is how a
-	@# hung test becomes a hung CI job. PYTEST_TIMEOUT= disables the flag if you
-	@# need the suite before the dependency lands.
 	$(UV) run python -m pytest $(PYTEST_TARGET) \
 		$(if $(PYTEST_TIMEOUT),--timeout $(PYTEST_TIMEOUT)) $(PYTEST_ARGS)
 
-native:  ## Rebuild both Rust crates and install them into the venv
-	@# Both crates are path sources in [tool.uv.sources]; `uv sync --reinstall-package`
-	@# is what actually rebuilds them. A plain `uv sync` keeps the cached wheel and
-	@# silently tests yesterday's Rust.
-	$(UV) sync --extra test \
-		--reinstall-package conductor-native \
-		--reinstall-package slop-core
+native:  ## Force-rebuild all three native runtimes, then precompile test targets
+	$(MAKE) install INSTALL_REINSTALL='--reinstall-package forge-cli --reinstall-package conductor-native --reinstall-package slop-core'
 
 gate:  ## The governance gate: config self-check plus the CI-identical review
 	$(UV) run python -m conductor.gate \

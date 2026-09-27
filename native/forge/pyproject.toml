@@ -1,0 +1,33 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "forge-cli"
+dynamic = ["version"]
+description = "Native Forge command-line runtime for conductor tooling"
+requires-python = ">=3.12"
+
+[tool.maturin]
+# The Cargo `forge` binary is installed into the environment's scripts directory.
+# Keep module-name absent: this is a CLI wheel, not a Python extension module.
+bindings = "bin"
+targets = [{ name = "forge", kind = "bin" }]
+locked = true
+
+[tool.uv]
+# uv's default local-directory key only watches pyproject.toml. Native source
+# edits and the shared conductor core must invalidate this binary wheel too.
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "Cargo.toml" },
+  { file = "Cargo.lock" },
+  { file = "build.rs" },
+  { file = "src/**/*" },
+  { file = "../../ledger/routing_policy.toml" },
+  { file = "tests/fixtures/ledger/calibration.json" },
+  { file = "../conductor-native/Cargo.toml" },
+  { file = "../conductor-native/Cargo.lock" },
+  { file = "../conductor-native/src/**/*" },
+  { git = { commit = true } },
+]
