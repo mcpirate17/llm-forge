@@ -7,7 +7,9 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
@@ -75,6 +77,7 @@ struct Row {
     read_at: Option<String>,
 }
 
+#[cfg(feature = "python")]
 fn parse_json(source: &str) -> Result<Value, String> {
     serde_json::from_str(source).map_err(|error| format!("invalid native JSON input: {error}"))
 }
@@ -341,6 +344,12 @@ fn coordination_value(coordination: &Coordination) -> Value {
     })
 }
 
+/// Validate the transport's coordination-v2 shape through the same pure core
+/// used by the Python extension. Native senders call this before any writes.
+pub fn validate_coordination_v2_value(value: &Value) -> Result<Value, String> {
+    validate_coordination(value).map(|coordination| coordination_value(&coordination))
+}
+
 fn data_kind(data: Option<&Value>) -> Result<Option<String>, String> {
     let Some(kind) = data
         .and_then(Value::as_object)
@@ -368,7 +377,7 @@ fn legacy_thread_id(direction: &str, message_id: &str) -> String {
     format!("legacy-{}", &sha256(identity.as_bytes())[..24])
 }
 
-fn compact_message_value(value: &Value) -> Result<Value, String> {
+pub fn compact_message_value(value: &Value) -> Result<Value, String> {
     let row = validated_row(value)?;
     let (data, data_json_valid) = match row.data_json.as_deref() {
         None => (None, true),
@@ -650,7 +659,9 @@ fn thread_digest(
     }))
 }
 
-fn compact_threads_value(value: &Value) -> Result<Value, String> {
+/// Compact bounded A2A thread receipts with the same pure algorithm exported
+/// through the Python extension when that feature is enabled.
+pub fn compact_threads_value(value: &Value) -> Result<Value, String> {
     let request = value
         .as_object()
         .ok_or_else(|| "native compaction request must be a JSON object".to_owned())?;
@@ -704,6 +715,7 @@ fn compact_threads_value(value: &Value) -> Result<Value, String> {
     Ok(result)
 }
 
+#[cfg(feature = "python")]
 fn run_native(
     py: Python<'_>,
     source: &str,
@@ -718,23 +730,25 @@ fn run_native(
     })
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn a2a_validate_coordination_v2_native(py: Python<'_>, source: &str) -> PyResult<String> {
-    run_native(py, source, |value| {
-        validate_coordination(value).map(|coordination| coordination_value(&coordination))
-    })
+    run_native(py, source, validate_coordination_v2_value)
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn a2a_compact_message_native(py: Python<'_>, source: &str) -> PyResult<String> {
     run_native(py, source, compact_message_value)
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn a2a_compact_threads_native(py: Python<'_>, source: &str) -> PyResult<String> {
     run_native(py, source, compact_threads_value)
 }
 
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(
         a2a_validate_coordination_v2_native,

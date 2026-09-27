@@ -7,6 +7,8 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use super::queue::PreparedMessage;
+
 const MAX_METADATA_BYTES: i64 = 4096;
 const MESSAGE_COLUMNS: &str = "message_id,direction,sender,recipient,body,data_json,created_at,received_at,delivery_status,status_reason,read_at";
 
@@ -139,6 +141,99 @@ impl Store {
             .prepare(&format!("SELECT {MESSAGE_COLUMNS} FROM messages LIMIT 0"))
             .context("invalid messages schema")?;
         Ok(())
+    }
+
+    /// Enqueue only into a transport-created, fully migrated store. No table is
+    /// created or altered by this path; the composite keys preserve dedup.
+    pub fn require_enqueue_schema(&self) -> Result<()> {
+        self.validate_messages()?;
+        for table in [
+            "delivery_events",
+            "message_state",
+            "retention_events",
+            "message_presentations",
+        ] {
+            ensure!(
+                table_exists(&self.connection, table)?,
+                "sender mailbox is not fully migrated: missing {table} table"
+            );
+        }
+        self.connection
+            .prepare(
+                "SELECT event_id,message_id,occurred_at,status,reason FROM delivery_events LIMIT 0",
+            )
+            .context("invalid delivery_events schema")?;
+        self.connection.prepare("SELECT direction,message_id,thread_id,summary,protocol_status,requires_response,retention_class,body_sha256,body_bytes,data_sha256,data_bytes FROM message_state LIMIT 0")
+            .context("invalid message_state schema")?;
+        let composite = vec!["direction".to_string(), "message_id".to_string()];
+        ensure!(
+            primary_key(&self.connection, "messages")? == composite,
+            "sender messages table lacks the transport composite key"
+        );
+        ensure!(
+            primary_key(&self.connection, "message_state")? == composite,
+            "sender message_state table lacks the transport composite key"
+        );
+        ensure!(
+            primary_key(&self.connection, "delivery_events")? == ["event_id".to_string()],
+            "sender delivery_events table lacks its transport key"
+        );
+        Ok(())
+    }
+
+    pub fn enqueue(&mut self, message: &PreparedMessage, reason: &str) -> Result<Value> {
+        self.connection.busy_timeout(Duration::from_secs(5))?;
+        self.connection.pragma_update(None, "foreign_keys", "ON")?;
+        let metadata = &message.metadata;
+        let thread = metadata["thread_id"]
+            .as_str()
+            .context("missing compacted thread_id")?;
+        let summary = metadata["summary"]
+            .as_str()
+            .context("missing compacted summary")?;
+        let status = metadata["status"].as_str().unwrap_or("open");
+        let response = metadata["actionable"]
+            .as_bool()
+            .context("missing compacted actionable state")?;
+        let response_int = i64::from(response);
+        let retention = if metadata["protocol"] == "coordination-v2" {
+            "operational"
+        } else {
+            "pinned"
+        };
+        let body_hash = metadata["body_sha256"]
+            .as_str()
+            .context("missing compacted body digest")?;
+        let body_bytes = metadata["raw_body_bytes"]
+            .as_i64()
+            .context("missing compacted body size")?;
+        let data_hash = metadata["data_sha256"].as_str();
+        let data_bytes = metadata["raw_data_bytes"]
+            .as_i64()
+            .context("missing compacted data size")?;
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute(
+            "INSERT INTO messages(message_id,direction,sender,recipient,body,data_json,created_at,received_at,delivery_status,status_reason,read_at) VALUES (?1,'outbound',?2,?3,?4,?5,?6,NULL,'queued',?7,NULL)",
+            params![message.id,message.sender,message.recipient,message.body,message.data_json,message.created_at,reason],
+        )?;
+        transaction.execute(
+            "INSERT INTO message_state(direction,message_id,thread_id,summary,protocol_status,requires_response,retention_class,body_sha256,body_bytes,data_sha256,data_bytes) VALUES ('outbound',?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+            params![message.id,thread,summary,status,response_int,retention,body_hash,body_bytes,data_hash,data_bytes],
+        )?;
+        transaction.execute("INSERT INTO delivery_events(message_id,occurred_at,status,reason) VALUES (?1,?2,'queued',?3)",
+            params![message.id,message.created_at,reason])?;
+        transaction.commit()?;
+        Ok(
+            json!({"schema_version":1,"authority":"a2a-delivery-receipt",
+            "message_id":message.id,"sender":message.sender,"recipient":message.recipient,
+            "created_at":message.created_at,"received_at":null,"delivery_status":"queued",
+            "status_reason":reason,"thread_id":thread,"summary":summary,
+            "protocol_status":status,"requires_response":response_int,
+            "body_sha256":body_hash,"body_bytes":body_bytes,
+            "data_sha256":data_hash,"data_bytes":data_bytes}),
+        )
     }
 
     pub fn previews(
@@ -346,6 +441,13 @@ fn table_exists(connection: &Connection, name: &str) -> Result<bool> {
         None => Ok(false),
         _ => bail!("expected SQLite table {name:?}"),
     }
+}
+
+fn primary_key(connection: &Connection, table: &str) -> Result<Vec<String>> {
+    let mut statement =
+        connection.prepare("SELECT name FROM pragma_table_info(?1) WHERE pk > 0 ORDER BY pk")?;
+    let names = statement.query_map([table], |row| row.get::<_, String>(0))?;
+    Ok(names.collect::<std::result::Result<Vec<_>, _>>()?)
 }
 
 fn preview_row(row: &rusqlite::Row<'_>, chars: usize) -> rusqlite::Result<Preview> {

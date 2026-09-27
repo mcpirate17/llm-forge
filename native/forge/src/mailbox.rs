@@ -1,5 +1,7 @@
 //! Native inspection and acknowledgment of existing local A2A mailboxes.
 
+#[path = "mailbox_queue.rs"]
+mod queue;
 #[path = "mailbox_store.rs"]
 mod store;
 #[path = "mailbox_view.rs"]
@@ -24,6 +26,8 @@ pub struct MailboxArgs {
 
 #[derive(Subcommand)]
 enum MailboxCommand {
+    /// Queue one outbound message durably for a later transport flush.
+    Enqueue(queue::EnqueueArgs),
     /// Read bounded inbox summaries without marking anything read or presented.
     Inbox(InboxArgs),
     /// Explicitly retrieve one complete message, refusing oversized content.
@@ -114,6 +118,9 @@ pub fn run(args: MailboxArgs) -> Result<u8> {
         .state_dir
         .unwrap_or_else(|| args.host.join(".agents/a2a"));
     match args.action {
+        MailboxCommand::Enqueue(args) => {
+            print_json(&queue::run(args, &state_dir)?)?;
+        }
         MailboxCommand::Inbox(args) => {
             ensure!(
                 (1..=8).contains(&args.max_messages),

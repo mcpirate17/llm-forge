@@ -31,7 +31,9 @@ receipt and shell parsing algorithms. The default `python` feature and
 `extension-module` feature preserve the existing package bindings. Native task and
 mailbox commands run directly in Rust; hook events with remaining legacy handlers
 still use their configured host dispatcher. See [mailbox operations](docs/messaging.md)
-and [resource-aware task execution](docs/coordination.md).
+and [resource-aware task execution](docs/coordination.md). For bounded code
+relationships and references extracted from a message, see
+[native graph context](docs/graph-context.md).
 
 ## Install
 
