@@ -76,6 +76,31 @@ tool versions, path manifests, AST ranges and raw Tokei JSON with every update.
 Do not pad implementations, move live code into excluded paths, or remove needed
 behavior to raise these percentages.
 
+## Latest verified commit
+
+Commit `e70f2d9a816d76131dbf92f14158c0ec2f5a13d0`, measured from a `git archive`
+with the same path classification and inline Rust test treatment:
+
+| Scope | Python code lines | Rust code lines | Shell code lines | Native / Rust share |
+| --- | ---: | ---: | ---: | ---: |
+| Production | 55,001 | 42,081 | 194 | **43.2594% native** |
+| Tests | 46,373 | 27,114 | 0 | **36.8963% Rust** |
+| All tracked source, including examples | 101,374 | 69,294 | 194 | 40.5555% native |
+
+Production Rust contains 54,546 raw code lines before removing 12,465 inline
+test lines. The AST splitter identified 91 test-only ranges in 76 production
+Rust files; the separate test-path manifest contributes another 14,649 Rust
+code lines. The all-source view includes 99 Rust code lines in
+`native/forge/examples/`, excluded from production and tests. Compared with the
+first cohort, the production share is up 0.0013 percentage points and the Rust
+test share is up 3.2666 points; both 50% milestones remain open.
+
+The [measurement evidence](native-metrics/e70f2d9-evidence.tar.gz) contains the
+NUL-delimited path manifests, Tokei 15.0.0 raw JSON, inline Rust AST ranges,
+original and masked inline-file counts, AST splitter source and lockfile, and
+tool hashes. Its SHA-256 is
+`f2ff08f2c0c51c8160c65f6a20f70d169d2be6689d45e1c7038b8cb0147b06e3`.
+
 ## Behavioral migration
 
 The Forge-owned graph query CLI reads the code-review-graph SQLite index. The
