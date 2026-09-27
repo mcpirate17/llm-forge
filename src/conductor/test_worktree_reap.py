@@ -231,7 +231,7 @@ def test_live_lease_keeps_an_idle_worktree(repo):
 
 
 def test_expired_lease_makes_a_dirty_unlanded_worktree_eligible(repo):
-    """Dirty and unproven no longer protect a tree: the archive does."""
+    """Dirty and unproven no longer protect a tree: lasting work belongs in its home first."""
     tree = _worktree(repo, "expired", "topic/expired")
     (tree / "work.txt").write_text("uncommitted\n")
     _git(tree, "add", "work.txt")
@@ -316,8 +316,13 @@ def test_idle_probe_ignores_the_hardlinked_venv(repo):
     assert worktree_reap.recent_change(tree, 6.0) is None
 
 
-def test_archive_preserves_patches_diff_status_and_moves_artifacts(repo, tmp_path):
-    tree = _worktree(repo, "archive-me", "topic/archive-me")
+def _files(root: Path) -> set[str]:
+    return {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()}
+
+
+def test_apply_keeps_nothing_but_the_moved_checkpoints(repo, tmp_path):
+    """No patches, diff, status or reports survive a reap -- only ``*.pt`` run data."""
+    tree = _worktree(repo, "reap-all", "topic/reap-all")
     (tree / "landed.txt").write_text("committed\n")
     _git(tree, "add", "landed.txt")
     _git(tree, "commit", "-m", "unlanded commit")
@@ -327,23 +332,52 @@ def test_archive_preserves_patches_diff_status_and_moves_artifacts(repo, tmp_pat
     reports.mkdir(parents=True)
     (reports / "run.json").write_text("{}\n")
     (tree / "model.pt").write_bytes(b"weights")
-    row = _state(_decide(repo), tree).worktree
-    record = worktree_reap.archive_worktree(
+    (tree / "runs" / "step").mkdir(parents=True)
+    (tree / "runs" / "step" / "ema.pt").write_bytes(b"ema")
+    (tree / ".venv").mkdir()
+    (tree / ".venv" / "cached.pt").write_bytes(b"venv-owned")
+    _age(tree, 48)
+    ckpt = tmp_path / "ckpt"
+    removed = worktree_reap.apply(
         repo,
-        row,
-        integration_ref="origin/master",
-        archive_root=tmp_path / "archive",
-        checkpoint_root=tmp_path / "ckpt",
+        _decide(repo, idle_hours=6.0),
+        checkpoint_root=ckpt,
+        delete_remote=False,
+        current=repo,
+        proc_root=_proc(repo.parent / "empty-proc"),
     )
-    dest = Path(str(record["archive"]))
-    assert list(dest.glob("0001-*.patch"))
-    assert "committed then edited" in (dest / "worktree.diff").read_text()
-    assert "untracked.txt" in (dest / "status.txt").read_text()
-    moved = [Path(p) for p in record["moved_artifacts"]]  # type: ignore[union-attr]
-    assert {p.name for p in moved} == {"run.json", "model.pt"}
-    assert all(p.exists() for p in moved)
-    assert not (tree / "model.pt").exists()
-    assert not (reports / "run.json").exists()
+    assert not tree.exists()
+    assert _files(ckpt) == {
+        "topic-reap-all/model.pt",
+        "topic-reap-all/runs/step/ema.pt",
+    }
+    assert (ckpt / "topic-reap-all" / "model.pt").read_bytes() == b"weights"
+    [record] = removed
+    assert set(record) == {
+        "worktree",
+        "branch",
+        "moved_checkpoints",
+        "branches_deleted",
+    }
+    assert sorted(Path(p).name for p in record["moved_checkpoints"]) == [
+        "ema.pt",
+        "model.pt",
+    ]  # type: ignore[union-attr]
+    assert "archived" not in record
+    assert not (tmp_path / "archive").exists()
+
+
+def test_move_checkpoints_never_overwrites_an_existing_target(tmp_path):
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    (tree / "model.pt").write_bytes(b"new")
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    (dest / "model.pt").write_bytes(b"old")
+    [moved] = worktree_reap.move_checkpoints(tree, dest)
+    assert (dest / "model.pt").read_bytes() == b"old"
+    assert Path(moved).read_bytes() == b"new"
+    assert Path(moved).name == f"model.pt.{os.getpid()}"
 
 
 def test_apply_force_removes_a_dirty_tree_and_deletes_the_branch(repo, tmp_path):
@@ -354,7 +388,6 @@ def test_apply_force_removes_a_dirty_tree_and_deletes_the_branch(repo, tmp_path)
     removed = worktree_reap.apply(
         repo,
         decisions,
-        archive_root=tmp_path / "archive",
         checkpoint_root=tmp_path / "ckpt",
         delete_remote=False,
         current=repo,
@@ -375,7 +408,6 @@ def test_apply_refuses_a_tree_that_became_active_after_the_decision(repo, tmp_pa
         worktree_reap.apply(
             repo,
             decisions,
-            archive_root=tmp_path / "archive",
             checkpoint_root=tmp_path / "ckpt",
             delete_remote=False,
             current=repo,
@@ -394,7 +426,6 @@ def test_apply_never_touches_an_ineligible_tree(repo, tmp_path):
     removed = worktree_reap.apply(
         repo,
         decisions,
-        archive_root=tmp_path / "archive",
         checkpoint_root=tmp_path / "ckpt",
         delete_remote=False,
         current=repo,
@@ -407,12 +438,7 @@ def test_apply_never_touches_an_ineligible_tree(repo, tmp_path):
 def test_second_apply_is_refused_while_one_holds_the_lock(repo, tmp_path, capsys):
     handle = worktree_reap._hold_lock(repo)
     assert handle is not None
-    roots = [
-        "--archive-root",
-        str(tmp_path / "archive"),
-        "--checkpoint-root",
-        str(tmp_path / "ckpt"),
-    ]
+    roots = ["--checkpoint-root", str(tmp_path / "ckpt")]
     try:
         assert worktree_reap.main(["--repo", str(repo), "--apply", *roots]) == 0
     finally:
@@ -420,25 +446,30 @@ def test_second_apply_is_refused_while_one_holds_the_lock(repo, tmp_path, capsys
     assert "another reap is running" in capsys.readouterr().err
 
 
-def test_apply_refuses_to_run_with_nowhere_to_archive(repo, monkeypatch, capsys):
+def test_apply_refuses_to_run_without_a_checkpoint_root(repo, monkeypatch, capsys):
     """The data volume's path is the machine's, not this module's -- so it must be given."""
-    monkeypatch.delenv(worktree_reap.ARCHIVE_ROOT_ENV, raising=False)
     monkeypatch.delenv(worktree_reap.CHECKPOINT_ROOT_ENV, raising=False)
     assert worktree_reap.main(["--repo", str(repo), "--apply"]) == 2
-    assert "needs somewhere to archive to" in capsys.readouterr().err
+    assert "needs somewhere to move stray checkpoints" in capsys.readouterr().err
 
 
-def test_apply_roots_come_from_the_environment(repo, tmp_path, monkeypatch):
-    monkeypatch.setenv(worktree_reap.ARCHIVE_ROOT_ENV, str(tmp_path / "archive"))
+def test_archive_root_is_no_longer_accepted(repo, tmp_path):
+    with pytest.raises(SystemExit) as exc:
+        worktree_reap.main(["--repo", str(repo), "--archive-root", str(tmp_path)])
+    assert exc.value.code == 2
+
+
+def test_apply_checkpoint_root_comes_from_the_environment(repo, tmp_path, monkeypatch):
     monkeypatch.setenv(worktree_reap.CHECKPOINT_ROOT_ENV, str(tmp_path / "ckpt"))
     tree = _worktree(repo, "env-roots", "topic/env-roots")
     (tree / "work.txt").write_text("unlanded\n")
     _git(tree, "add", "work.txt")
     _git(tree, "commit", "-m", "unlanded work")
+    (tree / "model.pt").write_bytes(b"weights")
     _age(tree, 48)
     assert worktree_reap.main(["--repo", str(repo), "--apply"]) == 0
     assert not tree.exists()
-    assert list((tmp_path / "archive" / "topic-env-roots").glob("0001-*.patch"))
+    assert _files(tmp_path / "ckpt") == {"topic-env-roots/model.pt"}
 
 
 def test_main_is_preview_by_default_and_reports_state(repo, capsys):

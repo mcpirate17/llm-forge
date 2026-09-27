@@ -1,4 +1,4 @@
-"""Archive-then-remove cleanup for linked Git worktrees.
+"""Remove-without-archive cleanup for linked Git worktrees.
 
 Tim's rule (2026-09-10): a worktree is a temporary sandbox for one run. It holds
 only the directories that run imports, never checkpoints, and it goes away when
@@ -15,7 +15,7 @@ reaper could not remove any of them:
   per tree, so *no* worktree was ever eligible. Nothing ran it automatically
   either, so the no-op was invisible.
 
-The policy here is the inverse, and it is safe because nothing is lost:
+The policy here is the inverse:
 
 **Blockers** (never removed): the primary checkout, the caller's own directory,
 a tree with a live process of this user cwd'd inside it, a Git-locked tree, and
@@ -26,15 +26,16 @@ its pushed branch is gone from the remote, or its HEAD is an ancestor of the
 integration line), the tree is idle (no live process and no file modified in
 ``--idle-hours``), its lease expired, or its registration is stale.
 
-**Archive before removal**: ``git format-patch <integration-ref>..<branch>``, the
-working-tree diff and ``git status --porcelain`` are written under
-``<archive root>/<slug>/``, and every ``research/reports`` entry and ``*.pt``
-checkpoint is *moved* to ``<checkpoint root>/<slug>/``. Only then does the tree
-get ``git worktree remove --force``. Both roots are configuration -- the data
-volume's path belongs to the machine, not to this module -- and ``--apply``
-refuses to run without them (``WORKTREE_ARCHIVE_ROOT`` /
-``WORKTREE_CHECKPOINT_ROOT``, or the Makefile's ``ARCHIVE_ROOT`` /
-``CHECKPOINT_ROOT``).
+**Nothing is archived** (Tim, 2026-09-26): whatever is meant to last is put in
+its permanent home by the agent before its run ends -- work committed and
+pushed, findings and reports committed, checkpoints written to the data volume.
+Everything left in the tree is deleted with ``git worktree remove --force``: no
+patches, no diff, no status capture, no recovery. The one exception is run data:
+stray ``*.pt`` checkpoints are *moved* to ``<checkpoint root>/<slug>/`` first,
+because a checkpoint is the output of hardware time, not code. The checkpoint
+root is configuration -- the data volume's path belongs to the machine, not to
+this module -- and ``--apply`` refuses to run without it
+(``--checkpoint-root`` or ``WORKTREE_CHECKPOINT_ROOT``).
 
 Other users' processes are skipped rather than treated as unknown: their
 ``cwd`` link is unreadable by design, so "unknown" was never recoverable and
@@ -60,7 +61,6 @@ from conductor.project_paths import host_root, integration_refs
 from conductor.worktree_lease import LeaseError, is_linked_worktree, read_lease
 
 DEFAULT_IDLE_HOURS = 6.0
-ARCHIVE_ROOT_ENV = "WORKTREE_ARCHIVE_ROOT"
 CHECKPOINT_ROOT_ENV = "WORKTREE_CHECKPOINT_ROOT"
 #: Never walked when probing for recent work: ``.venv`` is hardlinked from the
 #: primary checkout, so its mtimes belong to another tree and would make every
@@ -423,8 +423,10 @@ def default_integration_ref(repo: Path, *, allow_network: bool = True) -> str:
     if advertised.returncode == 0:
         for line in advertised.stdout.splitlines():
             parts = line.split()
-            if len(parts) >= 2 and parts[0] == "ref:" and parts[1].startswith(
-                "refs/heads/"
+            if (
+                len(parts) >= 2
+                and parts[0] == "ref:"
+                and parts[1].startswith("refs/heads/")
             ):
                 return f"origin/{parts[1].removeprefix('refs/heads/')}"
     raise ReapError(
@@ -478,25 +480,14 @@ def decide(
 
 
 def slug_for(row: Worktree) -> str:
-    """A filesystem-safe archive directory name for this worktree's branch."""
+    """A filesystem-safe checkpoint directory name for this worktree's branch."""
     raw = row.branch or row.path.name
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", raw).strip("-.")
     return cleaned or "worktree"
 
 
-def _capture(repo: Path, dest: Path, name: str, *args: str) -> None:
-    done = subprocess.run(
-        ["git", "-C", str(repo), *args], capture_output=True, text=True, check=False
-    )
-    dest.joinpath(name).write_text(done.stdout or done.stderr, encoding="utf-8")
-
-
-def move_artifacts(worktree: Path, dest: Path) -> list[str]:
-    """Move reports and ``*.pt`` checkpoints out of ``worktree`` into ``dest``."""
-    sources: list[Path] = []
-    reports = worktree / "research" / "reports"
-    if reports.is_dir():
-        sources.extend(sorted(reports.iterdir()))
+def move_checkpoints(worktree: Path, dest: Path) -> list[str]:
+    """Move every ``*.pt`` checkpoint out of ``worktree`` into ``dest``."""
     prune: list[str] = ["("]
     for index, name in enumerate(SKIP_DIRS):
         if index:
@@ -519,11 +510,11 @@ def move_artifacts(worktree: Path, dest: Path) -> list[str]:
         text=True,
         check=False,
     )
-    sources.extend(Path(line) for line in found.stdout.splitlines() if line.strip())
     moved: list[str] = []
-    for source in sources:
-        if not source.exists():
-            continue  # already moved with the reports directory above
+    for line in found.stdout.splitlines():
+        if not line.strip():
+            continue
+        source = Path(line)
         target = dest / source.relative_to(worktree)
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists():
@@ -531,43 +522,6 @@ def move_artifacts(worktree: Path, dest: Path) -> list[str]:
         shutil.move(str(source), str(target))
         moved.append(str(target))
     return moved
-
-
-def archive_worktree(
-    repo: Path,
-    row: Worktree,
-    *,
-    integration_ref: str,
-    archive_root: Path,
-    checkpoint_root: Path,
-) -> dict[str, object]:
-    """Preserve the branch, the working tree and the heavy artifacts, then report where."""
-    slug = slug_for(row)
-    dest = Path(archive_root) / slug
-    dest.mkdir(parents=True, exist_ok=True)
-    tip = row.branch or row.head
-    patches = _run(repo, "format-patch", f"{integration_ref}..{tip}", "-o", str(dest))
-    dest.joinpath("format-patch.log").write_text(
-        patches.stdout + patches.stderr, encoding="utf-8"
-    )
-    _capture(row.path, dest, "worktree.diff", "diff", "HEAD")
-    _capture(
-        row.path, dest, "status.txt", "status", "--porcelain", "--untracked-files=all"
-    )
-    moved = move_artifacts(row.path, Path(checkpoint_root) / slug)
-    record: dict[str, object] = {
-        "worktree": str(row.path),
-        "branch": row.branch,
-        "head": row.head,
-        "integration_ref": integration_ref,
-        "archived_at": datetime.now(UTC).isoformat(),
-        "archive": str(dest),
-        "moved_artifacts": moved,
-    }
-    dest.joinpath("archived.json").write_text(
-        json.dumps(record, indent=2), encoding="utf-8"
-    )
-    return record
 
 
 def _recheck(
@@ -638,14 +592,13 @@ def apply(
     *,
     integration_ref: str | None = None,
     idle_hours: float = DEFAULT_IDLE_HOURS,
-    archive_root: Path,
     checkpoint_root: Path,
     delete_branches: bool = True,
     delete_remote: bool = True,
     current: Path | None = None,
     proc_root: Path = Path("/proc"),
 ) -> list[dict[str, object]]:
-    """Archive, then force-remove, every eligible worktree."""
+    """Move stray checkpoints out, then force-remove, every eligible worktree."""
     line = integration_ref or default_integration_ref(repo)
     here = (current or Path.cwd()).resolve()
     removed: list[dict[str, object]] = []
@@ -662,12 +615,8 @@ def apply(
         )
         record: dict[str, object] = {"worktree": str(row.path), "branch": row.branch}
         if row.path.is_dir():
-            record["archived"] = archive_worktree(
-                repo,
-                row,
-                integration_ref=line,
-                archive_root=archive_root,
-                checkpoint_root=checkpoint_root,
+            record["moved_checkpoints"] = move_checkpoints(
+                row.path, Path(checkpoint_root) / slug_for(row)
             )
             gone = _run(repo, "worktree", "remove", "--force", str(row.path))
             if gone.returncode:
@@ -722,13 +671,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--idle-hours", type=float, default=DEFAULT_IDLE_HOURS)
     parser.add_argument(
-        "--archive-root", type=Path, default=_root_from_env(ARCHIVE_ROOT_ENV)
-    )
-    parser.add_argument(
         "--checkpoint-root", type=Path, default=_root_from_env(CHECKPOINT_ROOT_ENV)
     )
     parser.add_argument(
-        "--apply", action="store_true", help="archive and remove eligible worktrees"
+        "--apply", action="store_true", help="remove eligible worktrees"
     )
     parser.add_argument(
         "--keep-branches",
@@ -758,9 +704,7 @@ def _render(
     for record in removed:
         lines.append(f"removed {record['worktree']} [{record['branch']}]")
     if not apply_mode:
-        lines.append(
-            "dry-run only; pass --apply to archive and remove eligible worktrees"
-        )
+        lines.append("dry-run only; pass --apply to remove eligible worktrees")
     return "\n".join(lines)
 
 
@@ -770,10 +714,10 @@ def main(argv: list[str] | None = None) -> int:
     handle = None
     try:
         if args.apply:
-            if args.archive_root is None or args.checkpoint_root is None:
+            if args.checkpoint_root is None:
                 raise ReapError(
-                    "--apply needs somewhere to archive to: pass --archive-root and "
-                    f"--checkpoint-root, or set {ARCHIVE_ROOT_ENV} and {CHECKPOINT_ROOT_ENV}"
+                    "--apply needs somewhere to move stray checkpoints: pass "
+                    f"--checkpoint-root or set {CHECKPOINT_ROOT_ENV}"
                 )
             handle = _hold_lock(repo)
             if handle is None:
@@ -791,7 +735,6 @@ def main(argv: list[str] | None = None) -> int:
                 decisions,
                 integration_ref=args.integration_ref,
                 idle_hours=args.idle_hours,
-                archive_root=args.archive_root,
                 checkpoint_root=args.checkpoint_root,
                 delete_branches=not args.keep_branches,
                 delete_remote=not args.keep_remote_branches,
