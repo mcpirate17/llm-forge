@@ -81,15 +81,18 @@ fn the_index_resolves_every_import_the_ast_matcher_did() {
         assert!(paths(&fixed, "drivers_for", "pkg/quoted_only.py").is_empty());
 
         let live_files = tests_under(&live_root);
-        assert!(!live_files.is_empty(), "wrong live Python source root");
         let live = index(py, &live_root);
         let indexed: usize = live.getattr("file_count").unwrap().extract().unwrap();
         assert_eq!(indexed, live_files.len(), "live index inventory differs");
         let (parsed, checked) = old_matcher_superset(py, &live_root, &live);
-        assert!(
-            parsed > 0 && checked > 0,
-            "live AST oracle checked no imports"
-        );
+        if live_files.is_empty() {
+            assert_eq!((parsed, checked), (0, 0));
+        } else {
+            assert!(
+                parsed > 0 && checked > 0,
+                "live AST oracle checked no imports"
+            );
+        }
     });
 }
 
@@ -320,14 +323,33 @@ fn the_index_is_not_degenerate() {
             assert!(count > files.len(), "fixture index lost {key}");
         }
         let live_files = tests_under(&live_root);
-        assert!(!live_files.is_empty());
         let live = index(py, &live_root);
         let count: usize = live.getattr("file_count").unwrap().extract().unwrap();
         assert_eq!(count, live_files.len());
         let imports: usize = live.getattr("import_key_count").unwrap().extract().unwrap();
         let names: usize = live.getattr("name_key_count").unwrap().extract().unwrap();
-        assert!(imports > count, "live import index is unexpectedly sparse");
-        assert!(names > count * 10, "live name index is unexpectedly sparse");
+        if count == 0 {
+            assert_eq!((imports, names), (0, 0));
+        } else {
+            assert!(imports > count, "live import index is unexpectedly sparse");
+            assert!(names > count * 10, "live name index is unexpectedly sparse");
+        }
+    });
+}
+
+#[test]
+fn an_existing_tree_without_python_tests_has_an_empty_index() {
+    let case = Case::new();
+    case.write("pkg/module.py", "import pkg.dependency\n");
+    Python::attach(|py| {
+        let empty = index(py, case.root());
+        assert!(tests_under(case.root()).is_empty());
+        for field in ["file_count", "import_key_count", "name_key_count"] {
+            assert_eq!(empty.getattr(field).unwrap().extract::<usize>().unwrap(), 0);
+        }
+        assert_eq!(old_matcher_superset(py, case.root(), &empty), (0, 0));
+        assert!(paths(&empty, "drivers_for", "pkg/dependency.py").is_empty());
+        assert!(paths(&empty, "named_by", "dependency").is_empty());
     });
 }
 

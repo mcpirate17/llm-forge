@@ -36,4 +36,5 @@ native tests exercise real loopback HTTP and SQLite state, including the
 sender lock, FIFO retry, capability recheck, terminal failures, and CLI exit
 status. The four obsolete transport cases from `test_agent_a2a.py` were
 retired on the same mapping. The Python `A2aStore`, CLI presentation, and
-`build_app` checks remain active in `test_agent_a2a.py`.
+`build_app` checks now run in the Rust-owned `python_contracts_agent_a2a`
+target, as mapped in [the communication migration](native-agent-communication-tests-migration.md).
