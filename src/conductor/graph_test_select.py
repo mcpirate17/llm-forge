@@ -15,13 +15,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import subprocess
 import sys
+from collections.abc import Sequence
+from contextlib import nullcontext
 from pathlib import Path, PurePosixPath
-from typing import Final, Sequence
+from typing import TYPE_CHECKING, Final
 
+from conductor.candidate_review.contract_runtime import standalone_contract_runtime
 from conductor.candidate_review.git_source import repository_root
+
+if TYPE_CHECKING:
+    from conductor.candidate_review.checks import ContractPlan
 
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 SELECTION_SCOPE: Final = "direct-dependencies-and-conventions"
@@ -39,7 +46,7 @@ def git_changed_and_untracked_files(repo: Path) -> list[str]:
     """Retrieve modified, staged, and untracked files from Git."""
     paths: set[str] = set()
     diff_proc = subprocess.run(
-        ["git", "diff", "--name-only", "HEAD"],
+        ["git", "diff", "--no-renames", "--name-only", "HEAD"],
         cwd=repo,
         capture_output=True,
         text=True,
@@ -48,7 +55,7 @@ def git_changed_and_untracked_files(repo: Path) -> list[str]:
     if diff_proc.returncode == 0:
         for line in diff_proc.stdout.splitlines():
             line = line.strip()
-            if line and (repo / line).is_file():
+            if line and (not (repo / line).exists() or (repo / line).is_file()):
                 paths.add(line)
 
     untracked_proc = subprocess.run(
@@ -162,41 +169,90 @@ def select_tests_for_sources(repo: Path, source_paths: Sequence[str]) -> list[st
         return []
 
     # 1. Graph dependencies
-    selected.update(query_graph_tests(repo, sources))
+    selected.update(
+        test for test in query_graph_tests(repo, sources) if test.endswith(".py")
+    )
 
     # 2. Convention and self-test dependencies
     for source in sources:
-        selected.update(convention_tests_for_path(repo, source))
+        selected.update(
+            test
+            for test in convention_tests_for_path(repo, source)
+            if test.endswith(".py")
+        )
 
     return sorted(selected)
 
 
 def run_tests(
-    repo: Path, test_paths: Sequence[str], pytest_args: Sequence[str] | None = None
+    repo: Path,
+    test_paths: Sequence[str],
+    pytest_args: Sequence[str] | None = None,
+    *,
+    contract_plan: ContractPlan | None = None,
 ) -> int:
-    """Execute pytest on selected test files."""
-    if not test_paths:
+    """Execute selected pytest files and native Rust contracts."""
+    contract_commands = contract_plan["commands"] if contract_plan else []
+    if not test_paths and not contract_commands:
         print("No targeted tests selected.", file=sys.stdout)
         return 0
 
-    cmd = [
-        sys.executable,
-        "-m",
-        "pytest",
-        "-o",
-        "addopts=",
-        *test_paths,
-        *(pytest_args or ["-q", "--tb=short"]),
-    ]
-    print(
-        f"Running {len(test_paths)} test file(s): {' '.join(test_paths)}",
-        file=sys.stdout,
+    runtime = (
+        standalone_contract_runtime(repo, contract_plan)
+        if contract_plan and contract_plan["targets"]
+        else nullcontext({})
     )
-    proc = subprocess.run(cmd, cwd=repo, check=False)
-    return proc.returncode
+    with runtime as contract_env:
+        environment = (
+            {
+                **{
+                    key: value
+                    for key, value in os.environ.items()
+                    if key not in {"PYO3_CONFIG_FILE", "PYTHONHOME"}
+                },
+                **contract_env,
+            }
+            if contract_env
+            else None
+        )
+        exit_code = 0
+        if test_paths:
+            cmd = [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-o",
+                "addopts=",
+                *test_paths,
+                *(pytest_args or ["-q", "--tb=short"]),
+            ]
+            print(
+                f"Running {len(test_paths)} test file(s): {' '.join(test_paths)}",
+                file=sys.stdout,
+            )
+            exit_code = subprocess.run(
+                cmd, cwd=repo, env=environment, check=False
+            ).returncode
+        for command in contract_commands:
+            print(
+                f"Running Rust contracts: {', '.join(command['targets'])}",
+                file=sys.stdout,
+            )
+            result = subprocess.run(
+                command["argv"],
+                cwd=command["cwd"],
+                env=environment,
+                timeout=900,
+                check=False,
+            )
+            if result.returncode and not exit_code:
+                exit_code = result.returncode
+        return exit_code
 
 
 def main(argv: list[str] | None = None) -> int:
+    from conductor._native import contract_test_plan_native
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "paths",
@@ -204,10 +260,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Source files to select for; default: Git modified/untracked files.",
     )
     parser.add_argument(
-        "--run", action="store_true", help="Execute pytest on selected tests"
+        "--run", action="store_true", help="Execute selected pytest and Rust contracts"
     )
     parser.add_argument(
-        "--json", action="store_true", help="Output selected tests as JSON array"
+        "--json",
+        action="store_true",
+        help="Output the selected tests and contracts as JSON",
     )
     parser.add_argument(
         "--pytest-args",
@@ -223,7 +281,10 @@ def main(argv: list[str] | None = None) -> int:
     source_paths = args.paths if args.paths else git_changed_and_untracked_files(repo)
     try:
         selected_tests = select_tests_for_sources(repo, source_paths)
-    except GraphSelectError as exc:
+        contract_plan: ContractPlan = json.loads(
+            contract_test_plan_native(str(repo), list(source_paths))
+        )
+    except (GraphSelectError, ValueError) as exc:
         print(f"graph-test-select ERROR: {exc}", file=sys.stderr)
         return 2
 
@@ -234,7 +295,10 @@ def main(argv: list[str] | None = None) -> int:
                     "scope": SELECTION_SCOPE,
                     "sources": source_paths,
                     "selected_tests": selected_tests,
-                    "count": len(selected_tests),
+                    "contract_targets": contract_plan["targets"],
+                    "contract_test_paths": contract_plan["test_paths"],
+                    "contract_commands": contract_plan["commands"],
+                    "count": len(selected_tests) + len(contract_plan["targets"]),
                 },
                 indent=2,
             )
@@ -242,10 +306,18 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.run:
-        return run_tests(repo, selected_tests, args.pytest_args)
+        try:
+            return run_tests(
+                repo, selected_tests, args.pytest_args, contract_plan=contract_plan
+            )
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            print(f"graph-test-select ERROR: {exc}", file=sys.stderr)
+            return 2
 
     for test in selected_tests:
         print(test)
+    for target in contract_plan["targets"]:
+        print(f"cargo:{target}")
     return 0
 
 

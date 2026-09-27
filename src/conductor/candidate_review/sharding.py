@@ -12,9 +12,9 @@ import math
 import os
 import subprocess
 import sys
+from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Sequence
 
 from conductor.candidate_review.checks import ReviewContext
 from conductor.candidate_review.command_runner import _run_process, _tail
@@ -130,6 +130,8 @@ def execute_shards(
     ctx: ReviewContext,
     commands: Sequence[list[str]],
     check: CheckPolicy,
+    *,
+    extra_env: Mapping[str, str] | None = None,
 ) -> tuple[list[subprocess.CompletedProcess[str] | None], list[int]]:
     """Run every shard, returning its result or ``None`` if it blew the wall budget.
 
@@ -153,7 +155,7 @@ def execute_shards(
                 timeout_seconds=check.timeout_seconds,
                 memory_mb=check.memory_mb,
                 include_git_metadata=False,
-                extra_env=thread_pins,
+                extra_env={**thread_pins, **(extra_env or {})},
                 wall_timeout_seconds=check.wall_timeout_seconds,
             )
         except subprocess.TimeoutExpired:

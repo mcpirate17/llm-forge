@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypedDict
 
 from conductor._native import duplicate_body_fingerprints_native
 from conductor.candidate_review.equivalence_probe_check import (
@@ -54,11 +55,26 @@ class ReviewContext:
         return tuple(change for change in self.candidate.changes if not change.deleted)
 
 
+class ContractCommand(TypedDict):
+    cwd: str
+    argv: list[str]
+    targets: list[str]
+    test_paths: list[str]
+
+
+class ContractPlan(TypedDict):
+    source_paths: list[str]
+    targets: list[str]
+    test_paths: list[str]
+    commands: list[ContractCommand]
+
+
 @dataclass(frozen=True, slots=True)
 class TestSelection:
     tests: tuple[str, ...]
     graph: dict[str, object]
     findings: tuple[Finding, ...]
+    contract_plan: ContractPlan | None = None
 
 
 def _result(
@@ -503,7 +519,11 @@ def check_performance_evidence(
         rows.append(row)
     native = _native_eval(
         "performance-evidence",
-        {"hot_changes": rows, "evidence_paths": evidence_paths, "evidence_text": evidence_text},
+        {
+            "hot_changes": rows,
+            "evidence_paths": evidence_paths,
+            "evidence_text": evidence_text,
+        },
     )
     return _result(
         "performance-evidence",

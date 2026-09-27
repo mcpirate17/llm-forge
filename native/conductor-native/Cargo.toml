@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.48"
+version = "0.1.49"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -28,7 +28,7 @@ memmap2 = { version = "0.9", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
 sha2 = "0.10"
-syn = { version = "2", features = ["full", "visit", "parsing"], optional = true }
+syn = { version = "2", features = ["full", "visit", "parsing"] }
 toml = "0.8"
 unicode-general-category = { version = "0.6", optional = true }
 zstd = "0.13"
@@ -43,7 +43,7 @@ zstd = "0.13"
 [features]
 default = ["python"]
 bundled-sqlite = ["rusqlite/bundled"]
-source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:syn", "dep:proc-macro2", "dep:unicode-general-category"]
+source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:unicode-general-category"]
 python = ["dep:pyo3", "source-analysis", "dep:memmap2", "dep:libloading"]
 python-compat-tests = ["python"]
 extension-module = ["python", "pyo3/extension-module"]
