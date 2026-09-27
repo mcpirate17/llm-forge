@@ -1,0 +1,13 @@
+# Rust dispatcher test fixture
+
+`native/forge/tests/hook_delegation.rs` was the sole consumer of the executable `tests/fixtures/stub_dispatch.py`. Before migration, the default `cargo test --test hook_delegation` baseline passed all 22 tests (`/tmp/forge-stub-dispatch-baseline.log`). CI runs the crate's default `cargo test`, so the replacement remains available without a feature flag.
+
+The replacement is a small, nested Rust fixture crate under `native/forge/tests/fixtures/stub_dispatch/`. The integration test builds it once per test process with `cargo build --offline --locked --jobs 2` into Cargo's ignored test-output tree and copies its executable to the temporary project's `.venv/bin/python`. Forge still resolves and execs that path with `-m tooling.hooks.dispatch <event>`. The fixture is not a `native/forge` binary target, so normal production builds do not build or ship it. The nested crate carries its own lockfile for a reproducible test build.
+
+The Rust fixture reads all stdin and selects the last argv item as the event, matching the original stub. It echoes parsed standard JSON with valid Unicode and the hook environment for PreToolUse and session events, emits the exact warning on PostToolUse, and preserves allow, deny, fatal, and unknown-event exit statuses. Its output formatter uses Python `json.dumps` spacing, key order, ASCII escapes and numeric rendering, including negative zero, scientific exponents and large integers. The existing Forge integration tests still verify the native/delegated branches and telemetry. An additional direct protocol test pins byte output, stderr and exit statuses for the modeled events. Invalid JSON still exits 1 with a clear Rust diagnostic; CPython-specific traceback text, nonstandard NaN/Infinity tokens, and unpaired Unicode surrogates are outside this private fixture's contract.
+
+Independent review compared 66 modeled Python and Rust process cases and found identical exit codes, stdout and stderr. It also checked the fixture's bounded child-build cleanup. The original Python file was then removed. Post-retirement exact test and Clippy results are recorded below.
+
+- `cargo test --offline --locked --jobs 2 --test hook_delegation -- --test-threads=1`: 23 passed (`/tmp/forge-stub-dispatch-post-retirement-tests.log`).
+- Outer `cargo clippy --offline --locked --jobs 2 --test hook_delegation -- -D warnings`: passed (`/tmp/forge-stub-dispatch-post-retirement-outer-clippy.log`).
+- Nested fixture `cargo clippy --offline --locked --jobs 2 -- -D warnings`: passed (`/tmp/forge-stub-dispatch-post-retirement-inner-clippy.log`).
