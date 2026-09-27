@@ -67,6 +67,7 @@ pub mod project_paths;
 mod receipt_auth;
 pub mod receipt_slim;
 pub mod reuse_consolidation;
+pub mod test_contracts;
 mod text_normalization;
 #[cfg(feature = "python")]
 mod tooling_boundary;
@@ -116,6 +117,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     receipt_auth::register(module)?;
     receipt_slim::register(module)?;
     reuse_consolidation::register(module)?;
+    test_contracts::register(module)?;
     tooling_boundary::register(module)?;
     workspace_runtime_matrix::register(module)?;
     Ok(())

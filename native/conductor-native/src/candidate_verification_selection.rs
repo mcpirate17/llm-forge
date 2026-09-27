@@ -99,6 +99,11 @@ pub(super) fn decide(request: &Value) -> Result<Value, String> {
     let mut tests: BTreeSet<_> = strings(&request["graph_tests"]).into_iter().collect();
     tests.extend(strings(&request["convention_tests"]));
     tests.extend(strings(&request["changed_tests"]));
+    let contract_sources: BTreeSet<_> = strings(&request["contract_sources"]).into_iter().collect();
+    let contract_targets = strings(&request["contract_targets"]);
+    let contract_test_paths: BTreeSet<_> = strings(&request["contract_test_paths"])
+        .into_iter()
+        .collect();
     let native = request["native_tests"]
         .as_object()
         .ok_or("native tests must be an object")?;
@@ -112,6 +117,11 @@ pub(super) fn decide(request: &Value) -> Result<Value, String> {
         .map(|files| files.as_array().map_or(0, Vec::len))
         .sum();
     graph.insert("native_test_files".into(), json!(native_count));
+    graph.insert("contract_targets".into(), json!(contract_targets));
+    graph.insert(
+        "contract_test_files".into(),
+        json!(contract_test_paths.len()),
+    );
     let mut findings = Vec::new();
     if let Some(error) = request["graph_error"].as_str() {
         findings.push(finding(
@@ -126,7 +136,7 @@ pub(super) fn decide(request: &Value) -> Result<Value, String> {
     }
     let uncovered: Vec<_> = sources
         .into_iter()
-        .filter(|source| !native.contains_key(source))
+        .filter(|source| !native.contains_key(source) && !contract_sources.contains(source))
         .collect();
     if !uncovered.is_empty() && tests.is_empty() {
         findings.push(finding(
@@ -139,7 +149,8 @@ pub(super) fn decide(request: &Value) -> Result<Value, String> {
             Some(json!({"source_paths": uncovered})),
         ));
     }
-    let evidence_tests: BTreeSet<_> = tests.union(&native_files).cloned().collect();
+    let mut evidence_tests: BTreeSet<_> = tests.union(&native_files).cloned().collect();
+    evidence_tests.extend(contract_test_paths);
     if request["high_risk"] == true
         && !evidence_tests.is_empty()
         && request["property_evidence"] != true

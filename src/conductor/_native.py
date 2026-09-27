@@ -129,6 +129,12 @@ def candidate_verification_native(operation: str, request_json: str) -> str:
     return decide(operation, request_json)
 
 
+def contract_test_plan_native(repo_root: str, changed_paths: list[str]) -> str:
+    from conductor_native import contract_test_plan_native as plan
+
+    return plan(repo_root, changed_paths)
+
+
 def candidate_verification_ast_native(source: str, path: str) -> str:
     from conductor_native import candidate_verification_ast_native as definitions
 

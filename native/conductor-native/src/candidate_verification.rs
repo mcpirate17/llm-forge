@@ -9,6 +9,8 @@ mod ast;
 mod evidence;
 #[path = "candidate_verification_inventory.rs"]
 mod inventory;
+#[path = "candidate_verification_runtime.rs"]
+mod runtime;
 #[path = "candidate_verification_selection.rs"]
 mod selection;
 
@@ -24,6 +26,7 @@ pub fn decide(operation: &str, request: &Value) -> Result<Value, String> {
         "gated_nodeids" => selection::gated_nodeids(request),
         "selection_plan" => selection::plan(request),
         "selection_decide" => selection::decide(request),
+        "contract_runtime_plan" => runtime::plan(request),
         "waiver_states" => selection::waiver_states(request),
         "receipt_findings" => evidence::receipt_findings(request),
         "evidence_index" => evidence::index(request),

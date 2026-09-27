@@ -6,6 +6,7 @@ import ast
 import json
 import re
 import sqlite3
+import subprocess
 import sys
 import time
 from collections.abc import Mapping, Sequence
@@ -14,11 +15,13 @@ from pathlib import Path, PurePosixPath
 
 from conductor.candidate_review import external_invariants
 from conductor.candidate_review.checks import (
+    ContractPlan,
     ReviewContext,
     TestSelection,
     _result,
 )
 from conductor.candidate_review.command_runner import _tail
+from conductor.candidate_review.contract_runtime import prepare_contract_runtime
 from conductor.candidate_review.coverage_eval import (  # noqa: F401
     # `_coverage_counts` and `_risk_buckets` are re-exported, not used here:
     # callers and tests reach them through this module's namespace.
@@ -380,6 +383,8 @@ def _waiver_states(ctx: ReviewContext) -> list[dict[str, object]]:
 
 
 def select_tests(ctx: ReviewContext) -> TestSelection:
+    from conductor._native import contract_test_plan_native
+
     changes = [
         {
             "path": change.path,
@@ -403,11 +408,23 @@ def select_tests(ctx: ReviewContext) -> TestSelection:
         graph = {"status": "not-required", "selected_edges": 0}
     convention_tests = _convention_tests(ctx, sources)
     native_tests = _rust_crate_tests(ctx, sources)
+    contract_plan = json.loads(
+        contract_test_plan_native(
+            str(ctx.snapshot),
+            [
+                path
+                for change in ctx.candidate.changes
+                for path in (change.path, change.old_path)
+                if path
+            ],
+        )
+    )
     evidence_tests = (
         graph_tests
         | convention_tests
         | set(plan["changed_tests"])
         | {test for files in native_tests.values() for test in files}
+        | set(contract_plan["test_paths"])
     )
     property_evidence = (
         _has_property_evidence(ctx, evidence_tests)
@@ -421,6 +438,9 @@ def select_tests(ctx: ReviewContext) -> TestSelection:
             "graph_tests": sorted(graph_tests),
             "convention_tests": sorted(convention_tests),
             "native_tests": native_tests,
+            "contract_sources": contract_plan["source_paths"],
+            "contract_targets": contract_plan["targets"],
+            "contract_test_paths": contract_plan["test_paths"],
             "graph": graph,
             "graph_error": graph_error,
             "property_evidence": property_evidence,
@@ -431,6 +451,7 @@ def select_tests(ctx: ReviewContext) -> TestSelection:
         tuple(result["tests"]),
         result["graph"],
         tuple(finding.finalize() for finding in findings),
+        contract_plan,
     )
 
 
@@ -789,10 +810,65 @@ def check_test_evidence(ctx: ReviewContext) -> tuple[CheckResult, TestSelection]
         "test-evidence",
         started,
         selection.findings,
-        files=selection.tests,
+        files=[
+            *selection.tests,
+            *(selection.contract_plan or {}).get("test_paths", []),
+        ],
         metrics={"selected_tests": len(selection.tests), **selection.graph},
     )
     return result, selection
+
+
+def _targeted_commands(
+    selection: TestSelection,
+    check: CheckPolicy,
+    coverage_file: Path,
+    coverage: bool,
+) -> tuple[list[list[str]], list[Path], list[list[str]], int]:
+    """Keep pytest command construction separate from Rust process arguments."""
+    shards = (
+        shard_tests(selection.tests, check.shard_max_files) if selection.tests else []
+    )
+    pytest_shard_count = len(shards)
+    contract_commands = (selection.contract_plan or {}).get("commands", [])
+    shards.extend(command["test_paths"] for command in contract_commands)
+    shard_files = [
+        shard_data_file(coverage_file, index, pytest_shard_count)
+        for index in range(pytest_shard_count)
+    ]
+    commands = [
+        _pytest_command(tests, shard_files[index] if coverage else None)
+        for index, tests in enumerate(shards[:pytest_shard_count])
+    ]
+    commands.extend(command["argv"] for command in contract_commands)
+    return shards, shard_files, commands, pytest_shard_count
+
+
+def _targeted_coverage(
+    ctx: ReviewContext,
+    check: CheckPolicy,
+    coverage_file: Path,
+    shard_files: list[Path],
+    pytest_shard_count: int,
+    contract_plan: ContractPlan | None,
+    findings: list[Finding],
+    metrics: dict[str, object],
+) -> None:
+    """Evaluate available Python coverage and report the native coverage gap."""
+    if not findings and pytest_shard_count:
+        if pytest_shard_count > 1:
+            combine_finding = combine_coverage(ctx, coverage_file, shard_files, check)
+            if combine_finding is not None:
+                findings.append(combine_finding)
+        if not findings:
+            coverage_findings, coverage_metrics = _evaluate_changed_coverage(
+                ctx, coverage_file
+            )
+            findings.extend(coverage_findings)
+            metrics.update(coverage_metrics)
+    if contract_plan and contract_plan["test_paths"]:
+        metrics["python_coverage_scope"] = "pytest-only"
+        findings.append(_contract_coverage_finding(check, contract_plan))
 
 
 def run_targeted_tests(
@@ -803,7 +879,9 @@ def run_targeted_tests(
     coverage: bool,
 ) -> CheckResult:
     started = time.perf_counter()
-    if not selection.tests:
+    contract_plan = selection.contract_plan
+    contract_paths = contract_plan["test_paths"] if contract_plan else []
+    if not selection.tests and not contract_paths:
         return CheckResult(
             check_id=check.check_id,
             status=CheckStatus.SKIPPED,
@@ -811,58 +889,60 @@ def run_targeted_tests(
             skipped_reason="no selected tests",
         )
     coverage_file = ctx.runtime_dir / ".coverage-targeted"
-    shards = shard_tests(selection.tests, check.shard_max_files)
+    shards, shard_files, commands, pytest_shard_count = _targeted_commands(
+        selection, check, coverage_file, coverage
+    )
     total = len(shards)
-    shard_files = [
-        shard_data_file(coverage_file, index, total) for index in range(total)
-    ]
-    commands = [
-        _pytest_command(tests, shard_files[index] if coverage else None)
-        for index, tests in enumerate(shards)
-    ]
-
+    selected_files = [*selection.tests, *contract_paths]
     try:
-        completed_raw, timed_out = execute_shards(ctx, commands, check)
-    except OSError as exc:
+        completed_raw, timed_out = _run_selected_shards(
+            ctx, check, contract_plan, commands
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
         finding = Finding(
             check_id=check.check_id,
             rule_id="targeted-test-crash",
             severity=Severity.CRITICAL,
             message=f"targeted test execution did not complete: {type(exc).__name__}: {exc}",
         )
-        return _result(check.check_id, started, [finding], files=selection.tests)
+        return _result(check.check_id, started, [finding], files=selected_files)
 
     timeout_findings = shard_timeout_findings(check, shards, timed_out, total)
     finished = [index for index in range(total) if completed_raw[index] is not None]
     if not finished:
-        return _result(check.check_id, started, timeout_findings, files=selection.tests)
+        return _result(check.check_id, started, timeout_findings, files=selected_files)
     completed_all = [completed for completed in completed_raw if completed is not None]
     shards = [shards[index] for index in finished]
-    shard_files = [shard_files[index] for index in finished]
+    shard_files = [
+        shard_files[index] for index in finished if index < pytest_shard_count
+    ]
 
     findings, exit_codes, failed = shard_outcome_findings(
-        check, shards, completed_all, len(selection.tests)
+        check, shards, completed_all, len(selected_files)
     )
     # Timeouts first: they explain any missing coverage the other shards cannot.
     findings = timeout_findings + findings
-    metrics: dict[str, object] = {"selected_tests": len(selection.tests)}
+    metrics: dict[str, object] = {
+        "selected_tests": len(selection.tests),
+        "selected_contract_targets": contract_plan["targets"] if contract_plan else [],
+    }
     if total > 1:
         metrics["shard_count"] = total
         metrics["shard_workers"] = min(check.shard_workers, total)
         metrics["shard_exit_codes"] = exit_codes
-    if not findings and coverage:
-        if total > 1:
-            combine_finding = combine_coverage(ctx, coverage_file, shard_files, check)
-            if combine_finding is not None:
-                findings.append(combine_finding)
-        if not findings:
-            coverage_findings, coverage_metrics = _evaluate_changed_coverage(
-                ctx, coverage_file
-            )
-            findings.extend(coverage_findings)
-            metrics.update(coverage_metrics)
+    if coverage:
+        _targeted_coverage(
+            ctx,
+            check,
+            coverage_file,
+            shard_files,
+            pytest_shard_count,
+            contract_plan,
+            findings,
+            metrics,
+        )
     result = _result(
-        check.check_id, started, findings, files=selection.tests, metrics=metrics
+        check.check_id, started, findings, files=selected_files, metrics=metrics
     )
     representative = failed[0] if failed else 0
     result.command = commands[finished[representative]]
@@ -876,6 +956,36 @@ def run_targeted_tests(
         check.max_output_chars,
     )
     return result
+
+
+def _run_selected_shards(
+    ctx: ReviewContext,
+    check: CheckPolicy,
+    contract_plan: ContractPlan | None,
+    commands: list[list[str]],
+) -> tuple[list[subprocess.CompletedProcess[str] | None], list[int]]:
+    environment = (
+        prepare_contract_runtime(ctx, check, contract_plan)
+        if contract_plan and contract_plan["targets"]
+        else None
+    )
+    return execute_shards(ctx, commands, check, extra_env=environment)
+
+
+def _contract_coverage_finding(check: CheckPolicy, plan: ContractPlan) -> Finding:
+    return Finding(
+        check_id=check.check_id,
+        rule_id="rust-contract-coverage-unsupported",
+        severity=Severity.HIGH,
+        message=(
+            "targeted Rust contracts ran, but Python coverage cannot measure "
+            "their embedded PyO3 calls; changed-line coverage is incomplete"
+        ),
+        evidence={
+            "contract_targets": plan["targets"],
+            "python_coverage_scope": "pytest-only",
+        },
+    )
 
 
 def _pytest_command(tests: Sequence[str], coverage_file: Path | None) -> list[str]:

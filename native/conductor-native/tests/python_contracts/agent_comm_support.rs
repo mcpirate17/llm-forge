@@ -1,4 +1,4 @@
-//! Small PyO3 fixtures shared only by the agent-communication migration targets.
+//! Small PyO3 fixtures shared by communication and dispatch contract targets.
 
 use crate::support::AttrPatch;
 use pyo3::prelude::*;
