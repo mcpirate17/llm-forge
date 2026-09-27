@@ -280,7 +280,7 @@ fn generic_tools_run_the_refresh_report_without_starting_a_dispatcher() {
 }
 
 #[test]
-fn edit_graph_and_malformed_payloads_keep_delegating() {
+fn edit_and_graph_tools_use_native_pretool_dispatch() {
     for name in [
         "Edit",
         "Write",
@@ -291,14 +291,12 @@ fn edit_graph_and_malformed_payloads_keep_delegating() {
         "mcp__code_review_graph__query",
     ] {
         let project = Project::new();
-        let raw = json!({"tool_name": name}).to_string();
-        let output = project.run(&raw, None, false);
-        assert_eq!(output.status.code(), Some(17), "{name}");
-        assert_eq!(
-            fs::read_to_string(project.0.join("delegated.input")).unwrap(),
-            raw
-        );
+        project.native(&json!({"tool_name": name}), false);
     }
+}
+
+#[test]
+fn malformed_payloads_keep_delegating() {
     for raw in ["not json", "[]", "null", "{\"tool_name\":17}"] {
         let project = Project::new();
         assert_eq!(project.run(raw, None, false).status.code(), Some(17));
