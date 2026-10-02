@@ -8,6 +8,27 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[test]
+fn model_usage_deduplicates_requests_separately_from_tool_byte_counts() {
+    let case = Case::new();
+    let row = json!({"event":"PostToolUse","provider":"openai","session_id":"s","request_id_hash":"r","model":"example","input_tokens":100,"output_tokens":30,"cached_input_tokens":60,"reasoning_tokens":20,"output_bytes":4000});
+    let path = case.log(&[
+        row.clone(),
+        row,
+        json!({"event":"HookContext","output_bytes":500}),
+    ]);
+    let result = summarize(&[path], 8000).unwrap();
+    assert_eq!(result["output_bytes"], 8500);
+    assert_eq!(result["model_usage"]["totals"]["total_input_tokens"], 100);
+    assert_eq!(result["model_usage"]["totals"]["output_tokens"], 30);
+    assert_eq!(result["model_usage"]["deduplicated_events"], 1);
+    assert_eq!(result["model_usage"]["events_without_usage"], 1);
+    assert_eq!(result["model_usage"]["totals"]["cache_read_ratio"], 0.6);
+    assert!(format_summary(&result)
+        .unwrap()
+        .contains("keyed_requests=1"));
+}
+
 struct Case(PathBuf);
 
 impl Case {

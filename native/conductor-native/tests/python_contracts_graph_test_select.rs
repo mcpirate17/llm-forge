@@ -218,7 +218,9 @@ fn main_cli() {
             data["selected_tests"],
             serde_json::json!(["pkg/test_cli_src.py"])
         );
-        assert_eq!(data["scope"], "direct-dependencies-and-conventions");
+        assert_eq!(data["scope"], "full-test-inventory-fallback");
+        assert_eq!(data["complete"], false);
+        assert!(!data["fallback_reasons"].as_array().unwrap().is_empty());
         let (plain, _, _) = capture(py, || {
             graph
                 .getattr("main")

@@ -3,11 +3,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::land_exec::Usage;
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const SCHEMA: u32 = 1;
+pub const SCHEMA: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -28,6 +29,7 @@ pub struct StepRecord {
     pub verdict: Verdict,
     pub log_file: Option<String>,
     pub log_sha256: Option<String>,
+    pub usage: Option<Usage>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +53,22 @@ pub struct Receipt {
 
 pub fn sha256(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
+}
+
+/// Hash arbitrary logs/sources with a constant 64 KiB working buffer.
+pub fn sha256_file(path: &Path) -> Result<String> {
+    use std::io::Read;
+    let mut input = fs::File::open(path)?;
+    let mut hash = Sha256::new();
+    let mut buffer = [0; 64 * 1024];
+    loop {
+        let count = input.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hash.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", hash.finalize()))
 }
 
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
@@ -77,14 +95,26 @@ pub fn validate_logs(path: &Path, receipt: &Receipt) -> Result<()> {
     let parent = path.parent().context("receipt has no parent")?;
     for step in &receipt.steps {
         match (&step.log_file, &step.log_sha256, &step.verdict) {
-            (None, None, Verdict::Skipped) => continue,
+            (None, None, Verdict::Skipped) if step.usage.is_none() => continue,
             (Some(file), Some(expected), verdict) if *verdict != Verdict::Skipped => {
                 if file.is_empty() || file.contains('/') || file.contains('\\') || file == ".." {
                     bail!("unsafe log filename for step {}", step.name);
                 }
-                let actual = sha256(&fs::read(parent.join(file))?);
+                let actual = sha256_file(&parent.join(file))?;
                 if &actual != expected {
                     bail!("log hash changed for step {}", step.name);
+                }
+                let usage = step
+                    .usage
+                    .as_ref()
+                    .context("executed step has no resource measurement")?;
+                if !usage.wall_ms.is_finite()
+                    || usage.wall_ms < 0.0
+                    || !usage.cpu_ms.is_finite()
+                    || usage.cpu_ms < 0.0
+                    || usage.retained_bytes != fs::metadata(parent.join(file))?.len()
+                {
+                    bail!("invalid resource/log measurement for step {}", step.name);
                 }
             }
             _ => bail!("inconsistent log fields for step {}", step.name),
@@ -130,6 +160,10 @@ mod tests {
                 verdict: Verdict::Passed,
                 log_file: Some("run.log".into()),
                 log_sha256: Some(sha256(b"original")),
+                usage: Some(Usage {
+                    retained_bytes: 8,
+                    ..Usage::default()
+                }),
             }],
         };
         let path = dir.join("receipt.json");

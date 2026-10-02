@@ -16,13 +16,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sqlite3
 import subprocess
 import sys
 from collections.abc import Sequence
 from contextlib import nullcontext
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final, TypedDict
 
 from conductor.candidate_review.contract_runtime import standalone_contract_runtime
 from conductor.candidate_review.git_source import repository_root
@@ -31,7 +30,15 @@ if TYPE_CHECKING:
     from conductor.candidate_review.checks import ContractPlan
 
 ROOT: Final[Path] = Path(__file__).resolve().parents[1]
-SELECTION_SCOPE: Final = "direct-dependencies-and-conventions"
+
+
+class GraphTestPlan(TypedDict):
+    paths: list[str]
+    complete: bool
+    scope: str
+    reasons: list[str]
+    generation: str | None
+    metadata: dict[str, str]
 
 
 class GraphSelectError(RuntimeError):
@@ -39,7 +46,8 @@ class GraphSelectError(RuntimeError):
 
 
 def graph_database_path(repo: Path) -> Path:
-    return repo / ".code-review-graph" / "graph.db"
+    native = repo / ".forge" / "graph.db"
+    return native if native.is_file() else repo / ".code-review-graph" / "graph.db"
 
 
 def git_changed_and_untracked_files(repo: Path) -> list[str]:
@@ -74,49 +82,26 @@ def git_changed_and_untracked_files(repo: Path) -> list[str]:
     return sorted(paths)
 
 
-def query_graph_tests(repo: Path, source_paths: Sequence[str]) -> set[str]:
-    """Query .code-review-graph/graph.db for test nodes that depend on source_paths."""
-    db_path = graph_database_path(repo)
-    if not db_path.is_file():
-        raise GraphSelectError(
-            f"code-review graph missing: {db_path}; run `code-review-graph update`"
-        )
+def graph_test_plan(
+    repo: Path, source_paths: Sequence[str], *, expected_head: str | None = None
+) -> GraphTestPlan:
+    """Return bounded transitive selection and explicit conservative fallback metadata."""
+    from conductor._native import graph_context_native
 
-    absolute_paths = [str((repo / path).resolve()) for path in source_paths]
-    if not absolute_paths:
-        return set()
-
-    tests: set[str] = set()
-    uri = f"file:{db_path.as_posix()}?mode=ro&immutable=1"
+    payload: dict[str, Any] = {"repo": str(repo), "paths": list(source_paths)}
+    if expected_head is not None:
+        payload["expected_head"] = expected_head
     try:
-        connection = sqlite3.connect(uri, uri=True, timeout=2.0)
-        try:
-            placeholders = ",".join("?" for _ in absolute_paths)
-            query = f"""
-                SELECT DISTINCT source.file_path
-                FROM nodes AS target
-                JOIN edges AS edge ON edge.target_qualified = target.qualified_name
-                JOIN nodes AS source ON source.qualified_name = edge.source_qualified
-                WHERE target.file_path IN ({placeholders}) AND source.is_test = 1
-            """
-            rows = connection.execute(query, absolute_paths).fetchall()
-            for (file_path,) in rows:
-                try:
-                    rel = (
-                        Path(file_path).resolve().relative_to(repo.resolve()).as_posix()
-                    )
-                    if (repo / rel).is_file():
-                        tests.add(rel)
-                except (ValueError, OSError):
-                    continue
-        finally:
-            connection.close()
-    except (sqlite3.Error, OSError) as exc:
-        raise GraphSelectError(
-            f"code-review graph unreadable: {db_path}: {exc}"
-        ) from exc
+        return json.loads(graph_context_native("test_selection", json.dumps(payload)))
+    except ValueError as exc:
+        raise GraphSelectError(str(exc)) from exc
 
-    return tests
+
+def query_graph_tests(repo: Path, source_paths: Sequence[str]) -> set[str]:
+    """Select through the shared native/external graph adapter."""
+    if not source_paths:
+        return set()
+    return set(graph_test_plan(repo, source_paths)["paths"])
 
 
 def is_test_file(path_str: str) -> bool:
@@ -159,7 +144,6 @@ def convention_tests_for_path(repo: Path, source_path: str) -> set[str]:
 
 def select_tests_for_sources(repo: Path, source_paths: Sequence[str]) -> list[str]:
     """Combine graph and convention test selections for source paths."""
-    selected: set[str] = set()
     sources = [
         s
         for s in source_paths
@@ -168,19 +152,19 @@ def select_tests_for_sources(repo: Path, source_paths: Sequence[str]) -> list[st
     if not sources:
         return []
 
-    # 1. Graph dependencies
-    selected.update(
-        test for test in query_graph_tests(repo, sources) if test.endswith(".py")
-    )
+    return _selected_from_plan(repo, sources, graph_test_plan(repo, sources))
 
-    # 2. Convention and self-test dependencies
+
+def _selected_from_plan(
+    repo: Path, sources: Sequence[str], plan: GraphTestPlan
+) -> list[str]:
+    selected = {test for test in plan["paths"] if test.endswith(".py")}
     for source in sources:
         selected.update(
             test
             for test in convention_tests_for_path(repo, source)
             if test.endswith(".py")
         )
-
     return sorted(selected)
 
 
@@ -280,7 +264,19 @@ def main(argv: list[str] | None = None) -> int:
 
     source_paths = args.paths if args.paths else git_changed_and_untracked_files(repo)
     try:
-        selected_tests = select_tests_for_sources(repo, source_paths)
+        graph_plan = (
+            graph_test_plan(repo, source_paths)
+            if source_paths
+            else {
+                "paths": [],
+                "complete": True,
+                "scope": "no-source-changes",
+                "reasons": [],
+                "generation": None,
+                "metadata": {},
+            }
+        )
+        selected_tests = _selected_from_plan(repo, source_paths, graph_plan)
         contract_plan: ContractPlan = json.loads(
             contract_test_plan_native(str(repo), list(source_paths))
         )
@@ -292,7 +288,10 @@ def main(argv: list[str] | None = None) -> int:
         print(
             json.dumps(
                 {
-                    "scope": SELECTION_SCOPE,
+                    "scope": graph_plan["scope"],
+                    "complete": graph_plan["complete"],
+                    "fallback_reasons": graph_plan["reasons"],
+                    "generation": graph_plan["generation"],
                     "sources": source_paths,
                     "selected_tests": selected_tests,
                     "contract_targets": contract_plan["targets"],

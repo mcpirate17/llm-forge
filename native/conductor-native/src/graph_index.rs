@@ -9,18 +9,18 @@ use std::fmt;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Definition {
     /// Stable within a file while the lexical scope and name are unchanged.
     pub qualified: String,
     pub name: String,
-    pub kind: &'static str,
+    pub kind: String,
     pub line_start: usize,
     pub line_end: usize,
     pub signature: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
     /// Lexical definition containing the call; empty for module-level calls.
     pub caller: String,
@@ -29,7 +29,7 @@ pub struct Call {
     pub line: usize,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Import {
     /// Local name used at a call site.
     pub alias: String,
@@ -39,7 +39,7 @@ pub struct Import {
     pub member: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FileFacts {
     pub definitions: Vec<Definition>,
     pub calls: Vec<Call>,
@@ -120,7 +120,7 @@ impl PythonCollector<'_> {
         self.facts.definitions.push(Definition {
             qualified,
             name: name.to_owned(),
-            kind,
+            kind: kind.to_owned(),
             line_start: start,
             line_end: end.max(start),
             signature,
@@ -256,7 +256,7 @@ impl RustCollector {
         self.facts.definitions.push(Definition {
             qualified,
             name: name.to_owned(),
-            kind,
+            kind: kind.to_owned(),
             line_start: span.start().line,
             line_end: span.end().line.max(span.start().line),
             signature: String::new(),
@@ -283,7 +283,17 @@ impl<'ast> Visit<'ast> for RustCollector {
 
     fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
         let name = node.sig.ident.to_string();
-        self.definition(&name, "Function", node.span());
+        let kind = if node.attrs.iter().any(|attr| {
+            attr.path()
+                .segments
+                .last()
+                .is_some_and(|part| part.ident == "test")
+        }) {
+            "Test"
+        } else {
+            "Function"
+        };
+        self.definition(&name, kind, node.span());
         self.scope.push(name);
         visit::visit_item_fn(self, node);
         self.scope.pop();
@@ -302,6 +312,22 @@ impl<'ast> Visit<'ast> for RustCollector {
         if node.trait_.is_some() {
             self.scope.pop();
         }
+        self.scope.pop();
+    }
+
+    fn visit_item_trait(&mut self, node: &'ast syn::ItemTrait) {
+        let name = node.ident.to_string();
+        self.definition(&name, "Trait", node.span());
+        self.scope.push(name);
+        visit::visit_item_trait(self, node);
+        self.scope.pop();
+    }
+
+    fn visit_trait_item_fn(&mut self, node: &'ast syn::TraitItemFn) {
+        let name = node.sig.ident.to_string();
+        self.definition(&name, "Method", node.span());
+        self.scope.push(name);
+        visit::visit_trait_item_fn(self, node);
         self.scope.pop();
     }
 

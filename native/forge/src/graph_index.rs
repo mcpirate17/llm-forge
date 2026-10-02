@@ -13,6 +13,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use walkdir::{DirEntry, WalkDir};
 
+#[path = "graph_index_cache.rs"]
+mod cache;
+
 pub const DEFAULT_DB: &str = ".forge/graph.db";
 const MAX_SOURCE_BYTES: u64 = 1 << 20;
 const MAX_TOTAL_SOURCE_BYTES: usize = 128 << 20;
@@ -38,6 +41,9 @@ pub struct IndexReport {
     unresolved_calls: usize,
     dynamic_calls: usize,
     embeddings: &'static str,
+    parsed_files: usize,
+    reused_files: usize,
+    elapsed_ms: u128,
 }
 
 fn is_source(entry: &DirEntry) -> bool {
@@ -59,11 +65,12 @@ fn may_enter(entry: &DirEntry) -> bool {
         )
 }
 
-fn scan(host: &Path) -> Result<Vec<IndexedFile>> {
+fn scan(host: &Path, cached: &cache::FactCache) -> Result<(Vec<IndexedFile>, usize)> {
     let mut files = Vec::new();
     let mut total_bytes = 0usize;
     let mut total_definitions = 0usize;
     let mut total_calls = 0usize;
+    let mut parsed_files = 0usize;
     for entry in WalkDir::new(host)
         .follow_links(false)
         .sort_by_file_name()
@@ -110,12 +117,23 @@ fn scan(host: &Path) -> Result<Vec<IndexedFile>> {
         let hash = format!("{:x}", Sha256::digest(&bytes));
         let source =
             String::from_utf8(bytes).with_context(|| format!("source is not UTF-8: {relative}"))?;
-        let (language, facts) = if relative.ends_with(".py") {
-            ("python", extract_python(&source))
+        let language = if relative.ends_with(".py") {
+            "python"
         } else {
-            ("rust", extract_rust(&source))
+            "rust"
         };
-        let facts = facts.with_context(|| format!("parse source: {relative}"))?;
+        let facts = match cached.get(&relative) {
+            Some((previous, facts)) if previous == &hash => facts.clone(),
+            _ => {
+                parsed_files += 1;
+                if language == "python" {
+                    extract_python(&source)
+                } else {
+                    extract_rust(&source)
+                }
+                .with_context(|| format!("parse source: {relative}"))?
+            }
+        };
         total_definitions += facts.definitions.len();
         total_calls += facts.calls.len();
         ensure!(
@@ -129,7 +147,7 @@ fn scan(host: &Path) -> Result<Vec<IndexedFile>> {
             facts,
         });
     }
-    Ok(files)
+    Ok((files, parsed_files))
 }
 
 type Definitions = BTreeMap<(String, String), String>;
@@ -192,7 +210,40 @@ fn lexical_target(path: &str, call: &Call, ids: &Definitions, separator: &str) -
     ids.get(&(path.to_owned(), target.to_owned())).cloned()
 }
 
-fn python_module_file(files: &[IndexedFile], from: &str, module: &str) -> Option<String> {
+type ModuleLookup = BTreeMap<(String, String), Option<String>>;
+
+fn module_lookup(files: &[IndexedFile]) -> ModuleLookup {
+    let mut lookup = BTreeMap::new();
+    for file in files {
+        let mut suffix = file.path.as_str();
+        loop {
+            let key = (file.language.to_owned(), suffix.to_owned());
+            lookup
+                .entry(key)
+                .and_modify(|slot| *slot = None)
+                .or_insert_with(|| Some(file.path.clone()));
+            let Some((_, rest)) = suffix.split_once('/') else {
+                break;
+            };
+            suffix = rest;
+        }
+    }
+    lookup
+}
+
+fn unique_module(lookup: &ModuleLookup, language: &str, candidates: &[String]) -> Option<String> {
+    let mut found = None;
+    for candidate in candidates {
+        match lookup.get(&(language.to_owned(), candidate.clone())) {
+            Some(Some(path)) if found.is_none() => found = Some(path.clone()),
+            Some(_) => return None,
+            None => {}
+        }
+    }
+    found
+}
+
+fn python_module_file(lookup: &ModuleLookup, from: &str, module: &str) -> Option<String> {
     let relative_level = module.bytes().take_while(|b| *b == b'.').count();
     let rest = &module[relative_level..];
     let dotted = if relative_level == 0 {
@@ -208,23 +259,13 @@ fn python_module_file(files: &[IndexedFile], from: &str, module: &str) -> Option
             .replace('\\', "/")
     };
     let candidates = [format!("{dotted}.py"), format!("{dotted}/__init__.py")];
-    let mut matches = files
-        .iter()
-        .filter(|file| file.language == "python")
-        .filter(|file| {
-            candidates.iter().any(|candidate| {
-                file.path == *candidate || file.path.ends_with(&format!("/{candidate}"))
-            })
-        })
-        .map(|file| file.path.clone());
-    let first = matches.next()?;
-    matches.next().is_none().then_some(first)
+    unique_module(lookup, "python", &candidates)
 }
 
 fn imported_python_target(
     file: &IndexedFile,
     call: &Call,
-    files: &[IndexedFile],
+    lookup: &ModuleLookup,
     ids: &Definitions,
 ) -> Option<String> {
     for import in &file.facts.imports {
@@ -235,7 +276,7 @@ fn imported_python_target(
         } else {
             continue;
         };
-        let Some(module_file) = python_module_file(files, &file.path, &import.module) else {
+        let Some(module_file) = python_module_file(lookup, &file.path, &import.module) else {
             continue;
         };
         let qualified = match &import.member {
@@ -251,35 +292,27 @@ fn imported_python_target(
     None
 }
 
-fn explicit_rust_target(call: &Call, files: &[IndexedFile], ids: &Definitions) -> Option<String> {
+fn explicit_rust_target(call: &Call, lookup: &ModuleLookup, ids: &Definitions) -> Option<String> {
     let target = call.target.strip_prefix("crate::")?;
     let (module, name) = target.rsplit_once("::")?;
+    let module = module.replace("::", "/");
     let candidates = [format!("{module}.rs"), format!("{module}/mod.rs")];
-    let mut matches = files
-        .iter()
-        .filter(|file| file.language == "rust")
-        .filter(|file| {
-            candidates.iter().any(|candidate| {
-                file.path == *candidate || file.path.ends_with(&format!("/{candidate}"))
-            })
-        })
-        .filter_map(|file| ids.get(&(file.path.clone(), name.to_owned())).cloned());
-    let first = matches.next()?;
-    matches.next().is_none().then_some(first)
+    let path = unique_module(lookup, "rust", &candidates)?;
+    ids.get(&(path, name.to_owned())).cloned()
 }
 
 fn resolve(
     file: &IndexedFile,
     call: &Call,
-    files: &[IndexedFile],
+    lookup: &ModuleLookup,
     ids: &Definitions,
 ) -> Option<String> {
     let separator = if file.language == "python" { "." } else { "::" };
     lexical_target(&file.path, call, ids, separator).or_else(|| {
         if file.language == "python" {
-            imported_python_target(file, call, files, ids)
+            imported_python_target(file, call, lookup, ids)
         } else {
-            explicit_rust_target(call, files, ids)
+            explicit_rust_target(call, lookup, ids)
         }
     })
 }
@@ -288,12 +321,12 @@ fn write_snapshot(conn: &mut Connection, files: &[IndexedFile]) -> Result<(usize
     conn.execute_batch(
         "PRAGMA foreign_keys=ON;
          CREATE TABLE files (
-           file_path TEXT PRIMARY KEY, file_hash TEXT NOT NULL, language TEXT NOT NULL);
+           file_path TEXT PRIMARY KEY, file_hash TEXT NOT NULL, language TEXT NOT NULL, facts_json TEXT NOT NULL, unresolved INTEGER NOT NULL);
          CREATE TABLE nodes (
            qualified_name TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL,
            file_path TEXT NOT NULL REFERENCES files(file_path),
            line_start INTEGER NOT NULL, line_end INTEGER NOT NULL,
-           signature TEXT, file_hash TEXT NOT NULL);
+           signature TEXT, file_hash TEXT NOT NULL, is_test INTEGER NOT NULL);
          CREATE TABLE edges (
            source_qualified TEXT NOT NULL REFERENCES nodes(qualified_name),
            target_qualified TEXT NOT NULL REFERENCES nodes(qualified_name),
@@ -305,23 +338,19 @@ fn write_snapshot(conn: &mut Connection, files: &[IndexedFile]) -> Result<(usize
          CREATE INDEX edges_target ON edges(target_qualified);",
     )?;
     let (ids, definitions) = definitions(files);
+    let lookup = module_lookup(files);
     let hashes = files
         .iter()
         .map(|file| (file.path.as_str(), file.hash.as_str()))
         .collect::<BTreeMap<_, _>>();
     let tx = conn.transaction()?;
-    for file in files {
-        tx.execute(
-            "INSERT INTO files VALUES (?1,?2,?3)",
-            params![file.path, file.hash, file.language],
-        )?;
-    }
+    write_files(&tx, files)?;
     for (path, definition, id) in &definitions {
         let hash = hashes
             .get(path.as_str())
             .context("definition references missing file")?;
         tx.execute(
-            "INSERT INTO nodes VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            "INSERT INTO nodes VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
             params![
                 id,
                 definition.name,
@@ -330,17 +359,58 @@ fn write_snapshot(conn: &mut Connection, files: &[IndexedFile]) -> Result<(usize
                 definition.line_start as i64,
                 definition.line_end as i64,
                 definition.signature,
-                hash
+                hash,
+                is_test_path(path)
+                    || definition.name.starts_with("test_")
+                    || definition.kind == "Test"
             ],
         )?;
     }
+    let (resolved, unresolved, unresolved_files) = write_call_edges(&tx, files, &ids, &lookup)?;
+    write_metadata(&tx, files, resolved, unresolved, &unresolved_files)?;
+    tx.commit()?;
+    Ok((resolved, unresolved))
+}
+
+fn write_files(tx: &rusqlite::Transaction<'_>, files: &[IndexedFile]) -> Result<()> {
+    for file in files {
+        tx.execute(
+            "INSERT INTO files VALUES (?1,?2,?3,?4,?5)",
+            params![
+                file.path,
+                file.hash,
+                file.language,
+                serde_json::to_string(&file.facts)?,
+                file.facts.dynamic_calls > 0
+            ],
+        )?;
+        tx.execute(
+            "INSERT INTO nodes VALUES (?1,?2,'File',?2,1,1,NULL,?3,?4)",
+            params![
+                format!("{}::<module>", file.path),
+                file.path,
+                file.hash,
+                is_test_path(&file.path)
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+fn write_call_edges(
+    tx: &rusqlite::Transaction<'_>,
+    files: &[IndexedFile],
+    ids: &Definitions,
+    lookup: &ModuleLookup,
+) -> Result<(usize, usize, BTreeSet<String>)> {
     let mut resolved = 0;
     let mut unresolved = 0;
     let mut distinct = BTreeSet::new();
+    let mut unresolved_files = BTreeSet::new();
     for file in files {
         for call in &file.facts.calls {
             let source = ids.get(&(file.path.clone(), call.caller.clone()));
-            let target = resolve(file, call, files, &ids);
+            let target = resolve(file, call, lookup, ids);
             if let (Some(source), Some(target)) = (source, target) {
                 if distinct.insert((source.clone(), target.clone(), call.line)) {
                     tx.execute(
@@ -351,15 +421,158 @@ fn write_snapshot(conn: &mut Connection, files: &[IndexedFile]) -> Result<(usize
                 }
             } else {
                 unresolved += 1;
+                unresolved_files.insert(file.path.clone());
             }
         }
+        if file.facts.dynamic_calls > 0 {
+            unresolved_files.insert(file.path.clone());
+        }
+        if unresolved_files.contains(&file.path) {
+            tx.execute(
+                "UPDATE files SET unresolved=1 WHERE file_path=?1",
+                [&file.path],
+            )?;
+        }
+        write_import_edges(tx, file, lookup)?;
     }
-    tx.execute("INSERT INTO index_meta VALUES ('schema_version','1')", [])?;
-    tx.commit()?;
-    Ok((resolved, unresolved))
+    Ok((resolved, unresolved, unresolved_files))
 }
 
 struct TempDb(PathBuf);
+
+fn is_test_path(path: &str) -> bool {
+    path.split('/').any(|part| part == "tests")
+        || Path::new(path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("test_") || name.ends_with("_test.py"))
+}
+
+fn write_import_edges(
+    tx: &rusqlite::Transaction<'_>,
+    file: &IndexedFile,
+    lookup: &ModuleLookup,
+) -> Result<()> {
+    for import in &file.facts.imports {
+        if let Some(target) = python_module_file(lookup, &file.path, &import.module) {
+            tx.execute(
+                "INSERT OR IGNORE INTO edges VALUES (?1,?2,'IMPORTS',0)",
+                params![
+                    format!("{}::<module>", file.path),
+                    format!("{target}::<module>")
+                ],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn write_metadata(
+    tx: &rusqlite::Transaction<'_>,
+    files: &[IndexedFile],
+    resolved: usize,
+    unresolved: usize,
+    unresolved_files: &BTreeSet<String>,
+) -> Result<()> {
+    let mut digest = Sha256::new();
+    digest.update(cache::PARSER_VERSION);
+    for file in files {
+        digest.update(&file.path);
+        digest.update(&file.hash);
+    }
+    let entries = [
+        ("schema_version", "3".to_owned()),
+        ("parser_version", cache::PARSER_VERSION.to_owned()),
+        ("content_generation", format!("{:x}", digest.finalize())),
+        ("coverage_complete", unresolved_files.is_empty().to_string()),
+        ("unresolved_files_count", unresolved_files.len().to_string()),
+        (
+            "unresolved_files_sha256",
+            format!(
+                "{:x}",
+                Sha256::digest(serde_json::to_vec(unresolved_files)?)
+            ),
+        ),
+        ("resolved_calls", resolved.to_string()),
+        ("unresolved_calls", unresolved.to_string()),
+        (
+            "dynamic_calls",
+            files
+                .iter()
+                .map(|file| file.facts.dynamic_calls)
+                .sum::<usize>()
+                .to_string(),
+        ),
+    ];
+    for (key, value) in entries {
+        tx.execute("INSERT INTO index_meta VALUES (?1,?2)", params![key, value])?;
+    }
+    Ok(())
+}
+
+fn git_head(host: &Path) -> Result<String> {
+    let output = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(host)
+        .output()
+        .context("read graph build revision")?;
+    if output.status.success() {
+        return Ok(String::from_utf8(output.stdout)?.trim().to_owned());
+    }
+    ensure!(
+        output.status.code() == Some(128),
+        "git rev-parse failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(String::new())
+}
+
+fn existing_counts(db: &Path, head: &str) -> Result<Option<(usize, usize)>> {
+    let conn = Connection::open_with_flags(db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let mut statement = conn.prepare("SELECT key,value FROM index_meta")?;
+    let metadata = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<rusqlite::Result<BTreeMap<String, String>>>()?;
+    if metadata.get("git_head_sha").map(String::as_str) != Some(head) {
+        return Ok(None);
+    }
+    let number = |key: &str| -> Result<usize> {
+        metadata
+            .get(key)
+            .with_context(|| format!("cached graph missing {key}"))?
+            .parse()
+            .context("invalid cached graph call count")
+    };
+    Ok(Some((
+        number("resolved_calls")?,
+        number("unresolved_calls")?,
+    )))
+}
+
+fn report(
+    db: &Path,
+    files: &[IndexedFile],
+    parsed_files: usize,
+    counts: (usize, usize),
+    started: std::time::Instant,
+) -> IndexReport {
+    IndexReport {
+        schema_version: 3,
+        authority: "forge-native-structural-graph",
+        database: db.display().to_string(),
+        files: files.len(),
+        definitions: files.iter().map(|file| file.facts.definitions.len()).sum(),
+        resolved_calls: counts.0,
+        unresolved_calls: counts.1,
+        dynamic_calls: files.iter().map(|file| file.facts.dynamic_calls).sum(),
+        embeddings: "absent",
+        parsed_files,
+        reused_files: files.len() - parsed_files,
+        elapsed_ms: started.elapsed().as_millis(),
+    }
+}
 
 impl Drop for TempDb {
     fn drop(&mut self) {
@@ -368,7 +581,7 @@ impl Drop for TempDb {
 }
 
 pub fn index(host: &Path, explicit_db: Option<&Path>) -> Result<IndexReport> {
-    let files = scan(host)?;
+    let started = std::time::Instant::now();
     let db = explicit_db
         .map(|path| {
             if path.is_absolute() {
@@ -378,6 +591,14 @@ pub fn index(host: &Path, explicit_db: Option<&Path>) -> Result<IndexReport> {
             }
         })
         .unwrap_or_else(|| host.join(DEFAULT_DB));
+    let previous = cache::load(&db)?;
+    let (files, parsed_files) = scan(host, &previous)?;
+    let head = git_head(host)?;
+    if parsed_files == 0 && files.len() == previous.len() && db.is_file() {
+        if let Some(counts) = existing_counts(&db, &head)? {
+            return Ok(report(&db, &files, 0, counts, started));
+        }
+    }
     let parent = db
         .parent()
         .context("graph database has no parent directory")?;
@@ -401,18 +622,15 @@ pub fn index(host: &Path, explicit_db: Option<&Path>) -> Result<IndexReport> {
     let mut conn = Connection::open(&temporary.0)
         .with_context(|| format!("create graph snapshot: {}", temporary.0.display()))?;
     let (resolved_calls, unresolved_calls) = write_snapshot(&mut conn, &files)?;
+    conn.execute("INSERT INTO index_meta VALUES ('git_head_sha',?1)", [head])?;
     conn.close().map_err(|(_, error)| error)?;
     fs::rename(&temporary.0, &db)
         .with_context(|| format!("publish graph snapshot: {}", db.display()))?;
-    Ok(IndexReport {
-        schema_version: 1,
-        authority: "forge-native-structural-graph",
-        database: db.display().to_string(),
-        files: files.len(),
-        definitions: files.iter().map(|file| file.facts.definitions.len()).sum(),
-        resolved_calls,
-        unresolved_calls,
-        dynamic_calls: files.iter().map(|file| file.facts.dynamic_calls).sum(),
-        embeddings: "absent",
-    })
+    Ok(report(
+        &db,
+        &files,
+        parsed_files,
+        (resolved_calls, unresolved_calls),
+        started,
+    ))
 }

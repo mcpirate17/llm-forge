@@ -2,7 +2,6 @@
 
 use super::{GraphRelationship, GraphResult};
 use regex::Regex;
-use rusqlite::{params_from_iter, types::Value, Connection, OpenFlags};
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{self, Read};
@@ -36,100 +35,41 @@ fn normalized(path: &Path) -> String {
     }
 }
 
-fn absolute_target(repo: &Path, file_path: &str) -> String {
-    let joined = repo.join(file_path);
-    if let Ok(canonical) = joined.canonicalize() {
-        return canonical.to_string_lossy().into_owned();
-    }
-    // `Path.resolve()` in the Python entry point also resolves an existing
-    // parent when the requested source has not yet been materialized.
-    let mut ancestor = joined.as_path();
-    let mut missing = Vec::new();
-    while !ancestor.exists() {
-        if let Some(name) = ancestor.file_name() {
-            missing.push(name.to_os_string());
-        }
-        let Some(parent) = ancestor.parent() else {
-            break;
-        };
-        ancestor = parent;
-    }
-    let mut result = ancestor
-        .canonicalize()
-        .unwrap_or_else(|_| ancestor.to_path_buf());
-    for part in missing.into_iter().rev() {
-        result.push(part);
-    }
-    result.to_string_lossy().into_owned()
-}
-
-fn rel_path(repo: &Path, path: &str) -> String {
-    let candidate = Path::new(path);
-    if !candidate.is_absolute() {
-        return path.to_owned();
-    }
-    let root = repo.canonicalize().unwrap_or_else(|_| repo.to_path_buf());
-    candidate
-        .strip_prefix(root)
-        .map_or_else(|_| path.to_owned(), normalized)
-}
-
-fn rows(
-    conn: &Connection,
-    repo: &Path,
-    absolute: &str,
-    relative: &str,
-    target: Option<&str>,
-    inbound: bool,
-) -> rusqlite::Result<Vec<GraphRelationship>> {
-    let (focus, other, target_field) = if inbound {
-        ("target", "source", "target")
-    } else {
-        ("source", "target", "source")
-    };
-    let condition = if target.is_some() {
-        format!("AND {target_field}.name = ?3")
-    } else {
-        String::new()
-    };
-    let sql = format!(
-        "SELECT DISTINCT {other}.qualified_name, edge.kind, {other}.file_path \
-         FROM nodes AS {focus} \
-         JOIN edges AS edge ON edge.{focus}_qualified = {focus}.qualified_name \
-         JOIN nodes AS {other} ON {other}.qualified_name = edge.{other}_qualified \
-         WHERE {focus}.file_path IN (?1, ?2) {condition} \
-         AND edge.kind != 'contains' ORDER BY {other}.qualified_name LIMIT 50"
-    );
-    let mut params = vec![
-        Value::Text(absolute.to_owned()),
-        Value::Text(relative.to_owned()),
-    ];
-    if let Some(target_name) = target {
-        params.push(Value::Text(target_name.to_owned()));
-    }
-    let mut statement = conn.prepare(&sql)?;
-    let found = statement.query_map(params_from_iter(params.iter()), |row| {
-        Ok(GraphRelationship {
-            qualified_name: rel_path(repo, &row.get::<_, String>(0)?),
-            kind: row.get(1)?,
-            file_path: rel_path(repo, &row.get::<_, Option<String>>(2)?.unwrap_or_default()),
-        })
-    })?;
-    found.collect()
-}
-
 fn read_graph(
     repo: &Path,
-    db_path: &Path,
+    _db_path: &Path,
     file_path: &str,
     target: Option<&str>,
-) -> rusqlite::Result<(Vec<GraphRelationship>, Vec<GraphRelationship>)> {
-    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-    let absolute = absolute_target(repo, file_path);
-    let relative = normalized(Path::new(file_path));
-    let callers = rows(&conn, repo, &absolute, &relative, target, true)?;
-    let callees = rows(&conn, repo, &absolute, &relative, target, false)?;
-    Ok((callers, callees))
+) -> Result<(Vec<GraphRelationship>, Vec<GraphRelationship>, String), String> {
+    let store = super::store::GraphStore::open(repo, None).map_err(|error| error.to_string())?;
+    let mut projection = store
+        .project(repo, file_path, target, 50)
+        .map_err(|error| error.to_string())?;
+    store
+        .validate_projection(repo, file_path, &mut projection)
+        .map_err(|error| error.to_string())?;
+    store
+        .verify_generation()
+        .map_err(|error| error.to_string())?;
+    let convert = |rows: Vec<super::store::Relationship>| {
+        rows.into_iter()
+            .map(|row| GraphRelationship {
+                qualified_name: row.qualified_name,
+                kind: row.kind,
+                file_path: row.file_path,
+            })
+            .collect()
+    };
+    let status = if projection.graph_status.starts_with("unindexed") {
+        "ok".to_owned()
+    } else {
+        projection.graph_status
+    };
+    Ok((
+        convert(projection.callers),
+        convert(projection.callees),
+        status,
+    ))
 }
 
 pub(super) fn query(
@@ -137,10 +77,10 @@ pub(super) fn query(
     file_path: &str,
     target: Option<&str>,
 ) -> Result<GraphResult, String> {
-    let db_path = repo.join(".code-review-graph/graph.db");
+    let db_path = super::store::GraphStore::database_path(repo);
     let (mut callers, callees, status) = if db_path.is_file() {
         match read_graph(repo, &db_path, file_path, target) {
-            Ok((callers, callees)) => (callers, callees, "ok".to_owned()),
+            Ok((callers, callees, status)) => (callers, callees, status),
             Err(error) => (
                 Vec::new(),
                 Vec::new(),

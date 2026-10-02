@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::sync::Mutex;
 use std::time::Duration;
 
 const CARD_BYTES: u64 = 65_536;
@@ -50,7 +51,73 @@ impl Peer {
 
 enum WireError {
     Unreachable(String),
+    Retryable(String, u64),
     Rejected(String),
+}
+
+struct Transport {
+    cards: Mutex<BTreeMap<String, Value>>,
+    discovery: ureq::Agent,
+    delivery: ureq::Agent,
+}
+
+impl Transport {
+    fn new() -> Self {
+        Self {
+            cards: Mutex::new(BTreeMap::new()),
+            discovery: client(CARD_TIMEOUT),
+            delivery: client(SEND_TIMEOUT),
+        }
+    }
+
+    fn card(&self, name: &str, peer: &Peer) -> std::result::Result<Value, WireError> {
+        if let Some(card) = self.cards.lock().expect("card cache poisoned").get(name) {
+            return Ok(card.clone());
+        }
+        let card = card(&self.discovery, name, peer)?;
+        self.cards
+            .lock()
+            .expect("card cache poisoned")
+            .insert(name.to_owned(), card.clone());
+        Ok(card)
+    }
+}
+
+fn retry_after(response: &ureq::http::Response<ureq::Body>) -> u64 {
+    let Some(raw) = response
+        .headers()
+        .get("Retry-After")
+        .and_then(|value| value.to_str().ok())
+    else {
+        return 0;
+    };
+    if let Ok(seconds) = raw.trim().parse::<u64>() {
+        return seconds.saturating_mul(1000).min(3_600_000);
+    }
+    // IMF-fixdate, the HTTP date format (numeric form above is delta-seconds).
+    let fields = raw.split_whitespace().collect::<Vec<_>>();
+    if fields.len() != 6 || fields[5] != "GMT" {
+        return 0;
+    }
+    let months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let Some(month) = months.iter().position(|month| *month == fields[2]) else {
+        return 0;
+    };
+    crate::instant::parse(&format!(
+        "{}-{:02}-{}T{}Z",
+        fields[3],
+        month + 1,
+        fields[1],
+        fields[4]
+    ))
+    .map(|due| ((due - crate::instant::now()).max(0.0) * 1000.0).min(3_600_000.0) as u64)
+    .unwrap_or(0)
+}
+
+fn transient(status: u16) -> bool {
+    matches!(status, 408 | 429 | 500..=599)
 }
 
 fn registry(root: &Path) -> Result<BTreeMap<String, Peer>> {
@@ -131,12 +198,22 @@ fn response_json(
         .map_err(|error| WireError::Rejected(format!("invalid peer JSON: {error}")))
 }
 
-fn card(peer_name: &str, peer: &Peer) -> std::result::Result<Value, WireError> {
-    let response = client(CARD_TIMEOUT)
+fn card(
+    client: &ureq::Agent,
+    peer_name: &str,
+    peer: &Peer,
+) -> std::result::Result<Value, WireError> {
+    let response = client
         .get(peer.url("/.well-known/agent-card.json"))
         .call()
         .map_err(|error| WireError::Unreachable(error.to_string()))?;
     let status = response.status().as_u16();
+    if transient(status) {
+        return Err(WireError::Retryable(
+            format!("card fetch returned HTTP {status}"),
+            retry_after(&response),
+        ));
+    }
     if status != 200 {
         return Err(WireError::Rejected(format!(
             "card fetch returned HTTP {status}"
@@ -180,6 +257,7 @@ fn data_value(data_json: Option<&str>) -> std::result::Result<Option<Value>, Wir
 }
 
 fn deliver(
+    transport: &Transport,
     peer_name: &str,
     peer: &Peer,
     row: &PendingOutbound,
@@ -188,7 +266,7 @@ fn deliver(
     let data = data_value(row.data_json.as_deref())?;
     let fetched = match known_card {
         Some(card) => card,
-        None => card(peer_name, peer)?,
+        None => transport.card(peer_name, peer)?,
     };
     if data
         .as_ref()
@@ -205,7 +283,8 @@ fn deliver(
         "parts":parts,"metadata":{"sender":row.sender}}}});
     let encoded = serde_json::to_vec(&request)
         .map_err(|error| WireError::Rejected(format!("cannot serialize message: {error}")))?;
-    let response = client(SEND_TIMEOUT)
+    let response = transport
+        .delivery
         .post(peer.url("/"))
         .header("X-A2A-Token", peer.token.as_str())
         .header("A2A-Version", "1.0")
@@ -213,6 +292,12 @@ fn deliver(
         .send(encoded.as_slice())
         .map_err(|error| WireError::Unreachable(error.to_string()))?;
     let status = response.status().as_u16();
+    if transient(status) {
+        return Err(WireError::Retryable(
+            format!("peer returned HTTP {status}"),
+            retry_after(&response),
+        ));
+    }
     let payload = response_json(response, REPLY_BYTES)?;
     if status != 200 || payload.get("error").is_some() {
         let reason = payload["error"]["message"]
@@ -239,16 +324,41 @@ fn deliver(
 }
 
 fn attempt(
+    transport: &Transport,
     store: &mut Store,
     peer_name: &str,
     peer: &Peer,
     row: &PendingOutbound,
     known_card: Option<Value>,
 ) -> Result<&'static str> {
-    let (status, reason) = match deliver(peer_name, peer, row, known_card) {
+    record_attempt(
+        store,
+        row,
+        deliver(transport, peer_name, peer, row, known_card),
+    )
+}
+
+fn record_attempt(
+    store: &mut Store,
+    row: &PendingOutbound,
+    result: std::result::Result<(), WireError>,
+) -> Result<&'static str> {
+    let (status, reason) = match result {
         Ok(()) => ("delivered", None),
         Err(WireError::Unreachable(error)) => {
-            ("queued", Some(format!("peer unreachable: {error}")))
+            store.schedule_retry(
+                &row.id,
+                &format!("peer unreachable: {error}")
+                    .chars()
+                    .take(500)
+                    .collect::<String>(),
+                0,
+            )?;
+            return Ok("queued");
+        }
+        Err(WireError::Retryable(error, delay)) => {
+            store.schedule_retry(&row.id, &error.chars().take(500).collect::<String>(), delay)?;
+            return Ok("queued");
         }
         Err(WireError::Rejected(error)) => (
             "failed",
@@ -265,6 +375,7 @@ fn attempt(
 }
 
 fn flush_store(
+    transport: &Transport,
     store: &mut Store,
     records: &BTreeMap<String, Peer>,
     to: Option<&str>,
@@ -273,47 +384,82 @@ fn flush_store(
     let mut output = Vec::new();
     let mut unreachable = BTreeSet::new();
     while output.len() < limit {
-        let excluded = unreachable.iter().cloned().collect::<Vec<_>>();
-        let Some(row) = store.next_outbound(to, &excluded)? else {
-            break;
-        };
-        let status = if let Some(peer) = records.get(&row.recipient) {
-            attempt(store, &row.recipient, peer, &row, None)?
-        } else {
-            store.mark_outbound(&row.id, "failed", Some("recipient no longer registered"))?;
-            "failed"
-        };
-        if status == "queued" {
-            unreachable.insert(row.recipient.clone());
+        let mut excluded = unreachable.iter().cloned().collect::<Vec<_>>();
+        let mut batch = Vec::new();
+        for _ in 0..4.min(limit - output.len()) {
+            let Some(row) = store.next_outbound(to, &excluded)? else {
+                break;
+            };
+            excluded.push(row.recipient.clone());
+            batch.push(row);
         }
-        output.push(json!({"message_id":row.id,"sender":row.sender,"recipient":row.recipient,"status":status}));
+        if batch.is_empty() {
+            break;
+        }
+        let results = std::thread::scope(|scope| {
+            batch
+                .iter()
+                .map(|row| {
+                    scope.spawn(move || {
+                        if let Some(peer) = records.get(&row.recipient) {
+                            deliver(transport, &row.recipient, peer, row, None)
+                        } else {
+                            Err(WireError::Rejected("recipient no longer registered".into()))
+                        }
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|handle| {
+                    handle
+                        .join()
+                        .map_err(|_| anyhow::anyhow!("delivery worker panicked"))
+                })
+                .collect::<Result<Vec<_>>>()
+        })?;
+        for (row, result) in batch.iter().zip(results) {
+            let status = record_attempt(store, row, result)?;
+            if status == "queued" {
+                unreachable.insert(row.recipient.clone());
+            }
+            output.push(json!({"message_id":row.id,"sender":row.sender,"recipient":row.recipient,"status":status}));
+        }
     }
     Ok(output)
 }
 
-fn preflight_v2(name: &str, peer: &Peer, input: &ValidatedMessage) -> Result<Option<Value>> {
+fn preflight_v2(
+    transport: &Transport,
+    name: &str,
+    peer: &Peer,
+    input: &ValidatedMessage,
+) -> Result<Option<Value>> {
     if !input.data_json.as_deref().is_some_and(|data| {
         serde_json::from_str::<Value>(data).is_ok_and(|value| value["kind"] == "coordination-v2")
     }) {
         return Ok(None);
     }
-    match card(name, peer) {
+    match transport.card(name, peer) {
         Ok(card) => {
             require_v2(name, &card).map_err(wire_as_error)?;
             Ok(Some(card))
         }
         Err(WireError::Unreachable(_)) => Ok(None),
+        Err(WireError::Retryable(_, _)) => Ok(None),
         Err(error) => Err(wire_as_error(error)),
     }
 }
 
 fn wire_as_error(error: WireError) -> anyhow::Error {
     match error {
-        WireError::Unreachable(reason) | WireError::Rejected(reason) => anyhow::anyhow!(reason),
+        WireError::Unreachable(reason)
+        | WireError::Retryable(reason, _)
+        | WireError::Rejected(reason) => anyhow::anyhow!(reason),
     }
 }
 
 pub fn send(args: SendArgs, state_dir: &Path) -> Result<(Value, u8)> {
+    let transport = Transport::new();
     let records = registry(state_dir)?;
     let input = queue::validate_input(args.message)?;
     let peer = records.get(&input.recipient).with_context(|| {
@@ -328,14 +474,23 @@ pub fn send(args: SendArgs, state_dir: &Path) -> Result<(Value, u8)> {
         "unknown sender {:?}",
         input.sender
     );
-    let preflight_card = preflight_v2(&input.recipient, peer, &input)?;
+    let preflight_card = preflight_v2(&transport, &input.recipient, peer, &input)?;
     let mut store = Store::required(state_dir, &input.sender, true)?;
     store.require_enqueue_schema()?;
     let _lock = SenderLock::acquire(state_dir, &input.sender)?;
-    flush_store(&mut store, &records, Some(&input.recipient), 100)?;
+    flush_store(
+        &transport,
+        &mut store,
+        &records,
+        Some(&input.recipient),
+        100,
+    )?;
     let waiting = store.has_outbound(Some(&input.recipient))?;
     let prepared = queue::prepare(input)?;
-    store.enqueue(&prepared, "awaiting explicit flush")?;
+    let existing = store.enqueue(&prepared, "awaiting explicit flush")?;
+    if existing["delivery_status"] == "delivered" || existing["delivery_status"] == "failed" {
+        return complete_send(&mut store, &prepared.id, args.no_queue);
+    }
     if waiting {
         store.mark_outbound(
             &prepared.id,
@@ -350,17 +505,28 @@ pub fn send(args: SendArgs, state_dir: &Path) -> Result<(Value, u8)> {
             row.id == prepared.id,
             "new message overtook earlier outbound delivery"
         );
-        attempt(&mut store, &prepared.recipient, peer, &row, preflight_card)?;
+        attempt(
+            &transport,
+            &mut store,
+            &prepared.recipient,
+            peer,
+            &row,
+            preflight_card,
+        )?;
     }
-    let mut receipt = store.outbound_receipt(&prepared.id)?;
-    if receipt["delivery_status"] == "queued" && args.no_queue {
+    complete_send(&mut store, &prepared.id, args.no_queue)
+}
+
+fn complete_send(store: &mut Store, id: &str, no_queue: bool) -> Result<(Value, u8)> {
+    let mut receipt = store.outbound_receipt(id)?;
+    if receipt["delivery_status"] == "queued" && no_queue {
         let reason = format!(
             "{}; queue disabled",
             receipt["status_reason"]
                 .as_str()
                 .unwrap_or("peer unreachable")
         );
-        store.mark_outbound(&prepared.id, "failed", Some(&reason))?;
+        store.mark_outbound(id, "failed", Some(&reason))?;
         bail!(reason);
     }
     if receipt["delivery_status"] == "failed" {
@@ -381,6 +547,7 @@ pub fn send(args: SendArgs, state_dir: &Path) -> Result<(Value, u8)> {
 }
 
 pub fn flush(args: FlushArgs, state_dir: &Path) -> Result<(Value, u8)> {
+    let transport = Transport::new();
     ensure!(
         (1..=1000).contains(&args.max_messages),
         "max_messages must be between 1 and 1000"
@@ -405,6 +572,7 @@ pub fn flush(args: FlushArgs, state_dir: &Path) -> Result<(Value, u8)> {
         let _lock = SenderLock::acquire(state_dir, &sender)?;
         if output.len() < args.max_messages {
             output.extend(flush_store(
+                &transport,
                 &mut store,
                 &records,
                 args.to.as_deref(),

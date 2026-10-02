@@ -7,10 +7,11 @@
 //! SIGKILLed on overrun and again after exit to reap stragglers.
 
 use std::fs::File;
-use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(test)]
+use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
 
@@ -62,54 +63,54 @@ pub struct ShellRun<'a> {
     pub timeout: Duration,
 }
 
-/// Runs `sh -c command` with stdout and stderr appended to `log`.
+#[path = "land_process.rs"]
+mod process;
+
+pub use process::{run_measured, Usage};
+
+/// Executes one bounded process group; logs retain at most 16 MiB.
 pub fn run_shell(run: &ShellRun) -> Result<Outcome> {
-    let log = File::create(run.log).with_context(|| format!("creating {}", run.log.display()))?;
-    let mut child = Command::new("sh")
-        .arg("-c")
-        .arg(run.command)
-        .current_dir(run.cwd)
-        .envs(run.env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
-        .stdin(Stdio::null())
-        .stdout(log.try_clone()?)
-        .stderr(log)
-        .process_group(0)
-        .spawn()
-        .with_context(|| format!("spawning sh -c {:?}", run.command))?;
-    let pgid = child.id() as libc::pid_t;
-    let deadline = Instant::now() + run.timeout;
-    let outcome = loop {
-        if let Some(status) = child.try_wait()? {
-            break match status.code() {
-                Some(0) => Outcome::Passed,
-                Some(code) => Outcome::Failed(code),
-                None => Outcome::Failed(-1),
-            };
-        }
-        if Instant::now() >= deadline {
-            kill_group(pgid);
-            child.wait()?;
-            break Outcome::TimedOut;
-        }
-        std::thread::sleep(Duration::from_millis(100));
-    };
-    kill_group(pgid);
-    Ok(outcome)
+    Ok(run_measured(run, 16 * 1024 * 1024)?.outcome)
 }
 
-fn kill_group(pgid: libc::pid_t) {
-    // SAFETY: kill(2) with a negative pid signals the group we created;
-    // ESRCH once the group is empty is the expected, ignorable result.
-    unsafe {
-        libc::kill(-pgid, libc::SIGKILL);
+/// Read at most 64 KiB backwards, regardless of log size or line length.
+pub fn tail(path: &Path, lines: usize) -> String {
+    match bounded_tail(path, lines, 64 * 1024) {
+        Ok(text) => text,
+        Err(error) => format!("unable to read log {}: {error}", path.display()),
     }
 }
 
-/// The last `lines` lines of `path`, for a failure report.
-pub fn tail(path: &Path, lines: usize) -> String {
-    let text = std::fs::read_to_string(path).unwrap_or_default();
-    let all: Vec<&str> = text.lines().collect();
-    all[all.len().saturating_sub(lines)..].join("\n")
+fn bounded_tail(path: &Path, lines: usize, byte_limit: usize) -> std::io::Result<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    if lines == 0 || byte_limit == 0 {
+        return Ok(String::new());
+    }
+    let mut file = File::open(path)?;
+    let mut position = file.metadata()?.len();
+    let mut pieces = Vec::new();
+    let mut bytes = 0;
+    let mut newlines = 0;
+    while position > 0 && bytes < byte_limit && newlines <= lines {
+        let count = (position as usize).min(4096).min(byte_limit - bytes);
+        position -= count as u64;
+        file.seek(SeekFrom::Start(position))?;
+        let mut piece = vec![0; count];
+        file.read_exact(&mut piece)?;
+        newlines += piece.iter().filter(|byte| **byte == b'\n').count();
+        bytes += count;
+        pieces.push(piece);
+    }
+    let data: Vec<u8> = pieces.into_iter().rev().flatten().collect();
+    let text = String::from_utf8_lossy(&data);
+    let mut output = text.lines().rev().take(lines).collect::<Vec<_>>();
+    output.reverse();
+    let result = output.join("\n");
+    Ok(if position > 0 && newlines <= lines {
+        format!("[tail clipped at {byte_limit} bytes]\n{result}")
+    } else {
+        result
+    })
 }
 
 #[cfg(test)]
@@ -172,6 +173,46 @@ mod tests {
         let dir = scratch("tail");
         std::fs::write(dir.join("f"), "a\nb\nc\n").unwrap();
         assert_eq!(tail(&dir.join("f"), 2), "b\nc");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn sparse_large_tail_and_long_lines_have_bounded_output() {
+        use std::io::{Seek, SeekFrom, Write};
+        let dir = scratch("large-tail");
+        let path = dir.join("sparse");
+        let mut file = File::create(&path).unwrap();
+        file.set_len(128 * 1024 * 1024).unwrap();
+        file.seek(SeekFrom::End(-7)).unwrap();
+        file.write_all(b"\na\nb\nc\n").unwrap();
+        assert_eq!(tail(&path, 2), "b\nc");
+        let text = tail(&path, 20);
+        assert!(text.len() < 66 * 1024);
+        assert!(text.starts_with("[tail clipped"));
+        assert_eq!(tail(&path, 0), "");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn measured_output_is_drained_capped_and_accounted() {
+        let dir = scratch("measured");
+        let measured = run_measured(
+            &ShellRun {
+                command: "head -c 131072 /dev/zero",
+                cwd: &dir,
+                env: &[],
+                log: &dir.join("log"),
+                timeout: Duration::from_secs(5),
+            },
+            1024,
+        )
+        .unwrap();
+        assert_eq!(measured.outcome, Outcome::Passed);
+        assert_eq!(measured.usage.retained_bytes, 1024);
+        assert_eq!(measured.usage.discarded_bytes, 130048);
+        assert!(measured.usage.max_rss_bytes > 0);
+        assert!(measured.usage.wall_ms > 0.0);
+        assert_eq!(std::fs::metadata(dir.join("log")).unwrap().len(), 1024);
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

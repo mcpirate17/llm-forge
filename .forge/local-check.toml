@@ -5,6 +5,17 @@ path_prepend = [".venv/bin"]
 # Only unrelated research drafts may remain untracked during a check.
 allowed_untracked_prefixes = ["research/"]
 
+# Checks remain serial unless forge check --jobs 2 is requested. Unlisted
+# checks reserve both CPUs and the shared environment. Only these independent,
+# read-only checks may overlap; Cargo/Python/install stages remain exclusive.
+[schedule.git-diff-check]
+cpus = 1
+resources = []
+
+[schedule.mutation-tooling]
+cpus = 1
+resources = ["mutation-evidence"]
+
 [env]
 CUDA_VISIBLE_DEVICES = ""
 CARGO_BUILD_JOBS = "2"

@@ -11,6 +11,7 @@ import argparse
 import ast
 import json
 import sys
+from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -46,6 +47,7 @@ class FileContextSummary:
     callers: list[GraphRelationship]
     callees: list[GraphRelationship]
     graph_status: str = "ok"
+    language: str = "python"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -53,6 +55,7 @@ class FileContextSummary:
             "symbols": self.symbols,
             "skeleton": self.skeleton,
             "graph_status": self.graph_status,
+            "language": self.language,
             "callers": [
                 {
                     "qualified_name": c.qualified_name,
@@ -248,6 +251,24 @@ def query_graph_relationships(
     )
 
 
+@lru_cache(maxsize=32)
+def _source_skeleton(
+    code: str, file_path: str, symbol: str | None
+) -> tuple[str, tuple[str, ...]]:
+    if file_path.endswith(".rs"):
+        try:
+            projection = _graph_native(
+                "rust_skeleton", {"source": code, "target_symbol": symbol}
+            )
+        except ValueError as exc:
+            raise GraphContextError(str(exc)) from exc
+        return projection["skeleton"], tuple(projection["symbols"])
+    skeleton, symbols = extract_ast_skeleton(
+        code, target_symbol=symbol, file_path_hint=file_path
+    )
+    return skeleton, tuple(symbols)
+
+
 def get_file_context(
     repo: Path,
     file_path: str,
@@ -258,11 +279,12 @@ def get_file_context(
     src = repo / file_path
     if not src.is_file():
         raise GraphContextError(f"file not found: {file_path}")
-
+    if src.stat().st_size > 1 << 20:
+        raise GraphContextError(f"source exceeds 1 MiB: {file_path}")
+    if src.suffix not in {".py", ".rs"}:
+        raise GraphContextError(f"unsupported source language: {src.suffix}")
     code = src.read_text(encoding="utf-8")
-    skeleton, symbols = extract_ast_skeleton(
-        code, target_symbol=target_symbol, file_path_hint=file_path
-    )
+    skeleton, symbols = _source_skeleton(code, file_path, target_symbol)
 
     callers: list[GraphRelationship] = []
     callees: list[GraphRelationship] = []
@@ -275,10 +297,11 @@ def get_file_context(
     return FileContextSummary(
         file_path=file_path,
         skeleton=skeleton,
-        symbols=symbols,
+        symbols=list(symbols),
         callers=callers,
         callees=callees,
         graph_status=graph_status,
+        language="rust" if src.suffix == ".rs" else "python",
     )
 
 
@@ -294,7 +317,7 @@ def format_markdown_context(summary: FileContextSummary) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("file_path", help="Path to Python source file")
+    parser.add_argument("file_path", help="Path to Python or Rust source file")
     parser.add_argument("--symbol", help="Target specific symbol name")
     parser.add_argument(
         "--no-graph",

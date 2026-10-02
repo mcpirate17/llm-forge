@@ -85,6 +85,60 @@ fn error_line(py: Python<'_>, failed: &Bound<'_, PyAny>) -> String {
 }
 
 #[test]
+fn enriched_fragment_budget_and_invalid_shapes_match_python_reference() {
+    let mut case = Case::new();
+    case.set_env("HOOK_CONTEXT_MAX_BYTES", "512");
+    case.set_env(
+        "CONTEXT_FRAGMENT_DIR",
+        case.root()
+            .join("fragments")
+            .to_str()
+            .unwrap()
+            .to_owned()
+            .as_str(),
+    );
+    Python::attach(|py| {
+        let required = "required instructions".repeat(100);
+        let rows = [outcome(
+            py,
+            "custom",
+            Some(json!({"hookSpecificOutput": {
+                "permissionDecision": "ask", "permissionDecisionReason": "approval required",
+                "contextFragments": [
+                    {"content": required, "category": "instructions"},
+                    {"content": "bad priority", "priority": "string"},
+                    {"content": "bad flag", "protected": "yes"}
+                ]
+            }})),
+        )];
+        let actual = merged(py, "PreToolUse", &rows);
+        let reference = production(py)
+            .getattr("_merge_reference")
+            .unwrap()
+            .call1(("PreToolUse", PyList::new(py, &rows).unwrap()))
+            .unwrap();
+        assert!(actual.eq(reference).unwrap());
+        assert!(specific(&actual)
+            .get_item("permissionDecision")
+            .unwrap()
+            .eq("ask")
+            .unwrap());
+        assert!(specific(&actual)
+            .get_item("additionalContext")
+            .unwrap()
+            .extract::<String>()
+            .unwrap()
+            .contains(&required));
+        assert!(actual
+            .get_item("systemMessage")
+            .unwrap()
+            .extract::<String>()
+            .unwrap()
+            .contains("invalid context fragment"));
+    });
+}
+
+#[test]
 fn any_deny_wins_over_allow_and_ask() {
     let _case = Case::new();
     Python::attach(|py| {

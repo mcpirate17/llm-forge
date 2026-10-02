@@ -6,7 +6,6 @@ import argparse
 import json
 import sqlite3
 import sys
-import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -165,6 +164,7 @@ def _add_send_commands(sub: argparse._SubParsersAction[Any]) -> None:
     send_parser = sub.add_parser("send", help="deliver one message to a peer")
     send_parser.add_argument("--from-name", required=True)
     send_parser.add_argument("--to", required=True)
+    send_parser.add_argument("--idempotency-key")
     body_group = send_parser.add_mutually_exclusive_group(required=True)
     body_group.add_argument("--body")
     body_group.add_argument("--body-file", type=Path)
@@ -264,6 +264,11 @@ def _add_watch_and_status_commands(sub: argparse._SubParsersAction[Any]) -> None
     watch_parser.add_argument("--as-name", required=True)
     watch_parser.add_argument("--interval", type=float, default=120.0)
     watch_parser.add_argument("--once", action="store_true")
+    watch_parser.add_argument(
+        "--replay-unread",
+        action="store_true",
+        help="recover unacknowledged messages even if previously presented",
+    )
     watch_parser.add_argument(
         "--max-messages", type=int, default=DEFAULT_COMPACT_MESSAGES
     )
@@ -391,6 +396,7 @@ def _cmd_send(args: argparse.Namespace) -> int:
         data_payload,
         args.state_dir,
         queue_on_unreachable=not args.no_queue,
+        idempotency_key=args.idempotency_key,
     )
     print(json.dumps(row, ensure_ascii=False, sort_keys=True))
     if row["delivery_status"] == "delivered":
@@ -532,12 +538,22 @@ def _cmd_watch(args: argparse.Namespace) -> int:
     if not 5.0 <= args.interval <= 3600.0:
         raise A2aError("--interval must be between 5 and 3600 seconds")
     store = A2aStore(args.state_dir, args.as_name)
+    from conductor.a2a_wait import MailboxWakeup
+
+    wakeup = MailboxWakeup(store.path.parent)
+    try:
+        return _watch_loop(args, store, wakeup)
+    finally:
+        wakeup.close()
+
+
+def _watch_loop(args: argparse.Namespace, store: A2aStore, wakeup: Any) -> int:
     while True:
         payload, message_ids = compact_inbox_payload(
             store,
             agent=args.as_name,
             unread_only=True,
-            unpresented_only=True,
+            unpresented_only=not args.replay_unread,
             max_messages=args.max_messages,
             preview_chars=args.preview_chars,
             max_chars=args.max_chars,
@@ -563,7 +579,7 @@ def _cmd_watch(args: argparse.Namespace) -> int:
             store.mark_presented(message_ids)
         if args.once:
             return 0
-        time.sleep(args.interval)
+        wakeup.wait(args.interval)
 
 
 def _cmd_peers(args: argparse.Namespace) -> int:

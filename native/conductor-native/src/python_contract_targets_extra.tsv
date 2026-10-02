@@ -250,3 +250,17 @@ src/conductor/project_paths.py	python_contracts_mutation_patch_audit_b
 src/conductor/project_paths.py	python_contracts_mutation_patch_audit_c
 src/conductor/slop_gate.py	python_contracts_candidate_call_evidence
 src/conductor/slop_ledger.py	python_contracts_candidate_call_evidence
+
+# Numerical performance gates and mailbox notification contracts.
+native/conductor-native/src/candidate_checks_evidence.rs	python_contracts_candidate_performance
+native/conductor-native/src/lib.rs	python_contracts_candidate_performance
+native/conductor-native/src/performance_receipt.rs	python_contracts_candidate_performance
+native/conductor-native/tests/python_contracts/candidate_review_support.rs	python_contracts_candidate_performance
+native/conductor-native/tests/python_contracts/git_fixture_support.rs	python_contracts_candidate_performance
+native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_performance
+src/conductor/_native.py	python_contracts_candidate_performance
+src/conductor/candidate_review/checks.py	python_contracts_candidate_performance
+src/conductor/candidate_review/model.py	python_contracts_candidate_performance
+native/conductor-native/tests/python_contracts/support.rs	python_contracts_a2a_wait
+src/conductor/a2a_cli.py	python_contracts_a2a_wait
+src/conductor/a2a_wait.py	python_contracts_a2a_wait

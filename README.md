@@ -34,6 +34,10 @@ still use their configured host dispatcher. See [mailbox operations](docs/messag
 and [resource-aware task execution](docs/coordination.md). For bounded code
 relationships and references extracted from a message, see
 [native graph context](docs/graph-context.md).
+Shared hook budgets, actual provider usage reports, and deferred tool definition
+discovery are documented in [context efficiency](docs/context-efficiency.md).
+For measured workload comparisons and explicit profiler commands, see
+[performance receipts](docs/performance.md).
 
 ## Install
 
@@ -51,6 +55,9 @@ Before opening or merging a pull request, commit the changes and run
 `make local-check` followed by `make local-verify`. The Rust runner checks the
 committed source locally and records a source-bound receipt. GitHub CI is an
 explicit manual fallback. See [local checks](docs/local-checks.md).
+During editing, `forge preview` prints an advisory test plan;
+`forge preview --execute` runs it in a private file snapshot with reusable build
+artifacts. Preview evidence stays separate from committed landing receipts.
 
 `make install` installs the checkout's Python package in editable mode, compiles
 `conductor_native`, `slop_core`, and `forge` into the environment, then prebuilds

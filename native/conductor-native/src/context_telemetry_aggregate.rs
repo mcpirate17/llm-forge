@@ -21,6 +21,15 @@ pub enum ReportError {
     NaiveTimestamp(String),
 }
 
+impl std::error::Error for ReportError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
 impl fmt::Display for ReportError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -87,6 +96,7 @@ struct SummaryRow {
 struct Summary {
     positions: HashMap<(String, String), usize>,
     rows: Vec<SummaryRow>,
+    usage: crate::context_telemetry_usage::UsageLedger,
 }
 
 fn python_string(value: Option<&Value>) -> String {
@@ -141,6 +151,7 @@ fn integer_or_zero(value: Option<&Value>) -> i128 {
 
 impl Summary {
     fn add(&mut self, item: &Map<String, Value>, bound_bytes: i128) {
+        self.usage.add(item);
         let event = python_string(item.get("event"));
         let tool = python_string(item.get("tool"));
         let index = *self
@@ -190,6 +201,7 @@ impl Summary {
             "output_bytes": output_bytes,
             "hook_context_bytes": hook_context_bytes,
             "rows": self.rows,
+            "model_usage": self.usage.finish(),
         })
     }
 }
@@ -574,6 +586,14 @@ pub fn format_summary(summary: &Value) -> Result<String, String> {
             right(&int_text(required(row, "over_bound")?)?, 8),
             right(&grouped(required(row, "over_bound_bytes")?)?, 13)
         ));
+    }
+    if let Some(usage) = summary
+        .get("model_usage")
+        .filter(|usage| usage["usage_events"].as_u64().unwrap_or(0) > 0)
+    {
+        let totals = &usage["totals"];
+        lines.push(format!("model_usage keyed_requests={} unkeyed_events={} input={} output={} cached={} deduplicated={}",
+            usage["keyed_requests"], usage["unkeyed_usage_events"], totals["total_input_tokens"], totals["output_tokens"], totals["cached_input_tokens"], usage["deduplicated_events"]));
     }
     Ok(lines.join("\n"))
 }

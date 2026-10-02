@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import fnmatch
+import hashlib
 import json
 import os
 import time
@@ -502,15 +503,32 @@ def check_performance_evidence(
         return _result("performance-evidence", started)
     evidence_paths = chosen["evidence_paths"]
     hot_changes = [change for change in ctx.live_changes if change.path in hot_paths]
-    evidence_text = ""
-    for test in selection.tests:
-        try:
-            evidence_text += (ctx.snapshot / test).read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+    receipts: list[dict[str, object]] = []
+    for evidence_path in evidence_paths:
+        if not evidence_path.endswith(".json"):
             continue
+        file = ctx.snapshot / evidence_path
+        try:
+            if file.stat().st_size > 2 * 1024 * 1024:
+                raise ValueError("performance receipt exceeds 2 MiB")
+            receipt = json.loads(file.read_text(encoding="utf-8"))
+            if (
+                isinstance(receipt, dict)
+                and receipt.get("schema") == "forge.performance-evidence.v1"
+            ):
+                receipts.append({"path": evidence_path, "receipt": receipt})
+        except (OSError, UnicodeDecodeError, ValueError) as error:
+            receipts.append(
+                {"path": evidence_path, "error": f"{evidence_path}: {error}"}
+            )
     rows: list[dict[str, object]] = []
     for change in hot_changes:
         row: dict[str, object] = {"path": change.path, "classes": change.classes}
+        try:
+            with (ctx.snapshot / change.path).open("rb") as source:
+                row["sha256"] = hashlib.file_digest(source, "sha256").hexdigest()
+        except OSError as error:
+            row["source_error"] = str(error)
         if "python" in change.classes and "native" not in change.classes:
             try:
                 row["text"] = (ctx.snapshot / change.path).read_text(encoding="utf-8")
@@ -522,7 +540,9 @@ def check_performance_evidence(
         {
             "hot_changes": rows,
             "evidence_paths": evidence_paths,
-            "evidence_text": evidence_text,
+            "performance_receipts": receipts,
+            "expected_host": str(ctx.repo.resolve()),
+            "max_regression_percent": 10.0,
         },
     )
     return _result(

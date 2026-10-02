@@ -161,6 +161,147 @@ fn malformed_database_fails_closed_and_a_rebuilt_database_can_be_read() {
 }
 
 #[test]
+#[cfg(feature = "source-analysis")]
+fn rust_skeleton_preserves_impl_traits_attributes_and_multiline_signatures() {
+    let source = "use std::fmt;\npub trait Worker {\n    fn run(&self, input: &str) -> usize;\n}\npub struct Engine { value: usize }\nimpl Worker for Engine {\n    #[inline]\n    fn run(\n        &self, input: &str,\n    ) -> usize { self.value + input.len() }\n}\n";
+    let full = dispatch("rust_skeleton", &json!({"source": source})).unwrap();
+    let skeleton = full["skeleton"].as_str().unwrap();
+    assert!(skeleton.contains("pub trait Worker"));
+    assert!(skeleton.contains("impl Worker for Engine"));
+    assert!(skeleton.contains("#[inline]"));
+    assert!(skeleton.contains("input: &str"));
+    assert!(!skeleton.contains("self.value + input.len()"));
+    let selected = dispatch(
+        "rust_skeleton",
+        &json!({"source": source, "target_symbol": "Engine::run"}),
+    )
+    .unwrap();
+    assert!(selected["skeleton"]
+        .as_str()
+        .unwrap()
+        .contains("impl Worker for Engine"));
+    assert!(!selected["skeleton"]
+        .as_str()
+        .unwrap()
+        .contains("pub trait Worker"));
+    assert!(dispatch(
+        "rust_skeleton",
+        &json!({"source": source, "target_symbol": "missing"})
+    )
+    .is_err());
+    assert!(dispatch("rust_skeleton", &json!({"source": "fn broken("})).is_err());
+}
+
+#[test]
+fn external_adapter_validates_dirty_and_deleted_peer_hashes() {
+    use sha2::{Digest, Sha256};
+    let repo = Repo::new();
+    let target = repo.write("pkg/target.py", "def target(): return 1\n");
+    let caller = repo.write(
+        "pkg/caller.py",
+        "from pkg.target import target\ndef caller(): return target()\n",
+    );
+    let connection = repo.database();
+    connection
+        .execute_batch("ALTER TABLE nodes ADD COLUMN file_hash TEXT")
+        .unwrap();
+    for (name, path) in [("target", target), ("caller", caller)] {
+        let hash = format!("{:x}", Sha256::digest(fs::read(&path).unwrap()));
+        connection
+            .execute(
+                "INSERT INTO nodes VALUES (?1,?1,?2,?3)",
+                params![name, path.to_string_lossy(), hash],
+            )
+            .unwrap();
+    }
+    connection
+        .execute("INSERT INTO edges VALUES ('caller','target','CALLS')", [])
+        .unwrap();
+    drop(connection);
+    assert_eq!(
+        query(&repo, "pkg/target.py", Some("target"))["status"],
+        "ok"
+    );
+    repo.write("pkg/caller.py", "def caller(): return 2\n");
+    let dirty = query(&repo, "pkg/target.py", Some("target"));
+    assert_eq!(dirty["status"], "stale (relationship endpoint differs)");
+    assert!(dirty["callers"].as_array().unwrap().is_empty());
+    fs::remove_file(repo.path().join("pkg/caller.py")).unwrap();
+    assert_eq!(
+        query(&repo, "pkg/target.py", Some("target"))["status"],
+        "stale (relationship endpoint differs)"
+    );
+}
+
+#[test]
+fn external_selection_broadens_unverified_coverage_and_exposes_build_revision() {
+    let repo = Repo::new();
+    repo.write("pkg/source.py", "def source(): return 1\n");
+    repo.write("tests/test_source.py", "def test_source(): pass\n");
+    repo.write("tests/test_other.py", "def test_other(): pass\n");
+    let connection = repo.database();
+    connection.execute_batch("CREATE TABLE metadata (key TEXT,value TEXT); INSERT INTO metadata VALUES ('git_head_sha','expected-head')").unwrap();
+    drop(connection);
+    let plan = dispatch(
+        "test_selection",
+        &json!({"repo": repo.path(), "paths": ["pkg/source.py"], "expected_head": "expected-head"}),
+    )
+    .unwrap();
+    assert_eq!(plan["metadata"]["git_head_sha"], "expected-head");
+    assert_eq!(plan["complete"], false);
+    assert_eq!(plan["scope"], "full-test-inventory-fallback");
+    assert_eq!(
+        plan["paths"],
+        json!(["tests/test_other.py", "tests/test_source.py"])
+    );
+    let stale = dispatch("test_selection", &json!({"repo": repo.path(), "paths": ["pkg/source.py"], "expected_head": "different-head"})).unwrap();
+    assert!(stale["reasons"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("graph build revision differs")));
+}
+
+#[test]
+fn nullable_external_symbol_columns_keep_relationships_available() {
+    let repo = Repo::new();
+    let connection = repo.database();
+    connection.execute_batch("ALTER TABLE nodes ADD COLUMN kind TEXT; ALTER TABLE nodes ADD COLUMN line_start INTEGER; ALTER TABLE nodes ADD COLUMN line_end INTEGER; INSERT INTO nodes VALUES ('target','run','pkg/target.py',NULL,NULL,NULL); INSERT INTO nodes VALUES ('caller','caller','pkg/caller.py',NULL,NULL,NULL); INSERT INTO edges VALUES ('caller','target','CALLS')").unwrap();
+    drop(connection);
+    let result = query(&repo, "pkg/target.py", Some("run"));
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["callers"][0]["qualified_name"], "caller");
+}
+
+#[test]
+fn full_test_inventory_excludes_fixtures_and_unknown_edges_are_preserved() {
+    let repo = Repo::new();
+    repo.write("tests/fixtures/config.json", "{}");
+    repo.write("tests/Cargo.toml", "[package]\nname='fixture'\n");
+    repo.write("tests/README.md", "fixture documentation");
+    repo.write("tests/test_real.py", "def test_real(): pass\n");
+    repo.write("src/inline.rs", "#[test]\nfn inline() {}\n");
+    let connection = repo.database();
+    connection.execute_batch("INSERT INTO nodes VALUES ('target','target','pkg/target.py'); INSERT INTO nodes VALUES ('caller','test_real','tests/test_real.py'); INSERT INTO edges VALUES ('caller','target',NULL)").unwrap();
+    drop(connection);
+    let relations = query(&repo, "pkg/target.py", Some("target"));
+    assert_eq!(relations["callers"][0]["kind"], "UNKNOWN");
+    let plan = dispatch(
+        "test_selection",
+        &json!({"repo": repo.path(), "paths": ["pkg/target.py"]}),
+    )
+    .unwrap();
+    assert_eq!(plan["complete"], false);
+    assert_eq!(
+        plan["paths"],
+        json!(["src/inline.rs", "tests/test_real.py"])
+    );
+    assert!(plan["reasons"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("graph edge kinds unverified")));
+}
+
+#[test]
 fn markdown_separates_test_calls_from_normal_calls_and_caps_each_role() {
     let callers: Vec<Value> = (0..17)
         .map(|index| {

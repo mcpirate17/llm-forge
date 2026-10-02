@@ -75,7 +75,7 @@ ruff_python_parser = { package = "rustpython-ruff_python_parser", version = "0.1
 ruff_text_size = { package = "rustpython-ruff_text_size", version = "0.15.8", optional = true }
 memmap2 = { version = "0.9", optional = true }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
+serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order", "float_roundtrip"] }
 sha2 = "0.10"
 syn = { version = "2", features = ["full", "visit", "parsing"] }
 toml = "0.8"

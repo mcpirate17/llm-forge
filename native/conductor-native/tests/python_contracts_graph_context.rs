@@ -6,7 +6,7 @@
 mod support;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyList, PyModule};
+use pyo3::types::{PyAny, PyDict, PyList, PyModule};
 use rusqlite::{params, Connection};
 use serde_json::Value;
 use std::fs;
@@ -28,6 +28,67 @@ CREATE TABLE edges (
     extra TEXT DEFAULT '{}', updated_at REAL DEFAULT 0.0,
     confidence REAL DEFAULT 1.0, confidence_tier TEXT DEFAULT 'EXTRACTED'
 );";
+
+#[test]
+fn rust_adapter_and_content_cache_preserve_current_signatures_after_same_size_edit() {
+    let case = Case::new();
+    let repo = context_repo(&case);
+    let source = case.write(
+        "ctx_ws/src/engine.rs",
+        "pub fn run(first: u8) -> u8 { first }\n",
+    );
+    let stamp = source.metadata().unwrap().modified().unwrap();
+    Python::attach(|py| {
+        let graph = module(py, "conductor.graph_context");
+        let options = PyDict::new(py);
+        options.set_item("with_graph", false).unwrap();
+        let get = graph.getattr("get_file_context").unwrap();
+        let first = get
+            .call((path(py, &repo), "src/engine.rs"), Some(&options))
+            .unwrap();
+        assert_eq!(
+            first
+                .getattr("language")
+                .unwrap()
+                .extract::<String>()
+                .unwrap(),
+            "rust"
+        );
+        assert!(first
+            .getattr("skeleton")
+            .unwrap()
+            .extract::<String>()
+            .unwrap()
+            .contains("first: u8"));
+        let again = get
+            .call((path(py, &repo), "src/engine.rs"), Some(&options))
+            .unwrap();
+        assert!(first
+            .getattr("skeleton")
+            .unwrap()
+            .eq(again.getattr("skeleton").unwrap())
+            .unwrap());
+        fs::write(&source, "pub fn run(other: u8) -> u8 { other }\n").unwrap();
+        fs::File::open(&source)
+            .unwrap()
+            .set_times(fs::FileTimes::new().set_modified(stamp))
+            .unwrap();
+        let edited = get
+            .call((path(py, &repo), "src/engine.rs"), Some(&options))
+            .unwrap();
+        let skeleton: String = edited.getattr("skeleton").unwrap().extract().unwrap();
+        assert!(skeleton.contains("other: u8"));
+        assert!(!skeleton.contains("first: u8"));
+        let markdown: String = graph
+            .getattr("format_markdown_context")
+            .unwrap()
+            .call1((edited,))
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert!(markdown.contains("```rust"));
+    });
+}
 
 fn context_repo(case: &Case) -> PathBuf {
     let repo = case.mkdir("ctx_ws");

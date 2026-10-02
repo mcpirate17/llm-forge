@@ -7,6 +7,7 @@ mod bounded_child;
 mod cap_enforce;
 mod civil;
 mod context_telemetry;
+mod context_tools;
 mod crg_gate;
 mod crg_refresh;
 mod current_work_guard;
@@ -33,6 +34,7 @@ mod mutation_results;
 mod notes_index;
 mod obsidian_sync;
 mod ownership;
+mod performance;
 mod post_edit_audit;
 mod post_tool;
 mod pre_edit;
@@ -94,6 +96,12 @@ enum Command {
     Land(land::LandArgs),
     /// Run repository checks against the clean, committed current checkout.
     Check(local_check::CheckArgs),
+    /// Plan or execute fast edit-loop checks; never a landing PASS receipt.
+    Preview(local_check::PreviewArgs),
+    /// Measure, compare, and profile source-bound workloads.
+    Performance(performance::PerformanceArgs),
+    /// Compose bounded context, discover tools, and report actual model usage.
+    Context(context_tools::ContextArgs),
     /// Validate a local check receipt against the current checkout and policy.
     Verify(local_check::VerifyArgs),
     /// Run a hook event with native handlers and delegate remaining hooks to the
@@ -263,6 +271,9 @@ fn main() -> ExitCode {
         Command::Task(args) => command_exit("task", tasks::run(args), 1),
         Command::Land(args) => command_exit("land", land::run(args), 2),
         Command::Check(args) => command_exit("check", local_check::run(args), 2),
+        Command::Preview(args) => command_exit("preview", local_check::preview(args), 2),
+        Command::Performance(args) => command_exit("performance", performance::run(args), 2),
+        Command::Context(args) => command_exit("context", context_tools::run(args), 2),
         Command::Verify(args) => command_exit("verify", local_check::verify(args), 2),
         Command::Status(args) => command_exit("status", status::run(args), 1),
         Command::Mailbox(args) => command_exit("mailbox", mailbox::run(args), 2),

@@ -28,7 +28,8 @@ messages read. `show` retrieves one complete message explicitly, with a default
 1 MiB limit (`--max-bytes`, maximum 16 MiB); larger records are refused rather
 than silently truncated. Use `--direction outbound` to inspect an outbound fact.
 `read` atomically acknowledges an unread inbound message; repeated acknowledgment
-fails, and a self-send's outbound record is preserved.
+returns the original durable acknowledgment and timestamp. A self-send's outbound
+record is preserved.
 
 `--state-dir` selects an existing alternative state directory. Inspection never
 creates a database or migrates its schema. Missing mailbox stores and corrupt
@@ -74,11 +75,34 @@ protocol; incompatible peers and malformed replies produce terminal failure even
 No protocol downgrade happens. Transport failures stay queued; `--no-queue` makes an
 unavailable send fail instead.
 
+HTTP 408, 429 and 5xx responses stay queued even when their bodies are not JSON.
+Retry timing is durable in an auxiliary `outbound_retries` table, created on the
+first retry. Backoff starts at 250 ms, doubles to 60 seconds with deterministic
+per-message jitter (up to 25%), and honors `Retry-After` delta seconds or HTTP dates,
+bounded to one hour. An explicit flush does not override a future due time. A
+delayed head blocks later messages to that recipient, while other recipients can
+progress. There is no terminal retry-count threshold: transient failure retains
+the durable request for recovery. Authentication, invalid protocol, invalid payload
+and acknowledgment mismatches remain terminal failures.
+
 Each sender has one delivery lock. Older messages to a recipient are retried first;
 new sends cannot overtake an undelivered backlog. A process interrupted between
 recording and delivery leaves `pending` evidence that the next flush retries with
 the same message ID. Receiver deduplication makes a lost acknowledgement safe to
 retry. Delivery is at least once over the wire and stored once by message ID.
+Identical inbound retries succeed; reusing an ID with a different sender, recipient,
+body or data fails without overwriting the original fact.
+
+Both native `send`/`enqueue` and Python `send` accept `--idempotency-key KEY` (1–256
+bytes). The key is scoped to sender and recipient. An identical logical send reuses
+its existing ID and receipt; different content under that key fails. Keys should
+identify one operation, not a recurring thread. A new operation needs a new key.
+
+Within one flush, up to four recipients deliver concurrently. Each recipient has
+one in-flight message, preserving its order. Clients reuse connections, and each
+peer's Agent Card is fetched once per command and reused for that command's batch;
+the next command rereads the registry and capabilities. Sender locks still prevent
+concurrent flushes from overtaking one another.
 
 `flush` attempts at most `--max-messages` messages (default 100, maximum 1000), skips
 the rest of an unreachable recipient's backlog for that pass, and returns exit 3
@@ -99,6 +123,33 @@ is 1–3600 seconds; each flush child has a timeout of at most 15 seconds and at
 the remaining budget. Queue contents survive timeouts and restarts. It does not run
 automatically when hooks are installed or a session starts.
 
+Idle supervisors reconcile at most once per 60 seconds and wake immediately on
+mailbox database/WAL changes on Linux. Lifecycle state is written on a changed
+flush result and at most one idle heartbeat per minute, plus startup and final
+state. Active retry queues continue using `--interval` and durable due times.
+
+## Notify consumers without idle scans
+
+```sh
+python -m conductor.agent_a2a watch --as-name recipient --json --interval 120
+python -m conductor.agent_a2a watch --as-name recipient --once --json --replay-unread
+```
+
+`watch` uses Linux inotify on the mailbox directory, including WAL file replacement,
+and polls at the requested interval as recovery for missed notifications. Platforms
+without inotify and identities without a database use bounded polling. Inotify
+resource failures are reported before falling back. No additional daemon starts.
+
+By default watch emits each unpresented message once, then marks it presented;
+presentation is distinct from read acknowledgment. `--replay-unread` recovers
+previously presented messages that were never read. Consumers must explicitly
+acknowledge durable processing with `read`, and can use replay after a crash.
+Explicitly superseded informational messages with `requires_response=false` are
+coalesced out of the unpresented watch stream. Actionable requests remain visible;
+full inbox inspection and historical message facts are preserved.
+
+## Supervisor endpoint ownership
+
 Add `--serve` to maintain this identity's endpoint for the supervisor lifetime.
 An already healthy endpoint is reused and never stopped. An endpoint the supervisor
 starts is stopped when the budget ends, a failure occurs, or SIGINT/SIGTERM arrives;
@@ -113,6 +164,6 @@ duration, cycle count, endpoint PID, status, and the last flush summary. A
 peer recovered or every message was delivered. Inspect pending/queued counts and
 delivery history separately. Terminal rejections remain failed and are not retried.
 
-The `watch` CLI polls bounded inbox summaries for presentation; it does not deliver
+The `watch` CLI emits bounded inbox summaries for presentation; it does not deliver
 outbound queues. Session startup performs one sender-scoped flush and bounded preview.
 Fleet last-heard consumes the same compact JSON schema, never parses display text.
