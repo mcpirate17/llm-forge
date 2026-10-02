@@ -2,6 +2,8 @@
 
 #[path = "a2a_store_compat.rs"]
 mod compat;
+#[path = "a2a_store_delivery.rs"]
+mod delivery;
 #[path = "a2a_store_preview.rs"]
 mod preview;
 
@@ -338,6 +340,16 @@ impl Store {
             params![id,sender,recipient,body,data_json,now],
         )?;
         if inserted == 0 {
+            let existing: (String, String, String, Option<String>) = tx.query_row(
+                "SELECT sender,recipient,body,data_json FROM messages WHERE direction='inbound' AND message_id=?1",
+                [id], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?)))?;
+            ensure!(
+                existing.0 == sender
+                    && existing.1 == recipient
+                    && existing.2 == body
+                    && delivery::same_data(existing.3.as_deref(), data_json),
+                "conflicting duplicate inbound message {id:?}"
+            );
             return Ok(());
         }
         let row = json!({"message_id":id,"direction":"inbound","sender":sender,
@@ -402,7 +414,7 @@ impl Store {
         excluded: &[String],
     ) -> Result<Option<PendingOutbound>> {
         self.validate_messages()?;
-        let mut sql = String::from("SELECT message_id,sender,recipient,length(CAST(body AS BLOB)),COALESCE(length(CAST(data_json AS BLOB)),0) FROM messages WHERE direction='outbound' AND delivery_status IN ('queued','pending')");
+        let mut sql = String::from("SELECT m.message_id,m.sender,m.recipient,length(CAST(m.body AS BLOB)),COALESCE(length(CAST(m.data_json AS BLOB)),0) FROM messages m WHERE m.direction='outbound' AND m.delivery_status IN ('queued','pending')");
         let mut parameters: Vec<&dyn rusqlite::ToSql> = Vec::new();
         let recipient_parameter = recipient.unwrap_or("");
         if recipient.is_some() {
@@ -415,7 +427,8 @@ impl Store {
             sql.push(')');
             parameters.extend(excluded.iter().map(|value| value as &dyn rusqlite::ToSql));
         }
-        sql.push_str(" ORDER BY created_at,rowid LIMIT 1");
+        sql.push_str(&self.retry_filter()?);
+        sql.push_str(" ORDER BY m.created_at,m.rowid LIMIT 1");
         let metadata: Option<(String, String, String, i64, i64)> = self
             .connection
             .query_row(&sql, parameters.as_slice(), |row| {
@@ -600,6 +613,20 @@ impl Store {
     pub fn enqueue(&mut self, message: &PreparedMessage, reason: &str) -> Result<Value> {
         self.connection.busy_timeout(Duration::from_secs(5))?;
         self.connection.pragma_update(None, "foreign_keys", "ON")?;
+        let existing: Option<(String,String,String,Option<String>)> = self.connection.query_row(
+            "SELECT sender,recipient,body,data_json FROM messages WHERE direction='outbound' AND message_id=?1",
+            [&message.id], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).optional()?;
+        if let Some(existing) = existing {
+            ensure!(
+                existing.0 == message.sender
+                    && existing.1 == message.recipient
+                    && existing.2 == message.body
+                    && delivery::same_data(existing.3.as_deref(), message.data_json.as_deref()),
+                "conflicting idempotency key for outbound message {:?}",
+                message.id
+            );
+            return self.outbound_receipt(&message.id);
+        }
         let state = state_fields(&message.metadata)?;
         let transaction = self
             .connection
@@ -757,10 +784,9 @@ impl Store {
             sender.len() <= MAX_METADATA_BYTES as usize,
             "mailbox sender exceeds 4096 bytes"
         );
-        ensure!(
-            read_at.is_none(),
-            "no unread inbound message {id:?}; already read"
-        );
+        if let Some(read_at) = read_at {
+            return Ok(json!({"message_id":id,"sender":sender,"read_at":read_at,"state":"read"}));
+        }
         let changed = transaction.execute("UPDATE messages SET read_at=?1 WHERE message_id=?2 AND direction='inbound' AND read_at IS NULL", params![now,id])?;
         ensure!(
             changed == 1,

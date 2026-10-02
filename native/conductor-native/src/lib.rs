@@ -23,9 +23,11 @@ pub mod candidate_policy;
 pub mod candidate_structure;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_verification;
+pub mod context_projection;
 #[cfg(feature = "python")]
 mod context_telemetry;
 pub mod context_telemetry_aggregate;
+pub mod context_telemetry_usage;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod dead_tests;
 #[cfg(feature = "python")]
@@ -45,6 +47,7 @@ mod guardrail_duplicates;
 pub mod hook_installer;
 #[cfg(feature = "python")]
 mod hook_merge;
+pub mod hook_response;
 pub mod kb_retrieve;
 pub mod memory_chunking;
 #[cfg(feature = "python")]
@@ -64,6 +67,7 @@ mod mutation_value;
 pub mod mutation_value_inputs;
 #[cfg(feature = "python")]
 mod native_reuse;
+pub mod performance_receipt;
 pub mod project_context;
 pub mod project_paths;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]

@@ -257,6 +257,74 @@ fn performance_and_research_decisions_keep_evidence_contract() {
 }
 
 #[test]
+fn numerical_performance_receipts_reject_keywords_tampering_and_stale_sources() {
+    use conductor_native::performance_receipt::{
+        digest, summarize, Identity, Receipt, Sample, SCHEMA,
+    };
+    let sources = std::collections::BTreeMap::from([("core/model.py".into(), digest(b"source"))]);
+    let samples = vec![
+        Sample {
+            wall_ms: 1.5,
+            cpu_ms: 0.3,
+            max_rss_bytes: 4096
+        };
+        5
+    ];
+    let mut receipt = Receipt {
+        schema: SCHEMA.into(),
+        created_unix: 1,
+        identity: Identity {
+            host: "/fixture".into(),
+            head: "head".into(),
+            source_files: sources,
+            command: "probe".into(),
+            workload_sha256: digest(b"probe"),
+            environment_sha256: digest(b"env"),
+            platform: "hardware".into(),
+            toolchain: "toolchain".into(),
+            warmups: 1,
+            timeout_seconds: 2,
+        },
+        summary: summarize(&samples).unwrap(),
+        samples,
+        receipt_sha256: String::new(),
+    };
+    receipt.seal().unwrap();
+    let mut payload = json!({"hot_changes":[{"path":"core/model.py","sha256":digest(b"source"),"classes":["python"]}],
+        "evidence_paths":["bench/numerical.json"],"evidence_text":"benchmark latency max_rss",
+        "expected_host":"/fixture","performance_receipts":[]});
+    assert_eq!(
+        rules(&evaluate("performance-evidence", &payload).unwrap()),
+        ["missing-performance-budget"]
+    );
+    payload["performance_receipts"] = json!([{"receipt":receipt}]);
+    assert_eq!(
+        rules(&evaluate("performance-evidence", &payload).unwrap()),
+        ["missing-performance-budget"]
+    );
+    payload["performance_receipts"] = json!([{"receipt":{"schema":"forge.performance-evidence.v1",
+        "current":receipt,"baseline":receipt,"max_regression_percent":10.0}}]);
+    assert!(rules(&evaluate("performance-evidence", &payload).unwrap()).is_empty());
+    payload["hot_changes"][0]["sha256"] = json!(digest(b"changed"));
+    assert_eq!(
+        rules(&evaluate("performance-evidence", &payload).unwrap()),
+        ["missing-performance-budget"]
+    );
+    payload["hot_changes"][0]["sha256"] = json!(digest(b"source"));
+    payload["performance_receipts"][0]["receipt"]["max_regression_percent"] = json!(100.0);
+    assert_eq!(
+        rules(&evaluate("performance-evidence", &payload).unwrap()),
+        ["missing-performance-budget"]
+    );
+    payload["performance_receipts"][0]["receipt"]["max_regression_percent"] = json!(10.0);
+    payload["performance_receipts"][0]["receipt"]["current"]["summary"]["p50_ms"] = json!(0.01);
+    assert_eq!(
+        rules(&evaluate("performance-evidence", &payload).unwrap()),
+        ["missing-performance-budget"]
+    );
+}
+
+#[test]
 fn python_ast_uses_syntax_and_comment_tokens_and_preserves_order() {
     let source =
         "def f():\n    pass\n# TODO fix\nfor x in xs:\n    for y in ys:\n        eval(y)\n";

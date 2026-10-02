@@ -8,7 +8,6 @@ store read-only and fails closed when its head does not match the candidate.
 from __future__ import annotations
 
 import ast
-import sqlite3
 from pathlib import Path, PurePosixPath
 from typing import Sequence
 
@@ -18,68 +17,49 @@ from conductor.project_paths import package_relative
 
 
 def _graph_database(repo: Path) -> Path:
-    return repo / ".code-review-graph" / "graph.db"
+    from conductor.graph_test_select import graph_database_path
+
+    return graph_database_path(repo)
 
 
 def _graph_test_paths(
     ctx: ReviewContext, source_paths: Sequence[str]
 ) -> tuple[set[str], dict[str, object]]:
-    database = _graph_database(ctx.repo)
-    if not database.is_file():
-        raise RuntimeError("code-review graph database is missing")
-    uri = f"file:{database.as_posix()}?mode=ro&immutable=1"
-    connection = sqlite3.connect(uri, uri=True, timeout=2.0)
+    from conductor.graph_test_select import GraphSelectError, graph_test_plan
+
+    expected = (
+        ctx.candidate.base_commit_oid
+        if ctx.candidate.kind == "index"
+        else ctx.candidate.commit_oid
+    )
+    if not expected:
+        raise RuntimeError("candidate revision is missing")
     try:
-        metadata = dict(connection.execute("SELECT key, value FROM metadata"))
-        expected = (
-            ctx.candidate.base_commit_oid
-            if ctx.candidate.kind == "index"
-            else ctx.candidate.commit_oid
+        plan = graph_test_plan(ctx.repo, source_paths, expected_head=expected)
+    except GraphSelectError as exc:
+        raise RuntimeError(str(exc)) from exc
+    tests = {
+        relative
+        for relative in plan["paths"]
+        if relative.endswith(".py") and (ctx.snapshot / relative).is_file()
+    }
+    metadata = plan["metadata"]
+    if metadata.get("git_head_sha") != expected:
+        raise RuntimeError(
+            f"stale code-review graph: expected {expected}, found {metadata.get('git_head_sha')}"
         )
-        if not expected or metadata.get("git_head_sha") != expected:
-            raise RuntimeError(
-                "stale code-review graph: "
-                f"expected {expected}, found {metadata.get('git_head_sha')}"
-            )
-        absolute = [str((ctx.repo / path).resolve()) for path in source_paths]
-        if not absolute:
-            return set(), {
-                "head_sha": expected,
-                "schema_version": metadata.get("schema_version"),
-            }
-        placeholders = ",".join("?" for _ in absolute)
-        rows = connection.execute(
-            f"""
-            SELECT DISTINCT source.file_path, edge.kind, target.qualified_name
-            FROM nodes AS target
-            JOIN edges AS edge ON edge.target_qualified = target.qualified_name
-            JOIN nodes AS source ON source.qualified_name = edge.source_qualified
-            WHERE target.file_path IN ({placeholders}) AND source.is_test = 1
-            ORDER BY source.file_path, edge.kind, target.qualified_name
-            """,
-            absolute,
-        ).fetchall()
-        tests: set[str] = set()
-        evidence_rows: list[tuple[str, str, str]] = []
-        for file_path, edge_kind, target in rows:
-            try:
-                relative = Path(file_path).resolve().relative_to(ctx.repo).as_posix()
-            except ValueError:
-                continue
-            # Rust `#[test]` nodes are is_test too; they run under cargo test, not pytest.
-            if relative.endswith(".py") and (ctx.snapshot / relative).is_file():
-                tests.add(relative)
-                evidence_rows.append((relative, edge_kind, target))
-        graph = {
-            "head_sha": expected,
-            "schema_version": metadata.get("schema_version"),
-            "last_updated": metadata.get("last_updated"),
-            "selected_edges": len(evidence_rows),
-            "evidence_sha256": sha256_json(evidence_rows),
-        }
-        return tests, graph
-    finally:
-        connection.close()
+    graph = {
+        "head_sha": metadata.get("git_head_sha"),
+        "schema_version": metadata.get("schema_version"),
+        "last_updated": metadata.get("last_updated"),
+        "generation": plan["generation"],
+        "selection_scope": plan["scope"],
+        "complete": plan["complete"],
+        "fallback_reasons": plan["reasons"],
+        "selected_edges": len(tests),
+        "evidence_sha256": sha256_json(sorted(tests)),
+    }
+    return tests, graph
 
 
 def _public_names(module: Path) -> set[str]:

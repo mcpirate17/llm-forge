@@ -155,6 +155,41 @@ fn supervisor_finishes_at_budget_with_durable_state() {
 }
 
 #[test]
+fn idle_supervisor_coalesces_flushes_and_lifecycle_writes() {
+    let case = Case::new();
+    Python::attach(|py| {
+        let supervisor = module(py, "conductor.a2a_supervisor");
+        let (config, _clock_patches, _) = setup(py, case.root(), &supervisor);
+        let result = py.import("json").unwrap().call_method1("loads",(r#"{"status":"complete","exit_code":0,"counts":{"delivered":0,"queued":0,"failed":0}}"#,)).unwrap();
+        let flush = mock(py, &result);
+        let writes = mock(py, &py.None().into_bound(py));
+        let _flush = AttrPatch::replace(supervisor.as_any(), "_flush", &flush);
+        let _writes = AttrPatch::replace(supervisor.as_any(), "_atomic_json", &writes);
+        supervisor
+            .getattr("supervise")
+            .unwrap()
+            .call1((config,))
+            .unwrap();
+        assert_eq!(
+            flush
+                .getattr("call_count")
+                .unwrap()
+                .extract::<usize>()
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            writes
+                .getattr("call_count")
+                .unwrap()
+                .extract::<usize>()
+                .unwrap(),
+            2
+        );
+    });
+}
+
+#[test]
 fn supervisor_never_stops_an_existing_endpoint() {
     let case = Case::new();
     Python::attach(|py| {

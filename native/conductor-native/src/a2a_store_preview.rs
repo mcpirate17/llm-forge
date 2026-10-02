@@ -19,6 +19,10 @@ impl Store {
         }
         if unpresented_only {
             where_clause.push_str(" AND p.message_id IS NULL");
+            // Explicit supersession coalesces informational updates only.
+            // Actionable requests stay visible until acknowledged.
+            where_clause
+                .push_str(" AND NOT (s.superseded_at IS NOT NULL AND s.requires_response=0)");
         }
         let query = format!(
             r"

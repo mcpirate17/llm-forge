@@ -59,11 +59,30 @@ always = true
 "#;
 
 fn shifted_date<'py>(py: Python<'py>, days: i64) -> Bound<'py, PyAny> {
+    // Value-waiver evaluation deliberately preserves the local-date contract.
     let datetime = PyModule::import(py, "datetime").unwrap();
     let today = datetime
         .getattr("date")
         .unwrap()
         .call_method0("today")
+        .unwrap();
+    let delta = datetime
+        .getattr("timedelta")
+        .unwrap()
+        .call1((days,))
+        .unwrap();
+    today.call_method1("__add__", (delta,)).unwrap()
+}
+
+fn shifted_utc_date<'py>(py: Python<'py>, days: i64) -> Bound<'py, PyAny> {
+    let datetime = PyModule::import(py, "datetime").unwrap();
+    // Policy expiry is evaluated in UTC, including during local/UTC date rollover.
+    let today = datetime
+        .getattr("datetime")
+        .unwrap()
+        .call_method1("now", (datetime.getattr("UTC").unwrap(),))
+        .unwrap()
+        .call_method0("date")
         .unwrap();
     let delta = datetime
         .getattr("timedelta")
@@ -619,8 +638,8 @@ fn policy_dataclass_validation_rejects_duplicate_unknown_and_unbounded_exception
                 pyo3::types::PyString::new(py, "unknown").into_any(),
                 "unknown check",
             ),
-            ("expires", shifted_date(py, -1), "expired"),
-            ("expires", shifted_date(py, 91), "more than 90 days"),
+            ("expires", shifted_utc_date(py, -1), "expired"),
+            ("expires", shifted_utc_date(py, 91), "more than 90 days"),
         ] {
             let changed = replace_field(py, &exception, field, &value);
             let entries = PyTuple::new(py, [changed]).unwrap();

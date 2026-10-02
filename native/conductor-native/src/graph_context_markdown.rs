@@ -13,6 +13,8 @@ struct Summary {
     graph_status: String,
     callers: Vec<GraphRelationship>,
     callees: Vec<GraphRelationship>,
+    #[serde(default)]
+    language: String,
 }
 
 pub(super) fn is_test_path(path: &str) -> bool {
@@ -44,7 +46,14 @@ pub(super) fn format(input: &Value) -> Result<String, String> {
         .map_err(|error| format!("invalid graph context summary: {error}"))?;
     let mut lines = vec![
         format!("### AST Context: `{}`", summary.file_path),
-        "```python".to_owned(),
+        format!(
+            "```{}",
+            if summary.language == "rust" {
+                "rust"
+            } else {
+                "python"
+            }
+        ),
         summary.skeleton.trim().to_owned(),
         "```".to_owned(),
     ];

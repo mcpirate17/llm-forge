@@ -3,6 +3,14 @@
 //! Python retains AST canonicalization and CLI presentation. This core is
 //! callable without an interpreter and never opens a writable graph database.
 
+#[cfg(feature = "source-analysis")]
+#[path = "graph_context_skeleton.rs"]
+mod skeleton;
+#[path = "graph_context_store.rs"]
+pub mod store;
+#[path = "graph_context_tests.rs"]
+mod test_selection;
+
 #[path = "graph_context_markdown.rs"]
 mod markdown;
 #[path = "graph_context_relationships.rs"]
@@ -62,8 +70,16 @@ pub fn dispatch(operation: &str, input: &Value) -> Result<Value, String> {
         .map_err(|error| error.to_string()),
         "is_test_path" => Ok(json!(markdown::is_test_path(string_field(input, "path")?))),
         "markdown" => Ok(json!(markdown::format(input)?)),
+        "test_selection" => test_selection::select(input),
+        #[cfg(feature = "source-analysis")]
+        "rust_skeleton" => skeleton::rust(string_field(input, "source")?, target_symbol(input)?),
         other => Err(format!("unknown graph context operation: {other}")),
     }
+}
+
+#[cfg(feature = "source-analysis")]
+pub fn current_symbols(source: &str, language: &str) -> Result<Vec<store::Symbol>, String> {
+    skeleton::symbols(source, language)
 }
 
 #[cfg(feature = "python")]

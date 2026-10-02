@@ -13,11 +13,17 @@ use regex::Regex;
 use serde::Deserialize;
 
 use crate::land::{selected, Step};
-use crate::land_exec::{run_shell, tail, Outcome, ShellRun};
+use crate::land_exec::{run_measured, tail, Outcome, ShellRun};
 use crate::local_check_receipt::{self as evidence, Receipt, StepRecord, Verdict};
 
 const POLICY_PATH: &str = ".forge/local-check.toml";
 const DEFAULT_BASE_REF: &str = "origin/main";
+
+#[path = "local_check_preview.rs"]
+mod preview_command;
+pub use preview_command::{preview, PreviewArgs};
+#[path = "local_check_schedule.rs"]
+mod schedule;
 
 #[derive(Args)]
 pub struct CheckArgs {
@@ -27,6 +33,9 @@ pub struct CheckArgs {
     /// Override the policy's local target ref (for offline or test use).
     #[arg(long)]
     pub base_ref: Option<String>,
+    /// Maximum concurrent checks; named resources and a 2-CPU budget still apply.
+    #[arg(long, default_value_t = 1)]
+    pub jobs: usize,
 }
 
 #[derive(Args)]
@@ -56,6 +65,8 @@ struct Policy {
     setup: Vec<Step>,
     #[serde(default, rename = "check")]
     checks: Vec<Step>,
+    #[serde(default)]
+    schedule: BTreeMap<String, schedule::Scheduling>,
 }
 
 impl Policy {
@@ -90,6 +101,7 @@ impl Policy {
                 bail!("path_prepend must stay inside the checkout: {dir}");
             }
         }
+        schedule::validate(&policy)?;
         Ok(policy)
     }
 }
@@ -105,7 +117,7 @@ struct Source {
     changed_paths: Vec<String>,
 }
 
-fn root() -> Result<PathBuf> {
+pub(crate) fn root() -> Result<PathBuf> {
     Ok(PathBuf::from(git(
         Path::new("."),
         &["rev-parse", "--show-toplevel"],
@@ -122,7 +134,7 @@ fn git_ok(root: &Path, args: &[&str]) -> bool {
     git_bytes(root, args).is_ok()
 }
 
-fn common_dir(root: &Path) -> Result<PathBuf> {
+pub(crate) fn common_dir(root: &Path) -> Result<PathBuf> {
     let dir = PathBuf::from(git(root, &["rev-parse", "--git-common-dir"])?);
     Ok(if dir.is_absolute() {
         dir
@@ -131,7 +143,7 @@ fn common_dir(root: &Path) -> Result<PathBuf> {
     })
 }
 
-fn git_bytes(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
+pub(crate) fn git_bytes(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
     let mut command = Command::new("git");
     command.args(args).current_dir(root);
     for (key, _) in std::env::vars_os() {
@@ -340,14 +352,17 @@ fn run_step(
     let log = dir.join(&log_file);
     let start = Instant::now();
     let command = clean_command(&step.run);
-    let outcome = run_shell(&ShellRun {
-        command: &command,
-        cwd: root,
-        env,
-        log: &log,
-        timeout: Duration::from_secs(step.timeout_s),
-    })?;
-    let verdict = match outcome {
+    let measurement = run_measured(
+        &ShellRun {
+            command: &command,
+            cwd: root,
+            env,
+            log: &log,
+            timeout: Duration::from_secs(step.timeout_s),
+        },
+        16 * 1024 * 1024,
+    )?;
+    let verdict = match measurement.outcome {
         Outcome::Passed => Verdict::Passed,
         Outcome::Failed(_) => Verdict::Failed,
         Outcome::TimedOut => Verdict::TimedOut,
@@ -369,7 +384,8 @@ fn run_step(
         blocking: step.blocking,
         verdict,
         log_file: Some(log_file),
-        log_sha256: Some(evidence::sha256(&fs::read(&log)?)),
+        log_sha256: Some(evidence::sha256_file(&log)?),
+        usage: Some(measurement.usage),
     })
 }
 
@@ -383,6 +399,7 @@ fn skipped(step: &Step, stage: &str) -> StepRecord {
         verdict: Verdict::Skipped,
         log_file: None,
         log_sha256: None,
+        usage: None,
     }
 }
 
@@ -392,6 +409,7 @@ fn execute(
     source: &Source,
     all: bool,
     dir: &Path,
+    jobs: usize,
 ) -> Result<(Vec<StepRecord>, String, String)> {
     let changed = dir.join("changed.txt");
     let changed_bytes = (source.changed_paths.join("\n") + "\n").into_bytes();
@@ -414,15 +432,16 @@ fn execute(
         }
         records.push(record);
     }
-    for step in &policy.checks {
-        let select = all || selected(step, &source.changed_paths);
-        let record = if select && setup_ok {
-            run_step(root, step, "check", records.len(), &env, dir)?
-        } else {
-            skipped(step, "check")
-        };
-        records.push(record);
-    }
+    records.extend(schedule::execute(schedule::Execution {
+        root,
+        policy,
+        source,
+        all,
+        setup_ok,
+        env: &env,
+        dir,
+        jobs,
+    })?);
     if fs::read(&changed)? != changed_bytes || fs::read(&changed_py)? != python_bytes {
         bail!("changed-path input files changed during local checks");
     }
@@ -473,6 +492,9 @@ fn effective_all(requested: bool, changed: &[String]) -> bool {
 }
 
 pub fn run(args: CheckArgs) -> Result<u8> {
+    if !(1..=2).contains(&args.jobs) {
+        bail!("check --jobs must be 1..2");
+    }
     let root = root()?;
     let common = common_dir(&root)?;
     let _lock = acquire_lock(&common, true)?;
@@ -497,7 +519,7 @@ pub fn run(args: CheckArgs) -> Result<u8> {
         before.head, before.tree, base_ref, before.base_sha
     );
     let (steps, changed_file_sha256, changed_python_sha256) =
-        execute(&root, &policy, &before, all, &dir)?;
+        execute(&root, &policy, &before, all, &dir, args.jobs)?;
     let (after, post_policy) = source(&root, &base_ref)?;
     clean_checkout(&root, &post_policy)?;
     if before != after {

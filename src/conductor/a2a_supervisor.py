@@ -155,6 +155,11 @@ def _run(
         "endpoint_pid": None,
     }
     _atomic_json(state_path, state)
+    from conductor.a2a_wait import MailboxWakeup
+
+    wakeup = MailboxWakeup(state_path.parent)
+    last_written = time.monotonic()
+    previous_flush: dict[str, Any] | None = None
     try:
         while time.monotonic() < deadline:
             if process is not None and process.poll() is not None:
@@ -173,8 +178,19 @@ def _run(
                 updated_at=_utc_now(),
                 endpoint_pid=process.pid if process else None,
             )
-            _atomic_json(state_path, state)
-            time.sleep(min(config.interval, max(0, deadline - time.monotonic())))
+            changed = state["last_flush"] != previous_flush
+            flush = state["last_flush"]
+            idle = flush.get("exit_code") == 0 and not any(
+                flush.get("counts", {}).values()
+            )
+            if idle and previous_flush is None:
+                changed = False
+            if changed or time.monotonic() - last_written >= 60:
+                _atomic_json(state_path, state)
+                last_written = time.monotonic()
+            previous_flush = state["last_flush"]
+            interval = 60.0 if idle else config.interval
+            wakeup.wait(min(interval, max(0, deadline - time.monotonic())))
         state["status"] = "completed"
     except KeyboardInterrupt:
         state["status"] = "interrupted"
@@ -183,6 +199,7 @@ def _run(
         state.update(status="failed", error=str(exc)[:500])
         raise
     finally:
+        wakeup.close()
         if process is not None:
             _stop_process(process)
         state.update(ended_at=_utc_now(), endpoint_pid=None)

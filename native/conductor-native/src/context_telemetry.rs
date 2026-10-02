@@ -204,6 +204,30 @@ fn add_usage_field(
     Ok(())
 }
 
+fn add_usage_details(
+    fields: &Bound<'_, PyDict>,
+    usage: &Bound<'_, PyAny>,
+    mapping: &Bound<'_, PyAny>,
+    field_names: &mut Vec<String>,
+    output_name: &str,
+    keys: &[&str],
+    names: &[&str],
+) -> PyResult<()> {
+    for key in keys {
+        if fields.contains(output_name)? {
+            break;
+        }
+        let details = mapping_get(usage, key)?;
+        if is_mapping(&details, mapping)? {
+            if let Some((value, matched)) = usage_value(&details, names)? {
+                fields.set_item(output_name, value)?;
+                field_names.push(format!("{key}.{matched}"));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn add_native_usage(
     output: &Bound<'_, PyDict>,
     payload: &Bound<'_, PyDict>,
@@ -212,86 +236,64 @@ fn add_native_usage(
     for (usage, usage_path) in usage_mappings(payload, mapping)? {
         let fields = PyDict::new(payload.py());
         let mut field_names = Vec::new();
-        add_usage_field(
+        let aliases: [(&str, &[&str]); 6] = [
+            (
+                "input_tokens",
+                &["input_tokens", "prompt_tokens", "prompt_eval_count"],
+            ),
+            (
+                "output_tokens",
+                &["output_tokens", "completion_tokens", "eval_count"],
+            ),
+            (
+                "cached_input_tokens",
+                &[
+                    "cached_tokens",
+                    "cache_read_input_tokens",
+                    "cache_read_tokens",
+                ],
+            ),
+            (
+                "cache_creation_input_tokens",
+                &["cache_creation_input_tokens", "cache_creation_tokens"],
+            ),
+            ("reasoning_tokens", &["reasoning_tokens"]),
+            ("total_tokens", &["total_tokens"]),
+        ];
+        for (name, names) in aliases {
+            add_usage_field(&fields, &usage, &mut field_names, name, names)?;
+        }
+
+        add_usage_details(
             &fields,
             &usage,
-            &mut field_names,
-            "input_tokens",
-            &["input_tokens", "prompt_tokens", "prompt_eval_count"],
-        )?;
-        add_usage_field(
-            &fields,
-            &usage,
-            &mut field_names,
-            "output_tokens",
-            &["output_tokens", "completion_tokens", "eval_count"],
-        )?;
-        add_usage_field(
-            &fields,
-            &usage,
+            mapping,
             &mut field_names,
             "cached_input_tokens",
+            &[
+                "prompt_tokens_details",
+                "input_tokens_details",
+                "promptTokenDetails",
+            ],
             &[
                 "cached_tokens",
                 "cache_read_input_tokens",
                 "cache_read_tokens",
             ],
         )?;
-        add_usage_field(
+        add_usage_details(
             &fields,
             &usage,
-            &mut field_names,
-            "cache_creation_input_tokens",
-            &["cache_creation_input_tokens", "cache_creation_tokens"],
-        )?;
-        add_usage_field(
-            &fields,
-            &usage,
+            mapping,
             &mut field_names,
             "reasoning_tokens",
+            &[
+                "completion_tokens_details",
+                "output_tokens_details",
+                "completionTokenDetails",
+            ],
             &["reasoning_tokens"],
         )?;
-        add_usage_field(
-            &fields,
-            &usage,
-            &mut field_names,
-            "total_tokens",
-            &["total_tokens"],
-        )?;
-
-        for detail_key in [
-            "prompt_tokens_details",
-            "input_tokens_details",
-            "promptTokenDetails",
-        ] {
-            let details = mapping_get(&usage, detail_key)?;
-            if is_mapping(&details, mapping)? && !fields.contains("cached_input_tokens")? {
-                if let Some((value, matched)) = usage_value(
-                    &details,
-                    &[
-                        "cached_tokens",
-                        "cache_read_input_tokens",
-                        "cache_read_tokens",
-                    ],
-                )? {
-                    fields.set_item("cached_input_tokens", value)?;
-                    field_names.push(format!("{detail_key}.{matched}"));
-                }
-            }
-        }
-        for detail_key in [
-            "completion_tokens_details",
-            "output_tokens_details",
-            "completionTokenDetails",
-        ] {
-            let details = mapping_get(&usage, detail_key)?;
-            if is_mapping(&details, mapping)? && !fields.contains("reasoning_tokens")? {
-                if let Some((value, matched)) = usage_value(&details, &["reasoning_tokens"])? {
-                    fields.set_item("reasoning_tokens", value)?;
-                    field_names.push(format!("{detail_key}.{matched}"));
-                }
-            }
-        }
 
         if !fields.is_empty() {
             for (key, value) in fields.iter() {
@@ -338,6 +340,51 @@ fn bounded_output(
     }
     let lowered = String::from_utf8_lossy(encoded).to_lowercase();
     Ok(lowered.contains("\"elided\"") || lowered.contains("\"truncated\""))
+}
+
+/// Copy only explicit routing labels; never serialize a tool payload for identity.
+fn identity_payload(payload: &Bound<'_, PyDict>) -> PyResult<serde_json::Value> {
+    let mut output = serde_json::Map::new();
+    for name in [
+        "request_id",
+        "response_id",
+        "model",
+        "task_id",
+        "task_outcome",
+    ] {
+        if let Some(value) = payload.get_item(name)? {
+            if let Ok(text) = value.extract::<String>() {
+                output.insert(name.into(), serde_json::json!(text));
+            }
+        }
+    }
+    for name in ["model_latency_ms", "time_to_first_token_ms"] {
+        if let Some(value) = payload.get_item(name)? {
+            if !value.is_instance_of::<PyBool>() {
+                if let Ok(number) = value.extract::<f64>() {
+                    if number.is_finite() && number >= 0.0 {
+                        output.insert(name.into(), serde_json::json!(number));
+                    }
+                }
+            }
+        }
+    }
+    for name in ["response", "metadata"] {
+        if let Some(value) = payload.get_item(name)? {
+            if let Ok(mapping) = value.cast::<PyDict>() {
+                let mut child = serde_json::Map::new();
+                for key in ["id", "request_id", "model", "task_id", "task_outcome"] {
+                    if let Some(value) = mapping.get_item(key)? {
+                        if let Ok(text) = value.extract::<String>() {
+                            child.insert(key.into(), serde_json::json!(text));
+                        }
+                    }
+                }
+                output.insert(name.into(), serde_json::Value::Object(child));
+            }
+        }
+    }
+    Ok(serde_json::Value::Object(output))
 }
 
 #[pyfunction]
@@ -395,6 +442,13 @@ fn context_telemetry_event_native<'py>(
         bounded_output(&tool_output, &output_encoded, &mapping)?,
     )?;
     add_native_usage(&result, payload, &mapping)?;
+    for (name, value) in crate::context_telemetry_usage::labels(&identity_payload(payload)?) {
+        match value {
+            serde_json::Value::String(value) => result.set_item(name, value)?,
+            serde_json::Value::Number(value) => result.set_item(name, value.as_f64())?,
+            _ => unreachable!("routing labels only contain strings or numbers"),
+        }
+    }
     Ok(result)
 }
 

@@ -33,6 +33,7 @@ pub struct Case {
     env: EnvRestore,
     root: PathBuf,
     sys_path_snapshot: Py<PyAny>,
+    executable_snapshot: Py<PyAny>,
     // Rust drops fields in declaration order, so release this after env restoration.
     _process_state: MutexGuard<'static, ()>,
 }
@@ -55,19 +56,36 @@ impl Case {
             NEXT_TREE.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir(&root).expect("create isolated test directory");
-        let sys_path_snapshot = Python::attach(|py| {
-            PyModule::import(py, "sys")
-                .expect("import sys")
+        let (sys_path_snapshot, executable_snapshot) = Python::attach(|py| {
+            let sys = PyModule::import(py, "sys").expect("import sys");
+            let executable = sys.getattr("executable").expect("sys.executable").unbind();
+            // Embedded CPython otherwise guesses /usr/bin/python and bypasses
+            // the explicitly selected venv for production subprocess contracts.
+            if let Some(interpreter) = std::env::var_os("PYO3_PYTHON") {
+                let interpreter = PathBuf::from(interpreter);
+                assert!(
+                    interpreter.is_absolute() && interpreter.is_file(),
+                    "PYO3_PYTHON must name an existing absolute interpreter"
+                );
+                sys.setattr(
+                    "executable",
+                    interpreter.to_str().expect("UTF-8 interpreter"),
+                )
+                .expect("bind subprocess interpreter");
+            }
+            let path = sys
                 .getattr("path")
                 .expect("sys.path")
                 .call_method0("copy")
                 .expect("copy sys.path")
-                .unbind()
+                .unbind();
+            (path, executable)
         });
         Self {
             env,
             root,
             sys_path_snapshot,
+            executable_snapshot,
             _process_state: process_state,
         }
     }
@@ -116,10 +134,10 @@ impl Drop for CwdRestore {
 impl Drop for Case {
     fn drop(&mut self) {
         Python::attach(|py| {
-            let sys_path = PyModule::import(py, "sys")
-                .expect("import sys")
-                .getattr("path")
-                .expect("sys.path");
+            let sys = PyModule::import(py, "sys").expect("import sys");
+            sys.setattr("executable", self.executable_snapshot.bind(py))
+                .expect("restore sys.executable");
+            let sys_path = sys.getattr("path").expect("sys.path");
             sys_path
                 .call_method0("clear")
                 .expect("clear test sys.path entries");

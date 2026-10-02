@@ -36,6 +36,9 @@ pub struct EnqueueArgs {
     /// Existing JSON object with a supported A2A data kind, at most 1 MiB.
     #[arg(long)]
     data_file: Option<PathBuf>,
+    /// Stable caller key: identical sends reuse one durable message ID.
+    #[arg(long)]
+    idempotency_key: Option<String>,
 }
 
 pub use conductor_native::a2a_store::PreparedMessage;
@@ -45,6 +48,7 @@ pub(super) struct ValidatedMessage {
     pub recipient: String,
     pub body: String,
     pub data_json: Option<String>,
+    pub idempotency_key: Option<String>,
 }
 
 fn read_bounded(path: &Path, max_bytes: usize, label: &str) -> Result<String> {
@@ -167,6 +171,12 @@ fn message_id() -> Result<String> {
 pub(super) fn validate_input(args: EnqueueArgs) -> Result<ValidatedMessage> {
     store::validate_identity(&args.from_name)?;
     store::validate_identity(&args.to)?;
+    if let Some(key) = &args.idempotency_key {
+        ensure!(
+            !key.trim().is_empty() && key.len() <= 256,
+            "idempotency key must contain 1..256 bytes"
+        );
+    }
     let body = body_text(&args)?;
     let data_json = data_json(args.data_file.as_deref())?;
     Ok(ValidatedMessage {
@@ -174,11 +184,18 @@ pub(super) fn validate_input(args: EnqueueArgs) -> Result<ValidatedMessage> {
         recipient: args.to,
         body,
         data_json,
+        idempotency_key: args.idempotency_key,
     })
 }
 
 pub(super) fn prepare(input: ValidatedMessage) -> Result<PreparedMessage> {
-    let id = message_id()?;
+    let id = if let Some(key) = &input.idempotency_key {
+        use sha2::{Digest, Sha256};
+        let tuple = serde_json::to_vec(&(&input.sender, &input.recipient, key))?;
+        format!("key-{:x}", Sha256::digest(tuple))
+    } else {
+        message_id()?
+    };
     let created_at = crate::instant::isoformat_millis_utc(crate::instant::now());
     let row = json!({
         "message_id": id, "direction": "outbound", "sender": input.sender,

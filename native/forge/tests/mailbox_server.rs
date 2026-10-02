@@ -249,6 +249,19 @@ fn card_auth_version_method_and_deduplicated_inbound_receipt() {
         )
         .unwrap();
     assert_eq!(count, 1);
+    let conflict = message("m-1", "sender", "different body", None);
+    assert!(
+        fixture.rpc(Some(&token), Some("1.0"), &conflict).1["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("conflicting duplicate")
+    );
+    let conflict = message("m-1", "other", "hello", None);
+    assert!(fixture
+        .rpc(Some(&token), Some("1.0"), &conflict)
+        .1
+        .get("error")
+        .is_some());
 }
 
 #[test]

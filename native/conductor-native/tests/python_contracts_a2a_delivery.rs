@@ -11,6 +11,7 @@ use std::fs;
 use std::net::TcpListener;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 use support::{assert_error, module, path, text, Case};
 
 fn history<'py>(
@@ -109,6 +110,10 @@ fn send_structured_and_assert<'py>(
     store: &Bound<'py, PyAny>,
     state: &Path,
 ) -> String {
+    let started_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
     let data = PyDict::new(py);
     data.set_item("kind", "coordination-v2").unwrap();
     data.set_item("thread_id", "python-boundary").unwrap();
@@ -140,6 +145,19 @@ fn send_structured_and_assert<'py>(
     assert!(!receipt.contains("body").unwrap());
     assert!(!receipt.contains("data_json").unwrap());
     let id = text(&receipt.get_item("message_id").unwrap());
+    let connection = rusqlite::Connection::open(state.join("sender/store.sqlite")).unwrap();
+    let (attempts, due): (u32, i64) = connection
+        .query_row(
+            "SELECT attempts,next_attempt_ms FROM outbound_retries WHERE message_id=?1",
+            [&id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(attempts, 1);
+    assert!(
+        due >= started_ms + 250,
+        "retry must retain its durable delay"
+    );
     let outbound = store
         .call_method1("message", (id.as_str(), "outbound"))
         .unwrap();
@@ -164,6 +182,26 @@ fn retry_and_refuse<'py>(
     state: &Path,
     id: &str,
 ) {
+    let connection = rusqlite::Connection::open(state.join("sender/store.sqlite")).unwrap();
+    // Hold the fixture clock deterministically so a slow test cannot cross the due time.
+    connection
+        .execute(
+            "UPDATE outbound_retries SET next_attempt_ms=?1 WHERE message_id=?2",
+            rusqlite::params![i64::MAX, id],
+        )
+        .unwrap();
+    let early = delivery
+        .getattr("flush_queued")
+        .unwrap()
+        .call1((path(py, state), "sender"))
+        .unwrap();
+    assert_eq!(early.len().unwrap(), 0, "deferred retry must remain queued");
+    connection
+        .execute(
+            "UPDATE outbound_retries SET next_attempt_ms=0 WHERE message_id=?1",
+            [id],
+        )
+        .unwrap();
     let rows = delivery
         .getattr("flush_queued")
         .unwrap()

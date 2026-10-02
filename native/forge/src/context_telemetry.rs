@@ -504,6 +504,9 @@ pub fn event_record(payload: &Value, timestamp: &str, pid: u32) -> String {
         line.null_field("native_usage_path");
         line.strings_field("native_usage_fields", &[]);
     }
+    for (name, value) in conductor_native::context_telemetry_usage::labels(payload) {
+        line.raw_field(&name, &value.to_string());
+    }
     if let Some(session) = payload.get("session_id") {
         if let Some(text) = session.as_str() {
             if !text.is_empty() {

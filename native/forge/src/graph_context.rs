@@ -3,6 +3,8 @@
 //! Forge writes its own `.forge/graph.db` via `graph index`; the external
 //! `.code-review-graph/graph.db` remains a read-only compatibility source.
 
+#[path = "graph_context_cache.rs"]
+mod cache;
 #[path = "graph_index.rs"]
 mod indexer;
 #[path = "graph_context_store.rs"]
@@ -61,6 +63,20 @@ struct ContextArgs {
     /// Maximum serialized JSON bytes (512..32768).
     #[arg(long, default_value_t = 8_192)]
     max_bytes: usize,
+    /// Conservative serialized UTF-8 token upper bound; no model tokenizer is assumed.
+    #[arg(long)]
+    max_tokens: Option<usize>,
+    /// Dependency expansion depth (0..3); each additional hop stays within node/edge caps.
+    #[arg(long, default_value_t = 1)]
+    max_depth: usize,
+    /// Maximum distinct relationship nodes across both directions (1..100).
+    #[arg(long, default_value_t = 24)]
+    max_nodes: usize,
+    /// Reject an expansion request when its previous snapshot has changed.
+    #[arg(long)]
+    expected_generation: Option<String>,
+    #[arg(long)]
+    expected_source_hash: Option<String>,
 }
 
 #[derive(Args)]
@@ -82,7 +98,7 @@ struct RefsArgs {
     max_bytes: usize,
 }
 
-#[derive(Serialize)]
+#[derive(serde::Deserialize, Serialize)]
 struct SourceExcerpt {
     line_start: usize,
     line_end: usize,
@@ -90,7 +106,7 @@ struct SourceExcerpt {
     truncated: bool,
 }
 
-#[derive(Serialize)]
+#[derive(serde::Deserialize, Serialize)]
 struct ContextOutput {
     schema_version: u8,
     file_path: String,
@@ -103,6 +119,11 @@ struct ContextOutput {
     omitted_symbols_at_least: usize,
     omitted_relationships_at_least: usize,
     truncated: bool,
+    generation: String,
+    source_hash: String,
+    tokenizer: String,
+    estimated_tokens: usize,
+    cache_status: String,
 }
 
 #[derive(Serialize)]
@@ -157,10 +178,42 @@ fn run_context(host: &Path, db: Option<&Path>, args: ContextArgs) -> Result<()> 
         "--max-bytes must be between 512 and {MAX_CONTEXT_OUTPUT_BYTES}"
     );
     let symbol = validate_symbol(args.symbol.as_deref())?;
+    ensure!(args.max_depth <= 3, "--max-depth must be between 0 and 3");
+    ensure!(
+        (1..=100).contains(&args.max_nodes),
+        "--max-nodes must be between 1 and 100"
+    );
+    if let Some(tokens) = args.max_tokens {
+        ensure!(tokens >= 512, "--max-tokens must be at least 512");
+    }
     let file = read_source(host, &args.file)?;
     let store = GraphStore::open(host, db)?;
-    let mut output = project_context(&store, host, &file, symbol, args.max_edges)?;
-    fit_context(&mut output, args.max_bytes)?;
+    if let Some(expected) = args.expected_generation {
+        ensure!(
+            expected == store.generation,
+            "graph generation changed; retrieve current context"
+        );
+    }
+    if let Some(expected) = args.expected_source_hash {
+        ensure!(
+            expected == file.digest,
+            "source hash changed; retrieve current context"
+        );
+    }
+    let mut output = cache::context(
+        &store,
+        host,
+        &file,
+        symbol,
+        args.max_edges,
+        args.max_depth,
+        args.max_nodes,
+    )?;
+    fit_context(
+        &mut output,
+        args.max_bytes.min(args.max_tokens.unwrap_or(usize::MAX)),
+    )?;
+    store.verify_generation()?;
     println!("{}", serde_json::to_string(&output)?);
     Ok(())
 }
@@ -239,8 +292,8 @@ fn validate_symbol(symbol: Option<&str>) -> Result<Option<&str>> {
         ensure!(
             symbol
                 .chars()
-                .all(|c| c.is_alphanumeric() || c == '_' || c == '.'),
-            "--symbol must contain only letters, digits, underscores or dots"
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == ':'),
+            "--symbol must contain only letters, digits, underscores, dots or colons"
         );
     }
     Ok(symbol)
@@ -317,6 +370,8 @@ fn project_context(
     max_edges: usize,
 ) -> Result<ContextOutput> {
     let mut projection = store.project(host, &file.relative, symbol, max_edges)?;
+    store.validate_projection(host, &file.relative, &mut projection)?;
+    store.verify_generation()?;
     let valid_hashes: Vec<&str> = projection
         .indexed_hashes
         .iter()
@@ -331,6 +386,20 @@ fn project_context(
         projection.graph_status = "stale (indexed source hash differs)".to_string();
         projection.callers.clear();
         projection.callees.clear();
+        projection.symbols.clear();
+    }
+    if projection.graph_status.starts_with("stale") || projection.symbols.is_empty() {
+        let language = if file.relative.ends_with(".rs") {
+            "rust"
+        } else {
+            "python"
+        };
+        let current = conductor_native::graph_context::current_symbols(&file.text, language)
+            .map_err(anyhow::Error::msg)?;
+        projection.symbols = current
+            .into_iter()
+            .filter(|row| symbol.is_none_or(|name| row.name == name || row.qualified_name == name))
+            .collect();
     }
     let selected = if symbol.is_some() && projection.symbols.len() == 1 {
         Some(&projection.symbols[0])
@@ -357,6 +426,11 @@ fn project_context(
         omitted_symbols_at_least: omitted_symbols,
         omitted_relationships_at_least: usize::from(projection.relationship_limit_reached),
         truncated: omitted_symbols > 0 || projection.relationship_limit_reached,
+        generation: store.generation.clone(),
+        source_hash: file.digest.clone(),
+        tokenizer: "utf8-byte-upper-bound".to_owned(),
+        estimated_tokens: 0,
+        cache_status: "miss".to_owned(),
     })
 }
 
@@ -412,8 +486,25 @@ fn prefix_bytes(value: &str, max_bytes: usize) -> &str {
 }
 
 fn fit_context(output: &mut ContextOutput, max_bytes: usize) -> Result<()> {
-    while serde_json::to_vec(&output)?.len() > max_bytes {
+    loop {
+        output.estimated_tokens = serde_json::to_vec(&output)?.len();
+        let length = serde_json::to_vec(&output)?.len();
+        if length <= max_bytes && length <= output.estimated_tokens {
+            break;
+        }
+        if length <= max_bytes {
+            output.estimated_tokens = length;
+            continue;
+        }
         output.truncated = true;
+        if output.callees.pop().is_some() || output.callers.pop().is_some() {
+            output.omitted_relationships_at_least += 1;
+            continue;
+        }
+        if output.symbols.len() > 1 && output.symbols.pop().is_some() {
+            output.omitted_symbols_at_least += 1;
+            continue;
+        }
         if let Some(source) = &mut output.source {
             if source.text.len() > 128 {
                 let reduced = source.text.len() / 2;
@@ -423,10 +514,6 @@ fn fit_context(output: &mut ContextOutput, max_bytes: usize) -> Result<()> {
                 source.truncated = true;
                 continue;
             }
-        }
-        if output.callees.pop().is_some() || output.callers.pop().is_some() {
-            output.omitted_relationships_at_least += 1;
-            continue;
         }
         if output.symbols.pop().is_some() {
             output.omitted_symbols_at_least += 1;

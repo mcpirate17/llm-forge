@@ -3,7 +3,8 @@
 Rules (each is a mutation-campaign contract):
 - ``permissionDecision``: the strongest wins, ``deny`` > ``ask`` > ``allow``; the
   reasons of every hook that voted the winning decision are joined.
-- ``additionalContext`` strings concatenate in hook order, blank-line separated.
+- Context fragments deduplicate and fit an aggregate budget, with stable instructions
+  first. Full omitted fragments remain recoverable; protected context is retained.
 - A hook error (exception, timeout, non-zero exit, non-JSON stdout) is never a
   silent skip: it lands in ``systemMessage`` (user-visible) and, for a PreToolUse
   hook marked fail-closed, becomes a ``deny``; otherwise it is also injected as
@@ -24,7 +25,7 @@ from dataclasses import dataclass
 import json
 from typing import Any, Final
 
-from conductor._native import hook_merge_native
+from conductor._native import hook_context_project_native, hook_merge_native
 
 SEPARATOR: Final[str] = "\n\n"
 _RANK: Final[dict[str, int]] = {"allow": 1, "ask": 2, "deny": 3}
@@ -52,6 +53,23 @@ def _specific(output: dict[str, Any]) -> dict[str, Any]:
     return specific if isinstance(specific, dict) else {}
 
 
+def _fragment(name: str, content: str, *, error: bool = False) -> dict[str, Any]:
+    protected = error or name in {
+        "session_policy",
+        "session_preamble",
+        "session_start",
+        "session_handoff",
+        "active_state",
+        "local_ai_policy",
+    }
+    return {
+        "id": name,
+        "content": content,
+        "protected": protected,
+        "category": "error" if error else "instructions" if protected else "state",
+    }
+
+
 def merge(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
     payload = [
         {
@@ -65,9 +83,46 @@ def merge(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
     return json.loads(hook_merge_native(event, json.dumps(payload)))
 
 
+def _contexts(
+    outcome: HookOutcome, specific: dict[str, Any], system: list[str]
+) -> list[dict[str, Any]]:
+    output = outcome.output or {}
+    protect = (
+        specific.get("permissionDecision") in ("deny", "ask")
+        or output.get("continue") is False
+        or output.get("decision") in ("deny", "block")
+    )
+    result: list[dict[str, Any]] = []
+    context = specific.get("additionalContext")
+    if isinstance(context, str) and context:
+        fragment = _fragment(outcome.name, context)
+        fragment["protected"] |= protect
+        result.append(fragment)
+    fragments = specific.get("contextFragments")
+    if not isinstance(fragments, list):
+        return result
+    for fragment in fragments:
+        valid = isinstance(fragment, dict) and isinstance(fragment.get("content"), str)
+        if valid:
+            valid = all(
+                isinstance(fragment.get(key, ""), str)
+                for key in ("id", "version", "category")
+            )
+            valid = valid and type(fragment.get("priority", 0)) is int
+            valid = valid and -(2**31) <= fragment.get("priority", 0) < 2**31
+            valid = valid and type(fragment.get("protected", False)) is bool
+        if not valid:
+            system.append(f"HOOK ERROR [{outcome.name}]: invalid context fragment")
+            continue
+        fragment = dict(fragment)
+        fragment["protected"] = protect or fragment.get("protected", False)
+        result.append(fragment)
+    return result
+
+
 def _merge_reference(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
     votes: list[tuple[str, str]] = []
-    contexts: list[str] = []
+    contexts: list[dict[str, Any]] = []
     system: list[str] = []
     block_reasons: list[str] = []
     stop_reasons: list[str] = []
@@ -83,7 +138,7 @@ def _merge_reference(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
             if event == "PreToolUse" and outcome.fail_closed:
                 votes.append(("deny", line))
             else:
-                contexts.append(line)
+                contexts.append(_fragment(outcome.name, line, error=True))
         output = outcome.output
         if not isinstance(output, dict):
             continue
@@ -93,9 +148,7 @@ def _merge_reference(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
             votes.append(
                 (decision, str(specific.get("permissionDecisionReason") or ""))
             )
-        context = specific.get("additionalContext")
-        if isinstance(context, str) and context:
-            contexts.append(context)
+        contexts.extend(_contexts(outcome, specific, system))
         for key in _REWRITE_KEYS:
             if key in specific:
                 if key in rewrites:
@@ -110,6 +163,7 @@ def _merge_reference(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
                 "permissionDecision",
                 "permissionDecisionReason",
                 "additionalContext",
+                "contextFragments",
                 *_REWRITE_KEYS,
             ):
                 extra_specific[key] = value
@@ -140,7 +194,9 @@ def _merge_reference(event: str, outcomes: list[HookOutcome]) -> dict[str, Any]:
         if reasons:
             specific_out["permissionDecisionReason"] = SEPARATOR.join(reasons)
     if contexts:
-        specific_out["additionalContext"] = SEPARATOR.join(contexts)
+        specific_out["additionalContext"] = hook_context_project_native(
+            json.dumps(contexts)
+        )
     specific_out.update(rewrites)
     specific_out.update(extra_specific)
     return _assemble(

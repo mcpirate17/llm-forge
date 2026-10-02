@@ -700,3 +700,85 @@ fn watch_once_does_not_present_the_same_message_twice() {
         assert_eq!(rows(&journal, true).as_array().unwrap().len(), 1);
     });
 }
+
+#[test]
+fn watch_coalesces_explicit_informational_supersession_but_keeps_actions_and_replay() {
+    let case = Case::new();
+    Python::attach(|py| {
+        let a2a = module(py, "conductor.agent_a2a");
+        let journal = store(py, &a2a, case.root());
+        let mut info = coordination("progress", "old progress", "informational", vec![]);
+        info["requires_response"] = json!(false);
+        record(&journal, "info-old", "old informational update", Some(info));
+        let mut info = coordination(
+            "progress",
+            "new progress",
+            "informational",
+            vec!["info-old"],
+        );
+        info["requires_response"] = json!(false);
+        record(&journal, "info-new", "new informational update", Some(info));
+        record(
+            &journal,
+            "action-old",
+            "old required action",
+            Some(coordination("actions", "old action", "open", vec![])),
+        );
+        record(
+            &journal,
+            "action-new",
+            "new required action",
+            Some(coordination(
+                "actions",
+                "new action",
+                "open",
+                vec!["action-old"],
+            )),
+        );
+        let (stdout, _patch) = capture(py, "stdout");
+        run_main(
+            &a2a,
+            main_args(
+                case.root(),
+                &[
+                    "watch",
+                    "--as-name",
+                    "tester-a",
+                    "--once",
+                    "--json",
+                    "--max-chars",
+                    "10000",
+                ],
+            ),
+        );
+        let payload: Value = serde_json::from_str(&buffer_text(&stdout)).unwrap();
+        let mut ids = payload["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m["id"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        ids.sort();
+        assert_eq!(ids, ["action-new", "action-old", "info-new"]);
+        assert_eq!(rows(&journal, true).as_array().unwrap().len(), 4);
+        clear_buffer(&stdout);
+        run_main(
+            &a2a,
+            main_args(
+                case.root(),
+                &[
+                    "watch",
+                    "--as-name",
+                    "tester-a",
+                    "--once",
+                    "--json",
+                    "--replay-unread",
+                    "--max-chars",
+                    "10000",
+                ],
+            ),
+        );
+        let recovered: Value = serde_json::from_str(&buffer_text(&stdout)).unwrap();
+        assert_eq!(recovered["total"], 4);
+    });
+}

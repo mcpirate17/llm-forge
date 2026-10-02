@@ -162,3 +162,46 @@ executable = "/usr/bin/git"
 minimum-version = "2.31"
 platforms = ["linux"]
 required-by = ["conductor.project_context"]
+
+# Explicitly requested optional standalone profilers. The native benchmark path
+# requires none of these. Forge never installs tools at runtime; availability is
+# checked before launching the selected profiler. uv cannot provision OS/Cargo
+# executables from Python package metadata.
+[tool.conductor.runtime-requirements.hyperfine]
+executable = "hyperfine"
+optional = true
+installer = "cargo install hyperfine --locked"
+required-by = ["forge performance profile --tool hyperfine"]
+
+[tool.conductor.runtime-requirements.py-spy]
+executable = "py-spy"
+optional = true
+installer = "uv tool install py-spy"
+required-by = ["forge performance profile --tool py-spy"]
+
+[tool.conductor.runtime-requirements.cargo-flamegraph]
+executable = "cargo-flamegraph"
+optional = true
+installer = "cargo install flamegraph --locked"
+required-by = ["forge performance profile --tool cargo-flamegraph"]
+
+[tool.conductor.runtime-requirements.perf]
+executable = "perf"
+optional = true
+platforms = ["linux"]
+installer = "install the Linux perf package matching your kernel"
+required-by = ["forge performance profile --tool cargo-flamegraph"]
+
+[tool.conductor.runtime-requirements.cargo]
+executable = "cargo"
+optional = true
+minimum-version = "1.98"
+installer = "rustup toolchain install 1.98.0"
+required-by = ["forge preview --execute"]
+
+[tool.conductor.runtime-requirements.rustc]
+executable = "rustc"
+optional = true
+minimum-version = "1.98"
+installer = "rustup toolchain install 1.98.0"
+required-by = ["forge preview --execute", "forge performance benchmark toolchain identity"]

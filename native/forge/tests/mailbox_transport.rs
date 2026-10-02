@@ -108,6 +108,12 @@ impl Fixture {
             .output()
             .unwrap()
     }
+
+    fn make_retries_due(&self) {
+        self.store()
+            .execute("UPDATE outbound_retries SET next_attempt_ms=0", [])
+            .unwrap();
+    }
 }
 
 impl Drop for Fixture {
@@ -247,7 +253,9 @@ fn offline_send_is_durable_and_flush_retries_same_ids_in_fifo_order() {
     assert_eq!(first["delivery_status"], "queued");
     assert_eq!(second["delivery_status"], "queued");
     assert!(first.get("body").is_none());
-    let (server, seen) = peer(port, 4, json!([{"id":"coordination-v2"}]), false);
+    fixture.make_retries_due();
+    // One cached discovery plus two ordered sends, rather than two discoveries.
+    let (server, seen) = peer(port, 3, json!([{"id":"coordination-v2"}]), false);
     let output = fixture.flush(2);
     assert_eq!(
         output.status.code(),
@@ -437,6 +445,7 @@ fn structured_offline_message_rechecks_skill_and_records_terminal_failure() {
         String::from_utf8_lossy(&queued.stderr)
     );
     let queued: Value = serde_json::from_slice(&queued.stdout).unwrap();
+    fixture.make_retries_due();
     let (server, seen) = peer(port, 1, json!([{"id":"coordination"}]), false);
     let flushed = fixture.flush(1);
     assert_eq!(flushed.status.code(), Some(0));
@@ -523,6 +532,7 @@ fn flush_limit_reports_remaining_and_missing_recipient_fails_old_queued_message(
     for body in ["one", "two"] {
         assert_eq!(fixture.send(body).status.code(), Some(3));
     }
+    fixture.make_retries_due();
     let (server, _) = peer(port, 2, json!([]), false);
     let first = fixture.flush(1);
     assert_eq!(first.status.code(), Some(3));
@@ -550,7 +560,7 @@ fn flush_limit_reports_remaining_and_missing_recipient_fails_old_queued_message(
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(reason, "recipient no longer registered");
+    assert!(reason.contains("recipient no longer registered"));
 }
 
 #[test]
@@ -597,6 +607,7 @@ fn structured_offline_message_rechecks_capability_and_ack_on_retry() {
         "thread-retry"
     );
 
+    fixture.make_retries_due();
     let (server, seen) = peer(port, 2, json!([{"id":"coordination-v2"}]), false);
     let flushed = fixture.flush(1);
     assert_eq!(
@@ -688,7 +699,8 @@ fn new_send_flushes_older_backlog_before_its_own_delivery() {
     let old = fixture.send("older body");
     assert_eq!(old.status.code(), Some(3));
     let old: Value = serde_json::from_slice(&old.stdout).unwrap();
-    let (server, seen) = peer(port, 4, json!([]), false);
+    fixture.make_retries_due();
+    let (server, seen) = peer(port, 3, json!([]), false);
     let fresh = fixture.send("fresh body");
     assert_eq!(
         fresh.status.code(),
@@ -754,5 +766,236 @@ fn legacy_send_accepts_card_without_v2_skill() {
     assert_eq!(
         posted[0]["params"]["message"]["parts"][1]["data"]["kind"],
         "coordination"
+    );
+}
+
+#[test]
+fn transient_busy_response_retries_the_same_id_only_when_due() {
+    let _endpoint = ENDPOINT_LIFECYCLE.lock().unwrap();
+    let port = free_port();
+    let fixture = Fixture::new(port);
+    let listener = TcpListener::bind(("127.0.0.1", port)).unwrap();
+    let server = thread::spawn(move || {
+        let mut ids = Vec::new();
+        for attempt in 0..2 {
+            let mut discovery = accept_bounded(&listener);
+            assert!(request(&mut discovery).0.starts_with("GET "));
+            reply(
+                &mut discovery,
+                200,
+                &json!({"name":"recipient","skills":[]}),
+            );
+            let mut stream = accept_bounded(&listener);
+            let (_, body) = request(&mut stream);
+            let id = body["params"]["message"]["messageId"].as_str().unwrap();
+            ids.push(id.to_owned());
+            if attempt == 0 {
+                // HTML/empty error bodies must not turn an HTTP retry into terminal JSON rejection.
+                stream.write_all(b"HTTP/1.1 503 Busy\r\nRetry-After: 2\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+            } else {
+                reply(
+                    &mut stream,
+                    200,
+                    &json!({"result":{"message":{"parts":[{"data":{"kind":"delivery-receipt","message_id":id}}]}}}),
+                );
+            }
+        }
+        assert_eq!(ids[0], ids[1]);
+    });
+    let before = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    let first = fixture.send("busy but recoverable");
+    assert_eq!(
+        first.status.code(),
+        Some(3),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&first.stdout).unwrap();
+    let retry: (u64, i64) = fixture
+        .store()
+        .query_row(
+            "SELECT attempts,next_attempt_ms FROM outbound_retries",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(retry.0, 1);
+    assert!(retry.1 >= before + 2000, "Retry-After was not honored");
+    let early = fixture.flush(1);
+    assert_eq!(early.status.code(), Some(3));
+    assert_eq!(
+        serde_json::from_slice::<Value>(&early.stdout).unwrap(),
+        json!([])
+    );
+    fixture.make_retries_due();
+    let recovered = fixture.flush(1);
+    assert_eq!(recovered.status.code(), Some(0));
+    assert_eq!(
+        serde_json::from_slice::<Value>(&recovered.stdout).unwrap()[0]["message_id"],
+        receipt["message_id"]
+    );
+    server.join().unwrap();
+}
+
+#[test]
+fn logical_idempotency_reuses_receipt_and_rejects_payload_collision() {
+    let _endpoint = ENDPOINT_LIFECYCLE.lock().unwrap();
+    let port = free_port();
+    let fixture = Fixture::new(port);
+    let (server, seen) = peer(port, 2, json!([]), false);
+    let send = |body: &str| {
+        fixture
+            .command("send")
+            .args([
+                "--from-name",
+                "sender",
+                "--to",
+                "recipient",
+                "--body",
+                body,
+                "--idempotency-key",
+                "logical-operation",
+            ])
+            .output()
+            .unwrap()
+    };
+    let first = send("one operation");
+    assert!(first.status.success());
+    server.join().unwrap();
+    let second = send("one operation");
+    assert!(
+        second.status.success(),
+        "{}",
+        String::from_utf8_lossy(&second.stderr)
+    );
+    assert_eq!(
+        serde_json::from_slice::<Value>(&first.stdout).unwrap()["message_id"],
+        serde_json::from_slice::<Value>(&second.stdout).unwrap()["message_id"]
+    );
+    let conflicting = send("changed operation");
+    assert!(!conflicting.status.success());
+    assert!(String::from_utf8_lossy(&conflicting.stderr).contains("conflicting idempotency key"));
+    assert_eq!(seen.lock().unwrap().len(), 1);
+    assert_eq!(
+        fixture
+            .store()
+            .query_row("SELECT count(*) FROM messages", [], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+}
+
+#[test]
+fn logical_key_accepts_equivalent_json_and_rejects_changed_data() {
+    let _endpoint = ENDPOINT_LIFECYCLE.lock().unwrap();
+    let fixture = Fixture::new(free_port());
+    let data = fixture.host.join("coordination.json");
+    let enqueue = || {
+        fixture
+            .command("enqueue")
+            .args([
+                "--from-name",
+                "sender",
+                "--to",
+                "recipient",
+                "--body",
+                "same operation",
+                "--idempotency-key",
+                "structured-key",
+                "--data-file",
+            ])
+            .arg(&data)
+            .output()
+            .unwrap()
+    };
+    fs::write(&data,r#"{"kind":"coordination-v2","thread_id":"thread-1","summary":"progress","status":"informational","requires_response":false}"#).unwrap();
+    let first = enqueue();
+    assert!(first.status.success());
+    fs::write(&data,r#"{ "requires_response": false, "status": "informational", "summary": "progress", "thread_id": "thread-1", "kind": "coordination-v2" }"#).unwrap();
+    let equivalent = enqueue();
+    assert!(
+        equivalent.status.success(),
+        "{}",
+        String::from_utf8_lossy(&equivalent.stderr)
+    );
+    assert_eq!(
+        serde_json::from_slice::<Value>(&first.stdout).unwrap()["message_id"],
+        serde_json::from_slice::<Value>(&equivalent.stdout).unwrap()["message_id"]
+    );
+    fs::write(&data,r#"{"kind":"coordination-v2","thread_id":"thread-1","summary":"changed progress","status":"informational","requires_response":false}"#).unwrap();
+    let changed = enqueue();
+    assert!(!changed.status.success());
+    assert!(String::from_utf8_lossy(&changed.stderr).contains("conflicting idempotency key"));
+}
+
+#[test]
+fn recipient_batches_are_parallel_ordered_and_discover_each_peer_once() {
+    let _endpoint = ENDPOINT_LIFECYCLE.lock().unwrap();
+    let a = TcpListener::bind("127.0.0.1:0").unwrap();
+    let b = TcpListener::bind("127.0.0.1:0").unwrap();
+    let fixture = Fixture::new(a.local_addr().unwrap().port());
+    let mut registry: Value =
+        serde_json::from_slice(&fs::read(fixture.root().join("agents.json")).unwrap()).unwrap();
+    registry["agents"]["other"] =
+        json!({"port":b.local_addr().unwrap().port(),"token":"synthetic-recipient-token"});
+    fs::write(fixture.root().join("agents.json"), registry.to_string()).unwrap();
+    for (recipient, body) in [
+        ("recipient", "a1"),
+        ("recipient", "a2"),
+        ("other", "b1"),
+        ("other", "b2"),
+    ] {
+        let output = fixture
+            .command("enqueue")
+            .args(["--from-name", "sender", "--to", recipient, "--body", body])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let concurrent = Arc::new(AtomicUsize::new(0));
+    let peers = [(a,"recipient",vec!["a1","a2"]),(b,"other",vec!["b1","b2"])].into_iter().map(|(listener,name,expected)| {
+        let concurrent = Arc::clone(&concurrent);
+        thread::spawn(move || {
+            let mut stream = accept_bounded(&listener);
+            assert!(request(&mut stream).0.starts_with("GET "));
+            reply(&mut stream,200,&json!({"name":name,"skills":[]}));
+            for (index,expected) in expected.iter().enumerate() {
+                let mut stream = accept_bounded(&listener);
+                let (head,body) = request(&mut stream);
+                assert!(head.starts_with("POST "),"peer card was fetched twice");
+                assert_eq!(body["params"]["message"]["parts"][0]["text"],*expected);
+                if index == 0 {
+                    concurrent.fetch_add(1,Ordering::SeqCst);
+                    let deadline = Instant::now()+Duration::from_secs(2);
+                    while concurrent.load(Ordering::SeqCst)<2 && Instant::now()<deadline { thread::sleep(Duration::from_millis(5)); }
+                    assert_eq!(concurrent.load(Ordering::SeqCst),2,"recipient delivery was serialized");
+                }
+                reply(&mut stream,200,&json!({"result":{"message":{"parts":[{"data":{"kind":"delivery-receipt","message_id":body["params"]["message"]["messageId"]}}]}}}));
+            }
+        })
+    }).collect::<Vec<_>>();
+    let flushed = fixture.flush(4);
+    assert!(
+        flushed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&flushed.stderr)
+    );
+    for peer in peers {
+        peer.join().unwrap();
+    }
+    assert_eq!(
+        serde_json::from_slice::<Value>(&flushed.stdout)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        4
     );
 }

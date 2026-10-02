@@ -59,6 +59,44 @@ Then push the branch, open the PR, and merge through the PR. The local receipt
 is cooperative evidence on this trusted machine; GitHub does not attest it
 or enforce it as a required status check.
 
+For uncommitted edits, use `make local-preview` or `forge preview --path
+native/forge/src/example.rs`. This prints an advisory plan and does not write a
+landing receipt. `make local-preview LOCAL_PREVIEW_ARGS='--execute --path
+native/forge/src/example.rs'` copies versioned and nonignored source inputs into
+a disposable directory under `.git/forge-previews`, then builds only the
+selected crate/test configuration. Graph-selected integration targets are used
+when available; unavailable or incomplete graph evidence is reported explicitly
+and affected crates remain selected. An optional `--filter test_name` limits the
+preview test names; it never alters the full committed gate.
+Default plan output reports graph metadata and selected-test counts; `--details`
+expands the full graph path inventory. Tests sharing a crate and feature set are
+grouped into one Cargo invocation and share one artifact cache.
+
+Preview Cargo caches are private, locked and keyed by target, features, toolchain,
+host and environment. An unchanged input manifest reuses the stable cached
+workspace; source hash drift invalidates package artifacts even for edits that
+preserved timestamps. Tests still rerun. Python compatibility builds import their
+newly built extension through a private overlay and read the existing interpreter;
+they never install a snapshot into the shared environment. Source changes during
+execution invalidate the current-source preview receipt. Preview files never
+update `.git/forge-checks/latest` and cannot pass `forge verify`.
+
+Local check receipt schema 2 persists wall time, child CPU time, Linux `wait4`
+maximum process RSS and retained/discarded log bytes for every executed step.
+Logs are drained with a 16 MiB retention cap, hashed incrementally, and failure
+tails read at most 64 KiB. Maximum RSS describes the largest measured process,
+not the sum of simultaneous process-tree memory. Numerical benchmark receipts
+and optional profilers are documented in [performance.md](performance.md).
+
+The full check remains serial by default. `forge check --all --jobs 2` permits
+policy-declared independent checks to overlap within a two-CPU budget. A
+`[schedule.<check-name>]` table declares `cpus`, `resources` and `depends_on`.
+Unspecified checks reserve both CPUs and `shared-environment`; setup always runs
+serially before checks. Resource-name overlaps prohibit concurrent execution.
+Unknown dependencies, cycles and impossible CPU requests fail before execution;
+a failed prerequisite skips its dependent check and prevents a blocking PASS.
+The same full check inventory, source binding and verification rules apply.
+
 To run the clean-host fallback manually, use the GitHub Actions `ci` workflow
 on the branch. It runs the Rust compatibility contracts and crate tests in
 their own jobs; the retired Python suites are no longer invoked there.

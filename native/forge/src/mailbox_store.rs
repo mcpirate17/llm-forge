@@ -75,6 +75,15 @@ impl Store {
         self.inner.outbound_receipt(id)
     }
 
+    pub fn schedule_retry(&mut self, id: &str, reason: &str, retry_after_ms: u64) -> Result<()> {
+        self.inner.schedule_retry(
+            id,
+            reason,
+            &crate::instant::isoformat_millis_utc(crate::instant::now()),
+            retry_after_ms,
+        )
+    }
+
     pub fn enqueue(&mut self, message: &PreparedMessage, reason: &str) -> Result<Value> {
         self.inner.enqueue(message, reason)
     }

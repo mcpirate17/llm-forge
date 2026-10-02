@@ -144,3 +144,47 @@ fn stale_head_and_untracked_source_fail_closed() {
     assert!(!forge(&root, &["verify", "--require-all"]).status.success());
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn optional_dag_runs_independent_checks_and_skips_failed_dependencies() {
+    let root = fixture("true", 2);
+    let policy = root.join(".forge/local-check.toml");
+    let mut text = fs::read_to_string(&policy).unwrap();
+    text.push_str(
+        r#"
+[[check]]
+name = "dependency"
+run = "false"
+timeout_s = 2
+[[check]]
+name = "dependent"
+run = "touch ran-dependent"
+timeout_s = 2
+[schedule.probe]
+cpus = 1
+resources = []
+[schedule.dependency]
+cpus = 1
+resources = []
+[schedule.dependent]
+cpus = 1
+resources = []
+depends_on = ["dependency"]
+"#,
+    );
+    fs::write(policy, text).unwrap();
+    git(&root, &["add", ".forge/local-check.toml"]);
+    git(&root, &["commit", "-qm", "schedule"]);
+    git(&root, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    let run = forge(&root, &["check", "--all", "--jobs", "2"]);
+    assert!(!run.status.success());
+    assert!(!root.join("ran-dependent").exists());
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(receipt(&root)).unwrap()).unwrap();
+    assert_eq!(receipt["steps"][1]["verdict"], "passed");
+    assert_eq!(receipt["steps"][2]["verdict"], "failed");
+    assert_eq!(receipt["steps"][3]["verdict"], "skipped");
+    assert!(receipt["steps"][1]["usage"]["wall_ms"].as_f64().unwrap() > 0.0);
+    assert!(!forge(&root, &["verify", "--require-all"]).status.success());
+    fs::remove_dir_all(root).unwrap();
+}

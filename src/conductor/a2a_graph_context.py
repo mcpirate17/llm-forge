@@ -1,7 +1,7 @@
 """Bounded, on-demand AST and code-graph context for A2A message batches.
 
 The durable A2A journal remains lossless.  This module scans only bounded message
-prefixes, accepts only concrete Python files inside the selected repository, and
+prefixes, accepts concrete Python/Rust files inside the selected repository, and
 emits a deterministic context envelope with a hard serialized-character budget.
 It never calls a model and never mutates the graph or message store.
 """
@@ -33,7 +33,7 @@ DEFAULT_AST_CHARS: Final[int] = 320
 
 _PYTHON_REF_RE: Final[re.Pattern[str]] = re.compile(
     r"(?<![A-Za-z0-9_.-])"
-    r"(?P<path>/?(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\.py)"
+    r"(?P<path>/?(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\.(?:py|rs))"
     r"(?:::(?P<symbol>[A-Za-z_][A-Za-z0-9_]*))?"
 )
 
@@ -44,7 +44,7 @@ class A2aGraphContextError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class ContextRef:
-    """One repository-contained Python file and optional symbol reference."""
+    """One repository-contained Python/Rust file and optional symbol reference."""
 
     path: str
     symbol: str | None
@@ -82,7 +82,7 @@ def _safe_ref(
     except (OSError, ValueError):
         return None
     if (
-        resolved.suffix != ".py"
+        resolved.suffix not in {".py", ".rs"}
         or not resolved.is_file()
         or any(part.startswith(".") for part in relative.parts)
     ):

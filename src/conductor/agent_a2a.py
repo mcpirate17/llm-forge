@@ -91,6 +91,7 @@ from conductor.a2a_compaction import (
     CompactionError,
     validate_coordination_v2,
 )
+from conductor.a2a_delivery import send_message
 from conductor.a2a_registry import (
     BIND_HOST,
     DEFAULT_REAP_FAILURES,
@@ -617,21 +618,6 @@ def _deliver_wire(
     ]
     if not receipts or receipts[0]["data"].get("message_id") != message_id:
         raise A2aError("peer ack did not echo the message_id")
-
-
-def send_message(
-    from_name: str,
-    to_name: str,
-    body: str,
-    data_payload: dict[str, Any] | None,
-    state_dir: Path,
-    queue_on_unreachable: bool = True,
-) -> dict[str, Any]:
-    from conductor.a2a_delivery import send_message as implementation
-
-    return implementation(
-        from_name, to_name, body, data_payload, state_dir, queue_on_unreachable
-    )
 
 
 def flush_queued(

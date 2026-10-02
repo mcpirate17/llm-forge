@@ -355,9 +355,9 @@ fn read_is_inbound_only_durable_and_does_not_resolve_or_present() {
     assert_eq!(read["state"], "read");
     assert_eq!(read["sender"], "sender");
     assert!(read["read_at"].as_str().unwrap().ends_with("+00:00"));
-    fixture.error(
-        &["read", "--as-name", "receiver", "same-id"],
-        "already read",
+    assert_eq!(
+        fixture.ok(&["read", "--as-name", "receiver", "same-id"]),
+        read
     );
     assert_eq!(
         fixture.ok(&["inbox", "--as-name", "receiver", "--json", "--unread"])["total"],
@@ -391,7 +391,7 @@ fn read_is_inbound_only_durable_and_does_not_resolve_or_present() {
 }
 
 #[test]
-fn concurrent_read_has_exactly_one_successful_acknowledgment() {
+fn concurrent_read_returns_the_same_durable_acknowledgment() {
     let fixture = Fixture::new();
     let connection = fixture.store(false);
     insert(&connection, "race", "inbound", "incoming", None);
@@ -411,11 +411,10 @@ fn concurrent_read_has_exactly_one_successful_acknowledgment() {
         first.wait_with_output().unwrap(),
         second.wait_with_output().unwrap(),
     ];
-    assert_eq!(outputs.iter().filter(|o| o.status.success()).count(), 1);
-    assert!(outputs
-        .iter()
-        .filter(|o| !o.status.success())
-        .all(|o| String::from_utf8_lossy(&o.stderr).contains("already read")));
+    assert!(outputs.iter().all(|o| o.status.success()));
+    let first: Value = serde_json::from_slice(&outputs[0].stdout).unwrap();
+    let second: Value = serde_json::from_slice(&outputs[1].stdout).unwrap();
+    assert_eq!(first, second);
 }
 
 #[test]

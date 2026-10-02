@@ -77,11 +77,15 @@ def send_message(
     data_payload: dict[str, Any] | None,
     state_dir: Path,
     queue_on_unreachable: bool = True,
+    *,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     """Store and attempt one send in native Forge, retaining the Python API."""
     if not isinstance(body, str):
         raise A2aError("body must be a string")
     args = ["--from-name", from_name, "--to", to_name, "--stdin"]
+    if idempotency_key is not None:
+        args.extend(["--idempotency-key", idempotency_key])
     if not queue_on_unreachable:
         args.append("--no-queue")
     payload, _ = _run(state_dir, "send", args, body=body, data_payload=data_payload)
