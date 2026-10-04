@@ -87,6 +87,7 @@ pub fn run(args: PlanArgs) -> Result<i32> {
         owner: args.owner,
         day,
         jobs: args.jobs,
+        python_jobs: None,
         run_timeout_seconds: args.run_timeout,
         campaigns_root,
         only_sources,

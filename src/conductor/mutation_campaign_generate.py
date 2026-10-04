@@ -112,6 +112,7 @@ def plan(
     owner: str = "claude",
     day: str | None = None,
     jobs: int = 4,
+    python_jobs: int | None = None,
     run_timeout_seconds: int = 1800,
     only_sources: Sequence[str] | None = None,
     include_covered: bool = False,
@@ -134,12 +135,17 @@ def plan(
     """
     if language not in ("python", "rust"):
         raise CampaignError(f"unknown language {language!r}; known: python, rust")
+    if python_jobs is not None and language != "python":
+        raise CampaignError("--python-jobs is Python-only")
+    if python_jobs is not None and python_jobs <= 0:
+        raise CampaignError("Python worker count must be positive")
     if extra_tests and language != "python":
         raise CampaignError("--extra-test pairs python subjects only")
     ctx = {
         "owner": owner,
         "day": day or datetime.now(UTC).strftime("%Y%m%d"),
         "jobs": jobs,
+        "python_jobs": python_jobs,
         "run_timeout_seconds": run_timeout_seconds,
         "only_sources": only_sources,
         "include_covered": include_covered,
@@ -222,6 +228,7 @@ def refresh_python_campaign(
     repo_root: Path = REPO_ROOT,
     extra_tests: Mapping[str, Sequence[str]] | None = None,
     run_timeout_seconds: int | None = None,
+    python_jobs: int | None = None,
 ) -> str:
     """Regenerate one generated Python campaign while retaining its engine baseline."""
     path, existing = _load_generated_cargo_campaign(campaign, repo_root)
@@ -233,6 +240,8 @@ def refresh_python_campaign(
         if run_timeout_seconds is None
         else run_timeout_seconds
     )
+    if python_jobs is not None and python_jobs <= 0:
+        raise CampaignError("Python worker count must be positive")
     if timeout <= 0:
         raise CampaignError("refresh run timeout must be positive")
     return _refresh_generated_campaign(
@@ -242,6 +251,7 @@ def refresh_python_campaign(
         language="python",
         run_timeout_seconds=timeout,
         extra_tests=extra_tests or {},
+        python_jobs=python_jobs,
     )
 
 
@@ -366,6 +376,9 @@ def _cli_parser() -> argparse.ArgumentParser:
         help="lane that owns the dirty scope and prefixes generated campaign IDs",
     )
     shared.add_argument("--jobs", type=int, default=4, help="Rust workers per crate")
+    shared.add_argument(
+        "--python-jobs", type=int, help="positive Python workers (default 1)"
+    )
     shared.add_argument("--run-timeout", type=int, default=1800)
     shared.add_argument("--only", action="append", default=[])
     shared.add_argument(
@@ -429,6 +442,11 @@ def _cli_parser() -> argparse.ArgumentParser:
         type=int,
         help="positive Python engine phase timeout; omitted retains the recorded value",
     )
+    refresh_parser.add_argument(
+        "--python-jobs",
+        type=int,
+        help="positive Python workers; omitted retains recorded width",
+    )
     return parser
 
 
@@ -437,9 +455,13 @@ def _refresh_command(args: argparse.Namespace) -> str:
 
     path, existing = _load_generated_cargo_campaign(args.campaign, REPO_ROOT)
     if existing.get("mutation_engine") == "cargo-mutants":
-        if args.extra_test or args.run_timeout is not None:
+        if (
+            args.extra_test
+            or args.run_timeout is not None
+            or args.python_jobs is not None
+        ):
             raise CampaignError(
-                "refresh --extra-test and --run-timeout are Python-only"
+                "refresh --extra-test, --run-timeout and --python-jobs are Python-only"
             )
         return refresh_rust_campaign(args.campaign, sources=args.source)
     if existing.get("mutation_engine") == "fest":
@@ -452,6 +474,7 @@ def _refresh_command(args: argparse.Namespace) -> str:
             repo_root=REPO_ROOT,
             extra_tests=_extra_tests(args.extra_test, repo_root=REPO_ROOT),
             run_timeout_seconds=args.run_timeout,
+            python_jobs=args.python_jobs,
         )
     raise CampaignError(f"{path} is not a generated supported-engine campaign")
 
@@ -478,6 +501,7 @@ def _run_plan_or_write(args: argparse.Namespace) -> dict[str, Any]:
         args.language,
         owner=campaign_owner,
         jobs=args.jobs,
+        python_jobs=args.python_jobs,
         run_timeout_seconds=args.run_timeout,
         only_sources=scope,
         include_covered=args.include_covered,
