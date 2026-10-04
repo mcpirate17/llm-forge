@@ -441,7 +441,7 @@ wheels = [
 
 [[package]]
 name = "conductor-native"
-version = "0.1.73"
+version = "0.1.74"
 source = { directory = "native/conductor-native" }
 
 [[package]]

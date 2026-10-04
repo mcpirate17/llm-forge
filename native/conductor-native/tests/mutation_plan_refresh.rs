@@ -345,7 +345,7 @@ fn python_refresh_rejects_foreign_and_missing_test_bindings() {
 }
 
 #[test]
-fn python_refresh_still_refuses_ambiguity_for_the_selected_source() {
+fn python_refresh_refuses_ambiguous_source_without_recorded_test_bindings() {
     let root = Tree::new();
     root.write("pkg/subject.py", "x = 2\n");
     root.write(
@@ -360,8 +360,10 @@ fn python_refresh_still_refuses_ambiguity_for_the_selected_source() {
         "second/test_subject.py",
         "def test_subject(): assert 2 == 2\n",
     );
-    let error = python_refresh_with_extra(&root, python_record(), json!({})).unwrap_err();
-    assert!(error.contains("several unrelated files share"), "{error}");
+    let mut existing = python_record();
+    existing["test_sha256"] = json!({});
+    let error = python_refresh_with_extra(&root, existing, json!({})).unwrap_err();
+    assert!(error.contains("no recorded test list"), "{error}");
 }
 
 fn refresh_python_worker_width(
@@ -421,4 +423,52 @@ fn python_refresh_rejects_invalid_requested_or_recorded_worker_widths() {
             .unwrap_err()
             .contains("worker count"));
     }
+}
+
+#[test]
+fn python_refresh_uses_valid_recorded_bindings_when_unrelated_basenames_are_ambiguous() {
+    let root = Tree::new();
+    root.write("pkg/subject.py", "x = 2\n");
+    root.write(
+        "pkg/test_feedback.py",
+        "def test_feedback(): assert 2 == 2\n",
+    );
+    root.write(
+        "pkg/test_selection.py",
+        "def test_selection(): assert 2 == 2\n",
+    );
+    root.write("other1/test_subject.py", "def test_unrelated(): pass\n");
+    root.write("other2/test_subject.py", "def test_unrelated(): pass\n");
+    let existing = python_record();
+    let result = python_refresh_with_extra(
+        &root,
+        existing.clone(),
+        json!({"pkg/subject.py": ["pkg/test_selection.py"]}),
+    )
+    .unwrap();
+    assert_eq!(
+        result["test_sha256"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>(),
+        ["pkg/test_feedback.py", "pkg/test_selection.py"]
+    );
+    assert_eq!(result["generator"]["source"], json!(["pkg/subject.py"]));
+    for field in [
+        "survivor_baseline",
+        "survivor_baseline_recorded",
+        "survivor_baseline_note",
+        "survivor_baseline_recorded_at",
+    ] {
+        assert_eq!(result[field], existing[field]);
+    }
+    let mut missing = existing;
+    missing["test_sha256"] = json!({"pkg/test_missing.py": "old"});
+    let error = python_refresh_with_extra(&root, missing, json!({})).unwrap_err();
+    assert!(
+        error.contains("existing repository-relative Python test file"),
+        "{error}"
+    );
 }
