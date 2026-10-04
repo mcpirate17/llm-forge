@@ -199,3 +199,167 @@ fn rust_legacy_manifest_path_repairs_only_an_unambiguous_package() {
     let error = refresh(&root, "rust", existing, &[]).unwrap_err();
     assert!(error.contains("no longer exists"), "{error}");
 }
+
+fn python_record() -> Value {
+    json!({
+        "mutation_engine": "fest",
+        "generator": {"source": ["pkg/subject.py"]},
+        "test_sha256": {"pkg/test_feedback.py": "old"},
+        "survivor_baseline": ["engine-kept"],
+        "survivor_baseline_recorded": true,
+        "survivor_baseline_note": "engine note",
+        "survivor_baseline_recorded_at": "2026-09-09T00:00:00Z"
+    })
+}
+
+fn python_refresh_with_extra(root: &Tree, existing: Value, extras: Value) -> Result<Value, String> {
+    let request: RefreshRequest = serde_json::from_value(json!({
+        "language": "python", "repo_root": root.path(),
+        "manifest_path": root.path().join("campaigns/recorded.json"),
+        "campaign_id": "recorded", "existing": existing,
+        "extra_tests": extras, "run_timeout_seconds": 91
+    }))
+    .unwrap();
+    compute_refresh(&request)
+}
+
+#[test]
+fn python_refresh_scopes_before_pairing_and_unions_recorded_paired_and_new_tests() {
+    let root = Tree::new();
+    root.write("pkg/subject.py", "x = 2\n");
+    root.write("pkg/test_subject.py", "def test_subject(): assert 2 == 2\n");
+    root.write(
+        "pkg/test_feedback.py",
+        "def test_feedback(): assert 2 == 2\n",
+    );
+    root.write(
+        "pkg/test_selection.py",
+        "def test_selection(): assert 2 == 2\n",
+    );
+    root.write(".claude/hooks/dispatch.py", "def dispatch(): pass\n");
+    root.write(
+        "first/tests/test_dispatch.py",
+        "def test_dispatch(): pass\n",
+    );
+    root.write(
+        "second/tests/test_dispatch.py",
+        "def test_dispatch(): pass\n",
+    );
+    let existing = python_record();
+    let result = python_refresh_with_extra(
+        &root,
+        existing.clone(),
+        json!({
+            "pkg/subject.py": ["pkg/test_selection.py", "pkg/test_feedback.py"]
+        }),
+    )
+    .unwrap();
+    assert_eq!(result["generator"]["source"], json!(["pkg/subject.py"]));
+    assert_eq!(
+        result["test_sha256"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>(),
+        [
+            "pkg/test_feedback.py",
+            "pkg/test_selection.py",
+            "pkg/test_subject.py"
+        ]
+    );
+    assert_eq!(
+        &result["test_argv"].as_array().unwrap()[5..],
+        &[
+            json!("pkg/test_feedback.py"),
+            json!("pkg/test_selection.py"),
+            json!("pkg/test_subject.py")
+        ]
+    );
+    for field in [
+        "survivor_baseline",
+        "survivor_baseline_recorded",
+        "survivor_baseline_note",
+        "survivor_baseline_recorded_at",
+    ] {
+        assert_eq!(result[field], existing[field]);
+    }
+    assert_ne!(result["test_sha256"]["pkg/test_feedback.py"], "old");
+}
+
+#[test]
+fn python_refresh_carries_recorded_tests_after_a_basename_pair_appears() {
+    let root = Tree::new();
+    root.write("pkg/subject.py", "x = 2\n");
+    root.write(
+        "pkg/test_feedback.py",
+        "def test_feedback(): assert 2 == 2\n",
+    );
+    let first = python_refresh_with_extra(&root, python_record(), json!({})).unwrap();
+    root.write("pkg/test_subject.py", "def test_subject(): assert 2 == 2\n");
+    let second = python_refresh_with_extra(&root, first, json!({})).unwrap();
+    assert_eq!(second["test_sha256"].as_object().unwrap().len(), 2);
+    assert_eq!(second["survivor_baseline"], json!(["engine-kept"]));
+}
+
+#[test]
+fn python_refresh_rejects_foreign_and_missing_test_bindings() {
+    let root = Tree::new();
+    root.write("pkg/subject.py", "x = 2\n");
+    root.write("pkg/test_subject.py", "def test_subject(): assert 2 == 2\n");
+    root.write(
+        "pkg/test_feedback.py",
+        "def test_feedback(): assert 2 == 2\n",
+    );
+    let foreign = python_refresh_with_extra(
+        &root,
+        python_record(),
+        json!({
+            "pkg/other.py": ["pkg/test_feedback.py"]
+        }),
+    )
+    .unwrap_err();
+    assert!(foreign.contains("different Python source"), "{foreign}");
+    for test in [
+        "pkg/test_missing.py",
+        "../test_escape.py",
+        "/tmp/test_escape.py",
+        "pkg/subject.py",
+    ] {
+        let error = python_refresh_with_extra(
+            &root,
+            python_record(),
+            json!({
+                "pkg/subject.py": [test]
+            }),
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("existing repository-relative Python test file"),
+            "{error}"
+        );
+    }
+    fs::remove_file(root.path().join("pkg/test_feedback.py")).unwrap();
+    let missing = python_refresh_with_extra(&root, python_record(), json!({})).unwrap_err();
+    assert!(missing.contains("pkg/test_feedback.py"), "{missing}");
+}
+
+#[test]
+fn python_refresh_still_refuses_ambiguity_for_the_selected_source() {
+    let root = Tree::new();
+    root.write("pkg/subject.py", "x = 2\n");
+    root.write(
+        "pkg/test_feedback.py",
+        "def test_feedback(): assert 2 == 2\n",
+    );
+    root.write(
+        "first/test_subject.py",
+        "def test_subject(): assert 2 == 2\n",
+    );
+    root.write(
+        "second/test_subject.py",
+        "def test_subject(): assert 2 == 2\n",
+    );
+    let error = python_refresh_with_extra(&root, python_record(), json!({})).unwrap_err();
+    assert!(error.contains("several unrelated files share"), "{error}");
+}

@@ -10,6 +10,8 @@ pub struct RefreshRequest {
     existing: Value,
     #[serde(default)]
     sources: Vec<String>,
+    #[serde(default)]
+    extra_tests: BTreeMap<String, Vec<String>>,
     #[serde(default = "default_jobs")]
     jobs: i64,
     #[serde(default = "default_timeout")]
@@ -62,6 +64,46 @@ fn recorded_tests(request: &RefreshRequest) -> Result<Vec<String>, String> {
     Ok(tests.keys().cloned().collect())
 }
 
+fn python_refresh_tests(
+    root: &Path,
+    request: &RefreshRequest,
+    source: &str,
+    paired_tests: &[String],
+) -> Result<Vec<String>, String> {
+    if request.extra_tests.keys().any(|path| path != source) {
+        return Err(
+            "--extra-test names a different Python source than the recorded campaign".into(),
+        );
+    }
+    let mut tests: BTreeSet<String> = recorded_tests(request)?.into_iter().collect();
+    tests.extend(paired_tests.iter().cloned());
+    if let Some(extra) = request.extra_tests.get(source) {
+        tests.extend(extra.iter().cloned());
+    }
+    let canonical_root = fs::canonicalize(root).map_err(|error| error.to_string())?;
+    for test in &tests {
+        let relative = Path::new(test);
+        let name = relative
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
+        if relative.is_absolute()
+            || relative
+                .components()
+                .any(|part| matches!(part, std::path::Component::ParentDir))
+            || !test.ends_with(".py")
+            || !is_test_name(test, name)
+            || !fs::canonicalize(root.join(relative))
+                .is_ok_and(|path| path.is_file() && path.starts_with(&canonical_root))
+        {
+            return Err(format!(
+                "refresh test must be an existing repository-relative Python test file: {test}"
+            ));
+        }
+    }
+    Ok(tests.into_iter().collect())
+}
+
 fn refresh_python(root: &Path, request: &RefreshRequest) -> Result<Value, String> {
     if request
         .existing
@@ -89,20 +131,25 @@ fn refresh_python(root: &Path, request: &RefreshRequest) -> Result<Value, String
             request.manifest_path
         ));
     };
-    let (paired, unpaired) = python_subjects(root, None)?;
-    let subject = if let Some(found) = paired.into_iter().find(|row| row.source == source) {
+    if request.run_timeout_seconds <= 0 {
+        return Err("refresh run timeout must be positive".into());
+    }
+    let in_scope = |path: &str, _: &[String]| path == source;
+    let (paired, unpaired) = python_subjects(root, Some(&in_scope))?;
+    let mut subject = if let Some(found) = paired.into_iter().find(|row| row.source == source) {
         found
     } else if let Some(orphan) = unpaired.into_iter().find(|row| row.source == source) {
         PySubject {
             source: orphan.source,
             lines: orphan.lines,
-            tests: recorded_tests(request)?,
+            tests: Vec::new(),
         }
     } else {
         return Err(format!(
             "generated Python source {source:?} no longer exists in the tree"
         ));
     };
+    subject.tests = python_refresh_tests(root, request, source, &subject.tests)?;
     let mut refreshed = fest_manifest(
         &subject,
         &request.campaign_id,

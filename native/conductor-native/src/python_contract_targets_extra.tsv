@@ -264,3 +264,14 @@ src/conductor/candidate_review/model.py	python_contracts_candidate_performance
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_a2a_wait
 src/conductor/a2a_cli.py	python_contracts_a2a_wait
 src/conductor/a2a_wait.py	python_contracts_a2a_wait
+
+# Python refresh CLI contracts retain test bindings and engine ratchets.
+native/conductor-native/src/lib.rs	python_contracts_mutation_refresh_cli
+native/conductor-native/src/mutation_plan.rs	python_contracts_mutation_refresh_cli
+native/conductor-native/src/mutation_plan_refresh.rs	python_contracts_mutation_refresh_cli
+native/conductor-native/tests/python_contracts/mutation_campaign_generate_support.rs	python_contracts_mutation_refresh_cli
+native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_refresh_cli
+src/conductor/_native.py	python_contracts_mutation_refresh_cli
+src/conductor/mutation_campaign_generate.py	python_contracts_mutation_refresh_cli
+src/conductor/mutation_scope.py	python_contracts_mutation_refresh_cli
+src/conductor/project_paths.py	python_contracts_mutation_refresh_cli
