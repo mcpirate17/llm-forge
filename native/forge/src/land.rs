@@ -65,6 +65,55 @@ pub struct Config {
     pub setup: Vec<Step>,
     #[serde(default, rename = "check")]
     pub checks: Vec<Step>,
+    /// Shell command run in the invoking checkout after a successful push, only
+    /// when that checkout is on `target`; preceded by `git fetch <remote> <target>`.
+    /// Failure warns and never fails the land.
+    #[serde(default)]
+    pub post_land: Option<String>,
+}
+
+/// What the post-land hook did in the invoking checkout.
+#[derive(Debug, PartialEq, Eq)]
+pub enum PostLand {
+    Skipped(String),
+    Ran,
+    Failed(String),
+}
+
+const POST_LAND_TIMEOUT: Duration = Duration::from_secs(600);
+
+/// Fetch the target and run `post_land` in `here`, never erroring: the push has
+/// already happened, so every failure is reported as a value.
+pub fn post_land(here: &Path, config: &Config) -> PostLand {
+    let Some(command) = &config.post_land else {
+        return PostLand::Skipped("no post_land configured".to_string());
+    };
+    match git(here, &["symbolic-ref", "--short", "-q", "HEAD"]) {
+        Ok(branch) if branch == config.target => {}
+        Ok(branch) => {
+            return PostLand::Skipped(format!("checkout is on {branch}, not {}", config.target))
+        }
+        Err(_) => return PostLand::Skipped("checkout has a detached HEAD".to_string()),
+    }
+    if let Err(error) = git(here, &["fetch", "--quiet", &config.remote, &config.target]) {
+        return PostLand::Failed(format!("{error:#}"));
+    }
+    let log = std::env::temp_dir().join(format!("forge-post-land-{}.log", std::process::id()));
+    let run = ShellRun {
+        command,
+        cwd: here,
+        env: &[],
+        log: &log,
+        timeout: POST_LAND_TIMEOUT,
+    };
+    match run_shell(&run) {
+        Ok(Outcome::Passed) => PostLand::Ran,
+        Ok(outcome) => PostLand::Failed(format!(
+            "`{command}` {outcome:?}; log tail:\n{}",
+            tail(&log, 20)
+        )),
+        Err(error) => PostLand::Failed(format!("`{command}`: {error:#}")),
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -176,6 +225,7 @@ pub fn run(args: LandArgs) -> Result<u8> {
         return Ok(0);
     }
     publish(&clone, &config, &args.branch, &landing)?;
+    report_post_land(&here, &config);
     Ok(0)
 }
 
@@ -412,6 +462,17 @@ fn publish(clone: &Path, config: &Config, branch: &str, landing: &Landing) -> Re
     Ok(())
 }
 
+fn report_post_land(here: &Path, config: &Config) {
+    match post_land(here, config) {
+        PostLand::Ran => println!("land: post_land ran in {}", here.display()),
+        PostLand::Skipped(why) => println!("land: post_land skipped ({why})"),
+        PostLand::Failed(why) => eprintln!(
+            "land: WARNING: landed, but post_land failed in {}: {why}",
+            here.display()
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,6 +528,85 @@ blocking = false
             &changed(&["a/b.rs", "c.pyi.txt"])
         ));
         assert!(selected(&config.checks[1], &changed(&[])));
+    }
+
+    fn run_git(dir: &Path, args: &[&str]) {
+        let status = std::process::Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .status()
+            .unwrap();
+        assert!(status.success(), "git {args:?}");
+    }
+
+    /// A clone of a bare origin, checked out on `master`.
+    fn checkout(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("forge-land-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let origin = root.join("origin.git");
+        let work = root.join("work");
+        run_git(
+            &root,
+            &["init", "-q", "--bare", "-b", "master", "origin.git"],
+        );
+        run_git(&root, &["clone", "-q", origin.to_str().unwrap(), "work"]);
+        run_git(&work, &["checkout", "-q", "-b", "master"]);
+        run_git(
+            &work,
+            &[
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@x",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "m",
+            ],
+        );
+        run_git(&work, &["push", "-q", "origin", "master"]);
+        work
+    }
+
+    fn with_post_land(command: &str) -> Config {
+        // post_land is a top-level key, so it goes before the first table.
+        let key = format!("required_trailers = [\"Agent\"]\npost_land = '{command}'");
+        let text = SAMPLE.replacen("required_trailers = [\"Agent\"]", &key, 1);
+        Config::parse(&text).unwrap()
+    }
+
+    #[test]
+    fn post_land_failure_is_a_value_not_an_error_and_never_fails_the_land() {
+        let work = checkout("fail");
+        let failed = post_land(&work, &with_post_land("exit 3"));
+        assert!(matches!(failed, PostLand::Failed(ref why) if why.contains("exit 3")));
+        report_post_land(&work, &with_post_land("exit 3"));
+        let ran = post_land(&work, &with_post_land("touch ran.txt"));
+        assert_eq!(ran, PostLand::Ran);
+        assert!(work.join("ran.txt").exists());
+        run_git(
+            &work,
+            &["remote", "set-url", "origin", "/nonexistent/origin.git"],
+        );
+        let fetch = post_land(&work, &with_post_land("touch never.txt"));
+        assert!(matches!(fetch, PostLand::Failed(_)));
+        assert!(!work.join("never.txt").exists());
+    }
+
+    #[test]
+    fn post_land_skips_when_checkout_is_not_on_target_or_unconfigured() {
+        let work = checkout("skip");
+        run_git(&work, &["checkout", "-q", "-b", "feature"]);
+        let skipped = post_land(&work, &with_post_land("touch ran.txt"));
+        assert!(matches!(skipped, PostLand::Skipped(ref why) if why.contains("feature")));
+        assert!(!work.join("ran.txt").exists());
+        run_git(&work, &["checkout", "-q", "master"]);
+        let plain = Config::parse(SAMPLE).unwrap();
+        assert!(matches!(post_land(&work, &plain), PostLand::Skipped(_)));
     }
 
     #[test]
