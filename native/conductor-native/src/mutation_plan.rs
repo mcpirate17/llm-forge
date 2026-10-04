@@ -223,14 +223,14 @@ struct Unpaired {
     lines: u64,
 }
 
-type Relevant = dyn Fn(&str, &[String]) -> bool;
+type Relevant<'a> = dyn Fn(&str, &[String]) -> bool + 'a;
 
 /// Pairs every python source with its tests. Test discovery always spans the whole
 /// repo; `relevant` (when given) limits which sources are paired, so an ambiguous
 /// pairing for a source nobody asked about cannot fail a scoped run.
 fn python_subjects(
     repo_root: &Path,
-    relevant: Option<&Relevant>,
+    relevant: Option<&Relevant<'_>>,
 ) -> Result<(Vec<PySubject>, Vec<Unpaired>), String> {
     let mut files = collect_files(repo_root, "py");
     files.sort();
