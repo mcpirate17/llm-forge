@@ -233,3 +233,36 @@ fn main_cli() {
         assert_eq!(plain, 0);
     });
 }
+
+#[test]
+fn graph_plan_accepts_an_exact_candidate_inventory_root() {
+    let case = Case::new();
+    let repo = GraphRepo::new(&case);
+    repo.write("tests/test_live.py", "def test_live(): pass\n");
+    let snapshot = case.mkdir("candidate");
+    case.write("candidate/tests/test_new.py", "def test_new(): pass\n");
+    Python::attach(|py| {
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs
+            .set_item("inventory_root", path(py, &snapshot))
+            .unwrap();
+        let result = graph_module(py)
+            .getattr("graph_test_plan")
+            .unwrap()
+            .call(
+                (path(py, repo.root()), vec!["pkg/target.py"]),
+                Some(&kwargs),
+            )
+            .unwrap();
+        let paths: Vec<String> = result.get_item("paths").unwrap().extract().unwrap();
+        assert_eq!(paths, ["tests/test_new.py"]);
+        assert_eq!(
+            result
+                .get_item("complete")
+                .unwrap()
+                .extract::<bool>()
+                .unwrap(),
+            false
+        );
+    });
+}

@@ -325,7 +325,20 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
         return Err("code-review graph missing or incompatible; run forge graph index".to_owned());
     }
     let mut reasons = reasons(&store, &root, input)?;
-    let inventory = inventory(&root)?;
+    let inventory_root = match input.get("inventory_root") {
+        Some(value) => Path::new(
+            value
+                .as_str()
+                .ok_or("inventory root must be a path string")?,
+        )
+        .canonicalize()
+        .map_err(|error| format!("candidate inventory unavailable: {error}"))?,
+        None => root.clone(),
+    };
+    let inventory = inventory(&inventory_root)?;
+    if inventory_root != root {
+        reasons.insert("candidate snapshot requires full test inventory".to_owned());
+    }
     validate_inventory(&store, &root, &inventory, &mut reasons)?;
     let selected = visit_dependencies(&store, &root, &paths, &mut reasons)?;
     let complete = reasons.is_empty();

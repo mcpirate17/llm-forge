@@ -35,7 +35,9 @@ def _graph_test_paths(
     if not expected:
         raise RuntimeError("candidate revision is missing")
     try:
-        plan = graph_test_plan(ctx.repo, source_paths, expected_head=expected)
+        plan = graph_test_plan(
+            ctx.repo, source_paths, expected_head=expected, inventory_root=ctx.snapshot
+        )
     except GraphSelectError as exc:
         raise RuntimeError(str(exc)) from exc
     tests = {
