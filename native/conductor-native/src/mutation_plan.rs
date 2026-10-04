@@ -223,7 +223,13 @@ struct Unpaired {
     lines: u64,
 }
 
-fn python_subjects(repo_root: &Path) -> Result<(Vec<PySubject>, Vec<Unpaired>), String> {
+/// Pairs every python source with its tests. Test discovery always spans the whole
+/// repo; `relevant` (when given) limits which sources are paired, so an ambiguous
+/// pairing for a source nobody asked about cannot fail a scoped run.
+fn python_subjects(
+    repo_root: &Path,
+    relevant: Option<&dyn Fn(&str, &[String]) -> bool>,
+) -> Result<(Vec<PySubject>, Vec<Unpaired>), String> {
     let mut files = collect_files(repo_root, "py");
     files.sort();
 
@@ -256,6 +262,11 @@ fn python_subjects(repo_root: &Path) -> Result<(Vec<PySubject>, Vec<Unpaired>), 
         let lines = line_count(path);
         let empty: Vec<String> = Vec::new();
         let matches = tests.get(&format!("test_{name}")).unwrap_or(&empty);
+        if let Some(relevant) = relevant {
+            if !relevant(relative, matches) {
+                continue;
+            }
+        }
         let mirrored = mirrored_tests(relative, matches);
         if !mirrored.is_empty() {
             paired.push(PySubject {
@@ -639,7 +650,14 @@ fn plan_python(
     run_timeout_seconds: i64,
     extra_tests: &BTreeMap<String, Vec<String>>,
 ) -> PythonPlanResult {
-    let (paired, unpaired) = python_subjects(repo_root)?;
+    let in_scope = |source: &str, tests: &[String]| {
+        scope.is_none_or(|scope| {
+            scope.contains(source)
+                || extra_tests.contains_key(source)
+                || tests.iter().any(|t| scope.contains(t))
+        })
+    };
+    let (paired, unpaired) = python_subjects(repo_root, Some(&in_scope))?;
     let (mut paired, mut unpaired) = admit_extra_tests(paired, unpaired, extra_tests)?;
     if let Some(scope) = scope {
         paired.retain(|s| scope.contains(&s.source) || s.tests.iter().any(|t| scope.contains(t)));

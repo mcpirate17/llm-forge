@@ -266,3 +266,57 @@ fn covered_subject_is_skipped_until_include_covered_requests_a_narrow_campaign()
     assert_eq!(manifests(&admitted).len(), 1);
     assert_eq!(admitted["already_covered"], json!([]));
 }
+
+fn ambiguous_pair(tree: &Tree, dir: &str) {
+    tree.write(&format!("{dir}/model.py"), "x = 1\n");
+    tree.write("t_a/test_model.py", "def test_a(): pass\n");
+    tree.write("t_b/test_model.py", "def test_b(): pass\n");
+}
+
+#[test]
+fn scoped_plan_ignores_ambiguous_out_of_scope_source() {
+    let tree = Tree::new();
+    ambiguous_pair(&tree, "other");
+    tree.write("pkg/widget.py", "y = 2\n");
+    tree.write("pkg/test_widget.py", "def test_w(): pass\n");
+
+    let result = tree
+        .plan("python", Some(&["pkg/widget.py"]))
+        .expect("scoped plan");
+    let planned = manifests(&result);
+    assert_eq!(planned.len(), 1);
+    assert_eq!(planned[0]["generator"]["source"], json!(["pkg/widget.py"]));
+    assert!(
+        tree.plan("python", None).is_err(),
+        "unscoped run still sees the ambiguity"
+    );
+}
+
+#[test]
+fn scoped_plan_still_refuses_ambiguous_in_scope_source() {
+    let tree = Tree::new();
+    ambiguous_pair(&tree, "other");
+    let error = tree
+        .plan("python", Some(&["other/model.py"]))
+        .expect_err("in-scope ambiguity is fatal");
+    assert!(error.contains("other/model.py"), "{error}");
+    assert!(error.contains("test_model.py"), "{error}");
+}
+
+#[test]
+fn in_scope_source_pairs_with_test_outside_scope_directory() {
+    let tree = Tree::new();
+    tree.write("src/pkg/widget.py", "y = 2\n");
+    tree.write("tests/test_widget.py", "def test_w(): pass\n");
+
+    let result = tree
+        .plan("python", Some(&["src/pkg/widget.py"]))
+        .expect("scoped plan");
+    let planned = manifests(&result);
+    assert_eq!(planned.len(), 1);
+    assert_eq!(
+        planned[0]["generator"]["source"],
+        json!(["src/pkg/widget.py"])
+    );
+    assert!(planned[0].to_string().contains("tests/test_widget.py"));
+}

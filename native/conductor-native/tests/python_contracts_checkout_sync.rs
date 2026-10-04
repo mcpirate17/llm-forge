@@ -390,3 +390,48 @@ fn dry_run_classifies_every_overlap_without_touching_the_tree() {
     assert_eq!(git(&clone, &["rev-parse", "HEAD"]), head);
     assert_eq!(git(&clone, &["status", "--porcelain"]), status);
 }
+
+#[test]
+fn render_lists_every_blocker_then_capped_rest_then_class_counts() {
+    Python::attach(|py| {
+        let classification = PyDict::new(py);
+        for n in 0..60 {
+            classification
+                .set_item(format!("a{n:02}.txt"), "carried")
+                .unwrap();
+        }
+        classification.set_item("b_same.txt", "identical").unwrap();
+        classification
+            .set_item("z_conflict.txt", "conflict")
+            .unwrap();
+        classification
+            .set_item("z_untracked.txt", "untracked-differs")
+            .unwrap();
+        let result = PyDict::new(py);
+        result.set_item("outcome", "blocked").unwrap();
+        result.set_item("remote", "origin/master").unwrap();
+        result.set_item("behind", 3).unwrap();
+        result
+            .set_item("blocked_by", vec!["z_conflict.txt", "z_untracked.txt"])
+            .unwrap();
+        result.set_item("classification", classification).unwrap();
+        let rendered: String = module(py, "conductor.checkout_sync")
+            .getattr("render")
+            .unwrap()
+            .call1((result,))
+            .unwrap()
+            .extract()
+            .unwrap();
+        let lines: Vec<&str> = rendered.lines().collect();
+        let position = |needle: &str| lines.iter().position(|l| l.contains(needle));
+        let conflict = position("z_conflict.txt").expect("conflict line kept");
+        let untracked = position("z_untracked.txt").expect("untracked-differs line kept");
+        assert!(conflict < position("a00.txt").unwrap());
+        assert!(untracked < position("a00.txt").unwrap());
+        assert!(position("a39.txt").is_some() && position("a40.txt").is_none());
+        assert!(position("20 more not shown").is_some());
+        assert!(position("b_same.txt").is_none());
+        assert!(rendered.contains("60 carried, 1 conflict, 1 identical, 1 untracked-differs"));
+        assert!(rendered.contains("2 local edit(s) conflict"));
+    });
+}

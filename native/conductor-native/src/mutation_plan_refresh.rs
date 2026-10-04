@@ -89,7 +89,7 @@ fn refresh_python(root: &Path, request: &RefreshRequest) -> Result<Value, String
             request.manifest_path
         ));
     };
-    let (paired, unpaired) = python_subjects(root)?;
+    let (paired, unpaired) = python_subjects(root, None)?;
     let subject = if let Some(found) = paired.into_iter().find(|row| row.source == source) {
         found
     } else if let Some(orphan) = unpaired.into_iter().find(|row| row.source == source) {

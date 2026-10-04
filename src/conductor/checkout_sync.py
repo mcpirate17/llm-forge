@@ -303,10 +303,33 @@ def sync(repo: Path = ROOT, *, dry_run: bool = False) -> dict[str, object]:
     return result
 
 
+_CAP = 40
+_QUIET = ("identical", "untracked-identical")
+
+
 def _classes(result: dict[str, object]) -> list[str]:
+    """Blocking files first and uncapped, then other non-identical files up to ``_CAP``,
+    then one count per class over everything classified."""
+
     classification = result["classification"]
     assert isinstance(classification, dict)
-    return [f"    {kind:<19} {path}" for path, kind in sorted(classification.items())]
+    blocking = [(p, k) for p, k in sorted(classification.items()) if k in _REFUSED]
+    rest = [
+        (p, k)
+        for p, k in sorted(classification.items())
+        if k not in _REFUSED and k not in _QUIET
+    ]
+    lines = [f"    {kind:<19} {path}" for path, kind in blocking]
+    lines += [f"    {kind:<19} {path}" for path, kind in rest[:_CAP]]
+    if len(rest) > _CAP:
+        lines.append(f"    ... {len(rest) - _CAP} more not shown")
+    counts: dict[str, int] = {}
+    for kind in classification.values():
+        counts[kind] = counts.get(kind, 0) + 1
+    if counts:
+        summary = ", ".join(f"{n} {kind}" for kind, n in sorted(counts.items()))
+        lines.append(f"  classes: {summary}")
+    return lines
 
 
 def render(result: dict[str, object]) -> str:
@@ -321,7 +344,7 @@ def render(result: dict[str, object]) -> str:
         lines = [
             f"checkout is {result['behind']} behind {remote} and cannot fast-forward:",
             f"  {len(blocked)} local edit(s) conflict with upstream (3-way merge failed or untracked file differs)",
-            *classes[:40],
+            *classes,
             "commit or land those first; nothing was changed",
         ]
         return "\n".join(lines)
@@ -332,7 +355,7 @@ def render(result: dict[str, object]) -> str:
     )
     lines = [
         head,
-        *(["  local edits meeting upstream:", *classes[:40]] if classes else []),
+        *(["  local edits meeting upstream:", *classes] if classes else []),
     ]
     if outcome == "fast-forwarded":
         saved = result["snapshot"]
