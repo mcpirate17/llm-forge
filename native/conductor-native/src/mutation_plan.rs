@@ -231,6 +231,7 @@ type Relevant<'a> = dyn Fn(&str, &[String]) -> bool + 'a;
 fn python_subjects(
     repo_root: &Path,
     relevant: Option<&Relevant<'_>>,
+    recorded: Option<&BTreeMap<String, Vec<String>>>,
 ) -> Result<(Vec<PySubject>, Vec<Unpaired>), String> {
     let mut files = collect_files(repo_root, "py");
     files.sort();
@@ -281,6 +282,12 @@ fn python_subjects(
                 source: relative.clone(),
                 lines,
                 tests: matches.clone(),
+            });
+        } else if let Some(tests) = recorded.and_then(|bindings| bindings.get(relative)) {
+            paired.push(PySubject {
+                source: relative.clone(),
+                lines,
+                tests: tests.clone(),
             });
         } else if !matches.is_empty() {
             let mut sorted_matches = matches.clone();
@@ -665,7 +672,7 @@ fn plan_python(
                 || tests.iter().any(|t| scope.contains(t))
         })
     };
-    let (paired, unpaired) = python_subjects(repo_root, Some(&in_scope))?;
+    let (paired, unpaired) = python_subjects(repo_root, Some(&in_scope), None)?;
     let (mut paired, mut unpaired) = admit_extra_tests(paired, unpaired, extra_tests)?;
     if let Some(scope) = scope {
         paired.retain(|s| scope.contains(&s.source) || s.tests.iter().any(|t| scope.contains(t)));

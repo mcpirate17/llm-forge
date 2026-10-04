@@ -155,8 +155,10 @@ fn refresh_python(root: &Path, request: &RefreshRequest) -> Result<Value, String
     if request.run_timeout_seconds <= 0 {
         return Err("refresh run timeout must be positive".into());
     }
+    let bound_tests = python_refresh_tests(root, request, source, &[])?;
+    let recorded = BTreeMap::from([(source.to_owned(), bound_tests)]);
     let in_scope = |path: &str, _: &[String]| path == source;
-    let (paired, unpaired) = python_subjects(root, Some(&in_scope))?;
+    let (paired, unpaired) = python_subjects(root, Some(&in_scope), Some(&recorded))?;
     let mut subject = if let Some(found) = paired.into_iter().find(|row| row.source == source) {
         found
     } else if let Some(orphan) = unpaired.into_iter().find(|row| row.source == source) {
