@@ -33,6 +33,7 @@ impl Tree {
             owner: "owner".to_string(),
             day: "20260910".to_string(),
             jobs: 2,
+            python_jobs: None,
             run_timeout_seconds: 91,
             campaigns_root: "conductor/mutation_campaigns".to_string(),
             only_sources: scope.map(|paths| paths.iter().map(|path| (*path).to_string()).collect()),
@@ -248,6 +249,7 @@ fn covered_subject_is_skipped_until_include_covered_requests_a_narrow_campaign()
         owner: "owner".to_string(),
         day: "20260910".to_string(),
         jobs: 2,
+        python_jobs: None,
         run_timeout_seconds: 91,
         campaigns_root: "conductor/mutation_campaigns".to_string(),
         only_sources: Some(vec!["pkg/subject.py".to_string()]),
@@ -319,4 +321,54 @@ fn in_scope_source_pairs_with_test_outside_scope_directory() {
         json!(["src/pkg/widget.py"])
     );
     assert!(planned[0].to_string().contains("tests/test_widget.py"));
+}
+
+#[test]
+fn python_workers_are_explicit_and_do_not_reuse_rust_jobs() {
+    let tree = Tree::new();
+    tree.write("pkg/subject.py", "x = 1\n");
+    tree.write("pkg/test_subject.py", "def test_subject(): pass\n");
+    for width in [None, Some(1), Some(2)] {
+        let request: PlanRequest = serde_json::from_value(json!({
+            "language": "python", "repo_root": tree.0, "owner": "fixture", "day": "20261004",
+            "jobs": 4, "python_jobs": width, "campaigns_root": "campaigns",
+            "only_sources": ["pkg/subject.py"]
+        }))
+        .unwrap();
+        let result = compute_plan(&request).unwrap();
+        let generator = &manifests(&result)[0]["generator"];
+        assert_eq!(generator.get("jobs").and_then(Value::as_i64), width);
+    }
+    tree.write("crate/Cargo.toml", rust_crate());
+    tree.write("crate/src/lib.rs", "#[cfg(test)] mod tests {}\n");
+    let request: PlanRequest = serde_json::from_value(json!({
+        "language": "rust", "repo_root": tree.0, "owner": "fixture", "day": "20261004",
+        "campaigns_root": "campaigns", "only_sources": ["crate/src/lib.rs"]
+    }))
+    .unwrap();
+    assert_eq!(
+        manifests(&compute_plan(&request).unwrap())[0]["generator"]["jobs"],
+        4
+    );
+}
+
+#[test]
+fn python_worker_validation_fails_before_source_discovery() {
+    let tree = Tree::new();
+    for width in [0, -1] {
+        let request: PlanRequest = serde_json::from_value(json!({
+            "language": "python", "repo_root": tree.0, "owner": "fixture", "day": "20261004",
+            "python_jobs": width, "campaigns_root": "campaigns"
+        }))
+        .unwrap();
+        assert!(compute_plan(&request)
+            .unwrap_err()
+            .contains("worker count must be positive"));
+    }
+    let request: PlanRequest = serde_json::from_value(json!({
+        "language": "rust", "repo_root": tree.0, "owner": "fixture", "day": "20261004",
+        "python_jobs": 2, "campaigns_root": "campaigns"
+    }))
+    .unwrap();
+    assert!(compute_plan(&request).unwrap_err().contains("Python-only"));
 }

@@ -199,3 +199,156 @@ fn direct_python_refresh_rejects_nonpositive_phase_timeout_without_erasing_ratch
         assert_eq!(fs::read(&file).unwrap(), original);
     });
 }
+
+fn scoped_cli_plan(
+    py: Python<'_>,
+    root: &Path,
+    language: &str,
+    width: Option<&str>,
+) -> PyResult<serde_json::Value> {
+    let generate = generator(py);
+    let _root = AttrPatch::replace(&generate, "REPO_ROOT", path(py, root).as_any());
+    let mut defaults = Vec::new();
+    for name in ["plan", "_explicit_scope", "_extra_tests"] {
+        let function = generate.getattr(name)?;
+        let copied = function.getattr("__kwdefaults__")?.call_method0("copy")?;
+        copied
+            .cast::<PyDict>()?
+            .set_item("repo_root", path(py, root))?;
+        defaults.push(AttrPatch::replace(&function, "__kwdefaults__", &copied));
+    }
+    let mut arguments = vec![
+        "plan",
+        language,
+        "--owner",
+        "fixture",
+        "--only",
+        "conductor/subject.py",
+    ];
+    if let Some(width) = width {
+        arguments.extend(["--python-jobs", width]);
+    }
+    let args = generate
+        .getattr("_cli_parser")?
+        .call0()?
+        .call_method1("parse_args", (arguments,))?;
+    let result = generate.getattr("_run_plan_or_write")?.call1((args,))?;
+    Ok(generate_support::py_to_json(&result))
+}
+
+#[test]
+fn python_worker_width_flows_through_cli_plan_write_loader_and_fest_config() {
+    for (setting, expected) in [(None, 1), (Some("1"), 1), (Some("2"), 2)] {
+        let case = Case::new();
+        Python::attach(|py| {
+            tree(
+                case.root(),
+                &[
+                    ("conductor/subject.py", "x = 1\n"),
+                    ("conductor/test_subject.py", "def test_subject(): pass\n"),
+                ],
+            );
+            let planned = scoped_cli_plan(py, case.root(), "python", setting).unwrap();
+            let item = first(&planned);
+            assert_eq!(
+                item["generator"]
+                    .get("jobs")
+                    .and_then(serde_json::Value::as_i64),
+                setting.map(|value| value.parse::<i64>().unwrap())
+            );
+            let file = manifest_file(
+                case.root(),
+                &write(py, case.root(), &[item], false).unwrap(),
+            );
+            let core = module(py, "conductor.mutation_engine_generated");
+            let campaign = core
+                .getattr("GeneratedCampaign")
+                .unwrap()
+                .call1((
+                    path(py, &file),
+                    generate_support::json_to_py(py, &load_json(&file)),
+                ))
+                .unwrap();
+            assert_eq!(
+                campaign.getattr("jobs").unwrap().extract::<i64>().unwrap(),
+                expected
+            );
+            core.getattr("resolve_mutant_timeout")
+                .unwrap()
+                .call1((&campaign, 0.01))
+                .unwrap();
+            let config: String = module(py, "conductor.mutation_engine_fest")
+                .getattr("_config")
+                .unwrap()
+                .call1((&campaign, "python"))
+                .unwrap()
+                .extract()
+                .unwrap();
+            assert!(
+                config
+                    .lines()
+                    .any(|line| line == format!("workers = {expected}")),
+                "{config}"
+            );
+        });
+    }
+}
+
+#[test]
+fn python_worker_refresh_cli_preserves_width_tests_and_baseline_unless_overridden() {
+    let case = Case::new();
+    Python::attach(|py| {
+        let file = recorded_python_campaign(py, case.root());
+        let original = load_json(&file);
+        cli_refresh(py, case.root(), &file, &["--python-jobs", "2"]).unwrap();
+        let two = load_json(&file);
+        assert_eq!(two["generator"]["jobs"], 2);
+        cli_refresh(py, case.root(), &file, &[]).unwrap();
+        assert_eq!(load_json(&file), two);
+        cli_refresh(py, case.root(), &file, &["--python-jobs", "3"]).unwrap();
+        let three = load_json(&file);
+        assert_eq!(three["generator"]["jobs"], 3);
+        assert_eq!(three["test_sha256"], original["test_sha256"]);
+        for field in [
+            "survivor_baseline",
+            "survivor_baseline_recorded",
+            "survivor_baseline_note",
+            "survivor_baseline_recorded_at",
+        ] {
+            assert_eq!(three[field], original[field]);
+        }
+    });
+}
+
+#[test]
+fn python_worker_cli_rejects_nonpositive_widths_and_rust_requests_without_writing() {
+    let case = Case::new();
+    Python::attach(|py| {
+        let file = recorded_python_campaign(py, case.root());
+        let original = fs::read(&file).unwrap();
+        let error_type = module(py, "conductor.mutation_scope")
+            .getattr("CampaignError")
+            .unwrap();
+        for width in ["0", "-1"] {
+            assert_error(
+                py,
+                scoped_cli_plan(py, case.root(), "python", Some(width)).unwrap_err(),
+                &error_type,
+                "worker count must be positive",
+            );
+            assert_error(
+                py,
+                cli_refresh(py, case.root(), &file, &["--python-jobs", width]).unwrap_err(),
+                &error_type,
+                "worker count must be positive",
+            );
+            assert_eq!(fs::read(&file).unwrap(), original);
+        }
+        assert_error(
+            py,
+            scoped_cli_plan(py, case.root(), "rust", Some("2")).unwrap_err(),
+            &error_type,
+            "Python-only",
+        );
+    });
+}

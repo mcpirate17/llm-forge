@@ -406,6 +406,7 @@ fn fest_manifest(
     subject: &PySubject,
     campaign_id: &str,
     repo_root: &Path,
+    python_jobs: Option<i64>,
     run_timeout_seconds: i64,
 ) -> Value {
     let source = subject.source.clone();
@@ -430,7 +431,7 @@ fn fest_manifest(
         "--rootdir=.".to_string(),
     ];
     test_argv.extend(tests);
-    json!({
+    let mut manifest = json!({
         "schema_version": 1,
         "campaign_id": campaign_id,
         "title": format!("Generated mutants for {source}, scored on the survivor set"),
@@ -450,7 +451,11 @@ fn fest_manifest(
         "survivor_baseline": [],
         "survivor_baseline_recorded": false,
         "survivor_baseline_note": SURVIVOR_BASELINE_NOTE,
-    })
+    });
+    if let Some(jobs) = python_jobs {
+        manifest["generator"]["jobs"] = json!(jobs);
+    }
+    manifest
 }
 
 fn cargo_manifest(
@@ -649,6 +654,7 @@ fn plan_python(
     scope: Option<&BTreeSet<String>>,
     owner: &str,
     day: &str,
+    python_jobs: Option<i64>,
     run_timeout_seconds: i64,
     extra_tests: &BTreeMap<String, Vec<String>>,
 ) -> PythonPlanResult {
@@ -677,7 +683,13 @@ fn plan_python(
     let mut manifests = Vec::new();
     for subject in &paired {
         let id = campaign_id(owner, &slugs[&subject.source], "fest", day);
-        manifests.push(fest_manifest(subject, &id, repo_root, run_timeout_seconds));
+        manifests.push(fest_manifest(
+            subject,
+            &id,
+            repo_root,
+            python_jobs,
+            run_timeout_seconds,
+        ));
     }
     Ok((manifests, unpaired, already))
 }
@@ -747,6 +759,8 @@ pub struct PlanRequest {
     pub day: String,
     #[serde(default = "default_jobs")]
     pub jobs: i64,
+    #[serde(default)]
+    pub python_jobs: Option<i64>,
     #[serde(default = "default_timeout")]
     pub run_timeout_seconds: i64,
     pub campaigns_root: String,
@@ -778,6 +792,12 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
     if !request.extra_tests.is_empty() && request.language != "python" {
         return Err("--extra-test pairs python subjects only".to_string());
     }
+    if request.python_jobs.is_some() && request.language != "python" {
+        return Err("--python-jobs is Python-only".into());
+    }
+    if request.python_jobs.is_some_and(|jobs| jobs <= 0) {
+        return Err("Python worker count must be positive".into());
+    }
     let repo_root = Path::new(&request.repo_root);
     let covered = if request.include_covered {
         BTreeSet::new()
@@ -801,6 +821,7 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
             scope.as_ref(),
             &request.owner,
             &request.day,
+            request.python_jobs,
             request.run_timeout_seconds,
             &request.extra_tests,
         )?;
@@ -974,6 +995,7 @@ mod fixture_parity_tests {
             owner: "llm-b0".to_string(),
             day: "20260913".to_string(),
             jobs: 4,
+            python_jobs: None,
             run_timeout_seconds: 1800,
             campaigns_root: "conductor/mutation_campaigns".to_string(),
             only_sources: None,

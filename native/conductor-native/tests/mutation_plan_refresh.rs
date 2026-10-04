@@ -363,3 +363,62 @@ fn python_refresh_still_refuses_ambiguity_for_the_selected_source() {
     let error = python_refresh_with_extra(&root, python_record(), json!({})).unwrap_err();
     assert!(error.contains("several unrelated files share"), "{error}");
 }
+
+fn refresh_python_worker_width(
+    root: &Tree,
+    existing: Value,
+    width: Option<i64>,
+) -> Result<Value, String> {
+    let request: RefreshRequest = serde_json::from_value(json!({
+        "language": "python", "repo_root": root.path(), "campaign_id": "recorded",
+        "manifest_path": root.path().join("campaigns/recorded.json"), "existing": existing,
+        "python_jobs": width
+    }))
+    .unwrap();
+    compute_refresh(&request)
+}
+
+#[test]
+fn python_refresh_retains_width_unless_explicitly_overridden_and_keeps_ratchet() {
+    let root = Tree::new();
+    root.write("pkg/subject.py", "x = 2\n");
+    root.write("pkg/test_feedback.py", "def test_feedback(): pass\n");
+    let legacy = refresh_python_worker_width(&root, python_record(), None).unwrap();
+    assert!(legacy["generator"].get("jobs").is_none());
+    let two = refresh_python_worker_width(&root, legacy.clone(), Some(2)).unwrap();
+    assert_eq!(two["generator"]["jobs"], 2);
+    let retained = refresh_python_worker_width(&root, two.clone(), None).unwrap();
+    assert_eq!(retained["generator"]["jobs"], 2);
+    let three = refresh_python_worker_width(&root, retained, Some(3)).unwrap();
+    assert_eq!(three["generator"]["jobs"], 3);
+    for field in [
+        "survivor_baseline",
+        "survivor_baseline_recorded",
+        "survivor_baseline_note",
+        "survivor_baseline_recorded_at",
+    ] {
+        assert_eq!(three[field], legacy[field]);
+    }
+    assert_eq!(three["test_sha256"], legacy["test_sha256"]);
+}
+
+#[test]
+fn python_refresh_rejects_invalid_requested_or_recorded_worker_widths() {
+    let root = Tree::new();
+    root.write("pkg/subject.py", "x = 2\n");
+    root.write("pkg/test_feedback.py", "def test_feedback(): pass\n");
+    for width in [0, -1] {
+        assert!(
+            refresh_python_worker_width(&root, python_record(), Some(width))
+                .unwrap_err()
+                .contains("worker count must be positive")
+        );
+    }
+    for invalid in [json!(0), json!(-1), json!("two")] {
+        let mut recorded = python_record();
+        recorded["generator"]["jobs"] = invalid;
+        assert!(refresh_python_worker_width(&root, recorded, None)
+            .unwrap_err()
+            .contains("worker count"));
+    }
+}

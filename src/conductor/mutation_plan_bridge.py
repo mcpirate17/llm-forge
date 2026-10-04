@@ -90,6 +90,7 @@ def plan_native(
         "owner": ctx["owner"],
         "day": ctx["day"],
         "jobs": ctx["jobs"],
+        "python_jobs": ctx.get("python_jobs"),
         "run_timeout_seconds": ctx["run_timeout_seconds"],
         "campaigns_root": str(campaigns_relative(repo_root)),
         "only_sources": list(ctx["only_sources"])

@@ -14,6 +14,8 @@ pub struct RefreshRequest {
     extra_tests: BTreeMap<String, Vec<String>>,
     #[serde(default = "default_jobs")]
     jobs: i64,
+    #[serde(default)]
+    python_jobs: Option<i64>,
     #[serde(default = "default_timeout")]
     run_timeout_seconds: i64,
 }
@@ -104,6 +106,25 @@ fn python_refresh_tests(
     Ok(tests.into_iter().collect())
 }
 
+fn python_refresh_jobs(request: &RefreshRequest) -> Result<Option<i64>, String> {
+    let recorded = generator(request).and_then(|row| row.get("jobs"));
+    let jobs = if let Some(jobs) = request.python_jobs {
+        Some(jobs)
+    } else if let Some(value) = recorded {
+        Some(
+            value
+                .as_i64()
+                .ok_or("recorded Python worker count must be an integer")?,
+        )
+    } else {
+        None
+    };
+    if jobs.is_some_and(|jobs| jobs <= 0) {
+        return Err("Python worker count must be positive".into());
+    }
+    Ok(jobs)
+}
+
 fn refresh_python(root: &Path, request: &RefreshRequest) -> Result<Value, String> {
     if request
         .existing
@@ -154,6 +175,7 @@ fn refresh_python(root: &Path, request: &RefreshRequest) -> Result<Value, String
         &subject,
         &request.campaign_id,
         root,
+        python_refresh_jobs(request)?,
         request.run_timeout_seconds,
     );
     retain_ratchet(&mut refreshed, &request.existing);
