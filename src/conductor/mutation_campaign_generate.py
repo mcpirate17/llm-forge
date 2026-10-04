@@ -216,18 +216,32 @@ def _refresh_generated_campaign(
     return path.relative_to(repo_root).as_posix()
 
 
-def refresh_python_campaign(campaign: str, *, repo_root: Path = REPO_ROOT) -> str:
+def refresh_python_campaign(
+    campaign: str,
+    *,
+    repo_root: Path = REPO_ROOT,
+    extra_tests: Mapping[str, Sequence[str]] | None = None,
+    run_timeout_seconds: int | None = None,
+) -> str:
     """Regenerate one generated Python campaign while retaining its engine baseline."""
     path, existing = _load_generated_cargo_campaign(campaign, repo_root)
     if existing.get("mutation_engine") != "fest":
         raise CampaignError(f"{path} is not a generated fest campaign")
     generator = existing.get("generator") or {}
+    timeout = (
+        int(generator.get("run_timeout_seconds", 1800))
+        if run_timeout_seconds is None
+        else run_timeout_seconds
+    )
+    if timeout <= 0:
+        raise CampaignError("refresh run timeout must be positive")
     return _refresh_generated_campaign(
         path,
         existing,
         repo_root,
         language="python",
-        run_timeout_seconds=int(generator.get("run_timeout_seconds", 1800)),
+        run_timeout_seconds=timeout,
+        extra_tests=extra_tests or {},
     )
 
 
@@ -403,6 +417,18 @@ def _cli_parser() -> argparse.ArgumentParser:
         default=[],
         help="repository-relative Rust source to mutate and bind as its test surface",
     )
+    refresh_parser.add_argument(
+        "--extra-test",
+        action="append",
+        default=[],
+        metavar="SOURCE=TEST",
+        help="retain recorded tests and add this exact Python test binding",
+    )
+    refresh_parser.add_argument(
+        "--run-timeout",
+        type=int,
+        help="positive Python engine phase timeout; omitted retains the recorded value",
+    )
     return parser
 
 
@@ -411,13 +437,22 @@ def _refresh_command(args: argparse.Namespace) -> str:
 
     path, existing = _load_generated_cargo_campaign(args.campaign, REPO_ROOT)
     if existing.get("mutation_engine") == "cargo-mutants":
+        if args.extra_test or args.run_timeout is not None:
+            raise CampaignError(
+                "refresh --extra-test and --run-timeout are Python-only"
+            )
         return refresh_rust_campaign(args.campaign, sources=args.source)
     if existing.get("mutation_engine") == "fest":
         if args.source:
             raise CampaignError(
                 "fest refresh retains its declared source; --source is Rust-only"
             )
-        return refresh_python_campaign(args.campaign)
+        return refresh_python_campaign(
+            args.campaign,
+            repo_root=REPO_ROOT,
+            extra_tests=_extra_tests(args.extra_test, repo_root=REPO_ROOT),
+            run_timeout_seconds=args.run_timeout,
+        )
     raise CampaignError(f"{path} is not a generated supported-engine campaign")
 
 
