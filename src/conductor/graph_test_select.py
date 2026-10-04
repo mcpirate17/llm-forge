@@ -83,7 +83,11 @@ def git_changed_and_untracked_files(repo: Path) -> list[str]:
 
 
 def graph_test_plan(
-    repo: Path, source_paths: Sequence[str], *, expected_head: str | None = None
+    repo: Path,
+    source_paths: Sequence[str],
+    *,
+    expected_head: str | None = None,
+    inventory_root: Path | None = None,
 ) -> GraphTestPlan:
     """Return bounded transitive selection and explicit conservative fallback metadata."""
     from conductor._native import graph_context_native
@@ -91,6 +95,8 @@ def graph_test_plan(
     payload: dict[str, Any] = {"repo": str(repo), "paths": list(source_paths)}
     if expected_head is not None:
         payload["expected_head"] = expected_head
+    if inventory_root is not None:
+        payload["inventory_root"] = str(inventory_root)
     try:
         return json.loads(graph_context_native("test_selection", json.dumps(payload)))
     except ValueError as exc:

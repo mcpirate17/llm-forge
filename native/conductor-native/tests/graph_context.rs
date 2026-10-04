@@ -352,3 +352,45 @@ fn test_path_classifier_uses_filename_or_tests_directory() {
         );
     }
 }
+
+#[test]
+fn candidate_inventory_uses_snapshot_tests_and_keeps_conservative_fallback() {
+    let repo = Repo::new();
+    let candidate = Repo::new();
+    repo.write("tests/test_live_scratch.py", "def test_scratch(): pass\n");
+    candidate.write(
+        "tests/test_new_candidate.py",
+        "def test_candidate(): pass\n",
+    );
+    repo.database();
+    let plan = dispatch(
+        "test_selection",
+        &json!({
+            "repo": repo.path(), "paths": ["pkg/target.py"],
+            "inventory_root": candidate.path(),
+        }),
+    )
+    .unwrap();
+    assert_eq!(plan["complete"], false);
+    assert_eq!(plan["scope"], "full-test-inventory-fallback");
+    assert_eq!(plan["paths"], json!(["tests/test_new_candidate.py"]));
+    assert!(plan["reasons"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("candidate snapshot requires full test inventory")));
+}
+
+#[test]
+fn missing_candidate_inventory_fails_closed() {
+    let repo = Repo::new();
+    repo.database();
+    let error = dispatch(
+        "test_selection",
+        &json!({
+            "repo": repo.path(), "paths": ["pkg/target.py"],
+            "inventory_root": repo.path().join("missing"),
+        }),
+    )
+    .unwrap_err();
+    assert!(error.contains("candidate inventory unavailable"), "{error}");
+}
