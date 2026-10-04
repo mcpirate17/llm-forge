@@ -7,6 +7,7 @@ mod support;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -84,6 +85,19 @@ fn sync<'py>(py: Python<'py>, clone: &Path, dry_run: bool) -> Bound<'py, PyDict>
 
 fn field<'py>(result: &Bound<'py, PyDict>, name: &str) -> Bound<'py, pyo3::types::PyAny> {
     result.get_item(name).unwrap().unwrap()
+}
+
+const MULTI: &str = "a\nb\nc\nd\ne\nf\ng\n";
+
+fn seed_multi(upstream: &Path, clone: &Path) {
+    advance(upstream, clone, "multi.txt", MULTI);
+    git(clone, &["merge", "-q", "--ff-only", "origin/master"]);
+}
+
+fn classes(result: &Bound<'_, PyDict>) -> BTreeMap<String, String> {
+    field(result, "classification")
+        .extract::<BTreeMap<String, String>>()
+        .unwrap()
 }
 
 #[test]
@@ -222,4 +236,157 @@ fn dry_run_reports_move_without_making_it() {
     });
     assert_eq!(git(&clone, &["rev-parse", "HEAD"]), before);
     assert!(!clone.join("incoming.txt").exists());
+}
+
+#[test]
+fn dirty_file_identical_to_upstream_is_clean_after_sync() {
+    let case = checkout_case();
+    let (upstream, clone) = pair(&case);
+    fs::write(clone.join("tracked.txt"), "two\n").unwrap();
+    advance(&upstream, &clone, "tracked.txt", "two\n");
+    Python::attach(|py| {
+        let result = sync(py, &clone, false);
+        assert_eq!(text(&field(&result, "outcome")), "fast-forwarded");
+        assert_eq!(classes(&result)["tracked.txt"], "identical");
+    });
+    assert_eq!(git(&clone, &["status", "--porcelain"]), "");
+    assert_eq!(
+        git(&clone, &["rev-parse", "HEAD"]),
+        git(&clone, &["rev-parse", "origin/master"])
+    );
+}
+
+#[test]
+fn non_overlapping_hunk_is_carried_and_other_edits_survive() {
+    let case = checkout_case();
+    let (upstream, clone) = pair(&case);
+    seed_multi(&upstream, &clone);
+    fs::write(clone.join("multi.txt"), "A\nb\nc\nd\ne\nf\ng\n").unwrap();
+    fs::write(clone.join("tracked.txt"), "edited locally\n").unwrap();
+    fs::write(clone.join("staged.txt"), "staged\n").unwrap();
+    git(&clone, &["add", "staged.txt"]);
+    advance(&upstream, &clone, "multi.txt", "a\nb\nc\nd\ne\nf\nG\n");
+    Python::attach(|py| {
+        let result = sync(py, &clone, false);
+        assert_eq!(text(&field(&result, "outcome")), "fast-forwarded");
+        assert_eq!(classes(&result)["multi.txt"], "carried");
+        assert!(!field(&result, "snapshot").is_none());
+    });
+    assert_eq!(
+        fs::read_to_string(clone.join("multi.txt")).unwrap(),
+        "A\nb\nc\nd\ne\nf\nG\n"
+    );
+    assert_eq!(
+        fs::read_to_string(clone.join("tracked.txt")).unwrap(),
+        "edited locally\n"
+    );
+    assert_eq!(
+        git(&clone, &["diff", "--cached", "--name-only"]),
+        "staged.txt\n"
+    );
+    assert_eq!(
+        git(&clone, &["rev-parse", "HEAD"]),
+        git(&clone, &["rev-parse", "origin/master"])
+    );
+}
+
+#[test]
+fn overlapping_hunk_is_refused_and_leaves_everything_unchanged() {
+    let case = checkout_case();
+    let (upstream, clone) = pair(&case);
+    seed_multi(&upstream, &clone);
+    fs::write(clone.join("multi.txt"), "a\nb\nc\nLOCAL\ne\nf\ng\n").unwrap();
+    fs::write(clone.join("staged.txt"), "staged\n").unwrap();
+    git(&clone, &["add", "staged.txt"]);
+    advance(&upstream, &clone, "multi.txt", "a\nb\nc\nUP\ne\nf\ng\n");
+    let head = git(&clone, &["rev-parse", "HEAD"]);
+    let status = git(&clone, &["status", "--porcelain"]);
+    let cached = git(&clone, &["diff", "--cached"]);
+    Python::attach(|py| {
+        let result = sync(py, &clone, false);
+        assert_eq!(text(&field(&result, "outcome")), "blocked");
+        assert_eq!(classes(&result)["multi.txt"], "conflict");
+        assert!(field(&result, "snapshot").is_none());
+    });
+    assert_eq!(git(&clone, &["rev-parse", "HEAD"]), head);
+    assert_eq!(git(&clone, &["status", "--porcelain"]), status);
+    assert_eq!(git(&clone, &["diff", "--cached"]), cached);
+    assert_eq!(
+        fs::read_to_string(clone.join("multi.txt")).unwrap(),
+        "a\nb\nc\nLOCAL\ne\nf\ng\n"
+    );
+}
+
+#[test]
+fn untracked_file_identical_to_incoming_is_absorbed() {
+    let case = checkout_case();
+    let (upstream, clone) = pair(&case);
+    fs::write(clone.join("incoming.txt"), "landed\n").unwrap();
+    advance(&upstream, &clone, "incoming.txt", "landed\n");
+    Python::attach(|py| {
+        let result = sync(py, &clone, false);
+        assert_eq!(text(&field(&result, "outcome")), "fast-forwarded");
+        assert_eq!(classes(&result)["incoming.txt"], "untracked-identical");
+    });
+    assert_eq!(git(&clone, &["status", "--porcelain"]), "");
+    assert_eq!(
+        fs::read_to_string(clone.join("incoming.txt")).unwrap(),
+        "landed\n"
+    );
+}
+
+#[test]
+fn untracked_file_differing_from_incoming_blocks() {
+    let case = checkout_case();
+    let (upstream, clone) = pair(&case);
+    fs::write(clone.join("incoming.txt"), "mine\n").unwrap();
+    advance(&upstream, &clone, "incoming.txt", "landed\n");
+    let head = git(&clone, &["rev-parse", "HEAD"]);
+    Python::attach(|py| {
+        let result = sync(py, &clone, false);
+        assert_eq!(text(&field(&result, "outcome")), "blocked");
+        assert_eq!(classes(&result)["incoming.txt"], "untracked-differs");
+        assert_eq!(
+            field(&result, "blocked_by")
+                .extract::<Vec<String>>()
+                .unwrap(),
+            ["incoming.txt"]
+        );
+    });
+    assert_eq!(git(&clone, &["rev-parse", "HEAD"]), head);
+    assert_eq!(
+        fs::read_to_string(clone.join("incoming.txt")).unwrap(),
+        "mine\n"
+    );
+}
+
+#[test]
+fn dry_run_classifies_every_overlap_without_touching_the_tree() {
+    let case = checkout_case();
+    let (upstream, clone) = pair(&case);
+    seed_multi(&upstream, &clone);
+    fs::write(clone.join("multi.txt"), "A\nb\nc\nd\ne\nf\ng\n").unwrap();
+    fs::write(clone.join("tracked.txt"), "two\n").unwrap();
+    fs::write(clone.join("incoming.txt"), "landed\n").unwrap();
+    fs::write(upstream.join("multi.txt"), "a\nb\nc\nd\ne\nf\nG\n").unwrap();
+    fs::write(upstream.join("tracked.txt"), "two\n").unwrap();
+    advance(&upstream, &clone, "incoming.txt", "landed\n");
+    let head = git(&clone, &["rev-parse", "HEAD"]);
+    let status = git(&clone, &["status", "--porcelain"]);
+    Python::attach(|py| {
+        let result = sync(py, &clone, true);
+        assert_eq!(text(&field(&result, "outcome")), "would fast-forward");
+        assert!(field(&result, "snapshot").is_none());
+        let expected: BTreeMap<String, String> = [
+            ("incoming.txt", "untracked-identical"),
+            ("multi.txt", "carried"),
+            ("tracked.txt", "identical"),
+        ]
+        .into_iter()
+        .map(|(path, kind)| (path.to_owned(), kind.to_owned()))
+        .collect();
+        assert_eq!(classes(&result), expected);
+    });
+    assert_eq!(git(&clone, &["rev-parse", "HEAD"]), head);
+    assert_eq!(git(&clone, &["status", "--porcelain"]), status);
 }
