@@ -309,7 +309,12 @@ fn unavailable_malformed_and_admitted_receipts() {
 
         fs::write(
             &receipt,
-            json!({"status":"PASS","test_value":null}).to_string(),
+            json!({"status":"PASS",
+                "baseline":{"returncode":0,"timed_out":false},
+                "outcome_counts":{"KILLED":1,"SURVIVED":0,"TIMED_OUT":0,"ERROR":0,"UNVIABLE":0},
+                "attribution":{"status":"ATTRIBUTED","attributed_mutants":1,"killed_mutants":1},
+                "test_value":null})
+            .to_string(),
         )
         .unwrap();
         let evidence = json!({"status":"PASS","checked_test_paths":[TEST_PATH],
@@ -317,7 +322,11 @@ fn unavailable_malformed_and_admitted_receipts() {
             "missing_evidence":[],"malformed_receipts":[]});
         let _valid_verifier = mock_verifier(py, evidence);
         assert_eq!(rules(&check(py, &context)), ["new-test-value-not-admitted"]);
-        fs::write(&receipt, json!({"status":"PASS","test_value":{
+        fs::write(&receipt, json!({"status":"PASS",
+                "baseline":{"returncode":0,"timed_out":false},
+                "outcome_counts":{"KILLED":1,"SURVIVED":0,"TIMED_OUT":0,"ERROR":0,"UNVIABLE":0},
+                "attribution":{"status":"ATTRIBUTED","attributed_mutants":1,"killed_mutants":1},
+                "test_value":{
             "schema_version":"llm.mutation-testing.test-value.v1","status":"PASS",
             "tests":[{"nodeid":format!("{TEST_PATH}::test_new_contract"),"classification":"CORE"}]}}).to_string()).unwrap();
         let result = check(py, &context);
@@ -355,7 +364,11 @@ fn value_gate_anchors_grandfather_exemption() {
         assert_eq!(crafted, actual);
         fs::write(
             &receipt,
-            json!({"status":"PASS","test_value":{
+            json!({"status":"PASS",
+                "baseline":{"returncode":0,"timed_out":false},
+                "outcome_counts":{"KILLED":1,"SURVIVED":0,"TIMED_OUT":0,"ERROR":0,"UNVIABLE":0},
+                "attribution":{"status":"ATTRIBUTED","attributed_mutants":1,"killed_mutants":1},
+                "test_value":{
             "schema_version":"llm.mutation-testing.test-value.v1","status":"PASS","tests":[]}})
             .to_string(),
         )

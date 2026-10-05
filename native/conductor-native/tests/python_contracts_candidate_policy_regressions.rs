@@ -1039,6 +1039,12 @@ fn mutation_gate_fixture<'py>(
     std::fs::write(
         snapshot.join("receipt.json"),
         serde_json::json!({
+            "status": "PASS",
+            "baseline": {"returncode": 0, "timed_out": false},
+            "outcome_counts": {"KILLED": 1, "SURVIVED": 0, "TIMED_OUT": 0,
+                               "ERROR": 0, "UNVIABLE": 0, "NO_COVERAGE": 0},
+            "attribution": {"status": "ATTRIBUTED", "attributed_mutants": 1,
+                            "killed_mutants": 1},
             "test_value": {"schema_version": schema, "status": "PASS",
                            "tests": [{"nodeid": NEW_NODEID, "classification": "DELETE_CANDIDATE"}]}
         })

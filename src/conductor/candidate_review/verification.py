@@ -70,7 +70,11 @@ from conductor.candidate_review.value_waivers import (
 from conductor.candidate_review.value_waivers import (
     waiver_states as value_waiver_states,
 )
-from conductor.mutation_receipt_slim import expand_receipt_field
+from conductor.mutation_receipt_slim import (
+    ReceiptDetailError,
+    expand_receipt,
+    expand_receipt_field,
+)
 from conductor.project_paths import registry_path, registry_relative
 
 GRANDFATHER_SCHEMA_VERSION = 1
@@ -609,7 +613,37 @@ def _new_test_value_findings(
         {"payload": payload, "new_nodeids": new_nodeids},
     )
     findings = _native_findings(plan["prefix_findings"])
+    from conductor.candidate_review.contextual_mutation_evidence import (
+        complete_pass_errors,
+        contextual_admission_errors,
+        declared_contexts,
+        prepare_context_admission,
+    )
+    from conductor.mutation_testing import CampaignError
     from conductor.mutation_value import admission_errors
+
+    try:
+        # Avoid requiring context-only fields from legacy adapter fixtures when
+        # the host declares no contextual admission requirements.
+        contexts = declared_contexts(
+            ctx.snapshot, [node for nodes in new_nodeids.values() for node in nodes]
+        )
+        contexts, witnesses = (
+            prepare_context_admission(
+                ctx.snapshot, ctx.repo, ctx.runtime_dir, new_nodeids
+            )
+            if contexts
+            else (contexts, [])
+        )
+    except (CampaignError, ValueError, OSError) as exc:
+        return [
+            Finding(
+                check_id="mutation-evidence",
+                rule_id="test-value-receipt-unavailable",
+                severity=Severity.CRITICAL,
+                message=f"contextual evidence unavailable: {exc}",
+            )
+        ]
 
     for step in plan["steps"]:
         if "finding" in step:
@@ -619,10 +653,10 @@ def _new_test_value_findings(
         path = task["path"]
         nodeids = task["nodeids"]
         try:
-            receipt = json.loads(
-                (ctx.snapshot / task["receipt"]).read_text(encoding="utf-8")
+            receipt = expand_receipt(
+                json.loads((ctx.snapshot / task["receipt"]).read_text(encoding="utf-8"))
             )
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        except (OSError, UnicodeError, json.JSONDecodeError, ReceiptDetailError) as exc:
             findings.append(
                 Finding(
                     check_id="mutation-evidence",
@@ -642,9 +676,21 @@ def _new_test_value_findings(
             if isinstance(receipt, dict)
             else None
         )
-        errors = admission_errors(
-            value, [nodeid for nodeid in nodeids if nodeid not in waived]
-        )
+        required = [nodeid for nodeid in nodeids if nodeid not in waived]
+        incomplete = complete_pass_errors(receipt) if required else []
+        errors = []
+        for nodeid in required:
+            if incomplete:
+                errors.append(
+                    f"new test {nodeid!r} has incomplete automatic PASS evidence: "
+                    + "; ".join(incomplete)
+                )
+                continue
+            errors.extend(
+                contextual_admission_errors(nodeid, contexts[nodeid], witnesses)
+                if nodeid in contexts
+                else admission_errors(value, [nodeid])
+            )
         findings.extend(
             _native_findings(
                 _native_decide(
