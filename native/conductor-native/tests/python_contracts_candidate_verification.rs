@@ -112,7 +112,7 @@ fn value_admission_reads_slim_receipt_and_blocks_malformed_envelopes() {
             attr_text(&findings.get_item(0).unwrap(), "rule_id"),
             "test-value-receipt-unavailable"
         );
-        case.write("receipt.json", r#"{"status":"PASS","test_value":{"schema_version":"llm.mutation-testing.test-value.v1","status":"PASS","tests":[{"nodeid":"t.py::test_new","classification":"CORE"}]}}"#);
+        case.write("receipt.json", r#"{"status":"PASS","baseline":{"returncode":0,"timed_out":false},"outcome_counts":{"KILLED":1,"SURVIVED":0,"TIMED_OUT":0,"ERROR":0,"UNVIABLE":0},"attribution":{"status":"ATTRIBUTED","attributed_mutants":1,"killed_mutants":1},"test_value":{"schema_version":"llm.mutation-testing.test-value.v1","status":"PASS","tests":[{"nodeid":"t.py::test_new","classification":"CORE"}]}}"#);
         let valid = module(py, "json")
             .getattr("loads")
             .unwrap()
@@ -325,7 +325,7 @@ fn slim_receipt_detail_still_admits_classified_new_test() {
     Python::attach(|py| {
         let json = module(py, "json");
         let loads = json.getattr("loads").unwrap();
-        let payload = loads.call1((r#"{"campaign_id":"c-slim","status":"PASS","generated_at":"2026-09-13T00:00:00+00:00","test_value":{"schema_version":"llm.mutation-testing.test-value.v1","status":"PASS","tests":[{"nodeid":"t.py::test_new","classification":"CORE"}]}}"#,)).unwrap();
+        let payload = loads.call1((r#"{"campaign_id":"c-slim","status":"PASS","generated_at":"2026-09-13T00:00:00+00:00","baseline":{"returncode":0,"timed_out":false},"outcome_counts":{"KILLED":80,"SURVIVED":0,"TIMED_OUT":0,"ERROR":0,"UNVIABLE":0},"attribution":{"status":"ATTRIBUTED","attributed_mutants":80,"killed_mutants":80},"test_value":{"schema_version":"llm.mutation-testing.test-value.v1","status":"PASS","tests":[{"nodeid":"t.py::test_new","classification":"CORE"}]}}"#,)).unwrap();
         let mutants = pyo3::types::PyList::empty(py);
         for index in 0..80 {
             let mutant = PyDict::new(py);

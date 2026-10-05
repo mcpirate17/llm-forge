@@ -190,3 +190,32 @@ records its pgid in `campaigns/receipts/.iterations/live_pgids.json`
 recorded groups whose engine is dead while the group still lives, and
 `MUTATION_REAP_APPLY=1 make mutation-reap` SIGKILLs exactly those — nothing
 outside the registry is ever signalled.
+
+
+## Contextual new-test admission
+
+Ordinary `verify-evidence` keeps its canonical receipt projection. A host may
+add exact node/source requirements under `[tool.conductor.mutation_value_contexts]`:
+
+```toml
+[tool.conductor.mutation_value_contexts]
+"tests/test_flow.py::test_flow" = ["pkg/training.py", "pkg/selection.py"]
+```
+
+These requirements are additional obligations, not waivers. Each required source
+needs a current registered automatic PASS original, independently checked by the
+unchanged native scope, manifest, source/test hash, runner and provenance rules.
+The test must have CORE or INTENTIONAL_REDUNDANCY value and actually kill a
+reported mutant in that source. Every reported kill must be attributed; baseline
+failures, survivors, errors, timeouts and missing value evidence block admission.
+Unrelated positive source contexts cannot satisfy the declaration.
+
+The latest attempt is selected separately within each exact final context. A
+failed or partial latest attempt prevents fallback to an older PASS in the same
+context, and contradictory classifications fail closed. A newer MERGE receipt
+in another source context cannot erase a valid required witness. MERGE rows
+remain in the original evidence. Candidate review retains the original receipt
+paths, byte hashes, bindings and value rows in
+`contextual_mutation_witnesses.json` in its runtime artifacts. It never writes a
+combined receipt or changes a classification. Hosts without declarations retain
+canonical value admission and now also reject incomplete nominal PASS receipts.
