@@ -677,8 +677,15 @@ def _new_test_value_findings(
             else None
         )
         required = [nodeid for nodeid in nodeids if nodeid not in waived]
-        errors = complete_pass_errors(receipt) if required else []
+        incomplete = complete_pass_errors(receipt) if required else []
+        errors = []
         for nodeid in required:
+            if incomplete:
+                errors.append(
+                    f"new test {nodeid!r} has incomplete automatic PASS evidence: "
+                    + "; ".join(incomplete)
+                )
+                continue
             errors.extend(
                 contextual_admission_errors(nodeid, contexts[nodeid], witnesses)
                 if nodeid in contexts
