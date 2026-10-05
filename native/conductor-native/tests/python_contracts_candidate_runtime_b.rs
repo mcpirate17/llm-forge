@@ -198,10 +198,12 @@ from conductor.candidate_review import baseline_rerun as b
 from conductor.candidate_review.model import Finding, Severity
 
 def run(check, base_fails, raise_):
-    def fake(ctx, chk, ids):
+    def fake(ctx, chk, shard_tests):
+        # The replay must get the failed shard's whole file list, in order.
+        assert shard_tests == {0: ["t/a.py", "t/c.py", "t/b.py"]}, shard_tests
         if raise_:
             raise RuntimeError("boom")
-        return set(base_fails) & set(ids)
+        return {0: set(base_fails)}
     orig = b._base_failures
     b._base_failures = fake
     try:
@@ -211,7 +213,10 @@ def run(check, base_fails, raise_):
         ]
         fallback = [Finding(check_id=check.check_id, rule_id="targeted-test-failure",
                             severity=Severity.HIGH, message="shard 1 failed")]
-        out = b.baseline_failure_findings(None, check, done, [0], [True, True], fallback)
+        shards = [["t/a.py", "t/c.py", "t/b.py"], ["t/d.py"]]
+        out = b.baseline_failure_findings(
+            None, check, shards, done, [0], [True, True], fallback
+        )
     finally:
         b._base_failures = orig
     return [(f.rule_id, f.inherited, f.message) for f in out]
@@ -268,5 +273,5 @@ fn a_base_rerun_that_cannot_run_keeps_every_failure_blocking() {
     let _case = fixture::isolated_case();
     let out = baseline_outcome(&["t/a.py::x", "t/b.py"], true);
     assert_eq!(out.len(), 1);
-    assert!(!out[0].1 && out[0].2.contains("base rerun did not complete"));
+    assert!(!out[0].1 && out[0].2.contains("base replay did not complete"));
 }

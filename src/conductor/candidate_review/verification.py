@@ -970,6 +970,7 @@ def run_targeted_tests(
     findings = baseline_failure_findings(
         ctx,
         check,
+        shards,
         completed_all,
         failed,
         [index < pytest_shard_count for index in finished],
