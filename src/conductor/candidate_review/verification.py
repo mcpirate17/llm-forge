@@ -14,6 +14,7 @@ from datetime import date
 from pathlib import Path, PurePosixPath
 
 from conductor.candidate_review import external_invariants
+from conductor.candidate_review.baseline_rerun import baseline_failure_findings
 from conductor.candidate_review.checks import (
     ContractPlan,
     ReviewContext,
@@ -966,6 +967,14 @@ def run_targeted_tests(
     findings, exit_codes, failed = shard_outcome_findings(
         check, shards, completed_all, len(selected_files)
     )
+    findings = baseline_failure_findings(
+        ctx,
+        check,
+        completed_all,
+        failed,
+        [index < pytest_shard_count for index in finished],
+        findings,
+    )
     # Timeouts first: they explain any missing coverage the other shards cannot.
     findings = timeout_findings + findings
     metrics: dict[str, object] = {
@@ -1055,6 +1064,7 @@ def _pytest_command(tests: Sequence[str], coverage_file: Path | None) -> list[st
             "addopts=",
             "-p",
             "no:cacheprovider",
+            "-rfE",
             *tests,
         ]
     )

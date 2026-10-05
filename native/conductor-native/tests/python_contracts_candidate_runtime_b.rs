@@ -191,3 +191,82 @@ fn agent_trailer_requirement_fails_closed_on_an_unreadable_date() {
             .unwrap());
     });
 }
+
+const BASELINE_CASE: &str = r#"
+import subprocess
+from conductor.candidate_review import baseline_rerun as b
+from conductor.candidate_review.model import Finding, Severity
+
+def run(check, base_fails, raise_):
+    def fake(ctx, chk, ids):
+        if raise_:
+            raise RuntimeError("boom")
+        return set(base_fails) & set(ids)
+    orig = b._base_failures
+    b._base_failures = fake
+    try:
+        done = [
+            subprocess.CompletedProcess([], 1, "FAILED t/a.py::x - boom\nERROR t/b.py\n", ""),
+            subprocess.CompletedProcess([], 0, "", ""),
+        ]
+        fallback = [Finding(check_id=check.check_id, rule_id="targeted-test-failure",
+                            severity=Severity.HIGH, message="shard 1 failed")]
+        out = b.baseline_failure_findings(None, check, done, [0], [True, True], fallback)
+    finally:
+        b._base_failures = orig
+    return [(f.rule_id, f.inherited, f.message) for f in out]
+"#;
+
+fn baseline_outcome(base_fails: &[&str], raise: bool) -> Vec<(String, bool, String)> {
+    Python::attach(|py| {
+        let full = runtime::policy(py)
+            .getattr("checks")
+            .unwrap()
+            .try_iter()
+            .unwrap()
+            .map(Result::unwrap)
+            .find(|row| {
+                row.getattr("check_id")
+                    .unwrap()
+                    .extract::<String>()
+                    .unwrap()
+                    == "targeted-tests-full"
+            })
+            .unwrap();
+        let code = std::ffi::CString::new(BASELINE_CASE).unwrap();
+        pyo3::types::PyModule::from_code(py, &code, c"baseline_case.py", c"baseline_case")
+            .unwrap()
+            .getattr("run")
+            .unwrap()
+            .call1((full, base_fails.to_vec(), raise))
+            .unwrap()
+            .extract()
+            .unwrap()
+    })
+}
+
+#[test]
+fn a_failure_that_passes_on_base_still_blocks() {
+    let _case = fixture::isolated_case();
+    let out = baseline_outcome(&["t/b.py"], false);
+    assert_eq!(out.len(), 2);
+    let summary = out[0].2.lines().next().unwrap();
+    assert!(!out[0].1 && summary.contains("t/a.py::x") && !summary.contains("t/b.py"));
+    assert!(out[1].1 && out[1].2.contains("t/b.py"));
+}
+
+#[test]
+fn failures_already_red_on_base_are_inherited_only() {
+    let _case = fixture::isolated_case();
+    let out = baseline_outcome(&["t/a.py::x", "t/b.py"], false);
+    assert_eq!(out.len(), 1);
+    assert!(out[0].1);
+}
+
+#[test]
+fn a_base_rerun_that_cannot_run_keeps_every_failure_blocking() {
+    let _case = fixture::isolated_case();
+    let out = baseline_outcome(&["t/a.py::x", "t/b.py"], true);
+    assert_eq!(out.len(), 1);
+    assert!(!out[0].1 && out[0].2.contains("base rerun did not complete"));
+}
