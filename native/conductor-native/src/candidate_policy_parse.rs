@@ -259,6 +259,19 @@ fn days_from_civil(date: &str) -> i64 {
     era * 146097 + doe - 719468
 }
 
+/// An expired entry excuses nothing, but it must not take the whole policy down:
+/// it moves to `expired_<key>` so only candidates touching its file are blocked
+/// and the report can name it.
+fn drop_expired(parsed: &mut Value, key: &str, today: &str) {
+    let now = days_from_civil(today);
+    let items = parsed[key].as_array().cloned().unwrap_or_default();
+    let (live, expired): (Vec<Value>, Vec<Value>) = items
+        .into_iter()
+        .partition(|item| days_from_civil(item["expires"].as_str().unwrap_or("")) >= now);
+    parsed[key] = Value::Array(live);
+    parsed[format!("expired_{key}")] = Value::Array(expired);
+}
+
 fn validate_dates(policy: &Value, today: &str) -> Result<()> {
     let now = days_from_civil(today);
     let expires = policy["baseline_expires"].as_str().unwrap_or("");
@@ -289,7 +302,7 @@ fn validate_dates(policy: &Value, today: &str) -> Result<()> {
         let expiry = item["expires"].as_str().unwrap_or("");
         let days = days_from_civil(expiry) - now;
         if days < 0 {
-            return Err(format!("exception {id} expired on {expiry}"));
+            continue;
         }
         if days > 90 {
             return Err(format!("exception {id} expires more than 90 days out"));
@@ -303,7 +316,7 @@ fn validate_dates(policy: &Value, today: &str) -> Result<()> {
         let expiry = item["expires"].as_str().unwrap_or("");
         let days = days_from_civil(expiry) - now;
         if days < 0 {
-            return Err(format!("mutation waiver {id} expired on {expiry}"));
+            continue;
         }
         if days > 90 {
             return Err(format!(
@@ -377,6 +390,9 @@ pub fn parse_policy(raw: &Value, today: &str) -> Result<Value> {
         "value_waivers": parse_value_waivers(value(map,"value_waivers"))?,
         "tools": tools(value(map,"tools"))?});
     validate_dates(&parsed, today)?;
+    let mut parsed = parsed;
+    drop_expired(&mut parsed, "exceptions", today);
+    drop_expired(&mut parsed, "mutation_waivers", today);
     Ok(parsed)
 }
 

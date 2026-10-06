@@ -55,6 +55,7 @@ from conductor.candidate_review.policy import (
     CheckPolicy,
     apply_exceptions,
     baseline_receipts,
+    expired_entries,
     unmatched_exceptions,
 )
 from conductor.candidate_review.verification import (
@@ -1050,6 +1051,7 @@ def _build_receipt(
             "schema_version": ctx.policy.schema_version,
             "block_at": ctx.policy.block_at.value,
             "baseline_expires": ctx.policy.baseline_expires.isoformat(),
+            **expired_entries(ctx.policy),
             "unmatched_exceptions": list(
                 unmatched_exceptions(ctx.policy, examined_paths(results), findings)
             ),

@@ -232,7 +232,13 @@ fn baseline_and_exception_dates_are_bounded_and_checks_are_known() {
         .contains("names an unknown check"));
     raw["exceptions"][0]["check"] = json!("candidate-integrity");
     raw["exceptions"][0]["expires"] = json!("2026-09-26");
-    assert!(parse_policy(&raw, today).unwrap_err().contains("expired"));
+    let parsed = parse_policy(&raw, today).unwrap();
+    assert_eq!(parsed["exceptions"].as_array().unwrap().len(), 0);
+    assert_eq!(parsed["expired_exceptions"][0]["exception_id"], "bounded");
+    raw["exceptions"][0]["expires"] = json!("2026-09-27");
+    let parsed = parse_policy(&raw, today).unwrap();
+    assert_eq!(parsed["exceptions"][0]["exception_id"], "bounded");
+    assert_eq!(parsed["expired_exceptions"].as_array().unwrap().len(), 0);
     raw["exceptions"][0]["expires"] = json!("2026-12-27");
     assert!(parse_policy(&raw, today)
         .unwrap_err()

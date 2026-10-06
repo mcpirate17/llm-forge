@@ -138,7 +138,6 @@ fn single_field_variants(py: Python<'_>) -> Vec<(&'static str, Value, &'static s
     vec![
         ("path", json!("*.py"), "glob metacharacters"),
         ("path", json!("probe.py"), "exact repo-relative"),
-        ("expires", json!(utc_date(py, -1)), "expired on"),
         ("expires", json!(utc_date(py, 91)), "more than 90 days out"),
         ("milestone", json!("other-milestone"), "milestone"),
         ("id", json!(""), "non-empty string"),
@@ -274,6 +273,20 @@ fn mutation_waiver_policy_accepts_bound_entry_and_rejects_malformed_variants() {
             entry.insert(key.to_owned(), replacement);
             rejection(py, &case, &entry, fragment);
         }
+        let mut expired = base.clone();
+        expired.insert("expires".into(), json!(utc_date(py, -1)));
+        let policy = load_waiver_policy(py, &case, &[waiver_table(&expired)], 35).unwrap();
+        let live: usize = policy.getattr("mutation_waivers").unwrap().len().unwrap();
+        let dropped: usize = policy
+            .getattr("expired_mutation_waivers")
+            .unwrap()
+            .len()
+            .unwrap();
+        assert_eq!(
+            (live, dropped),
+            (0, 1),
+            "an expired waiver is dropped, not fatal"
+        );
         let mut a = base.clone();
         a.insert("id".into(), json!("dup"));
         let mut b = a.clone();

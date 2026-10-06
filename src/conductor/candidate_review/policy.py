@@ -296,6 +296,8 @@ class Policy:
     mutation_waivers: tuple[MutationWaiverPolicy, ...] = ()
     value_waivers: tuple[ValueWaiverPolicy, ...] = ()
     tools: tuple[ToolPolicy, ...] = ()
+    expired_exceptions: tuple[ExceptionPolicy, ...] = ()
+    expired_mutation_waivers: tuple[MutationWaiverPolicy, ...] = ()
 
     def classify_change(self, change: Change) -> Change:
         from conductor._native import candidate_policy_classify_native
@@ -571,6 +573,12 @@ def load_policy(path: Path) -> Policy:
             )
             for row in parsed["tools"]
         ),
+        expired_exceptions=tuple(
+            _exception(row) for row in parsed["expired_exceptions"]
+        ),
+        expired_mutation_waivers=tuple(
+            _waiver(row) for row in parsed["expired_mutation_waivers"]
+        ),
     )
 
 
@@ -597,6 +605,29 @@ def baseline_receipts(
             }
         )
     return receipts
+
+
+def expired_entries(policy: Policy) -> dict[str, list[dict[str, str]]]:
+    """Expired exceptions and mutation waivers, dropped at load and named in the receipt."""
+
+    def row(
+        entry_id: str, entry: ExceptionPolicy | MutationWaiverPolicy
+    ) -> dict[str, str]:
+        return {
+            "id": entry_id,
+            "owner": entry.owner,
+            "path": entry.path,
+            "expires": entry.expires.isoformat(),
+        }
+
+    return {
+        "expired_exceptions": [
+            row(e.exception_id, e) for e in policy.expired_exceptions
+        ],
+        "expired_mutation_waivers": [
+            row(w.waiver_id, w) for w in policy.expired_mutation_waivers
+        ],
+    }
 
 
 def unmatched_exceptions(
