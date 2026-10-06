@@ -638,7 +638,6 @@ fn policy_dataclass_validation_rejects_duplicate_unknown_and_unbounded_exception
                 pyo3::types::PyString::new(py, "unknown").into_any(),
                 "unknown check",
             ),
-            ("expires", shifted_utc_date(py, -1), "expired"),
             ("expires", shifted_utc_date(py, 91), "more than 90 days"),
         ] {
             let changed = replace_field(py, &exception, field, &value);

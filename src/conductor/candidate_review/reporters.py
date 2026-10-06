@@ -62,6 +62,15 @@ def human_summary(receipt: ReviewReceipt) -> str:
     # invisible in the findings list precisely because it matched none of them. It
     # is named here, and nowhere near the blocking count -- removing it is the
     # owner's debt, not this candidate's problem.
+    for key, kind in (
+        ("expired_exceptions", "exception"),
+        ("expired_mutation_waivers", "mutation waiver"),
+    ):
+        for expired in receipt.policy.get(key, ()):
+            lines.append(
+                f"- EXPIRED {kind} {expired['id']} ({expired['owner']}, "
+                f"expired {expired['expires']}): no longer excuses {expired['path']}"
+            )
     for stale in receipt.policy.get("unmatched_exceptions", ()):
         lines.append(
             f"- STALE exception {stale['id']} ({stale['owner']}, expires {stale['expires']}): "
