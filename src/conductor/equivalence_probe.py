@@ -466,8 +466,17 @@ def _compare_one(
     variant: Callable[..., Any],
     args: tuple,
     kwargs: dict,
+    memo: dict | None = None,
+    key: Any = None,
 ) -> float | None:
     """Relative difference for one argument set, or None when the input is unusable.
+
+    `memo` and `key` let the caller reuse the unmodified function's outcome across
+    constructs: the baseline never changes between ablations of one function, yet it
+    was re-run for every one -- and for a function whose replayed call trains a model
+    that doubled the sweep's cost. The outcome (value or exception) is cached per
+    argument set; the variant always runs fresh. Control repeats pass no memo, because
+    their purpose is to re-sample the baseline.
 
     Relative, because an absolute threshold of zero reports a float32 round-off as a
     real effect -- which is exactly how a hand analysis of this project's own VSA code
@@ -480,8 +489,10 @@ def _compare_one(
     # raised -- one side "raising" and the other not reads as an infinite
     # difference, so an argument the probe cannot copy would report every construct
     # around it LIVE. It is the absence of evidence, so it returns None.
+    cached = memo.get(key) if memo is not None else None
     try:
-        baseline_args, baseline_kwargs = _clone(args), _clone(kwargs)
+        if cached is None:
+            baseline_args, baseline_kwargs = _clone(args), _clone(kwargs)
         variant_args, variant_kwargs = _clone(args), _clone(kwargs)
     except UncopyableValue:
         return None
@@ -491,10 +502,15 @@ def _compare_one(
     # calls `parser.error()`, and one such function cost the whole module its
     # measurement -- 148.7 s spent to report nothing for `uncurated_kill_rate.py`.
     # Exiting is a behaviour of the call like any other raise; measure it as one.
-    try:
-        expected = baseline(*baseline_args, **baseline_kwargs)
-    except (Exception, SystemExit) as exc:  # noqa: BLE001 - the outcome IS the measurement
-        raised_baseline = exc
+    if cached is not None:
+        expected, raised_baseline = cached
+    else:
+        try:
+            expected = baseline(*baseline_args, **baseline_kwargs)
+        except (Exception, SystemExit) as exc:  # noqa: BLE001 - the outcome IS the measurement
+            raised_baseline = exc
+        if memo is not None:
+            memo[key] = (expected, raised_baseline)
     try:
         actual = variant(*variant_args, **variant_kwargs)
     except (Exception, SystemExit) as exc:  # noqa: BLE001
@@ -553,6 +569,7 @@ def _sweep(
     calls: Sequence[tuple],
     budget: _Budget | None = None,
     settle_above: float | None = None,
+    memo: dict | None = None,
 ) -> tuple[float, int, bool]:
     """Worst relative difference, how many argument sets the baseline accepted, and
     whether the sweep stopped early because the answer was already decided.
@@ -571,10 +588,10 @@ def _sweep(
     ablations replay 24 recorded calls apiece.
     """
     worst, usable = 0.0, 0
-    for args, kwargs in calls:
+    for index, (args, kwargs) in enumerate(calls):
         if budget is not None and budget.expired():
             break
-        diff = _compare_one(baseline, variant, args, kwargs)
+        diff = _compare_one(baseline, variant, args, kwargs, memo, ("rec", index))
         if diff is not None:
             worst = max(worst, diff)
             usable += 1
@@ -605,6 +622,7 @@ def _sweep_amplified(
     variant: Callable,
     calls: Sequence[tuple],
     budget: _Budget | None = None,
+    memo: dict | None = None,
 ) -> tuple[float, str | None]:
     """Worst relative difference over the amplified regimes, and which one found it.
 
@@ -635,7 +653,7 @@ def _sweep_amplified(
     for label, transform in plans:
         if budget is not None and budget.expired():
             break
-        for args, kwargs in calls:
+        for index, (args, kwargs) in enumerate(calls):
             if budget is not None and budget.expired():
                 break
             amp_args = tuple(transform(a) for a in args)
@@ -644,7 +662,9 @@ def _sweep_amplified(
                 _unamplified(v, amp_kwargs[k]) for k, v in kwargs.items()
             ):
                 continue
-            diff = _compare_one(baseline, variant, amp_args, amp_kwargs)
+            diff = _compare_one(
+                baseline, variant, amp_args, amp_kwargs, memo, (label, index)
+            )
             if diff is not None and diff > worst:
                 worst, which = diff, label
     return worst, which
@@ -672,6 +692,10 @@ class _ProbeContext:
     noise: float
     budget: "_Budget"
     budget_seconds: float | None
+    # Baseline outcomes keyed by decorated-or-not; see _compare_one.
+    memos: dict[bool, dict] = dataclasses.field(
+        default_factory=lambda: {False: {}, True: {}}
+    )
 
 
 def _probe_construct(ablation: NativeAblation, ctx: _ProbeContext) -> AblationResult:
@@ -730,8 +754,9 @@ def _probe_construct(ablation: NativeAblation, ctx: _ProbeContext) -> AblationRe
     except (SyntaxError, LookupError) as exc:
         base.verdict, base.detail = Verdict.UNCOMPILABLE, str(exc)
         return base
+    memo = ctx.memos[decorated]
     recorded, usable, settled = _sweep(
-        against, variant, ctx.calls, ctx.budget, settle_above=ctx.noise
+        against, variant, ctx.calls, ctx.budget, settle_above=ctx.noise, memo=memo
     )
     base.max_diff_recorded = recorded
     base.usable_calls = usable
@@ -759,7 +784,7 @@ def _probe_construct(ablation: NativeAblation, ctx: _ProbeContext) -> AblationRe
                 "live either way, so max_diff_recorded is a lower bound"
             )
         return base
-    amplified, which = _sweep_amplified(against, variant, ctx.calls, ctx.budget)
+    amplified, which = _sweep_amplified(against, variant, ctx.calls, ctx.budget, memo)
     base.max_diff_amplified, base.amplifier = amplified, which
     if ctx.budget.cut:
         _over_budget(base, ctx.budget_seconds)
