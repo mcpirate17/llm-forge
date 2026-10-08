@@ -181,7 +181,7 @@ fn no_index(py: Python<'_>) -> AttrPatch {
 fn fixed_probe(py: Python<'_>, findings: Value) -> AttrPatch {
     let callback =
         PyCFunction::new_closure(py, None, None, move |args, kwargs| -> PyResult<Py<PyAny>> {
-            check_args(args, kwargs, 4)?;
+            check_args(args, kwargs, 5)?;
             py_result_json(args.py(), &findings)
         })
         .unwrap();
@@ -433,7 +433,7 @@ fn parallel_and_serial_report_same_findings() {
         let order = mods.clone();
         let callback =
             PyCFunction::new_closure(py, None, None, move |args, kwargs| -> PyResult<Py<PyAny>> {
-                check_args(args, kwargs, 4)?;
+                check_args(args, kwargs, 5)?;
                 let py = args.py();
                 let module_name: String = args.get_item(0)?.extract()?;
                 let position = order
@@ -524,7 +524,7 @@ fn more_than_one_module_is_probed_at_a_time() {
         let observed = Arc::clone(&activity);
         let callback =
             PyCFunction::new_closure(py, None, None, move |args, kwargs| -> PyResult<Py<PyAny>> {
-                check_args(args, kwargs, 4)?;
+                check_args(args, kwargs, 5)?;
                 let py = args.py();
                 {
                     let mut state = observed.lock().unwrap();
