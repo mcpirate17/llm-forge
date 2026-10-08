@@ -131,6 +131,20 @@ def _worker_count(jobs: int | None, pending: int) -> int:
     return max(1, min((os.cpu_count() or 4) // 4, pending, MAX_AUTO_JOBS))
 
 
+def _child_env(threads: int | None) -> dict[str, str]:
+    """Environment for a probe child, with intra-op threads divided among workers.
+
+    Every child imports torch, which sizes its pools to ALL cores. N parallel
+    children then run N x cores threads on cores machines, and a probe that takes
+    seconds alone blows its PER_MODULE_TIMEOUT. A caller's explicit setting wins.
+    """
+    env = dict(os.environ)
+    if threads is not None:
+        for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+            env.setdefault(name, str(threads))
+    return env
+
+
 def build_index(root: pathlib.Path) -> TestIndex:
     """The native test index, imported at the point of use.
 
@@ -270,6 +284,7 @@ def probe(
     tests: Sequence[str],
     root: pathlib.Path,
     index: TestIndex | None = None,
+    threads: int | None = None,
 ) -> list[dict]:
     # A private directory per probe, not a fixed report path. Two probes running at
     # once against a shared name is one reading the other's findings and attributing
@@ -297,6 +312,7 @@ def probe(
             capture_output=True,
             text=True,
             timeout=PER_MODULE_TIMEOUT,
+            env=_child_env(threads),
         )
     except subprocess.TimeoutExpired as expired:
         shutil.rmtree(workdir, ignore_errors=True)
@@ -357,6 +373,32 @@ def probe(
     return findings
 
 
+def _probe_driven(
+    driven: list[tuple[str, list[str]]],
+    root: pathlib.Path,
+    index: TestIndex,
+    jobs: int | None,
+) -> dict[str, list[dict]]:
+    """Probe every driven module, `jobs` at a time, keyed by module.
+
+    Threads, not processes: probe() is a subprocess.run, so the worker holds no GIL
+    while the real work happens in a child interpreter. The caller walks the result in
+    module order, so a parallel run reports identically to a serial one -- the report
+    is evidence, and evidence that reorders itself between runs is hard to diff and
+    easy to distrust.
+    """
+    if not driven:
+        return {}
+    workers = _worker_count(jobs, len(driven))
+    threads = max(1, (os.cpu_count() or 4) // workers)
+    findings_by_module: dict[str, list[dict]] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(probe, m, t, root, index, threads): m for m, t in driven}
+        for future in concurrent.futures.as_completed(futures):
+            findings_by_module[futures[future]] = future.result()
+    return findings_by_module
+
+
 def run(
     base: str, root: pathlib.Path, only: Iterable[str] = (), jobs: int | None = None
 ) -> tuple[int, dict]:
@@ -382,18 +424,7 @@ def run(
         else:
             skipped.append(module)
 
-    # Threads, not processes: probe() is a subprocess.run, so the worker holds no GIL
-    # while the real work happens in a child interpreter. Findings are collected and
-    # then walked in module order, so a parallel run reports identically to a serial
-    # one -- the report is evidence, and evidence that reorders itself between runs
-    # is hard to diff and easy to distrust.
-    findings_by_module: dict[str, list[dict]] = {}
-    if driven:
-        workers = _worker_count(jobs, len(driven))
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {pool.submit(probe, m, t, root, index): m for m, t in driven}
-            for future in concurrent.futures.as_completed(futures):
-                findings_by_module[futures[future]] = future.result()
+    findings_by_module = _probe_driven(driven, root, index, jobs)
 
     for module, _ in driven:
         for finding in findings_by_module.get(module, []):

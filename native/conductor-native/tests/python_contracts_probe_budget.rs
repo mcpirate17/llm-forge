@@ -492,7 +492,8 @@ fn run_with(py: Python<'_>, repo: &Path, findings: Vec<Value>) -> PyResult<Value
     let payload = serde_json::to_string(&findings).unwrap();
     let probe_stub =
         PyCFunction::new_closure(py, None, None, move |args, kwargs| -> PyResult<Py<PyAny>> {
-            assert_eq!(args.len(), 4);
+            assert_eq!(args.len(), 5);
+            assert!(args.get_item(4)?.extract::<usize>()? >= 1);
             assert!(kwargs.is_none_or(|k| k.is_empty()));
             Ok(module(args.py(), "json")
                 .getattr("loads")?
