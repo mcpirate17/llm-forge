@@ -373,6 +373,32 @@ def probe(
     return findings
 
 
+def _probe_driven(
+    driven: list[tuple[str, list[str]]],
+    root: pathlib.Path,
+    index: TestIndex,
+    jobs: int | None,
+) -> dict[str, list[dict]]:
+    """Probe every driven module, `jobs` at a time, keyed by module.
+
+    Threads, not processes: probe() is a subprocess.run, so the worker holds no GIL
+    while the real work happens in a child interpreter. The caller walks the result in
+    module order, so a parallel run reports identically to a serial one -- the report
+    is evidence, and evidence that reorders itself between runs is hard to diff and
+    easy to distrust.
+    """
+    if not driven:
+        return {}
+    workers = _worker_count(jobs, len(driven))
+    threads = max(1, (os.cpu_count() or 4) // workers)
+    findings_by_module: dict[str, list[dict]] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(probe, m, t, root, index, threads): m for m, t in driven}
+        for future in concurrent.futures.as_completed(futures):
+            findings_by_module[futures[future]] = future.result()
+    return findings_by_module
+
+
 def run(
     base: str, root: pathlib.Path, only: Iterable[str] = (), jobs: int | None = None
 ) -> tuple[int, dict]:
@@ -398,21 +424,7 @@ def run(
         else:
             skipped.append(module)
 
-    # Threads, not processes: probe() is a subprocess.run, so the worker holds no GIL
-    # while the real work happens in a child interpreter. Findings are collected and
-    # then walked in module order, so a parallel run reports identically to a serial
-    # one -- the report is evidence, and evidence that reorders itself between runs
-    # is hard to diff and easy to distrust.
-    findings_by_module: dict[str, list[dict]] = {}
-    if driven:
-        workers = _worker_count(jobs, len(driven))
-        threads = max(1, (os.cpu_count() or 4) // workers)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {
-                pool.submit(probe, m, t, root, index, threads): m for m, t in driven
-            }
-            for future in concurrent.futures.as_completed(futures):
-                findings_by_module[futures[future]] = future.result()
+    findings_by_module = _probe_driven(driven, root, index, jobs)
 
     for module, _ in driven:
         for finding in findings_by_module.get(module, []):
