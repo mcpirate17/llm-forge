@@ -492,7 +492,9 @@ fn local_and_ci_policy_findings_are_parity_bound() {
 
 #[test]
 fn analyzer_git_mutation_cannot_rebind_shared_worktree() {
-    let case = fixture::isolated_case();
+    let mut case = fixture::isolated_case();
+    case.remove_env("PYTHONFAULTHANDLER");
+    case.remove_env("TORCH_SHOW_CPP_STACKTRACES");
     let repo = case.root().join("repo");
     fixture::init_repo(&repo);
     fixture::write_fixture(&repo, "candidate.txt", "candidate\n");
@@ -519,6 +521,18 @@ fn analyzer_git_mutation_cannot_rebind_shared_worktree() {
                     case.root(),
                 );
                 let runner = module(py, "conductor.candidate_review.command_runner");
+                let env_without_diagnostics: HashMap<String, String> = runner
+                    .getattr("_environment")
+                    .unwrap()
+                    .call1((&context,))
+                    .unwrap()
+                    .extract()
+                    .unwrap();
+                assert!(!env_without_diagnostics.contains_key("PYTHONFAULTHANDLER"));
+                assert!(!env_without_diagnostics.contains_key("TORCH_SHOW_CPP_STACKTRACES"));
+
+                case.set_env("PYTHONFAULTHANDLER", "1");
+                case.set_env("TORCH_SHOW_CPP_STACKTRACES", "1");
                 runner
                     .getattr("prepare_candidate_git_environment")
                     .unwrap()
@@ -531,6 +545,11 @@ fn analyzer_git_mutation_cannot_rebind_shared_worktree() {
                     .unwrap()
                     .extract()
                     .unwrap();
+                assert_eq!(env.get("PYTHONFAULTHANDLER").map(String::as_str), Some("1"));
+                assert_eq!(
+                    env.get("TORCH_SHOW_CPP_STACKTRACES").map(String::as_str),
+                    Some("1")
+                );
                 let completed = Command::new("git")
                     .args(["config", "core.worktree", "/tmp/analyzer-poison"])
                     .current_dir(snapshot)

@@ -177,12 +177,14 @@ def _environment(
         "NO_PROXY",
         "OMP_NUM_THREADS",
         "PATH",
+        "PYTHONFAULTHANDLER",
         "REQUESTS_CA_BUNDLE",
         "ROCR_VISIBLE_DEVICES",
         "RUSTUP_HOME",
         "RUSTUP_TOOLCHAIN",
         "SSL_CERT_FILE",
         "TERM",
+        "TORCH_SHOW_CPP_STACKTRACES",
         "TZ",
     }
     environment = {key: value for key, value in os.environ.items() if key in allowed}
