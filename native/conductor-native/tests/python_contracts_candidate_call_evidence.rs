@@ -461,8 +461,16 @@ fn probe_context<'py>(py: Python<'py>, root: &Path, names: &[&str]) -> Bound<'py
         kwargs.set_item("classes", ("python",)).unwrap();
         changes.append(namespace(py, &kwargs)).unwrap();
     }
+    let candidate_kwargs = PyDict::new(py);
+    candidate_kwargs
+        .set_item("tree_oid", "a".repeat(40))
+        .unwrap();
     let kwargs = PyDict::new(py);
+    kwargs.set_item("repo", path(py, root)).unwrap();
     kwargs.set_item("snapshot", path(py, root)).unwrap();
+    kwargs
+        .set_item("candidate", namespace(py, &candidate_kwargs))
+        .unwrap();
     kwargs.set_item("live_changes", changes).unwrap();
     namespace(py, &kwargs)
 }
@@ -473,7 +481,20 @@ fn backlog_drop(py: Python<'_>, case: &Case) -> AttrPatch {
 }
 
 fn run_probe<'py>(py: Python<'py>, root: &Path, names: &[&str]) -> Bound<'py, PyAny> {
-    module(py, "conductor.candidate_review.checks")
+    let value = PyTuple::new(
+        py,
+        [path(py, root).into_any(), PyTuple::empty(py).into_any()],
+    )
+    .unwrap();
+    let scoped_materialization = module(py, "contextlib")
+        .getattr("nullcontext")
+        .unwrap()
+        .call1((value,))
+        .unwrap();
+    let materializer = mock(py, "return_value", &scoped_materialization);
+    let probe = module(py, "conductor.candidate_review.equivalence_probe_check");
+    let _materialize = AttrPatch::replace(&probe, "materialize_tree", &materializer);
+    probe
         .getattr("check_equivalence_probe")
         .unwrap()
         .call1((probe_context(py, root, names),))
