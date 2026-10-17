@@ -156,9 +156,14 @@ impl ProcessCallback {
         } else {
             "test failed"
         };
+        let stderr = if exit < 0 {
+            "terminate called without an active exception"
+        } else {
+            ""
+        };
         let completed = module(py, "subprocess")
             .getattr("CompletedProcess")?
-            .call1((command, exit, output, ""))?;
+            .call1((command, exit, output, stderr))?;
         Ok(completed.unbind())
     }
 }
@@ -489,7 +494,7 @@ fn targeted_test_shard_killed_by_signal_is_not_reported_as_a_failure() {
                 );
                 let sharding = module(py, "conductor.candidate_review.sharding");
                 {
-                    let _killed = patch_runner(py, &sharding, -9, false, true);
+                    let _killed = patch_runner(py, &sharding, -6, false, true);
                     let result = run_targeted(py, &ctx, &selected, &check, false);
                     assert_eq!(finding_rules(&result), ["targeted-test-killed"]);
                     let finding = result.getattr("findings").unwrap().get_item(0).unwrap();
@@ -503,13 +508,37 @@ fn targeted_test_shard_killed_by_signal_is_not_reported_as_a_failure() {
                             .unwrap(),
                         [2]
                     );
-                    assert!(finding
+                    let message = attr_text(&finding, "message");
+                    assert!(message.contains("SIGABRT (signal 6, return code -6)"));
+                    assert!(message.contains("terminate called without an active exception"));
+                    assert!(message.contains("signal alone does not identify why"));
+                    assert!(!message.contains("resource-budget overrun"));
+                    let signals = finding
                         .getattr("evidence")
                         .unwrap()
-                        .get_item("timeout_seconds")
-                        .unwrap()
-                        .eq(check.getattr("timeout_seconds").unwrap())
-                        .unwrap());
+                        .get_item("signals")
+                        .unwrap();
+                    let signal = signals.get_item(0).unwrap();
+                    assert_eq!(
+                        signal
+                            .get_item("name")
+                            .unwrap()
+                            .extract::<String>()
+                            .unwrap(),
+                        "SIGABRT"
+                    );
+                    assert_eq!(
+                        signal.get_item("number").unwrap().extract::<i32>().unwrap(),
+                        6
+                    );
+                    assert_eq!(
+                        signal
+                            .get_item("return_code")
+                            .unwrap()
+                            .extract::<i32>()
+                            .unwrap(),
+                        -6
+                    );
                 }
                 {
                     let _failure = patch_runner(py, &sharding, 1, false, true);
@@ -520,6 +549,66 @@ fn targeted_test_shard_killed_by_signal_is_not_reported_as_a_failure() {
                 }
             },
         );
+    });
+}
+
+#[test]
+fn signal_finding_keeps_output_attributed_to_the_killed_shard() {
+    let _case = fixture::isolated_case();
+    Python::attach(|py| {
+        let policy = fixture::default_policy(py);
+        let check = policy_check(&policy, "targeted-tests-full");
+        let code = std::ffi::CString::new(
+            r#"
+import subprocess
+from conductor.candidate_review.sharding import shard_outcome_findings
+
+def run(check):
+    findings, codes, failed = shard_outcome_findings(
+        check,
+        [["sibling.py"], ["killed.py"]],
+        [
+            subprocess.CompletedProcess([], 0, "SIBLING_STDOUT", "SIBLING_STDERR"),
+            subprocess.CompletedProcess(
+                [], -6, "KILLED_STDOUT", "KILLED_STDERR" + "\n" * (check.max_output_chars + 10)
+            ),
+        ],
+        2,
+    )
+    assert codes == [0, -6]
+    assert failed == [1]
+    finding = findings[0]
+    assert finding.rule_id == "targeted-test-killed"
+    assert finding.evidence["killed_shard_output"] == {
+        "2": {
+            "return_code": -6,
+            "stdout_tail": "KILLED_STDOUT",
+            "stderr_tail": "KILLED_STDERR",
+        }
+    }
+    assert "KILLED_STDOUT" in finding.message
+    assert "KILLED_STDERR" in finding.message
+    assert "SIBLING_" not in finding.message
+    assert finding.evidence["timeout_seconds"] == check.timeout_seconds
+    assert finding.evidence["memory_mb"] == check.memory_mb
+    return True
+"#,
+        )
+        .unwrap();
+        let module = pyo3::types::PyModule::from_code(
+            py,
+            &code,
+            c"signal_shard_output_case.py",
+            c"signal_shard_output_case",
+        )
+        .unwrap();
+        assert!(module
+            .getattr("run")
+            .unwrap()
+            .call1((check,))
+            .unwrap()
+            .extract::<bool>()
+            .unwrap());
     });
 }
 

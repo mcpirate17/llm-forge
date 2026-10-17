@@ -220,6 +220,67 @@ def run(check, base_fails, raise_):
     finally:
         b._base_failures = orig
     return [(f.rule_id, f.inherited, f.message) for f in out]
+
+def run_collection_error(check):
+    def replay(ctx, chk, shard_tests):
+        assert shard_tests == {0: ["t/a.py", "t/c.py", "t/b.py"]}, shard_tests
+        output = "FAILED t/a.py::x - boom\nERROR collecting t/b.py\n"
+        return {0: b._base_replay_node_ids(
+            subprocess.CompletedProcess([], 1, output, ""), 1
+        )}
+    orig = b._base_failures
+    b._base_failures = replay
+    try:
+        done = [
+            subprocess.CompletedProcess([], 1, "FAILED t/a.py::x - boom\n", ""),
+            subprocess.CompletedProcess([], 0, "", ""),
+        ]
+        fallback = [Finding(check_id=check.check_id, rule_id="targeted-test-failure",
+                            severity=Severity.HIGH, message="shard 1 failed")]
+        shards = [["t/a.py", "t/c.py", "t/b.py"], ["t/d.py"]]
+        out = b.baseline_failure_findings(
+            None, check, shards, done, [0], [True, True], fallback
+        )
+    finally:
+        b._base_failures = orig
+    finding = out[0]
+    return (
+        finding.rule_id,
+        finding.inherited,
+        finding.message,
+        finding.evidence["base_replay"]["status"],
+    )
+"#;
+
+const BASELINE_VERDICT_CASE: &str = r#"
+import subprocess
+from conductor.candidate_review.baseline_rerun import (
+    BaseReplayInconclusive,
+    _base_replay_node_ids,
+)
+
+def classify(code, stdout):
+    try:
+        ids = _base_replay_node_ids(subprocess.CompletedProcess([], code, stdout, ""), 7)
+        return ("valid", sorted(ids), "")
+    except BaseReplayInconclusive as exc:
+        return ("inconclusive", [], str(exc))
+
+def cases():
+    return [
+        classify(0, "1 passed in 0.01s\n"),
+        classify(1, "FAILED tests/test_a.py::test_x - assertion\n1 failed in 0.01s\n"),
+        classify(1, "FAILED tests/test_a.py::test_x - assertion\nERROR collecting tests/test_b.py\n"),
+        classify(2, "!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!\n"),
+        classify(3, "INTERNALERROR> runner crashed\n"),
+        classify(4, "ERROR: usage: pytest [options]\n"),
+        classify(5, "no tests ran in 0.01s\n"),
+        classify(1, "no tests ran in 0.01s\n"),
+        classify(1, "1 failed in 0.01s\n"),
+        classify(0, ""),
+        classify(0, "FAILED tests/test_a.py::test_x - assertion\n1 failed in 0.01s\n"),
+        classify(1, "1 passed in 0.01s\n"),
+    ]
 "#;
 
 fn baseline_outcome(base_fails: &[&str], raise: bool) -> Vec<(String, bool, String)> {
@@ -250,6 +311,34 @@ fn baseline_outcome(base_fails: &[&str], raise: bool) -> Vec<(String, bool, Stri
     })
 }
 
+fn collection_error_outcome() -> (String, bool, String, String) {
+    Python::attach(|py| {
+        let full = runtime::policy(py)
+            .getattr("checks")
+            .unwrap()
+            .try_iter()
+            .unwrap()
+            .map(Result::unwrap)
+            .find(|row| {
+                row.getattr("check_id")
+                    .unwrap()
+                    .extract::<String>()
+                    .unwrap()
+                    == "targeted-tests-full"
+            })
+            .unwrap();
+        let code = std::ffi::CString::new(BASELINE_CASE).unwrap();
+        pyo3::types::PyModule::from_code(py, &code, c"baseline_case.py", c"baseline_case")
+            .unwrap()
+            .getattr("run_collection_error")
+            .unwrap()
+            .call1((full,))
+            .unwrap()
+            .extract()
+            .unwrap()
+    })
+}
+
 #[test]
 fn a_failure_that_passes_on_base_still_blocks() {
     let _case = fixture::isolated_case();
@@ -273,5 +362,79 @@ fn a_base_rerun_that_cannot_run_keeps_every_failure_blocking() {
     let _case = fixture::isolated_case();
     let out = baseline_outcome(&["t/a.py::x", "t/b.py"], true);
     assert_eq!(out.len(), 1);
-    assert!(!out[0].1 && out[0].2.contains("base replay did not complete"));
+    assert!(!out[0].1 && out[0].2.contains("base replay inconclusive"));
+    assert!(out[0].2.contains("no base attribution was made"));
+    assert!(out[0].2.contains("candidate finding remains blocking"));
+}
+
+#[test]
+fn collection_errors_with_failed_nodes_do_not_create_base_attribution() {
+    let _case = fixture::isolated_case();
+    let (rule, inherited, message, replay_status) = collection_error_outcome();
+    assert_eq!(rule, "targeted-test-failure");
+    assert!(!inherited);
+    assert_eq!(replay_status, "inconclusive");
+    assert!(message.contains("base replay inconclusive"));
+    assert!(message.contains("no base attribution was made"));
+    assert!(!message.contains("pass when their shard"));
+}
+
+#[test]
+fn base_replay_accepts_only_unambiguous_pytest_verdicts() {
+    let _case = fixture::isolated_case();
+    Python::attach(|py| {
+        let code = std::ffi::CString::new(BASELINE_VERDICT_CASE).unwrap();
+        let cases = pyo3::types::PyModule::from_code(
+            py,
+            &code,
+            c"baseline_verdict_case.py",
+            c"baseline_verdict_case",
+        )
+        .unwrap()
+        .getattr("cases")
+        .unwrap()
+        .call0()
+        .unwrap()
+        .extract::<Vec<(String, Vec<String>, String)>>()
+        .unwrap();
+
+        assert_eq!(cases[0], ("valid".to_owned(), Vec::new(), String::new()));
+        assert_eq!(
+            cases[1],
+            (
+                "valid".to_owned(),
+                vec!["tests/test_a.py::test_x".to_owned()],
+                String::new()
+            )
+        );
+        for (index, exit_code) in [
+            (2, 1),
+            (3, 2),
+            (4, 3),
+            (5, 4),
+            (6, 5),
+            (7, 1),
+            (8, 1),
+            (9, 0),
+            (10, 0),
+            (11, 1),
+        ] {
+            assert_eq!(
+                cases[index].0, "inconclusive",
+                "exit {exit_code}: {:?}",
+                cases[index]
+            );
+            assert!(!cases[index].2.is_empty());
+        }
+        assert!(cases[2].2.contains("collection error"));
+        assert!(cases[3].2.contains("non-verdict pytest code 2"));
+        assert!(cases[4].2.contains("non-verdict pytest code 3"));
+        assert!(cases[5].2.contains("non-verdict pytest code 4"));
+        assert!(cases[6].2.contains("non-verdict pytest code 5"));
+        assert!(cases[7].2.contains("did not collect tests"));
+        assert!(cases[8].2.contains("without a failed-test summary"));
+        assert!(cases[9].2.contains("did not produce a pytest test summary"));
+        assert!(cases[10].2.contains("exited 0 with failure summaries"));
+        assert!(cases[11].2.contains("without a failed-test summary"));
+    });
 }
