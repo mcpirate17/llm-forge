@@ -193,6 +193,7 @@ fn agent_trailer_requirement_fails_closed_on_an_unreadable_date() {
 }
 
 const BASELINE_CASE: &str = r#"
+import json
 import subprocess
 from conductor.candidate_review import baseline_rerun as b
 from conductor.candidate_review.model import Finding, Severity
@@ -224,9 +225,13 @@ def run(check, base_fails, raise_):
 def run_collection_error(check):
     def replay(ctx, chk, shard_tests):
         assert shard_tests == {0: ["t/a.py", "t/c.py", "t/b.py"]}, shard_tests
-        output = "FAILED t/a.py::x - boom\nERROR collecting t/b.py\n"
+        output = (
+            "FAILED t/a.py::x - boom\nERROR collecting t/b.py\n"
+            "!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!\n"
+            "1 error in 0.01s\n"
+        )
         return {0: b._base_replay_node_ids(
-            subprocess.CompletedProcess([], 1, output, ""), 1
+            subprocess.CompletedProcess([], 2, output, ""), 1
         )}
     orig = b._base_failures
     b._base_failures = replay
@@ -249,38 +254,61 @@ def run_collection_error(check):
         finding.inherited,
         finding.message,
         finding.evidence["base_replay"]["status"],
+        json.dumps(finding.evidence["base_replay"]),
     )
 "#;
 
 const BASELINE_VERDICT_CASE: &str = r#"
+import json
 import subprocess
 from conductor.candidate_review.baseline_rerun import (
     BaseReplayInconclusive,
     _base_replay_node_ids,
+    _timed_out_shards,
 )
 
-def classify(code, stdout):
+def classify(code, stdout, stderr=""):
     try:
-        ids = _base_replay_node_ids(subprocess.CompletedProcess([], code, stdout, ""), 7)
-        return ("valid", sorted(ids), "")
+        ids = _base_replay_node_ids(
+            subprocess.CompletedProcess([], code, stdout, stderr), 7
+        )
+        return ("valid", sorted(ids), "", "{}")
     except BaseReplayInconclusive as exc:
-        return ("inconclusive", [], str(exc))
+        return ("inconclusive", [], str(exc), json.dumps(exc.evidence))
 
 def cases():
     return [
         classify(0, "1 passed in 0.01s\n"),
         classify(1, "FAILED tests/test_a.py::test_x - assertion\n1 failed in 0.01s\n"),
-        classify(1, "FAILED tests/test_a.py::test_x - assertion\nERROR collecting tests/test_b.py\n"),
-        classify(2, "!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!\n"),
-        classify(3, "INTERNALERROR> runner crashed\n"),
-        classify(4, "ERROR: usage: pytest [options]\n"),
-        classify(5, "no tests ran in 0.01s\n"),
+        classify(1, "FAILED tests/test_a.py::test_x - assertion\n"
+                       "ERROR collecting tests/test_b.py\n"),
+        classify(2, "ERROR collecting tests/test_b.py\n1 error in 0.01s\n"),
+        classify(2, "!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!\n", "control stderr"),
+        classify(3, "INTERNALERROR> runner crashed\n", "internal stderr"),
+        classify(4, "ERROR: usage: pytest [options]\n", "usage stderr"),
+        classify(5, "no tests ran in 0.01s\n", "empty collection stderr"),
         classify(1, "no tests ran in 0.01s\n"),
-        classify(1, "1 failed in 0.01s\n"),
+        classify(1, "FAILED tests/test_a.py::test_x - assertion\n1 passed in 0.01s\n"),
         classify(0, ""),
         classify(0, "FAILED tests/test_a.py::test_x - assertion\n1 failed in 0.01s\n"),
-        classify(1, "1 passed in 0.01s\n"),
+        classify(1, "E AssertionError: KeyboardInterrupt; Interrupted; no tests ran; "
+                       "collected 0 items; ERROR collecting tests/test_data.py\n"
+                       "FAILED tests/test_a.py::test_x - assertion\n1 failed in 0.01s\n"),
+        classify(1, "ERROR tests/test_a.py::test_setup - fixture setup failed\n"
+                       "1 error in 0.01s\n"),
+        classify(1, "FAILED tests/test_a.py::test_x - assertion\n"
+                       "1 error in 0.01s\n"),
+        classify(1, "FAILED tests/test_a.py::test_x - assertion\n"
+                       "================ 1 failed, 145 passed in 97.65s (0:01:37) ================\n"),
+        classify(0, "0 passed in 0.01s\n"),
+        classify(0, "1 warning in 0.01s\n"),
+        classify(2, "x" * 1400 + "tail-marker\n", "diagnostic stderr tail\n"),
     ]
+
+def timeout_mapping():
+    # `execute_shards` reports command ordinal 0, while only original shard 3
+    # survived base-tree filtering and was placed in the one-command list.
+    return _timed_out_shards([2], [0])
 "#;
 
 fn baseline_outcome(base_fails: &[&str], raise: bool) -> Vec<(String, bool, String)> {
@@ -311,7 +339,7 @@ fn baseline_outcome(base_fails: &[&str], raise: bool) -> Vec<(String, bool, Stri
     })
 }
 
-fn collection_error_outcome() -> (String, bool, String, String) {
+fn collection_error_outcome() -> (String, bool, String, String, String) {
     Python::attach(|py| {
         let full = runtime::policy(py)
             .getattr("checks")
@@ -370,13 +398,22 @@ fn a_base_rerun_that_cannot_run_keeps_every_failure_blocking() {
 #[test]
 fn collection_errors_with_failed_nodes_do_not_create_base_attribution() {
     let _case = fixture::isolated_case();
-    let (rule, inherited, message, replay_status) = collection_error_outcome();
+    let (rule, inherited, message, replay_status, replay_evidence) = collection_error_outcome();
     assert_eq!(rule, "targeted-test-failure");
     assert!(!inherited);
     assert_eq!(replay_status, "inconclusive");
     assert!(message.contains("base replay inconclusive"));
     assert!(message.contains("no base attribution was made"));
     assert!(!message.contains("pass when their shard"));
+    let evidence: serde_json::Value = serde_json::from_str(&replay_evidence).unwrap();
+    assert_eq!(evidence["shards"][0]["shard_index"], 1);
+    assert_eq!(evidence["shards"][0]["returncode"], 2);
+    assert!(evidence["shards"][0]["stdout_tail"]
+        .as_str()
+        .is_some_and(|s| !s.is_empty()));
+    assert!(evidence["shards"][0]["stderr_tail"]
+        .as_str()
+        .is_some_and(|s| !s.is_empty()));
 }
 
 #[test]
@@ -395,29 +432,40 @@ fn base_replay_accepts_only_unambiguous_pytest_verdicts() {
         .unwrap()
         .call0()
         .unwrap()
-        .extract::<Vec<(String, Vec<String>, String)>>()
+        .extract::<Vec<(String, Vec<String>, String, String)>>()
         .unwrap();
 
-        assert_eq!(cases[0], ("valid".to_owned(), Vec::new(), String::new()));
         assert_eq!(
-            cases[1],
             (
-                "valid".to_owned(),
-                vec!["tests/test_a.py::test_x".to_owned()],
-                String::new()
-            )
+                cases[0].0.as_str(),
+                cases[0].1.as_slice(),
+                cases[0].2.as_str()
+            ),
+            ("valid", &[][..], "")
+        );
+        assert_eq!(
+            (
+                cases[1].0.as_str(),
+                cases[1].1.as_slice(),
+                cases[1].2.as_str()
+            ),
+            ("valid", &["tests/test_a.py::test_x".to_owned()][..], "")
         );
         for (index, exit_code) in [
             (2, 1),
             (3, 2),
-            (4, 3),
-            (5, 4),
-            (6, 5),
-            (7, 1),
+            (4, 2),
+            (5, 3),
+            (6, 4),
+            (7, 5),
             (8, 1),
-            (9, 0),
+            (9, 1),
             (10, 0),
-            (11, 1),
+            (11, 0),
+            (14, 1),
+            (16, 0),
+            (17, 0),
+            (18, 2),
         ] {
             assert_eq!(
                 cases[index].0, "inconclusive",
@@ -426,15 +474,58 @@ fn base_replay_accepts_only_unambiguous_pytest_verdicts() {
             );
             assert!(!cases[index].2.is_empty());
         }
-        assert!(cases[2].2.contains("collection error"));
+        assert!(cases[2]
+            .2
+            .contains("did not produce a pytest terminal test summary"));
         assert!(cases[3].2.contains("non-verdict pytest code 2"));
-        assert!(cases[4].2.contains("non-verdict pytest code 3"));
-        assert!(cases[5].2.contains("non-verdict pytest code 4"));
-        assert!(cases[6].2.contains("non-verdict pytest code 5"));
-        assert!(cases[7].2.contains("did not collect tests"));
-        assert!(cases[8].2.contains("without a failed-test summary"));
-        assert!(cases[9].2.contains("did not produce a pytest test summary"));
-        assert!(cases[10].2.contains("exited 0 with failure summaries"));
-        assert!(cases[11].2.contains("without a failed-test summary"));
+        assert!(cases[4].2.contains("non-verdict pytest code 2"));
+        assert!(cases[5].2.contains("non-verdict pytest code 3"));
+        assert!(cases[6].2.contains("non-verdict pytest code 4"));
+        assert!(cases[7].2.contains("non-verdict pytest code 5"));
+        assert!(cases[8]
+            .2
+            .contains("did not produce a pytest terminal test summary"));
+        assert!(cases[9]
+            .2
+            .contains("without a consistent failed-test or setup-error summary"));
+        assert!(cases[10]
+            .2
+            .contains("did not produce a pytest terminal test summary"));
+        assert!(cases[11].2.contains("exited 0 with failure summaries"));
+        assert_eq!(cases[12].0, "valid");
+        assert_eq!(cases[12].1, vec!["tests/test_a.py::test_x"]);
+        assert_eq!(cases[13].0, "valid");
+        assert_eq!(cases[13].1, vec!["tests/test_a.py::test_setup".to_owned()]);
+        assert!(cases[14]
+            .2
+            .contains("without a consistent failed-test or setup-error summary"));
+        assert_eq!(cases[15].0, "valid");
+        assert_eq!(cases[15].1, vec!["tests/test_a.py::test_x"]);
+        assert!(cases[16].2.contains("for any collected tests"));
+        assert!(cases[17].2.contains("for any collected tests"));
+
+        let evidence: serde_json::Value = serde_json::from_str(&cases[18].3).unwrap();
+        assert_eq!(evidence["status"], "inconclusive");
+        assert_eq!(evidence["shards"][0]["shard_index"], 7);
+        assert_eq!(evidence["shards"][0]["returncode"], 2);
+        let stdout_tail = evidence["shards"][0]["stdout_tail"].as_str().unwrap();
+        let stderr_tail = evidence["shards"][0]["stderr_tail"].as_str().unwrap();
+        assert!(stdout_tail.len() <= 1000 && stdout_tail.contains("tail-marker"));
+        assert!(!stderr_tail.is_empty());
+
+        let timeout_mapping: Vec<usize> = pyo3::types::PyModule::from_code(
+            py,
+            &code,
+            c"baseline_verdict_case.py",
+            c"baseline_verdict_case",
+        )
+        .unwrap()
+        .getattr("timeout_mapping")
+        .unwrap()
+        .call0()
+        .unwrap()
+        .extract()
+        .unwrap();
+        assert_eq!(timeout_mapping, vec![3]);
     });
 }
