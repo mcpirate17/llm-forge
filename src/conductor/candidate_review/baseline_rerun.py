@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
+import signal
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -25,7 +26,21 @@ from conductor.candidate_review.policy import CheckPolicy
 from conductor.candidate_review.sharding import execute_shards
 
 _SUMMARY_LINE = re.compile(r"^(?:FAILED|ERROR) (\S+?)(?: - .*)?$")
+_COLLECTION_ERROR = re.compile(
+    r"(?im)^\s*ERROR collecting\b|\berrors? during collection\b"
+)
+_INCOMPLETE_RUN = re.compile(
+    r"(?im)\bInterrupted\b|\bKeyboardInterrupt\b|^\s*INTERNALERROR>|"
+    r"^\s*ERROR:\s*usage:|\bno tests ran\b|\bcollected 0 items\b"
+)
+_TEST_SUMMARY = re.compile(
+    r"(?im)^\s*\d+\s+(?:passed|failed|errors?|skipped|xfailed|xpassed|warnings?|deselected)\b"
+)
 MAX_BASELINE_IDS = 2000
+
+
+class BaseReplayInconclusive(RuntimeError):
+    """The base replay did not produce a trustworthy pytest test verdict."""
 
 
 def failed_node_ids(output: str) -> list[str]:
@@ -36,6 +51,56 @@ def failed_node_ids(output: str) -> list[str]:
         if match:
             seen.setdefault(match.group(1))
     return list(seen)
+
+
+def _base_replay_node_ids(
+    completed: subprocess.CompletedProcess[str], shard_index: int
+) -> set[str]:
+    """Return failures only when pytest produced an unambiguous test verdict."""
+    output = completed.stdout + "\n" + completed.stderr
+    code = completed.returncode
+    if code < 0:
+        number = -code
+        try:
+            name = signal.Signals(number).name
+        except ValueError:
+            name = f"signal {number}"
+        detail = _tail(completed.stderr.strip(), 1000)
+        raise BaseReplayInconclusive(
+            f"base replay shard {shard_index} terminated by {name} "
+            f"(signal {number}, return code {code})"
+            + (f"; stderr: {detail}" if detail else "")
+        )
+    if code not in {0, 1}:
+        detail = _tail(completed.stderr.strip(), 1000)
+        raise BaseReplayInconclusive(
+            f"base replay shard {shard_index} exited with non-verdict pytest "
+            f"code {code} (expected 0 or 1)"
+            + (f"; stderr: {detail}" if detail else "")
+        )
+    if _COLLECTION_ERROR.search(output):
+        raise BaseReplayInconclusive(
+            f"base replay shard {shard_index} reported a pytest collection error"
+        )
+    if _INCOMPLETE_RUN.search(output):
+        raise BaseReplayInconclusive(
+            f"base replay shard {shard_index} was interrupted or did not collect tests"
+        )
+
+    ids = set(failed_node_ids(output))
+    if not _TEST_SUMMARY.search(output):
+        raise BaseReplayInconclusive(
+            f"base replay shard {shard_index} did not produce a pytest test summary"
+        )
+    if code == 0 and ids:
+        raise BaseReplayInconclusive(
+            f"base replay shard {shard_index} exited 0 with failure summaries"
+        )
+    if code == 1 and not ids:
+        raise BaseReplayInconclusive(
+            f"base replay shard {shard_index} exited 1 without a failed-test summary"
+        )
+    return ids
 
 
 def _base_failures(
@@ -68,12 +133,16 @@ def _base_failures(
         ]
         completed, timed_out = execute_shards(base_ctx, commands, check)
     if timed_out:
-        raise RuntimeError(f"{len(timed_out)} base replay shard(s) timed out")
+        raise BaseReplayInconclusive(
+            f"{len(timed_out)} base replay shard(s) exceeded their wall budget"
+        )
     result: dict[int, set[str]] = {index: set() for index in shard_tests}
     for index, done in zip(order, completed, strict=True):
-        if done is None or done.returncode < 0:
-            raise RuntimeError(f"base replay of shard {index + 1} was killed")
-        result[index] = set(failed_node_ids(done.stdout + "\n" + done.stderr))
+        if done is None:
+            raise BaseReplayInconclusive(
+                f"base replay shard {index + 1} produced no process result"
+            )
+        result[index] = _base_replay_node_ids(done, index + 1)
     return result
 
 
@@ -107,7 +176,21 @@ def baseline_failure_findings(
         return list(fallback)
     per_shard = _attributable_failures(completed_all, failed, pytest_shard)
     if per_shard is None:
-        return list(fallback)
+        reason = "candidate shard output did not provide attributable pytest node ids"
+        return [
+            dataclasses.replace(
+                item,
+                message=(
+                    f"{item.message}\n[base attribution inconclusive: {reason}; "
+                    "no base attribution was made; the candidate finding remains blocking]"
+                ),
+                evidence={
+                    **item.evidence,
+                    "base_replay": {"status": "inconclusive", "reason": reason},
+                },
+            )
+            for item in fallback
+        ]
     try:
         on_base = _base_failures(ctx, check, {i: shards[i] for i in per_shard})
     except (
@@ -117,10 +200,18 @@ def baseline_failure_findings(
         GitSourceError,
         subprocess.TimeoutExpired,
     ) as exc:
-        reason = f"base replay did not complete: {type(exc).__name__}: {exc}"
+        reason = f"base replay inconclusive: {type(exc).__name__}: {exc}"
         return [
             dataclasses.replace(
-                item, message=f"{item.message}\n[{reason}; all failures kept blocking]"
+                item,
+                message=(
+                    f"{item.message}\n[{reason}; no base attribution was made; "
+                    "the candidate finding remains blocking]"
+                ),
+                evidence={
+                    **item.evidence,
+                    "base_replay": {"status": "inconclusive", "reason": str(exc)},
+                },
             )
             for item in fallback
         ]

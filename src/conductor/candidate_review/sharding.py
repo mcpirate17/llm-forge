@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import os
+import signal
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -209,6 +210,86 @@ def shard_timeout_findings(
     ]
 
 
+def _signal_metadata(exit_codes: Sequence[int], killed: Sequence[int]) -> list[dict[str, object]]:
+    details = []
+    for code in sorted({exit_codes[index] for index in killed}):
+        number = -code
+        try:
+            name = signal.Signals(number).name
+        except ValueError:
+            name = f"signal {number}"
+        details.append({"name": name, "number": number, "return_code": code})
+    return details
+
+
+def _killed_shard_output(
+    completed_all: Sequence[subprocess.CompletedProcess[str]],
+    exit_codes: Sequence[int],
+    killed: Sequence[int],
+    max_output_chars: int,
+) -> tuple[dict[str, dict[str, object]], str]:
+    by_shard: dict[str, dict[str, object]] = {}
+    output_blocks = []
+    for index in killed:
+        completed = completed_all[index]
+        shard_output: dict[str, object] = {"return_code": exit_codes[index]}
+        stdout_tail = _tail(completed.stdout.strip(), max_output_chars).strip()
+        stderr_tail = _tail(completed.stderr.strip(), max_output_chars).strip()
+        if stdout_tail:
+            shard_output["stdout_tail"] = stdout_tail
+            output_blocks.append(f"--- killed shard {index + 1} stdout ---\n{stdout_tail}")
+        if stderr_tail:
+            shard_output["stderr_tail"] = stderr_tail
+            output_blocks.append(f"--- killed shard {index + 1} stderr ---\n{stderr_tail}")
+        by_shard[str(index + 1)] = shard_output
+    section = (
+        "\n\nSignal-terminated shard output:\n" + "\n".join(output_blocks)
+        if output_blocks
+        else ""
+    )
+    return by_shard, section
+
+
+def _signal_killed_finding(
+    check: CheckPolicy,
+    total: int,
+    selected_count: int,
+    completed_all: Sequence[subprocess.CompletedProcess[str]],
+    exit_codes: Sequence[int],
+    killed: Sequence[int],
+) -> Finding:
+    signal_details = _signal_metadata(exit_codes, killed)
+    signal_summary = ", ".join(
+        f"{row['name']} (signal {row['number']}, return code {row['return_code']})"
+        for row in signal_details
+    )
+    killed_output, output_section = _killed_shard_output(
+        completed_all, exit_codes, killed, check.max_output_chars
+    )
+    return Finding(
+        check_id=check.check_id,
+        rule_id="targeted-test-killed",
+        severity=Severity.HIGH,
+        message=(
+            f"{len(killed)} of {total} targeted-test shard(s) terminated "
+            f"before finishing: {signal_summary}. Signal termination is "
+            "not a pytest test verdict, and the signal alone does not "
+            f"identify why the process stopped. Configured per-shard limits "
+            f"were {check.timeout_seconds}s CPU and {check.memory_mb}MB "
+            f"address space; they do not establish the cause.{output_section}"
+        ),
+        evidence={
+            "exit_codes": list(exit_codes),
+            "killed_shards": [index + 1 for index in killed],
+            "signals": signal_details,
+            "selected_tests": selected_count,
+            "timeout_seconds": check.timeout_seconds,
+            "memory_mb": check.memory_mb,
+            "killed_shard_output": killed_output,
+        },
+    )
+
+
 def shard_outcome_findings(
     check: CheckPolicy,
     shards: Sequence[Sequence[str]],
@@ -223,6 +304,16 @@ def shard_outcome_findings(
     exit_codes = [completed.returncode for completed in completed_all]
     failed = [index for index, code in enumerate(exit_codes) if code]
     killed = [index for index in failed if exit_codes[index] < 0]
+    if killed:
+        return (
+            [
+                _signal_killed_finding(
+                    check, total, selected_count, completed_all, exit_codes, killed
+                )
+            ],
+            exit_codes,
+            failed,
+        )
     combined_output = "\n".join(
         (
             f"--- shard {index + 1}/{total} ({len(shards[index])} files,"
@@ -235,39 +326,6 @@ def shard_outcome_findings(
         + completed_all[index].stderr
         for index in (failed or range(total))
     )
-    if killed:
-        # A signal kill is not a test verdict. Reported as `targeted-test-failure`
-        # it renders as a truncated pytest dump and reads like failing assertions,
-        # which is how a budget overrun cost an evening on 2026-08-28.
-        signals = sorted({-exit_codes[index] for index in killed})
-        return (
-            [
-                Finding(
-                    check_id=check.check_id,
-                    rule_id="targeted-test-killed",
-                    severity=Severity.HIGH,
-                    message=(
-                        f"{len(killed)} of {total} targeted-test shard(s) were killed "
-                        f"by signal {signals} before finishing; this is a "
-                        f"resource-budget overrun, not a test result. The sweep "
-                        f"selected {selected_count} test files against a "
-                        f"{check.timeout_seconds}s CPU and {check.memory_mb}MB budget "
-                        f"per shard. Raise shard_workers/shard_max_files on "
-                        f"checks.{check.check_id}, or its timeout_seconds/memory_mb."
-                        "\n\n" + _tail(combined_output, check.max_output_chars).strip()
-                    ),
-                    evidence={
-                        "exit_codes": exit_codes,
-                        "killed_shards": [index + 1 for index in killed],
-                        "selected_tests": selected_count,
-                        "timeout_seconds": check.timeout_seconds,
-                        "memory_mb": check.memory_mb,
-                    },
-                )
-            ],
-            exit_codes,
-            failed,
-        )
     if failed:
         return (
             [
