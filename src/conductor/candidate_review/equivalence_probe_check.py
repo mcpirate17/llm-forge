@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from conductor.candidate_review.git_source import materialize_tree
 from conductor.candidate_review.model import CheckResult, Finding, Severity
 
 if TYPE_CHECKING:
@@ -135,8 +136,8 @@ def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
     changes behaviour in a regime the tests never reach. Sampling cannot prove the
     converse, so "nothing moved" is reported by the CLI and never blocks here.
 
-    It runs against the candidate snapshot, not the working tree, because that is
-    the tree that ships.
+    It runs against a separate materialization of the exact candidate tree, not the
+    shared review snapshot or working tree, because that is the tree that ships.
     """
     from conductor.candidate_review.checks import _result
 
@@ -164,7 +165,14 @@ def check_equivalence_probe(ctx: ReviewContext) -> CheckResult:
     if not modules:
         return _result("equivalence-probe", started, (), files=())
 
-    _, summary = slop_gate.run("HEAD", ctx.snapshot, only=modules)
+    # The equivalence probe replays recorded calls after pytest has torn down its
+    # fixtures. A replay can therefore write through a module-relative default path
+    # (for example, ``research/evaluation.db``). Keep those writes inside a fresh
+    # materialization of the exact candidate Git tree so they cannot affect later
+    # checks that share ``ctx.snapshot``. `slop_gate.run` is synchronous and returns
+    # its complete summary before this disposable tree is removed.
+    with materialize_tree(ctx.repo, ctx.candidate.tree_oid) as (probe_snapshot, _):
+        _, summary = slop_gate.run("HEAD", probe_snapshot, only=modules)
 
     # The gate already paid for this measurement, so hand it to the backlog rather
     # than discarding it. A run ARTIFACT, not a ledger write: this check runs against
