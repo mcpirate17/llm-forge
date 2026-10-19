@@ -8,14 +8,14 @@ metric) are separate, later work.
 
 ## Policy table
 
-Approved by Tim 2026-09-13, encoded as data in `ledger/routing_policy.toml`
-(loaded at build time via `include_str!`, `policy_version = "2026-09-13.1"`).
+Approved by Tim 2026-09-13 (`explore` raised haiku to sonnet 2026-10-19, model-fit rule), encoded as data in `ledger/routing_policy.toml`
+(loaded at build time via `include_str!`, `policy_version = "2026-10-19.1"`).
 `tier_order` ranks the tiers cheapest to priciest: `haiku < sonnet < opus <
 fable`.
 
 | class | matched by | tier | cap_tokens |
 |---|---|---|---|
-| explore | `subagent_type` in `{Explore, claude-code-guide, statusline-setup}`, or description starts with `clerical:` | haiku | 150000 |
+| explore | `subagent_type` in `{Explore, claude-code-guide, statusline-setup}`, or description starts with `clerical:` | sonnet | 150000 |
 | general | `subagent_type` in `{general-purpose, claude}`, or absent/unknown | sonnet | 150000 |
 | design | `subagent_type == Plan`, or description starts with `design:` or `rust:` | opus | 150000 |
 | inherit | `subagent_type == fork`, or requested model `fable`/`inherit` | **deny** unless description contains `justify:` | 150000 |

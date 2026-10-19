@@ -124,7 +124,7 @@ fn policy_table_rows_match_the_embedded_policy() {
 #[test]
 fn policy_version_in_prose_matches_the_embedded_policy() {
     let policy = Policy::embedded().expect("embedded routing_policy.toml parses");
-    // The prose quotes it as `policy_version = "2026-09-13.1"`.
+    // The prose quotes it as `policy_version = "2026-10-19.1"`.
     let docs = normalize(ROUTING_MD);
     let quoted = docs
         .split("policy_version = \"")
