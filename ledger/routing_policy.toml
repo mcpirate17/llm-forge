@@ -5,8 +5,11 @@
 # model above a class's own tier is denied unless the description contains
 # `justify:`. `policy_version` is bumped by hand whenever this table changes
 # -- it is not derived from the file's mtime or a hash.
+#
+# 2026-10-19 (Tim): use the model level the task fits -- no opus to inventory
+# code bases, no haiku for unsolved math. `explore` is therefore capped at sonnet.
 
-policy_version = "2026-09-13.1"
+policy_version = "2026-10-19.1"
 tier_order = ["haiku", "sonnet", "opus", "fable"]
 justify_marker = "justify:"
 
@@ -14,7 +17,7 @@ justify_marker = "justify:"
 name = "explore"
 subagent_types = ["Explore", "claude-code-guide", "statusline-setup"]
 description_prefixes = ["clerical:"]
-tier = "haiku"
+tier = "sonnet"
 cap_tokens = 150000
 
 [[class]]
