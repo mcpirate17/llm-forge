@@ -27,12 +27,14 @@ from conductor.candidate_review.sharding import execute_shards
 
 _SUMMARY_LINE = re.compile(r"^(?:FAILED|ERROR) (\S+?)(?: - .*)?$")
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
-_SUMMARY_ITEM = re.compile(
-    r"(?i)(\d+)\s+(passed|failed|errors?|skipped|xfailed|xpassed|warnings?|deselected)"
+# pytest-subtests adds "N subtests passed|failed|..." items; they are not tests.
+_ITEM_NAME = (
+    r"subtests\s+(?:passed|failed|skipped|xfailed|xpassed)"
+    r"|passed|failed|errors?|skipped|xfailed|xpassed|warnings?|deselected"
 )
+_SUMMARY_ITEM = re.compile(rf"(?i)(\d+)\s+({_ITEM_NAME})")
 _TEST_SUMMARY = re.compile(
-    r"(?i)^(?P<counts>\d+\s+(?:passed|failed|errors?|skipped|xfailed|xpassed|warnings?|deselected)"
-    r"(?:,\s*\d+\s+(?:passed|failed|errors?|skipped|xfailed|xpassed|warnings?|deselected))*)"
+    rf"(?i)^(?P<counts>\d+\s+(?:{_ITEM_NAME})(?:,\s*\d+\s+(?:{_ITEM_NAME}))*)"
     r"\s+in\s+\d+(?:\.\d+)?s(?:\s+\([^)]*\))?$"
 )
 MAX_BASELINE_IDS = 2000
@@ -99,8 +101,8 @@ def _summary_counts(output: str) -> dict[str, int] | None:
         return None
     counts: dict[str, int] = {}
     for item in _SUMMARY_ITEM.finditer(match.group("counts")):
-        name = item.group(2).lower()
-        if name.endswith("s"):
+        name = "_".join(item.group(2).lower().split())
+        if name.endswith("s") and not name.startswith("subtests_"):
             name = name[:-1]
         counts[name] = counts.get(name, 0) + int(item.group(1))
     return counts

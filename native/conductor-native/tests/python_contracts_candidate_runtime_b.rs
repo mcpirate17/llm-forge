@@ -303,6 +303,11 @@ def cases():
         classify(0, "0 passed in 0.01s\n"),
         classify(0, "1 warning in 0.01s\n"),
         classify(2, "x" * 1400 + "tail-marker\n", "diagnostic stderr tail\n"),
+        classify(1, "FAILED tests/test_a.py::test_x - assertion\n"
+                       "FAILED tests/test_b.py::test_y - assertion\n"
+                       "2 failed, 192 passed, 61 skipped, 24 warnings, 8 subtests passed in 24.48s\n"),
+        classify(1, "FAILED tests/test_a.py::test_x - assertion\n"
+                       "2 subtests failed, 8 subtests passed in 0.5s\n"),
     ]
 
 def timeout_mapping():
@@ -503,6 +508,14 @@ fn base_replay_accepts_only_unambiguous_pytest_verdicts() {
         assert_eq!(cases[15].1, vec!["tests/test_a.py::test_x"]);
         assert!(cases[16].2.contains("for any collected tests"));
         assert!(cases[17].2.contains("for any collected tests"));
+
+        assert_eq!(cases[19].0, "valid");
+        assert_eq!(
+            cases[19].1,
+            vec!["tests/test_a.py::test_x", "tests/test_b.py::test_y"]
+        );
+        assert_eq!(cases[20].0, "inconclusive");
+        assert!(cases[20].2.contains("for any collected tests"));
 
         let evidence: serde_json::Value = serde_json::from_str(&cases[18].3).unwrap();
         assert_eq!(evidence["status"], "inconclusive");
