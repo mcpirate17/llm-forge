@@ -199,8 +199,8 @@
   },
   {
     "command": "grep -rn \"git clean -fd\" docs/",
-    "blocked": false,
-    "reason": null,
+    "blocked": true,
+    "reason": "BLOCKED: unbounded multi-file search output. Narrow to specific files; cap exploration to at most 80 lines total (for example sed -n '1,40p'), then summarize. rg -m limits matches per file, not total output. For an optional search, preserve failures: rg ... || { rg_status=$?; [ \"$rg_status\" -eq 1 ] || exit \"$rg_status\"; }. Do not use || true or suppress stderr.",
     "write_targets": []
   },
   {

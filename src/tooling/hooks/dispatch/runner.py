@@ -113,7 +113,51 @@ def subject_of(event: str, payload: dict[str, Any]) -> str:
         return str(payload.get("source") or "")
     if event == "SessionEnd":
         return str(payload.get("reason") or "")
-    return str(payload.get("tool_name") or payload.get("toolName") or "")
+    name = str(payload.get("tool_name") or payload.get("toolName") or "")
+    return "Bash" if _is_shell_tool(name) else name
+
+
+def _is_shell_tool(name: str) -> bool:
+    """Recognize provider shell spellings without matching arbitrary MCP tools."""
+    return name.lower().removeprefix("functions.") in {
+        "bash",
+        "shell",
+        "exec_command",
+        "shell_command",
+        "run_shell_command",
+        "run_terminal_command",
+    }
+
+
+class _ShellPayloadError(ValueError):
+    """A recognized shell tool supplied an unsupported command payload."""
+
+
+def _normalize_shell_payload(event: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Give all shell hooks one input shape, including bodies that read stdin."""
+    if event not in {"PreToolUse", "PostToolUse"}:
+        return payload
+    name = str(payload.get("tool_name") or payload.get("toolName") or "")
+    if not _is_shell_tool(name):
+        return payload
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        raise _ShellPayloadError(f"shell tool {name!r} requires an object tool_input")
+    commands = [tool_input[key] for key in ("command", "cmd") if key in tool_input]
+    if not commands or any(not isinstance(command, str) for command in commands):
+        raise _ShellPayloadError(
+            f"shell tool {name!r} requires a string tool_input.command or cmd; "
+            "argv arrays are unsupported"
+        )
+    if len(commands) == 2 and commands[0] != commands[1]:
+        raise _ShellPayloadError(
+            f"shell tool {name!r} has conflicting command and cmd values"
+        )
+    return {
+        **payload,
+        "tool_name": "Bash",
+        "tool_input": {**tool_input, "command": commands[0]},
+    }
 
 
 def select(event: str, payload: dict[str, Any]) -> tuple[HookSpec, ...]:
@@ -242,6 +286,10 @@ def build_context(event: str, raw: bytes, root: Path) -> Context:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
+    normalized = _normalize_shell_payload(event, payload)
+    if normalized != payload:
+        raw = json.dumps(normalized).encode("utf-8")
+        payload = normalized
     env = dict(os.environ)
     env["PROJECT_DIR"] = str(root)
     env.setdefault("CLAUDE_PROJECT_DIR", str(root))
@@ -295,7 +343,24 @@ def _splice_native_outcomes(
 def dispatch(
     event: str, raw: bytes, root: Path
 ) -> tuple[dict[str, Any], list[HookOutcome]]:
-    ctx = build_context(event, raw, root)
+    try:
+        ctx = build_context(event, raw, root)
+    except _ShellPayloadError as exc:
+        if event != "PreToolUse":
+            raise
+        outcome = HookOutcome(
+            "shell_input",
+            {
+                "hookSpecificOutput": {
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": str(exc),
+                }
+            },
+            None,
+            True,
+            0.0,
+        )
+        return merge(event, [outcome]), [outcome]
     outcomes = run_all(select(event, ctx.payload), ctx)
     outcomes = _splice_native_outcomes(event, ctx.payload, outcomes)
     return merge(event, outcomes), outcomes
