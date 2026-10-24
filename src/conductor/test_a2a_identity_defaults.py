@@ -142,23 +142,24 @@ class IdentityRegression(unittest.TestCase):
             self.assertEqual(out.getvalue(), "")
             self.assertIn("fixture registry failure", err.getvalue())
 
+    @contextlib.contextmanager
+    def _blocked_startup(self, m):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(m, "run_startup") as startup,
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            yield startup
+
     def test_bounds_fail_before_startup(self):
         for m in self.modules:
-            with (
-                patch.dict(os.environ, {}, clear=True),
-                patch.object(m, "run_startup") as startup,
-                contextlib.redirect_stderr(io.StringIO()),
-            ):
+            with self._blocked_startup(m) as startup:
                 self.assertEqual(m.main(["--max-messages", "9"]), 2)
                 startup.assert_not_called()
 
     def test_missing_identity_main_never_starts_endpoint(self):
         self.default.unlink()
         for m in self.modules:
-            with (
-                patch.dict(os.environ, {}, clear=True),
-                patch.object(m, "run_startup") as startup,
-                contextlib.redirect_stderr(io.StringIO()),
-            ):
+            with self._blocked_startup(m) as startup:
                 self.assertEqual(m.main([]), 2)
                 startup.assert_not_called()
