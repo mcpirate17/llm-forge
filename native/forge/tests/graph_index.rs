@@ -271,6 +271,139 @@ fn shared_adapter_selects_indirect_tests_and_unknown_inventory_broadens() {
     );
 }
 
+const CANDIDATE_FILES: [(&str, &str); 4] = [
+    ("pkg/leaf.py", "def leaf():\n    return 1\n"),
+    (
+        "pkg/wrapper.py",
+        "from pkg.leaf import leaf\ndef wrapper():\n    return leaf()\n",
+    ),
+    (
+        "tests/test_indirect.py",
+        "from pkg.wrapper import wrapper\ndef test_indirect():\n    return wrapper() == 1\n",
+    ),
+    (
+        "tests/test_other.py",
+        "def test_other():\n    return True\n",
+    ),
+];
+
+fn candidate_plan(base: &Fixture, edits: &[(&str, &str)], paths: &[&str]) -> (Value, Fixture) {
+    use conductor_native::graph_context::dispatch;
+    use serde_json::json;
+    let candidate = Fixture::new();
+    for (path, text) in CANDIDATE_FILES {
+        candidate.write(path, text);
+    }
+    for (path, text) in edits {
+        candidate.write(path, text);
+    }
+    let plan = dispatch(
+        "test_selection",
+        &json!({"repo": base.0, "paths": paths, "inventory_root": candidate.0}),
+    )
+    .unwrap();
+    (plan, candidate)
+}
+
+fn candidate_base() -> Fixture {
+    let base = Fixture::new();
+    for (path, text) in CANDIDATE_FILES {
+        base.write(path, text);
+    }
+    base.run(&["index"]);
+    base
+}
+
+#[test]
+fn covered_candidate_snapshot_selects_only_reverse_dependencies() {
+    let base = candidate_base();
+    let (plan, _candidate) = candidate_plan(
+        &base,
+        &[("pkg/leaf.py", "def leaf():\n    return 2\n")],
+        &["pkg/leaf.py"],
+    );
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["scope"], "transitive-reverse-dependencies");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_indirect.py"]));
+}
+
+#[test]
+fn candidate_snapshot_selects_unknown_new_tests_explicitly() {
+    let base = candidate_base();
+    let (plan, _candidate) = candidate_plan(
+        &base,
+        &[
+            ("pkg/leaf.py", "def leaf():\n    return 2\n"),
+            ("tests/test_new.py", "def test_new():\n    return True\n"),
+        ],
+        &["pkg/leaf.py", "tests/test_new.py"],
+    );
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(
+        plan["paths"],
+        serde_json::json!(["tests/test_indirect.py", "tests/test_new.py"])
+    );
+}
+
+#[test]
+fn candidate_snapshot_the_graph_cannot_verify_falls_back() {
+    let base = candidate_base();
+    for (edits, reason) in [
+        // a test the graph never saw that the diff does not declare
+        (
+            vec![("tests/test_new.py", "def test_new():\n    return True\n")],
+            None,
+        ),
+        // a changed source the declared paths do not mention
+        (
+            vec![
+                ("pkg/leaf.py", "def leaf():\n    return 2\n"),
+                ("pkg/wrapper.py", "def wrapper():\n    return 3\n"),
+            ],
+            Some("candidate source differs from the graph outside the declared changed paths"),
+        ),
+        // a new non-test source file
+        (
+            vec![
+                ("pkg/leaf.py", "def leaf():\n    return 2\n"),
+                ("pkg/extra.py", "def extra():\n    return 1\n"),
+            ],
+            Some("candidate adds a source file the graph has never indexed"),
+        ),
+    ] {
+        let (plan, _candidate) = candidate_plan(&base, &edits, &["pkg/leaf.py"]);
+        if let Some(reason) = reason {
+            assert_eq!(plan["complete"], false, "{plan}");
+            assert_eq!(plan["scope"], "full-test-inventory-fallback");
+            assert!(plan["reasons"]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!(reason)));
+            assert!(plan["paths"]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!("tests/test_other.py")));
+        } else {
+            // an undeclared but unseen test is selected, never silently dropped
+            assert!(plan["paths"]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!("tests/test_new.py")));
+        }
+    }
+    // a declared source the candidate deletes still resolves through the graph
+    let candidate = Fixture::new();
+    for (path, text) in &CANDIDATE_FILES[1..] {
+        candidate.write(path, text);
+    }
+    let plan = conductor_native::graph_context::dispatch(
+        "test_selection",
+        &serde_json::json!({"repo": base.0, "paths": ["pkg/leaf.py"], "inventory_root": candidate.0}),
+    )
+    .unwrap();
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_indirect.py"]));
+}
+
 #[test]
 fn bounded_subgraphs_keep_requested_source_and_reject_old_expansion_generations() {
     let fixture = Fixture::new();
@@ -377,7 +510,7 @@ fn large_unresolved_inventory_uses_per_file_flags_without_metadata_overflow() {
     let mut noisy_paths = Vec::new();
     for index in 0..160 {
         let path = format!("pkg/component_with_a_long_but_valid_name_{index:03}.py");
-        fixture.write(&path, "def noisy(): return unknown_operation()\n");
+        fixture.write(&path, &format!("from pkg.absent_{index:03} import noisy\n"));
         noisy_paths.push(path);
     }
     assert!(serde_json::to_vec(&noisy_paths).unwrap().len() > 4096);
@@ -386,8 +519,7 @@ fn large_unresolved_inventory_uses_per_file_flags_without_metadata_overflow() {
         "tests/test_clean.py",
         "from pkg.clean import clean\ndef test_clean(): return clean()\n",
     );
-    let report = fixture.run(&["index"]);
-    assert_eq!(report["unresolved_calls"], 160);
+    fixture.run(&["index"]);
     assert_eq!(
         fixture.run(&["context", "pkg/clean.py", "--symbol", "clean"])["graph_status"],
         "ok"
@@ -411,4 +543,115 @@ fn large_unresolved_inventory_uses_per_file_flags_without_metadata_overflow() {
         "affected source has unresolved or dynamic dependencies"
     )));
     assert_eq!(fixture.run(&["index"])["parsed_files"], 0);
+}
+
+fn plan_with_extras(
+    extras: &[(&str, &str)],
+    edits: &[(&str, &str)],
+    paths: &[&str],
+) -> serde_json::Value {
+    let base = Fixture::new();
+    let candidate = Fixture::new();
+    for (path, text) in CANDIDATE_FILES.iter().chain(extras) {
+        base.write(path, text);
+        candidate.write(path, text);
+    }
+    base.run(&["index"]);
+    for (path, text) in edits {
+        candidate.write(path, text);
+    }
+    conductor_native::graph_context::dispatch(
+        "test_selection",
+        &serde_json::json!({"repo": base.0, "paths": paths, "inventory_root": candidate.0}),
+    )
+    .unwrap()
+}
+
+const LEAF_EDIT: (&str, &str) = ("pkg/leaf.py", "def leaf():\n    return 2\n");
+
+#[test]
+fn a_declared_new_module_has_no_dependents_and_does_not_force_fallback() {
+    let plan = plan_with_extras(
+        &[],
+        &[LEAF_EDIT, ("pkg/extra.py", "def extra():\n    return 1\n")],
+        &["pkg/leaf.py", "pkg/extra.py"],
+    );
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_indirect.py"]));
+}
+
+#[test]
+fn a_test_behind_a_nonliteral_import_is_always_selected_and_a_literal_one_is_an_edge() {
+    let dynamic = [
+        (
+            "pkg/loader.py",
+            "import importlib\ndef load(name):\n    return importlib.import_module(name)\n",
+        ),
+        (
+            "tests/test_loader.py",
+            "from pkg.loader import load\ndef test_load():\n    return load('x')\n",
+        ),
+    ];
+    let plan = plan_with_extras(&dynamic, &[LEAF_EDIT], &["pkg/leaf.py"]);
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(
+        plan["paths"],
+        serde_json::json!(["tests/test_indirect.py", "tests/test_loader.py"])
+    );
+    let literal = [
+        (
+            "pkg/loader.py",
+            "import importlib\ndef load():\n    return importlib.import_module('pkg.leaf')\n",
+        ),
+        (
+            "tests/test_loader.py",
+            "from pkg.loader import load\ndef test_load():\n    return load()\n",
+        ),
+    ];
+    let plan = plan_with_extras(&literal, &[LEAF_EDIT], &["pkg/leaf.py"]);
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(
+        plan["paths"],
+        serde_json::json!(["tests/test_indirect.py", "tests/test_loader.py"])
+    );
+}
+
+#[test]
+fn a_stdlib_or_unrelated_call_does_not_widen_selection() {
+    let extras = [
+        (
+            "pkg/util.py",
+            "import json\ndef dump(x):\n    return json.dumps(x)\n",
+        ),
+        (
+            "tests/test_util.py",
+            "from pkg.util import dump\ndef test_dump():\n    return dump(1)\n",
+        ),
+    ];
+    let plan = plan_with_extras(&extras, &[LEAF_EDIT], &["pkg/leaf.py"]);
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_indirect.py"]));
+}
+
+#[test]
+fn conftest_and_data_readers_are_selected_or_fall_back() {
+    let conftest = [("tests/conftest.py", "import pytest\n")];
+    let plan = plan_with_extras(
+        &conftest,
+        &[("tests/conftest.py", "import pytest\nX = 1\n")],
+        &["tests/conftest.py"],
+    );
+    assert_eq!(plan["complete"], false, "{plan}");
+    assert!(plan["reasons"].to_string().contains("conftest.py"));
+    let reader = [(
+        "tests/test_reader.py",
+        "def test_reader():\n    return open('tests/data/table.json').read()\n",
+    )];
+    let plan = plan_with_extras(
+        &reader,
+        &[("tests/data/table.json", "{}")],
+        &["tests/data/table.json"],
+    );
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_reader.py"]));
 }
