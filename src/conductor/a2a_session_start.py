@@ -104,14 +104,28 @@ class StartupResult:
 def resolve_identity(
     explicit: str | None, environ: Mapping[str, str] | None = None
 ) -> str:
-    """Resolve an explicit identity first, then ``A2A_AGENT_NAME``."""
+    """Resolve explicit, environment, then the host's configured default identity.
+
+    The shell SessionStart hook uses the same per-checkout default. Do not
+    infer an identity from a provider name or another agent's registry entry.
+    """
 
     source = (
-        explicit if explicit is not None else (environ or os.environ).get(IDENTITY_ENV)
+        explicit
+        if explicit is not None
+        else (os.environ if environ is None else environ).get(IDENTITY_ENV)
     )
+    default_path = ROOT / ".agents" / "a2a" / "default_identity"
+    if source is None:
+        try:
+            with default_path.open(encoding="utf-8") as handle:
+                source = handle.readline().strip()
+        except FileNotFoundError:
+            pass
     if source is None:
         raise SessionStartError(
-            f"A2A identity missing; pass --identity or set {IDENTITY_ENV}"
+            f"A2A identity missing; pass --identity, set {IDENTITY_ENV}, "
+            f"or configure {default_path}"
         )
     identity = source.strip()
     if not identity or IDENTITY_RE.fullmatch(identity) is None:
