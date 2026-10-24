@@ -25,7 +25,7 @@ impl Place {
 /// Classification roots, all canonical. Environment prefixes (the venv, the base
 /// interpreter, site-packages) are covered by the environment key, so they are
 /// checked before the repository root: a venv inside the repository is not source.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Places {
     root: PathBuf,
     environment: Vec<PathBuf>,
@@ -85,6 +85,34 @@ impl Places {
 
     pub(crate) fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// The place a recorded label names here: `~/` is this session's home, so a
+    /// record made under another home names a different file.
+    pub(crate) fn resolve(&self, label: &str) -> Option<(Place, PathBuf)> {
+        if let Some(rel) = label.strip_prefix("~/") {
+            let home = self.home.as_ref()?;
+            return Some((Place::Home(rel.to_owned()), home.join(rel)));
+        }
+        if label.starts_with('/') {
+            return Some((Place::Abs(label.to_owned()), PathBuf::from(label)));
+        }
+        Some((Place::Repo(label.to_owned()), self.root.join(label)))
+    }
+
+    /// A test's file relative to the root, and its node id re-rooted on that file,
+    /// so records from different checkouts and pytest rootdirs of one repository agree.
+    pub(crate) fn rerooted(&self, nodeid: &str, path: &Path) -> (String, PathBuf) {
+        let real = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        let rel = real
+            .strip_prefix(&self.root)
+            .map_or_else(|_| real.clone(), Path::to_path_buf);
+        let shown = rel.to_string_lossy();
+        let canonical = match nodeid.split_once("::") {
+            Some((_, suffix)) => format!("{shown}::{suffix}"),
+            None => shown.into_owned(),
+        };
+        (canonical, rel)
     }
 
     /// `raw` is resolved against `cwd` when relative. `None` means the path is

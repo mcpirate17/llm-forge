@@ -332,11 +332,10 @@ impl State {
             Ok(window) => window,
             Err(error) => return self.fail(error),
         };
-        let real = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-        let inside = real.strip_prefix(self.places.root()).ok();
-        let rel = inside.map_or_else(|| real.clone(), Path::to_path_buf);
+        let (canonical, rel) = self.places.rerooted(nodeid, path);
         // A conftest added later in any ancestor directory changes the test.
-        for dir in inside
+        for dir in Some(rel.as_path())
+            .filter(|rel| rel.is_relative())
             .and_then(Path::parent)
             .into_iter()
             .flat_map(Path::ancestors)
@@ -347,10 +346,6 @@ impl State {
             }
         }
         let rel = rel.to_string_lossy().into_owned();
-        let canonical = match nodeid.split_once("::") {
-            Some((_, suffix)) => format!("{rel}::{suffix}"),
-            None => rel.clone(),
-        };
         let outcome = self
             .outcomes
             .remove(nodeid)

@@ -5,7 +5,7 @@ use rusqlite::{params, Connection, TransactionBehavior};
 use std::path::Path;
 use std::time::Duration;
 
-const SCHEMA_VERSION: i64 = 1;
+pub(crate) const SCHEMA_VERSION: i64 = 1;
 
 // Windows are content-addressed: identical setups across sessions share a row.
 // `deps` and `lines` are zstd-compressed JSON.

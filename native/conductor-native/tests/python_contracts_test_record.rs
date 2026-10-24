@@ -284,3 +284,83 @@ fn recording_is_off_without_the_table_or_with_the_switch() {
     assert!(!stdout.contains("test record"), "{stdout}");
     assert!(!case.root().join("record").exists());
 }
+
+fn recorded(store: &Path) -> Vec<(i64, String)> {
+    let connection = Connection::open(store).expect("open store");
+    let mut query = connection
+        .prepare("SELECT session, nodeid FROM runs ORDER BY id")
+        .expect("runs query");
+    query
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .expect("runs")
+        .collect::<Result<_, _>>()
+        .expect("run rows")
+}
+
+#[test]
+fn reuse_skips_recorded_passes_until_an_input_changes() {
+    let case = Case::new();
+    project(&case);
+    pytest(case.root(), &[]);
+    let report = case.root().join("reuse-report");
+    let reuse = [
+        ("FORGE_TEST_RECORD_REUSE", "1"),
+        (
+            "FORGE_TEST_RECORD_REUSE_REPORT",
+            report.to_str().expect("UTF-8 path"),
+        ),
+        ("PYTEST_ADDOPTS", "-rs"),
+    ];
+    // pytest's progress characters, one per test in definition order.
+    let progress = |stdout: &str| stdout.lines().next().unwrap_or_default().to_owned();
+
+    // A pass with no opaque step is skipped; a failure, an xfail, a subprocess and a
+    // test that was never recorded run.
+    let stdout = pytest(case.root(), &reuse);
+    assert!(
+        progress(&stdout).starts_with("sFxs..")
+            && stdout.contains("test record reuse: 2 of 6 tests passed before against identical inputs and were skipped")
+            && stdout.contains("SKIPPED [2] tests/test_pkg.py: forge test record: passed in session 1 against identical inputs")
+            && stdout.contains("1 failed, 2 passed, 2 skipped, 1 xfailed"),
+        "{stdout}"
+    );
+    let files: Vec<_> = std::fs::read_dir(&report)
+        .expect("reuse report dir")
+        .map(|entry| entry.expect("report entry").path())
+        .collect();
+    assert_eq!(files.len(), 1, "{files:?}");
+    let counts: Value =
+        serde_json::from_slice(&std::fs::read(&files[0]).expect("report")).expect("JSON report");
+    assert_eq!(
+        (counts["collected"].as_u64(), counts["reused"].as_u64()),
+        (Some(6), Some(2))
+    );
+    assert!(
+        counts["recorded_seconds"].as_f64().is_some_and(|s| s > 0.0),
+        "{counts}"
+    );
+    let store = case.root().join("record/test_record.sqlite");
+    let second: Vec<String> = recorded(&store)
+        .into_iter()
+        .filter(|(session, _)| *session == 2)
+        .map(|(_, nodeid)| nodeid)
+        .collect();
+    assert!(
+        !second
+            .iter()
+            .any(|nodeid| nodeid.ends_with("::test_fixture") || nodeid.ends_with("::test_reads")),
+        "a skipped test is not recorded again: {second:?}"
+    );
+
+    // The fixture's data file changes: only its test runs again.
+    case.write("tests/table.txt", "1  2\n");
+    let stdout = pytest(case.root(), &reuse);
+    assert!(
+        progress(&stdout).starts_with(".Fxs..")
+            && stdout.contains("test record reuse: 1 of 6 tests")
+            && stdout
+                .contains("SKIPPED [1] tests/test_pkg.py: forge test record: passed in session 1")
+            && stdout.contains("1 failed, 3 passed, 1 skipped, 1 xfailed"),
+        "{stdout}"
+    );
+}

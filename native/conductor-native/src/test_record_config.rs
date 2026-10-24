@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Table {
-    /// The SQLite record; relative to the declaring directory, or `~/`-rooted.
+    /// The SQLite record: absolute, `~/`-rooted, or relative to the declaring directory.
     store: String,
     /// Per-line hits feed coverage. Off records executed files only.
     #[serde(default = "enabled")]
@@ -106,6 +106,11 @@ mod tests {
         assert_eq!(
             store_path(&found, "~/r.sqlite", Some("/home/x")).unwrap(),
             Path::new("/home/x/r.sqlite")
+        );
+        // One store shared by every checkout and clone of the repository.
+        assert_eq!(
+            store_path(&found, "/srv/record/r.sqlite", None).unwrap(),
+            Path::new("/srv/record/r.sqlite")
         );
         std::fs::write(
             root.join("pyproject.toml"),

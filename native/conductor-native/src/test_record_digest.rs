@@ -75,9 +75,35 @@ fn editable(dist_info: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// One entry per installed distribution: its RECORD digest, which changes whenever
-/// any installed file does. Editable installs point at source the recorder already
-/// tracks file by file, and their RECORD names the checkout path, so they are
+/// The RECORD rows of the files a distribution installs into site-packages. Its
+/// own `*.dist-info` metadata, the console scripts under `../bin` and any bytecode
+/// carry install paths, installer caches and compile flags, so two venvs holding
+/// identical code would otherwise differ.
+fn installed_files(record: &[u8]) -> String {
+    let text = String::from_utf8_lossy(record);
+    let mut rows: Vec<&str> = text
+        .lines()
+        .filter(|row| {
+            let path = row
+                .split(',')
+                .next()
+                .unwrap_or_default()
+                .trim_start_matches('"');
+            let top = path.split('/').next().unwrap_or_default();
+            !path.is_empty()
+                && !path.starts_with("../")
+                && !top.ends_with(".dist-info")
+                && !path.contains("__pycache__/")
+                && !path.ends_with(".pyc")
+        })
+        .collect();
+    rows.sort_unstable();
+    sha1_hex(rows.join("\n").as_bytes())
+}
+
+/// One entry per installed distribution: the digest of the files it installs, which
+/// changes whenever any of them does. Editable installs point at source the recorder
+/// already tracks file by file, and their RECORD names the checkout path, so they are
 /// recorded by name only.
 pub(crate) fn distributions(site_dirs: &[String]) -> std::io::Result<BTreeMap<String, String>> {
     let mut out = BTreeMap::new();
@@ -103,6 +129,7 @@ pub(crate) fn distributions(site_dirs: &[String]) -> std::io::Result<BTreeMap<St
                 "editable".to_owned()
             } else {
                 match std::fs::read(path.join(manifest)) {
+                    Ok(bytes) if manifest == "RECORD" => installed_files(&bytes),
                     Ok(bytes) => sha1_hex(&bytes),
                     Err(_) => ABSENT.to_owned(),
                 }
@@ -141,7 +168,7 @@ mod tests {
     }
 
     #[test]
-    fn editable_distributions_are_recorded_by_name() {
+    fn distributions_are_keyed_by_installed_code_and_editables_by_name() {
         let site = std::env::temp_dir().join(format!("test-record-site-{}", std::process::id()));
         let fixed = site.join("fixed-1.0.dist-info");
         let edit = site.join("local-0.1.dist-info");
@@ -154,11 +181,34 @@ mod tests {
             r#"{"url":"file:///x","dir_info":{"editable":true}}"#,
         )
         .unwrap();
-        let dists = distributions(&[site.to_str().unwrap().to_owned()]).unwrap();
+        let site_dirs = [site.to_str().unwrap().to_owned()];
+        let dists = distributions(&site_dirs).unwrap();
         assert_eq!(dists["local-0.1"], "editable");
         assert_eq!(
             dists["fixed-1.0"],
-            sha1_hex(b"fixed/__init__.py,sha256=x,1\n")
+            installed_files(b"fixed/__init__.py,sha256=x,1\n")
+        );
+        // Another venv's install of the same code: its scripts carry another shebang,
+        // its metadata another install record, and it compiled bytecode.
+        std::fs::write(
+            fixed.join("RECORD"),
+            concat!(
+                "../../../bin/fixed,sha256=other-shebang,9\n",
+                "fixed-1.0.dist-info/direct_url.json,sha256=other-url,7\n",
+                "\"fixed-1.0.dist-info/RECORD\",,\n",
+                "fixed/__pycache__/__init__.cpython-312.pyc,sha256=z,3\n",
+                "fixed/__init__.py,sha256=x,1\n",
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            distributions(&site_dirs).unwrap()["fixed-1.0"],
+            dists["fixed-1.0"]
+        );
+        std::fs::write(fixed.join("RECORD"), "fixed/__init__.py,sha256=changed,1\n").unwrap();
+        assert_ne!(
+            distributions(&site_dirs).unwrap()["fixed-1.0"],
+            dists["fixed-1.0"]
         );
         std::fs::remove_dir_all(&site).unwrap();
     }

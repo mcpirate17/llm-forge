@@ -208,6 +208,7 @@ src/conductor/candidate_review/policy_path.py	python_contracts_candidate_review_
 src/conductor/candidate_review/policy_path.py	python_contracts_candidate_review_scan
 src/conductor/candidate_review/policy_path.py	python_contracts_candidate_review_waivers
 src/conductor/candidate_review/policy_path.py	python_contracts_candidate_runtime_a
+src/conductor/candidate_review/record_reuse.py	python_contracts_candidate_runtime_a
 src/conductor/candidate_review/policy_path.py	python_contracts_candidate_runtime_b
 src/conductor/candidate_review/quality_checks.py	python_contracts_candidate_review_scan
 src/conductor/candidate_review/reporters.py	python_contracts_candidate_review_flow_b
@@ -289,6 +290,7 @@ native/conductor-native/src/test_record_finish.rs	python_contracts_test_record
 native/conductor-native/src/test_record.rs	python_contracts_test_record
 native/conductor-native/src/test_record_paths.rs	python_contracts_test_record
 native/conductor-native/src/test_record_recorder.rs	python_contracts_test_record
+native/conductor-native/src/test_record_reuse.rs	python_contracts_test_record
 native/conductor-native/src/test_record_state.rs	python_contracts_test_record
 native/conductor-native/src/test_record_store.rs	python_contracts_test_record
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_test_record
