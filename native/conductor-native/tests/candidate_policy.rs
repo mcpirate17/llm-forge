@@ -31,6 +31,14 @@ fn normalized_schema_and_defaults_are_stable() {
 }
 
 #[test]
+fn nightly_is_a_known_profile() {
+    let mut raw = policy();
+    raw["checks"]["candidate-integrity"]["profiles"] = json!(["nightly"]);
+    let parsed = parse_policy(&raw, "2026-09-27").unwrap();
+    assert_eq!(parsed["checks"][0]["profiles"], json!(["nightly"]));
+}
+
+#[test]
 fn parser_preserves_precise_refusals() {
     let mut raw = policy();
     raw["extra"] = json!(true);

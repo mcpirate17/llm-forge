@@ -489,7 +489,7 @@ def _add_review_parsers(
     review.add_argument(
         "--candidate", choices=("index", "commit", "range"), required=True
     )
-    review.add_argument("--profile", choices=("fast", "full"), required=True)
+    review.add_argument("--profile", choices=("fast", "full", "nightly"), required=True)
     review.add_argument("--target-ref", default="HEAD")
     review.add_argument("--base-ref", default="")
     review.add_argument(
