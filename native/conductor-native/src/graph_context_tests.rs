@@ -206,7 +206,11 @@ fn reasons(store: &GraphStore, root: &Path, input: &Value) -> Result<BTreeSet<St
         result.insert("graph provenance unverified".to_owned());
     }
     if !store.metadata.contains_key("coverage_complete") {
-        result.insert("graph dynamic/import coverage unverified".to_owned());
+        result.insert(
+            "graph dynamic/import coverage unverified: graph records no coverage_complete \
+             (only `forge graph index` writes it; a code-review-graph database cannot)"
+                .to_owned(),
+        );
     }
     if store
         .metadata
@@ -243,6 +247,7 @@ fn reasons(store: &GraphStore, root: &Path, input: &Value) -> Result<BTreeSet<St
 fn visit_dependencies(
     store: &GraphStore,
     root: &Path,
+    present: &Path,
     paths: &[String],
     reasons: &mut BTreeSet<String>,
 ) -> Result<BTreeSet<String>, String> {
@@ -283,7 +288,7 @@ fn visit_dependencies(
                 reasons.insert("affected source unindexed or dirty".to_owned());
             }
         }
-        if is_test(&path) && root.join(&path).is_file() {
+        if is_test(&path) && present.join(&path).is_file() {
             selected.insert(path.clone());
         }
         let callers = reverse(store, root, &path)?;
@@ -292,13 +297,75 @@ fn visit_dependencies(
             continue;
         }
         for (caller, test) in callers {
-            if test && root.join(&caller).is_file() {
+            if test && present.join(&caller).is_file() {
                 selected.insert(caller.clone());
             }
             queue.push_back((caller, depth + 1));
         }
     }
     Ok(selected)
+}
+
+/// A candidate snapshot is trusted only when its source inventory can be checked
+/// against the graph: every py/rs file outside the declared changed paths must match
+/// the graph's recorded hash, and none may be missing. Otherwise the diff is wider
+/// than declared or the graph never saw it, selection cannot be shown sound, and the
+/// full inventory runs. Test files the graph has never seen (new or renamed) have no
+/// reverse dependencies to reach them, so they are selected explicitly. Returns the
+/// changed paths still to walk and the explicitly added tests.
+fn candidate_delta(
+    store: &GraphStore,
+    (root, candidate_root): (&Path, &Path),
+    (base, candidate): (&Inventory, &Inventory),
+    paths: &[String],
+    reasons: &mut BTreeSet<String>,
+) -> (Vec<String>, BTreeSet<String>) {
+    let declared: HashSet<&String> = paths.iter().collect();
+    let mut added = BTreeSet::new();
+    let mut walk = Vec::new();
+    for path in paths {
+        let unknown = !matches!(store.indexed_hash(root, path), Ok(Some(_)));
+        if unknown && candidate.tests.contains(path) {
+            added.insert(path.clone());
+        } else {
+            walk.push(path.clone());
+        }
+    }
+    for path in candidate.sources.iter().filter(|p| !declared.contains(p)) {
+        match (
+            store.indexed_hash(root, path),
+            current_hash(candidate_root, path),
+        ) {
+            (Ok(Some(expected)), Ok(Some(actual))) if expected == actual => {}
+            (Ok(None), Ok(Some(_))) if candidate.tests.contains(path) => {
+                added.insert(path.clone());
+            }
+            (Ok(None), Ok(Some(_))) => {
+                reasons
+                    .insert("candidate adds a source file the graph has never indexed".to_owned());
+            }
+            (Ok(Some(_)), Ok(Some(_))) => {
+                reasons.insert(
+                    "candidate source differs from the graph outside the declared changed paths"
+                        .to_owned(),
+                );
+            }
+            _ => {
+                reasons
+                    .insert("candidate source could not be checked against the graph".to_owned());
+            }
+        }
+    }
+    if base
+        .sources
+        .iter()
+        .any(|path| !candidate.sources.contains(path) && !declared.contains(path))
+    {
+        reasons.insert(
+            "candidate removes a source file outside the declared changed paths".to_owned(),
+        );
+    }
+    (walk, added)
 }
 
 pub(super) fn select(input: &Value) -> Result<Value, String> {
@@ -335,12 +402,28 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
         .map_err(|error| format!("candidate inventory unavailable: {error}"))?,
         None => root.clone(),
     };
-    let inventory = inventory(&inventory_root)?;
-    if inventory_root != root {
-        reasons.insert("candidate snapshot requires full test inventory".to_owned());
-    }
-    validate_inventory(&store, &root, &inventory, &mut reasons)?;
-    let selected = visit_dependencies(&store, &root, &paths, &mut reasons)?;
+    let root_inventory = inventory(&root)?;
+    validate_inventory(&store, &root, &root_inventory, &mut reasons)?;
+    let (inventory, walk, mut selected) = if inventory_root != root {
+        let candidate = inventory(&inventory_root)?;
+        let (walk, added) = candidate_delta(
+            &store,
+            (&root, &inventory_root),
+            (&root_inventory, &candidate),
+            &paths,
+            &mut reasons,
+        );
+        (candidate, walk, added)
+    } else {
+        (root_inventory, paths, BTreeSet::new())
+    };
+    selected.extend(visit_dependencies(
+        &store,
+        &root,
+        &inventory_root,
+        &walk,
+        &mut reasons,
+    )?);
     let complete = reasons.is_empty();
     let paths = if complete {
         selected
