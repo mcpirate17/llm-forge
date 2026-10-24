@@ -293,4 +293,7 @@ native/conductor-native/src/test_record_recorder.rs	python_contracts_test_record
 native/conductor-native/src/test_record_reuse.rs	python_contracts_test_record
 native/conductor-native/src/test_record_state.rs	python_contracts_test_record
 native/conductor-native/src/test_record_store.rs	python_contracts_test_record
+native/conductor-native/src/test_record_untested.rs	python_contracts_test_record
+src/conductor/candidate_review/untested_changes.py	python_contracts_test_record
+src/conductor/candidate_review/untested_changes.py	python_contracts_contract_runner
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_test_record

@@ -22,5 +22,9 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         crate::test_record_config::test_record_config_native,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(
+        crate::test_record_untested::test_record_untested_native,
+        module
+    )?)?;
     Ok(())
 }

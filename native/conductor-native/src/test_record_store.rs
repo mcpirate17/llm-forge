@@ -1,7 +1,7 @@
 //! The SQLite test record. A pytest session is written in one transaction, so a
 //! reader sees all of a session or none of it.
 
-use rusqlite::{params, Connection, TransactionBehavior};
+use rusqlite::{params, Connection, OpenFlags, TransactionBehavior};
 use std::path::Path;
 use std::time::Duration;
 
@@ -83,6 +83,23 @@ fn open(path: &Path) -> anyhow::Result<Connection> {
         ),
     }
     Ok(connection)
+}
+
+/// The store for reading, or `None` when none was written yet. A store of another
+/// schema is an error.
+pub(crate) fn open_read_only(path: &Path) -> anyhow::Result<Option<Connection>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    connection.busy_timeout(Duration::from_secs(60))?;
+    let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    anyhow::ensure!(
+        version == SCHEMA_VERSION,
+        "{}: test record schema {version}, this build reads {SCHEMA_VERSION}",
+        path.display()
+    );
+    Ok(Some(connection))
 }
 
 /// Returns the new session id.

@@ -38,6 +38,16 @@ def _risk_buckets(
     return buckets
 
 
+def changed_source_lines(ctx: ReviewContext) -> dict[str, set[int]]:
+    """The changed line numbers of each changed Python file that is not a test."""
+    source_paths = [
+        change.path
+        for change in ctx.live_changes
+        if "python" in change.classes and "test" not in change.classes
+    ]
+    return changed_line_numbers(ctx.repo, ctx.candidate, source_paths)
+
+
 def _evaluate_changed_coverage(
     ctx: ReviewContext, coverage_file: Path
 ) -> tuple[list[Finding], dict[str, object]]:
@@ -74,12 +84,7 @@ def _evaluate_changed_coverage(
             )
         ], {}
     payload = json.loads(output.read_text(encoding="utf-8"))
-    source_paths = [
-        change.path
-        for change in ctx.live_changes
-        if "python" in change.classes and "test" not in change.classes
-    ]
-    changed = changed_line_numbers(ctx.repo, ctx.candidate, source_paths)
+    changed = changed_source_lines(ctx)
     covered, measurable, per_file = _coverage_counts(ctx, payload, changed)
     percent = 100.0 if measurable == 0 else covered * 100.0 / measurable
     # Evaluate each risk class against its own bar, using the lines actually
