@@ -164,7 +164,7 @@ PASS settings: 2 entries over [PreToolUse, SubagentStop], mode=warn, standalone=
 PASS binary: 1 binary checked, versions match 0.1.0 (git 890e5e5)
 SKIP python: every installed entry is standalone; forge never delegates to Python
 PASS ledger: /mnt/data/llm/ledger is writable (probe under live/ created and deleted)
-PASS policy: embedded routing_policy.toml parses: policy_version 2026-09-13.1, 4 classes
+PASS policy: embedded routing_policy.toml parses: policy_version 2026-10-19.1, 4 classes
 PASS hook-roundtrip: exit 0, stdout empty, 1 ms
 ```
 
