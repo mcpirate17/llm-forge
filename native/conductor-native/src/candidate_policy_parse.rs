@@ -53,6 +53,8 @@ const CLASSES: &[&str] = &[
     "workflow",
     "web",
 ];
+// `nightly` holds checks too slow for every landing; a scheduled sweep runs it.
+const PROFILES: &[&str] = &["fast", "full", "nightly"];
 const CHECK_KEYS: &[&str] = &[
     "kind",
     "profiles",
@@ -101,7 +103,7 @@ fn check(id: &str, entry: &Value) -> Result<Value> {
         return Err(format!("{field}.kind must be builtin or command"));
     }
     let profiles = strings(value(raw, "profiles"), &format!("{field}.profiles"), false)?;
-    if profiles.iter().any(|s| s != "fast" && s != "full") {
+    if profiles.iter().any(|s| !PROFILES.contains(&s.as_str())) {
         return Err(format!("{field}.profiles contains an unknown profile"));
     }
     let classes = class_list(
