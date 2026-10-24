@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.78"
+version = "0.1.79"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -76,6 +76,7 @@ ruff_text_size = { package = "rustpython-ruff_text_size", version = "0.15.8", op
 memmap2 = { version = "0.9", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order", "float_roundtrip"] }
+sha1 = { version = "0.10", optional = true }
 sha2 = "0.10"
 syn = { version = "2", features = ["full", "visit", "parsing"] }
 toml = "0.8"
@@ -93,7 +94,7 @@ zstd = "0.13"
 default = ["python"]
 bundled-sqlite = ["rusqlite/bundled"]
 source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:unicode-general-category"]
-python = ["dep:pyo3", "source-analysis", "dep:memmap2", "dep:libloading"]
+python = ["dep:pyo3", "source-analysis", "dep:memmap2", "dep:libloading", "dep:sha1"]
 python-compat-tests = ["python"]
 extension-module = ["python", "pyo3/extension-module"]
 
