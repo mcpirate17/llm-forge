@@ -5,10 +5,16 @@ Active only under a ``pyproject.toml`` that declares ``[tool.forge.test_record]`
 (``conductor_native.TestRecorder``); this module only connects pytest's hooks,
 ``sys.monitoring`` and the audit hook to it. A recording failure is reported loudly
 and never changes the session's exit status.
+
+``FORGE_TEST_RECORD_REUSE=1`` skips each collected test whose newest run against
+identical inputs passed, and records nothing for it. With
+``FORGE_TEST_RECORD_REUSE_REPORT=<dir>`` the session also writes how many it skipped
+to ``<dir>/<pid>.json``.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import site
 import sys
@@ -27,7 +33,9 @@ _owner: pytest.Config | None = None  # nested in-process sessions are not record
 _store = ""
 _tool = -1
 _running: str | None = None  # node id of the owner's test in progress
+_reused: set[str] = set()  # node ids skipped on a recorded pass, never recorded
 _summary = ""
+_reuse_summary = ""
 
 
 def _active(config: pytest.Config) -> bool:
@@ -44,7 +52,13 @@ def _host_places() -> tuple[list[str], list[str], str | None]:
     )
     if site.ENABLE_USER_SITE:
         prefixes.add(site.getusersitepackages())
-    return sorted(prefixes), [tempfile.gettempdir()], os.environ.get("HOME")
+    home = os.environ.get("HOME")
+    # A cache holds what was built from recorded inputs (torch extensions, compiled
+    # kernels), and a build during the session would otherwise drop every test after it.
+    scratch = {tempfile.gettempdir(), os.environ.get("XDG_CACHE_HOME")}
+    if home:
+        scratch.add(os.path.join(home, ".cache"))
+    return sorted(prefixes), sorted(path for path in scratch if path), home
 
 
 def _start(config: pytest.Config) -> None:
@@ -89,6 +103,45 @@ def _stop() -> None:
 def pytest_load_initial_conftests(early_config: pytest.Config) -> None:
     if _recorder is None and os.environ.get("FORGE_TEST_RECORD") != "0":
         _start(early_config)
+
+
+def _reuse_report(collected: int, reused: int, seconds: float) -> None:
+    directory = os.environ.get("FORGE_TEST_RECORD_REUSE_REPORT")
+    if not directory:
+        return
+    os.makedirs(directory, exist_ok=True)
+    report = {"collected": collected, "reused": reused, "recorded_seconds": seconds}
+    path = os.path.join(directory, f"{os.getpid()}.json")
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(report, handle)
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]):
+    global _reuse_summary
+    if not _active(config) or os.environ.get("FORGE_TEST_RECORD_REUSE") != "1":
+        return
+    tests = [(item.nodeid, str(item.path)) for item in items]
+    try:
+        found = _recorder.reusable(_store, tests)
+    except RuntimeError as error:
+        _reuse_summary = f"test record reuse FAILED, every test runs: {error}"
+        print(_reuse_summary, file=sys.stderr)
+        return
+    seconds = 0.0
+    for item, hit in zip(items, found, strict=True):
+        if hit is None:
+            continue
+        session, recorded = hit
+        reason = f"forge test record: passed in session {session} against identical inputs"
+        item.add_marker(pytest.mark.skip(reason=reason))
+        _reused.add(item.nodeid)
+        seconds += recorded
+    _reuse_summary = (
+        f"test record reuse: {len(_reused)} of {len(items)} tests passed before "
+        f"against identical inputs and were skipped ({seconds:.1f}s recorded)"
+    )
+    _reuse_report(len(items), len(_reused), seconds)
 
 
 @pytest.hookimpl(wrapper=True)
@@ -148,7 +201,7 @@ def pytest_runtest_teardown(item: pytest.Item):
 
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_protocol(item: pytest.Item):
-    if not _active(item.config):
+    if not _active(item.config) or item.nodeid in _reused:
         return (yield)
     global _running
     _recorder.push("test", item.nodeid, True)
@@ -193,12 +246,14 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
 
 
 def pytest_terminal_summary(terminalreporter, config: pytest.Config) -> None:
-    global _summary
-    if config is _owner and _summary:
-        terminalreporter.write_line(
-            _summary, red=_summary.startswith("test record FAILED")
-        )
-        _summary = ""
+    global _summary, _reuse_summary
+    if config is not _owner:
+        return
+    for line in (_reuse_summary, _summary):
+        if line:
+            failed = line.startswith(("test record FAILED", "test record reuse FAILED"))
+            terminalreporter.write_line(line, red=failed)
+    _summary = _reuse_summary = ""
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:
@@ -208,3 +263,4 @@ def pytest_unconfigure(config: pytest.Config) -> None:
         if _recorder is not None:
             _recorder.close()
         _recorder, _owner = None, None
+        _reused.clear()

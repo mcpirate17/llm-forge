@@ -640,6 +640,7 @@ fn mixed_context_check<'py>(
     context_args
         .set_item("runtime_dir", path(py, case.root()))
         .unwrap();
+    context_args.set_item("profile", "full").unwrap();
     let context = namespace.call((), Some(&context_args)).unwrap();
     let check_args = PyDict::new(py);
     check_args
@@ -762,6 +763,7 @@ fn candidate_runner_executes_candidate_python_extension_and_forge() {
         let args = PyDict::new(py);
         args.set_item("repo", path(py, &root)).unwrap();
         args.set_item("snapshot", path(py, &root)).unwrap();
+        args.set_item("profile", "full").unwrap();
         args.set_item("runtime_dir", path(py, &runtime_dir))
             .unwrap();
         let ctx = module(py, "types")
@@ -833,6 +835,7 @@ fn candidate_runner_uses_candidate_slop_over_conflicting_ambient() {
         let args = PyDict::new(py);
         args.set_item("repo", path(py, &root)).unwrap();
         args.set_item("snapshot", path(py, &root)).unwrap();
+        args.set_item("profile", "full").unwrap();
         args.set_item("runtime_dir", path(py, &runtime_dir))
             .unwrap();
         let ctx = module(py, "types")

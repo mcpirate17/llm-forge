@@ -23,6 +23,7 @@ use std::fs;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use support::{module, path, AttrPatch};
 
 fn call_bool<'py>(object: &Bound<'py, PyAny>, name: &str, arg: impl IntoPyObject<'py>) -> bool {
@@ -380,6 +381,103 @@ fn every_stalled_shard_still_fails_the_check() {
     let (rules, evidence, _) = stalled_shards(true);
     assert_eq!(rules, ["targeted-test-timeout"]);
     assert_eq!(evidence["timed_out_shards"], json!([1, 2, 3, 4]));
+}
+
+/// The 8-test, 4-shard sweep under `profile`, each shard reporting one of its two tests
+/// reused as the test-record plugin would, over a runtime directory holding an earlier
+/// run's report. Returns the reuse switch each shard saw and the check's metrics.
+fn reusing_shards(profile: &str) -> (Vec<Option<String>>, serde_json::Value) {
+    let case = fixture::isolated_case();
+    let repo = runtime::staged_probe(&case);
+    let runtime_dir = case.root().join("runtime");
+    let stale = runtime_dir.join("test-record-reuse/targeted-tests-full");
+    fs::create_dir_all(&stale).unwrap();
+    fs::write(
+        stale.join("stale.json"),
+        r#"{"collected": 9, "reused": 9, "recorded_seconds": 9.0}"#,
+    )
+    .unwrap();
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let switches = Arc::clone(&seen);
+    Python::attach(|py| {
+        let sharded = sharded_policy(py);
+        let candidate = runtime::staged_candidate(py, &repo);
+        let tests: Vec<_> = (0..8).map(|i| format!("t{i}.py")).collect();
+        let tests: Vec<_> = tests.iter().map(String::as_str).collect();
+        let wide = fixture::test_selection(py, &tests);
+        let sharding = module(py, "conductor.candidate_review.sharding");
+        let callback =
+            PyCFunction::new_closure(py, None, None, move |args, kwargs| -> PyResult<Py<PyAny>> {
+                let py = args.py();
+                let env = kwargs
+                    .expect("keyword arguments")
+                    .get_item("extra_env")?
+                    .expect("extra_env");
+                let get = |name: &str| -> PyResult<Option<String>> {
+                    env.call_method1("get", (name,))?.extract()
+                };
+                switches
+                    .lock()
+                    .unwrap()
+                    .push(get("FORGE_TEST_RECORD_REUSE")?);
+                if let Some(report) = get("FORGE_TEST_RECORD_REUSE_REPORT")? {
+                    let name: String = module(py, "uuid")
+                        .getattr("uuid4")?
+                        .call0()?
+                        .getattr("hex")?
+                        .extract()?;
+                    fs::create_dir_all(&report).unwrap();
+                    fs::write(
+                        Path::new(&report).join(format!("{name}.json")),
+                        r#"{"collected": 2, "reused": 1, "recorded_seconds": 1.25}"#,
+                    )
+                    .unwrap();
+                }
+                Ok(module(py, "subprocess")
+                    .getattr("CompletedProcess")?
+                    .call1((args.get_item(0)?, 0, ".s [100%]", ""))?
+                    .unbind())
+            })
+            .unwrap();
+        let _patch = AttrPatch::replace(sharding.as_any(), "_run_process", callback.as_any());
+        let metrics = runtime::with_context(
+            py,
+            &repo,
+            &candidate,
+            "pre-commit",
+            profile,
+            &runtime_dir,
+            |ctx| {
+                let kwargs = PyDict::new(py);
+                kwargs.set_item("coverage", false).unwrap();
+                let result = module(py, "conductor.candidate_review.verification")
+                    .getattr("run_targeted_tests")
+                    .unwrap()
+                    .call((ctx, wide, sharded.clone()), Some(&kwargs))
+                    .unwrap();
+                runtime::json_value(&result.getattr("metrics").unwrap())
+            },
+        );
+        (seen.lock().unwrap().clone(), metrics)
+    })
+}
+
+#[test]
+fn shards_reuse_recorded_passes_except_in_the_nightly_sweep() {
+    let (switches, metrics) = reusing_shards("full");
+    assert_eq!(switches, vec![Some("1".to_owned()); 4]);
+    assert_eq!(
+        [
+            &metrics["reused_tests"],
+            &metrics["reused_of_collected"],
+            &metrics["reused_recorded_seconds"]
+        ],
+        [&json!(4), &json!(8), &json!(5.0)],
+        "{metrics}"
+    );
+    let (switches, metrics) = reusing_shards("nightly");
+    assert_eq!(switches, vec![None; 4]);
+    assert!(metrics.get("reused_tests").is_none(), "{metrics}");
 }
 
 #[test]

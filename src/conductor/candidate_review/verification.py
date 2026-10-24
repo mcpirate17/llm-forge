@@ -23,6 +23,7 @@ from conductor.candidate_review.checks import (
 )
 from conductor.candidate_review.command_runner import _tail
 from conductor.candidate_review.contract_runtime import prepare_contract_runtime
+from conductor.candidate_review.record_reuse import reuse_environment, reuse_metrics
 from conductor.candidate_review.coverage_eval import (  # noqa: F401
     # `_coverage_counts` and `_risk_buckets` are re-exported, not used here:
     # callers and tests reach them through this module's namespace.
@@ -981,6 +982,7 @@ def run_targeted_tests(
     metrics: dict[str, object] = {
         "selected_tests": len(selection.tests),
         "selected_contract_targets": contract_plan["targets"] if contract_plan else [],
+        **reuse_metrics(ctx, check.check_id),
     }
     if total > 1:
         metrics["shard_count"] = total
@@ -1020,12 +1022,10 @@ def _run_selected_shards(
     contract_plan: ContractPlan | None,
     commands: list[list[str]],
 ) -> tuple[list[subprocess.CompletedProcess[str] | None], list[int]]:
-    environment = (
-        prepare_contract_runtime(ctx, check, contract_plan)
-        if contract_plan and contract_plan["targets"]
-        else None
-    )
-    return execute_shards(ctx, commands, check, extra_env=environment)
+    environment = reuse_environment(ctx, check.check_id)
+    if contract_plan and contract_plan["targets"]:
+        environment.update(prepare_contract_runtime(ctx, check, contract_plan))
+    return execute_shards(ctx, commands, check, extra_env=environment or None)
 
 
 def _contract_coverage_finding(check: CheckPolicy, plan: ContractPlan) -> Finding:

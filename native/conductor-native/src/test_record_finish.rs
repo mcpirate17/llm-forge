@@ -30,6 +30,10 @@ impl Environment {
     fn value(&self) -> Value {
         json!({"python": self.python, "dists": self.dists, "vars": self.vars})
     }
+
+    pub(crate) fn digest(&self) -> String {
+        sha1_hex(self.value().to_string().as_bytes())
+    }
 }
 
 /// Loaded modules by name, and by real path for resolving relative imports.
@@ -344,13 +348,12 @@ pub(crate) fn finish(mut state: State, session: &Session<'_>) -> anyhow::Result<
     }
     let windows = complete(&mut state, session.snapshot, &mut runs)?;
     let (stored, window_rows, unstable, changed) = rows(&state, &windows, &runs);
-    let environment = session.environment.value();
     let row = SessionRow {
         started: session.started,
         finished: now(),
         root: state.places.root().to_string_lossy().into_owned(),
-        env_digest: sha1_hex(environment.to_string().as_bytes()),
-        env_data: environment,
+        env_digest: session.environment.digest(),
+        env_data: session.environment.value(),
         argv: session.argv.to_owned(),
         unstable,
     };

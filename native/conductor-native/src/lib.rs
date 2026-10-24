@@ -88,6 +88,8 @@ mod test_record_paths;
 #[cfg(feature = "python")]
 mod test_record_recorder;
 #[cfg(feature = "python")]
+mod test_record_reuse;
+#[cfg(feature = "python")]
 mod test_record_state;
 #[cfg(feature = "python")]
 mod test_record_store;

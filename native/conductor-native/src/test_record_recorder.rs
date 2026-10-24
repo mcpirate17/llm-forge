@@ -9,6 +9,7 @@
 use crate::test_record_digest as digest;
 use crate::test_record_finish::{self as finish, Environment, Session, Snapshot};
 use crate::test_record_paths::Places;
+use crate::test_record_reuse as reuse;
 use crate::test_record_state::{Access, Kind, State};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::intern;
@@ -320,6 +321,31 @@ impl TestRecorder {
     /// registered and returns at once.
     fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
+    }
+
+    /// For each collected `(nodeid, path)`, the `(session, seconds)` of the recorded
+    /// pass it can be skipped on, or `None`.
+    fn reusable(
+        &self,
+        py: Python<'_>,
+        store: &str,
+        tests: Vec<(String, String)>,
+    ) -> PyResult<Vec<Option<(i64, f64)>>> {
+        let places = self
+            .state
+            .lock()
+            .map_err(|_| PyRuntimeError::new_err("test recorder state is poisoned"))?
+            .as_ref()
+            .map(|state| state.places.clone())
+            .ok_or_else(|| PyRuntimeError::new_err("the session already finished"))?;
+        let environment = self.environment.digest();
+        let found = py
+            .detach(|| reuse::reusable(Path::new(store), &environment, &places, &tests))
+            .map_err(|error| PyRuntimeError::new_err(format!("{error:#}")))?;
+        Ok(found
+            .into_iter()
+            .map(|hit| hit.map(|hit| (hit.session, hit.seconds)))
+            .collect())
     }
 
     /// Write the session to `store` and return a one-line summary.
