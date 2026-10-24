@@ -90,12 +90,13 @@ struct AuditFacts {
     files: Vec<FileFacts>,
 }
 
-struct Lines {
+/// 1-based line numbers of byte offsets.
+pub(crate) struct Lines {
     starts: Vec<usize>,
 }
 
 impl Lines {
-    fn new(source: &str) -> Self {
+    pub(crate) fn new(source: &str) -> Self {
         let mut starts = vec![0];
         starts.extend(
             source
@@ -107,7 +108,7 @@ impl Lines {
         Self { starts }
     }
 
-    fn number(&self, offset: usize) -> usize {
+    pub(crate) fn number(&self, offset: usize) -> usize {
         self.starts.partition_point(|start| *start <= offset)
     }
 }

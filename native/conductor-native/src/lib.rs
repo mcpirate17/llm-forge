@@ -93,6 +93,8 @@ mod test_record_reuse;
 mod test_record_state;
 #[cfg(feature = "python")]
 mod test_record_store;
+#[cfg(feature = "python")]
+mod test_record_untested;
 mod text_normalization;
 #[cfg(feature = "python")]
 mod tooling_boundary;

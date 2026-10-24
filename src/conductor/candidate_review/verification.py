@@ -24,6 +24,7 @@ from conductor.candidate_review.checks import (
 from conductor.candidate_review.command_runner import _tail
 from conductor.candidate_review.contract_runtime import prepare_contract_runtime
 from conductor.candidate_review.record_reuse import reuse_environment, reuse_metrics
+from conductor.candidate_review.untested_changes import untested_changes
 from conductor.candidate_review.coverage_eval import (  # noqa: F401
     # `_coverage_counts` and `_risk_buckets` are re-exported, not used here:
     # callers and tests reach them through this module's namespace.
@@ -999,6 +1000,9 @@ def run_targeted_tests(
             findings,
             metrics,
         )
+        untested, untested_metrics = untested_changes(ctx, check.check_id)
+        findings.extend(untested)
+        metrics.update(untested_metrics)
     result = _result(
         check.check_id, started, findings, files=selected_files, metrics=metrics
     )

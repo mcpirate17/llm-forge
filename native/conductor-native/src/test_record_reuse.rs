@@ -12,11 +12,10 @@
 
 use crate::test_record_paths::Places;
 use crate::test_record_state::{Dep, DepKind};
-use crate::test_record_store::SCHEMA_VERSION;
-use rusqlite::{params, Connection, OpenFlags};
+use crate::test_record_store::open_read_only;
+use rusqlite::params;
 use std::collections::HashMap;
 use std::path::Path;
-use std::time::Duration;
 
 /// Runs of one test considered, newest first, before giving up on finding one whose
 /// inputs match.
@@ -118,17 +117,9 @@ pub(crate) fn reusable(
     places: &Places,
     tests: &[(String, String)],
 ) -> anyhow::Result<Vec<Option<Reused>>> {
-    if !store.exists() {
+    let Some(connection) = open_read_only(store)? else {
         return Ok(tests.iter().map(|_| None).collect());
-    }
-    let connection = Connection::open_with_flags(store, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-    connection.busy_timeout(Duration::from_secs(60))?;
-    let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-    anyhow::ensure!(
-        version == SCHEMA_VERSION,
-        "{}: test record schema {version}, this build reads {SCHEMA_VERSION}",
-        store.display()
-    );
+    };
     let mut runs = connection.prepare(
         "SELECT r.id, r.session, r.outcome, r.opaque, r.seconds FROM runs r \
          JOIN sessions s ON s.id = r.session \
