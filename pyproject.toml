@@ -79,8 +79,15 @@ mutation_engine = "conductor.mutation_engine_generated:main"
 agent_a2a = "conductor.agent_a2a:main"
 handoff = "conductor.handoff:main"
 
+# Loaded by pytest itself, so it needs no pytest dependency of its own; it records
+# only under a pyproject that declares `[tool.forge.test_record]`. A top-level module
+# of its own: pytest loads it in every session of the venv, including host repos
+# whose own `conductor` package would shadow a `conductor.*` plugin.
+[project.entry-points.pytest11]
+forge_test_record = "forge_test_record"
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/conductor", "src/tooling"]
+packages = ["src/conductor", "src/tooling", "src/forge_test_record"]
 
 [tool.uv.sources]
 conductor-native = { path = "native/conductor-native" }

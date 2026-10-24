@@ -282,3 +282,13 @@ src/tooling/hooks/dispatch/runner.py	python_contracts_dispatch_shell_aliases
 native/conductor-native/tests/python_contracts/dispatch_runner_support.rs	python_contracts_dispatch_shell_aliases
 native/conductor-native/tests/python_contracts/agent_comm_support.rs	python_contracts_dispatch_shell_aliases
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_dispatch_shell_aliases
+src/forge_test_record/__init__.py	python_contracts_test_record
+native/conductor-native/src/test_record_config.rs	python_contracts_test_record
+native/conductor-native/src/test_record_digest.rs	python_contracts_test_record
+native/conductor-native/src/test_record_finish.rs	python_contracts_test_record
+native/conductor-native/src/test_record.rs	python_contracts_test_record
+native/conductor-native/src/test_record_paths.rs	python_contracts_test_record
+native/conductor-native/src/test_record_recorder.rs	python_contracts_test_record
+native/conductor-native/src/test_record_state.rs	python_contracts_test_record
+native/conductor-native/src/test_record_store.rs	python_contracts_test_record
+native/conductor-native/tests/python_contracts/support.rs	python_contracts_test_record

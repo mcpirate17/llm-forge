@@ -75,6 +75,22 @@ mod receipt_auth;
 pub mod receipt_slim;
 pub mod reuse_consolidation;
 pub mod test_contracts;
+#[cfg(feature = "python")]
+mod test_record;
+#[cfg(feature = "python")]
+mod test_record_config;
+#[cfg(feature = "python")]
+mod test_record_digest;
+#[cfg(feature = "python")]
+mod test_record_finish;
+#[cfg(feature = "python")]
+mod test_record_paths;
+#[cfg(feature = "python")]
+mod test_record_recorder;
+#[cfg(feature = "python")]
+mod test_record_state;
+#[cfg(feature = "python")]
+mod test_record_store;
 mod text_normalization;
 #[cfg(feature = "python")]
 mod tooling_boundary;
@@ -127,6 +143,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     receipt_slim::register(module)?;
     reuse_consolidation::register(module)?;
     test_contracts::register(module)?;
+    test_record::register(module)?;
     tooling_boundary::register(module)?;
     workspace_runtime_matrix::register(module)?;
     Ok(())
