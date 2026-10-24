@@ -13,6 +13,9 @@ use regex::Regex;
 
 use crate::write_targets::{posix_shlex, split_commands};
 
+#[path = "inspection_guard.rs"]
+mod inspection_guard;
+
 const SHELL_RUNNERS: &[&str] = &["bash", "sh", "zsh", "dash", "ksh"];
 const RECURSIVE_FLAGS: &[&str] = &["-r", "-R", "--recursive"];
 
@@ -184,6 +187,9 @@ pub(crate) fn check_command(argv: &[String]) -> Option<String> {
 
 /// Return a block reason for a full command line, or `None` to allow.
 pub fn check(command: &str) -> Option<String> {
+    if let Some(reason) = inspection_guard::check(command) {
+        return Some(reason);
+    }
     let tokens = match posix_shlex::tokenize(command, posix_shlex::PUNCTUATION_CHARS_FULL) {
         Ok(tokens) => tokens,
         Err(_) => {
@@ -288,7 +294,7 @@ mod tests {
             r#"echo '{"tool_input":{"command":"git push --force origin master"}}' | ./hook.sh"#
         ));
         assert!(!blocked(r#"echo "git reset --hard is blocked""#));
-        assert!(!blocked(r#"grep -rn "git clean -fd" docs/"#));
+        assert!(!blocked(r#"grep -rn "git clean -fd" docs/guide.md"#));
     }
 
     #[test]

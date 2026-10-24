@@ -104,6 +104,59 @@ fn standalone_mode() -> bool {
     std::env::var("FORGE_HOOK_STANDALONE").as_deref() == Ok("1")
 }
 
+/// Canonicalize provider shell names before selecting the shared native guards.
+/// Command text is retained verbatim; argv arrays have no supported hook contract.
+fn normalize_shell_payload(payload: &mut Value) -> Result<()> {
+    let Some(name) = payload
+        .get("tool_name")
+        .filter(|value| value.as_str().is_some_and(|name| !name.is_empty()))
+        .or_else(|| payload.get("toolName"))
+        .and_then(Value::as_str)
+    else {
+        return Ok(());
+    };
+    let lower = name.to_ascii_lowercase();
+    if !matches!(
+        lower.strip_prefix("functions.").unwrap_or(&lower),
+        "bash"
+            | "shell"
+            | "exec_command"
+            | "shell_command"
+            | "run_shell_command"
+            | "run_terminal_command"
+    ) {
+        return Ok(());
+    }
+    let input = payload
+        .get("tool_input")
+        .and_then(Value::as_object)
+        .ok_or_else(|| anyhow::anyhow!("shell tool {name:?} requires an object tool_input"))?;
+    let command = input.get("command").or_else(|| input.get("cmd"));
+    let command = command.and_then(Value::as_str).ok_or_else(|| {
+        anyhow::anyhow!(
+            "shell tool {name:?} requires a string tool_input.command or cmd; argv arrays are unsupported"
+        )
+    })?;
+    if let Some(cmd) = input.get("cmd") {
+        anyhow::ensure!(
+            cmd.as_str() == Some(command),
+            "shell tool {name:?} has conflicting or malformed command and cmd values"
+        );
+    }
+    let command = command.to_owned();
+    payload["tool_name"] = Value::String("Bash".to_owned());
+    payload["tool_input"]["command"] = Value::String(command);
+    Ok(())
+}
+
+fn parse_tool_payload(input: &str) -> Result<Option<Value>> {
+    let mut parsed: Option<Value> = serde_json::from_str(input).ok();
+    if let Some(payload) = parsed.as_mut() {
+        normalize_shell_payload(payload)?;
+    }
+    Ok(parsed)
+}
+
 /// `FORGE_HOOK_STANDALONE=1`: `PreToolUse` (routing + live cap check + the
 /// native Bash guard) and `SubagentStop` (the ledger rollup) have anything
 /// forge wants to say; every other event -- and any `PreToolUse` call none
@@ -142,7 +195,10 @@ fn run_pre_tool_use_standalone(event: &str) -> Result<u8> {
     std::io::stdin()
         .read_to_string(&mut input)
         .context("failed to read hook payload from stdin")?;
-    let parsed: Option<Value> = serde_json::from_str(&input).ok();
+    let parsed = match parse_tool_payload(&input) {
+        Ok(parsed) => parsed,
+        Err(error) => return print_cap_verdict("deny", Some(&error.to_string()), None),
+    };
 
     if let Some(payload) = parsed.as_ref() {
         match crate::cap_enforce::check(payload) {
@@ -225,7 +281,10 @@ fn run_pre_tool_use(event: &str) -> Result<u8> {
         .context("failed to read hook payload from stdin")?;
 
     let native_hooks = handlers::native_hook_names_from_env();
-    let parsed: Option<Value> = serde_json::from_str(&input).ok();
+    let parsed = match parse_tool_payload(&input) {
+        Ok(parsed) => parsed,
+        Err(error) => return print_cap_verdict("deny", Some(&error.to_string()), None),
+    };
 
     // Live cap enforcement (Phase 3 step 3, item 2): runs first,
     // unconditionally, for every `PreToolUse` call. `NoOp` (no `agent_id`,
@@ -358,7 +417,7 @@ fn run_post_tool_use(event: &str) -> Result<u8> {
         .context("failed to read hook payload from stdin")?;
 
     let native_hooks = handlers::native_hook_names_from_env();
-    let parsed: Option<Value> = serde_json::from_str(&input).ok();
+    let parsed = parse_tool_payload(&input)?;
     let tool_name = parsed
         .as_ref()
         .and_then(|payload| payload.get("tool_name"))
@@ -525,4 +584,79 @@ fn delegate(
 
     let code = status.code().unwrap_or(1);
     Ok(code.clamp(0, 255) as u8)
+}
+
+#[cfg(test)]
+mod shell_payload_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn provider_shell_aliases_keep_command_bytes_and_fields() {
+        let command = "set -euo pipefail\nrg -n 'quoted text' -- 'path with spaces'";
+        for alias in [
+            "Bash",
+            "bash",
+            "shell",
+            "exec_command",
+            "shell_command",
+            "run_shell_command",
+            "run_terminal_command",
+            "functions.exec_command",
+            "functions.shell",
+            "functions.run_shell_command",
+        ] {
+            for field in ["tool_name", "toolName"] {
+                for key in ["command", "cmd"] {
+                    let mut payload = json!({field:alias,"tool_input":{key:command,"timeout":600},"session_id":"keep"});
+                    normalize_shell_payload(&mut payload).unwrap();
+                    assert_eq!(payload["tool_name"], "Bash");
+                    assert_eq!(payload["tool_input"]["command"], command);
+                    assert_eq!(payload["tool_input"][key], command);
+                    assert_eq!(payload["tool_input"]["timeout"], 600);
+                    assert_eq!(payload["session_id"], "keep");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn malformed_shell_inputs_fail_loudly() {
+        for mut payload in [
+            json!({"tool_name":"exec_command"}),
+            json!({"tool_name":"shell","tool_input":{"cmd":["sh","-c","echo ok"]}}),
+            json!({"tool_name":"Bash","tool_input":{"command":null}}),
+            json!({"tool_name":"functions.exec_command","tool_input":{"cmd":false}}),
+            json!({"tool_name":"Bash","tool_input":{"command":"one","cmd":"two"}}),
+        ] {
+            assert!(normalize_shell_payload(&mut payload)
+                .unwrap_err()
+                .to_string()
+                .contains("shell tool"));
+        }
+    }
+
+    #[test]
+    fn unknown_namespaced_tools_are_unchanged() {
+        let mut payload = json!({"tool_name":"mcp__custom__exec_command","tool_input":{"cmd":[]}});
+        let original = payload.clone();
+        normalize_shell_payload(&mut payload).unwrap();
+        assert_eq!(payload, original);
+    }
+
+    #[test]
+    fn aliases_reach_the_native_bash_guard() {
+        let hooks = handlers::BASH_PRETOOLUSE_HOOK_NAMES
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        let payload = parse_tool_payload(
+            r#"{"tool_name":"functions.exec_command","tool_input":{"cmd":"git reset --hard"}}"#,
+        )
+        .unwrap()
+        .unwrap();
+        let answer =
+            native_pretool_answer(&payload, &hooks).expect("shell aliases must select Bash guards");
+        assert_eq!(answer["hookSpecificOutput"]["permissionDecision"], "deny");
+    }
 }

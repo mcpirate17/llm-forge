@@ -35,3 +35,26 @@ fn python_binding_uses_the_native_guard() {
             .unwrap());
     });
 }
+
+#[test]
+fn python_binding_enforces_shared_inspection_limits() {
+    let _case = Case::new();
+    Python::attach(|py| {
+        let guard = module(py, "tooling.hooks.claude._bash_guard");
+        let check = guard.getattr("check").unwrap();
+        let reason = check
+            .call1((
+                "rg -n '^(from|import)|def ' research/disk_codec --glob '*.py' | sed -n '1,260p'",
+            ))
+            .unwrap()
+            .extract::<String>()
+            .unwrap();
+        assert!(reason.contains("BLOCKED"), "{reason}");
+        for command in [
+            "rg -n symbol src/tooling/hooks/dispatch/runner.py | sed -n '1,40p'",
+            "if rg -q symbol src; then echo found; fi",
+        ] {
+            assert!(check.call1((command,)).unwrap().is_none(), "{command}");
+        }
+    });
+}
