@@ -206,7 +206,11 @@ fn reasons(store: &GraphStore, root: &Path, input: &Value) -> Result<BTreeSet<St
         result.insert("graph provenance unverified".to_owned());
     }
     if !store.metadata.contains_key("coverage_complete") {
-        result.insert("graph dynamic/import coverage unverified".to_owned());
+        result.insert(
+            "graph dynamic/import coverage unverified: graph records no coverage_complete \
+             (only `forge graph index` writes it; a code-review-graph database cannot)"
+                .to_owned(),
+        );
     }
     if store
         .metadata
@@ -240,9 +244,96 @@ fn reasons(store: &GraphStore, root: &Path, input: &Value) -> Result<BTreeSet<St
     Ok(result)
 }
 
+fn module_name(path: &str) -> String {
+    path.trim_end_matches(".py")
+        .trim_end_matches("/__init__")
+        .replace('/', ".")
+}
+
+/// Lines of the files that can register pytest plugins (`-p`, `pytest11` entry points,
+/// `pytest_plugins`, a `plugin` key); a plugin is code every test runs.
+fn pytest_config(root: &Path) -> String {
+    ["pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini"]
+        .iter()
+        .filter_map(|name| std::fs::read_to_string(root.join(name)).ok())
+        .flat_map(|text| text.lines().map(str::to_owned).collect::<Vec<_>>())
+        .filter(|line| {
+            let line = line.to_lowercase();
+            line.contains("plugin") || line.contains("pytest11") || line.contains(" -p ")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Tests that depend on something the import graph cannot see: a file that imports
+/// by a non-literal name, launches a process, or (tests only) reads files as data.
+/// Any test that transitively depends on such a file might reach a changed path
+/// through it, so all of them are selected whenever anything changed.
+fn dynamic_dependents(
+    store: &GraphStore,
+    root: &Path,
+    present: &Path,
+    reasons: &mut BTreeSet<String>,
+) -> Result<BTreeSet<String>, String> {
+    let Some(conn) = store.conn.as_ref() else {
+        return Ok(BTreeSet::new());
+    };
+    if !store.metadata.contains_key("content_generation") {
+        return Ok(BTreeSet::new());
+    }
+    if !columns(conn, "files")
+        .map_err(|error| error.to_string())?
+        .contains("dynamic")
+    {
+        reasons
+            .insert("graph predates the dynamic-importer index; run forge graph index".to_owned());
+        return Ok(BTreeSet::new());
+    }
+    let mut stmt = conn
+        .prepare("SELECT file_path FROM files WHERE dynamic=1 ORDER BY file_path")
+        .map_err(|error| error.to_string())?;
+    let importers = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+    let mut scratch = BTreeSet::new();
+    let tests = visit_dependencies(store, root, present, &importers, &mut scratch)?;
+    reasons.extend(
+        scratch
+            .into_iter()
+            .filter(|reason| reason.contains("cap reached")),
+    );
+    Ok(tests)
+}
+
+/// Tests whose text names a changed non-source file (a fixture, config or note).
+fn tests_naming(
+    present: &Path,
+    tests: &BTreeSet<String>,
+    data_paths: &[String],
+) -> Result<BTreeSet<String>, String> {
+    let mut found = BTreeSet::new();
+    if data_paths.is_empty() {
+        return Ok(found);
+    }
+    let names: Vec<&str> = data_paths
+        .iter()
+        .map(|path| path.rsplit('/').next().unwrap_or(path))
+        .collect();
+    for test in tests {
+        let text = std::fs::read_to_string(present.join(test)).unwrap_or_default();
+        if names.iter().any(|name| text.contains(name)) {
+            found.insert(test.clone());
+        }
+    }
+    Ok(found)
+}
+
 fn visit_dependencies(
     store: &GraphStore,
     root: &Path,
+    present: &Path,
     paths: &[String],
     reasons: &mut BTreeSet<String>,
 ) -> Result<BTreeSet<String>, String> {
@@ -250,6 +341,7 @@ fn visit_dependencies(
     let mut seen = HashSet::new();
     let mut queue: VecDeque<(String, usize)> =
         paths.iter().cloned().map(|path| (path, 0)).collect();
+    let config = pytest_config(root);
     let unresolved: HashSet<String> = store
         .metadata
         .get("unresolved_files")
@@ -258,6 +350,21 @@ fn visit_dependencies(
     while let Some((path, depth)) = queue.pop_front() {
         if !seen.insert(path.clone()) {
             continue;
+        }
+        if Path::new(&path)
+            .file_name()
+            .is_some_and(|name| name == "conftest.py")
+        {
+            reasons.insert(
+                "conftest.py is reachable from a changed path and applies to every test below it"
+                    .to_owned(),
+            );
+        }
+        if path.ends_with(".py")
+            && module_name(&path).contains('.')
+            && config.contains(&module_name(&path))
+        {
+            reasons.insert("a pytest plugin named in the pytest configuration is reachable from a changed path".to_owned());
         }
         if seen.len() > MAX_NODES {
             reasons.insert("reverse dependency node cap reached".to_owned());
@@ -283,7 +390,7 @@ fn visit_dependencies(
                 reasons.insert("affected source unindexed or dirty".to_owned());
             }
         }
-        if is_test(&path) && root.join(&path).is_file() {
+        if is_test(&path) && present.join(&path).is_file() {
             selected.insert(path.clone());
         }
         let callers = reverse(store, root, &path)?;
@@ -292,13 +399,78 @@ fn visit_dependencies(
             continue;
         }
         for (caller, test) in callers {
-            if test && root.join(&caller).is_file() {
+            if test && present.join(&caller).is_file() {
                 selected.insert(caller.clone());
             }
             queue.push_back((caller, depth + 1));
         }
     }
     Ok(selected)
+}
+
+/// A candidate snapshot is trusted only when its source inventory can be checked
+/// against the graph: every py/rs file outside the declared changed paths must match
+/// the graph's recorded hash, and none may be missing. Otherwise the diff is wider
+/// than declared or the graph never saw it, selection cannot be shown sound, and the
+/// full inventory runs. Test files the graph has never seen (new or renamed) have no
+/// reverse dependencies to reach them, so they are selected explicitly. Returns the
+/// changed paths still to walk and the explicitly added tests.
+fn candidate_delta(
+    store: &GraphStore,
+    (root, candidate_root): (&Path, &Path),
+    (base, candidate): (&Inventory, &Inventory),
+    paths: &[String],
+    reasons: &mut BTreeSet<String>,
+) -> (Vec<String>, BTreeSet<String>) {
+    let declared: HashSet<&String> = paths.iter().collect();
+    let mut added = BTreeSet::new();
+    let mut walk = Vec::new();
+    for path in paths {
+        let unknown = !matches!(store.indexed_hash(root, path), Ok(Some(_)));
+        if unknown && candidate.tests.contains(path) {
+            added.insert(path.clone());
+        } else if unknown && candidate.sources.contains(path) && !base.sources.contains(path) {
+            // A new module: nothing in the graph can depend on it yet, and the
+            // files that import it are themselves declared changes.
+        } else {
+            walk.push(path.clone());
+        }
+    }
+    for path in candidate.sources.iter().filter(|p| !declared.contains(p)) {
+        match (
+            store.indexed_hash(root, path),
+            current_hash(candidate_root, path),
+        ) {
+            (Ok(Some(expected)), Ok(Some(actual))) if expected == actual => {}
+            (Ok(None), Ok(Some(_))) if candidate.tests.contains(path) => {
+                added.insert(path.clone());
+            }
+            (Ok(None), Ok(Some(_))) => {
+                reasons
+                    .insert("candidate adds a source file the graph has never indexed".to_owned());
+            }
+            (Ok(Some(_)), Ok(Some(_))) => {
+                reasons.insert(
+                    "candidate source differs from the graph outside the declared changed paths"
+                        .to_owned(),
+                );
+            }
+            _ => {
+                reasons
+                    .insert("candidate source could not be checked against the graph".to_owned());
+            }
+        }
+    }
+    if base
+        .sources
+        .iter()
+        .any(|path| !candidate.sources.contains(path) && !declared.contains(path))
+    {
+        reasons.insert(
+            "candidate removes a source file outside the declared changed paths".to_owned(),
+        );
+    }
+    (walk, added)
 }
 
 pub(super) fn select(input: &Value) -> Result<Value, String> {
@@ -335,12 +507,47 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
         .map_err(|error| format!("candidate inventory unavailable: {error}"))?,
         None => root.clone(),
     };
-    let inventory = inventory(&inventory_root)?;
-    if inventory_root != root {
-        reasons.insert("candidate snapshot requires full test inventory".to_owned());
+    let root_inventory = inventory(&root)?;
+    validate_inventory(&store, &root, &root_inventory, &mut reasons)?;
+    let (inventory, walk, mut selected) = if inventory_root != root {
+        let candidate = inventory(&inventory_root)?;
+        let (walk, added) = candidate_delta(
+            &store,
+            (&root, &inventory_root),
+            (&root_inventory, &candidate),
+            &paths,
+            &mut reasons,
+        );
+        (candidate, walk, added)
+    } else {
+        (root_inventory, paths, BTreeSet::new())
+    };
+    let (walk, data_paths): (Vec<String>, Vec<String>) = walk.into_iter().partition(|path| {
+        matches!(
+            Path::new(path).extension().and_then(|part| part.to_str()),
+            Some("py" | "rs")
+        )
+    });
+    selected.extend(visit_dependencies(
+        &store,
+        &root,
+        &inventory_root,
+        &walk,
+        &mut reasons,
+    )?);
+    if !walk.is_empty() || !data_paths.is_empty() {
+        selected.extend(dynamic_dependents(
+            &store,
+            &root,
+            &inventory_root,
+            &mut reasons,
+        )?);
     }
-    validate_inventory(&store, &root, &inventory, &mut reasons)?;
-    let selected = visit_dependencies(&store, &root, &paths, &mut reasons)?;
+    selected.extend(tests_naming(
+        &inventory_root,
+        &inventory.tests,
+        &data_paths,
+    )?);
     let complete = reasons.is_empty();
     let paths = if complete {
         selected

@@ -46,6 +46,18 @@ pub struct FileFacts {
     pub imports: Vec<Import>,
     /// Calls whose callable is a dynamic expression and has no static path.
     pub dynamic_calls: usize,
+    /// Module names passed as string literals to `import_module`, `__import__` or `run_module`.
+    #[serde(default)]
+    pub literal_imports: Vec<String>,
+    /// Import-by-name sites whose target is not a string literal (or is a file path).
+    #[serde(default)]
+    pub dynamic_imports: usize,
+    /// Process launches: `subprocess.*`, `os.system`, `os.exec*`, `os.spawn*`, `os.popen`.
+    #[serde(default)]
+    pub process_spawns: usize,
+    /// Reads of files as data: `ast.parse`, `inspect.getsource*`, `read_text`, `read_bytes`, `glob`.
+    #[serde(default)]
+    pub file_reads: usize,
 }
 
 #[derive(Debug)]
@@ -128,6 +140,64 @@ impl PythonCollector<'_> {
     }
 }
 
+const IMPORT_BY_NAME: [&str; 3] = ["import_module", "__import__", "run_module"];
+const IMPORT_BY_PATH: [&str; 3] = ["run_path", "spec_from_file_location", "load_source"];
+const FILE_READS: [&str; 12] = [
+    "parse",
+    "getsource",
+    "getsourcelines",
+    "getsourcefile",
+    "read_text",
+    "read_bytes",
+    "glob",
+    "rglob",
+    "iterdir",
+    "walk",
+    "listdir",
+    "scandir",
+];
+
+impl PythonCollector<'_> {
+    /// Record import-by-name sites, process launches and data reads. These are the
+    /// dependencies the import graph cannot see; the selector treats files that
+    /// carry them as always-run when anything they depend on changes.
+    fn classify_call(&mut self, target: &str, call: &ast::ExprCall) {
+        let (head, last) = target.rsplit_once('.').unwrap_or(("", target));
+        if IMPORT_BY_NAME.contains(&last) {
+            match call.arguments.args.first() {
+                Some(ast::Expr::StringLiteral(text))
+                    if !text.value.to_str().is_empty() && !text.value.to_str().starts_with('.') =>
+                {
+                    self.facts
+                        .literal_imports
+                        .push(text.value.to_str().to_owned());
+                }
+                _ => self.facts.dynamic_imports += 1,
+            }
+        } else if IMPORT_BY_PATH.contains(&last) {
+            self.facts.dynamic_imports += 1;
+        }
+        let spawns = match head {
+            "subprocess" => true,
+            "os" => {
+                matches!(last, "system" | "popen")
+                    || last.starts_with("exec")
+                    || last.starts_with("spawn")
+            }
+            _ => matches!(last, "Popen" | "check_output" | "check_call"),
+        };
+        if spawns {
+            self.facts.process_spawns += 1;
+        }
+        if FILE_READS.contains(&last)
+            && (last != "parse" || head == "ast")
+            && (last != "walk" || head == "os")
+        {
+            self.facts.file_reads += 1;
+        }
+    }
+}
+
 impl<'a> SourceOrderVisitor<'a> for PythonCollector<'_> {
     fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
         match statement {
@@ -154,7 +224,7 @@ impl<'a> SourceOrderVisitor<'a> for PythonCollector<'_> {
                 }
                 self.scope.pop();
             }
-            ast::Stmt::Import(import) if self.scope.is_empty() => {
+            ast::Stmt::Import(import) => {
                 for alias in &import.names {
                     self.facts.imports.push(Import {
                         alias: alias
@@ -167,7 +237,7 @@ impl<'a> SourceOrderVisitor<'a> for PythonCollector<'_> {
                     });
                 }
             }
-            ast::Stmt::ImportFrom(import) if self.scope.is_empty() => {
+            ast::Stmt::ImportFrom(import) => {
                 let module = format!(
                     "{}{}",
                     ".".repeat(import.level as usize),
@@ -195,6 +265,7 @@ impl<'a> SourceOrderVisitor<'a> for PythonCollector<'_> {
     fn visit_expr(&mut self, expression: &'a ast::Expr) {
         if let ast::Expr::Call(call) = expression {
             if let Some(target) = py_path(call.func.as_ref()) {
+                self.classify_call(&target, call);
                 self.facts.calls.push(Call {
                     caller: self.scope.join("."),
                     target,

@@ -748,6 +748,7 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_dispatch_merge",
             "python_contracts_dispatch_runner_execution",
             "python_contracts_dispatch_runner_protocol",
+            "python_contracts_dispatch_shell_aliases",
             "python_contracts_doctor",
             "python_contracts_handoff",
             "python_contracts_harness_provisioning",

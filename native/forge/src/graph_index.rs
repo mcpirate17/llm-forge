@@ -228,10 +228,24 @@ fn module_lookup(files: &[IndexedFile]) -> ModuleLookup {
             suffix = rest;
         }
     }
+    // A repository-root-relative path is exact and beats any deeper path it is a suffix of.
+    for file in files {
+        lookup.insert(
+            (file.language.to_owned(), file.path.clone()),
+            Some(file.path.clone()),
+        );
+    }
     lookup
 }
 
 fn unique_module(lookup: &ModuleLookup, language: &str, candidates: &[String]) -> Option<String> {
+    for candidate in candidates.iter().rev() {
+        if let Some(Some(path)) = lookup.get(&(language.to_owned(), candidate.clone())) {
+            if path == candidate {
+                return Some(path.clone());
+            }
+        }
+    }
     let mut found = None;
     for candidate in candidates {
         match lookup.get(&(language.to_owned(), candidate.clone())) {
@@ -321,7 +335,7 @@ fn write_snapshot(conn: &mut Connection, files: &[IndexedFile]) -> Result<(usize
     conn.execute_batch(
         "PRAGMA foreign_keys=ON;
          CREATE TABLE files (
-           file_path TEXT PRIMARY KEY, file_hash TEXT NOT NULL, language TEXT NOT NULL, facts_json TEXT NOT NULL, unresolved INTEGER NOT NULL);
+           file_path TEXT PRIMARY KEY, file_hash TEXT NOT NULL, language TEXT NOT NULL, facts_json TEXT NOT NULL, unresolved INTEGER NOT NULL, dynamic INTEGER NOT NULL DEFAULT 0);
          CREATE TABLE nodes (
            qualified_name TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL,
            file_path TEXT NOT NULL REFERENCES files(file_path),
@@ -366,7 +380,9 @@ fn write_snapshot(conn: &mut Connection, files: &[IndexedFile]) -> Result<(usize
             ],
         )?;
     }
-    let (resolved, unresolved, unresolved_files) = write_call_edges(&tx, files, &ids, &lookup)?;
+    let names = repo_names(files);
+    let (resolved, unresolved, unresolved_files) =
+        write_call_edges(&tx, files, &ids, &lookup, &names)?;
     write_metadata(&tx, files, resolved, unresolved, &unresolved_files)?;
     tx.commit()?;
     Ok((resolved, unresolved))
@@ -375,13 +391,13 @@ fn write_snapshot(conn: &mut Connection, files: &[IndexedFile]) -> Result<(usize
 fn write_files(tx: &rusqlite::Transaction<'_>, files: &[IndexedFile]) -> Result<()> {
     for file in files {
         tx.execute(
-            "INSERT INTO files VALUES (?1,?2,?3,?4,?5)",
+            "INSERT INTO files(file_path,file_hash,language,facts_json,unresolved,dynamic) VALUES (?1,?2,?3,?4,0,?5)",
             params![
                 file.path,
                 file.hash,
                 file.language,
                 serde_json::to_string(&file.facts)?,
-                file.facts.dynamic_calls > 0
+                is_dynamic(file)
             ],
         )?;
         tx.execute(
@@ -402,6 +418,7 @@ fn write_call_edges(
     files: &[IndexedFile],
     ids: &Definitions,
     lookup: &ModuleLookup,
+    names: &BTreeSet<String>,
 ) -> Result<(usize, usize, BTreeSet<String>)> {
     let mut resolved = 0;
     let mut unresolved = 0;
@@ -421,10 +438,15 @@ fn write_call_edges(
                 }
             } else {
                 unresolved += 1;
-                unresolved_files.insert(file.path.clone());
+                if file.language != "python" {
+                    unresolved_files.insert(file.path.clone());
+                }
             }
         }
-        if file.facts.dynamic_calls > 0 {
+        if file.language != "python" && file.facts.dynamic_calls > 0 {
+            unresolved_files.insert(file.path.clone());
+        }
+        if write_import_edges(tx, file, lookup, names)? {
             unresolved_files.insert(file.path.clone());
         }
         if unresolved_files.contains(&file.path) {
@@ -433,7 +455,6 @@ fn write_call_edges(
                 [&file.path],
             )?;
         }
-        write_import_edges(tx, file, lookup)?;
     }
     Ok((resolved, unresolved, unresolved_files))
 }
@@ -448,23 +469,110 @@ fn is_test_path(path: &str) -> bool {
             .is_some_and(|name| name.starts_with("test_") || name.ends_with("_test.py"))
 }
 
+/// Names a static import can resolve to in this repository (repo-root packages and modules,
+/// plus `src/` children); a stdlib or third-party name that merely matches a nested directory is not one.
+fn repo_names(files: &[IndexedFile]) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    for file in files.iter().filter(|file| file.language == "python") {
+        // Import roots: the repository root, and the children of a `src/` layout.
+        let mut parts = file.path.split('/');
+        let first = parts.next().unwrap_or_default();
+        let root = if first == "src" {
+            parts.next().unwrap_or_default()
+        } else {
+            first
+        };
+        names.insert(root.strip_suffix(".py").unwrap_or(root).to_owned());
+    }
+    names
+}
+
+/// A file the selector must treat as depending on code it cannot see: it imports by a
+/// non-literal name, launches processes, or (tests only) reads files as data.
+fn is_dynamic(file: &IndexedFile) -> bool {
+    file.facts.dynamic_imports > 0
+        || file.facts.process_spawns > 0
+        || (file.facts.file_reads > 0 && is_test_path(&file.path))
+}
+
+fn insert_import_edge(
+    tx: &rusqlite::Transaction<'_>,
+    file: &IndexedFile,
+    target: &str,
+) -> Result<()> {
+    if target != file.path {
+        tx.execute(
+            "INSERT OR IGNORE INTO edges VALUES (?1,?2,'IMPORTS',0)",
+            params![
+                format!("{}::<module>", file.path),
+                format!("{target}::<module>")
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+fn submodule_name(module: &str, member: &str) -> String {
+    if module.bytes().all(|byte| byte == b'.') {
+        format!("{module}{member}")
+    } else {
+        format!("{module}.{member}")
+    }
+}
+
+/// Write one IMPORTS edge per resolvable import (any scope), per parent package
+/// `__init__`, per imported submodule, and per string-literal import-by-name.
+/// Returns true when a static import names a repository module that resolves to no
+/// indexed file, the only case where the dependency edges are incomplete.
 fn write_import_edges(
     tx: &rusqlite::Transaction<'_>,
     file: &IndexedFile,
     lookup: &ModuleLookup,
-) -> Result<()> {
-    for import in &file.facts.imports {
-        if let Some(target) = python_module_file(lookup, &file.path, &import.module) {
-            tx.execute(
-                "INSERT OR IGNORE INTO edges VALUES (?1,?2,'IMPORTS',0)",
-                params![
-                    format!("{}::<module>", file.path),
-                    format!("{target}::<module>")
-                ],
-            )?;
+    names: &BTreeSet<String>,
+) -> Result<bool> {
+    let mut unresolved = false;
+    let literals = file
+        .facts
+        .literal_imports
+        .iter()
+        .map(|module| (module, None));
+    let statics = file
+        .facts
+        .imports
+        .iter()
+        .map(|import| (&import.module, import.member.as_ref()));
+    for (module, member) in statics.chain(literals) {
+        let relative = module.starts_with('.');
+        let top = module.split('.').next().unwrap_or_default();
+        let on_path = |found: Option<String>| {
+            found.filter(|target| {
+                relative || names.contains(top) || sibling_import(&file.path, target)
+            })
+        };
+        let main = on_path(python_module_file(lookup, &file.path, module));
+        let submodule = member.and_then(|member| {
+            on_path(python_module_file(
+                lookup,
+                &file.path,
+                &submodule_name(module, member),
+            ))
+        });
+        if !relative {
+            let parts: Vec<&str> = module.split('.').collect();
+            for end in 1..parts.len() {
+                if let Some(parent) =
+                    python_module_file(lookup, &file.path, &parts[..end].join("."))
+                {
+                    insert_import_edge(tx, file, &parent)?;
+                }
+            }
         }
+        for target in main.iter().chain(submodule.iter()) {
+            insert_import_edge(tx, file, target)?;
+        }
+        unresolved |= main.is_none() && submodule.is_none() && (relative || names.contains(top));
     }
-    Ok(())
+    Ok(unresolved)
 }
 
 fn write_metadata(
@@ -480,11 +588,24 @@ fn write_metadata(
         digest.update(&file.path);
         digest.update(&file.hash);
     }
+    let dynamic: BTreeSet<&str> = files
+        .iter()
+        .filter(|file| is_dynamic(file))
+        .map(|file| file.path.as_str())
+        .collect();
     let entries = [
         ("schema_version", "3".to_owned()),
         ("parser_version", cache::PARSER_VERSION.to_owned()),
         ("content_generation", format!("{:x}", digest.finalize())),
-        ("coverage_complete", unresolved_files.is_empty().to_string()),
+        (
+            "coverage_complete",
+            (unresolved_files.is_empty() && dynamic.is_empty()).to_string(),
+        ),
+        ("dynamic_importers_count", dynamic.len().to_string()),
+        (
+            "dynamic_importers_sha256",
+            format!("{:x}", Sha256::digest(serde_json::to_vec(&dynamic)?)),
+        ),
         ("unresolved_files_count", unresolved_files.len().to_string()),
         (
             "unresolved_files_sha256",
@@ -633,4 +754,15 @@ pub fn index(host: &Path, explicit_db: Option<&Path>) -> Result<IndexReport> {
         (resolved_calls, unresolved_calls),
         started,
     ))
+}
+
+/// A bare import (`import helper`) reaches a repo file only from the importer's own
+/// directory or an ancestor, where pytest and scripts put it on `sys.path`; anywhere
+/// else a name that is not a repo root is a stdlib or third-party module.
+fn sibling_import(from: &str, target: &str) -> bool {
+    let dir = Path::new(target).parent().unwrap_or(Path::new(""));
+    Path::new(from)
+        .ancestors()
+        .skip(1)
+        .any(|ancestor| ancestor == dir)
 }

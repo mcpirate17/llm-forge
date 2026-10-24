@@ -46,6 +46,40 @@ duplicate count, and an overflow flag. Exit code 2 means required context or
 recovery metadata exceeded the budget. `--max-tokens` uses UTF-8 bytes as a
 conservative token upper bound, not an exact tokenizer or billing estimate.
 
+## Code inspection preflight
+
+The shared native Bash guard checks inspection commands before execution. Both
+native Forge hooks and Python dispatcher hooks use this guard, independently of
+the selected model. Shell-tool aliases are normalized before dispatcher selection,
+so a Codex `exec_command` receives the same inspection checks as Claude `Bash`.
+
+Use graph MCP queries for directory-wide symbol, import, and caller discovery,
+then inspect specific files or line ranges. Directory-wide `rg`/`grep` discovery
+must have a global output bound of at most 80 lines; bounds across a compound
+inspection command share that budget. A per-file `rg -m` limit is not a global
+bound. The guard rejects oversized discovery with a retry instruction instead of
+running it and trying to replace its output afterward. This also covers Codex,
+whose post-tool protocol does not support output replacement.
+
+Keep shell failure checking enabled. A required `rg` search can legitimately
+return 1 when its expected text is absent. For an optional discovery search,
+handle only status 1 as no matches and propagate actual errors:
+
+```sh
+set -euo pipefail
+{ rg -n 'target_symbol' src/module.py || {
+    rg_status=$?
+    [ "$rg_status" -eq 1 ] || exit "$rg_status"
+}; } | sed -n '1,80p'
+```
+
+`sed` consumes the stream, avoiding the upstream SIGPIPE that an early-closing
+`head` can cause under `pipefail`. The hook does not rewrite shell programs or
+turn failed mandatory searches into successes. Provider installation support is
+described in [bootstrap capabilities](bootstrap.md#harness-capabilities); the
+updated native binary and Python dispatcher must be installed in the host
+environment before these source changes affect running clients.
+
 ## Actual provider usage
 
 ```sh
