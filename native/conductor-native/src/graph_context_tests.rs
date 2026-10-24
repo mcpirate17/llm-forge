@@ -415,6 +415,29 @@ fn visit_dependencies(
 /// full inventory runs. Test files the graph has never seen (new or renamed) have no
 /// reverse dependencies to reach them, so they are selected explicitly. Returns the
 /// changed paths still to walk and the explicitly added tests.
+/// Tracked `.py`/`.rs` paths of a git checkout; `None` when `root` is not one.
+fn tracked_sources(root: &Path) -> Result<Option<HashSet<String>>, String> {
+    if !root.join(".git").exists() {
+        return Ok(None);
+    }
+    let output = std::process::Command::new("git")
+        .args(["ls-files", "-z", "--", "*.py", "*.rs"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
+    }
+    Ok(Some(
+        output
+            .stdout
+            .split(|byte| *byte == 0)
+            .filter(|raw| !raw.is_empty())
+            .map(|raw| String::from_utf8_lossy(raw).into_owned())
+            .collect(),
+    ))
+}
+
 fn candidate_delta(
     store: &GraphStore,
     (root, candidate_root): (&Path, &Path),
@@ -461,11 +484,21 @@ fn candidate_delta(
             }
         }
     }
-    if base
-        .sources
-        .iter()
-        .any(|path| !candidate.sources.contains(path) && !declared.contains(path))
-    {
+    // A candidate snapshot holds tracked files only, so base files that git
+    // ignores or has never tracked (scratch trees, generated output) cannot be
+    // "removed" by it.
+    let tracked = match tracked_sources(root) {
+        Ok(tracked) => tracked,
+        Err(error) => {
+            reasons.insert(format!("tracked source listing failed: {error}"));
+            None
+        }
+    };
+    if base.sources.iter().any(|path| {
+        !candidate.sources.contains(path)
+            && !declared.contains(path)
+            && tracked.as_ref().is_none_or(|set| set.contains(path))
+    }) {
         reasons.insert(
             "candidate removes a source file outside the declared changed paths".to_owned(),
         );

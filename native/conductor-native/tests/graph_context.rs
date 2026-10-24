@@ -394,3 +394,47 @@ fn missing_candidate_inventory_fails_closed() {
     .unwrap_err();
     assert!(error.contains("candidate inventory unavailable"), "{error}");
 }
+
+fn removal_reasons(repo: &Repo, candidate: &Repo) -> Vec<Value> {
+    let plan = dispatch(
+        "test_selection",
+        &json!({"repo": repo.path(), "paths": [], "inventory_root": candidate.path()}),
+    )
+    .unwrap();
+    plan["reasons"].as_array().unwrap().clone()
+}
+
+fn tracked_repo() -> Repo {
+    let repo = Repo::new();
+    repo.write(".gitignore", "scratch/\n");
+    repo.write("pkg/kept.py", "x = 1\n");
+    repo.write("scratch/ignored.py", "y = 2\n");
+    repo.database();
+    for args in [vec!["init", "-q"], vec!["add", ".gitignore", "pkg"]] {
+        let status = std::process::Command::new("git")
+            .args(args)
+            .current_dir(repo.path())
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+    repo
+}
+
+const REMOVED: &str = "candidate removes a source file outside the declared changed paths";
+
+#[test]
+fn candidate_snapshot_lacking_only_ignored_base_sources_is_not_a_removal() {
+    let repo = tracked_repo();
+    let candidate = Repo::new();
+    candidate.write("pkg/kept.py", "x = 1\n");
+    assert!(!removal_reasons(&repo, &candidate).contains(&json!(REMOVED)));
+}
+
+#[test]
+fn candidate_snapshot_lacking_a_tracked_base_source_still_falls_back() {
+    let repo = tracked_repo();
+    let candidate = Repo::new();
+    candidate.write("other.py", "z = 3\n");
+    assert!(removal_reasons(&repo, &candidate).contains(&json!(REMOVED)));
+}
