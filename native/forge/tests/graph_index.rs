@@ -510,7 +510,7 @@ fn large_unresolved_inventory_uses_per_file_flags_without_metadata_overflow() {
     let mut noisy_paths = Vec::new();
     for index in 0..160 {
         let path = format!("pkg/component_with_a_long_but_valid_name_{index:03}.py");
-        fixture.write(&path, "def noisy(): return unknown_operation()\n");
+        fixture.write(&path, &format!("from pkg.absent_{index:03} import noisy\n"));
         noisy_paths.push(path);
     }
     assert!(serde_json::to_vec(&noisy_paths).unwrap().len() > 4096);
@@ -519,8 +519,7 @@ fn large_unresolved_inventory_uses_per_file_flags_without_metadata_overflow() {
         "tests/test_clean.py",
         "from pkg.clean import clean\ndef test_clean(): return clean()\n",
     );
-    let report = fixture.run(&["index"]);
-    assert_eq!(report["unresolved_calls"], 160);
+    fixture.run(&["index"]);
     assert_eq!(
         fixture.run(&["context", "pkg/clean.py", "--symbol", "clean"])["graph_status"],
         "ok"
@@ -544,4 +543,115 @@ fn large_unresolved_inventory_uses_per_file_flags_without_metadata_overflow() {
         "affected source has unresolved or dynamic dependencies"
     )));
     assert_eq!(fixture.run(&["index"])["parsed_files"], 0);
+}
+
+fn plan_with_extras(
+    extras: &[(&str, &str)],
+    edits: &[(&str, &str)],
+    paths: &[&str],
+) -> serde_json::Value {
+    let base = Fixture::new();
+    let candidate = Fixture::new();
+    for (path, text) in CANDIDATE_FILES.iter().chain(extras) {
+        base.write(path, text);
+        candidate.write(path, text);
+    }
+    base.run(&["index"]);
+    for (path, text) in edits {
+        candidate.write(path, text);
+    }
+    conductor_native::graph_context::dispatch(
+        "test_selection",
+        &serde_json::json!({"repo": base.0, "paths": paths, "inventory_root": candidate.0}),
+    )
+    .unwrap()
+}
+
+const LEAF_EDIT: (&str, &str) = ("pkg/leaf.py", "def leaf():\n    return 2\n");
+
+#[test]
+fn a_declared_new_module_has_no_dependents_and_does_not_force_fallback() {
+    let plan = plan_with_extras(
+        &[],
+        &[LEAF_EDIT, ("pkg/extra.py", "def extra():\n    return 1\n")],
+        &["pkg/leaf.py", "pkg/extra.py"],
+    );
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_indirect.py"]));
+}
+
+#[test]
+fn a_test_behind_a_nonliteral_import_is_always_selected_and_a_literal_one_is_an_edge() {
+    let dynamic = [
+        (
+            "pkg/loader.py",
+            "import importlib\ndef load(name):\n    return importlib.import_module(name)\n",
+        ),
+        (
+            "tests/test_loader.py",
+            "from pkg.loader import load\ndef test_load():\n    return load('x')\n",
+        ),
+    ];
+    let plan = plan_with_extras(&dynamic, &[LEAF_EDIT], &["pkg/leaf.py"]);
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(
+        plan["paths"],
+        serde_json::json!(["tests/test_indirect.py", "tests/test_loader.py"])
+    );
+    let literal = [
+        (
+            "pkg/loader.py",
+            "import importlib\ndef load():\n    return importlib.import_module('pkg.leaf')\n",
+        ),
+        (
+            "tests/test_loader.py",
+            "from pkg.loader import load\ndef test_load():\n    return load()\n",
+        ),
+    ];
+    let plan = plan_with_extras(&literal, &[LEAF_EDIT], &["pkg/leaf.py"]);
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(
+        plan["paths"],
+        serde_json::json!(["tests/test_indirect.py", "tests/test_loader.py"])
+    );
+}
+
+#[test]
+fn a_stdlib_or_unrelated_call_does_not_widen_selection() {
+    let extras = [
+        (
+            "pkg/util.py",
+            "import json\ndef dump(x):\n    return json.dumps(x)\n",
+        ),
+        (
+            "tests/test_util.py",
+            "from pkg.util import dump\ndef test_dump():\n    return dump(1)\n",
+        ),
+    ];
+    let plan = plan_with_extras(&extras, &[LEAF_EDIT], &["pkg/leaf.py"]);
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_indirect.py"]));
+}
+
+#[test]
+fn conftest_and_data_readers_are_selected_or_fall_back() {
+    let conftest = [("tests/conftest.py", "import pytest\n")];
+    let plan = plan_with_extras(
+        &conftest,
+        &[("tests/conftest.py", "import pytest\nX = 1\n")],
+        &["tests/conftest.py"],
+    );
+    assert_eq!(plan["complete"], false, "{plan}");
+    assert!(plan["reasons"].to_string().contains("conftest.py"));
+    let reader = [(
+        "tests/test_reader.py",
+        "def test_reader():\n    return open('tests/data/table.json').read()\n",
+    )];
+    let plan = plan_with_extras(
+        &reader,
+        &[("tests/data/table.json", "{}")],
+        &["tests/data/table.json"],
+    );
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_reader.py"]));
 }

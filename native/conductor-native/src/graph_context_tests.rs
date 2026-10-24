@@ -244,6 +244,92 @@ fn reasons(store: &GraphStore, root: &Path, input: &Value) -> Result<BTreeSet<St
     Ok(result)
 }
 
+fn module_name(path: &str) -> String {
+    path.trim_end_matches(".py")
+        .trim_end_matches("/__init__")
+        .replace('/', ".")
+}
+
+/// Lines of the files that can register pytest plugins (`-p`, `pytest11` entry points,
+/// `pytest_plugins`, a `plugin` key); a plugin is code every test runs.
+fn pytest_config(root: &Path) -> String {
+    ["pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini"]
+        .iter()
+        .filter_map(|name| std::fs::read_to_string(root.join(name)).ok())
+        .flat_map(|text| text.lines().map(str::to_owned).collect::<Vec<_>>())
+        .filter(|line| {
+            let line = line.to_lowercase();
+            line.contains("plugin") || line.contains("pytest11") || line.contains(" -p ")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Tests that depend on something the import graph cannot see: a file that imports
+/// by a non-literal name, launches a process, or (tests only) reads files as data.
+/// Any test that transitively depends on such a file might reach a changed path
+/// through it, so all of them are selected whenever anything changed.
+fn dynamic_dependents(
+    store: &GraphStore,
+    root: &Path,
+    present: &Path,
+    reasons: &mut BTreeSet<String>,
+) -> Result<BTreeSet<String>, String> {
+    let Some(conn) = store.conn.as_ref() else {
+        return Ok(BTreeSet::new());
+    };
+    if !store.metadata.contains_key("content_generation") {
+        return Ok(BTreeSet::new());
+    }
+    if !columns(conn, "files")
+        .map_err(|error| error.to_string())?
+        .contains("dynamic")
+    {
+        reasons
+            .insert("graph predates the dynamic-importer index; run forge graph index".to_owned());
+        return Ok(BTreeSet::new());
+    }
+    let mut stmt = conn
+        .prepare("SELECT file_path FROM files WHERE dynamic=1 ORDER BY file_path")
+        .map_err(|error| error.to_string())?;
+    let importers = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+    let mut scratch = BTreeSet::new();
+    let tests = visit_dependencies(store, root, present, &importers, &mut scratch)?;
+    reasons.extend(
+        scratch
+            .into_iter()
+            .filter(|reason| reason.contains("cap reached")),
+    );
+    Ok(tests)
+}
+
+/// Tests whose text names a changed non-source file (a fixture, config or note).
+fn tests_naming(
+    present: &Path,
+    tests: &BTreeSet<String>,
+    data_paths: &[String],
+) -> Result<BTreeSet<String>, String> {
+    let mut found = BTreeSet::new();
+    if data_paths.is_empty() {
+        return Ok(found);
+    }
+    let names: Vec<&str> = data_paths
+        .iter()
+        .map(|path| path.rsplit('/').next().unwrap_or(path))
+        .collect();
+    for test in tests {
+        let text = std::fs::read_to_string(present.join(test)).unwrap_or_default();
+        if names.iter().any(|name| text.contains(name)) {
+            found.insert(test.clone());
+        }
+    }
+    Ok(found)
+}
+
 fn visit_dependencies(
     store: &GraphStore,
     root: &Path,
@@ -255,6 +341,7 @@ fn visit_dependencies(
     let mut seen = HashSet::new();
     let mut queue: VecDeque<(String, usize)> =
         paths.iter().cloned().map(|path| (path, 0)).collect();
+    let config = pytest_config(root);
     let unresolved: HashSet<String> = store
         .metadata
         .get("unresolved_files")
@@ -263,6 +350,21 @@ fn visit_dependencies(
     while let Some((path, depth)) = queue.pop_front() {
         if !seen.insert(path.clone()) {
             continue;
+        }
+        if Path::new(&path)
+            .file_name()
+            .is_some_and(|name| name == "conftest.py")
+        {
+            reasons.insert(
+                "conftest.py is reachable from a changed path and applies to every test below it"
+                    .to_owned(),
+            );
+        }
+        if path.ends_with(".py")
+            && module_name(&path).contains('.')
+            && config.contains(&module_name(&path))
+        {
+            reasons.insert("a pytest plugin named in the pytest configuration is reachable from a changed path".to_owned());
         }
         if seen.len() > MAX_NODES {
             reasons.insert("reverse dependency node cap reached".to_owned());
@@ -327,6 +429,9 @@ fn candidate_delta(
         let unknown = !matches!(store.indexed_hash(root, path), Ok(Some(_)));
         if unknown && candidate.tests.contains(path) {
             added.insert(path.clone());
+        } else if unknown && candidate.sources.contains(path) && !base.sources.contains(path) {
+            // A new module: nothing in the graph can depend on it yet, and the
+            // files that import it are themselves declared changes.
         } else {
             walk.push(path.clone());
         }
@@ -417,12 +522,31 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
     } else {
         (root_inventory, paths, BTreeSet::new())
     };
+    let (walk, data_paths): (Vec<String>, Vec<String>) = walk.into_iter().partition(|path| {
+        matches!(
+            Path::new(path).extension().and_then(|part| part.to_str()),
+            Some("py" | "rs")
+        )
+    });
     selected.extend(visit_dependencies(
         &store,
         &root,
         &inventory_root,
         &walk,
         &mut reasons,
+    )?);
+    if !walk.is_empty() || !data_paths.is_empty() {
+        selected.extend(dynamic_dependents(
+            &store,
+            &root,
+            &inventory_root,
+            &mut reasons,
+        )?);
+    }
+    selected.extend(tests_naming(
+        &inventory_root,
+        &inventory.tests,
+        &data_paths,
     )?);
     let complete = reasons.is_empty();
     let paths = if complete {
