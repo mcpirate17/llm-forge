@@ -403,9 +403,9 @@ def select_tests(ctx: ReviewContext) -> TestSelection:
     sources = plan["sources"]
     graph_tests: set[str] = set()
     graph_error: str | None = None
-    if sources:
+    if plan["graph_paths"]:
         try:
-            graph_tests, graph = _graph_test_paths(ctx, sources)
+            graph_tests, graph = _graph_test_paths(ctx, plan["graph_paths"])
         except (RuntimeError, sqlite3.Error) as exc:
             graph_error = str(exc)
             graph = {}

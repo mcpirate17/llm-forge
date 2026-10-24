@@ -75,14 +75,23 @@ pub(super) fn plan(request: &Value) -> Result<Value, String> {
     let mut sources = Vec::new();
     let mut changed_tests = BTreeSet::new();
     let mut high_risk = false;
+    let mut graph_paths = Vec::new();
+    let mut needs_graph = false;
     for change in changes {
-        if change["deleted"] == true {
-            continue;
-        }
         let path = change["path"]
             .as_str()
             .ok_or("candidate change requires path")?;
         let test = has_class(change, "test");
+        // Every change is declared to the graph, so the candidate snapshot is
+        // compared against exactly the paths the candidate touches. The graph
+        // runs when any change is neither a test nor docs: deletions and
+        // non-source files (config, fixtures) reach tests the import graph
+        // alone would miss.
+        graph_paths.push(path.to_owned());
+        needs_graph |= !test && !has_class(change, "docs");
+        if change["deleted"] == true {
+            continue;
+        }
         if !test && (has_class(change, "python") || has_class(change, "native")) {
             sources.push(path.to_owned());
         }
@@ -91,7 +100,11 @@ pub(super) fn plan(request: &Value) -> Result<Value, String> {
         }
         high_risk |= !test && change["risk"] == "high";
     }
-    Ok(json!({"sources": sources, "changed_tests": changed_tests, "high_risk": high_risk}))
+    if !needs_graph {
+        graph_paths.clear();
+    }
+    Ok(json!({"sources": sources, "graph_paths": graph_paths,
+              "changed_tests": changed_tests, "high_risk": high_risk}))
 }
 
 pub(super) fn decide(request: &Value) -> Result<Value, String> {

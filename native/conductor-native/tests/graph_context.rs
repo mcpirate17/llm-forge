@@ -377,7 +377,7 @@ fn candidate_inventory_uses_snapshot_tests_and_keeps_conservative_fallback() {
     assert!(plan["reasons"]
         .as_array()
         .unwrap()
-        .contains(&json!("candidate snapshot requires full test inventory")));
+        .contains(&json!("affected source unindexed or dirty")));
 }
 
 #[test]
