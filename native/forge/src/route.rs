@@ -586,10 +586,10 @@ mod tests {
     }
 
     #[test]
-    fn explore_row_haiku_default() {
+    fn explore_row_sonnet_default() {
         let d = route(&policy(), &input(Some("Explore"), None, None));
         assert_eq!(d.class, "explore");
-        assert_eq!(d.model.as_deref(), Some("haiku"));
+        assert_eq!(d.model.as_deref(), Some("sonnet"));
         assert_eq!(d.decision, Verdict::Allow);
         assert_eq!(d.cap_tokens, 150_000);
     }
@@ -609,7 +609,7 @@ mod tests {
             &input(None, None, Some("clerical: tidy the log")),
         );
         assert_eq!(d.class, "explore");
-        assert_eq!(d.model.as_deref(), Some("haiku"));
+        assert_eq!(d.model.as_deref(), Some("sonnet"));
     }
 
     #[test]
@@ -676,7 +676,7 @@ mod tests {
         let d = route(&policy(), &input(Some("Explore"), Some("opus"), None));
         assert_eq!(d.class, "explore");
         assert_eq!(d.decision, Verdict::Deny);
-        assert!(d.reason.contains("add model: \"haiku\""));
+        assert!(d.reason.contains("add model: \"sonnet\""));
         assert!(d.reason.contains("justify:"));
     }
 
@@ -788,7 +788,7 @@ mod tests {
         std::env::set_var("FORGE_MODE", "warn");
 
         // "Explore" with no model on the call is a would-be reroute to
-        // haiku in enforce mode (see `explore_row_haiku_default`).
+        // sonnet in enforce mode (see `explore_row_sonnet_default`).
         let payload = agent_payload("Explore", None);
         let outcome = hook_outcome_for_agent(&payload);
         let specific = &outcome.output["hookSpecificOutput"];
@@ -824,7 +824,7 @@ mod tests {
             .expect("enforce mode must still carry its own context line");
         assert!(!context.starts_with("forge warn-only"), "got {context:?}");
         assert_eq!(
-            specific["updatedInput"]["model"], "haiku",
+            specific["updatedInput"]["model"], "sonnet",
             "enforce mode must still apply the reroute: {specific}"
         );
     }
