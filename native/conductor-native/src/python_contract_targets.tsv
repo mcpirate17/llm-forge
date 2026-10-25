@@ -81,6 +81,9 @@ src/conductor/candidate_review/quality_checks.py	python_contracts_candidate_stru
 src/conductor/candidate_review/reporters.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/sharding.py	python_contracts_contract_runner
 src/conductor/candidate_review/style_scan.py	python_contracts_candidate_style
+src/conductor/candidate_review/style_scan.py	python_contracts_candidate_tools
+src/conductor/candidate_review/style_scan.py	python_contracts_test_value_scan
+src/conductor/candidate_review/test_value_scan.py	python_contracts_test_value_scan
 src/conductor/candidate_review/value_waivers.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/verification.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/verification.py	python_contracts_candidate_verification
@@ -156,6 +159,13 @@ src/conductor/project_paths.py	python_contracts_candidate_engine
 src/conductor/project_paths.py	python_contracts_fleet_status
 src/conductor/project_paths.py	python_contracts_project_paths
 src/conductor/run_duplicate_audit.py	python_contracts_candidate_files
+native/conductor-native/tests/python_contracts/source_dirs_support.rs	python_contracts_candidate_files
+native/conductor-native/tests/python_contracts/source_dirs_support.rs	python_contracts_reuse_consolidation
+native/conductor-native/tests/python_contracts/source_dirs_support.rs	python_contracts_reuse_detector_scan
+native/conductor-native/tests/python_contracts/source_dirs_support.rs	python_contracts_reuse_file_family_profiles
+src/conductor/duplicate_audit_config.py	python_contracts_reuse_consolidation
+src/conductor/duplicate_audit_config.py	python_contracts_reuse_detector_scan
+src/conductor/duplicate_audit_config.py	python_contracts_reuse_file_family_profiles
 src/conductor/session_brief.py	python_contracts_session_brief
 src/conductor/session_close.py	python_contracts_session_close
 src/conductor/session_policy.py	python_contracts_session_policy
@@ -582,6 +592,8 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_nativ
 native/slop-core/src/lib.rs	python_contracts_candidate_style
 native/slop-core/src/style_scan.rs	python_contracts_candidate_style
 native/slop-core/src/lib.rs	python_contracts_hot_loop_scan
+native/slop-core/src/test_value_scan.rs	python_contracts_test_value_scan
+native/conductor-native/tests/python_contracts/support.rs	python_contracts_test_value_scan
 native/slop-core/src/rust_scan.rs	python_contracts_candidate_style
 native/slop-core/src/detector_scan.rs	python_contracts_candidate_style
 native/slop-core/src/engine.rs	python_contracts_candidate_style

@@ -5,7 +5,7 @@
 //! attribution rather than crediting a mutant with an unobserved kill.
 
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::Reader;
+use quick_xml::{Reader, XmlVersion};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -151,7 +151,7 @@ fn xml_case(
     for attr in start.attributes() {
         let attr = attr.map_err(|error| error.to_string())?;
         let value = attr
-            .decode_and_unescape_value(reader.decoder())
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| error.to_string())?
             .into_owned();
         match attr.key.as_ref() {

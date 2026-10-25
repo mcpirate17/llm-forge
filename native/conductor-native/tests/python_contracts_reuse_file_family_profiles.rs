@@ -17,6 +17,24 @@ use std::fs;
 use std::path::Path;
 use support::{module, path, Case};
 
+#[path = "python_contracts/source_dirs_support.rs"]
+mod source_dirs_support;
+
+#[test]
+fn file_families_scan_the_pyproject_source_dirs_without_targets() {
+    let case = Case::new();
+    let root = source_dirs_support::host(&case);
+    Python::attach(|py| {
+        let seen = source_dirs_support::targets_main_scans(
+            py,
+            "conductor.reuse.file_families",
+            "scan_file_families",
+            &root,
+        );
+        assert_eq!(seen, ["pkg", "lib/pkg"]);
+    });
+}
+
 const SOURCES: [&str; 3] = [
     r#"from alpha.beta import item
 import gamma.delta as gd
