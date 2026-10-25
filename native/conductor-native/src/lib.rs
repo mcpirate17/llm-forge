@@ -79,7 +79,9 @@ pub mod reuse_consolidation;
 pub mod test_contracts;
 #[cfg(feature = "python")]
 mod test_record;
-#[cfg(feature = "python")]
+// Test selection reads the record, so these two build without Python too; the rest of
+// each serves the Python recorder.
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
 mod test_record_config;
 #[cfg(feature = "python")]
 mod test_record_digest;
@@ -93,7 +95,7 @@ mod test_record_recorder;
 mod test_record_reuse;
 #[cfg(feature = "python")]
 mod test_record_state;
-#[cfg(feature = "python")]
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
 mod test_record_store;
 #[cfg(feature = "python")]
 mod test_record_untested;

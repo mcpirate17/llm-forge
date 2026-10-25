@@ -1,8 +1,8 @@
 //! `[tool.forge.test_record]`: whether, and where, a host project records its test
 //! runs.
 
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pyo3::{exceptions::PyValueError, prelude::*};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
@@ -59,10 +59,20 @@ fn store_path(root: &Path, store: &str, home: Option<&str>) -> Result<PathBuf, S
     }
 }
 
+/// The store the table governing `start` names, or `None` when no pyproject declares one.
+pub(crate) fn store_for(start: &Path) -> Result<Option<PathBuf>, String> {
+    let Some((root, table)) = find(start)? else {
+        return Ok(None);
+    };
+    store_path(&root, &table.store, std::env::var("HOME").ok().as_deref()).map(Some)
+}
+
 /// `(root, store, lines, environment)` as Python receives it.
+#[cfg(feature = "python")]
 type Resolved = (String, String, bool, Vec<String>);
 
 /// The resolved table, or `None` when no pyproject declares one.
+#[cfg(feature = "python")]
 #[pyfunction]
 pub(crate) fn test_record_config_native(start_dir: &str) -> PyResult<Option<Resolved>> {
     let start = std::fs::canonicalize(start_dir)

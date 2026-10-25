@@ -581,7 +581,7 @@ fn a_declared_new_module_has_no_dependents_and_does_not_force_fallback() {
 }
 
 #[test]
-fn a_test_behind_a_nonliteral_import_is_always_selected_and_a_literal_one_is_an_edge() {
+fn a_test_behind_a_nonliteral_import_is_left_to_its_record_and_a_literal_one_is_an_edge() {
     let dynamic = [
         (
             "pkg/loader.py",
@@ -592,12 +592,10 @@ fn a_test_behind_a_nonliteral_import_is_always_selected_and_a_literal_one_is_an_
             "from pkg.loader import load\ndef test_load():\n    return load('x')\n",
         ),
     ];
+    // Only a recorded run of test_loader could show it reaches pkg/leaf.py.
     let plan = plan_with_extras(&dynamic, &[LEAF_EDIT], &["pkg/leaf.py"]);
     assert_eq!(plan["complete"], true, "{plan}");
-    assert_eq!(
-        plan["paths"],
-        serde_json::json!(["tests/test_indirect.py", "tests/test_loader.py"])
-    );
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_indirect.py"]));
     let literal = [
         (
             "pkg/loader.py",
@@ -634,7 +632,7 @@ fn a_stdlib_or_unrelated_call_does_not_widen_selection() {
 }
 
 #[test]
-fn conftest_and_data_readers_are_selected_or_fall_back() {
+fn a_conftest_falls_back_and_a_data_file_selects_nothing() {
     let conftest = [("tests/conftest.py", "import pytest\n")];
     let plan = plan_with_extras(
         &conftest,
@@ -653,5 +651,34 @@ fn conftest_and_data_readers_are_selected_or_fall_back() {
         &["tests/data/table.json"],
     );
     assert_eq!(plan["complete"], true, "{plan}");
-    assert_eq!(plan["paths"], serde_json::json!(["tests/test_reader.py"]));
+    assert_eq!(plan["paths"], serde_json::json!([]));
+}
+
+#[test]
+fn a_changed_lock_file_falls_back_to_every_test() {
+    let plan = plan_with_extras(
+        &[("uv.lock", "version = 1\n")],
+        &[("uv.lock", "version = 2\n")],
+        &["uv.lock"],
+    );
+    assert_eq!(plan["complete"], false, "{plan}");
+    assert!(plan["reasons"].to_string().contains("lock file"), "{plan}");
+}
+
+#[test]
+fn a_test_that_runs_a_changed_script_by_path_is_selected() {
+    let script = [
+        ("scripts/run.sh", "echo one\n"),
+        (
+            "tests/test_run.py",
+            "import subprocess\ndef test_run():\n    subprocess.run(['bash', 'scripts/run.sh'], check=True)\n",
+        ),
+    ];
+    let plan = plan_with_extras(
+        &script,
+        &[("scripts/run.sh", "echo two\n")],
+        &["scripts/run.sh"],
+    );
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_run.py"]));
 }
