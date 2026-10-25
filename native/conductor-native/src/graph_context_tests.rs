@@ -1,11 +1,11 @@
 //! Conservative reverse dependency test selection over either graph backend.
 //!
 //! Only changed code files select tests: a change to a document, fixture or other data
-//! selects none, and a changed lock file selects all of them. A test is selected when
-//! the graph shows it depends on a changed `.py` or `.rs` file, when its newest
-//! recorded run executed or opened a changed code file (`[tool.forge.test_record]`),
-//! or when its text names one, which is how a test that imports through a string or
-//! runs a script by path is found.
+//! selects none, and a changed lock file or C, C++ or CUDA file selects all of them. A
+//! test is selected when the graph shows it depends on a changed `.py` or `.rs` file,
+//! when its newest recorded run executed or opened a changed code file
+//! (`[tool.forge.test_record]`), or when its text names one, which is how a test that
+//! imports through a string or runs a script by path is found.
 
 use super::store::{columns, current_hash, GraphStore};
 use crate::test_record_config::store_for;
@@ -34,6 +34,10 @@ const LOCKS: &[&str] = &[
     "yarn.lock",
     "pnpm-lock.yaml",
 ];
+/// C, C++ and CUDA sources and headers build into a library the tests load, and
+/// neither the graph nor the test record links that library back to its sources, so
+/// a change selects the full inventory.
+const COMPILED: &[&str] = &["c", "cc", "cpp", "cxx", "h", "hpp", "cu", "cuh"];
 /// Directories the inventory never walks, beside every `.`-prefixed one.
 const UNWALKED: &[&str] = &[
     "target",
@@ -635,6 +639,12 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
         .into_iter()
         .filter(|path| CODE.contains(&extension(path)))
         .collect();
+    if code.iter().any(|path| COMPILED.contains(&extension(path))) {
+        reasons.insert(
+            "a C, C++ or CUDA file changed, and nothing links the library it builds to the tests that load it"
+                .to_owned(),
+        );
+    }
     let graphed: Vec<String> = code
         .iter()
         .filter(|path| ["py", "rs"].contains(&extension(path)))
