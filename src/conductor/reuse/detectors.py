@@ -26,8 +26,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from conductor.audit_root import resolve_audit_root
-from conductor.duplicate_audit_config import DEFAULT_SOURCE_DIRS
+from conductor.duplicate_audit_config import add_scan_root_arguments, scan_roots
 from conductor.project_paths import guardrail_allowlist_path
 from conductor.reuse import _support as files
 from conductor.reuse import _support as process
@@ -472,15 +471,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Weighted repository health metrics over the source tree."
     )
-    parser.add_argument(
-        "--repo", default=None, help="Repo root (default: the Git worktree of the cwd)."
-    )
-    parser.add_argument(
-        "--targets",
-        nargs="+",
-        default=None,
-        help="Subdirs to scan (default: conductor DEFAULT_SOURCE_DIRS).",
-    )
+    add_scan_root_arguments(parser)
     parser.add_argument("--exclude", nargs="+", default=None)
     parser.add_argument("--out", default=None, help="Output JSON path.")
     return parser
@@ -494,8 +485,7 @@ def main(argv: list[str] | None = None) -> int:
     that the loop is gone, or nothing reaches the four native detectors behind it.
     """
     args = build_parser().parse_args(argv)
-    repo = resolve_audit_root(args.repo)
-    targets = args.targets if args.targets else list(DEFAULT_SOURCE_DIRS)
+    repo, targets = scan_roots(args)
     exclude = set(args.exclude) if args.exclude else set()
 
     payload = measure(repo, targets, exclude).as_dict()

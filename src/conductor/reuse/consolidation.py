@@ -25,8 +25,7 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from conductor.audit_root import resolve_audit_root
-from conductor.duplicate_audit_config import DEFAULT_SOURCE_DIRS
+from conductor.duplicate_audit_config import add_scan_root_arguments, scan_roots
 from conductor.reuse import _support
 from conductor.reuse import core as slop_core
 
@@ -322,14 +321,8 @@ def _markdown_row(cluster: dict) -> str:
 
 
 def resolve_settings(args: argparse.Namespace) -> tuple[Path, list[str], list[str]]:
-    """Scan roots for this run: explicit flags, else conductor's own scan config.
-
-    The root comes from ``resolve_audit_root``, which requires the Git worktree the
-    operator is standing in -- never ``__file__``, which would name whichever checkout
-    supplied the imported module.
-    """
-    repo = resolve_audit_root(args.repo)
-    targets = args.targets if args.targets else list(DEFAULT_SOURCE_DIRS)
+    """Scan roots for this run (see ``scan_roots``) and the path parts to skip."""
+    repo, targets = scan_roots(args)
     exclude = args.exclude if args.exclude else []
     return repo, targets, exclude
 
@@ -340,15 +333,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Deterministic, stdlib-only code-reuse/consolidation cluster aggregator."
         )
     )
-    parser.add_argument(
-        "--repo", default=None, help="Repo root (default: the Git worktree of the cwd)."
-    )
-    parser.add_argument(
-        "--targets",
-        nargs="+",
-        default=None,
-        help="Subdirs to scan (default: conductor DEFAULT_SOURCE_DIRS).",
-    )
+    add_scan_root_arguments(parser)
     parser.add_argument(
         "--exclude",
         nargs="+",
