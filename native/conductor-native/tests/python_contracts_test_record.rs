@@ -69,6 +69,39 @@ def test_unstable():
     path.write_text(path.read_text() + "more")
 "#;
 
+const LAUNCHES: &str = r#"import ctypes.util
+import multiprocessing
+import subprocess
+import sys
+from concurrent.futures import ProcessPoolExecutor
+
+SPAWNS = []
+sys.addaudithook(lambda event, args: event == "os.posix_spawn" and SPAWNS.append(args))
+
+
+def test_find_library():
+    assert ctypes.util.find_library("c")
+
+
+def test_ldconfig_through_posix_spawn():
+    subprocess.run(["/sbin/ldconfig", "-p"], stdout=subprocess.DEVNULL, close_fds=False, check=True)
+    assert SPAWNS, "close_fds=False takes the os.posix_spawn path"
+
+
+def test_other_ldconfig():
+    subprocess.run(["/sbin/ldconfig", "-p", "-v"], stdout=subprocess.DEVNULL, check=True)
+
+
+def test_spawn_pool():
+    with multiprocessing.get_context("spawn").Pool(1) as pool:
+        assert pool.map(abs, [-1]) == [1]
+
+
+def test_spawn_again():
+    with ProcessPoolExecutor(1, mp_context=multiprocessing.get_context("spawn")) as pool:
+        assert pool.submit(abs, -2).result() == 2
+"#;
+
 fn python() -> OsString {
     std::env::var_os("PYO3_PYTHON").expect("make test exports PYO3_PYTHON")
 }
@@ -276,6 +309,40 @@ fn a_session_records_outcomes_dependencies_and_opacity() {
         .as_array()
         .is_some_and(|names| names.iter().any(|name| name == "pytest")));
     assert!(env.get("dists").is_none());
+}
+
+#[test]
+fn a_modeled_program_is_a_read_and_an_unaudited_launch_is_opaque() {
+    let case = Case::new();
+    case.write("pyproject.toml", PYPROJECT);
+    case.write("conductor/__init__.py", "");
+    case.write("tests/test_launch.py", LAUNCHES);
+    pytest_in(&python(), case.root(), &[], 0);
+    let runs = runs(&case.root().join("record/test_record.sqlite"));
+    let run = |name: &str| &runs[&format!("tests/test_launch.py::{name}")];
+    let spawn = Some("multiprocessing.util.spawnv_passfds");
+    assert_eq!(
+        [
+            "test_find_library",
+            "test_ldconfig_through_posix_spawn",
+            "test_other_ldconfig",
+            "test_spawn_pool",
+            "test_spawn_again",
+        ]
+        .map(|name| run(name).opaque.as_deref()),
+        [None, None, Some("subprocess.Popen"), spawn, spawn],
+        "the second spawn proves each window re-arms the check"
+    );
+    let cache = ("file".to_owned(), "/etc/ld.so.cache".to_owned());
+    for name in ["test_find_library", "test_ldconfig_through_posix_spawn"] {
+        assert!(
+            run(name)
+                .deps
+                .get(&cache)
+                .is_some_and(|value| value != "absent"),
+            "{name}"
+        );
+    }
 }
 
 #[test]

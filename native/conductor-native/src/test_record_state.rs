@@ -58,6 +58,8 @@ impl DepKind {
 pub(crate) enum Access {
     Read(PathBuf),
     List(PathBuf),
+    /// A modeled program ran: its output is a function of these files.
+    Program(&'static [&'static str]),
     Opaque(&'static str),
 }
 
@@ -288,17 +290,24 @@ impl State {
     }
 
     pub(crate) fn access(&mut self, access: Access) {
-        let (kind, raw) = match access {
-            Access::Read(raw) => (DepKind::File, raw),
-            Access::List(raw) => (DepKind::Listing, raw),
+        match access {
+            Access::Read(raw) => self.read(DepKind::File, &raw),
+            Access::List(raw) => self.read(DepKind::Listing, &raw),
+            Access::Program(files) => {
+                for file in files {
+                    self.read(DepKind::File, Path::new(file));
+                }
+            }
             Access::Opaque(reason) => {
                 self.current()
                     .opaque
                     .get_or_insert_with(|| reason.to_owned());
-                return;
             }
-        };
-        if let Some((id, _)) = self.located(kind, &raw) {
+        }
+    }
+
+    fn read(&mut self, kind: DepKind, raw: &Path) {
+        if let Some((id, _)) = self.located(kind, raw) {
             self.current().deps.insert(id);
         }
     }
@@ -457,6 +466,29 @@ mod tests {
             .iter()
             .all(|dep| dep.place.label() != "lib.py" || dep.first == digest::blob_oid(b"x = 1\n")));
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_modeled_program_is_a_read_of_its_files_and_not_opaque() {
+        let mut state = state(Path::new("/nonexistent-record-root"));
+        state.push(Kind::Test, "tests/test_a.py::test".to_owned());
+        state.access(Access::Program(&[
+            "/nonexistent/program",
+            "/nonexistent/cache",
+        ]));
+        let window = std::mem::take(state.current());
+        assert!(window.opaque.is_none());
+        let deps: Vec<(String, String)> = window
+            .deps
+            .into_iter()
+            .map(|id| &state.deps[id as usize])
+            .map(|dep| (dep.place.label(), dep.first.clone()))
+            .collect();
+        let absent = |path: &str| (path.to_owned(), ABSENT.to_owned());
+        assert_eq!(
+            deps,
+            [absent("/nonexistent/program"), absent("/nonexistent/cache")]
+        );
     }
 
     #[test]

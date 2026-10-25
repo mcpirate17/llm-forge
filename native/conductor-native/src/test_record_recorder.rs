@@ -37,6 +37,18 @@ const OPAQUE_EVENTS: [&str; 10] = [
     "socket.sendmsg",
 ];
 
+/// Programs whose output is a function of the files they read, so launching one is a
+/// read of those files and not an unseen process. `ctypes.util.find_library` runs
+/// `ldconfig -p`, which prints the linker cache, and `import torch` calls it.
+const PROGRAMS: [(&[&str], &[&str]); 1] = [(
+    &["/sbin/ldconfig", "-p"],
+    &["/sbin/ldconfig", "/etc/ld.so.cache"],
+)];
+
+/// The standard-library launcher that raises no audit event: multiprocessing's
+/// `spawn` and `forkserver` start methods and its resource tracker go through it.
+const UNAUDITED_LAUNCHER: (&str, &str) = ("/multiprocessing/util.py", "spawnv_passfds");
+
 /// Variables every record is keyed on: a GPU-visible run is not a CPU run.
 const ALWAYS_KEYED: [&str; 1] = ["CUDA_VISIBLE_DEVICES"];
 
@@ -100,11 +112,61 @@ fn access(event: &str, args: &Bound<'_, PyTuple>) -> Option<Access> {
             let name = path_arg(&arg(0)?)?;
             name.to_str()?.contains('/').then_some(Access::Read(name))
         }
-        _ => OPAQUE_EVENTS
-            .iter()
-            .find(|opaque| **opaque == event)
-            .map(|opaque| Access::Opaque(opaque)),
+        // Both carry the executable and its argv first; `subprocess` may raise both
+        // for one launch.
+        "subprocess.Popen" | "os.posix_spawn" => arg(0)
+            .zip(arg(1))
+            .and_then(|(executable, argv)| program(&executable, &argv))
+            .map(Access::Program)
+            .or_else(|| opaque(event)),
+        _ => opaque(event),
     }
+}
+
+fn opaque(event: &str) -> Option<Access> {
+    OPAQUE_EVENTS
+        .iter()
+        .find(|opaque| **opaque == event)
+        .map(|opaque| Access::Opaque(opaque))
+}
+
+/// The files a launch reads when it is exactly a modeled program's command line.
+fn program(
+    executable: &Bound<'_, PyAny>,
+    argv: &Bound<'_, PyAny>,
+) -> Option<&'static [&'static str]> {
+    let executable = path_arg(executable)?;
+    if !PROGRAMS
+        .iter()
+        .any(|(command, _)| executable == Path::new(command[0]))
+    {
+        return None;
+    }
+    let argv = argv
+        .try_iter()
+        .ok()?
+        .map(|item| path_arg(&item.ok()?))
+        .collect::<Option<Vec<_>>>()?;
+    PROGRAMS
+        .iter()
+        .find(|(command, _)| {
+            executable == Path::new(command[0])
+                && argv
+                    .iter()
+                    .map(PathBuf::as_path)
+                    .eq(command.iter().map(Path::new))
+        })
+        .map(|(_, files)| *files)
+}
+
+fn unaudited_launch(filename: &str, code: &Bound<'_, PyAny>) -> bool {
+    filename.ends_with(UNAUDITED_LAUNCHER.0)
+        && code
+            .getattr(intern!(code.py(), "co_name"))
+            .is_ok_and(|name| {
+                name.extract::<&str>()
+                    .is_ok_and(|name| name == UNAUDITED_LAUNCHER.1)
+            })
 }
 
 fn filename(code: &Bound<'_, PyAny>) -> Option<String> {
@@ -249,6 +311,10 @@ impl TestRecorder {
     ) -> Py<PyAny> {
         if self.open() {
             if let Some(name) = filename(code) {
+                if unaudited_launch(&name, code) {
+                    let reason = "multiprocessing.util.spawnv_passfds";
+                    self.with_state(|state| state.access(Access::Opaque(reason)));
+                }
                 let source = self.with_state(|state| state.hit(&name)) == Some(true);
                 if source && self.lines {
                     let enable = (self.tool, code, self.line_event.bind(py));
