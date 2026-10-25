@@ -1,24 +1,61 @@
 //! Conservative reverse dependency test selection over either graph backend.
+//!
+//! Only changed code files select tests: a change to a document, fixture or other data
+//! selects none, and a changed lock file selects all of them. A test is selected when
+//! the graph shows it depends on a changed `.py` or `.rs` file, when its newest
+//! recorded run executed or opened a changed code file (`[tool.forge.test_record]`),
+//! or when its text names one, which is how a test that imports through a string or
+//! runs a script by path is found.
 
 use super::store::{columns, current_hash, GraphStore};
+use crate::test_record_config::store_for;
+use crate::test_record_store::open_read_only;
 use rusqlite::params;
 use serde_json::{json, Value};
-use std::collections::{BTreeSet, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::path::Path;
 
 const MAX_DEPTH: usize = 12;
 const MAX_NODES: usize = 10_000;
 const MAX_INVENTORY: usize = 100_000;
+/// Extensions of the files a test can import or run; a change to any other file
+/// selects no test.
+const CODE: &[&str] = &[
+    "py", "rs", "sh", "bash", "zsh", "c", "cc", "cpp", "cxx", "h", "hpp", "cu", "cuh", "js", "mjs",
+    "cjs", "ts", "jsx", "tsx", "go", "java", "rb", "lua", "pl",
+];
+/// Lock files: a change swaps dependency code that any test can run, so it selects
+/// the full inventory.
+const LOCKS: &[&str] = &[
+    "uv.lock",
+    "Cargo.lock",
+    "package-lock.json",
+    "poetry.lock",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+];
+/// Directories the inventory never walks, beside every `.`-prefixed one.
+const UNWALKED: &[&str] = &[
+    "target",
+    "node_modules",
+    "build",
+    "dist",
+    "__pycache__",
+    "venv",
+];
 
-pub(super) fn is_test(path: &str) -> bool {
-    let extension = Path::new(path)
+fn extension(path: &str) -> &str {
+    Path::new(path)
         .extension()
         .and_then(|part| part.to_str())
-        .unwrap_or("");
+        .unwrap_or("")
+}
+
+pub(super) fn is_test(path: &str) -> bool {
     if ![
         "py", "rs", "js", "ts", "jsx", "tsx", "c", "cc", "cpp", "h", "hpp",
     ]
-    .contains(&extension)
+    .contains(&extension(path))
     {
         return false;
     }
@@ -38,11 +75,14 @@ pub(super) fn is_test(path: &str) -> bool {
 struct Inventory {
     tests: BTreeSet<String>,
     sources: BTreeSet<String>,
+    /// How many files in the tree carry each file name.
+    names: HashMap<String, usize>,
 }
 
 fn inventory(root: &Path) -> Result<Inventory, String> {
     let mut tests = BTreeSet::new();
     let mut sources = BTreeSet::new();
+    let mut names = HashMap::new();
     let mut pending = vec![root.to_path_buf()];
     let mut entries = 0;
     while let Some(directory) = pending.pop() {
@@ -54,20 +94,10 @@ fn inventory(root: &Path) -> Result<Inventory, String> {
             }
             let name = entry.file_name().to_string_lossy().to_string();
             let kind = entry.file_type().map_err(|error| error.to_string())?;
-            if kind.is_dir()
-                && !name.starts_with('.')
-                && ![
-                    "target",
-                    "node_modules",
-                    "build",
-                    "dist",
-                    "__pycache__",
-                    "venv",
-                ]
-                .contains(&name.as_str())
-            {
+            if kind.is_dir() && !name.starts_with('.') && !UNWALKED.contains(&name.as_str()) {
                 pending.push(entry.path());
             } else if kind.is_file() {
+                *names.entry(name).or_insert(0) += 1;
                 let relative = entry
                     .path()
                     .strip_prefix(root)
@@ -87,29 +117,20 @@ fn inventory(root: &Path) -> Result<Inventory, String> {
                         || source.contains("::test]")
                         || source.contains("#[cfg(test)]")
                     {
-                        tests.insert(relative);
+                        tests.insert(relative.clone());
                     }
                 }
-                if ["py", "rs"].contains(
-                    &entry
-                        .path()
-                        .extension()
-                        .and_then(|part| part.to_str())
-                        .unwrap_or(""),
-                ) {
-                    sources.insert(
-                        entry
-                            .path()
-                            .strip_prefix(root)
-                            .unwrap()
-                            .to_string_lossy()
-                            .replace('\\', "/"),
-                    );
+                if ["py", "rs"].contains(&extension(&relative)) {
+                    sources.insert(relative);
                 }
             }
         }
     }
-    Ok(Inventory { tests, sources })
+    Ok(Inventory {
+        tests,
+        sources,
+        names,
+    })
 }
 
 fn validate_inventory(
@@ -250,6 +271,58 @@ fn module_name(path: &str) -> String {
         .replace('/', ".")
 }
 
+/// Whether `text` holds `name` whole, not as part of a longer identifier.
+fn names(text: &str, name: &str) -> bool {
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    text.match_indices(name).any(|(at, _)| {
+        !text[..at].chars().next_back().is_some_and(word)
+            && !text[at + name.len()..].chars().next().is_some_and(word)
+    })
+}
+
+/// The tests whose text names a changed code file by its path, its dotted module, or
+/// a file name no other inventoried file carries. The graph never sees a test that
+/// runs a script by path or imports a module through a string.
+fn tests_naming(
+    present: &Path,
+    inventory: &Inventory,
+    paths: &[String],
+) -> Result<BTreeSet<String>, String> {
+    let mut wanted = Vec::new();
+    for path in paths {
+        wanted.push(path.clone());
+        if path.ends_with(".py") {
+            let module = module_name(path.strip_prefix("src/").unwrap_or(path));
+            if module.contains('.') {
+                wanted.push(module);
+            }
+        }
+        let name = path.rsplit('/').next().unwrap_or(path);
+        // The changed file is itself counted unless it is gone or sits where the
+        // inventory never walks.
+        let walked = !path
+            .split('/')
+            .any(|part| part.starts_with('.') || UNWALKED.contains(&part));
+        let own = usize::from(walked && present.join(path).is_file());
+        if name != path && inventory.names.get(name).copied().unwrap_or(0) <= own {
+            wanted.push(name.to_owned());
+        }
+    }
+    let mut found = BTreeSet::new();
+    if wanted.is_empty() {
+        return Ok(found);
+    }
+    for test in &inventory.tests {
+        let bytes =
+            std::fs::read(present.join(test)).map_err(|error| format!("{test}: {error}"))?;
+        let text = String::from_utf8_lossy(&bytes);
+        if wanted.iter().any(|name| names(&text, name)) {
+            found.insert(test.clone());
+        }
+    }
+    Ok(found)
+}
+
 /// Lines of the files that can register pytest plugins (`-p`, `pytest11` entry points,
 /// `pytest_plugins`, a `plugin` key); a plugin is code every test runs.
 fn pytest_config(root: &Path) -> String {
@@ -265,69 +338,66 @@ fn pytest_config(root: &Path) -> String {
         .join("\n")
 }
 
-/// Tests that depend on something the import graph cannot see: a file that imports
-/// by a non-literal name, launches a process, or (tests only) reads files as data.
-/// Any test that transitively depends on such a file might reach a changed path
-/// through it, so all of them are selected whenever anything changed.
-fn dynamic_dependents(
-    store: &GraphStore,
+/// The test files whose newest recorded run executed or opened one of `paths` in a
+/// fixture or the test itself, in the store `[tool.forge.test_record]` names; none
+/// without one. Any recorded content of the file counts, since a changed file differs
+/// from it.
+fn recorded_tests(
     root: &Path,
     present: &Path,
-    reasons: &mut BTreeSet<String>,
+    paths: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let Some(conn) = store.conn.as_ref() else {
-        return Ok(BTreeSet::new());
+    let mut selected = BTreeSet::new();
+    if paths.is_empty() {
+        return Ok(selected);
+    }
+    let Some(store) = store_for(root)? else {
+        return Ok(selected);
     };
-    if !store.metadata.contains_key("content_generation") {
-        return Ok(BTreeSet::new());
-    }
-    if !columns(conn, "files")
-        .map_err(|error| error.to_string())?
-        .contains("dynamic")
-    {
-        reasons
-            .insert("graph predates the dynamic-importer index; run forge graph index".to_owned());
-        return Ok(BTreeSet::new());
-    }
+    let Some(conn) = open_read_only(&store).map_err(|error| format!("{error:#}"))? else {
+        return Ok(selected);
+    };
+    let wanted: HashSet<&str> = paths.iter().map(String::as_str).collect();
     let mut stmt = conn
-        .prepare("SELECT file_path FROM files WHERE dynamic=1 ORDER BY file_path")
+        .prepare(
+            "SELECT run.path, window.digest, window.lines, window.deps FROM runs AS run \
+             JOIN run_windows AS link ON link.run=run.id \
+             JOIN windows AS window ON window.digest=link.window \
+             WHERE window.kind IN ('fixture','test') \
+             AND run.id IN (SELECT max(id) FROM runs GROUP BY nodeid)",
+        )
         .map_err(|error| error.to_string())?;
-    let importers = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|error| error.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| error.to_string())?;
-    let mut scratch = BTreeSet::new();
-    let tests = visit_dependencies(store, root, present, &importers, &mut scratch)?;
-    reasons.extend(
-        scratch
-            .into_iter()
-            .filter(|reason| reason.contains("cap reached")),
-    );
-    Ok(tests)
-}
-
-/// Tests whose text names a changed non-source file (a fixture, config or note).
-fn tests_naming(
-    present: &Path,
-    tests: &BTreeSet<String>,
-    data_paths: &[String],
-) -> Result<BTreeSet<String>, String> {
-    let mut found = BTreeSet::new();
-    if data_paths.is_empty() {
-        return Ok(found);
-    }
-    let names: Vec<&str> = data_paths
-        .iter()
-        .map(|path| path.rsplit('/').next().unwrap_or(path))
-        .collect();
-    for test in tests {
-        let text = std::fs::read_to_string(present.join(test)).unwrap_or_default();
-        if names.iter().any(|name| text.contains(name)) {
-            found.insert(test.clone());
+    let mut rows = stmt.query([]).map_err(|error| error.to_string())?;
+    let mut uses: HashMap<String, bool> = HashMap::new();
+    while let Some(row) = rows.next().map_err(|error| error.to_string())? {
+        let path: String = row.get(0).map_err(|error| error.to_string())?;
+        let digest: String = row.get(1).map_err(|error| error.to_string())?;
+        let hit = match uses.get(&digest) {
+            Some(hit) => *hit,
+            None => {
+                let decode = |column: usize| -> Result<Vec<u8>, String> {
+                    let blob: Vec<u8> = row.get(column).map_err(|error| error.to_string())?;
+                    zstd::decode_all(blob.as_slice()).map_err(|error| error.to_string())
+                };
+                let lines: Vec<(String, String, Vec<usize>)> =
+                    serde_json::from_slice(&decode(2)?).map_err(|error| error.to_string())?;
+                let deps: Vec<(String, String, String)> =
+                    serde_json::from_slice(&decode(3)?).map_err(|error| error.to_string())?;
+                let hit = lines
+                    .iter()
+                    .any(|(label, _, _)| wanted.contains(label.as_str()))
+                    || deps
+                        .iter()
+                        .any(|(kind, label, _)| kind == "file" && wanted.contains(label.as_str()));
+                uses.insert(digest, hit);
+                hit
+            }
+        };
+        if hit && present.join(&path).is_file() {
+            selected.insert(path);
         }
     }
-    Ok(found)
+    Ok(selected)
 }
 
 fn visit_dependencies(
@@ -555,32 +625,30 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
     } else {
         (root_inventory, paths, BTreeSet::new())
     };
-    let (walk, data_paths): (Vec<String>, Vec<String>) = walk.into_iter().partition(|path| {
-        matches!(
-            Path::new(path).extension().and_then(|part| part.to_str()),
-            Some("py" | "rs")
-        )
-    });
+    if walk
+        .iter()
+        .any(|path| LOCKS.contains(&path.rsplit('/').next().unwrap_or(path)))
+    {
+        reasons.insert("a dependency lock file changed, so any test can run new code".to_owned());
+    }
+    let code: Vec<String> = walk
+        .into_iter()
+        .filter(|path| CODE.contains(&extension(path)))
+        .collect();
+    let graphed: Vec<String> = code
+        .iter()
+        .filter(|path| ["py", "rs"].contains(&extension(path)))
+        .cloned()
+        .collect();
     selected.extend(visit_dependencies(
         &store,
         &root,
         &inventory_root,
-        &walk,
+        &graphed,
         &mut reasons,
     )?);
-    if !walk.is_empty() || !data_paths.is_empty() {
-        selected.extend(dynamic_dependents(
-            &store,
-            &root,
-            &inventory_root,
-            &mut reasons,
-        )?);
-    }
-    selected.extend(tests_naming(
-        &inventory_root,
-        &inventory.tests,
-        &data_paths,
-    )?);
+    selected.extend(recorded_tests(&root, &inventory_root, &code)?);
+    selected.extend(tests_naming(&inventory_root, &inventory, &code)?);
     let complete = reasons.is_empty();
     let paths = if complete {
         selected
@@ -593,4 +661,164 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
     Ok(json!({"paths": paths, "complete": complete,
         "scope": if complete {"transitive-reverse-dependencies"} else {"full-test-inventory-fallback"},
         "reasons": reasons, "generation": store.generation, "metadata": store.metadata}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{inventory, recorded_tests, tests_naming};
+    use crate::test_record_store::{self as store, RunRow, SessionRow, WindowRow};
+    use serde_json::json;
+    use std::collections::BTreeSet;
+
+    fn window(digest: &str, kind: &'static str, label: &str) -> WindowRow {
+        WindowRow {
+            digest: digest.to_owned(),
+            kind,
+            key: digest.to_owned(),
+            opaque: None,
+            deps: json!([]),
+            lines: json!([[label, "oid", [1]]]),
+        }
+    }
+
+    fn run(path: &str, windows: &[&str]) -> RunRow {
+        RunRow {
+            nodeid: format!("{path}::test"),
+            path: path.to_owned(),
+            outcome: "passed".to_owned(),
+            opaque: None,
+            seconds: 0.1,
+            windows: windows.iter().map(|digest| (*digest).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn a_test_whose_newest_run_executed_a_changed_file_is_selected() {
+        let root =
+            std::env::temp_dir().join(format!("graph-recorded-tests-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("tests")).unwrap();
+        let changed = ["pkg/m.py".to_owned()];
+        assert!(recorded_tests(&root, &root, &changed).unwrap().is_empty());
+        std::fs::write(
+            root.join("pyproject.toml"),
+            "[tool.forge.test_record]\nstore = \"record.sqlite\"\n",
+        )
+        .unwrap();
+        for test in [
+            "test_body",
+            "test_fixture",
+            "test_collect",
+            "test_moved_on",
+            "test_opened",
+            "test_listed",
+        ] {
+            std::fs::write(root.join(format!("tests/{test}.py")), "").unwrap();
+        }
+        let session = SessionRow {
+            started: 0.0,
+            finished: 1.0,
+            root: "/r".to_owned(),
+            env_digest: "env".to_owned(),
+            env_data: json!({}),
+            argv: "[]".to_owned(),
+            unstable: 0,
+        };
+        let windows = [
+            window("body", "test", "pkg/m.py"),
+            window("fixture", "fixture", "pkg/m.py"),
+            window("collect", "collect", "pkg/m.py"),
+            window("other", "test", "pkg/other.py"),
+            WindowRow {
+                deps: json!([["file", "pkg/m.py", "oid"]]),
+                ..window("opened", "test", "pkg/other.py")
+            },
+            WindowRow {
+                deps: json!([["list", "pkg/m.py", "digest"]]),
+                ..window("listed", "test", "pkg/other.py")
+            },
+        ];
+        let db = root.join("record.sqlite");
+        store::write(
+            &db,
+            &session,
+            &windows,
+            &[
+                run("tests/test_body.py", &["body"]),
+                run("tests/test_fixture.py", &["fixture", "other"]),
+                // Collection imports are not a use.
+                run("tests/test_collect.py", &["collect", "other"]),
+                run("tests/test_moved_on.py", &["body"]),
+                // Opening a file is a use; listing its directory is not.
+                run("tests/test_opened.py", &["opened"]),
+                run("tests/test_listed.py", &["listed"]),
+                // Deleted since it ran.
+                run("tests/test_deleted.py", &["body"]),
+            ],
+        )
+        .unwrap();
+        // Only the newest run of a test counts.
+        store::write(
+            &db,
+            &session,
+            &[],
+            &[run("tests/test_moved_on.py", &["other"])],
+        )
+        .unwrap();
+        assert_eq!(
+            recorded_tests(&root, &root, &changed).unwrap(),
+            BTreeSet::from([
+                "tests/test_body.py".to_owned(),
+                "tests/test_fixture.py".to_owned(),
+                "tests/test_opened.py".to_owned()
+            ])
+        );
+        assert!(recorded_tests(&root, &root, &["pkg/none.py".to_owned()])
+            .unwrap()
+            .is_empty());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_test_naming_a_changed_file_by_path_module_or_unique_name_is_selected() {
+        let root = std::env::temp_dir().join(format!("graph-tests-naming-{}", std::process::id()));
+        for (path, text) in [
+            ("scripts/run.sh", ""),
+            ("src/pkg/tool.py", ""),
+            ("src/pkg/common.py", ""),
+            ("other/common.py", ""),
+            ("tests/test_path.py", "run(['bash', 'scripts/run.sh'])"),
+            ("tests/test_module.py", "runpy.run_module('pkg.tool')"),
+            ("tests/test_name.py", "ROOT / 'scripts' / 'run.sh'"),
+            (".hooks/start.sh", ""),
+            ("tests/test_hook.py", "ROOT / '.hooks' / 'start.sh'"),
+            // A name two files carry, and names inside longer ones, are not a use.
+            ("tests/test_shared.py", "'common.py'"),
+            ("tests/test_longer.py", "'pkg.toolkit', 'scripts/run.shx'"),
+        ] {
+            std::fs::create_dir_all(root.join(path).parent().unwrap()).unwrap();
+            std::fs::write(root.join(path), text).unwrap();
+        }
+        let inventory = inventory(&root).unwrap();
+        let changed = [
+            "scripts/run.sh",
+            "src/pkg/tool.py",
+            "src/pkg/common.py",
+            ".hooks/start.sh",
+        ]
+        .map(str::to_owned);
+        assert_eq!(
+            tests_naming(&root, &inventory, &changed).unwrap(),
+            BTreeSet::from(
+                [
+                    "tests/test_hook.py",
+                    "tests/test_module.py",
+                    "tests/test_name.py",
+                    "tests/test_path.py"
+                ]
+                .map(str::to_owned)
+            )
+        );
+        assert!(tests_naming(&root, &inventory, &[]).unwrap().is_empty());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 }
