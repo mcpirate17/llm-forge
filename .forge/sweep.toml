@@ -79,8 +79,3 @@ name = "cargo-audit"
 # fixture's lock (native/forge/tests/fixtures/stub_dispatch), which audits clean.
 run = "git ls-files -z '*Cargo.lock' | xargs -0 -n1 python -m conductor.candidate_review.cargo_audit_files"
 timeout_s = 900
-# Red on 2026-10-25, exit 1 per lock: native/conductor-native (quick-xml RUSTSEC-2026-0194,
-# -0195) and native/forge (the same two quick-xml, plus tokio RUSTSEC-2026-0386 in the
-# listing; cargo-audit's summary line says 2). native/slop-core and the stub_dispatch
-# fixture are clean. Blocking again once this exits 0 on main.
-blocking = false
