@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from conductor.candidate_review.diff_ranges import DiffError, changed_line_ranges
@@ -83,8 +84,21 @@ def in_range(line: int, ranges: tuple[tuple[int, int], ...]) -> bool:
     return any(start <= line <= end for start, end in ranges)
 
 
-def scope(findings: list[dict], base: str, root: Path) -> tuple[list[dict], list[str]]:
+def overlaps(finding: dict, ranges: tuple[tuple[int, int], ...]) -> bool:
+    """True when any line of the finding's span, `line` to `end_line`, changed."""
+    return any(
+        start <= finding["end_line"] and end >= finding["line"] for start, end in ranges
+    )
+
+
+def scope(
+    findings: list[dict], base: str, root: Path, *, span: bool = False
+) -> tuple[list[dict], list[str]]:
     """Keep the findings that sit on lines this candidate changed.
+
+    With `span`, a finding is kept when any line of its span changed: a finding
+    that covers a whole function holds the candidate to it when the body is
+    edited and the `def` line is not.
 
     An empty `base` means there is nothing to diff against -- a full-tree run --
     and every finding is kept. A file with no changed lines at all is dropped
@@ -103,20 +117,69 @@ def scope(findings: list[dict], base: str, root: Path) -> tuple[list[dict], list
             except DiffError as error:
                 unreadable.append(str(error))
                 ranges[path] = ()
-        if in_range(finding["line"], ranges[path]):
+        changed = ranges[path]
+        if overlaps(finding, changed) if span else in_range(finding["line"], changed):
             kept.append(finding)
     return kept, unreadable
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+def report(tool: str, kept: list[dict], unreadable: list[str]) -> int:
+    """Print what `scope` returned to stderr: 1 on an unreadable diff or any finding."""
+    for message in unreadable:
+        print(f"{tool}: {message}", file=sys.stderr)
+    if unreadable:
+        return 1
+    for finding in sorted(kept, key=lambda row: (row["path"], row["line"])):
+        print(
+            f"{finding['path']}:{finding['line']}: {finding['rule']}: "
+            f"{finding['message']}",
+            file=sys.stderr,
+        )
+    print(f"{tool}: {len(kept)} finding(s)", file=sys.stderr)
+    return 1 if kept else 0
+
+
+def changed_line_parser(description: str | None) -> argparse.ArgumentParser:
+    """`--base`, `--version` and the files, which every changed-line check takes."""
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--base", default="")
-    parser.add_argument("--language", choices=sorted(SUFFIXES), default="python")
     parser.add_argument("--version", action="store_true")
     parser.add_argument("files", nargs="*")
+    return parser
+
+
+def run_python_scan(
+    argv: list[str] | None,
+    *,
+    version: str,
+    description: str,
+    scan: Callable[[list[str]], list[dict]],
+    span: bool = False,
+) -> int:
+    """The CLI of a Python scanner: `--base`, `--version` and files, scoped and reported.
+
+    `version` is the `--version` answer; its first word names the tool in every
+    line printed. `scan` runs only when a `.py` file was passed, so it can import
+    slop_core itself and `--version` still answers where the extension is not built.
+    """
+    parser = changed_line_parser(description)
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if args.version:
-        print("style-scan 4")
+        print(version)
+        return 0
+    paths = [f for f in args.files if f.endswith(".py")]
+    if not paths:
+        return 0
+    kept, unreadable = scope(scan(paths), args.base, Path.cwd().resolve(), span=span)
+    return report(version.split()[0], kept, unreadable)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = changed_line_parser(__doc__)
+    parser.add_argument("--language", choices=sorted(SUFFIXES), default="python")
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    if args.version:
+        print("style-scan 5")
         return 0
 
     paths = [f for f in args.files if f.endswith(SUFFIXES[args.language])]
@@ -124,19 +187,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     root = Path.cwd().resolve()
-    findings = _scan(paths, args.language)
-    kept, unreadable = scope(findings, args.base, root)
-    for message in unreadable:
-        print(f"style-scan: {message}", file=sys.stderr)
-    if unreadable:
-        return 1
-    for finding in kept:
-        print(
-            f"{finding['path']}:{finding['line']}: {finding['rule']}: "
-            f"{finding['message']}",
-            file=sys.stderr,
-        )
-    return 1 if kept else 0
+    kept, unreadable = scope(_scan(paths, args.language), args.base, root)
+    return report("style-scan", kept, unreadable)
 
 
 if __name__ == "__main__":
