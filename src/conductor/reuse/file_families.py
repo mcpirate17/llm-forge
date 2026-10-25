@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from conductor.audit_root import resolve_audit_root
-from conductor.duplicate_audit_config import DEFAULT_SOURCE_DIRS
 from conductor.reuse import _support, consolidation
 from conductor.reuse import core as slop_core
 
@@ -627,7 +626,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--targets",
         nargs="+",
         default=None,
-        help="Subdirs to scan (default: conductor DEFAULT_SOURCE_DIRS).",
+        help="Subdirs to scan (default: the repo's [tool.forge.duplicate_audit] source_dirs).",
     )
     parser.add_argument(
         "--exclude", nargs="+", default=None, help="Path parts to skip."
@@ -658,7 +657,7 @@ def main(argv: list[str] | None = None) -> int:
     """
     args = build_parser().parse_args(argv)
     repo = resolve_audit_root(args.repo)
-    targets = args.targets if args.targets else list(DEFAULT_SOURCE_DIRS)
+    targets = args.targets if args.targets else list(source_dirs(repo))
     exclude = set(args.exclude) if args.exclude else set()
 
     settings = {

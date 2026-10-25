@@ -27,7 +27,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from conductor.audit_root import resolve_audit_root
-from conductor.duplicate_audit_config import DEFAULT_SOURCE_DIRS
 from conductor.project_paths import guardrail_allowlist_path
 from conductor.reuse import _support as files
 from conductor.reuse import _support as process
@@ -479,7 +478,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--targets",
         nargs="+",
         default=None,
-        help="Subdirs to scan (default: conductor DEFAULT_SOURCE_DIRS).",
+        help="Subdirs to scan (default: the repo's [tool.forge.duplicate_audit] source_dirs).",
     )
     parser.add_argument("--exclude", nargs="+", default=None)
     parser.add_argument("--out", default=None, help="Output JSON path.")
@@ -495,7 +494,7 @@ def main(argv: list[str] | None = None) -> int:
     """
     args = build_parser().parse_args(argv)
     repo = resolve_audit_root(args.repo)
-    targets = args.targets if args.targets else list(DEFAULT_SOURCE_DIRS)
+    targets = args.targets if args.targets else list(source_dirs(repo))
     exclude = set(args.exclude) if args.exclude else set()
 
     payload = measure(repo, targets, exclude).as_dict()

@@ -26,7 +26,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from conductor.audit_root import resolve_audit_root
-from conductor.duplicate_audit_config import DEFAULT_SOURCE_DIRS
 from conductor.reuse import _support
 from conductor.reuse import core as slop_core
 
@@ -329,7 +328,7 @@ def resolve_settings(args: argparse.Namespace) -> tuple[Path, list[str], list[st
     supplied the imported module.
     """
     repo = resolve_audit_root(args.repo)
-    targets = args.targets if args.targets else list(DEFAULT_SOURCE_DIRS)
+    targets = args.targets if args.targets else list(source_dirs(repo))
     exclude = args.exclude if args.exclude else []
     return repo, targets, exclude
 
@@ -347,7 +346,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--targets",
         nargs="+",
         default=None,
-        help="Subdirs to scan (default: conductor DEFAULT_SOURCE_DIRS).",
+        help="Subdirs to scan (default: the repo's [tool.forge.duplicate_audit] source_dirs).",
     )
     parser.add_argument(
         "--exclude",

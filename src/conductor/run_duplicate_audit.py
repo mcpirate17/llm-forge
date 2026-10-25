@@ -760,7 +760,7 @@ def run_pylint(
     report = audit_dir / "duplication-pylint.txt"
     file_list = python_file_list(
         "duplication-python-files.txt",
-        ("research", "aria_core", "aria_designer"),
+        source_dirs(root),
         root=root,
     )
     files = [
@@ -1088,8 +1088,11 @@ def run_nicad_python(
 
     nicad_dir = root / "tasks" / "audit" / "nicad"
     nicad_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [nicad, "functions", "py", str(root / "research"), "notests-report"]
-    return run(cmd, allow_findings=not check, cwd=nicad_dir)
+    rc = 0
+    for source in source_dirs(root):
+        cmd = [nicad, "functions", "py", str(root / source), "notests-report"]
+        rc = max(rc, run(cmd, allow_findings=not check, cwd=nicad_dir))
+    return rc
 
 
 TOOLS = {
