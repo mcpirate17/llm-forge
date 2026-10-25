@@ -26,5 +26,8 @@ tasks/audit/
 conductor/active_state.json
 conductor/avo_runtime_state.json
 
+# Reports the gate and `forge sweep` (.forge/sweep.toml) write in this checkout
+research/reports/
+
 # Ratchet-loop iteration receipts (slice L): only promoted finals are tracked
 campaigns/receipts/.iterations/
