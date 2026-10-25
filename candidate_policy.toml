@@ -887,9 +887,8 @@ max_output_chars = 30000
 [checks.pmd]
 # PMD-CPD's tokenizer catches clones jscpd's line-based scan misses, so it backs
 # its own baseline (baselines.pmd) rather than folding into checks.jscpd. pmd
-# has no packaged distribution -- CI and local dev both install the pinned
-# release zip (see README.md and .github/workflows/ci.yml) rather than a
-# system package.
+# has no packaged distribution -- local dev installs the pinned release zip
+# (see README.md) rather than a system package.
 kind = "command"
 profiles = ["full"]
 classes = ["python"]
@@ -1032,7 +1031,7 @@ required_profiles = ["full"]
 # command and dropping the CPU and address-space budget entirely. That is why
 # `prlimit`, `git` and `uv` are declared here even though no `[checks.*]` names them.
 #
-# `expected_version` is CI's pin (see .github/workflows/governance-ci.yml). A local
+# `expected_version` is the pinned version. A local
 # version that differs is REPORTED, not refused: version skew is worth knowing, a
 # missing tool is what actually breaks the run.
 # ---------------------------------------------------------------------------

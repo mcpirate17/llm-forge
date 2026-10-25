@@ -768,7 +768,7 @@ def _bypass_evidence(ctx: ReviewContext) -> tuple[dict[str, object], CheckResult
                     severity=Severity.MEDIUM,
                     message=(
                         "one or more candidate commits lack a matching local attestation; "
-                        "the mandatory CI review is the replacement promotion evidence"
+                        "the blocking land review is the replacement promotion evidence"
                     ),
                     evidence={"missing": missing, "mismatched": mismatched},
                 )
