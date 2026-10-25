@@ -391,6 +391,91 @@ fn jscpd_snapshot_preserves_repository_relative_ignores() {
     });
 }
 
+#[test]
+fn host_source_dirs_replace_the_default_layout() {
+    let (case, root) = repo();
+    write(
+        &root,
+        "pyproject.toml",
+        "[tool.forge.duplicate_audit]\nsource_dirs = [\"lib\"]\n",
+    );
+    let _cwd = case.chdir("repo");
+    let seen = Arc::new(Mutex::new(Vec::<String>::new()));
+    let observed = seen.clone();
+    Python::attach(|py| {
+        configure_jscpd(py, &root, &[]);
+        write(&root, "lib/a.py", &format!("{SENTINEL}\n"));
+        write(&root, "src/b.py", &format!("{SENTINEL}\n"));
+        let callback =
+            PyCFunction::new_closure(py, None, None, move |args, _| -> PyResult<Py<PyAny>> {
+                *observed.lock().unwrap() = args.get_item(0)?.extract()?;
+                Ok(py_json(args.py(), &json!([])).unbind())
+            })
+            .unwrap();
+        let _collect = AttrPatch::replace(
+            audit(py).as_any(),
+            "_jscpd_collect_duplicates",
+            callback.as_any(),
+        );
+        let (stdout, _capture) = capture(py, "stdout");
+        assert_eq!(call_main(py, &["--tool", "jscpd", "--check"]), 0);
+        assert!(captured(&stdout).contains("| source-dirs: lib |"));
+    });
+    assert_eq!(*seen.lock().unwrap(), vec!["lib"]);
+}
+
+#[test]
+fn invalid_duplicate_audit_table_exits_two() {
+    for table in [
+        "source_dirs = [\"../outside\"]",
+        "source_dirs = []",
+        "dirs = [\"lib\"]",
+    ] {
+        let (case, root) = repo();
+        write(
+            &root,
+            "pyproject.toml",
+            &format!("[tool.forge.duplicate_audit]\n{table}\n"),
+        );
+        let _cwd = case.chdir("repo");
+        Python::attach(|py| {
+            let (stderr, _capture) = capture(py, "stderr");
+            assert_eq!(call_main(py, &["--tool", "jscpd", "--check"]), 2, "{table}");
+            assert!(captured(&stderr).contains("takes one key, source_dirs"));
+        });
+    }
+}
+
+#[test]
+fn empty_source_set_fails_instead_of_passing() {
+    let (_case, root) = repo();
+    write(
+        &root,
+        "pyproject.toml",
+        "[tool.forge.duplicate_audit]\nsource_dirs = [\"lib\"]\n",
+    );
+    Python::attach(|py| {
+        configure_jscpd(py, &root, &[]);
+        configure_pmd(&root);
+        let (stderr, _capture) = capture(py, "stderr");
+        for name in ["run_jscpd", "run_pmd_python"] {
+            for check in [true, false] {
+                assert_eq!(
+                    run_with_root(py, name, &root, check, false),
+                    2,
+                    "{name} check={check}"
+                );
+            }
+        }
+        assert_eq!(
+            captured(&stderr)
+                .matches("no source files under the scanned directories")
+                .count(),
+            4
+        );
+    });
+}
+
 fn report_failure(py: Python<'_>, analyzer: &str, failure: &str) -> AttrPatch {
     let expected = analyzer.to_owned();
     let mode = failure.to_owned();

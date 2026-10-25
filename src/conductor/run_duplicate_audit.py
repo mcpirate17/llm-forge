@@ -472,6 +472,9 @@ def _run_jscpd_paths(
     audit_dir: Path,
     executable: str | None = None,
 ) -> int:
+    if not paths:
+        print(f"ERROR: jscpd: {NO_SOURCES}", file=sys.stderr)
+        return AUDIT_ERROR_EXIT_CODE
     cmd = [_resolve_jscpd_executable(cwd, executable)]
     if not check:
         cmd.extend(
@@ -486,9 +489,6 @@ def _run_jscpd_paths(
             ]
         )
     cmd.extend(paths)
-    if not paths:
-        print(f"ERROR: jscpd: {NO_SOURCES}", file=sys.stderr)
-        return AUDIT_ERROR_EXIT_CODE
     return run(cmd, allow_findings=not check, cwd=cwd)
 
 
