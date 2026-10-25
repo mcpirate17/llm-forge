@@ -595,6 +595,7 @@ native/slop-core/src/lib.rs	python_contracts_candidate_style
 native/slop-core/src/style_scan.rs	python_contracts_candidate_style
 native/slop-core/src/lib.rs	python_contracts_hot_loop_scan
 native/slop-core/src/test_value_scan.rs	python_contracts_test_value_scan
+native/slop-core/src/lib.rs	python_contracts_test_value_scan
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_test_value_scan
 native/slop-core/src/rust_scan.rs	python_contracts_candidate_style
 native/slop-core/src/detector_scan.rs	python_contracts_candidate_style
@@ -1224,5 +1225,6 @@ native/conductor-native/src/lib.rs	python_contracts_tooling_boundary
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_tooling_boundary
 src/conductor/candidate_review/verbosity_scan.py	python_contracts_verbosity_scan
 native/slop-core/src/verbosity_scan.rs	python_contracts_verbosity_scan
+native/slop-core/src/lib.rs	python_contracts_verbosity_scan
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_verbosity_scan
 # include: python_contract_targets_extra.tsv

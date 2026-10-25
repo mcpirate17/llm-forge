@@ -13,6 +13,8 @@ const SLOP_MANIFEST: &str = "native/slop-core/Cargo.toml";
 const SLOP_CONSUMERS: &[&str] = &[
     "python_contracts_candidate_style",
     "python_contracts_hot_loop_scan",
+    "python_contracts_test_value_scan",
+    "python_contracts_verbosity_scan",
     "python_contracts_equivalence_probe",
     "python_contracts_native_ablations",
     "python_contracts_policy_engine_crash",
@@ -178,4 +180,28 @@ pub fn plan(request: &Value) -> Result<Value, String> {
         }
     }
     Ok(json!({"build_commands": build, "test_env": env, "extension": extension}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SLOP_CONSUMERS;
+
+    /// A contract mapped from a slop-core source loads slop_core, so it must be
+    /// built from the candidate's slop-core; off this list it tests the installed one.
+    #[test]
+    fn every_contract_mapped_from_slop_core_is_a_slop_consumer() {
+        let registry = [
+            include_str!("python_contract_targets.tsv"),
+            include_str!("python_contract_targets_extra.tsv"),
+        ]
+        .join("\n");
+        let missing: std::collections::BTreeSet<&str> = registry
+            .lines()
+            .filter_map(|line| line.split_once('\t'))
+            .filter(|(source, _)| source.starts_with("native/slop-core/"))
+            .map(|(_, target)| target)
+            .filter(|target| !SLOP_CONSUMERS.contains(target))
+            .collect();
+        assert!(missing.is_empty(), "add to SLOP_CONSUMERS: {missing:?}");
+    }
 }
