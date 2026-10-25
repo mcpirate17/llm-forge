@@ -7,9 +7,11 @@ of a second hardcoded literal. The directories scanned are the host's
 (`src/`, `native/`).
 """
 
+import argparse
 import tomllib
 from pathlib import Path, PurePosixPath
 
+from conductor.audit_root import resolve_audit_root
 from conductor.project_paths import host_root, package_relative, registry_relative
 
 _HOST_ROOT = host_root()
@@ -53,6 +55,30 @@ def source_dirs(root: Path) -> tuple[str, ...]:
             "a non-empty list of directories relative to the host root"
         )
     return tuple(dirs)
+
+
+def add_scan_root_arguments(parser: argparse.ArgumentParser) -> None:
+    """`--repo` and `--targets`, which every reuse analyzer takes."""
+    parser.add_argument(
+        "--repo", default=None, help="Repo root (default: the Git worktree of the cwd)."
+    )
+    parser.add_argument(
+        "--targets",
+        nargs="+",
+        default=None,
+        help="Subdirs to scan (default: the repo's [tool.forge.duplicate_audit] source_dirs).",
+    )
+
+
+def scan_roots(args: argparse.Namespace) -> tuple[Path, list[str]]:
+    """The repo root and its folders to scan: the flags, else the repo's `source_dirs`.
+
+    The root comes from ``resolve_audit_root``, which requires the Git worktree the
+    operator is standing in -- never ``__file__``, which would name whichever checkout
+    supplied the imported module.
+    """
+    repo = resolve_audit_root(args.repo)
+    return repo, args.targets if args.targets else list(source_dirs(repo))
 
 
 GENERATED_ARTIFACT_GLOBS: tuple[str, ...] = ()
