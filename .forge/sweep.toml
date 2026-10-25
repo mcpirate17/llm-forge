@@ -55,5 +55,27 @@ run = """venv=/mnt/data/llm/sweep/clean-venv-llm-forge && rm -rf "$venv" && trap
   && FORGE_INSTALL_SMOKE_VENV="$venv" PYO3_NO_PYTHON=1 FORGE_BIN="$venv/bin/forge" \
      cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml \
      --test install_packaging -- --ignored --test-threads=1 \
-  && PATH="$venv/bin:$PATH" python -m conductor.mutation_coverage canary"""
+  && PATH="$venv/bin:$PATH" python -m conductor.mutation_coverage canary \
+  && "$venv/bin/python" -m conductor.mutation_retention"""
 timeout_s = 2400
+
+# Whole-tree dependency audits, copied from LLM's sweep. The land runs these only when a
+# lock file changes, but a new advisory can land against an unchanged lock.
+[[step]]
+name = "pip-audit"
+run = "pip-audit --progress-spinner off"
+timeout_s = 600
+
+[[step]]
+name = "npm-audit"
+run = "npm audit --package-lock-only --audit-level=high"
+timeout_s = 300
+# Clean on 2026-10-25: `found 0 vulnerabilities`, exit 0.
+
+[[step]]
+name = "cargo-audit"
+# One lock file per call: cargo_audit_files stops at the first failing lock file, and
+# xargs keeps going and exits 123 if any call failed. The glob also takes the test
+# fixture's lock (native/forge/tests/fixtures/stub_dispatch), which audits clean.
+run = "git ls-files -z '*Cargo.lock' | xargs -0 -n1 python -m conductor.candidate_review.cargo_audit_files"
+timeout_s = 900

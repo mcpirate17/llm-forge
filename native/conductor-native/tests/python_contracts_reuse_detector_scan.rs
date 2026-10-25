@@ -17,6 +17,24 @@ use std::fs;
 use std::path::Path;
 use support::{assert_error, Case};
 
+#[path = "python_contracts/source_dirs_support.rs"]
+mod source_dirs_support;
+
+#[test]
+fn detector_measure_scans_the_pyproject_source_dirs_without_targets() {
+    let case = Case::new();
+    let root = source_dirs_support::host(&case);
+    Python::attach(|py| {
+        let seen = source_dirs_support::targets_main_scans(
+            py,
+            "conductor.reuse.detectors",
+            "measure",
+            &root,
+        );
+        assert_eq!(seen, ["pkg", "lib/pkg"]);
+    });
+}
+
 fn allowlist(repo: &Path, allowed: &[&str]) {
     let directory = repo.join("conductor");
     fs::create_dir_all(&directory).unwrap();

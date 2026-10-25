@@ -14,6 +14,34 @@ use pyo3::types::{PyAny, PyDict, PyList};
 use serde_json::{json, Value};
 use support::{module, Case};
 
+#[path = "python_contracts/source_dirs_support.rs"]
+mod source_dirs_support;
+
+#[test]
+fn resolve_settings_defaults_to_the_pyproject_source_dirs() {
+    let case = Case::new();
+    let root = source_dirs_support::host(&case);
+    Python::attach(|py| {
+        let tool = native(py);
+        let argv = vec!["--repo".to_owned(), root.to_string_lossy().into_owned()];
+        let args = tool
+            .getattr("build_parser")
+            .unwrap()
+            .call0()
+            .unwrap()
+            .call_method1("parse_args", (argv,))
+            .unwrap();
+        let (_repo, targets, _exclude): (std::path::PathBuf, Vec<String>, Vec<String>) = tool
+            .getattr("resolve_settings")
+            .unwrap()
+            .call1((args,))
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(targets, ["pkg", "lib/pkg"]);
+    });
+}
+
 const EXPECTED_CLUSTER_SUMMARY: &str = r#"[["exact",60,[["pkg/local/member_0.py",10,25,"shared","return value"],["pkg/local/member_1.py",11,21,"_shared","return value"],["pkg/local/member_2.py",12,22,"_shared","return value"]],0.99,63,"low","auto","exact, same-dir"],["near",48,[["pkg/near/member_0.py",10,20,"renamed","return renamed_0"],["pkg/near/member_1.py",11,21,"_renamed","return renamed_1"],["pkg/near/member_2.py",12,22,"_renamed","return renamed_2"]],0.9,46,"low","auto","near, same-dir"],["exact",55,[["pkg/local/member_0.py",10,20,"shared_two","return other"],["pkg/local/member_1.py",11,21,"_shared_two","return other"]],0.99,35,"low","auto","exact, same-dir"],["exact",90,[["research/synthesis/member_0.py",10,20,"tpl_lane","return x"],["research/synthesis/member_1.py",11,21,"_tpl_lane","return x"]],0.71,10,"high","ignore","exact, same-dir, semantic-family-risk"],["exact",72,[["pkg/member_0.py",10,20,"helper","return item"],["research/member_1.py",11,21,"_helper","return item"]],0.81,4,"high","ignore","exact, cross-dir"]]"#;
 
 fn native(py: Python<'_>) -> Bound<'_, pyo3::types::PyModule> {
