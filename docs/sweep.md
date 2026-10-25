@@ -44,9 +44,11 @@ failed, 2 refused before any step ran (config, clone, fetch).
 ## `forge sweep install`
 
 Writes `forge-sweep-<checkout dir>.service` and `.timer` to
-`$XDG_CONFIG_HOME/systemd/user` (default `~/.config/systemd/user`). It then runs
-`systemctl --user daemon-reload` and `enable --now` on the timer. `--print` shows
-both units and writes nothing.
+`$XDG_CONFIG_HOME/systemd/user` (default `~/.config/systemd/user`).
+`systemd-analyze --user verify` checks both, and a unit it rejects is removed again.
+Install then runs `systemctl --user daemon-reload` and `enable --now` on the timer,
+and fails unless the timer is active afterwards: `enable --now` exits 0 even when the
+timer refuses to start. `--print` shows both units and writes nothing.
 
 - The service is a `Type=oneshot` run at `Nice=10`, in the checkout. It runs
   `launcher` followed by this forge binary's `sweep run`. A relative launcher program

@@ -48,19 +48,29 @@ pub fn install(here: &Path, land: &Config, sweep: &SweepConfig, args: &InstallAr
     systemd(&["systemd-analyze", "calendar", &sweep.calendar])?;
     let dir = unit_dir()?;
     std::fs::create_dir_all(&dir)?;
+    let mut paths = Vec::new();
     for (suffix, body) in [("service", &service), ("timer", &timer)] {
         let path = dir.join(format!("{name}.{suffix}"));
         std::fs::write(&path, body).with_context(|| format!("writing {}", path.display()))?;
+        paths.push(path.to_string_lossy().to_string());
     }
+    // `enable --now` exits 0 even when the timer refuses to start because its
+    // service has a bad setting, so the units are verified first.
+    if let Err(err) = systemd(&["systemd-analyze", "--user", "verify", &paths[0], &paths[1]]) {
+        for path in &paths {
+            std::fs::remove_file(path).with_context(|| format!("removing {path}"))?;
+        }
+        return Err(err);
+    }
+    let timer_unit = format!("{name}.timer");
     systemd(&["systemctl", "--user", "daemon-reload"])?;
-    systemd(&[
-        "systemctl",
-        "--user",
-        "enable",
-        "--now",
-        &format!("{name}.timer"),
-    ])?;
-    println!("sweep: {name}.timer enabled; `systemctl --user list-timers {name}.timer` shows the next run");
+    systemd(&["systemctl", "--user", "enable", "--now", &timer_unit])?;
+    systemd(&["systemctl", "--user", "is-active", "--quiet", &timer_unit]).with_context(|| {
+        format!(
+            "{timer_unit} is enabled but not active; see `systemctl --user status {name}.service`"
+        )
+    })?;
+    println!("sweep: {timer_unit} active; `systemctl --user list-timers {timer_unit}` shows the next run");
     Ok(0)
 }
 
@@ -108,6 +118,8 @@ fn dedup_path(path: &str) -> String {
 }
 
 /// systemd expands `%` specifiers everywhere and `$` variables in ExecStart.
+/// Only ExecStart and Environment unquote: WorkingDirectory takes its value
+/// verbatim, quotes included, so it gets `%%` alone.
 fn quote(arg: &str, exec: bool) -> String {
     let mut escaped = arg
         .replace('\\', "\\\\")
@@ -126,7 +138,7 @@ fn render_service(here: &Path, argv: &[String], path: &str) -> String {
          [Service]\nType=oneshot\nWorkingDirectory={dir}\n\
          Environment={env}\nExecStart={exec}\nNice=10\nTimeoutStartSec=infinity\n",
         here = here.display().to_string().replace('%', "%%"),
-        dir = quote(&here.to_string_lossy(), false),
+        dir = here.to_string_lossy().replace('%', "%%"),
         env = quote(&format!("PATH={path}"), false),
         exec = exec.join(" "),
     )
@@ -223,10 +235,9 @@ mod tests {
             service.contains(r#"ExecStart="/a b/x" "50%%" "$$HOME" "q\"""#),
             "{service}"
         );
-        assert!(
-            service.contains("WorkingDirectory=\"/h/LLM\"\n"),
-            "{service}"
-        );
+        assert!(service.contains("WorkingDirectory=/h/LLM\n"), "{service}");
+        let spaced = render_service(Path::new("/h/a b%"), &argv, "/bin");
+        assert!(spaced.contains("WorkingDirectory=/h/a b%%\n"), "{spaced}");
         assert!(
             service.contains("Environment=\"PATH=/u/bin:/bin\"\n"),
             "{service}"
