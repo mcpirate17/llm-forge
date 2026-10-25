@@ -58,6 +58,10 @@ src/conductor/candidate_review/git_source.py	python_contracts_candidate_cli
 src/conductor/candidate_review/git_source.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/graph_selection.py	python_contracts_graph_selection
 src/conductor/candidate_review/identity.py	python_contracts_candidate_cli
+src/conductor/candidate_review/hot_loop_scan.py	python_contracts_hot_loop_scan
+src/conductor/hot_paths_config.py	python_contracts_hot_loop_scan
+src/conductor/candidate_review/style_scan.py	python_contracts_hot_loop_scan
+native/slop-core/src/hot_loop_scan.rs	python_contracts_hot_loop_scan
 src/conductor/candidate_review/model.py	python_contracts_candidate_cli
 src/conductor/candidate_review/model.py	python_contracts_candidate_crate_version
 src/conductor/candidate_review/model.py	python_contracts_candidate_policy
@@ -232,6 +236,7 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_candi
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_review_isolation
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_structure_audit
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_style
+native/conductor-native/tests/python_contracts/support.rs	python_contracts_hot_loop_scan
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_tools
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_verification
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_vulture
@@ -587,6 +592,7 @@ src/conductor/testdata/native_ablations/sample.py	python_contracts_native_ablati
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_native_ablations
 native/slop-core/src/lib.rs	python_contracts_candidate_style
 native/slop-core/src/style_scan.rs	python_contracts_candidate_style
+native/slop-core/src/lib.rs	python_contracts_hot_loop_scan
 native/slop-core/src/test_value_scan.rs	python_contracts_test_value_scan
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_test_value_scan
 native/slop-core/src/rust_scan.rs	python_contracts_candidate_style

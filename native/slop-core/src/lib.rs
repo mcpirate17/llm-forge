@@ -19,6 +19,7 @@ pub mod file_families;
 pub mod file_profiles;
 pub mod gate;
 pub mod gate_report;
+pub mod hot_loop_scan;
 pub mod index;
 pub mod ledger;
 pub mod python_ast;
@@ -281,6 +282,7 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rust_scan::rust_scan_rules, m)?)?;
     m.add_function(wrap_pyfunction!(style_scan::style_scan_files, m)?)?;
     m.add_function(wrap_pyfunction!(style_scan::style_scan_rules, m)?)?;
+    m.add_function(wrap_pyfunction!(hot_loop_scan::hot_loop_scan_files, m)?)?;
     m.add_function(wrap_pyfunction!(test_value_scan::test_value_scan_files, m)?)?;
     m.add_function(wrap_pyfunction!(test_value_scan::test_value_scan_rules, m)?)?;
     m.add_class::<PyTestIndex>()?;
@@ -298,6 +300,9 @@ mod ledger_tests;
 
 #[cfg(test)]
 mod style_scan_tests;
+
+#[cfg(test)]
+mod hot_loop_scan_tests;
 
 #[cfg(test)]
 mod detector_scan_tests;
