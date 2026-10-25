@@ -26,6 +26,7 @@ pub mod repository_scan;
 pub mod rules;
 pub mod rust_scan;
 pub mod style_scan;
+pub mod test_value_scan;
 
 use engine::{Ablation, Rule};
 use pyo3::prelude::*;
@@ -280,6 +281,8 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rust_scan::rust_scan_rules, m)?)?;
     m.add_function(wrap_pyfunction!(style_scan::style_scan_files, m)?)?;
     m.add_function(wrap_pyfunction!(style_scan::style_scan_rules, m)?)?;
+    m.add_function(wrap_pyfunction!(test_value_scan::test_value_scan_files, m)?)?;
+    m.add_function(wrap_pyfunction!(test_value_scan::test_value_scan_rules, m)?)?;
     m.add_class::<PyTestIndex>()?;
     Ok(())
 }

@@ -15,7 +15,6 @@ trains people to ignore it.
 
 from __future__ import annotations
 
-import argparse
 import json
 import shutil
 import subprocess
@@ -27,6 +26,7 @@ from conductor.candidate_review.diff_ranges import (
     changed_line_ranges,
     merge_ranges,
 )
+from conductor.candidate_review.style_scan import changed_line_parser
 
 COMPILE_DB = "compile_commands.json"
 TIDY_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp"}
@@ -131,11 +131,8 @@ def version(mode: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = changed_line_parser(__doc__)
     parser.add_argument("--mode", choices=("format", "tidy"), required=True)
-    parser.add_argument("--base", default="")
-    parser.add_argument("--version", action="store_true")
-    parser.add_argument("files", nargs="*")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if args.version:
         return version(args.mode)
