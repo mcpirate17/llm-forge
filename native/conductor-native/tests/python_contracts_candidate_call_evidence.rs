@@ -8,7 +8,7 @@ mod support;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList, PySet, PyString, PyTuple};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::fs;
 use std::path::Path;
 use support::{attr_text, module, path, text, AttrPatch, Case};
@@ -420,85 +420,90 @@ fn jscpd_fingerprint_ignores_audit_roots_and_pair_order() {
     });
 }
 
-fn blocking<'py>(py: Python<'py>, module_name: &str) -> Bound<'py, PyDict> {
-    let item = PyDict::new(py);
-    for (key, value) in [
-        ("module", module_name),
-        ("qualname", "Lane.forward"),
-        ("rule", "drop_where"),
-        ("verdict", "REACHABLE_BUT_UNTESTED"),
-        ("description", "torch.where(...) collapsed"),
-        ("amplifier", "params_x1e3"),
-    ] {
-        item.set_item(key, value).unwrap();
-    }
-    item.set_item("lineno", 12).unwrap();
-    item.set_item("max_diff_amplified", 0.97).unwrap();
-    item
+fn row(module_name: &str, verdict: &str) -> Value {
+    json!({"module": module_name, "qualname": "Lane.forward", "rule": "drop_where",
+        "lineno": 12, "verdict": verdict, "description": "torch.where(...) collapsed",
+        "amplifier": "params_x1e3", "max_diff_amplified": 0.97, "drivers_source": "index"})
 }
 
-fn probe_summary<'py>(
+fn blocking(module_name: &str) -> Value {
+    row(module_name, "REACHABLE_BUT_UNTESTED")
+}
+
+/// The summary JSON `slop_core.equivalence_gate` returns, holding these rows.
+fn probe_summary(blocking: Vec<Value>, advisory: Vec<Value>, modules_probed: usize) -> String {
+    json!({"modules_probed": modules_probed, "measured": [], "modules_without_drivers": [],
+        "modules_index_driven": [], "blocking": blocking, "advisory": advisory,
+        "untested": [], "unreached": [], "incomplete": [], "unmeasured": [], "live": 0})
+    .to_string()
+}
+
+fn answering<'py>(py: Python<'py>, summary: String) -> Bound<'py, PyAny> {
+    mock(py, "return_value", PyString::new(py, &summary).as_any())
+}
+
+/// The check's result for a change to `names`, each changing line 12, with `fake` in
+/// place of the probe, and the stand-in that answered which lines changed.
+fn run_probe<'py>(
     py: Python<'py>,
-    blocking_rows: Vec<Bound<'py, PyDict>>,
-    advisory: Vec<Bound<'py, PyDict>>,
-    modules_probed: usize,
-) -> Bound<'py, PyDict> {
-    let summary = PyDict::new(py);
-    summary.set_item("modules_probed", modules_probed).unwrap();
-    summary
-        .set_item("modules_without_drivers", PyList::empty(py))
-        .unwrap();
-    summary.set_item("blocking", blocking_rows).unwrap();
-    summary.set_item("advisory", advisory).unwrap();
-    summary
-}
-
-fn probe_context<'py>(py: Python<'py>, root: &Path, names: &[&str]) -> Bound<'py, PyAny> {
+    root: &Path,
+    names: &[&str],
+    fake: &Bound<'py, PyAny>,
+) -> (Bound<'py, PyAny>, Bound<'py, PyAny>) {
     let changes = PyList::empty(py);
+    let lines = PyDict::new(py);
     for name in names {
+        let is_test = name.rsplit('/').next().unwrap().starts_with("test_");
+        let classes: &[&str] = if is_test {
+            &["python", "test"]
+        } else {
+            &["python"]
+        };
         let kwargs = PyDict::new(py);
         kwargs.set_item("path", name).unwrap();
-        kwargs.set_item("classes", ("python",)).unwrap();
+        kwargs
+            .set_item("classes", PyTuple::new(py, classes).unwrap())
+            .unwrap();
         changes.append(namespace(py, &kwargs)).unwrap();
+        if !is_test {
+            lines.set_item(name, PySet::new(py, [12]).unwrap()).unwrap();
+        }
     }
-    let candidate_kwargs = PyDict::new(py);
-    candidate_kwargs
-        .set_item("tree_oid", "a".repeat(40))
-        .unwrap();
+    let candidate = PyDict::new(py);
+    candidate.set_item("tree_oid", "a".repeat(40)).unwrap();
     let kwargs = PyDict::new(py);
     kwargs.set_item("repo", path(py, root)).unwrap();
     kwargs.set_item("snapshot", path(py, root)).unwrap();
     kwargs
-        .set_item("candidate", namespace(py, &candidate_kwargs))
+        .set_item("candidate", namespace(py, &candidate))
         .unwrap();
     kwargs.set_item("live_changes", changes).unwrap();
-    namespace(py, &kwargs)
-}
-
-fn backlog_drop(py: Python<'_>, case: &Case) -> AttrPatch {
-    let drop = path(py, &case.root().join("autouse_gate_findings"));
-    AttrPatch::replace(&module(py, "conductor.slop_ledger"), "GATE_FINDINGS", &drop)
-}
-
-fn run_probe<'py>(py: Python<'py>, root: &Path, names: &[&str]) -> Bound<'py, PyAny> {
-    let value = PyTuple::new(
+    let tree = PyTuple::new(
         py,
         [path(py, root).into_any(), PyTuple::empty(py).into_any()],
     )
     .unwrap();
-    let scoped_materialization = module(py, "contextlib")
+    let scoped = module(py, "contextlib")
         .getattr("nullcontext")
         .unwrap()
-        .call1((value,))
+        .call1((tree,))
         .unwrap();
-    let materializer = mock(py, "return_value", &scoped_materialization);
-    let probe = module(py, "conductor.candidate_review.equivalence_probe_check");
-    let _materialize = AttrPatch::replace(&probe, "materialize_tree", &materializer);
-    probe
+    let check = module(py, "conductor.candidate_review.equivalence_probe_check");
+    let _materialize = AttrPatch::replace(
+        &check,
+        "materialize_tree",
+        &mock(py, "return_value", &scoped),
+    );
+    let changed = mock(py, "return_value", lines.as_any());
+    let coverage = module(py, "conductor.candidate_review.coverage_eval");
+    let _lines = AttrPatch::replace(&coverage, "changed_line_numbers", &changed);
+    let _probe = AttrPatch::replace(&module(py, "conductor.equivalence_gate"), "probe", fake);
+    let result = check
         .getattr("check_equivalence_probe")
         .unwrap()
-        .call1((probe_context(py, root, names),))
-        .unwrap()
+        .call1((namespace(py, &kwargs),))
+        .unwrap();
+    (result, changed)
 }
 
 fn finding_paths(result: &Bound<'_, PyAny>) -> Vec<String> {
@@ -511,31 +516,24 @@ fn finding_paths(result: &Bound<'_, PyAny>) -> Vec<String> {
         .collect()
 }
 
+fn severity_of<'py>(py: Python<'py>, name: &str) -> Bound<'py, PyAny> {
+    module(py, "conductor.candidate_review.model")
+        .getattr("Severity")
+        .unwrap()
+        .getattr(name)
+        .unwrap()
+}
+
 #[test]
 fn equivalence_probe_reports_only_reachable_untested_branches() {
     let case = Case::new();
     Python::attach(|py| {
-        let _drop = backlog_drop(py, &case);
         let summary = probe_summary(
-            py,
-            vec![blocking(py, "lane.py")],
-            vec![blocking(py, "other.py")],
+            vec![blocking("lane.py")],
+            vec![row("other.py", "NO_DIFFERENCE_OBSERVED")],
             1,
         );
-        let response = PyTuple::new(
-            py,
-            [
-                1_i64.into_pyobject(py).unwrap().into_any(),
-                summary.into_any(),
-            ],
-        )
-        .unwrap();
-        let _run = AttrPatch::replace(
-            &module(py, "conductor.slop_gate"),
-            "run",
-            &mock(py, "return_value", &response.into_any()),
-        );
-        let result = run_probe(py, case.root(), &["lane.py"]);
+        let (result, _) = run_probe(py, case.root(), &["lane.py"], &answering(py, summary));
         assert_eq!(finding_paths(&result), ["lane.py"]);
         let advisory: usize = result
             .getattr("metrics")
@@ -552,124 +550,73 @@ fn equivalence_probe_reports_only_reachable_untested_branches() {
 fn equivalence_probe_never_probes_a_test_file() {
     let case = Case::new();
     Python::attach(|py| {
-        let _drop = backlog_drop(py, &case);
-        let summary = probe_summary(py, vec![], vec![], 0);
-        let response = PyTuple::new(
-            py,
-            [
-                0_i64.into_pyobject(py).unwrap().into_any(),
-                summary.into_any(),
-            ],
-        )
-        .unwrap();
-        let fake = mock(py, "return_value", &response.into_any());
-        let _run = AttrPatch::replace(&module(py, "conductor.slop_gate"), "run", &fake);
-        run_probe(py, case.root(), &["lane.py", "test_lane.py"]);
-        let calls = fake.getattr("call_args").unwrap();
-        let only: Vec<String> = calls
-            .getattr("kwargs")
+        let fake = answering(py, probe_summary(vec![], vec![], 0));
+        let (_, changed) = run_probe(py, case.root(), &["lane.py", "test_lane.py"], &fake);
+        let asked: Vec<String> = changed
+            .getattr("call_args")
             .unwrap()
-            .get_item("only")
+            .getattr("args")
+            .unwrap()
+            .get_item(2)
             .unwrap()
             .extract()
             .unwrap();
-        assert_eq!(only, ["lane.py"]);
+        assert_eq!(asked, ["lane.py"]);
+        let probed: Vec<(String, Vec<usize>)> = fake
+            .getattr("call_args")
+            .unwrap()
+            .getattr("args")
+            .unwrap()
+            .get_item(2)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(probed, [("lane.py".to_owned(), vec![12])]);
         let count: usize = fake.getattr("call_count").unwrap().extract().unwrap();
         assert_eq!(count, 1);
     });
 }
 
 #[test]
-fn severity_follows_tier_so_only_shipped_code_blocks() {
+fn severity_is_the_same_wherever_the_module_lives() {
     let case = Case::new();
     Python::attach(|py| {
-        let _drop = backlog_drop(py, &case);
-        let summary = probe_summary(
-            py,
-            vec![
-                blocking(py, "conductor/lane.py"),
-                blocking(py, "research/tools/one_off.py"),
-            ],
-            vec![],
-            2,
-        );
-        let response = PyTuple::new(
-            py,
-            [
-                1_i64.into_pyobject(py).unwrap().into_any(),
-                summary.into_any(),
-            ],
-        )
-        .unwrap();
-        let _run = AttrPatch::replace(
-            &module(py, "conductor.slop_gate"),
-            "run",
-            &mock(py, "return_value", &response.into_any()),
-        );
-        let result = run_probe(
-            py,
-            case.root(),
-            &["conductor/lane.py", "research/tools/one_off.py"],
-        );
+        let modules = ["conductor/lane.py", "research/tools/one_off.py"];
+        let summary = probe_summary(modules.iter().map(|m| blocking(m)).collect(), vec![], 2);
+        let (result, _) = run_probe(py, case.root(), &modules, &answering(py, summary));
+        let high = severity_of(py, "HIGH");
         let findings = result.getattr("findings").unwrap();
-        let mut severities = std::collections::HashMap::new();
+        assert_eq!(findings.len().unwrap(), 2);
         for finding in findings.try_iter().unwrap() {
-            let finding = finding.unwrap();
-            severities.insert(
-                attr_text(&finding, "path"),
-                finding.getattr("severity").unwrap(),
-            );
+            assert!(finding.unwrap().getattr("severity").unwrap().is(&high));
         }
-        let severity = module(py, "conductor.candidate_review.model")
-            .getattr("Severity")
-            .unwrap();
-        assert!(severities["conductor/lane.py"].is(severity.getattr("HIGH").unwrap()));
-        assert!(severities["research/tools/one_off.py"].is(severity.getattr("LOW").unwrap()));
     });
 }
 
 #[test]
 fn gate_hands_findings_to_backlog_as_complete_artifact() {
     let case = Case::new();
+    case.write(
+        "pyproject.toml",
+        "[tool.forge.equivalence_probe]\nrun_artifacts = \"runs\"\n",
+    );
     Python::attach(|py| {
-        let _drop = backlog_drop(py, &case);
-        let summary = probe_summary(py, vec![blocking(py, "conductor/lane.py")], vec![], 1);
-        let response = PyTuple::new(
+        let rows = vec![blocking("conductor/lane.py")];
+        let summary = probe_summary(rows.clone(), vec![], 1);
+        run_probe(
             py,
-            [
-                1_i64.into_pyobject(py).unwrap().into_any(),
-                summary.clone().into_any(),
-            ],
-        )
-        .unwrap();
-        let _run = AttrPatch::replace(
-            &module(py, "conductor.slop_gate"),
-            "run",
-            &mock(py, "return_value", &response.into_any()),
+            case.root(),
+            &["conductor/lane.py"],
+            &answering(py, summary),
         );
-        run_probe(py, case.root(), &["conductor/lane.py"]);
-        let drop = case.root().join("autouse_gate_findings");
-        let written: Vec<_> = fs::read_dir(&drop)
+        let written: Vec<_> = fs::read_dir(case.root().join("runs"))
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .collect();
-        assert_eq!(written.len(), 1);
+        assert_eq!(written.len(), 1, "{written:?}");
         assert_eq!(written[0].extension().unwrap(), "json");
         let payload: Value = serde_json::from_slice(&fs::read(&written[0]).unwrap()).unwrap();
-        let expected = module(py, "json")
-            .getattr("dumps")
-            .unwrap()
-            .call1((summary.get_item("blocking").unwrap().unwrap(),))
-            .unwrap()
-            .extract::<String>()
-            .unwrap();
-        assert_eq!(
-            payload["blocking"],
-            serde_json::from_str::<Value>(&expected).unwrap()
-        );
-        assert!(!written
-            .iter()
-            .any(|item| item.extension().is_some_and(|ext| ext == "part")));
+        assert_eq!(payload["blocking"], json!(rows));
     });
 }
 
@@ -677,29 +624,26 @@ fn gate_hands_findings_to_backlog_as_complete_artifact() {
 fn backlog_write_failure_does_not_fail_review() {
     let case = Case::new();
     case.write("unwritable", "not a directory");
+    case.write(
+        "pyproject.toml",
+        "[tool.forge.equivalence_probe]\nrun_artifacts = \"unwritable/nested\"\n",
+    );
     Python::attach(|py| {
-        let target = path(py, &case.root().join("unwritable/nested"));
-        let _drop = AttrPatch::replace(
-            &module(py, "conductor.slop_ledger"),
-            "GATE_FINDINGS",
-            &target,
-        );
-        let summary = probe_summary(py, vec![blocking(py, "conductor/lane.py")], vec![], 1);
-        let response = PyTuple::new(
+        let summary = probe_summary(vec![blocking("conductor/lane.py")], vec![], 1);
+        let (result, _) = run_probe(
             py,
-            [
-                1_i64.into_pyobject(py).unwrap().into_any(),
-                summary.into_any(),
-            ],
-        )
-        .unwrap();
-        let _run = AttrPatch::replace(
-            &module(py, "conductor.slop_gate"),
-            "run",
-            &mock(py, "return_value", &response.into_any()),
+            case.root(),
+            &["conductor/lane.py"],
+            &answering(py, summary),
         );
-        let result = run_probe(py, case.root(), &["conductor/lane.py"]);
-        assert_eq!(finding_paths(&result), ["conductor/lane.py"]);
+        let findings = result.getattr("findings").unwrap();
+        assert_eq!(finding_paths(&result)[0], "conductor/lane.py");
+        let unwritten = findings.get_item(1).unwrap();
+        assert_eq!(attr_text(&unwritten, "rule_id"), "run-artifact-unwritten");
+        assert!(unwritten
+            .getattr("severity")
+            .unwrap()
+            .is(severity_of(py, "MEDIUM")));
     });
 }
 
@@ -707,7 +651,6 @@ fn backlog_write_failure_does_not_fail_review() {
 fn missing_engine_is_named_critical_finding_without_probe_run() {
     let case = Case::new();
     Python::attach(|py| {
-        let _drop = backlog_drop(py, &case);
         let unavailable = PyString::new(py, "slop_core is not installed (test)");
         let _native = AttrPatch::replace(
             &module(py, "conductor._native"),
@@ -720,27 +663,19 @@ fn missing_engine_is_named_critical_finding_without_probe_run() {
             .call1(("the probe ran without its engine",))
             .unwrap();
         let fake = mock(py, "side_effect", &error);
-        let _run = AttrPatch::replace(&module(py, "conductor.slop_gate"), "run", &fake);
-        let result = run_probe(py, case.root(), &["conductor/lane.py"]);
+        let (result, _) = run_probe(py, case.root(), &["conductor/lane.py"], &fake);
         let findings = result.getattr("findings").unwrap();
         assert_eq!(findings.len().unwrap(), 1);
         let finding = findings.get_item(0).unwrap();
         assert_eq!(attr_text(&finding, "rule_id"), "slop-core-unavailable");
-        let critical = module(py, "conductor.candidate_review.model")
-            .getattr("Severity")
+        assert!(finding
+            .getattr("severity")
             .unwrap()
-            .getattr("CRITICAL")
-            .unwrap();
-        assert!(finding.getattr("severity").unwrap().is(&critical));
+            .is(severity_of(py, "CRITICAL")));
         assert!(attr_text(&finding, "message").contains("slop_core is not installed (test)"));
         assert_eq!(result.getattr("files").unwrap().len().unwrap(), 0);
-        assert_eq!(
-            fake.getattr("call_count")
-                .unwrap()
-                .extract::<usize>()
-                .unwrap(),
-            0
-        );
+        let count: usize = fake.getattr("call_count").unwrap().extract().unwrap();
+        assert_eq!(count, 0);
     });
 }
 

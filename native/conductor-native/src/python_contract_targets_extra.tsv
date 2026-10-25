@@ -249,8 +249,8 @@ src/conductor/project_paths.py	python_contracts_candidate_review_hardening
 src/conductor/project_paths.py	python_contracts_mutation_patch_audit_a
 src/conductor/project_paths.py	python_contracts_mutation_patch_audit_b
 src/conductor/project_paths.py	python_contracts_mutation_patch_audit_c
-src/conductor/slop_gate.py	python_contracts_candidate_call_evidence
-src/conductor/slop_ledger.py	python_contracts_candidate_call_evidence
+src/conductor/_native.py	python_contracts_import_ablation
+native/slop-core/src/lib.rs	python_contracts_import_ablation
 
 # Numerical performance gates and mailbox notification contracts.
 native/conductor-native/src/candidate_checks_evidence.rs	python_contracts_candidate_performance

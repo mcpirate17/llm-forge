@@ -21,24 +21,24 @@ use ruff_text_size::{Ranged, TextSize};
 use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
-struct Function {
-    qualname: String,
+pub(crate) struct Function {
+    pub(crate) qualname: String,
     /// The `def` line.
-    line: usize,
+    pub(crate) line: usize,
     /// The first decorator's line.
     start: usize,
-    end: usize,
+    pub(crate) end: usize,
     docstring: Option<(usize, usize)>,
     /// The first body statement's line, docstring included.
     body: usize,
     /// The first line a call runs, or `None` for nothing to test.
-    runs: Option<usize>,
+    pub(crate) runs: Option<usize>,
 }
 
 impl Function {
     /// Whether `line` is this function's own code: inside it, outside its docstring
     /// and outside the bodies of the functions nested in it.
-    fn owns(&self, line: usize, nested: &[Function]) -> bool {
+    pub(crate) fn owns(&self, line: usize, nested: &[Function]) -> bool {
         (self.start..=self.end).contains(&line)
             && !self
                 .docstring
@@ -115,7 +115,7 @@ impl<'a> SourceOrderVisitor<'a> for Collector<'_> {
 }
 
 /// Every function in `source`, nested ones and methods included, in source order.
-fn functions(source: &str) -> anyhow::Result<Vec<Function>> {
+pub(crate) fn functions(source: &str) -> anyhow::Result<Vec<Function>> {
     let module = ruff_python_parser::parse_module(source)?.into_syntax();
     let lines = Lines::new(source);
     let mut collector = Collector {
@@ -128,7 +128,7 @@ fn functions(source: &str) -> anyhow::Result<Vec<Function>> {
 }
 
 /// The functions nested in `functions[index]`: those after it that start inside it.
-fn nested(functions: &[Function], index: usize) -> &[Function] {
+pub(crate) fn nested(functions: &[Function], index: usize) -> &[Function] {
     let end = functions[index].end;
     let after = &functions[index + 1..];
     &after[..after.partition_point(|inner| inner.start <= end)]

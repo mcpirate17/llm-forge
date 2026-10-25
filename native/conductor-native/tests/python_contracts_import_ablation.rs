@@ -12,10 +12,10 @@ mod support;
 
 use ablation_support::{classify_patches, collection_site, ia, sample, simple_site, sites};
 use pyo3::prelude::*;
-use pyo3::types::PyList;
+use pyo3::types::{PyDict, PyList};
 use std::fs;
 use std::process::Command;
-use support::{path, Case};
+use support::{module, path, AttrPatch, Case};
 
 #[test]
 fn only_silenced_imports_are_candidates() {
@@ -190,4 +190,55 @@ fn failing_drivers_mean_the_import_is_load_bearing() {
 #[test]
 fn passing_drivers_with_no_consumers_is_dead_candidate() {
     classify_with_mock(0, &[], "UNVERIFIED");
+}
+
+#[test]
+fn main_drives_each_import_with_the_test_files_that_import_its_module() {
+    let case = Case::new();
+    run_git(&case, &["init", "-q"]);
+    fs::write(case.root().join("m.py"), "import os  # noqa: F401\n").unwrap();
+    fs::write(
+        case.root().join("test_m.py"),
+        "import m\n\ndef test_m():\n    assert m\n",
+    )
+    .unwrap();
+    fs::write(
+        case.root().join("test_other.py"),
+        "def test_other():\n    pass\n",
+    )
+    .unwrap();
+    run_git(&case, &["add", "-A"]);
+    Python::attach(|py| {
+        let record = PyDict::new(py);
+        record.set_item("verdict", "NOT_EXERCISED").unwrap();
+        record.set_item("line", 1).unwrap();
+        record.set_item("import", "import os").unwrap();
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("return_value", record).unwrap();
+        let fake = module(py, "unittest.mock")
+            .getattr("Mock")
+            .unwrap()
+            .call((), Some(&kwargs))
+            .unwrap();
+        let _classify = AttrPatch::replace(ia(py).as_any(), "classify", &fake);
+        let argv = vec!["m.py", "--root", case.root().to_str().unwrap()];
+        let status: i64 = ia(py)
+            .getattr("main")
+            .unwrap()
+            .call1((argv,))
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(status, 0);
+        let drivers: Vec<String> = fake
+            .getattr("call_args")
+            .unwrap()
+            .getattr("args")
+            .unwrap()
+            .get_item(2)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(drivers, ["test_m.py"]);
+    });
 }

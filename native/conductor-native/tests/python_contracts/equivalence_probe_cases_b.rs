@@ -61,6 +61,34 @@ fn the_jitter_control_reports_rather_than_swallows() {
     });
 }
 #[test]
+fn the_report_names_an_infinite_difference_for_a_strict_parser() {
+    // The native gate parses this report with serde_json, which refuses Python's
+    // `Infinity` token; one such token once cost every finding in its module.
+    let ws = ProbeWorkspace::new();
+    let report = ws._case.root().join("report.json");
+    let argv = [
+        "fixture_mod.py",
+        "test_fixture_mod.py",
+        "--function",
+        "timed",
+        "--json",
+        report.to_str().unwrap(),
+    ];
+    Python::attach(|py| {
+        ep(py)
+            .getattr("main")
+            .unwrap()
+            .call1((argv.to_vec(),))
+            .unwrap();
+    });
+    let text = std::fs::read_to_string(&report).unwrap();
+    let rows: Vec<serde_json::Value> = serde_json::from_str(&text).unwrap();
+    assert!(
+        rows.iter().any(|row| row["max_diff_amplified"] == "inf"),
+        "{text}"
+    );
+}
+#[test]
 fn the_control_does_not_suppress_a_deterministic_finding() {
     let ws = ProbeWorkspace::new();
     Python::attach(|py| {

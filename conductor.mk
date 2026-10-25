@@ -34,7 +34,6 @@ CONDUCTOR_MUTATION_REGISTRY ?= campaigns/registry.json
 # in one place instead of patching every recipe that writes a report.
 CONDUCTOR_AUDIT_DIR ?= tasks/audit
 CONDUCTOR_REPORTS_DIR ?= reports
-CONDUCTOR_GATE_FINDINGS_DIR ?= $(CONDUCTOR_REPORTS_DIR)/gate_findings
 
 .PHONY: governance-check governance-audit governance-preflight governance-fix \
 	governance-commit governance-claim governance-release-claim governance-claims \
@@ -137,25 +136,18 @@ SLOP_ENFORCE ?=
 SLOP_MODULE ?=
 SLOP_TESTS ?=
 
-slop-gate:  ## Tier-1 equivalence probe over changed modules; reports only (add SLOP_ENFORCE=--enforce to fail)
-	$(PYTHON) -m conductor.slop_gate --base "$(SLOP_BASE)" --root "$(CONDUCTOR_HOST_ROOT)" $(SLOP_ENFORCE)
+slop-gate:  ## Equivalence probe over changed modules; reports only (add SLOP_ENFORCE=--enforce to fail)
+	$(PYTHON) -m conductor.equivalence_gate gate --base "$(SLOP_BASE)" --root "$(CONDUCTOR_HOST_ROOT)" $(SLOP_ENFORCE)
 
-slop-backlog:  ## Sweep SLOP_MODULES (default: changed) into the ranked backlog + ledger
+slop-backlog:  ## Probe SLOP_MODULES (default: changed), then fold it and every land's run into the ledger
 	@mkdir -p "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_REPORTS_DIR)"
-	$(PYTHON) -m conductor.slop_gate \
+	$(PYTHON) -m conductor.equivalence_gate gate \
 		--base "$(SLOP_BASE)" --root "$(CONDUCTOR_HOST_ROOT)" \
 		$(if $(SLOP_MODULES),$(foreach m,$(SLOP_MODULES),--module $(m))) \
 		$(if $(SLOP_JOBS),--jobs $(SLOP_JOBS)) \
 		--json "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_REPORTS_DIR)/slop_sweep.json"
-	@# Folds in every summary a prior `gate` run left under CONDUCTOR_GATE_FINDINGS_DIR.
-	@# Globbed in the recipe, not with $$(wildcard): that expands when the Makefile is
-	@# parsed, so the list folded in and the list deleted could differ.
-	@set -e; folded=$$(ls "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_GATE_FINDINGS_DIR)"/*.json 2>/dev/null || true); \
-	$(PYTHON) -m conductor.slop_ledger \
-		"$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_REPORTS_DIR)/slop_sweep.json" $$folded \
-		--ledger "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_PACKAGE_ROOT)/slop_ledger.json" \
-		--report "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_REPORTS_DIR)/slop_backlog.md"; \
-	rm -f $$folded
+	$(PYTHON) -m conductor.equivalence_gate backlog --root "$(CONDUCTOR_HOST_ROOT)" \
+		"$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_REPORTS_DIR)/slop_sweep.json"
 
 slop-imports:  ## Ablate the silenced (noqa F401) imports of SLOP_MODULE against its drivers
 	@test -n "$(SLOP_MODULE)" || { echo "Set SLOP_MODULE=path.py"; exit 2; }

@@ -26,5 +26,9 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         crate::test_record_untested::test_record_untested_native,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(
+        crate::equivalence_targets::equivalence_targets_native,
+        module
+    )?)?;
     Ok(())
 }

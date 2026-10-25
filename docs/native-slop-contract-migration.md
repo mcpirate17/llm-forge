@@ -1,5 +1,9 @@
 # Native slop gate and ledger contract migration
 
+Superseded: `slop_gate`, `slop_ledger` and their two targets are gone. The gate and
+ledger are `slop_core.equivalence_gate` and `equivalence_backlog`, driven from
+`conductor.equivalence_gate` and contracted in `python_contracts_equivalence_gate`.
+
 This cohort ports all 19 cases from `src/conductor/test_slop_gate.py` and all
 16 from `src/conductor/test_slop_ledger.py` to Rust-owned PyO3 contracts. The
 original Python baseline passed 35/35 in 2.01 seconds

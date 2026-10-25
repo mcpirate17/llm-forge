@@ -1,5 +1,8 @@
 # Repository-index test migration
 
+Superseded: `conductor.repo_index` and its target are gone. `import_ablation` calls
+`slop_core.build_test_index` directly, contracted in `python_contracts_import_ablation`.
+
 The 11 declared tests in `src/conductor/test_repo_index.py` are now Rust-owned
 compatibility tests in `native/conductor-native/tests/python_contracts_repo_index.rs`.
 They call the shipped Python `conductor.repo_index` and `conductor.slop_gate`

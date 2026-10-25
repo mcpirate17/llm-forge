@@ -36,6 +36,8 @@ import sys
 import tempfile
 from typing import Sequence
 
+from conductor._native import slop_core
+
 __all__ = ["ImportSite", "import_sites", "ablate_source", "classify", "main"]
 
 LOAD_BEARING = "LOAD_BEARING"
@@ -85,8 +87,11 @@ def ablate_source(source: str, site: ImportSite) -> str:
     """
     tree = ast.parse(source)
     node = next(
-        (n for n in tree.body
-         if isinstance(n, (ast.Import, ast.ImportFrom)) and n.lineno == site.lineno),
+        (
+            n
+            for n in tree.body
+            if isinstance(n, (ast.Import, ast.ImportFrom)) and n.lineno == site.lineno
+        ),
         None,
     )
     if node is None:
@@ -135,23 +140,37 @@ def consumers(module: str, names: Sequence[str], root: pathlib.Path) -> list[str
     tail = dotted.rsplit(".", 1)[-1]
     found: set[str] = set()
     for name in names:
-        for pattern in (f"from {dotted} import", f"from .{tail} import", f"{tail}.{name}"):
+        for pattern in (
+            f"from {dotted} import",
+            f"from .{tail} import",
+            f"{tail}.{name}",
+        ):
             out = subprocess.run(
                 ["git", "grep", "-l", "-F", pattern, "--", "*.py"],
-                cwd=root, capture_output=True, text=True,
+                cwd=root,
+                capture_output=True,
+                text=True,
             ).stdout.split()
             found.update(f for f in out if f != module)
     return sorted(found)
 
 
 def classify(
-    site: ImportSite, module: str, drivers: Sequence[str], root: pathlib.Path,
+    site: ImportSite,
+    module: str,
+    drivers: Sequence[str],
+    root: pathlib.Path,
     timeout: int = 240,
 ) -> dict[str, object]:
     """Run both oracles for one import and return a verdict record."""
     if not drivers:
-        return {"import": site.statement, "line": site.lineno, "verdict": NOT_EXERCISED,
-                "consumers": [], "detail": "no test file imports this module"}
+        return {
+            "import": site.statement,
+            "line": site.lineno,
+            "verdict": NOT_EXERCISED,
+            "consumers": [],
+            "detail": "no test file imports this module",
+        }
     source = ablate_source((root / module).read_text(), site)
     # The ablated source goes to a temp file, never into the command line: a large
     # module blows past ARG_MAX and the run dies with an OSError that looks like a
@@ -165,8 +184,13 @@ def classify(
             payload=json.dumps(str(payload)),
             drivers=json.dumps(list(drivers)),
         )
-        proc = subprocess.run([sys.executable, "-c", runner], cwd=root,
-                              capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(
+            [sys.executable, "-c", runner],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
     used = consumers(module, site.names, root)
     if proc.returncode != 0:
         verdict = LOAD_BEARING
@@ -174,8 +198,13 @@ def classify(
         verdict = REEXPORTED
     else:
         verdict = UNVERIFIED
-    return {"import": site.statement, "line": site.lineno, "verdict": verdict,
-            "names": list(site.names), "consumers": used[:6]}
+    return {
+        "import": site.statement,
+        "line": site.lineno,
+        "verdict": verdict,
+        "names": list(site.names),
+        "consumers": used[:6],
+    }
 
 
 _RUNNER = """
@@ -192,14 +221,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="conductor.import_ablation")
     parser.add_argument("module")
     parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path.cwd())
-    parser.add_argument("--all-imports", action="store_true",
-                        help="also ablate imports nobody silenced (ruff already covers those)")
+    parser.add_argument(
+        "--all-imports",
+        action="store_true",
+        help="also ablate imports nobody silenced (ruff already covers those)",
+    )
     parser.add_argument("--json", type=pathlib.Path)
     args = parser.parse_args(argv)
 
-    from conductor import slop_gate
-
-    drivers = slop_gate.drivers_for(args.module, args.root)
+    drivers = slop_core().build_test_index(str(args.root)).drivers_for(args.module)
     sites = import_sites(args.root / args.module, silenced_only=not args.all_imports)
     records = [classify(s, args.module, drivers, args.root) for s in sites]
     if args.json:

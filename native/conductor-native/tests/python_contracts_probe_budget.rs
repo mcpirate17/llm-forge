@@ -9,6 +9,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyCFunction, PyDict};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -333,204 +335,86 @@ fn the_remediation_names_a_flag_the_probe_accepts() {
     });
 }
 
-fn strings(_py: Python<'_>, value: &Bound<'_, PyAny>) -> BTreeSet<String> {
-    value
-        .try_iter()
+/// Every verdict `conductor.equivalence_probe.Verdict` defines.
+fn emitted_verdicts(py: Python<'_>) -> BTreeSet<String> {
+    let builtins = module(py, "builtins");
+    let values = builtins
+        .getattr("vars")
         .unwrap()
-        .map(|item| text(&item.unwrap()))
-        .collect()
-}
-
-#[test]
-fn an_over_budget_construct_does_not_erase_its_module_from_the_report() {
-    let _case = Case::new();
-    Python::attach(|py| {
-        let gate = module(py, "conductor.slop_gate");
-        let verdict = probe(py).getattr("Verdict").unwrap();
-        let unmeasured = strings(py, &gate.getattr("UNMEASURED").unwrap());
-        assert!(unmeasured.contains("OVER_BUDGET"));
-        let mut other = BTreeSet::new();
-        for bucket in ["INCOMPLETE", "BLOCKING", "ADVISORY"] {
-            other.extend(strings(py, &gate.getattr(bucket).unwrap()));
+        .call1((probe(py).getattr("Verdict").unwrap(),))
+        .unwrap();
+    let str_type = builtins.getattr("str").unwrap();
+    let mut emitted = BTreeSet::new();
+    for pair in values.call_method0("items").unwrap().try_iter().unwrap() {
+        let pair = pair.unwrap();
+        let value = pair.get_item(1).unwrap();
+        if !text(&pair.get_item(0).unwrap()).starts_with('_')
+            && value.is_instance(&str_type).unwrap()
+        {
+            emitted.insert(text(&value));
         }
-        other.insert(text(&gate.getattr("UNTESTED").unwrap()));
-        assert!(unmeasured.is_disjoint(&other));
-        for label in ["BASELINE_UNUSABLE", "UNCOMPILABLE"] {
-            assert!(unmeasured.contains(&text(&verdict.getattr(label).unwrap())));
-        }
-    });
-}
-
-fn bucket_verdicts(py: Python<'_>) -> BTreeSet<String> {
-    let gate = module(py, "conductor.slop_gate");
-    let mut result = BTreeSet::new();
-    for bucket in ["BLOCKING", "ADVISORY", "INCOMPLETE", "UNMEASURED"] {
-        result.extend(strings(py, &gate.getattr(bucket).unwrap()));
     }
-    for label in ["UNTESTED", "UNREACHED", "LIVE"] {
-        result.insert(text(&gate.getattr(label).unwrap()));
-    }
-    result
-}
-
-#[test]
-fn every_verdict_the_probe_can_emit_lands_in_a_gate_bucket() {
-    let _case = Case::new();
-    Python::attach(|py| {
-        let verdict = probe(py).getattr("Verdict").unwrap();
-        let values = module(py, "builtins")
-            .getattr("vars")
-            .unwrap()
-            .call1((&verdict,))
-            .unwrap();
-        let mut emitted = BTreeSet::new();
-        for pair in values.call_method0("items").unwrap().try_iter().unwrap() {
-            let pair = pair.unwrap();
-            let name = text(&pair.get_item(0).unwrap());
-            let value = pair.get_item(1).unwrap();
-            if !name.starts_with('_')
-                && value
-                    .is_instance(&module(py, "builtins").getattr("str").unwrap())
-                    .unwrap()
-            {
-                emitted.insert(text(&value));
-            }
-        }
-        let known = bucket_verdicts(py);
-        assert!(
-            emitted.is_subset(&known),
-            "the gate cannot classify {:?}",
-            emitted.difference(&known).collect::<Vec<_>>()
-        );
-    });
-}
-
-fn fixture_repo(case: &Case, rel: &str) -> std::path::PathBuf {
-    let root = case.mkdir(rel);
-    let git = |args: &[&str]| {
-        let output = Command::new("git")
-            .args(args)
-            .current_dir(&root)
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .env_remove("GIT_COMMON_DIR")
-            .env_remove("GIT_INDEX_FILE")
-            .env_remove("GIT_OBJECT_DIRECTORY")
-            .env_remove("GIT_ALTERNATE_OBJECT_DIRECTORIES")
-            .env_remove("GIT_CONFIG")
-            .env_remove("GIT_TEMPLATE_DIR")
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_CONFIG_SYSTEM", "/dev/null")
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "git {args:?}: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    };
-    git(&["init", "-q"]);
-    git(&[
-        "-c",
-        "user.name=t",
-        "-c",
-        "user.email=t@t",
-        "commit",
-        "-q",
-        "--allow-empty",
-        "-m",
-        "root",
-    ]);
-    case.write(
-        &format!("{rel}/conductor/slop_waivers.json"),
-        "{\"waivers\": []}",
-    );
-    root
-}
-
-fn isolated_case() -> Case {
-    let mut case = Case::new();
-    for name in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_COMMON_DIR",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_CONFIG_COUNT",
-        "GIT_CONFIG_PARAMETERS",
-        "GIT_CONFIG_KEY_0",
-        "GIT_CONFIG_VALUE_0",
-        "GIT_CONFIG",
-        "GIT_TEMPLATE_DIR",
-    ] {
-        case.remove_env(name);
-    }
-    case.set_env("GIT_CONFIG_NOSYSTEM", "1");
-    case.set_env("GIT_CONFIG_GLOBAL", "/dev/null");
-    case.set_env("GIT_CONFIG_SYSTEM", "/dev/null");
-    case
+    emitted
 }
 
 fn finding(verdict: &str, qualname: &str) -> Value {
-    json!({"qualname":qualname,"rule":"drop_where","lineno":12,
-        "verdict":verdict,"description":"torch.where(...) collapsed"})
+    json!({"qualname": qualname, "rule": "drop_where", "lineno": 2, "verdict": verdict,
+        "description": "torch.where(...) collapsed", "amplifier": "x1e3", "max_diff_amplified": 1.0})
 }
 
-fn run_with(py: Python<'_>, repo: &Path, findings: Vec<Value>) -> PyResult<Value> {
-    let gate = module(py, "conductor.slop_gate");
-    let drivers =
-        PyCFunction::new_closure(py, None, None, |args, kwargs| -> PyResult<Vec<String>> {
-            assert_eq!(args.len(), 3);
-            assert!(kwargs.is_none_or(|k| k.is_empty()));
-            Ok(vec!["test_lane.py".to_owned()])
+/// The native gate's summary for `<rel>/lane.py` when its child reports `findings`.
+fn gate_with(py: Python<'_>, case: &Case, rel: &str, findings: &[Value]) -> PyResult<Value> {
+    let root = case.mkdir(rel);
+    case.write(&format!("{rel}/lane.py"), "class Lane:\n    pass\n");
+    let report = root.join("report.json");
+    fs::write(&report, serde_json::to_string(findings).unwrap()).unwrap();
+    let python = root.join("python");
+    fs::write(
+        &python,
+        format!(
+            "#!/bin/sh\nwhile [ $# -gt 0 ]; do [ \"$1\" = --json ] && cp {report:?} \"$2\"; shift; done\n"
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&python, fs::Permissions::from_mode(0o755)).unwrap();
+    let units: Vec<(String, usize, Vec<String>)> = findings
+        .iter()
+        .map(|f| {
+            (
+                f["qualname"].as_str().unwrap().to_owned(),
+                1,
+                vec!["test_lane.py".to_owned()],
+            )
         })
-        .unwrap();
-    let payload = serde_json::to_string(&findings).unwrap();
-    let probe_stub =
-        PyCFunction::new_closure(py, None, None, move |args, kwargs| -> PyResult<Py<PyAny>> {
-            assert_eq!(args.len(), 5);
-            assert!(args.get_item(4)?.extract::<usize>()? >= 1);
-            assert!(kwargs.is_none_or(|k| k.is_empty()));
-            Ok(module(args.py(), "json")
-                .getattr("loads")?
-                .call1((&payload,))?
-                .unbind())
-        })
-        .unwrap();
-    let _drivers = AttrPatch::replace(gate.as_any(), "drivers_for", drivers.as_any());
-    let _probe = AttrPatch::replace(gate.as_any(), "probe", probe_stub.as_any());
-    let output = gate.getattr("run")?.call(
-        ("HEAD", path(py, repo)),
-        Some(&{
-            let kwargs = PyDict::new(py);
-            kwargs.set_item("only", ["lane.py"])?;
-            kwargs
-        }),
-    )?;
-    let summary = output.get_item(1)?;
-    let raw: String = module(py, "json")
-        .getattr("dumps")?
-        .call1((summary,))?
+        .collect();
+    let summary: String = module(py, "slop_core")
+        .getattr("equivalence_gate")?
+        .call1((
+            root.to_str().unwrap(),
+            python.to_str().unwrap(),
+            vec![(
+                "lane.py",
+                true,
+                units,
+                Vec::<(String, usize, String)>::new(),
+            )],
+        ))?
         .extract()?;
-    Ok(serde_json::from_str(&raw).unwrap())
+    Ok(serde_json::from_str(&summary).unwrap())
 }
 
 #[test]
-fn every_verdict_reaches_a_summary_list_or_a_count() {
-    let case = isolated_case();
-    let repo = fixture_repo(&case, "repo");
+fn every_verdict_the_probe_can_emit_reaches_a_summary_list_or_a_count() {
+    let case = Case::new();
     Python::attach(|py| {
-        let verdicts = bucket_verdicts(py);
-        let findings = verdicts
+        let verdicts = emitted_verdicts(py);
+        assert!(verdicts.contains("REACHABLE_BUT_UNTESTED") && verdicts.contains("LIVE"));
+        let findings: Vec<Value> = verdicts
             .iter()
             .enumerate()
             .map(|(i, v)| finding(v, &format!("Lane.f{i}")))
             .collect();
-        let summary = run_with(py, &repo, findings).unwrap();
+        let summary = gate_with(py, &case, "repo", &findings).unwrap();
         let accounted = summary["live"].as_u64().unwrap() as usize
             + [
                 "blocking",
@@ -543,44 +427,41 @@ fn every_verdict_reaches_a_summary_list_or_a_count() {
             .iter()
             .map(|key| summary[key].as_array().unwrap().len())
             .sum::<usize>();
-        assert_eq!(accounted, verdicts.len());
+        assert_eq!(accounted, verdicts.len(), "{summary}");
+        assert_eq!(summary["incomplete"], json!([]), "{summary}");
     });
 }
 
 #[test]
 fn an_unclassified_verdict_stops_the_run_rather_than_vanishing() {
-    let case = isolated_case();
-    let repo = fixture_repo(&case, "repo");
+    let case = Case::new();
     Python::attach(|py| {
-        let error = run_with(
+        let error = gate_with(
             py,
-            &repo,
-            vec![finding("A_VERDICT_FROM_THE_FUTURE", "Lane.forward")],
+            &case,
+            "repo",
+            &[finding("A_VERDICT_FROM_THE_FUTURE", "Lane.forward")],
         )
         .unwrap_err();
-        assert!(error.to_string().contains("does not classify"));
+        assert!(error.to_string().contains("unknown verdict"), "{error}");
     });
 }
 
 #[test]
-fn an_over_budget_module_is_still_counted_as_probed() {
-    let case = isolated_case();
-    let repo = fixture_repo(&case, "repo");
+fn an_unmeasured_construct_still_counts_its_module_as_probed() {
+    let case = Case::new();
     Python::attach(|py| {
-        let summary = run_with(
-            py,
-            &repo,
-            vec![
-                finding("OVER_BUDGET", "Lane.slow"),
-                finding("LIVE", "Lane.fast"),
-            ],
-        )
-        .unwrap();
-        assert_eq!(summary["modules_probed"], 1);
-        assert_eq!(summary["unmeasured"].as_array().unwrap().len(), 1);
-        assert_eq!(summary["live"], 1);
-        let other = fixture_repo(&case, "b");
-        let timed_out = run_with(py, &other, vec![finding("TIMEOUT", "Lane.forward")]).unwrap();
-        assert_eq!(timed_out["modules_probed"], 0);
+        let emitted = emitted_verdicts(py);
+        for (i, verdict) in ["OVER_BUDGET", "BASELINE_UNUSABLE", "UNCOMPILABLE"]
+            .iter()
+            .enumerate()
+        {
+            assert!(emitted.contains(*verdict), "{verdict}");
+            let findings = [finding(verdict, "Lane.slow"), finding("LIVE", "Lane.fast")];
+            let summary = gate_with(py, &case, &format!("repo{i}"), &findings).unwrap();
+            assert_eq!(summary["modules_probed"], 1, "{summary}");
+            assert_eq!(summary["unmeasured"].as_array().unwrap().len(), 1);
+            assert_eq!(summary["live"], 1);
+        }
     });
 }

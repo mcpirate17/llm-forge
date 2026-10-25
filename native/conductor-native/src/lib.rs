@@ -33,6 +33,8 @@ mod dead_tests;
 #[cfg(feature = "python")]
 mod duplicate_bodies;
 #[cfg(feature = "python")]
+mod equivalence_targets;
+#[cfg(feature = "python")]
 mod fleet_status;
 pub mod forge_binary;
 #[cfg(feature = "python")]
