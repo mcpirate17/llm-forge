@@ -244,7 +244,14 @@ impl<'a> SourceOrderVisitor<'a> for PythonCollector<'_> {
                     import.module.as_ref().map_or("", |name| name.as_str())
                 );
                 for alias in &import.names {
+                    // A star import binds no name callers can resolve, but it does load
+                    // the module, so it is a module import.
                     if alias.name.as_str() == "*" {
+                        self.facts.imports.push(Import {
+                            alias: "*".to_owned(),
+                            module: module.clone(),
+                            member: None,
+                        });
                         continue;
                     }
                     self.facts.imports.push(Import {

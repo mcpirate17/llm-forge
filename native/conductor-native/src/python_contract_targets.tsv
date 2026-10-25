@@ -56,7 +56,6 @@ src/conductor/candidate_review/engine.py	python_contracts_candidate_policy_regre
 src/conductor/candidate_review/engine.py	python_contracts_governance_lock
 src/conductor/candidate_review/git_source.py	python_contracts_candidate_cli
 src/conductor/candidate_review/git_source.py	python_contracts_candidate_policy_regressions
-src/conductor/candidate_review/graph_selection.py	python_contracts_candidate_files
 src/conductor/candidate_review/graph_selection.py	python_contracts_graph_selection
 src/conductor/candidate_review/identity.py	python_contracts_candidate_cli
 src/conductor/candidate_review/model.py	python_contracts_candidate_cli

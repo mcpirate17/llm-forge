@@ -682,3 +682,44 @@ fn a_test_that_runs_a_changed_script_by_path_is_selected() {
     assert_eq!(plan["complete"], true, "{plan}");
     assert_eq!(plan["paths"], serde_json::json!(["tests/test_run.py"]));
 }
+
+#[test]
+fn a_test_importing_a_package_reexport_is_selected_for_the_defining_module() {
+    let adaptation = ("lib/adaptation.py", "def adapt():\n    return 1\n");
+    let test = (
+        "tests/test_reexport.py",
+        "from lib import adapt\ndef test_adapt():\n    return adapt() == 1\n",
+    );
+    let edit = ("lib/adaptation.py", "def adapt():\n    return 2\n");
+    for init in [
+        "from .adaptation import adapt\n",
+        "from lib.adaptation import adapt\n",
+        "from .adaptation import adapt as adapt\n",
+        "try:\n    from .adaptation import adapt\nexcept ImportError:\n    adapt = None\n",
+        "from .adaptation import *\n",
+    ] {
+        let extras = [("lib/__init__.py", init), adaptation, test];
+        let plan = plan_with_extras(&extras, &[edit], &["lib/adaptation.py"]);
+        assert_eq!(plan["complete"], true, "{init}: {plan}");
+        assert_eq!(
+            plan["paths"],
+            serde_json::json!(["tests/test_reexport.py"]),
+            "{init}"
+        );
+    }
+    let src_layout = [
+        ("src/conductor/__init__.py", ""),
+        ("src/conductor/widget.py", "def go():\n    return 1\n"),
+        (
+            "tests/test_widget.py",
+            "from conductor.widget import go\ndef test_go():\n    return go() == 1\n",
+        ),
+    ];
+    let plan = plan_with_extras(
+        &src_layout,
+        &[("src/conductor/widget.py", "def go():\n    return 2\n")],
+        &["src/conductor/widget.py"],
+    );
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_widget.py"]));
+}

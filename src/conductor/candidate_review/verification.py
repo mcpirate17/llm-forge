@@ -39,7 +39,6 @@ from conductor.candidate_review.git_source import (
     run_git,
 )
 from conductor.candidate_review.graph_selection import (
-    _convention_tests,
     _graph_test_paths,
     _rust_crate_tests,
 )
@@ -413,7 +412,6 @@ def select_tests(ctx: ReviewContext) -> TestSelection:
             graph = {}
     else:
         graph = {"status": "not-required", "selected_edges": 0}
-    convention_tests = _convention_tests(ctx, sources)
     native_tests = _rust_crate_tests(ctx, sources)
     contract_plan = json.loads(
         contract_test_plan_native(
@@ -428,7 +426,6 @@ def select_tests(ctx: ReviewContext) -> TestSelection:
     )
     evidence_tests = (
         graph_tests
-        | convention_tests
         | set(plan["changed_tests"])
         | {test for files in native_tests.values() for test in files}
         | set(contract_plan["test_paths"])
@@ -443,7 +440,6 @@ def select_tests(ctx: ReviewContext) -> TestSelection:
         {
             **plan,
             "graph_tests": sorted(graph_tests),
-            "convention_tests": sorted(convention_tests),
             "native_tests": native_tests,
             "contract_sources": contract_plan["source_paths"],
             "contract_targets": contract_plan["targets"],
