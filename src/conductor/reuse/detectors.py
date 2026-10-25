@@ -27,6 +27,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from conductor.audit_root import resolve_audit_root
+from conductor.duplicate_audit_config import source_dirs
 from conductor.project_paths import guardrail_allowlist_path
 from conductor.reuse import _support as files
 from conductor.reuse import _support as process

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from conductor.audit_root import resolve_audit_root
+from conductor.duplicate_audit_config import source_dirs
 from conductor.reuse import _support, consolidation
 from conductor.reuse import core as slop_core
 
