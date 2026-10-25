@@ -703,6 +703,43 @@ fn a_changed_c_cpp_or_cuda_file_falls_back_even_when_a_test_names_it() {
 }
 
 #[test]
+fn a_changed_build_definition_falls_back_but_a_makefile_does_not() {
+    let build = [
+        ("pkg/setup.py", "from setuptools import setup\nsetup()\n"),
+        ("native/CMakeLists.txt", "project(ops)\n"),
+        ("native/flags.cmake", "set(OPT -O2)\n"),
+        ("native/meson.build", "project('ops', 'c')\n"),
+        ("native/Makefile", "all:\n\ttrue\n"),
+        (
+            "tests/test_build.py",
+            "def test_build():\n    assert 'pkg/setup.py'\n",
+        ),
+    ];
+    for (path, text) in [
+        (
+            "pkg/setup.py",
+            "from setuptools import setup\nsetup(name='ops')\n",
+        ),
+        ("native/CMakeLists.txt", "project(ops C)\n"),
+        ("native/flags.cmake", "set(OPT -O3)\n"),
+        ("native/meson.build", "project('ops', 'cpp')\n"),
+    ] {
+        let plan = plan_with_extras(&build, &[(path, text)], &[path]);
+        assert_eq!(plan["complete"], false, "{path}: {plan}");
+        assert!(
+            plan["reasons"].to_string().contains("build definition"),
+            "{path}: {plan}"
+        );
+    }
+    let plan = plan_with_extras(
+        &build,
+        &[("native/Makefile", "all:\n\tfalse\n")],
+        &["native/Makefile"],
+    );
+    assert_eq!(plan["complete"], true, "{plan}");
+}
+
+#[test]
 fn a_test_that_runs_a_changed_script_by_path_is_selected() {
     let script = [
         ("scripts/run.sh", "echo one\n"),
