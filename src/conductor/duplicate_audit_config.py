@@ -1,13 +1,14 @@
 """Static configuration for repository duplicate analyzers.
 
-Every path below is specific to the host tree conductor is running in -- this
-repository's own layout (`src/conductor`, `native/`), not the monorepo's
-(`conductor/`, `research/`, ...). Where `conductor.project_paths` already knows the
-answer (the package's own location, the mutation registry it must not be confused
-with), it is resolved from there instead of a second hardcoded literal.
+Where `conductor.project_paths` already knows the answer (the package's own location,
+the mutation registry it must not be confused with), it is resolved from there instead
+of a second hardcoded literal. The directories scanned are the host's
+``[tool.forge.duplicate_audit] source_dirs``, else this repository's own layout
+(`src/`, `native/`).
 """
 
-from pathlib import Path
+import tomllib
+from pathlib import Path, PurePosixPath
 
 from conductor.project_paths import host_root, package_relative, registry_relative
 
@@ -21,6 +22,38 @@ PMD_CPD_BASELINE_RELATIVE = Path(
 AUDIT_ERROR_EXIT_CODE = 2
 
 DEFAULT_SOURCE_DIRS = ("src", "native")
+
+
+def source_dirs(root: Path) -> tuple[str, ...]:
+    """The directories under `root` its duplicate analyzers scan.
+
+    Every host was scanned at ``DEFAULT_SOURCE_DIRS`` from 2026-09-12 to 2026-10-25,
+    so a tree without `src/` or `native/` passed every duplicate check over no files.
+    """
+    pyproject = root / "pyproject.toml"
+    if not pyproject.is_file():
+        return DEFAULT_SOURCE_DIRS
+    tool = tomllib.loads(pyproject.read_text(encoding="utf-8")).get("tool", {})
+    table = tool.get("forge", {}).get("duplicate_audit", {})
+    dirs = table.get("source_dirs", DEFAULT_SOURCE_DIRS)
+    if (
+        set(table) - {"source_dirs"}
+        or not isinstance(dirs, (list, tuple))
+        or not dirs
+        or not all(
+            isinstance(entry, str)
+            and entry
+            and not PurePosixPath(entry).is_absolute()
+            and ".." not in PurePosixPath(entry).parts
+            for entry in dirs
+        )
+    ):
+        raise ValueError(
+            f"{pyproject}: [tool.forge.duplicate_audit] takes one key, source_dirs, "
+            "a non-empty list of directories relative to the host root"
+        )
+    return tuple(dirs)
+
 
 GENERATED_ARTIFACT_GLOBS: tuple[str, ...] = ()
 JSCPD_INDEX_CONFIG_PATHS = (

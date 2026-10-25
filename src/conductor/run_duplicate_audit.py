@@ -22,7 +22,6 @@ from conductor.changed_files_cli import (
 )
 from conductor.duplicate_audit_config import (
     AUDIT_ERROR_EXIT_CODE,
-    DEFAULT_SOURCE_DIRS,
     GENERATED_ARTIFACT_GLOBS,
     JSCPD_BASELINE_RELATIVE,
     JSCPD_GENERATED_EVIDENCE_IGNORE,
@@ -32,10 +31,15 @@ from conductor.duplicate_audit_config import (
     PMD_EXCLUDES,
     VULTURE_SOURCE_DIRS,
     VULTURE_SOURCE_SUFFIXES,
+    source_dirs,
 )
 from conductor.project_paths import host_root
 
 ROOT = host_root()
+NO_SOURCES = (
+    "no source files under the scanned directories; a host names its own in "
+    "[tool.forge.duplicate_audit] source_dirs"
+)
 
 
 class DuplicateAuditError(RuntimeError):
@@ -89,9 +93,14 @@ def _git_head(root: Path) -> str:
     return head if completed.returncode == 0 and head else "unavailable"
 
 
-def _print_audit_provenance(root: Path, *, index_snapshot: bool) -> None:
+def _print_audit_provenance(
+    root: Path, dirs: tuple[str, ...], *, index_snapshot: bool
+) -> None:
     mode = "index-snapshot" if index_snapshot else "worktree"
-    print(f"audit-root: {root} | git-head: {_git_head(root)} | mode: {mode}")
+    print(
+        f"audit-root: {root} | git-head: {_git_head(root)} | "
+        f"source-dirs: {' '.join(dirs)} | mode: {mode}"
+    )
 
 
 def should_skip_python(path: Path, *, root: Path = ROOT) -> bool:
@@ -116,7 +125,7 @@ def should_skip_python(path: Path, *, root: Path = ROOT) -> bool:
 
 def python_file_list(
     name: str,
-    paths: tuple[str, ...] = DEFAULT_SOURCE_DIRS,
+    paths: tuple[str, ...] | None = None,
     *,
     root: Path = ROOT,
 ) -> Path:
@@ -124,7 +133,7 @@ def python_file_list(
     audit_dir.mkdir(parents=True, exist_ok=True)
     file_list = audit_dir / name
     files: list[str] = []
-    for source in existing(paths, root=root):
+    for source in existing(source_dirs(root) if paths is None else paths, root=root):
         for path in (root / source).rglob("*.py"):
             if not should_skip_python(path, root=root):
                 files.append(str(path))
@@ -160,7 +169,7 @@ def _live_jscpd_sources(*, root: Path) -> list[str] | None:
             "--exclude-standard",
             "-z",
             "--",
-            *DEFAULT_SOURCE_DIRS,
+            *source_dirs(root),
         ],
         cwd=root,
         check=False,
@@ -478,7 +487,8 @@ def _run_jscpd_paths(
         )
     cmd.extend(paths)
     if not paths:
-        return 0
+        print(f"ERROR: jscpd: {NO_SOURCES}", file=sys.stderr)
+        return AUDIT_ERROR_EXIT_CODE
     return run(cmd, allow_findings=not check, cwd=cwd)
 
 
@@ -487,7 +497,7 @@ def _jscpd_collect_duplicates(
 ) -> list[dict]:
     """Run jscpd with the JSON reporter and return normalized clone entries."""
     if not paths:
-        return []
+        raise DuplicateAuditError(NO_SOURCES)
     with tempfile.TemporaryDirectory(prefix="llm-jscpd-json-") as tmp:
         out_dir = Path(tmp)
         try:
@@ -573,6 +583,7 @@ def run_jscpd(
     root: Path = ROOT,
     changed_files: frozenset[str] | None = None,
 ) -> int:
+    dirs = source_dirs(root)
     if index_snapshot:
         executable = root / "node_modules" / ".bin" / "jscpd"
         if not executable.exists():
@@ -582,12 +593,12 @@ def run_jscpd(
             )
             return 127
         with materialized_index_sources(
-            DEFAULT_SOURCE_DIRS,
+            dirs,
             JSCPD_SOURCE_SUFFIXES,
             root=root,
             exact_paths=JSCPD_INDEX_CONFIG_PATHS,
         ) as snapshot:
-            paths = existing(DEFAULT_SOURCE_DIRS, root=snapshot)
+            paths = existing(dirs, root=snapshot)
             try:
                 entries = _jscpd_collect_duplicates(
                     paths, cwd=snapshot, executable=str(executable.resolve())
@@ -615,7 +626,7 @@ def run_jscpd(
         return AUDIT_ERROR_EXIT_CODE
 
     with materialized_live_jscpd_sources(live_sources, root=root) as scan_root:
-        scan_paths = existing(DEFAULT_SOURCE_DIRS, root=scan_root)
+        scan_paths = existing(dirs, root=scan_root)
         if not (save_baseline or check):
             code = _run_jscpd_paths(
                 check,
@@ -803,7 +814,7 @@ def _skip_pmd_source(path: PurePosixPath) -> bool:
 
 def _pmd_snapshot_file_list(root: Path, snapshot: Path) -> list[str]:
     sources = _tracked_index_sources(
-        DEFAULT_SOURCE_DIRS, frozenset({".py"}), root=root, skip=_skip_pmd_source
+        source_dirs(root), frozenset({".py"}), root=root, skip=_skip_pmd_source
     )
     return [str(snapshot / source) for source in sources]
 
@@ -928,7 +939,7 @@ def _pmd_collect_duplicates(
 ) -> list[dict]:
     """Run PMD CPD with the XML reporter and return normalized clone entries."""
     if not files:
-        return []
+        raise DuplicateAuditError(NO_SOURCES)
     with tempfile.TemporaryDirectory(prefix="llm-pmd-xml-") as tmp:
         file_list = Path(tmp) / "files.txt"
         file_list.write_text("\n".join(files) + "\n", encoding="utf-8")
@@ -967,7 +978,7 @@ def run_pmd_python(
 ) -> int:
     if index_snapshot:
         with materialized_index_sources(
-            DEFAULT_SOURCE_DIRS,
+            source_dirs(root),
             frozenset({".py"}),
             root=root,
             skip=_skip_pmd_source,
@@ -1032,6 +1043,9 @@ def run_pmd_python(
     audit_dir = root / "tasks" / "audit"
     report = audit_dir / "duplication-pmd-python.txt"
     file_list = python_file_list("duplication-python-files.txt", root=root)
+    if not file_list.read_text(encoding="utf-8").strip():
+        print(f"ERROR: pmd-cpd: {NO_SOURCES}", file=sys.stderr)
+        return AUDIT_ERROR_EXIT_CODE
     cmd = [
         executable,
         "cpd",
@@ -1148,10 +1162,11 @@ def main() -> int:
         )
     try:
         root = _resolve_audit_root(args.root)
-    except DuplicateAuditError as exc:
+        dirs = source_dirs(root)
+    except (DuplicateAuditError, ValueError) as exc:
         print(f"ERROR: audit-root: {exc}", file=sys.stderr)
         return AUDIT_ERROR_EXIT_CODE
-    _print_audit_provenance(root, index_snapshot=args.index_snapshot)
+    _print_audit_provenance(root, dirs, index_snapshot=args.index_snapshot)
     for name in selected:
         print(f"== {name} ==", flush=True)
         if name in baseline_supported:
