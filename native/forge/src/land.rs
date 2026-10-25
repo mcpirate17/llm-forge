@@ -27,7 +27,7 @@ use serde::Deserialize;
 
 use crate::land_exec::{git, git_ok, run_shell, tail, Outcome, ShellRun};
 
-const CONFIG_PATH: &str = ".forge/land.toml";
+pub(crate) const CONFIG_PATH: &str = ".forge/land.toml";
 const WORK_BRANCH: &str = "forge-land";
 
 #[derive(Args)]
@@ -142,15 +142,21 @@ impl Config {
     pub fn parse(text: &str) -> Result<Self> {
         let config: Config = toml::from_str(text).context("parsing land config")?;
         for step in config.setup.iter().chain(&config.checks) {
-            for pattern in &step.paths {
-                Regex::new(pattern)
-                    .with_context(|| format!("step {}: bad path regex", step.name))?;
-            }
-            if step.timeout_s == 0 {
-                bail!("step {}: timeout_s must be positive", step.name);
-            }
+            step.validate()?;
         }
         Ok(config)
+    }
+}
+
+impl Step {
+    pub(crate) fn validate(&self) -> Result<()> {
+        for pattern in &self.paths {
+            Regex::new(pattern).with_context(|| format!("step {}: bad path regex", self.name))?;
+        }
+        if self.timeout_s == 0 {
+            bail!("step {}: timeout_s must be positive", self.name);
+        }
+        Ok(())
     }
 }
 
@@ -230,7 +236,7 @@ pub fn run(args: LandArgs) -> Result<u8> {
 }
 
 /// The returned File holds the lock until it is dropped.
-fn acquire_lock(clone_dir: &Path) -> Result<File> {
+pub(crate) fn acquire_lock(clone_dir: &Path) -> Result<File> {
     let lock_path = clone_dir.with_extension("lock");
     if let Some(parent) = lock_path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -244,10 +250,7 @@ fn acquire_lock(clone_dir: &Path) -> Result<File> {
     // SAFETY: flock(2) on an fd this process owns; the lock is released
     // when the guard's File closes.
     if unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-        eprintln!(
-            "land: another landing holds {}; waiting",
-            lock_path.display()
-        );
+        eprintln!("forge: another run holds {}; waiting", lock_path.display());
         if unsafe { libc::flock(fd, libc::LOCK_EX) } != 0 {
             bail!(
                 "flock {}: {}",
@@ -261,16 +264,7 @@ fn acquire_lock(clone_dir: &Path) -> Result<File> {
 
 fn prepare_clone(config: &Config, url: &str, here: &Path) -> Result<PathBuf> {
     let clone = config.clone_dir.clone();
-    if !clone.join(".git").exists() {
-        let parent = clone.parent().context("clone_dir has no parent")?;
-        std::fs::create_dir_all(parent)?;
-        let dest = clone.to_string_lossy().to_string();
-        git(
-            parent,
-            &["clone", "--quiet", "--origin", &config.remote, url, &dest],
-        )?;
-    }
-    git(&clone, &["remote", "set-url", &config.remote, url])?;
+    sync_clone(&clone, &config.remote, url)?;
     // The rebase writes commits, so it needs the invoker's identity; a
     // machine without a global one would otherwise fail every real rebase.
     for key in ["user.name", "user.email"] {
@@ -278,13 +272,29 @@ fn prepare_clone(config: &Config, url: &str, here: &Path) -> Result<PathBuf> {
             .with_context(|| format!("{key} is unset where forge land was invoked"))?;
         git(&clone, &["config", key, &value])?;
     }
+    Ok(clone)
+}
+
+/// Creates the persistent clone on first use, clears what a killed run left,
+/// and fetches `remote`.
+pub(crate) fn sync_clone(clone: &Path, remote: &str, url: &str) -> Result<()> {
+    if !clone.join(".git").exists() {
+        let parent = clone.parent().context("clone_dir has no parent")?;
+        std::fs::create_dir_all(parent)?;
+        let dest = clone.to_string_lossy().to_string();
+        git(
+            parent,
+            &["clone", "--quiet", "--origin", remote, url, &dest],
+        )?;
+    }
+    git(clone, &["remote", "set-url", remote, url])?;
     // A previous landing killed mid-rebase leaves state behind; clear it.
     // `clean -fd` without `-x` keeps ignored state (venv, target/).
-    let _ = git_ok(&clone, &["rebase", "--abort"]);
-    git(&clone, &["reset", "--quiet", "--hard"])?;
-    git(&clone, &["clean", "-fdq"])?;
-    git(&clone, &["fetch", "--quiet", "--prune", &config.remote])?;
-    Ok(clone)
+    let _ = git_ok(clone, &["rebase", "--abort"]);
+    git(clone, &["reset", "--quiet", "--hard"])?;
+    git(clone, &["clean", "-fdq"])?;
+    git(clone, &["fetch", "--quiet", "--prune", remote])?;
+    Ok(())
 }
 
 /// The target branch's own config, when it has one.
@@ -368,9 +378,9 @@ fn run_steps(clone: &Path, config: &Config, landing: &Landing) -> Result<usize> 
     std::fs::create_dir_all(&log_dir)?;
     let changed_file = log_dir.join("changed.txt");
     std::fs::write(&changed_file, landing.changed.join("\n") + "\n")?;
-    let env = step_env(clone, config, landing, &changed_file)?;
+    let env = step_env(clone, config, &landing.base, &changed_file)?;
     for step in &config.setup {
-        if !run_step(clone, step, &env, &log_dir)? {
+        if !run_step(clone, step, &env, &log_dir)?.passed() {
             eprintln!("land: setup {} failed; no checks run", step.name);
             return Ok(1);
         }
@@ -381,17 +391,17 @@ fn run_steps(clone: &Path, config: &Config, landing: &Landing) -> Result<usize> 
             println!("  skip  {} (no matching path)", step.name);
             continue;
         }
-        if !run_step(clone, step, &env, &log_dir)? && step.blocking {
+        if !run_step(clone, step, &env, &log_dir)?.passed() && step.blocking {
             failed += 1;
         }
     }
     Ok(failed)
 }
 
-fn step_env(
+pub(crate) fn step_env(
     clone: &Path,
     config: &Config,
-    landing: &Landing,
+    base: &str,
     changed: &Path,
 ) -> Result<Vec<(String, String)>> {
     let mut path: Vec<String> = config
@@ -402,7 +412,7 @@ fn step_env(
     path.push(std::env::var("PATH").unwrap_or_default());
     let mut env: Vec<(String, String)> = config.env.clone().into_iter().collect();
     env.push(("PATH".into(), path.join(":")));
-    env.push(("FORGE_LAND_BASE".into(), landing.base.clone()));
+    env.push(("FORGE_LAND_BASE".into(), base.to_string()));
     env.push((
         "FORGE_LAND_CHANGED".into(),
         changed.to_string_lossy().to_string(),
@@ -410,8 +420,26 @@ fn step_env(
     Ok(env)
 }
 
-/// Runs one step, prints its verdict line; true when it passed.
-fn run_step(clone: &Path, step: &Step, env: &[(String, String)], log_dir: &Path) -> Result<bool> {
+/// One step's verdict, wall time and log.
+pub(crate) struct StepRun {
+    pub outcome: Outcome,
+    pub secs: f64,
+    pub log: PathBuf,
+}
+
+impl StepRun {
+    pub fn passed(&self) -> bool {
+        self.outcome == Outcome::Passed
+    }
+}
+
+/// Runs one step and prints its verdict line, with the log tail on failure.
+pub(crate) fn run_step(
+    clone: &Path,
+    step: &Step,
+    env: &[(String, String)],
+    log_dir: &Path,
+) -> Result<StepRun> {
     let log = log_dir.join(format!("{}.log", step.name.replace(['/', ' '], "_")));
     let started = Instant::now();
     let outcome = run_shell(&ShellRun {
@@ -424,18 +452,17 @@ fn run_step(clone: &Path, step: &Step, env: &[(String, String)], log_dir: &Path)
     let secs = started.elapsed().as_secs_f64();
     let kind = if step.blocking { "" } else { " (advisory)" };
     match outcome {
-        Outcome::Passed => {
-            println!("  pass  {}{kind} {secs:.1}s", step.name);
-            return Ok(true);
-        }
+        Outcome::Passed => println!("  pass  {}{kind} {secs:.1}s", step.name),
         Outcome::Failed(code) => println!("  FAIL  {}{kind} exit {code} {secs:.1}s", step.name),
         Outcome::TimedOut => println!(
             "  FAIL  {}{kind} timed out after {}s",
             step.name, step.timeout_s
         ),
     }
-    println!("        log {}\n{}", log.display(), indent(&tail(&log, 30)));
-    Ok(false)
+    if outcome != Outcome::Passed {
+        println!("        log {}\n{}", log.display(), indent(&tail(&log, 30)));
+    }
+    Ok(StepRun { outcome, secs, log })
 }
 
 fn indent(text: &str) -> String {

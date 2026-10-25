@@ -1,6 +1,6 @@
 [package]
 name = "forge"
-version = "0.8.6"
+version = "0.8.7"
 edition = "2021"
 description = "Native hooks, resource-aware task execution, audit and cost tooling for AI agents"
 
