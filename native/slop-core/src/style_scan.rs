@@ -559,7 +559,7 @@ fn scan_condition(source: &Source, node: Node, path: &str, out: &mut Vec<Finding
 /// A path whose contents are test material. A fixture names a host or an id on
 /// purpose, and hoisting it to a module constant would say less about the case
 /// than the literal sitting in it does.
-fn is_test_path(path: &str) -> bool {
+pub(crate) fn is_test_path(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     name.starts_with("test_")
         || name.ends_with("_test.py")
