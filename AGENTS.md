@@ -31,8 +31,9 @@ except through a pull request.
 After committing a branch, run `make local-check` (full check by default) and
 `make local-verify` before opening or merging its PR. The receipt binds the
 current committed tree and `origin/main`; rerun after either changes. See
-[`docs/local-checks.md`](docs/local-checks.md). GitHub's full CI workflow is a
-manual clean-host fallback, not a per-commit gate.
+[`docs/local-checks.md`](docs/local-checks.md). There is no hosted CI. The clean-host
+proof is the nightly `forge sweep` (`.forge/sweep.toml`), whose results are in
+`research/reports/sweep/latest.md`.
 
 **No worktrees, ever.** Not `git worktree add`, not a leased tree, not a scratch clone
 standing next to the checkout. Work in the checkout you have. The only worktrees this
@@ -76,9 +77,10 @@ docs/mutation.md's "Bytecode isolation" for why and where.
 
 `candidate_policy.toml` and `campaigns/registry.json` are named by `[tool.conductor]` in
 `pyproject.toml` and resolved through `conductor.project_paths`. Do not hardcode either
-path in code, in a Makefile recipe, or in a CI job.
+path in code, in a Makefile recipe, or in a check's script.
 
-Anything a shipped module imports goes in `pyproject.toml`, never only in a CI job.
+Anything a shipped module imports goes in `pyproject.toml`, never only in a check's
+install step.
 
 ## Code
 

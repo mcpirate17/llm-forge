@@ -1,9 +1,8 @@
 # Local checks for Forge pull requests
 
 Forge keeps pull requests as the only route to `main`. Routine checks run on the
-developer's machine against a **clean, committed** checkout. GitHub's full CI
-workflow is available through `workflow_dispatch` for a clean-host fallback;
-it no longer installs the full stack on every commit and pull request.
+developer's machine against a **clean, committed** checkout. There is no hosted
+CI. The clean-host proof is the nightly `forge sweep` ([`sweep.md`](sweep.md)).
 
 After committing the branch, run:
 
@@ -97,6 +96,7 @@ Unknown dependencies, cycles and impossible CPU requests fail before execution;
 a failed prerequisite skips its dependent check and prevents a blocking PASS.
 The same full check inventory, source binding and verification rules apply.
 
-To run the clean-host fallback manually, use the GitHub Actions `ci` workflow
-on the branch. It runs the Rust compatibility contracts and crate tests in
-their own jobs; the retired Python suites are no longer invoked there.
+The clean-venv install runs nightly in `forge sweep` (`.forge/sweep.toml`), with
+results in `research/reports/sweep/latest.md`. To run it on demand:
+`systemctl --user start forge-sweep-llm-forge.service`. It covers `main`, not a
+branch.

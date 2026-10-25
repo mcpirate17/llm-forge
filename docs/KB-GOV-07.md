@@ -95,12 +95,12 @@ two fields out of the receipt, not just the exit code or the one-line verdict:
 distinguish them. When quoting a gate PASS in a landing report, quote the change count and
 the per-check statuses alongside the verdict line, not just the verdict line.
 
-## The local gate can see files CI cannot
+## The local gate can see files a clean clone cannot
 
 A local mutation/evidence inventory that is built from tracked *and* untracked files can
-resolve a manifest or rank a test file that was never committed. CI clones clean and sees
-neither. A local gate passing on a worktree with uncommitted files proves nothing about
-what CI will do on the same branch — before trusting any gate-relevant result, build the
+resolve a manifest or rank a test file that was never committed. A clean clone (forge
+land's, cleaned before every landing) sees neither. A local gate passing on a worktree with
+uncommitted files proves nothing about what the land will do on the same branch — before trusting any gate-relevant result, build the
 actual candidate tree (for example with a scratch index and `git write-tree`) and inspect
 that object, not the worktree.
 
@@ -119,9 +119,9 @@ something undiagnosed.
 
 ## The commit-hook attestation advisory is expected on worktree-landed PRs
 
-A worktree carries no commit hooks, so CI cannot confirm hooks ran on commits made inside
-one. Expect a medium-severity "hooks unverifiable" style advisory on every worktree-landed
-PR — this is by design (worktrees are scratch, and the mandatory CI review is the promotion
+A worktree carries no commit hooks, so the review cannot confirm hooks ran on commits
+made inside one. Expect a medium-severity "hooks unverifiable" style advisory on every worktree-landed
+PR — this is by design (worktrees are scratch, and the blocking land review is the promotion
 evidence instead). Do not add hook scaffolding to worktrees to chase this away, and do not
 treat it as a finding against the change.
 
