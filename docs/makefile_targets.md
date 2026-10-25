@@ -23,7 +23,6 @@ target changes.
 | `CONDUCTOR_MUTATION_REGISTRY` | `campaigns/registry.json` |
 | `CONDUCTOR_AUDIT_DIR` | `tasks/audit` |
 | `CONDUCTOR_REPORTS_DIR` | `reports` |
-| `CONDUCTOR_GATE_FINDINGS_DIR` | `$(CONDUCTOR_REPORTS_DIR)/gate_findings` |
 | `PREFLIGHT_REF` | `HEAD` |
 | `PREFLIGHT_BASE` | `origin/main` |
 | `SLOP_BASE` | `origin/main` |
@@ -47,8 +46,8 @@ target changes.
 | `make governance-claims` | Show active claims, one line each (CLAIM_PATH="a b" filters by overlap) |
 | `make governance-claims-json` | Show the full machine-readable claim store (active and expired) |
 | `make governance-close-session` | Atomically close session: release claims, append handoff, update state |
-| `make slop-gate` | Tier-1 equivalence probe over changed modules; reports only (add SLOP_ENFORCE=--enforce to fail) |
-| `make slop-backlog` | Sweep SLOP_MODULES (default: changed) into the ranked backlog + ledger |
+| `make slop-gate` | Equivalence probe over changed modules; reports only (add SLOP_ENFORCE=--enforce to fail) |
+| `make slop-backlog` | Probe SLOP_MODULES (default: changed), then fold it and every land's run into the ledger |
 | `make slop-imports` | Ablate the silenced (noqa F401) imports of SLOP_MODULE against its drivers |
 | `make slop-probe` | Probe one module against its driver tests: SLOP_MODULE=path.py SLOP_TESTS='tests...' |
 | `make complexity-report` | Report production Python cyclomatic complexity |

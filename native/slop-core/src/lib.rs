@@ -11,11 +11,14 @@
 //! belong here.
 
 pub mod audit_inventory;
+pub mod backlog;
 pub mod consolidation;
 pub mod detector_scan;
 pub mod engine;
 pub mod file_families;
 pub mod file_profiles;
+pub mod gate;
+pub mod gate_report;
 pub mod index;
 pub mod ledger;
 pub mod python_ast;
@@ -153,7 +156,7 @@ struct PyTestIndex {
 #[pymethods]
 impl PyTestIndex {
     /// Test files that import `module`, given as a repository-relative path
-    /// (`conductor/slop_gate.py`) or a dotted name.
+    /// (`conductor/equivalence_gate.py`) or a dotted name.
     fn drivers_for(&self, module: &str) -> Vec<String> {
         self.inner.drivers_for(module)
     }
@@ -205,131 +208,10 @@ fn build_test_index(py: Python<'_>, root: &str) -> PyResult<PyTestIndex> {
     Ok(PyTestIndex { inner })
 }
 
-/// `conductor/slop_gate.py` -> `conductor.slop_gate`.
+/// `pkg/mod.py` -> `pkg.mod`.
 #[pyfunction]
 fn dotted_for(module: &str) -> String {
     index::dotted_for(module)
-}
-
-fn item_to_dict<'py>(py: Python<'py>, i: &ledger::Item) -> PyResult<Bound<'py, PyDict>> {
-    let d = PyDict::new(py);
-    d.set_item("id", &i.id)?;
-    d.set_item("module", &i.module)?;
-    d.set_item("qualname", &i.qualname)?;
-    d.set_item("verdict", &i.verdict)?;
-    d.set_item("tier", &i.tier)?;
-    d.set_item("rules", &i.rules)?;
-    d.set_item("findings", i.findings)?;
-    d.set_item("line", i.line)?;
-    d.set_item("description", &i.description)?;
-    Ok(d)
-}
-
-fn findings_from(raw: &Bound<'_, PyList>) -> PyResult<Vec<ledger::Finding>> {
-    let mut out = Vec::with_capacity(raw.len());
-    for obj in raw.iter() {
-        let d = obj.cast::<PyDict>()?;
-        let get = |k: &str| -> PyResult<String> {
-            Ok(match d.get_item(k)? {
-                Some(v) if !v.is_none() => v.str()?.to_string_lossy().into_owned(),
-                _ => String::new(),
-            })
-        };
-        let line = match d.get_item("lineno")? {
-            Some(v) if !v.is_none() => v.extract::<usize>().unwrap_or(0),
-            _ => 0,
-        };
-        out.push(ledger::Finding {
-            module: get("module")?,
-            qualname: get("qualname")?,
-            verdict: get("verdict")?,
-            rule: get("rule")?,
-            description: get("description")?,
-            line,
-        });
-    }
-    Ok(out)
-}
-
-/// Collapse a sweep's findings into ranked work items, one per function and verdict.
-#[pyfunction]
-fn aggregate_findings(
-    py: Python<'_>,
-    findings: &Bound<'_, PyList>,
-    shipped_prefixes: Vec<String>,
-) -> PyResult<Py<PyList>> {
-    let parsed = findings_from(findings)?;
-    let items = ledger::aggregate(&parsed, &shipped_prefixes);
-    let out = PyList::empty(py);
-    for i in &items {
-        out.append(item_to_dict(py, i)?)?;
-    }
-    Ok(out.unbind())
-}
-
-/// `(new, carried, fixed_ids)` against the ids a previous sweep recorded.
-///
-/// Partitions the caller's own item objects rather than rebuilding them. An earlier
-/// version reconstructed `ledger::Item` from each dict and copied only the identity
-/// fields, so every rendered row lost its rules, its finding count and its line
-/// number -- the report came out correct and useless.
-#[pyfunction]
-fn diff_against(
-    py: Python<'_>,
-    previous_ids: Vec<String>,
-    items: &Bound<'_, PyList>,
-) -> PyResult<(Py<PyList>, Py<PyList>, Vec<String>)> {
-    let known: std::collections::BTreeSet<String> = previous_ids.iter().cloned().collect();
-    let mut present: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-
-    let new = PyList::empty(py);
-    let carried = PyList::empty(py);
-    for obj in items.iter() {
-        let d = obj.cast::<PyDict>()?;
-        let id = match d.get_item("id")? {
-            Some(v) if !v.is_none() => v.str()?.to_string_lossy().into_owned(),
-            _ => {
-                return Err(pyo3::exceptions::PyKeyError::new_err(
-                    "every item needs an 'id'; pass what aggregate_findings returned",
-                ))
-            }
-        };
-        present.insert(id.clone());
-        if known.contains(&id) {
-            carried.append(&obj)?;
-        } else {
-            new.append(&obj)?;
-        }
-    }
-    let fixed: Vec<String> = previous_ids
-        .into_iter()
-        .filter(|i| !present.contains(i))
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
-        .collect();
-    Ok((new.unbind(), carried.unbind(), fixed))
-}
-
-/// `{"tier|verdict": count}` for a report summary.
-#[pyfunction]
-fn tally_items(py: Python<'_>, items: &Bound<'_, PyList>) -> PyResult<Py<PyDict>> {
-    let out = PyDict::new(py);
-    for obj in items.iter() {
-        let d = obj.cast::<PyDict>()?;
-        let s = |k: &str| -> PyResult<String> {
-            Ok(match d.get_item(k)? {
-                Some(v) if !v.is_none() => v.str()?.to_string_lossy().into_owned(),
-                _ => String::new(),
-            })
-        };
-        let key = format!("{}|{}", s("tier")?, s("verdict")?);
-        let prev: usize = match out.get_item(&key)? {
-            Some(v) => v.extract()?,
-            None => 0,
-        };
-        out.set_item(key, prev + 1)?;
-    }
-    Ok(out.unbind())
 }
 
 #[pymodule]
@@ -343,9 +225,10 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rule_names, m)?)?;
     m.add_function(wrap_pyfunction!(build_test_index, m)?)?;
     m.add_function(wrap_pyfunction!(dotted_for, m)?)?;
-    m.add_function(wrap_pyfunction!(aggregate_findings, m)?)?;
-    m.add_function(wrap_pyfunction!(diff_against, m)?)?;
-    m.add_function(wrap_pyfunction!(tally_items, m)?)?;
+    m.add_function(wrap_pyfunction!(gate::equivalence_gate, m)?)?;
+    m.add_function(wrap_pyfunction!(gate_report::equivalence_report, m)?)?;
+    m.add_function(wrap_pyfunction!(gate_report::equivalence_findings, m)?)?;
+    m.add_function(wrap_pyfunction!(backlog::equivalence_backlog, m)?)?;
     m.add_function(wrap_pyfunction!(
         file_families::audit_file_family_compare,
         m
@@ -421,3 +304,9 @@ mod rust_scan_tests;
 
 #[cfg(test)]
 mod config_scan_tests;
+
+#[cfg(test)]
+mod gate_tests;
+
+#[cfg(test)]
+mod backlog_tests;

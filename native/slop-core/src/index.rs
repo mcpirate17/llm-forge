@@ -84,7 +84,7 @@ impl TestIndex {
     }
 }
 
-/// `conductor/slop_gate.py` -> `conductor.slop_gate`; a package's `__init__.py`
+/// `pkg/mod.py` -> `pkg.mod`; a package's `__init__.py`
 /// resolves to the package itself, which is what an importer names.
 pub fn dotted_for(module: &str) -> String {
     let stem = module.strip_suffix(".py").unwrap_or(module);
@@ -187,7 +187,7 @@ fn imported_name(src: &[u8], n: Node) -> Option<String> {
 
 /// Register `base` and, for a `from` import, `base.name` for every name bound.
 ///
-/// Binding the names is the fix: `from conductor import slop_gate` is the form that
+/// Binding the names is the fix: `from pkg import mod` is the form that
 /// was invisible, and it is by a wide margin the most common one in this repository.
 fn collect_imports(src: &[u8], rel: &Path, node: Node, out: &mut HashSet<String>) {
     match node.kind() {

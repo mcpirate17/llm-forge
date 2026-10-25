@@ -6,10 +6,10 @@ use std::path::{Path, PathBuf};
 
 /// A throwaway tree. Tests that index a repository need real files on disk, because
 /// walking and reading them is half of what is under test.
-struct Tree(PathBuf);
+pub(crate) struct Tree(PathBuf);
 
 impl Tree {
-    fn new(tag: &str) -> Tree {
+    pub(crate) fn new(tag: &str) -> Tree {
         let mut p = std::env::temp_dir();
         p.push(format!(
             "slop-core-index-{tag}-{}-{:?}",
@@ -23,13 +23,13 @@ impl Tree {
         Tree(p)
     }
 
-    fn write(&self, rel: &str, body: &str) {
+    pub(crate) fn write(&self, rel: &str, body: &str) {
         let path = self.0.join(rel);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, body).unwrap();
     }
 
-    fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &Path {
         &self.0
     }
 }
@@ -41,8 +41,7 @@ impl Drop for Tree {
 }
 
 /// The tree the Python side of this package indexes: `<repo>/src`, home of the
-/// `conductor` namespace package (mirrors `test_repo_index.py`'s
-/// `Path(__file__).resolve().parents[1]`).
+/// `conductor` namespace package.
 fn repo_root() -> PathBuf {
     // native/slop-core -> repository root -> src. Checked by name, not depth: when
     // the crate moved (twice now: research/runtime/native/rust -> tooling/native ->
@@ -54,7 +53,7 @@ fn repo_root() -> PathBuf {
     }
     let p = p.join("src");
     assert!(
-        p.join("conductor/slop_gate.py").is_file(),
+        p.join("conductor/equivalence_gate.py").is_file(),
         "resolved root {} is not the repository",
         p.display()
     );
@@ -63,17 +62,17 @@ fn repo_root() -> PathBuf {
 
 #[test]
 fn from_package_import_module_binds_the_module() {
-    // The defect this index exists to fix. `from conductor import slop_gate` is the
+    // The defect this index exists to fix. `from conductor import equivalence_gate` is the
     // dominant idiom in this repository and the old matcher, which compared only the
     // `module` field of an ImportFrom against the full dotted path, never saw it.
     let t = Tree::new("frompkg");
     t.write(
         "conductor/test_gate.py",
-        "from conductor import slop_gate\n",
+        "from conductor import equivalence_gate\n",
     );
     let idx = build(t.path());
     assert_eq!(
-        idx.drivers_for("conductor/slop_gate.py"),
+        idx.drivers_for("conductor/equivalence_gate.py"),
         vec!["conductor/test_gate.py"]
     );
 }
@@ -130,7 +129,10 @@ fn a_relative_import_climbing_past_the_root_is_dropped_not_wrapped() {
 #[test]
 fn a_package_is_named_by_its_directory_not_its_init() {
     assert_eq!(dotted_for("conductor/__init__.py"), "conductor");
-    assert_eq!(dotted_for("conductor/slop_gate.py"), "conductor.slop_gate");
+    assert_eq!(
+        dotted_for("conductor/equivalence_gate.py"),
+        "conductor.equivalence_gate"
+    );
     let t = Tree::new("init");
     t.write("pkg/test_a.py", "from pkg import thing\n");
     let idx = build(t.path());
@@ -226,14 +228,14 @@ fn the_index_over_this_repository_resolves_it_at_scale() {
     }
     let driver = "conductor/test_native_index_reference.py";
     assert!(!root.join(driver).exists());
-    corpus.write(driver, "from conductor import slop_gate\n");
+    corpus.write(driver, "from conductor import equivalence_gate\n");
     let reference = build(corpus.path());
     assert_eq!(reference.file_count(), tests.len() + 1);
     assert!(reference.import_key_count() >= idx.import_key_count());
     // The import form whose bound name the old matcher could not see.
     assert!(
         reference
-            .drivers_for("conductor/slop_gate.py")
+            .drivers_for("conductor/equivalence_gate.py")
             .contains(&driver.to_owned()),
         "the known Python driver is still unresolved"
     );

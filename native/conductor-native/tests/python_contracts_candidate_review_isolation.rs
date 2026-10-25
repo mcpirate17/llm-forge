@@ -16,11 +16,20 @@ use pyo3::prelude::*;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;
-use support::{module, path, AttrPatch, Case};
+use support::{module, Case};
 
 fn side_effect_probe_repo(case: &Case) -> PathBuf {
     let repo = case.root().join("repo");
     fixture::init_repo(&repo);
+    let artifacts = case.root().join("gate-findings");
+    fixture::write_fixture(
+        &repo,
+        "pyproject.toml",
+        &format!(
+            "[tool.forge.equivalence_probe]\nrun_artifacts = {:?}\n",
+            artifacts.to_str().unwrap()
+        ),
+    );
     fixture::write_fixture(
         &repo,
         "subject.py",
@@ -89,9 +98,6 @@ fn equivalence_probe_replays_side_effects_outside_candidate_snapshot() {
         let source_before = fs::read(repo.join("subject.py")).unwrap();
         let test_before = fs::read(repo.join("test_subject.py")).unwrap();
         let artifact_dir = case.root().join("gate-findings");
-        let ledger = module(py, "conductor.slop_ledger");
-        let _artifacts =
-            AttrPatch::replace(ledger.as_any(), "GATE_FINDINGS", &path(py, &artifact_dir));
 
         fixture::with_materialized(
             py,

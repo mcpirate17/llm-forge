@@ -32,6 +32,7 @@ import functools
 import importlib
 import inspect
 import json
+import math
 import pathlib
 import sys
 import time
@@ -47,12 +48,12 @@ MAX_RECORDED_CALLS = 24
 # Wall clock ONE function's sweeps may spend before its remaining constructs are
 # reported unmeasured instead of measured. Not a taste. Measured per function over
 # five modules of this repo, 62 functions: 60 of them finish in under 1 s (p95 =
-# 0.71 s), the slowest that finishes at all is `slop_gate.probe` at 11.0 s, and then
+# 0.71 s), the slowest that finishes at all is the old gate's `probe` at 11.0 s, and then
 # the distribution jumps -- `equivalence_probe._record_many` 55.3 s,
 # `equivalence_probe.probe_function` 93.3 s, `mutation_coverage.main` 221.9 s. Those
 # are the functions whose replayed call runs a pytest suite, so one recorded call
 # costs a whole test run, and they are why the modules holding them exceeded
-# `slop_gate.PER_MODULE_TIMEOUT` and were killed -- throwing away the verdicts of
+# the per-module timeout and were killed -- throwing away the verdicts of
 # every OTHER function in the module. `mutation_coverage` spent 222.5 s to report
 # nothing about any of its twelve functions, eleven of which cost 0.5 s combined.
 #
@@ -135,7 +136,15 @@ class AblationResult:
     detail: str = ""
 
     def as_dict(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
+        # JSON has no infinity, and an incomparable difference is reported as one.
+        # It travels as its name, which the native gate reads back, rather than as
+        # the `Infinity` token only Python's own parser accepts.
+        return {
+            key: repr(value)
+            if isinstance(value, float) and not math.isfinite(value)
+            else value
+            for key, value in dataclasses.asdict(self).items()
+        }
 
 
 # --------------------------------------------------------------------------- copy
@@ -1065,7 +1074,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     if args.json:
         args.json.write_text(
-            json.dumps([r.as_dict() for r in results], indent=2) + "\n"
+            json.dumps([r.as_dict() for r in results], indent=2, allow_nan=False) + "\n"
         )
     counts: dict[str, int] = {}
     for r in results:

@@ -6,7 +6,10 @@
 //! a unit whose body is only `...` or `pass` has nothing to ablate. A unit's drivers
 //! are the tests a passed run of which executed one of the unit's own lines in a
 //! fixture or test window, in the file's current content, as `test_record_untested`
-//! counts them, less the tests no longer in the tree.
+//! counts them, less the tests no longer in the tree. A module's drivers run inside its
+//! probe's timeout, so their recorded seconds may use only part of it: a unit no
+//! recorded driver fits is refused and says why, rather than costing its module's
+//! every measurement.
 
 use crate::test_record_digest::blob_oid;
 use crate::test_record_store::open_read_only;
@@ -22,6 +25,10 @@ use std::path::Path;
 /// them and more add only recording time, most of a probe's cost: the tests that ran
 /// the most of the unit's own lines win, the fastest among equals.
 const DRIVERS_PER_UNIT: usize = 8;
+
+/// The share of a module's timeout its drivers' recorded seconds may use; the rest is
+/// the probe's own, recording calls and replaying ablations.
+const DRIVING_SHARE: f64 = 0.5;
 
 /// Whether the probe ablates the function named `qualname`.
 fn probed(qualname: &str) -> bool {
@@ -142,8 +149,30 @@ impl Tests<'_> {
 /// Per test, its fastest passed run's seconds and the unit's own lines its runs executed.
 type Driven = HashMap<String, (f64, HashSet<usize>)>;
 
-/// The nodeids of the strongest of `runs` still in the tree, sorted.
-fn strongest(runs: Driven, tests: &mut Tests) -> anyhow::Result<Vec<String>> {
+/// The drivers one file's units have chosen and their recorded seconds: a test chosen
+/// once costs nothing again.
+#[derive(Default)]
+struct Spent {
+    chosen: HashSet<String>,
+    seconds: f64,
+}
+
+/// A unit's drivers, or, when every one still in the tree is past the budget, the
+/// cheapest one's seconds and what was left.
+#[derive(Debug, PartialEq)]
+enum Drivers {
+    Chosen(Vec<String>),
+    OverBudget { cheapest: f64, left: f64 },
+}
+
+/// The nodeids of the strongest of `runs` still in the tree that fit in `budget` with
+/// what `spent` has chosen, sorted.
+fn strongest(
+    runs: Driven,
+    tests: &mut Tests,
+    spent: &mut Spent,
+    budget: f64,
+) -> anyhow::Result<Drivers> {
     let mut ranked: Vec<(String, (f64, HashSet<usize>))> = runs.into_iter().collect();
     ranked.sort_by(|(a, (a_took, a_ran)), (b, (b_took, b_ran))| {
         b_ran
@@ -153,25 +182,47 @@ fn strongest(runs: Driven, tests: &mut Tests) -> anyhow::Result<Vec<String>> {
             .then_with(|| a.cmp(b))
     });
     let mut chosen = Vec::new();
-    for (nodeid, _) in ranked {
+    let mut cheapest = f64::INFINITY;
+    for (nodeid, (took, _)) in ranked {
         if chosen.len() == DRIVERS_PER_UNIT {
             break;
         }
-        if tests.exist(&nodeid)? {
-            chosen.push(nodeid);
+        if !tests.exist(&nodeid)? {
+            continue;
         }
+        let cost = if spent.chosen.contains(&nodeid) {
+            0.0
+        } else {
+            took
+        };
+        if spent.seconds + cost > budget {
+            cheapest = cheapest.min(took);
+            continue;
+        }
+        spent.seconds += cost;
+        spent.chosen.insert(nodeid.clone());
+        chosen.push(nodeid);
+    }
+    if chosen.is_empty() && cheapest.is_finite() {
+        let left = budget - spent.seconds;
+        return Ok(Drivers::OverBudget { cheapest, left });
     }
     chosen.sort();
-    Ok(chosen)
+    Ok(Drivers::Chosen(chosen))
 }
 
-/// Per file and unit, its drivers' nodeids.
-fn drivers(root: &Path, store: &Path, files: &[File]) -> anyhow::Result<Vec<Vec<Vec<String>>>> {
+/// Per file and unit, its drivers within `budget` seconds a file.
+fn drivers(
+    root: &Path,
+    store: Option<&Path>,
+    files: &[File],
+    budget: f64,
+) -> anyhow::Result<Vec<Vec<Drivers>>> {
     let mut driven: Vec<Vec<Driven>> = files
         .iter()
         .map(|file| vec![HashMap::new(); file.units.len()])
         .collect();
-    if let Some(connection) = open_read_only(store)? {
+    if let Some(connection) = store.map(open_read_only).transpose()?.flatten() {
         let hits = windows(&connection, files)?;
         let mut statement = connection.prepare(
             "SELECT r.nodeid, r.seconds, w.window FROM runs r \
@@ -200,9 +251,10 @@ fn drivers(root: &Path, store: &Path, files: &[File]) -> anyhow::Result<Vec<Vec<
     driven
         .into_iter()
         .map(|units| {
+            let mut spent = Spent::default();
             units
                 .into_iter()
-                .map(|runs| strongest(runs, &mut tests))
+                .map(|runs| strongest(runs, &mut tests, &mut spent, budget))
                 .collect::<anyhow::Result<Vec<_>>>()
         })
         .collect()
@@ -210,48 +262,65 @@ fn drivers(root: &Path, store: &Path, files: &[File]) -> anyhow::Result<Vec<Vec<
 
 /// A unit the probe ablates: `(qualname, def line, driver nodeids)`.
 type Unit = (String, usize, Vec<String>);
+/// A unit no driver fits the budget of: `(qualname, def line, why)`.
+type Refused = (String, usize, String);
+/// A change: `(path, whole file, units, refused units)`.
+type Target = (String, bool, Vec<Unit>, Vec<Refused>);
 
-/// Per change, `(path, whole, units)`.
+/// Per change, its target, the drivers of each file within `timeout`'s driving share.
 fn targets(
     root: &Path,
-    store: &Path,
+    store: Option<&Path>,
     changes: &[(String, Option<Vec<usize>>)],
-) -> anyhow::Result<Vec<(String, bool, Vec<Unit>)>> {
+    timeout: f64,
+) -> anyhow::Result<Vec<Target>> {
     let files = changes
         .iter()
         .map(|(path, changed)| file(root, path, changed.as_deref()))
         .collect::<anyhow::Result<Vec<_>>>()?;
-    let drivers = drivers(root, store, &files)?;
+    let budget = timeout * DRIVING_SHARE;
+    let drivers = drivers(root, store, &files, budget)?;
     Ok(files
         .iter()
         .zip(drivers)
         .map(|(file, drivers)| {
-            let units = file
-                .units
-                .iter()
-                .zip(drivers)
-                .map(|(&index, nodeids)| {
-                    let function = &file.functions[index];
-                    (function.qualname.clone(), function.line, nodeids)
-                })
-                .collect();
-            (file.path.to_owned(), file.whole, units)
+            let (mut units, mut refused) = (Vec::new(), Vec::new());
+            for (&index, driven) in file.units.iter().zip(drivers) {
+                let function = &file.functions[index];
+                let (qualname, line) = (function.qualname.clone(), function.line);
+                match driven {
+                    Drivers::Chosen(nodeids) => units.push((qualname, line, nodeids)),
+                    Drivers::OverBudget { cheapest, left } => refused.push((
+                        qualname,
+                        line,
+                        format!(
+                            "its cheapest recorded driver takes {cheapest:.1}s, past the \
+                             {left:.1}s left of the {budget:.1}s its module's drivers may take \
+                             of the {timeout:.0}s timeout"
+                        ),
+                    )),
+                }
+            }
+            let whole = file.whole && refused.is_empty();
+            (file.path.to_owned(), whole, units, refused)
         })
         .collect())
 }
 
 /// For `changes`, each a path relative to `root` and its changed line numbers, or
-/// `None` for the whole file: per change `(path, whole, units)`, each unit the
-/// `(qualname, def line, driver nodeids)` of one the probe ablates, its drivers from
-/// the runs recorded in `store`.
+/// `None` for the whole file: per change `(path, whole, units, refused)`, each unit
+/// the `(qualname, def line, driver nodeids)` of one the probe ablates, its drivers
+/// from the runs recorded in `store` and none without one, and each unit whose drivers
+/// do not fit a probe killed at `timeout` seconds `(qualname, def line, why)`.
 #[pyfunction]
 pub(crate) fn equivalence_targets_native(
     py: Python<'_>,
     root: &str,
-    store: &str,
+    store: Option<&str>,
     changes: Vec<(String, Option<Vec<usize>>)>,
-) -> PyResult<Vec<(String, bool, Vec<Unit>)>> {
-    py.detach(|| targets(Path::new(root), Path::new(store), &changes))
+    timeout: f64,
+) -> PyResult<Vec<Target>> {
+    py.detach(|| targets(Path::new(root), store.map(Path::new), &changes, timeout))
         .map_err(|error| PyRuntimeError::new_err(format!("{error:#}")))
 }
 
@@ -313,14 +382,7 @@ def untouched():
         }
     }
 
-    #[test]
-    fn a_unit_is_driven_by_the_passed_tests_that_ran_its_own_lines() {
-        let root = std::env::temp_dir().join(format!("equivalence-targets-{}", std::process::id()));
-        std::fs::create_dir_all(&root).unwrap();
-        std::fs::write(root.join("m.py"), SOURCE).unwrap();
-        std::fs::write(root.join("t.py"), TESTS).unwrap();
-        let db = root.join("record.sqlite");
-        let oid = blob_oid(SOURCE.as_bytes());
+    fn record(db: &Path, windows: &[WindowRow], runs: &[RunRow]) {
         let session = SessionRow {
             started: 0.0,
             finished: 1.0,
@@ -330,9 +392,19 @@ def untouched():
             argv: "[]".to_owned(),
             unstable: 0,
         };
-        store::write(
+        store::write(db, &session, windows, runs).unwrap();
+    }
+
+    #[test]
+    fn a_unit_is_driven_by_the_passed_tests_that_ran_its_own_lines() {
+        let root = std::env::temp_dir().join(format!("equivalence-targets-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("m.py"), SOURCE).unwrap();
+        std::fs::write(root.join("t.py"), TESTS).unwrap();
+        let db = root.join("record.sqlite");
+        let oid = blob_oid(SOURCE.as_bytes());
+        record(
             &db,
-            &session,
             &[
                 // Line 8 is inner's body, not outer's.
                 window("inner", "test", json!([["m.py", oid, [8]]])),
@@ -350,8 +422,8 @@ def untouched():
                 run("gone.py::test_x", "passed", 0.01, &["both"]),
                 run("t.py::test_c", "passed", 0.01, &["collect"]),
             ],
-        )
-        .unwrap();
+        );
+        let unbounded = f64::INFINITY;
         let both = vec!["t.py::TestB::test_b".to_owned(), "t.py::test_a".to_owned()];
         let unit =
             |name: &str, line: usize, nodeids: &[String]| (name.to_owned(), line, nodeids.to_vec());
@@ -359,11 +431,12 @@ def untouched():
         // stub (21).
         let changes = [("m.py".to_owned(), Some(vec![2, 8, 15, 18, 21]))];
         assert_eq!(
-            targets(&root, &db, &changes).unwrap(),
+            targets(&root, Some(&db), &changes, unbounded).unwrap(),
             vec![(
                 "m.py".to_owned(),
                 false,
-                vec![unit("outer", 6, &both), unit("C.method", 14, &both)]
+                vec![unit("outer", 6, &both), unit("C.method", 14, &both)],
+                vec![]
             )]
         );
         let whole = [("m.py".to_owned(), None)];
@@ -372,7 +445,7 @@ def untouched():
             "t.py::test_a[x-1]".to_owned(),
         ];
         assert_eq!(
-            targets(&root, &db, &whole).unwrap(),
+            targets(&root, Some(&db), &whole, unbounded).unwrap(),
             vec![(
                 "m.py".to_owned(),
                 true,
@@ -381,17 +454,61 @@ def untouched():
                     unit("outer", 6, &both),
                     unit("C.method", 14, &both),
                     unit("untouched", 24, &[]),
-                ]
+                ],
+                vec![]
             )]
         );
         // With no store, no unit has drivers.
         assert_eq!(
-            targets(&root, &root.join("none.sqlite"), &changes).unwrap(),
+            targets(&root, Some(&root.join("none.sqlite")), &changes, unbounded).unwrap(),
             vec![(
                 "m.py".to_owned(),
                 false,
-                vec![unit("outer", 6, &[]), unit("C.method", 14, &[])]
+                vec![unit("outer", 6, &[]), unit("C.method", 14, &[])],
+                vec![]
             )]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_unit_whose_only_drivers_overrun_the_timeout_is_refused_not_probed() {
+        let root = std::env::temp_dir().join(format!("equivalence-budget-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let source = "def fast():\n    return 1\n\n\ndef slow():\n    return 2\n";
+        std::fs::write(root.join("m.py"), source).unwrap();
+        std::fs::write(root.join("t.py"), TESTS).unwrap();
+        let db = root.join("record.sqlite");
+        let oid = blob_oid(source.as_bytes());
+        record(
+            &db,
+            &[
+                window("fast", "test", json!([["m.py", oid, [2]]])),
+                window("slow", "test", json!([["m.py", oid, [6]]])),
+            ],
+            &[
+                run("t.py::test_a", "passed", 1.0, &["fast"]),
+                run("t.py::TestB::test_b", "passed", 140.0, &["slow"]),
+            ],
+        );
+        let [(path, whole, units, refused)] =
+            targets(&root, Some(&db), &[("m.py".to_owned(), None)], 180.0)
+                .unwrap()
+                .try_into()
+                .unwrap();
+        assert_eq!((path.as_str(), whole), ("m.py", false));
+        assert_eq!(
+            units,
+            vec![("fast".to_owned(), 1, vec!["t.py::test_a".to_owned()])]
+        );
+        assert_eq!(refused.len(), 1);
+        assert_eq!((refused[0].0.as_str(), refused[0].1), ("slow", 5));
+        assert!(
+            refused[0]
+                .2
+                .contains("takes 140.0s, past the 89.0s left of the 90.0s"),
+            "{}",
+            refused[0].2
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -421,7 +538,75 @@ def untouched():
         let kept: Vec<String> = [0, 1, 4, 5, 6, 7, 8, 9]
             .map(|n| format!("t.py::test_{n}"))
             .to_vec();
-        assert_eq!(strongest(runs, &mut tests).unwrap(), kept);
+        let mut spent = Spent::default();
+        assert_eq!(
+            strongest(runs, &mut tests, &mut spent, f64::INFINITY).unwrap(),
+            Drivers::Chosen(kept)
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_files_drivers_share_one_budget_and_a_test_already_chosen_is_free() {
+        let root = std::env::temp_dir().join(format!("equivalence-spent-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let source: String = (0..3)
+            .map(|n| format!("def test_{n}():\n    pass\n"))
+            .collect();
+        std::fs::write(root.join("t.py"), source).unwrap();
+        let mut tests = Tests {
+            root: &root,
+            defined: HashMap::new(),
+        };
+        let runs = |drivers: &[(usize, f64, usize)]| -> Driven {
+            drivers
+                .iter()
+                .map(|&(n, took, lines)| (format!("t.py::test_{n}"), (took, (0..lines).collect())))
+                .collect()
+        };
+        let named = |n: usize| format!("t.py::test_{n}");
+        let mut spent = Spent::default();
+        // test_0 fits; test_1 would take the file past 10s, so the unit keeps test_0 alone.
+        assert_eq!(
+            strongest(
+                runs(&[(0, 6.0, 2), (1, 5.0, 1)]),
+                &mut tests,
+                &mut spent,
+                10.0
+            )
+            .unwrap(),
+            Drivers::Chosen(vec![named(0)])
+        );
+        // test_0 costs nothing a second time; test_2 does not fit.
+        assert_eq!(
+            strongest(
+                runs(&[(0, 6.0, 1), (2, 20.0, 2)]),
+                &mut tests,
+                &mut spent,
+                10.0
+            )
+            .unwrap(),
+            Drivers::Chosen(vec![named(0)])
+        );
+        assert_eq!(
+            strongest(
+                runs(&[(2, 20.0, 1), (1, 5.0, 1)]),
+                &mut tests,
+                &mut spent,
+                10.0
+            )
+            .unwrap(),
+            Drivers::OverBudget {
+                cheapest: 5.0,
+                left: 4.0
+            }
+        );
+        // A unit no recorded test ran has no drivers, which is not a refusal.
+        assert_eq!(
+            strongest(runs(&[]), &mut tests, &mut spent, 10.0).unwrap(),
+            Drivers::Chosen(vec![])
+        );
+        assert_eq!(spent.seconds, 6.0);
         std::fs::remove_dir_all(&root).unwrap();
     }
 }

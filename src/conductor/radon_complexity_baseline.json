@@ -216,15 +216,6 @@
     },
     {
       "complexity": 22,
-      "key": "src/conductor/slop_ledger.py::render",
-      "line": 171,
-      "name": "render",
-      "path": "src/conductor/slop_ledger.py",
-      "rank": "D",
-      "type": "F"
-    },
-    {
-      "complexity": 22,
       "key": "src/conductor/uncurated_kill_rate.py::measure",
       "line": 281,
       "name": "measure",

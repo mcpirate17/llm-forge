@@ -1,17 +1,17 @@
 #![cfg(feature = "python-compat-tests")]
-//! Rust-owned policy-engine crash reporting and backlog contracts.
+//! Rust-owned policy-engine crash reporting contracts.
 
 #[path = "python_contracts/support.rs"]
 #[allow(dead_code)]
 mod support;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBytes, PyDict};
+use pyo3::types::{PyAny, PyDict};
 use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use support::{attr_text, module, path, text, AttrPatch, Case};
+use support::{attr_text, module, AttrPatch, Case};
 
 // Data for the Python traceback interpreter. The assertions and test driver live in Rust.
 const RAISE_FIXTURE: &str =
@@ -135,46 +135,11 @@ fn crash_finding_carries_no_path_or_line() {
 }
 
 #[test]
-fn unserializable_summary_is_reported_not_fatal() {
-    let case = Case::new();
-    let findings_dir = case.root().join("gate_findings");
-    Python::attach(|py| {
-        let ledger = module(py, "conductor.slop_ledger");
-        let new_path = path(py, &findings_dir);
-        let _path_patch = AttrPatch::replace(ledger.as_any(), "GATE_FINDINGS", &new_path);
-        let stderr = module(py, "io")
-            .getattr("StringIO")
-            .unwrap()
-            .call0()
-            .unwrap();
-        let _stderr_patch = AttrPatch::replace(module(py, "sys").as_any(), "stderr", &stderr);
-        let incomplete = PyDict::new(py);
-        incomplete
-            .set_item("stderr_tail", PyBytes::new(py, b"killed mid-import"))
-            .unwrap();
-        let summary = PyDict::new(py);
-        summary.set_item("incomplete", vec![incomplete]).unwrap();
-        module(py, "conductor.candidate_review.equivalence_probe_check")
-            .getattr("_record_for_backlog")
-            .unwrap()
-            .call1((summary, py.None()))
-            .unwrap();
-        assert!(text(&stderr.call_method0("getvalue").unwrap()).contains("not recorded"));
-    });
-    assert!(
-        fs::read_dir(&findings_dir).unwrap().next().is_none(),
-        "no .json or .part may survive"
-    );
-}
-
-#[test]
-fn crash_help_names_flag_gate_actually_accepts() {
+fn incomplete_probe_help_names_a_command_the_gate_accepts() {
     let _case = Case::new();
-    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../src/conductor/candidate_review/equivalence_probe_check.py");
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../slop-core/src/gate_report.rs");
     let content = fs::read_to_string(source).unwrap();
-    assert!(content.contains("python -m conductor.slop_gate --module <module>"));
-    assert!(!content.contains("--only"));
+    assert!(content.contains("python -m conductor.equivalence_gate gate --module <module>"));
     let python = std::env::var_os("PYO3_PYTHON")
         .or_else(|| std::env::var_os("PYTHON"))
         .unwrap_or_else(|| OsString::from("python3"));
@@ -184,16 +149,16 @@ fn crash_help_names_flag_gate_actually_accepts() {
         search_path.extend(std::env::split_paths(&inherited));
     }
     let output = Command::new(python)
-        .args(["-m", "conductor.slop_gate", "--help"])
+        .args(["-m", "conductor.equivalence_gate", "gate", "--help"])
         .env("PYTHONPATH", std::env::join_paths(search_path).unwrap())
         .output()
-        .expect("run slop_gate help");
+        .expect("run equivalence_gate help");
     assert!(
         output.status.success(),
-        "slop_gate help failed: {}",
+        "equivalence_gate help failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("--module"));
-    assert!(!stdout.contains("--only"));
+    assert!(String::from_utf8(output.stdout)
+        .unwrap()
+        .contains("--module"));
 }
