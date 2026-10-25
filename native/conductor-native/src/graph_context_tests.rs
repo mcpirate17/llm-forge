@@ -1,11 +1,12 @@
 //! Conservative reverse dependency test selection over either graph backend.
 //!
 //! Only changed code files select tests: a change to a document, fixture or other data
-//! selects none, and a changed lock file or C, C++ or CUDA file selects all of them. A
-//! test is selected when the graph shows it depends on a changed `.py` or `.rs` file,
-//! when its newest recorded run executed or opened a changed code file
-//! (`[tool.forge.test_record]`), or when its text names one, which is how a test that
-//! imports through a string or runs a script by path is found.
+//! selects none, and a changed lock file, build definition (`setup.py`,
+//! `CMakeLists.txt`, `*.cmake`, `meson.build`) or C, C++ or CUDA file
+//! selects all of them. A test is selected when the graph shows it depends on a
+//! changed `.py` or `.rs` file, when its newest recorded run executed or opened a
+//! changed code file (`[tool.forge.test_record]`), or when its text names one, which is
+//! how a test that imports through a string or runs a script by path is found.
 
 use super::store::{columns, current_hash, GraphStore};
 use crate::test_record_config::store_for;
@@ -38,6 +39,12 @@ const LOCKS: &[&str] = &[
 /// neither the graph nor the test record links that library back to its sources, so
 /// a change selects the full inventory.
 const COMPILED: &[&str] = &["c", "cc", "cpp", "cxx", "h", "hpp", "cu", "cuh"];
+/// Build definitions, by file name, beside every `*.cmake`: they decide how a library
+/// the tests load is built, and nothing links them to those tests, so a change selects
+/// the full inventory. A Makefile is left out because most only orchestrate, and
+/// `build.rs` because the graph links a maturin crate's files to the tests that import
+/// its module.
+const BUILD_DEFINITIONS: &[&str] = &["setup.py", "CMakeLists.txt", "meson.build"];
 /// Directories the inventory never walks, beside every `.`-prefixed one.
 const UNWALKED: &[&str] = &[
     "target",
@@ -634,6 +641,15 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
         .any(|path| LOCKS.contains(&path.rsplit('/').next().unwrap_or(path)))
     {
         reasons.insert("a dependency lock file changed, so any test can run new code".to_owned());
+    }
+    if walk.iter().any(|path| {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        BUILD_DEFINITIONS.contains(&name) || name.ends_with(".cmake")
+    }) {
+        reasons.insert(
+            "a build definition file changed, and nothing links what it builds to the tests that load it"
+                .to_owned(),
+        );
     }
     let code: Vec<String> = walk
         .into_iter()
