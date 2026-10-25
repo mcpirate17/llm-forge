@@ -48,6 +48,7 @@ mod session_preamble;
 mod status;
 mod subagent_stop;
 mod subagent_transcript;
+mod sweep;
 mod takeover;
 mod task_limits;
 mod task_resources;
@@ -94,6 +95,9 @@ enum Command {
     /// rebase, run the host's `.forge/land.toml` checks bounded, fast-forward
     /// push, delete the branch. No CI service involved.
     Land(land::LandArgs),
+    /// Run the host's scheduled checks (`.forge/sweep.toml`) from a persistent
+    /// clone of the integration line, or install the systemd timer that does.
+    Sweep(sweep::SweepArgs),
     /// Run repository checks against the clean, committed current checkout.
     Check(local_check::CheckArgs),
     /// Plan or execute fast edit-loop checks; never a landing PASS receipt.
@@ -270,6 +274,7 @@ fn main() -> ExitCode {
         }
         Command::Task(args) => command_exit("task", tasks::run(args), 1),
         Command::Land(args) => command_exit("land", land::run(args), 2),
+        Command::Sweep(args) => command_exit("sweep", sweep::run(args), 2),
         Command::Check(args) => command_exit("check", local_check::run(args), 2),
         Command::Preview(args) => command_exit("preview", local_check::preview(args), 2),
         Command::Performance(args) => command_exit("performance", performance::run(args), 2),

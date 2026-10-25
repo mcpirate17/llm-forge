@@ -33,3 +33,6 @@ the checks ran (config, rebase, trailers, push).
 
 Forge carries no host policy. The host's `.forge/land.toml` declares everything:
 checks, bounds, trailers. See this repository's own `.forge/land.toml`.
+
+Scheduled whole-repository checks run from their own clone on a timer: see
+[sweep.md](sweep.md).
