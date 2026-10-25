@@ -26,13 +26,13 @@ fn main(py: Python<'_>, args: &[&str]) -> i64 {
         .unwrap()
 }
 
-fn capture<'py>(py: Python<'py>) -> (Bound<'py, PyAny>, AttrPatch) {
+fn capture<'py>(py: Python<'py>, stream: &str) -> (Bound<'py, PyAny>, AttrPatch) {
     let sink = module(py, "io")
         .getattr("StringIO")
         .unwrap()
         .call0()
         .unwrap();
-    let guard = AttrPatch::replace(&module(py, "sys").into_any(), "stdout", &sink);
+    let guard = AttrPatch::replace(&module(py, "sys").into_any(), stream, &sink);
     (sink, guard)
 }
 
@@ -50,7 +50,7 @@ fn mock_return<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> Bound<'py, Py
 fn version_prints_and_exits_zero() {
     let _case = Case::new();
     Python::attach(|py| {
-        let (out, _capture) = capture(py);
+        let (out, _capture) = capture(py, "stdout");
         assert_eq!(main(py, &["--version"]), 0);
         assert!(text(&out.call_method0("getvalue").unwrap()).starts_with("verbosity-scan"));
     });
@@ -62,7 +62,7 @@ fn comment_heavy_function_is_reported_and_exits_one() {
     let src = case.write("heavy.py", HEAVY);
     let src = src.to_string_lossy().to_string();
     Python::attach(|py| {
-        let (out, _capture) = capture(py);
+        let (out, _capture) = capture(py, "stderr");
         assert_eq!(main(py, &[&src]), 1);
         let printed = text(&out.call_method0("getvalue").unwrap());
         assert!(printed.contains(&format!("{src}:1: comment/comment-heavy-function")));
@@ -76,7 +76,7 @@ fn light_function_exits_zero() {
     let src = case.write("light.py", LIGHT);
     let src = src.to_string_lossy().to_string();
     Python::attach(|py| {
-        let (out, _capture) = capture(py);
+        let (out, _capture) = capture(py, "stderr");
         assert_eq!(main(py, &[&src]), 0);
         assert!(text(&out.call_method0("getvalue").unwrap()).contains("0 finding(s)"));
     });
@@ -88,7 +88,7 @@ fn non_python_paths_are_ignored() {
     let other = case.write("notes.txt", HEAVY);
     let other = other.to_string_lossy().to_string();
     Python::attach(|py| {
-        let (out, _capture) = capture(py);
+        let (out, _capture) = capture(py, "stderr");
         assert_eq!(main(py, &[&other]), 0);
         assert_eq!(text(&out.call_method0("getvalue").unwrap()), "");
     });
@@ -105,8 +105,7 @@ fn with_changed_lines(ranges: &[(i64, i64)]) -> i64 {
             "changed_line_ranges",
             &mock,
         );
-        let _verbosity = AttrPatch::replace(&verbosity(py), "changed_line_ranges", &mock);
-        let (_out, _capture) = capture(py);
+        let (_out, _capture) = capture(py, "stderr");
         main(py, &["--base", "HEAD", &src])
     })
 }
