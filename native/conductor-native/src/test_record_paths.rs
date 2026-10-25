@@ -1,15 +1,19 @@
 //! Where a path a test touched lives, and therefore how its identity is recorded.
 
+use crate::test_record_installed::Installed;
 use std::path::{Component, Path, PathBuf};
 
 /// A dependency location. Repository files are recorded by git blob oid so a
 /// candidate tree can be matched without reading it; files under `$HOME` and other
-/// absolute paths are host state and are recorded by `stat` identity.
+/// absolute paths are host state and are recorded by `stat` identity. A file an
+/// installed distribution owns is recorded as that distribution, by its metadata
+/// directory name, which carries the version.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum Place {
     Repo(String),
     Home(String),
     Abs(String),
+    Dist(String),
 }
 
 impl Place {
@@ -17,20 +21,23 @@ impl Place {
         match self {
             Place::Repo(rel) => rel.clone(),
             Place::Home(rel) => format!("~/{rel}"),
-            Place::Abs(path) => path.clone(),
+            Place::Abs(path) | Place::Dist(path) => path.clone(),
         }
     }
 }
 
-/// Classification roots, all canonical. Environment prefixes (the venv, the base
-/// interpreter, site-packages) are covered by the environment key, so they are
-/// checked before the repository root: a venv inside the repository is not source.
+/// Classification roots, all canonical. Site directories are checked first: a file
+/// there belongs to the distribution that installed it. The other environment
+/// prefixes (the venv, the base interpreter) are covered by the environment key, so
+/// they are checked before the repository root: a venv inside the repository is not
+/// source.
 #[derive(Clone, Debug)]
 pub(crate) struct Places {
     root: PathBuf,
     environment: Vec<PathBuf>,
     scratch: Vec<PathBuf>,
     home: Option<PathBuf>,
+    installed: Installed,
 }
 
 const PSEUDO_FILESYSTEMS: [&str; 3] = ["/proc", "/sys", "/dev"];
@@ -80,11 +87,28 @@ impl Places {
             environment: environment.iter().map(|p| canonical(p)).collect(),
             scratch: scratch.iter().map(|p| canonical(p)).collect(),
             home: home.map(canonical),
+            installed: Installed::default(),
         }
+    }
+
+    pub(crate) fn with_installed(self, installed: Installed) -> Self {
+        Self { installed, ..self }
+    }
+
+    pub(crate) fn installed(&self) -> &Installed {
+        &self.installed
     }
 
     pub(crate) fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// A distribution's place and the metadata directory its identity is read from.
+    pub(crate) fn dist(&self, label: &str) -> (Place, PathBuf) {
+        (
+            Place::Dist(label.to_owned()),
+            self.installed.dist_dir(label),
+        )
     }
 
     /// The place a recorded label names here: `~/` is this session's home, so a
@@ -124,11 +148,16 @@ impl Places {
             cwd.join(raw)
         };
         let path = std::fs::canonicalize(&joined).unwrap_or_else(|_| lexical(&joined));
-        if bytecode(&path)
-            || self
-                .environment
-                .iter()
-                .any(|prefix| path.starts_with(prefix))
+        if bytecode(&path) {
+            return None;
+        }
+        if let Some(found) = self.installed.classify(&joined, &path) {
+            return found;
+        }
+        if self
+            .environment
+            .iter()
+            .any(|prefix| path.starts_with(prefix))
         {
             return None;
         }
@@ -181,6 +210,43 @@ mod tests {
             .classify(Path::new("pkg/__pycache__/mod.cpython-312.pyc"), &root)
             .is_none());
         assert!(places.classify(Path::new(".git/HEAD"), &root).is_none());
+    }
+
+    #[test]
+    fn site_files_are_their_distribution_and_the_rest_of_the_venv_is_ignored() {
+        let root =
+            std::env::temp_dir().join(format!("test-record-paths-site-{}", std::process::id()));
+        let site = root.join(".venv/lib/python3.12/site-packages");
+        let meta = site.join("alpha-1.0.dist-info");
+        std::fs::create_dir_all(site.join("alpha")).unwrap();
+        std::fs::create_dir_all(&meta).unwrap();
+        std::fs::write(meta.join("RECORD"), "alpha/__init__.py,,\n").unwrap();
+        let sites = [site.to_str().unwrap().to_owned()];
+        let places = places(&root).with_installed(Installed::new(&sites).unwrap());
+        let (place, _) = places
+            .classify(
+                Path::new(".venv/lib/python3.12/site-packages/alpha/__init__.py"),
+                &root,
+            )
+            .unwrap();
+        assert_eq!(place, Place::Dist("alpha-1.0.dist-info".to_owned()));
+        assert_eq!(places.dist("alpha-1.0.dist-info").1, meta);
+        let stray = site.join("_virtualenv.py");
+        assert_eq!(
+            places.classify(&stray, &root).unwrap().0,
+            Place::Abs(stray.to_str().unwrap().to_owned())
+        );
+        assert!(places.classify(&site, &root).is_none());
+        assert!(places
+            .classify(Path::new(".venv/bin/python"), &root)
+            .is_none());
+        assert!(places
+            .classify(
+                &site.join("alpha/__pycache__/__init__.cpython-312.pyc"),
+                &root
+            )
+            .is_none());
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

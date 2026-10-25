@@ -46,7 +46,8 @@ pub struct FileFacts {
     pub imports: Vec<Import>,
     /// Calls whose callable is a dynamic expression and has no static path.
     pub dynamic_calls: usize,
-    /// Module names passed as string literals to `import_module`, `__import__` or `run_module`.
+    /// Module names passed as string literals to `import_module`, `__import__`,
+    /// `run_module` or pytest's `importorskip`.
     #[serde(default)]
     pub literal_imports: Vec<String>,
     /// Import-by-name sites whose target is not a string literal (or is a file path).
@@ -140,7 +141,7 @@ impl PythonCollector<'_> {
     }
 }
 
-const IMPORT_BY_NAME: [&str; 3] = ["import_module", "__import__", "run_module"];
+const IMPORT_BY_NAME: [&str; 4] = ["import_module", "__import__", "run_module", "importorskip"];
 const IMPORT_BY_PATH: [&str; 3] = ["run_path", "spec_from_file_location", "load_source"];
 const FILE_READS: [&str; 12] = [
     "parse",
@@ -244,7 +245,14 @@ impl<'a> SourceOrderVisitor<'a> for PythonCollector<'_> {
                     import.module.as_ref().map_or("", |name| name.as_str())
                 );
                 for alias in &import.names {
+                    // A star import binds no name callers can resolve, but it does load
+                    // the module, so it is a module import.
                     if alias.name.as_str() == "*" {
+                        self.facts.imports.push(Import {
+                            alias: "*".to_owned(),
+                            module: module.clone(),
+                            member: None,
+                        });
                         continue;
                     }
                     self.facts.imports.push(Import {

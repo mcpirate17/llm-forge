@@ -30,6 +30,17 @@ dicts, preserving container equality.
 | `test_public_names_excludes_underscored` | Same suffix; exact public function, class, and constant Python set. |
 | `test_public_names_prefers_dunder_all` | Same suffix; exact `__all__` Python set. |
 
+The selector these twelve cases covered, `_convention_tests` and its re-export
+helpers, was deleted on 2026-10-25. Replaying 60 LLM commits, it added 76
+file-commit selections the import graph did not make, and none of those files
+failed in the sessions of the commits that selected them. Its re-export cases
+now live in one native case,
+`a_test_importing_a_package_reexport_is_selected_for_the_defining_module` in
+`native/forge/tests/graph_index.rs`, covering plain, absolute, aliased,
+`try`-nested and star re-exports and a src layout. The star form exposed a gap:
+the fact extractor dropped `import *`, so it wrote no edge. The Rust target
+keeps only `candidate_graph_selection_inventories_the_immutable_snapshot`.
+
 The advisory selector target initializes Git and a minimal SQLite graph only
 inside a disposable fixture, with isolated Git configuration. Its graph edge
 keys use Python `Path.resolve()` even for the intentionally absent source file,

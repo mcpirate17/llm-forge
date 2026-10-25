@@ -60,18 +60,6 @@ fn select_with_no_python_tests<'py>(
         "_graph_test_paths",
         graph.as_any(),
     );
-    let convention_shape = signature(py, &["_ctx", "_sources"], &[]);
-    let convention = PyCFunction::new_closure(py, None, None, move |args, kw| {
-        bind_signature(&convention_shape, args, kw)?;
-        Ok::<_, PyErr>(PySet::empty(args.py())?.unbind())
-    })
-    .unwrap();
-    gate.setattr(
-        py,
-        verification.as_any(),
-        "_convention_tests",
-        convention.as_any(),
-    );
     let selected = changed_context(py, context, changes);
     verification
         .getattr("select_tests")
@@ -223,18 +211,6 @@ fn native_mutation_evidence_answers_the_high_risk_gate() {
             verification.as_any(),
             "_graph_test_paths",
             graph.as_any(),
-        );
-        let convention_shape = signature(py, &["_ctx", "_sources"], &[]);
-        let convention = PyCFunction::new_closure(py, None, None, move |args, kw| {
-            bind_signature(&convention_shape, args, kw)?;
-            Ok::<_, PyErr>(PySet::empty(args.py())?.unbind())
-        })
-        .unwrap();
-        gate.setattr(
-            py,
-            verification.as_any(),
-            "_convention_tests",
-            convention.as_any(),
         );
         let seen = Arc::new(Mutex::new(Vec::<BTreeSet<String>>::new()));
         let evidence_shape = signature(py, &["_ctx", "tests"], &[]);

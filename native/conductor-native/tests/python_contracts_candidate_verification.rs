@@ -169,12 +169,6 @@ fn selection_adapter_preserves_graph_failure_and_structured_finding() {
         let context = replace.call((&context,), Some(&context_kwargs)).unwrap();
         let verification = module(py, "conductor.candidate_review.verification");
         let mock = module(py, "unittest.mock").getattr("Mock").unwrap();
-        let no_tests = PyDict::new(py);
-        no_tests
-            .set_item("return_value", PySet::empty(py).unwrap())
-            .unwrap();
-        let empty = mock.call((), Some(&no_tests)).unwrap();
-        let _convention = AttrPatch::replace(&verification, "_convention_tests", &empty);
         let no_native = PyDict::new(py);
         no_native.set_item("return_value", PyDict::new(py)).unwrap();
         let empty_native = mock.call((), Some(&no_native)).unwrap();

@@ -40,18 +40,19 @@ impl Checker<'_> {
         if let Some(value) = self.values.get(&(kind, label.to_owned())) {
             return value.clone();
         }
-        let value = self
-            .places
-            .resolve(label)
-            .map_or_else(String::new, |(place, real)| {
-                Dep {
-                    kind,
-                    place,
-                    real,
-                    first: String::new(),
-                }
-                .current()
-            });
+        let found = match kind {
+            DepKind::Installed => Some(self.places.dist(label)),
+            DepKind::File | DepKind::Listing => self.places.resolve(label),
+        };
+        let value = found.map_or_else(String::new, |(place, real)| {
+            Dep {
+                kind,
+                place,
+                real,
+                first: String::new(),
+            }
+            .current()
+        });
         self.values.insert((kind, label.to_owned()), value.clone());
         value
     }
@@ -65,6 +66,7 @@ impl Checker<'_> {
                 "file" => DepKind::File,
                 "list" if compare_listings => DepKind::Listing,
                 "list" => continue,
+                "inst" => DepKind::Installed,
                 other => anyhow::bail!("unknown dependency kind {other:?}"),
             };
             if self.current(dep_kind, label) != *value {
@@ -286,6 +288,84 @@ mod tests {
         // A missing store reuses nothing.
         let missing = reusable(&root.join("none.sqlite"), "env", &places, &tests).unwrap();
         assert!(missing.iter().all(Option::is_none));
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_rebuilt_distribution_reruns_only_the_tests_that_loaded_it() {
+        let root =
+            std::env::temp_dir().join(format!("test-record-reuse-inst-{}", std::process::id()));
+        let site = root.join("site");
+        for (label, file) in [
+            ("alpha-1.0.dist-info", "alpha.py"),
+            ("beta-1.0.dist-info", "beta.py"),
+        ] {
+            std::fs::create_dir_all(site.join(label)).unwrap();
+            std::fs::write(
+                site.join(label).join("RECORD"),
+                format!("{file},sha256=v1,1\n"),
+            )
+            .unwrap();
+        }
+        let sites = [site.to_string_lossy().into_owned()];
+        let places = Places::new(root.to_str().unwrap(), &[], &[], None)
+            .with_installed(crate::test_record_installed::Installed::new(&sites).unwrap());
+        let value = |label: &str| crate::test_record_digest::distribution(&site.join(label));
+        let db = root.join("record.sqlite");
+        store::write(
+            &db,
+            &session("env"),
+            &[
+                window(
+                    "s",
+                    "session",
+                    json!([["inst", "beta-1.0.dist-info", value("beta-1.0.dist-info")]]),
+                ),
+                window(
+                    "t-alpha",
+                    "test",
+                    json!([["inst", "alpha-1.0.dist-info", value("alpha-1.0.dist-info")]]),
+                ),
+                window("t-none", "test", json!([])),
+            ],
+            &[
+                run("t.py::uses_alpha", "passed", &["s", "t-alpha"]),
+                run("t.py::uses_neither", "passed", &["s", "t-none"]),
+            ],
+        )
+        .unwrap();
+        let tests: Vec<(String, String)> = ["uses_alpha", "uses_neither"]
+            .iter()
+            .map(|name| {
+                (
+                    format!("t.py::{name}"),
+                    root.join("t.py").to_string_lossy().into(),
+                )
+            })
+            .collect();
+        let reused = |places: &Places| {
+            reusable(&db, "env", places, &tests)
+                .unwrap()
+                .iter()
+                .map(Option::is_some)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(reused(&places), [true, true]);
+        std::fs::write(
+            site.join("alpha-1.0.dist-info/RECORD"),
+            "alpha.py,sha256=v2,1\n",
+        )
+        .unwrap();
+        assert_eq!(reused(&places), [false, true]);
+        // A version bump renames the metadata directory: the recorded one is absent.
+        std::fs::rename(
+            site.join("beta-1.0.dist-info"),
+            site.join("beta-2.0.dist-info"),
+        )
+        .unwrap();
+        let bumped = Places::new(root.to_str().unwrap(), &[], &[], None)
+            .with_installed(crate::test_record_installed::Installed::new(&sites).unwrap());
+        assert_eq!(reused(&bumped), [false, false]);
         std::fs::remove_dir_all(&root).unwrap();
     }
 }

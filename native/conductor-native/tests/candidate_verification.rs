@@ -106,7 +106,7 @@ fn selection_keeps_native_evidence_out_of_pytest_and_reports_uncovered_python() 
         "selection_decide",
         &json!({
             "sources":plan["sources"], "changed_tests":plan["changed_tests"],
-            "high_risk":plan["high_risk"], "graph_tests":[], "convention_tests":[],
+            "high_risk":plan["high_risk"], "graph_tests":[],
             "native_tests":{"crate/src/lib.rs":["crate/src/lib.rs"]},
             "graph":{}, "graph_error":null, "property_evidence":true
         }),
@@ -123,7 +123,7 @@ fn selection_keeps_native_evidence_out_of_pytest_and_reports_uncovered_python() 
         "selection_decide",
         &json!({
             "sources":plan["sources"], "changed_tests":[], "high_risk":false,
-            "graph_tests":[], "convention_tests":[],
+            "graph_tests":[],
             "native_tests":{"crate/src/lib.rs":["crate/src/lib.rs"]},
             "graph":{}, "graph_error":null, "property_evidence":false
         }),

@@ -110,7 +110,6 @@ pub(super) fn plan(request: &Value) -> Result<Value, String> {
 pub(super) fn decide(request: &Value) -> Result<Value, String> {
     let sources = strings(&request["sources"]);
     let mut tests: BTreeSet<_> = strings(&request["graph_tests"]).into_iter().collect();
-    tests.extend(strings(&request["convention_tests"]));
     tests.extend(strings(&request["changed_tests"]));
     let contract_sources: BTreeSet<_> = strings(&request["contract_sources"]).into_iter().collect();
     let contract_targets = strings(&request["contract_targets"]);

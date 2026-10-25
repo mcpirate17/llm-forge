@@ -3,7 +3,7 @@
 
 use crate::test_record_digest::{self as digest, Stat, ABSENT};
 use crate::test_record_paths::{Place, Places};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Where a hit is attributed. A test depends on the session window, the collect
@@ -40,6 +40,8 @@ impl Kind {
 pub(crate) enum DepKind {
     File,
     Listing,
+    /// An installed distribution, by the digest of the files it installs.
+    Installed,
 }
 
 impl DepKind {
@@ -47,6 +49,7 @@ impl DepKind {
         match self {
             Self::File => "file",
             Self::Listing => "list",
+            Self::Installed => "inst",
         }
     }
 }
@@ -55,6 +58,8 @@ impl DepKind {
 pub(crate) enum Access {
     Read(PathBuf),
     List(PathBuf),
+    /// A modeled program ran: its output is a function of these files.
+    Program(&'static [&'static str]),
     Opaque(&'static str),
 }
 
@@ -78,6 +83,7 @@ impl Dep {
             (DepKind::Listing, _) => {
                 digest::listing(&self.real).unwrap_or_else(|_| ABSENT.to_owned())
             }
+            (DepKind::Installed, _) => digest::distribution(&self.real),
         }
     }
 }
@@ -150,6 +156,9 @@ pub(crate) struct State {
     dep_ids: HashMap<(DepKind, Place), u32>,
     /// `co_filename` to (dependency, is repository source).
     code_files: HashMap<String, Option<(u32, bool)>>,
+    /// The recorder's own files: they run in every window, and depending on the
+    /// distribution that ships them would rerun every test whenever it is rebuilt.
+    instrument: HashSet<PathBuf>,
     pub(crate) stack: Vec<(Kind, String, Window)>,
     /// Collect and fixture windows accumulate over every setup with the same key.
     pub(crate) closed: HashMap<(Kind, String), Window>,
@@ -165,6 +174,7 @@ impl State {
             deps: Vec::new(),
             dep_ids: HashMap::new(),
             code_files: HashMap::new(),
+            instrument: HashSet::new(),
             stack: vec![(Kind::Session, String::new(), Window::default())],
             closed: HashMap::new(),
             runs: Vec::new(),
@@ -198,7 +208,37 @@ impl State {
         }
     }
 
+    /// Excludes the recorder's own files, given as `__file__` paths, from every window.
+    pub(crate) fn exclude(&mut self, files: &[String]) {
+        for file in files {
+            if let Some((_, real)) = self.locate(Path::new(file)) {
+                self.instrument.insert(real);
+            }
+        }
+    }
+
+    /// The dependency `raw` names, and whether it is repository source; `None` when
+    /// it is no dependency or is the recorder's own file.
+    pub(crate) fn located(&mut self, kind: DepKind, raw: &Path) -> Option<(u32, bool)> {
+        let (place, real) = self.locate(raw)?;
+        if self.instrument.contains(&real) {
+            return None;
+        }
+        let source = matches!(place, Place::Repo(_));
+        Some((self.dep(kind, place, real), source))
+    }
+
+    /// The id of a dependency already seen, without adding it.
+    pub(crate) fn known(&self, kind: DepKind, place: &Place) -> Option<u32> {
+        self.dep_ids.get(&(kind, place.clone())).copied()
+    }
+
+    /// A file a distribution owns is that distribution, read from its metadata.
     pub(crate) fn dep(&mut self, kind: DepKind, place: Place, real: PathBuf) -> u32 {
+        let (kind, real) = match &place {
+            Place::Dist(label) => (DepKind::Installed, self.places.dist(label).1),
+            _ => (kind, real),
+        };
         if let Some(id) = self.dep_ids.get(&(kind, place.clone())) {
             return *id;
         }
@@ -222,10 +262,7 @@ impl State {
         let entry = if filename.starts_with('<') {
             None
         } else {
-            self.locate(Path::new(filename)).map(|(place, real)| {
-                let source = matches!(place, Place::Repo(_));
-                (self.dep(DepKind::File, place, real), source)
-            })
+            self.located(DepKind::File, Path::new(filename))
         };
         self.code_files.insert(filename.to_owned(), entry);
         entry
@@ -253,26 +290,31 @@ impl State {
     }
 
     pub(crate) fn access(&mut self, access: Access) {
-        let (kind, raw) = match access {
-            Access::Read(raw) => (DepKind::File, raw),
-            Access::List(raw) => (DepKind::Listing, raw),
+        match access {
+            Access::Read(raw) => self.read(DepKind::File, &raw),
+            Access::List(raw) => self.read(DepKind::Listing, &raw),
+            Access::Program(files) => {
+                for file in files {
+                    self.read(DepKind::File, Path::new(file));
+                }
+            }
             Access::Opaque(reason) => {
                 self.current()
                     .opaque
                     .get_or_insert_with(|| reason.to_owned());
-                return;
             }
-        };
-        if let Some((place, real)) = self.locate(&raw) {
-            let id = self.dep(kind, place, real);
+        }
+    }
+
+    fn read(&mut self, kind: DepKind, raw: &Path) {
+        if let Some((id, _)) = self.located(kind, raw) {
             self.current().deps.insert(id);
         }
     }
 
     /// A module imported before recording started is a dependency of every test.
     pub(crate) fn preloaded(&mut self, file: &str) {
-        if let Some((place, real)) = self.locate(Path::new(file)) {
-            let id = self.dep(DepKind::File, place, real);
+        if let Some((id, _)) = self.located(DepKind::File, Path::new(file)) {
             self.stack[0].2.deps.insert(id);
         }
     }
@@ -424,6 +466,29 @@ mod tests {
             .iter()
             .all(|dep| dep.place.label() != "lib.py" || dep.first == digest::blob_oid(b"x = 1\n")));
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_modeled_program_is_a_read_of_its_files_and_not_opaque() {
+        let mut state = state(Path::new("/nonexistent-record-root"));
+        state.push(Kind::Test, "tests/test_a.py::test".to_owned());
+        state.access(Access::Program(&[
+            "/nonexistent/program",
+            "/nonexistent/cache",
+        ]));
+        let window = std::mem::take(state.current());
+        assert!(window.opaque.is_none());
+        let deps: Vec<(String, String)> = window
+            .deps
+            .into_iter()
+            .map(|id| &state.deps[id as usize])
+            .map(|dep| (dep.place.label(), dep.first.clone()))
+            .collect();
+        let absent = |path: &str| (path.to_owned(), ABSENT.to_owned());
+        assert_eq!(
+            deps,
+            [absent("/nonexistent/program"), absent("/nonexistent/cache")]
+        );
     }
 
     #[test]

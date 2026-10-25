@@ -400,12 +400,6 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
             .unwrap();
         let graph = mock.call((), Some(&graph_kwargs)).unwrap();
         let _graph = AttrPatch::replace(&verification, "_graph_test_paths", &graph);
-        let empty_kwargs = PyDict::new(py);
-        empty_kwargs
-            .set_item("return_value", PySet::empty(py).unwrap())
-            .unwrap();
-        let empty = mock.call((), Some(&empty_kwargs)).unwrap();
-        let _convention = AttrPatch::replace(&verification, "_convention_tests", &empty);
         let native_kwargs = PyDict::new(py);
         native_kwargs
             .set_item("return_value", PyDict::new(py))
@@ -458,7 +452,6 @@ fn native_policy_reports_unmapped_source_in_mixed_contract_change() {
             "sources": ["src/conductor/memory_vectors.py", "src/conductor/unmapped.py"],
             "changed_tests": [],
             "graph_tests": [],
-            "convention_tests": [],
             "native_tests": {},
             "contract_sources": ["src/conductor/memory_vectors.py"],
             "contract_targets": ["python_contracts_memory_vectors"],

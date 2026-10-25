@@ -15,6 +15,8 @@ use walkdir::{DirEntry, WalkDir};
 
 #[path = "graph_index_cache.rs"]
 mod cache;
+#[path = "graph_index_crates.rs"]
+mod crates;
 
 pub const DEFAULT_DB: &str = ".forge/graph.db";
 const MAX_SOURCE_BYTES: u64 = 1 << 20;
@@ -331,7 +333,11 @@ fn resolve(
     })
 }
 
-fn write_snapshot(conn: &mut Connection, files: &[IndexedFile]) -> Result<(usize, usize)> {
+fn write_snapshot(
+    conn: &mut Connection,
+    files: &[IndexedFile],
+    crates: &crates::Crates,
+) -> Result<(usize, usize)> {
     conn.execute_batch(
         "PRAGMA foreign_keys=ON;
          CREATE TABLE files (
@@ -381,9 +387,19 @@ fn write_snapshot(conn: &mut Connection, files: &[IndexedFile]) -> Result<(usize
         )?;
     }
     let names = repo_names(files);
-    let (resolved, unresolved, unresolved_files) =
-        write_call_edges(&tx, files, &ids, &lookup, &names)?;
-    write_metadata(&tx, files, resolved, unresolved, &unresolved_files)?;
+    let (resolved, unresolved, mut unresolved_files) =
+        write_call_edges(&tx, files, &ids, &lookup, &names, crates)?;
+    crates.write_edges(&tx, &mut unresolved_files)?;
+    for path in &unresolved_files {
+        tx.execute("UPDATE files SET unresolved=1 WHERE file_path=?1", [path])?;
+    }
+    write_metadata(
+        &tx,
+        files,
+        crates,
+        (resolved, unresolved),
+        &unresolved_files,
+    )?;
     tx.commit()?;
     Ok((resolved, unresolved))
 }
@@ -419,12 +435,15 @@ fn write_call_edges(
     ids: &Definitions,
     lookup: &ModuleLookup,
     names: &BTreeSet<String>,
+    crates: &crates::Crates,
 ) -> Result<(usize, usize, BTreeSet<String>)> {
     let mut resolved = 0;
     let mut unresolved = 0;
     let mut distinct = BTreeSet::new();
     let mut unresolved_files = BTreeSet::new();
     for file in files {
+        // A file of a closed crate already reaches every consumer through its root.
+        let unlinked_rust = file.language != "python" && !crates.linked(&file.path);
         for call in &file.facts.calls {
             let source = ids.get(&(file.path.clone(), call.caller.clone()));
             let target = resolve(file, call, lookup, ids);
@@ -438,22 +457,16 @@ fn write_call_edges(
                 }
             } else {
                 unresolved += 1;
-                if file.language != "python" {
+                if unlinked_rust {
                     unresolved_files.insert(file.path.clone());
                 }
             }
         }
-        if file.language != "python" && file.facts.dynamic_calls > 0 {
+        if unlinked_rust && file.facts.dynamic_calls > 0 {
             unresolved_files.insert(file.path.clone());
         }
-        if write_import_edges(tx, file, lookup, names)? {
+        if write_import_edges(tx, file, lookup, names, crates)? {
             unresolved_files.insert(file.path.clone());
-        }
-        if unresolved_files.contains(&file.path) {
-            tx.execute(
-                "UPDATE files SET unresolved=1 WHERE file_path=?1",
-                [&file.path],
-            )?;
         }
     }
     Ok((resolved, unresolved, unresolved_files))
@@ -495,18 +508,11 @@ fn is_dynamic(file: &IndexedFile) -> bool {
         || (file.facts.file_reads > 0 && is_test_path(&file.path))
 }
 
-fn insert_import_edge(
-    tx: &rusqlite::Transaction<'_>,
-    file: &IndexedFile,
-    target: &str,
-) -> Result<()> {
-    if target != file.path {
+fn insert_import_edge(tx: &rusqlite::Transaction<'_>, source: &str, target: &str) -> Result<()> {
+    if target != source {
         tx.execute(
             "INSERT OR IGNORE INTO edges VALUES (?1,?2,'IMPORTS',0)",
-            params![
-                format!("{}::<module>", file.path),
-                format!("{target}::<module>")
-            ],
+            params![format!("{source}::<module>"), format!("{target}::<module>")],
         )?;
     }
     Ok(())
@@ -521,7 +527,8 @@ fn submodule_name(module: &str, member: &str) -> String {
 }
 
 /// Write one IMPORTS edge per resolvable import (any scope), per parent package
-/// `__init__`, per imported submodule, and per string-literal import-by-name.
+/// `__init__`, per imported submodule, per string-literal import-by-name, and per
+/// repository crate that builds the imported module.
 /// Returns true when a static import names a repository module that resolves to no
 /// indexed file, the only case where the dependency edges are incomplete.
 fn write_import_edges(
@@ -529,6 +536,7 @@ fn write_import_edges(
     file: &IndexedFile,
     lookup: &ModuleLookup,
     names: &BTreeSet<String>,
+    crates: &crates::Crates,
 ) -> Result<bool> {
     let mut unresolved = false;
     let literals = file
@@ -563,14 +571,26 @@ fn write_import_edges(
                 if let Some(parent) =
                     python_module_file(lookup, &file.path, &parts[..end].join("."))
                 {
-                    insert_import_edge(tx, file, &parent)?;
+                    insert_import_edge(tx, &file.path, &parent)?;
                 }
             }
         }
         for target in main.iter().chain(submodule.iter()) {
-            insert_import_edge(tx, file, target)?;
+            insert_import_edge(tx, &file.path, target)?;
         }
-        unresolved |= main.is_none() && submodule.is_none() && (relative || names.contains(top));
+        let full = member.map(|member| submodule_name(module, member));
+        let imported: Vec<&str> = [Some(module.as_str()), full.as_deref()]
+            .into_iter()
+            .flatten()
+            .filter(|_| !relative)
+            .collect();
+        let mut native = false;
+        for root in crates.module_roots(&imported) {
+            insert_import_edge(tx, &file.path, root)?;
+            native = true;
+        }
+        unresolved |=
+            main.is_none() && submodule.is_none() && !native && (relative || names.contains(top));
     }
     Ok(unresolved)
 }
@@ -578,8 +598,8 @@ fn write_import_edges(
 fn write_metadata(
     tx: &rusqlite::Transaction<'_>,
     files: &[IndexedFile],
-    resolved: usize,
-    unresolved: usize,
+    crates: &crates::Crates,
+    (resolved, unresolved): (usize, usize),
     unresolved_files: &BTreeSet<String>,
 ) -> Result<()> {
     let mut digest = Sha256::new();
@@ -588,6 +608,7 @@ fn write_metadata(
         digest.update(&file.path);
         digest.update(&file.hash);
     }
+    digest.update(&crates.digest);
     let dynamic: BTreeSet<&str> = files
         .iter()
         .filter(|file| is_dynamic(file))
@@ -597,6 +618,7 @@ fn write_metadata(
         ("schema_version", "3".to_owned()),
         ("parser_version", cache::PARSER_VERSION.to_owned()),
         ("content_generation", format!("{:x}", digest.finalize())),
+        ("crate_manifests_sha256", crates.digest.clone()),
         (
             "coverage_complete",
             (unresolved_files.is_empty() && dynamic.is_empty()).to_string(),
@@ -648,7 +670,7 @@ fn git_head(host: &Path) -> Result<String> {
     Ok(String::new())
 }
 
-fn existing_counts(db: &Path, head: &str) -> Result<Option<(usize, usize)>> {
+fn existing_counts(db: &Path, head: &str, manifests: &str) -> Result<Option<(usize, usize)>> {
     let conn = Connection::open_with_flags(db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let mut statement = conn.prepare("SELECT key,value FROM index_meta")?;
     let metadata = statement
@@ -656,7 +678,9 @@ fn existing_counts(db: &Path, head: &str) -> Result<Option<(usize, usize)>> {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?
         .collect::<rusqlite::Result<BTreeMap<String, String>>>()?;
-    if metadata.get("git_head_sha").map(String::as_str) != Some(head) {
+    if metadata.get("git_head_sha").map(String::as_str) != Some(head)
+        || metadata.get("crate_manifests_sha256").map(String::as_str) != Some(manifests)
+    {
         return Ok(None);
     }
     let number = |key: &str| -> Result<usize> {
@@ -715,8 +739,9 @@ pub fn index(host: &Path, explicit_db: Option<&Path>) -> Result<IndexReport> {
     let previous = cache::load(&db)?;
     let (files, parsed_files) = scan(host, &previous)?;
     let head = git_head(host)?;
+    let crates = crates::Crates::discover(host, &files)?;
     if parsed_files == 0 && files.len() == previous.len() && db.is_file() {
-        if let Some(counts) = existing_counts(&db, &head)? {
+        if let Some(counts) = existing_counts(&db, &head, &crates.digest)? {
             return Ok(report(&db, &files, 0, counts, started));
         }
     }
@@ -742,7 +767,7 @@ pub fn index(host: &Path, explicit_db: Option<&Path>) -> Result<IndexReport> {
     );
     let mut conn = Connection::open(&temporary.0)
         .with_context(|| format!("create graph snapshot: {}", temporary.0.display()))?;
-    let (resolved_calls, unresolved_calls) = write_snapshot(&mut conn, &files)?;
+    let (resolved_calls, unresolved_calls) = write_snapshot(&mut conn, &files, &crates)?;
     conn.execute("INSERT INTO index_meta VALUES ('git_head_sha',?1)", [head])?;
     conn.close().map_err(|(_, error)| error)?;
     fs::rename(&temporary.0, &db)

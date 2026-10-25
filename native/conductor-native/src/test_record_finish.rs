@@ -2,7 +2,8 @@
 //! check, and the rows the store writes.
 
 use crate::graph_index;
-use crate::test_record_digest::{self as digest, sha1_hex};
+use crate::test_record_digest::{sha1_hex, EDITABLE};
+use crate::test_record_installed::Installed;
 use crate::test_record_paths::Place;
 use crate::test_record_state::{bit_lines, Dep, DepKind, Kind, Run, State, Window};
 use crate::test_record_store::{self as store, RunRow, SessionRow, WindowRow};
@@ -18,17 +19,19 @@ pub(crate) struct Snapshot {
     pub(crate) inipath: Option<String>,
 }
 
-/// The environment key: a record is reusable only under an equal key.
+/// The environment key: a record is reusable only under an equal key. It names the
+/// installed distributions without their versions: a test records the ones it
+/// loaded, and an optional import that was absent changes the key when installed.
 pub(crate) struct Environment {
     pub(crate) python: String,
     pub(crate) vars: BTreeMap<String, Option<String>>,
     pub(crate) site_dirs: Vec<String>,
-    pub(crate) dists: BTreeMap<String, String>,
+    pub(crate) installed: BTreeSet<String>,
 }
 
 impl Environment {
     fn value(&self) -> Value {
-        json!({"python": self.python, "dists": self.dists, "vars": self.vars})
+        json!({"python": self.python, "installed": self.installed, "vars": self.vars})
     }
 
     pub(crate) fn digest(&self) -> String {
@@ -160,16 +163,78 @@ impl Closure {
     }
 }
 
-/// Session-wide dependencies pytest and the interpreter load outside any window.
-fn session_extras(state: &mut State, snapshot: &Snapshot, session: &mut Window) {
+/// Installed distributions bring the ones they require: native code loads its
+/// libraries through the dynamic linker, which no audit event sees. An editable
+/// install is repository source, whose imports the closure already follows.
+#[derive(Default)]
+struct Requirements {
+    cache: HashMap<u32, Vec<u32>>,
+}
+
+impl Requirements {
+    fn extend(&mut self, state: &mut State, window: &mut Window) {
+        let mut pending: Vec<u32> = window
+            .deps
+            .iter()
+            .copied()
+            .filter(|id| state.deps[*id as usize].kind == DepKind::Installed)
+            .collect();
+        while let Some(id) = pending.pop() {
+            let required = match self.cache.entry(id) {
+                Entry::Occupied(entry) => entry.into_mut(),
+                Entry::Vacant(entry) => {
+                    let dep = &state.deps[id as usize];
+                    let labels = if dep.first == EDITABLE {
+                        Vec::new()
+                    } else {
+                        state.places.installed().requires(&dep.place.label())
+                    };
+                    let found = labels
+                        .iter()
+                        .map(|label| {
+                            let (place, real) = state.places.dist(label);
+                            state.dep(DepKind::Installed, place, real)
+                        })
+                        .collect();
+                    entry.insert(found)
+                }
+            };
+            pending.extend(
+                required
+                    .iter()
+                    .copied()
+                    .filter(|id| window.deps.insert(*id)),
+            );
+        }
+    }
+}
+
+/// Session-wide dependencies pytest and the interpreter load outside any window:
+/// loaded extension modules and the ini file. An extension of a distribution some
+/// window already depends on is that window's; one no window names is everyone's.
+fn session_extras(
+    state: &mut State,
+    snapshot: &Snapshot,
+    session: &mut Window,
+    held: &BTreeSet<u32>,
+) {
     let extensions = snapshot
         .modules
         .iter()
         .map(|(_, file)| file.as_str())
         .filter(|file| file.ends_with(".so") || file.ends_with(".pyd"));
     for file in extensions.chain(snapshot.inipath.as_deref()) {
-        if let Some((place, real)) = state.locate(Path::new(file)) {
-            session.deps.insert(state.dep(DepKind::File, place, real));
+        let Some((place, _)) = state.locate(Path::new(file)) else {
+            continue;
+        };
+        if state
+            .known(DepKind::Installed, &place)
+            .is_some_and(|id| held.contains(&id))
+        {
+            continue;
+        }
+        if let Some((id, _)) = state.located(DepKind::File, Path::new(file)) {
+            session.deps.insert(id);
         }
     }
 }
@@ -185,14 +250,24 @@ fn complete(state: &mut State, snapshot: &Snapshot, runs: &mut [Run]) -> anyhow:
     let mut shared = std::mem::take(&mut state.closed);
     let modules = Modules::new(state, snapshot);
     let mut closure = Closure::default();
-    session_extras(state, snapshot, &mut session);
-    closure.extend(state, &modules, &mut session)?;
-    for window in shared.values_mut() {
+    let mut requirements = Requirements::default();
+    let mut held = BTreeSet::new();
+    let windows = std::iter::once(&mut session)
+        .chain(shared.values_mut())
+        .chain(runs.iter_mut().map(|run| &mut run.window));
+    for window in windows {
         closure.extend(state, &modules, window)?;
+        requirements.extend(state, window);
+        held.extend(
+            window
+                .deps
+                .iter()
+                .copied()
+                .filter(|id| state.deps[*id as usize].kind == DepKind::Installed),
+        );
     }
-    for run in runs {
-        closure.extend(state, &modules, &mut run.window)?;
-    }
+    session_extras(state, snapshot, &mut session, &held);
+    requirements.extend(state, &mut session);
     Ok(Windows { session, shared })
 }
 
@@ -343,8 +418,8 @@ pub(crate) fn finish(mut state: State, session: &Session<'_>) -> anyhow::Result<
     if runs.is_empty() {
         return Ok("no tests ran; nothing recorded".to_owned());
     }
-    if digest::distributions(&session.environment.site_dirs)? != session.environment.dists {
-        anyhow::bail!("installed distributions changed during the session");
+    if Installed::names(&session.environment.site_dirs)? != session.environment.installed {
+        anyhow::bail!("distributions were installed or removed during the session");
     }
     let windows = complete(&mut state, session.snapshot, &mut runs)?;
     let (stored, window_rows, unstable, changed) = rows(&state, &windows, &runs);
@@ -382,6 +457,7 @@ pub(crate) fn finish(mut state: State, session: &Session<'_>) -> anyhow::Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_record_paths::Places;
 
     #[test]
     fn relative_imports_resolve_against_the_importing_package() {
@@ -401,5 +477,90 @@ mod tests {
         let mut names = BTreeSet::new();
         with_parents("a.b.c", &mut names);
         assert_eq!(names.into_iter().collect::<Vec<_>>(), ["a", "a.b", "a.b.c"]);
+    }
+
+    /// A venv inside `root` where `<name>-1.0.dist-info` owns each of its files.
+    fn site(root: &Path, dists: &[(&str, &[&str], &str)]) -> PathBuf {
+        let site = root.join(".venv/lib/python3.12/site-packages");
+        for (name, files, metadata) in dists {
+            let meta = site.join(format!("{name}-1.0.dist-info"));
+            std::fs::create_dir_all(&meta).unwrap();
+            let record: String = files.iter().map(|file| format!("{file},,\n")).collect();
+            std::fs::write(meta.join("RECORD"), record).unwrap();
+            std::fs::write(meta.join("METADATA"), metadata).unwrap();
+            for file in *files {
+                std::fs::create_dir_all(site.join(file).parent().unwrap()).unwrap();
+                std::fs::write(site.join(file), "").unwrap();
+            }
+        }
+        site
+    }
+
+    #[test]
+    fn the_recorder_is_no_dependency_and_a_held_extension_stays_with_its_window() {
+        let root = std::env::temp_dir().join(format!("test-record-finish-{}", std::process::id()));
+        let native: &[&str] = &["conductor_native/__init__.py", "conductor_native/native.so"];
+        let site = site(
+            &root,
+            &[
+                ("conductor_native", native, "Name: conductor-native\n"),
+                (
+                    "numpy",
+                    &["numpy/__init__.py", "numpy/core.so"],
+                    "Name: numpy\n",
+                ),
+                ("lonely", &["lonely/ext.so"], "Name: lonely\n"),
+                (
+                    "held",
+                    &["held/__init__.py", "held/ext.so"],
+                    "Name: held\nRequires-Dist: numpy\n\
+                     Requires-Dist: conductor-native; extra == 'native'\n",
+                ),
+            ],
+        );
+        let file = |rel: &str| site.join(rel).to_string_lossy().into_owned();
+        let sites = [site.to_string_lossy().into_owned()];
+        let venv = root.join(".venv").to_string_lossy().into_owned();
+        let places = Places::new(root.to_str().unwrap(), &[venv], &[], None)
+            .with_installed(Installed::new(&sites).unwrap());
+        let mut state = State::new(places);
+        state.exclude(&native.iter().map(|rel| file(rel)).collect::<Vec<_>>());
+        state.preloaded(&file("conductor_native/__init__.py"));
+        state.push(Kind::Test, "t.py::uses_held".to_owned());
+        state.hit(&file("held/__init__.py"));
+        state.hit(&file("conductor_native/__init__.py"));
+        state.end_test("t.py::uses_held", &root.join("t.py"), None, Vec::new(), 0.1);
+        let loaded = [
+            ("conductor_native.native", "conductor_native/native.so"),
+            ("numpy.core", "numpy/core.so"),
+            ("lonely.ext", "lonely/ext.so"),
+            ("held.ext", "held/ext.so"),
+        ];
+        let snapshot = Snapshot {
+            modules: loaded
+                .iter()
+                .map(|(name, rel)| ((*name).to_owned(), file(rel)))
+                .collect(),
+            inipath: None,
+        };
+        let mut runs = std::mem::take(&mut state.runs);
+        let windows = complete(&mut state, &snapshot, &mut runs).unwrap();
+        let labels = |window: &Window| -> Vec<String> {
+            let ids = window.all_deps();
+            ids.iter()
+                .map(|id| state.deps[*id as usize].place.label())
+                .collect()
+        };
+        // The recorder's distribution is in no window. The extension of lonely, which
+        // no window names, is everyone's. Those of held and numpy stay with the test
+        // that ran held, which requires numpy but not its optional native extra.
+        assert_eq!(labels(&windows.session), ["lonely-1.0.dist-info"]);
+        let mut test = labels(&runs[0].window);
+        test.sort();
+        assert_eq!(
+            test,
+            ["conftest.py", "held-1.0.dist-info", "numpy-1.0.dist-info"]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }
