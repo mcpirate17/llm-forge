@@ -674,6 +674,35 @@ fn a_changed_lock_file_falls_back_to_every_test() {
 }
 
 #[test]
+fn a_changed_c_cpp_or_cuda_file_falls_back_even_when_a_test_names_it() {
+    let native = [
+        ("csrc/ops.cpp", "int ops() { return 1; }\n"),
+        ("csrc/ops.h", "int ops();\n"),
+        ("csrc/scan.cu", "__global__ void scan() {}\n"),
+        (
+            "tests/test_build.py",
+            "def test_build():\n    assert 'csrc/ops.cpp'\n",
+        ),
+    ];
+    for (path, text) in [
+        ("csrc/ops.cpp", "int ops() { return 2; }\n"),
+        ("csrc/ops.h", "int ops(void);\n"),
+        ("csrc/scan.cu", "__global__ void scan() { }\n"),
+    ] {
+        let plan = plan_with_extras(&native, &[(path, text)], &[path]);
+        assert_eq!(plan["complete"], false, "{path}: {plan}");
+        assert!(
+            plan["reasons"].to_string().contains("C, C++ or CUDA"),
+            "{path}: {plan}"
+        );
+        assert!(
+            plan["paths"].to_string().contains("tests/test_build.py"),
+            "{path}: {plan}"
+        );
+    }
+}
+
+#[test]
 fn a_test_that_runs_a_changed_script_by_path_is_selected() {
     let script = [
         ("scripts/run.sh", "echo one\n"),
