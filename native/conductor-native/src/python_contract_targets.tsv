@@ -78,6 +78,7 @@ src/conductor/candidate_review/quality_checks.py	python_contracts_candidate_stru
 src/conductor/candidate_review/reporters.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/sharding.py	python_contracts_contract_runner
 src/conductor/candidate_review/style_scan.py	python_contracts_candidate_style
+src/conductor/candidate_review/test_value_scan.py	python_contracts_test_value_scan
 src/conductor/candidate_review/value_waivers.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/verification.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/verification.py	python_contracts_candidate_verification
@@ -577,6 +578,8 @@ src/conductor/testdata/native_ablations/sample.py	python_contracts_native_ablati
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_native_ablations
 native/slop-core/src/lib.rs	python_contracts_candidate_style
 native/slop-core/src/style_scan.rs	python_contracts_candidate_style
+native/slop-core/src/test_value_scan.rs	python_contracts_test_value_scan
+native/conductor-native/tests/python_contracts/support.rs	python_contracts_test_value_scan
 native/slop-core/src/rust_scan.rs	python_contracts_candidate_style
 native/slop-core/src/detector_scan.rs	python_contracts_candidate_style
 native/slop-core/src/engine.rs	python_contracts_candidate_style
