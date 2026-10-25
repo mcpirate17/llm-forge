@@ -1086,10 +1086,12 @@ def run_nicad_python(
         )
         return 127 if check else 0
 
-    nicad_dir = root / "tasks" / "audit" / "nicad"
-    nicad_dir.mkdir(parents=True, exist_ok=True)
     rc = 0
     for source in source_dirs(root):
+        # NiCad writes nicadclones/<basename of the folder> under its cwd, so folders
+        # that share a basename (a/src, b/src) need separate cwds to keep their results.
+        nicad_dir = root / "tasks" / "audit" / "nicad" / source.replace("/", "__")
+        nicad_dir.mkdir(parents=True, exist_ok=True)
         cmd = [nicad, "functions", "py", str(root / source), "notests-report"]
         rc = max(rc, run(cmd, allow_findings=not check, cwd=nicad_dir))
     return rc
