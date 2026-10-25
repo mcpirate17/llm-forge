@@ -1,0 +1,59 @@
+# `forge sweep` policy for llm-forge (docs/sweep.md). It covers what the deleted
+# GitHub workflow proved on a fresh runner and `make local-check` cannot: a clean-venv
+# install, the compilerless runtime smoke and the mutation tools run against that
+# install, plus the tool versions the workflow pinned.
+#
+# Tim reads research/reports/sweep/latest.md in this checkout. Each run's logs are in
+# research/reports/sweep/<UTC stamp>/, and the newest 14 runs are kept.
+#
+# The timer: `.venv/bin/forge sweep install` (reinstall after changing calendar or
+# launcher). `systemctl --user list-timers 'forge-sweep-*'` shows the next run.
+clone_dir = "/mnt/data/llm/sweep/llm-forge"
+report_dir = "research/reports/sweep"
+# Local time. LLM's sweep runs 00:30-03:30, so this one starts after LLM's cap.
+calendar = "*-*-* 03:45:00"
+# The cap research/tools/run_capped.sh applies in LLM: its own systemd scope, a 16 GB
+# memory cap with no swap, and a 1.5 h wall limit. That covers a cold first build;
+# the step timeouts add up to more.
+launcher = [
+  "/usr/bin/systemd-run", "--user", "--scope", "--quiet", "--collect",
+  "-p", "MemoryMax=16G", "-p", "MemorySwapMax=0",
+  "--", "/usr/bin/timeout", "--kill-after=30", "5400",
+]
+
+# The workflow pinned Python 3.12, node 20, uv through setup-uv and Rust 1.98.0. The
+# host runs node 22; land.toml's RUSTUP_TOOLCHAIN selects 1.98.0. Drift fails here by
+# name.
+[[step]]
+name = "toolchain-versions"
+run = """python - <<'PY'
+import subprocess, sys
+def version(*argv):
+    return subprocess.run(argv, capture_output=True, text=True, check=True).stdout.strip()
+have = {
+    "python": "%d.%d.%d" % sys.version_info[:3],
+    "node": version("node", "--version"),
+    "uv": version("uv", "--version"),
+    "cargo": version("cargo", "--version"),
+}
+want = {"python": "3.12.", "node": "v22.", "uv": "uv 0.10.9", "cargo": "cargo 1.98.0"}
+bad = [f"{tool}: want {want[tool]}*, have {have[tool]}" for tool in want if not have[tool].startswith(want[tool])]
+print("\\n".join(bad or [f"{tool}: {have[tool]}" for tool in want]))
+sys.exit(1 if bad else 0)
+PY"""
+timeout_s = 60
+
+# `make install` into an empty venv, so a shipped import missing from pyproject or
+# uv.lock fails (AGENTS.md; the vulture defect, #2). Then two checks run against that
+# install: the compilerless runtime smoke (`installed-runtime` in local-check, with
+# this venv), and the mutation tools. The venv is removed on exit. Its path is fixed
+# and also cleared first, because a hard kill skips the exit trap.
+[[step]]
+name = "clean-install"
+run = """venv=/mnt/data/llm/sweep/clean-venv-llm-forge && rm -rf "$venv" && trap 'rm -rf "$venv"' EXIT \
+  && UV_PROJECT_ENVIRONMENT="$venv" make install \
+  && FORGE_INSTALL_SMOKE_VENV="$venv" PYO3_NO_PYTHON=1 FORGE_BIN="$venv/bin/forge" \
+     cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml \
+     --test install_packaging -- --ignored --test-threads=1 \
+  && PATH="$venv/bin:$PATH" python -m conductor.mutation_coverage canary"""
+timeout_s = 2400
