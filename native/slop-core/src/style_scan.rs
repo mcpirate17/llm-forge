@@ -36,7 +36,7 @@ const ALLOW_ENDPOINT: &str = "guardrail: allow-endpoint";
 const ALLOW_ID: &str = "guardrail: allow-id";
 
 /// Comments this scan never reads: machine directives and tracked debt.
-const DIRECTIVES: &[&str] = &[
+pub(crate) const DIRECTIVES: &[&str] = &[
     "noqa",
     "type:",
     "pragma",
@@ -192,7 +192,7 @@ fn code_words(line: &str) -> BTreeSet<String> {
     out
 }
 
-fn comment_body(text: &str) -> &str {
+pub(crate) fn comment_body(text: &str) -> &str {
     text.trim_start_matches('#').trim()
 }
 

@@ -28,6 +28,7 @@ pub mod rules;
 pub mod rust_scan;
 pub mod style_scan;
 pub mod test_value_scan;
+pub mod verbosity_scan;
 
 use engine::{Ablation, Rule};
 use pyo3::prelude::*;
@@ -285,6 +286,8 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hot_loop_scan::hot_loop_scan_files, m)?)?;
     m.add_function(wrap_pyfunction!(test_value_scan::test_value_scan_files, m)?)?;
     m.add_function(wrap_pyfunction!(test_value_scan::test_value_scan_rules, m)?)?;
+    m.add_function(wrap_pyfunction!(verbosity_scan::verbosity_scan_files, m)?)?;
+    m.add_function(wrap_pyfunction!(verbosity_scan::verbosity_scan_rules, m)?)?;
     m.add_class::<PyTestIndex>()?;
     Ok(())
 }
