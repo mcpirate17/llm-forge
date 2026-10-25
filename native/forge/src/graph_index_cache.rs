@@ -6,7 +6,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::collections::BTreeMap;
 use std::path::Path;
 
-pub const PARSER_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), ":syntax-facts-v7");
+pub const PARSER_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), ":syntax-facts-v8");
 pub type FactCache = BTreeMap<String, (String, FileFacts)>;
 
 pub fn load(path: &Path) -> Result<FactCache> {

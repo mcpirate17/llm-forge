@@ -605,12 +605,20 @@ fn a_test_behind_a_nonliteral_import_is_left_to_its_record_and_a_literal_one_is_
             "tests/test_loader.py",
             "from pkg.loader import load\ndef test_load():\n    return load()\n",
         ),
+        (
+            "tests/test_skip.py",
+            "import pytest\nleaf = pytest.importorskip('pkg.leaf')\ndef test_skip():\n    assert leaf\n",
+        ),
     ];
     let plan = plan_with_extras(&literal, &[LEAF_EDIT], &["pkg/leaf.py"]);
     assert_eq!(plan["complete"], true, "{plan}");
     assert_eq!(
         plan["paths"],
-        serde_json::json!(["tests/test_indirect.py", "tests/test_loader.py"])
+        serde_json::json!([
+            "tests/test_indirect.py",
+            "tests/test_loader.py",
+            "tests/test_skip.py"
+        ])
     );
 }
 
@@ -722,4 +730,186 @@ fn a_test_importing_a_package_reexport_is_selected_for_the_defining_module() {
     );
     assert_eq!(plan["complete"], true, "{plan}");
     assert_eq!(plan["paths"], serde_json::json!(["tests/test_widget.py"]));
+}
+
+fn select_in(fixture: &Fixture, paths: &[&str]) -> Value {
+    conductor_native::graph_context::dispatch(
+        "test_selection",
+        &serde_json::json!({"repo": fixture.0, "paths": paths}),
+    )
+    .unwrap()
+}
+
+const EXTENSION: [(&str, &str); 8] = [
+    (
+        "native/fast/Cargo.toml",
+        "[package]\nname = \"fast-core\"\nversion = \"0.1.0\"\n[lib]\ncrate-type = [\"cdylib\"]\n",
+    ),
+    (
+        "native/fast/pyproject.toml",
+        "[build-system]\nbuild-backend = \"maturin\"\n[tool.maturin]\nmodule-name = \"fast_native\"\n",
+    ),
+    (
+        "native/fast/src/lib.rs",
+        "mod kernel;\npub fn entry() -> i32 { kernel::run() + std::cmp::max(1, 2) }\n",
+    ),
+    (
+        "native/fast/src/kernel.rs",
+        "pub fn run() -> i32 { Vec::<i32>::new().len() as i32 }\n",
+    ),
+    (
+        "native/fast/build.rs",
+        "fn main() { println!(\"cargo:rerun-if-changed=src\"); }\n",
+    ),
+    (
+        "pkg/fast.py",
+        "import fast_native\ndef go():\n    return fast_native.entry()\n",
+    ),
+    (
+        "tests/test_fast.py",
+        "from pkg.fast import go\ndef test_go():\n    assert go()\n",
+    ),
+    (
+        "tests/test_skip.py",
+        "import pytest\nnative = pytest.importorskip('fast_native')\ndef test_skip():\n    assert native\n",
+    ),
+];
+
+#[test]
+fn every_file_of_a_maturin_crate_selects_the_tests_that_import_its_module() {
+    let fixture = Fixture::new();
+    for (path, text) in EXTENSION {
+        fixture.write(path, text);
+    }
+    fixture.write(
+        "tests/test_other.py",
+        "def test_other():\n    assert True\n",
+    );
+    fixture.run(&["index"]);
+    for changed in [
+        "native/fast/src/kernel.rs",
+        "native/fast/src/lib.rs",
+        "native/fast/build.rs",
+    ] {
+        let plan = select_in(&fixture, &[changed]);
+        assert_eq!(plan["complete"], true, "{changed}: {plan}");
+        assert_eq!(
+            plan["paths"],
+            serde_json::json!(["tests/test_fast.py", "tests/test_skip.py"]),
+            "{changed}"
+        );
+    }
+    // Renaming the module in a manifest that is not an indexed file still rebuilds.
+    fixture.write(
+        "native/fast/pyproject.toml",
+        "[build-system]\nbuild-backend = \"maturin\"\n[tool.maturin]\nmodule-name = \"renamed\"\n",
+    );
+    assert_eq!(fixture.run(&["index"])["parsed_files"], 0);
+    let plan = select_in(&fixture, &["native/fast/src/kernel.rs"]);
+    assert_eq!(plan["complete"], false, "{plan}");
+}
+
+#[test]
+fn a_metadata_named_crate_is_reached_through_a_literal_submodule_import() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "store/Cargo.toml",
+        "[package]\nname = \"store-native\"\nversion = \"0.1.0\"\n[package.metadata.maturin]\n[lib]\ncrate-type = [\"cdylib\"]\n",
+    );
+    fixture.write(
+        "store/src/lib.rs",
+        "pub fn open() -> String { String::new() }\n",
+    );
+    fixture.write(
+        "tests/test_store.py",
+        "import importlib\ndef test_open():\n    assert importlib.import_module('store_native.sub')\n",
+    );
+    fixture.write(
+        "tests/test_other.py",
+        "def test_other():\n    assert True\n",
+    );
+    fixture.run(&["index"]);
+    let plan = select_in(&fixture, &["store/src/lib.rs"]);
+    assert_eq!(plan["complete"], true, "{plan}");
+    assert_eq!(plan["paths"], serde_json::json!(["tests/test_store.py"]));
+}
+
+#[test]
+fn a_crate_the_graph_cannot_close_runs_every_test() {
+    let fixture = Fixture::new();
+    fixture.write("scripts/orphan.rs", "pub fn one() -> i32 { 1 }\n");
+    fixture.write(
+        "cli/Cargo.toml",
+        "[package]\nname = \"cli\"\nversion = \"0.1.0\"\n",
+    );
+    fixture.write(
+        "cli/src/main.rs",
+        "mod args;\nfn main() { args::parse(); }\n",
+    );
+    fixture.write("cli/src/args.rs", "pub fn parse() {}\n");
+    fixture.write(
+        "lonely/Cargo.toml",
+        "[package]\nname = \"lonely\"\nversion = \"0.1.0\"\n",
+    );
+    fixture.write("lonely/src/lib.rs", "pub fn alone() -> i32 { 1 }\n");
+    fixture.write(
+        "tests/test_other.py",
+        "def test_other():\n    assert True\n",
+    );
+    fixture.run(&["index"]);
+    for changed in ["scripts/orphan.rs", "cli/src/args.rs", "lonely/src/lib.rs"] {
+        let plan = select_in(&fixture, &[changed]);
+        assert_eq!(plan["complete"], false, "{changed}: {plan}");
+        assert!(
+            plan["reasons"]
+                .to_string()
+                .contains("unresolved or dynamic dependencies"),
+            "{changed}: {plan}"
+        );
+    }
+}
+
+#[test]
+fn a_change_in_a_path_or_workspace_dependency_selects_the_dependents_importers() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "Cargo.toml",
+        "[workspace]\nmembers = [\"core\", \"py\", \"shared\"]\n[workspace.dependencies]\nshared = { path = \"shared\" }\n",
+    );
+    fixture.write(
+        "shared/Cargo.toml",
+        "[package]\nname = \"shared\"\nversion = \"0.1.0\"\n",
+    );
+    fixture.write("shared/src/lib.rs", "pub fn base() -> i32 { 1 }\n");
+    fixture.write(
+        "core/Cargo.toml",
+        "[package]\nname = \"core-lib\"\nversion = \"0.1.0\"\n[dependencies]\nshared = { workspace = true }\n",
+    );
+    fixture.write(
+        "core/src/lib.rs",
+        "pub fn mid() -> i32 { shared::base() }\n",
+    );
+    fixture.write(
+        "py/Cargo.toml",
+        "[package]\nname = \"py-ext\"\nversion = \"0.1.0\"\n[package.metadata.maturin]\nname = \"pyext\"\n[lib]\ncrate-type = [\"cdylib\"]\n[target.'cfg(unix)'.dependencies]\ncore-lib = { path = \"../core\" }\n",
+    );
+    fixture.write("py/src/lib.rs", "pub fn top() -> i32 { core_lib::mid() }\n");
+    fixture.write(
+        "tests/test_ext.py",
+        "import pyext\ndef test_ext():\n    assert pyext\n",
+    );
+    fixture.write(
+        "tests/test_other.py",
+        "def test_other():\n    assert True\n",
+    );
+    fixture.run(&["index"]);
+    for changed in ["shared/src/lib.rs", "core/src/lib.rs"] {
+        let plan = select_in(&fixture, &[changed]);
+        assert_eq!(plan["complete"], true, "{changed}: {plan}");
+        assert_eq!(
+            plan["paths"],
+            serde_json::json!(["tests/test_ext.py"]),
+            "{changed}"
+        );
+    }
 }
