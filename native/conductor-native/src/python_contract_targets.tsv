@@ -60,6 +60,7 @@ src/conductor/candidate_review/graph_selection.py	python_contracts_graph_selecti
 src/conductor/candidate_review/identity.py	python_contracts_candidate_cli
 src/conductor/candidate_review/hot_loop_scan.py	python_contracts_hot_loop_scan
 src/conductor/hot_paths_config.py	python_contracts_hot_loop_scan
+src/conductor/candidate_review/style_scan.py	python_contracts_hot_loop_scan
 native/slop-core/src/hot_loop_scan.rs	python_contracts_hot_loop_scan
 src/conductor/candidate_review/model.py	python_contracts_candidate_cli
 src/conductor/candidate_review/model.py	python_contracts_candidate_crate_version
