@@ -25,6 +25,7 @@ pub mod python_ast;
 pub mod repository_scan;
 pub mod rules;
 pub mod rust_scan;
+pub mod hot_loop_scan;
 pub mod style_scan;
 
 use engine::{Ablation, Rule};
@@ -280,6 +281,7 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rust_scan::rust_scan_rules, m)?)?;
     m.add_function(wrap_pyfunction!(style_scan::style_scan_files, m)?)?;
     m.add_function(wrap_pyfunction!(style_scan::style_scan_rules, m)?)?;
+    m.add_function(wrap_pyfunction!(hot_loop_scan::hot_loop_scan_files, m)?)?;
     m.add_class::<PyTestIndex>()?;
     Ok(())
 }
@@ -295,6 +297,9 @@ mod ledger_tests;
 
 #[cfg(test)]
 mod style_scan_tests;
+
+#[cfg(test)]
+mod hot_loop_scan_tests;
 
 #[cfg(test)]
 mod detector_scan_tests;
