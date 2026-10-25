@@ -1,8 +1,8 @@
 """Report Python functions whose comment lines outnumber their code lines.
 
 The detector is `slop_core.verbosity_scan_files`; this module is argv, changed-line
-scoping and printing. Advisory: findings print as `path:line: rule: message` and the
-exit status is 0 unless `--strict` is given.
+scoping and printing. Findings print as `path:line: rule: message` and the exit
+status is 1 whenever one is kept, as in style_scan; the caller's severity makes it advisory.
 
 A finding carries the function's span, and a function counts as changed when any
 line of that span changed, because adding comments to the body leaves the `def` line
@@ -46,7 +46,6 @@ def _touched(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", default="")
-    parser.add_argument("--strict", action="store_true")
     parser.add_argument("--version", action="store_true")
     parser.add_argument("files", nargs="*")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
@@ -69,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     for row in sorted(kept, key=lambda r: (r["path"], r["line"])):
         print(f"{row['path']}:{row['line']}: {row['rule']}: {row['message']}")
     print(f"verbosity-scan: {len(kept)} finding(s)")
-    return 1 if kept and args.strict else 0
+    return 1 if kept else 0
 
 
 if __name__ == "__main__":
