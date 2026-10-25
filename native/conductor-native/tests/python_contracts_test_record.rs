@@ -11,8 +11,8 @@ use pyo3::types::{PyDict, PySet};
 use rusqlite::Connection;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::OsString;
-use std::path::Path;
+use std::ffi::{OsStr, OsString};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 use support::{module, path, text, AttrPatch, Case};
@@ -91,7 +91,12 @@ fn project(case: &Case) {
 
 /// Runs pytest in `root` and returns its stdout.
 fn pytest(root: &Path, extra_env: &[(&str, &str)]) -> String {
-    let mut child = Command::new(python())
+    // Exit 1: test_fails fails by design.
+    pytest_in(&python(), root, extra_env, 1)
+}
+
+fn pytest_in(python: &OsStr, root: &Path, extra_env: &[(&str, &str)], code: i32) -> String {
+    let mut child = Command::new(python)
         .args(["-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"])
         .current_dir(root)
         .env("PYTHONPATH", root)
@@ -111,8 +116,7 @@ fn pytest(root: &Path, extra_env: &[(&str, &str)]) -> String {
     let output = child.wait_with_output().expect("child pytest output");
     let stdout = String::from_utf8(output.stdout).expect("UTF-8 stdout");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    // Exit 1: test_fails fails by design.
-    assert_eq!(output.status.code(), Some(1), "{stdout}\n{stderr}");
+    assert_eq!(output.status.code(), Some(code), "{stdout}\n{stderr}");
     stdout
 }
 
@@ -267,9 +271,11 @@ fn a_session_records_outcomes_dependencies_and_opacity() {
     let env = unpacked(env);
     assert_eq!(env["vars"]["RECORD_KEY"], "k");
     assert_eq!(env["vars"]["CUDA_VISIBLE_DEVICES"], "");
-    assert!(env["dists"]
-        .as_object()
-        .is_some_and(|dists| dists.keys().any(|name| name.starts_with("pytest-"))));
+    // The key holds installed names only: a version bump is judged per test.
+    assert!(env["installed"]
+        .as_array()
+        .is_some_and(|names| names.iter().any(|name| name == "pytest")));
+    assert!(env.get("dists").is_none());
 }
 
 #[test]
@@ -363,6 +369,104 @@ fn reuse_skips_recorded_passes_until_an_input_changes() {
             && stdout
                 .contains("SKIPPED [1] tests/test_pkg.py: forge test record: passed in session 1")
             && stdout.contains("1 failed, 3 passed, 1 skipped, 1 xfailed"),
+        "{stdout}"
+    );
+}
+
+/// A venv inside the project whose interpreter finds pytest and the plugin through
+/// the host venv, and whose own site directory holds `fakedist`. Returns its python
+/// and site directory.
+fn venv_with_fakedist(case: &Case) -> (PathBuf, PathBuf) {
+    let venv = case.root().join("venv");
+    let status = Command::new(python())
+        .args(["-m", "venv", "--without-pip"])
+        .arg(&venv)
+        .status()
+        .expect("create venv");
+    assert!(status.success());
+    let host = Command::new(python())
+        .args(["-c", "import site; print(site.getsitepackages()[0])"])
+        .output()
+        .expect("host site directory");
+    let host = String::from_utf8(host.stdout).expect("UTF-8 path");
+    let site = venv.join("lib/python3.12/site-packages");
+    assert!(site.is_dir(), "{}", site.display());
+    std::fs::write(
+        site.join("host.pth"),
+        format!("import site; site.addsitedir({:?})\n", host.trim()),
+    )
+    .expect("host .pth");
+    fakedist(&site, "1");
+    (venv.join("bin/python"), site)
+}
+
+fn fakedist(site: &Path, value: &str) {
+    std::fs::create_dir_all(site.join("fakedist")).expect("fakedist dir");
+    std::fs::create_dir_all(site.join("fakedist-1.0.dist-info")).expect("fakedist metadata");
+    std::fs::write(
+        site.join("fakedist/__init__.py"),
+        format!("def value():\n    return {value}\n"),
+    )
+    .expect("fakedist code");
+    std::fs::write(
+        site.join("fakedist-1.0.dist-info/RECORD"),
+        format!("fakedist/__init__.py,sha256={value},1\nfakedist-1.0.dist-info/RECORD,,\n"),
+    )
+    .expect("fakedist RECORD");
+    std::fs::write(
+        site.join("fakedist-1.0.dist-info/METADATA"),
+        "Metadata-Version: 2.1\nName: fakedist\nVersion: 1.0\n",
+    )
+    .expect("fakedist METADATA");
+}
+
+#[test]
+fn a_rebuilt_distribution_reruns_only_the_tests_that_loaded_it() {
+    let case = Case::new();
+    case.write("pyproject.toml", PYPROJECT);
+    case.write("conductor/__init__.py", "");
+    case.write(
+        "tests/test_dist.py",
+        "import fakedist\n\n\ndef test_uses_dist():\n    assert fakedist.value() > 0\n",
+    );
+    case.write(
+        "tests/test_plain.py",
+        "def test_plain():\n    assert 1 + 1 == 2\n",
+    );
+    let (python, site) = venv_with_fakedist(&case);
+    let reuse = [("FORGE_TEST_RECORD_REUSE", "1"), ("PYTEST_ADDOPTS", "-rs")];
+    let progress = |stdout: &str| stdout.lines().next().unwrap_or_default().to_owned();
+    let stdout = pytest_in(python.as_os_str(), case.root(), &[], 0);
+    assert!(progress(&stdout).starts_with(".."), "{stdout}");
+    let store = case.root().join("record/test_record.sqlite");
+    let recorded = runs(&store);
+    let installed = |nodeid: &str| -> Vec<String> {
+        recorded[nodeid]
+            .deps
+            .keys()
+            .filter(|(kind, _)| kind == "inst")
+            .map(|(_, label)| label.clone())
+            .collect()
+    };
+    assert_eq!(
+        installed("tests/test_dist.py::test_uses_dist"),
+        ["fakedist-1.0.dist-info"]
+    );
+    assert!(installed("tests/test_plain.py::test_plain").is_empty());
+
+    // The same version rebuilt with other code: only the test that loaded it reruns.
+    fakedist(&site, "2");
+    let stdout = pytest_in(python.as_os_str(), case.root(), &reuse, 0);
+    assert!(
+        progress(&stdout).starts_with(".s") && stdout.contains("1 passed, 1 skipped"),
+        "{stdout}"
+    );
+
+    // Installing a distribution changes the environment key: nothing is reused.
+    std::fs::create_dir_all(site.join("other-1.0.dist-info")).expect("other metadata");
+    let stdout = pytest_in(python.as_os_str(), case.root(), &reuse, 0);
+    assert!(
+        progress(&stdout).starts_with("..") && stdout.contains("2 passed"),
         "{stdout}"
     );
 }

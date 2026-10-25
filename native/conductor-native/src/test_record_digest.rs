@@ -1,13 +1,13 @@
-//! Content identities: git blob oids, `stat` keys, directory listings and the
-//! installed-distribution part of the environment key.
+//! Content identities: git blob oids, `stat` keys, directory listings and
+//! installed distributions.
 
 use sha1::{Digest, Sha1};
-use std::collections::BTreeMap;
 use std::fs::Metadata;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 pub(crate) const ABSENT: &str = "absent";
+pub(crate) const EDITABLE: &str = "editable";
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -101,43 +101,21 @@ fn installed_files(record: &[u8]) -> String {
     sha1_hex(rows.join("\n").as_bytes())
 }
 
-/// One entry per installed distribution: the digest of the files it installs, which
-/// changes whenever any of them does. Editable installs point at source the recorder
-/// already tracks file by file, and their RECORD names the checkout path, so they are
-/// recorded by name only.
-pub(crate) fn distributions(site_dirs: &[String]) -> std::io::Result<BTreeMap<String, String>> {
-    let mut out = BTreeMap::new();
-    for site in site_dirs {
-        let Ok(entries) = std::fs::read_dir(site) else {
-            continue;
-        };
-        for entry in entries {
-            let path = entry?.path();
-            let name = path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .into_owned();
-            let (stem, manifest) = if let Some(stem) = name.strip_suffix(".dist-info") {
-                (stem.to_owned(), "RECORD")
-            } else if let Some(stem) = name.strip_suffix(".egg-info") {
-                (stem.to_owned(), "PKG-INFO")
-            } else {
-                continue;
-            };
-            let value = if editable(&path) {
-                "editable".to_owned()
-            } else {
-                match std::fs::read(path.join(manifest)) {
-                    Ok(bytes) if manifest == "RECORD" => installed_files(&bytes),
-                    Ok(bytes) => sha1_hex(&bytes),
-                    Err(_) => ABSENT.to_owned(),
-                }
-            };
-            out.insert(stem, value);
-        }
+/// The identity of the installed distribution whose metadata is `dir`: the digest
+/// of the files it installs, which changes whenever any of them does. An editable
+/// install points at source the recorder tracks file by file, and its RECORD names
+/// the checkout path, so it is recorded by name only. A distribution that is not
+/// installed, or is installed under another version, is absent.
+pub(crate) fn distribution(dir: &Path) -> String {
+    if editable(dir) {
+        return EDITABLE.to_owned();
     }
-    Ok(out)
+    let egg = dir.extension().is_some_and(|ext| ext == "egg-info");
+    match std::fs::read(dir.join(if egg { "PKG-INFO" } else { "RECORD" })) {
+        Ok(bytes) if egg => sha1_hex(&bytes),
+        Ok(bytes) => installed_files(&bytes),
+        Err(_) => ABSENT.to_owned(),
+    }
 }
 
 #[cfg(test)]
@@ -181,13 +159,10 @@ mod tests {
             r#"{"url":"file:///x","dir_info":{"editable":true}}"#,
         )
         .unwrap();
-        let site_dirs = [site.to_str().unwrap().to_owned()];
-        let dists = distributions(&site_dirs).unwrap();
-        assert_eq!(dists["local-0.1"], "editable");
-        assert_eq!(
-            dists["fixed-1.0"],
-            installed_files(b"fixed/__init__.py,sha256=x,1\n")
-        );
+        assert_eq!(distribution(&edit), EDITABLE);
+        let first = distribution(&fixed);
+        assert_eq!(first, installed_files(b"fixed/__init__.py,sha256=x,1\n"));
+        assert_eq!(distribution(&site.join("fixed-2.0.dist-info")), ABSENT);
         // Another venv's install of the same code: its scripts carry another shebang,
         // its metadata another install record, and it compiled bytecode.
         std::fs::write(
@@ -201,15 +176,9 @@ mod tests {
             ),
         )
         .unwrap();
-        assert_eq!(
-            distributions(&site_dirs).unwrap()["fixed-1.0"],
-            dists["fixed-1.0"]
-        );
+        assert_eq!(distribution(&fixed), first);
         std::fs::write(fixed.join("RECORD"), "fixed/__init__.py,sha256=changed,1\n").unwrap();
-        assert_ne!(
-            distributions(&site_dirs).unwrap()["fixed-1.0"],
-            dists["fixed-1.0"]
-        );
+        assert_ne!(distribution(&fixed), first);
         std::fs::remove_dir_all(&site).unwrap();
     }
 }

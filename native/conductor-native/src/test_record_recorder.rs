@@ -6,8 +6,8 @@
 //! never held while Python code can run, so a callback that finds it held has
 //! re-entered: that also fails the session rather than dropping a hit.
 
-use crate::test_record_digest as digest;
 use crate::test_record_finish::{self as finish, Environment, Session, Snapshot};
+use crate::test_record_installed::Installed;
 use crate::test_record_paths::Places;
 use crate::test_record_reuse as reuse;
 use crate::test_record_state::{Access, Kind, State};
@@ -176,7 +176,7 @@ impl TestRecorder {
 
 #[pymethods]
 impl TestRecorder {
-    /// `places` is `(environment prefixes, scratch directories, home)`.
+    /// `places` is `(environment prefixes, scratch directories, home, site directories)`.
     #[new]
     fn new(
         py: Python<'_>,
@@ -184,9 +184,10 @@ impl TestRecorder {
         tool: u8,
         lines: bool,
         environment: Vec<String>,
-        places: (Vec<String>, Vec<String>, Option<String>),
-        site_dirs: Vec<String>,
+        places: (Vec<String>, Vec<String>, Option<String>, Vec<String>),
+        instrument: Vec<String>,
     ) -> PyResult<Self> {
+        let (prefixes, scratch, home, site_dirs) = places;
         let sys = PyModule::import(py, "sys")?;
         let monitoring = sys.getattr("monitoring")?;
         let version: String = sys.getattr("version")?.extract()?;
@@ -205,10 +206,15 @@ impl TestRecorder {
                 (name, value)
             })
             .collect();
-        let dists = digest::distributions(&site_dirs)
-            .map_err(|error| PyValueError::new_err(format!("installed distributions: {error}")))?;
-        let (prefixes, scratch, home) = places;
-        let mut state = State::new(Places::new(root, &prefixes, &scratch, home.as_deref()));
+        let installed_error = |error: std::io::Error| {
+            PyValueError::new_err(format!("installed distributions: {error}"))
+        };
+        let names = Installed::names(&site_dirs).map_err(installed_error)?;
+        let installed = Installed::new(&site_dirs).map_err(installed_error)?;
+        let places =
+            Places::new(root, &prefixes, &scratch, home.as_deref()).with_installed(installed);
+        let mut state = State::new(places);
+        state.exclude(&instrument);
         for (_, file) in loaded_modules(py)? {
             state.preloaded(&file);
         }
@@ -226,7 +232,7 @@ impl TestRecorder {
                 python: format!("{version} {}", cache_tag.unwrap_or_default()),
                 vars,
                 site_dirs,
-                dists,
+                installed: names,
             },
             started: unix_now(),
             argv: serde_json::to_string(&argv).expect("strings serialize"),

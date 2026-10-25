@@ -88,6 +88,8 @@ mod test_record_digest;
 #[cfg(feature = "python")]
 mod test_record_finish;
 #[cfg(feature = "python")]
+mod test_record_installed;
+#[cfg(feature = "python")]
 mod test_record_paths;
 #[cfg(feature = "python")]
 mod test_record_recorder;

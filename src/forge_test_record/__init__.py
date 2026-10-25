@@ -42,8 +42,9 @@ def _active(config: pytest.Config) -> bool:
     return _recorder is not None and config is _owner
 
 
-def _host_places() -> tuple[list[str], list[str], str | None]:
-    """Interpreter and installed-package prefixes, scratch directories and home."""
+def _host_places() -> tuple[list[str], list[str], str | None, list[str]]:
+    """Interpreter and installed-package prefixes, scratch directories, home and the
+    site directories whose distributions a test can depend on."""
     paths = sysconfig.get_paths()
     prefixes = {sys.prefix, sys.base_prefix, sys.exec_prefix, sys.base_exec_prefix}
     prefixes.update(site.getsitepackages())
@@ -58,7 +59,19 @@ def _host_places() -> tuple[list[str], list[str], str | None]:
     scratch = {tempfile.gettempdir(), os.environ.get("XDG_CACHE_HOME")}
     if home:
         scratch.add(os.path.join(home, ".cache"))
-    return sorted(prefixes), sorted(path for path in scratch if path), home
+    scratch_dirs = sorted(path for path in scratch if path)
+    return sorted(prefixes), scratch_dirs, home, site.getsitepackages()
+
+
+def _instrument_files() -> list[str]:
+    """This plugin and the native recorder: they run in every test, so the package
+    that ships them is no test's dependency."""
+    return [__file__] + [
+        module.__file__
+        for name, module in list(sys.modules.items())
+        if name.partition(".")[0] == "conductor_native"
+        and getattr(module, "__file__", None)
+    ]
 
 
 def _start(config: pytest.Config) -> None:
@@ -77,7 +90,12 @@ def _start(config: pytest.Config) -> None:
             "set FORGE_TEST_RECORD=0 to run without recording"
         )
     recorder = TestRecorder(
-        root, free[0], lines, environment, _host_places(), site.getsitepackages()
+        root,
+        free[0],
+        lines,
+        environment,
+        _host_places(),
+        _instrument_files(),
     )
     monitoring.use_tool_id(free[0], "forge test record")
     monitoring.register_callback(free[0], monitoring.events.PY_START, recorder.on_start)
@@ -133,7 +151,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         if hit is None:
             continue
         session, recorded = hit
-        reason = f"forge test record: passed in session {session} against identical inputs"
+        reason = (
+            f"forge test record: passed in session {session} against identical inputs"
+        )
         item.add_marker(pytest.mark.skip(reason=reason))
         _reused.add(item.nodeid)
         seconds += recorded
