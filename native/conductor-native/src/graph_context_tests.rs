@@ -42,10 +42,9 @@ const LOCKS: &[&str] = &[
 const COMPILED: &[&str] = &["c", "cc", "cpp", "cxx", "h", "hpp", "cu", "cuh"];
 /// Build definitions, by file name, beside every `*.cmake`: they decide how a library
 /// the tests load is built, and nothing links them to those tests, so a change selects
-/// the full inventory. A Makefile is one too: in LLM it is the build entry point
-/// (`make -C research/runtime/native all` builds the C kernels, the Rust crates and the
-/// cython extensions the tests load), and nothing links what it builds to the tests
-/// that load it. `build.rs` is left out because the graph links a maturin crate's files
+/// the full inventory. A Makefile is one too, since a host can make it the entry point
+/// that builds the compiled extensions its tests load, and nothing links what it builds
+/// to the tests that load it. `build.rs` is left out because the graph links a maturin crate's files
 /// to the tests that import its module.
 const BUILD_DEFINITIONS: &[&str] = &[
     "setup.py",
