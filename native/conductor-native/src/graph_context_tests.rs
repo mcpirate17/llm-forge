@@ -2,7 +2,8 @@
 //!
 //! Only changed code files select tests: a change to a document, fixture or other data
 //! selects none, and a changed lock file, build definition (`setup.py`,
-//! `CMakeLists.txt`, `*.cmake`, `meson.build`) or C, C++ or CUDA file
+//! `CMakeLists.txt`, `*.cmake`, `meson.build`, `Makefile`, `GNUmakefile`, `*.mk`) or C,
+//! C++ or CUDA file
 //! selects all of them. A test is selected when the graph shows it depends on a
 //! changed `.py` or `.rs` file, when its newest recorded run executed or opened a
 //! changed code file (`[tool.forge.test_record]`), or when its text names one, which is
@@ -41,10 +42,18 @@ const LOCKS: &[&str] = &[
 const COMPILED: &[&str] = &["c", "cc", "cpp", "cxx", "h", "hpp", "cu", "cuh"];
 /// Build definitions, by file name, beside every `*.cmake`: they decide how a library
 /// the tests load is built, and nothing links them to those tests, so a change selects
-/// the full inventory. A Makefile is left out because most only orchestrate, and
-/// `build.rs` because the graph links a maturin crate's files to the tests that import
-/// its module.
-const BUILD_DEFINITIONS: &[&str] = &["setup.py", "CMakeLists.txt", "meson.build"];
+/// the full inventory. A Makefile is one too: in LLM it is the build entry point
+/// (`make -C research/runtime/native all` builds the C kernels, the Rust crates and the
+/// cython extensions the tests load), and nothing links what it builds to the tests
+/// that load it. `build.rs` is left out because the graph links a maturin crate's files
+/// to the tests that import its module.
+const BUILD_DEFINITIONS: &[&str] = &[
+    "setup.py",
+    "CMakeLists.txt",
+    "meson.build",
+    "Makefile",
+    "GNUmakefile",
+];
 /// Directories the inventory never walks, beside every `.`-prefixed one.
 const UNWALKED: &[&str] = &[
     "target",
@@ -644,7 +653,7 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
     }
     if walk.iter().any(|path| {
         let name = path.rsplit('/').next().unwrap_or(path);
-        BUILD_DEFINITIONS.contains(&name) || name.ends_with(".cmake")
+        BUILD_DEFINITIONS.contains(&name) || name.ends_with(".cmake") || name.ends_with(".mk")
     }) {
         reasons.insert(
             "a build definition file changed, and nothing links what it builds to the tests that load it"
