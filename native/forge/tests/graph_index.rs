@@ -703,13 +703,16 @@ fn a_changed_c_cpp_or_cuda_file_falls_back_even_when_a_test_names_it() {
 }
 
 #[test]
-fn a_changed_build_definition_falls_back_but_a_makefile_does_not() {
+fn a_changed_build_definition_falls_back_but_a_document_does_not() {
     let build = [
         ("pkg/setup.py", "from setuptools import setup\nsetup()\n"),
         ("native/CMakeLists.txt", "project(ops)\n"),
         ("native/flags.cmake", "set(OPT -O2)\n"),
         ("native/meson.build", "project('ops', 'c')\n"),
         ("native/Makefile", "all:\n\ttrue\n"),
+        ("sub/GNUmakefile", "all:\n\ttrue\n"),
+        ("x/rules.mk", "OPT = -O2\n"),
+        ("README.md", "one\n"),
         (
             "tests/test_build.py",
             "def test_build():\n    assert 'pkg/setup.py'\n",
@@ -723,6 +726,9 @@ fn a_changed_build_definition_falls_back_but_a_makefile_does_not() {
         ("native/CMakeLists.txt", "project(ops C)\n"),
         ("native/flags.cmake", "set(OPT -O3)\n"),
         ("native/meson.build", "project('ops', 'cpp')\n"),
+        ("native/Makefile", "all:\n\tfalse\n"),
+        ("sub/GNUmakefile", "all:\n\tfalse\n"),
+        ("x/rules.mk", "OPT = -O3\n"),
     ] {
         let plan = plan_with_extras(&build, &[(path, text)], &[path]);
         assert_eq!(plan["complete"], false, "{path}: {plan}");
@@ -731,11 +737,7 @@ fn a_changed_build_definition_falls_back_but_a_makefile_does_not() {
             "{path}: {plan}"
         );
     }
-    let plan = plan_with_extras(
-        &build,
-        &[("native/Makefile", "all:\n\tfalse\n")],
-        &["native/Makefile"],
-    );
+    let plan = plan_with_extras(&build, &[("README.md", "two\n")], &["README.md"]);
     assert_eq!(plan["complete"], true, "{plan}");
 }
 
