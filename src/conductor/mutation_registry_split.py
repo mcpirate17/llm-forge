@@ -21,6 +21,7 @@ import json
 from pathlib import Path, PurePosixPath
 
 from conductor.mutation_campaign_model import REPO_ROOT
+from conductor.mutation_registry_rows import FRAGMENT_DIRECTORY, pending_fragment
 from conductor.mutation_scope import CampaignError
 from conductor.project_paths import registry_path
 
@@ -55,28 +56,19 @@ def split_registry_array(repo_root: Path = REPO_ROOT) -> list[str]:
                 f"{path} campaigns[{index}] manifest has no campaign id to name a fragment"
             )
         if campaign_id in seen:
-            raise CampaignError(
-                f"two array rows share the campaign id {campaign_id!r}"
-            )
+            raise CampaignError(f"two array rows share the campaign id {campaign_id!r}")
         seen.add(campaign_id)
         pairs.append((campaign_id, row["manifest"]))
     if not pairs:
         return []  # already split: the array is empty and the fragments stand
 
-    fragments = path.parent / "registry.d"
-    pending: list[tuple[Path, str]] = []
-    for campaign_id, manifest in pairs:
-        fragment = fragments / f"{campaign_id}.json"
-        body = json.dumps({"manifest": manifest}, indent=2) + "\n"
-        if fragment.exists():
-            if fragment.read_text(encoding="utf-8") != body:
-                raise CampaignError(
-                    f"{fragment.relative_to(repo_root)} already registers a "
-                    "different manifest"
-                )
-            continue
-        pending.append((fragment, body))
-    fragments.mkdir(parents=True, exist_ok=True)
+    pending = [
+        row
+        for campaign_id, manifest in pairs
+        if (row := pending_fragment(path, campaign_id, manifest, repo_root=repo_root))
+        is not None
+    ]
+    (path.parent / FRAGMENT_DIRECTORY).mkdir(parents=True, exist_ok=True)
     for fragment, body in pending:
         fragment.write_text(body, encoding="utf-8")
     payload["campaigns"] = []

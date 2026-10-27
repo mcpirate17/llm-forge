@@ -22,6 +22,29 @@ def is_fragment_name(name: str) -> bool:
     return PurePosixPath(name).suffix == ".json"
 
 
+def pending_fragment(
+    registry: Path, campaign_id: str, manifest: str, *, repo_root: Path
+) -> tuple[Path, str] | None:
+    """The fragment that registers `manifest` and its bytes, or None when it stands.
+
+    Raises CampaignError when `registry.d/<campaign_id>.json` is unreadable or
+    already registers a different manifest.
+    """
+    fragment = registry.parent / FRAGMENT_DIRECTORY / f"{campaign_id}.json"
+    if fragment.exists():
+        try:
+            declared = json.loads(fragment.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise CampaignError(f"cannot read fragment {fragment}: {exc}") from exc
+        if declared != {"manifest": manifest}:
+            raise CampaignError(
+                f"{fragment.relative_to(repo_root)} already registers a "
+                "different manifest"
+            )
+        return None
+    return fragment, json.dumps({"manifest": manifest}, indent=2) + "\n"
+
+
 def merge_registry_manifests(rows: object, fragments: Iterable[object]) -> list[str]:
     """Array rows first, then fragments in the order given, first occurrence kept."""
     if not isinstance(rows, list):
