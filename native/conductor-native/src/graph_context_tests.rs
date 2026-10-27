@@ -70,6 +70,31 @@ fn extension(path: &str) -> &str {
         .unwrap_or("")
 }
 
+fn file_name(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
+}
+
+fn is_lock(path: &str) -> bool {
+    LOCKS.contains(&file_name(path))
+}
+
+fn is_build_definition(path: &str) -> bool {
+    let name = file_name(path);
+    BUILD_DEFINITIONS.contains(&name) || name.ends_with(".cmake") || name.ends_with(".mk")
+}
+
+/// Changed config and data files: they select nothing and add no fallback
+/// reason, since no import edge, recorded run or naming convention links them
+/// to the tests that read them. Reported so the review can say so.
+fn unmapped(walk: &[String]) -> Vec<String> {
+    walk.iter()
+        .filter(|path| {
+            !CODE.contains(&extension(path)) && !is_lock(path) && !is_build_definition(path)
+        })
+        .cloned()
+        .collect()
+}
+
 pub(super) fn is_test(path: &str) -> bool {
     if ![
         "py", "rs", "js", "ts", "jsx", "tsx", "c", "cc", "cpp", "h", "hpp",
@@ -644,21 +669,16 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
     } else {
         (root_inventory, paths, BTreeSet::new())
     };
-    if walk
-        .iter()
-        .any(|path| LOCKS.contains(&path.rsplit('/').next().unwrap_or(path)))
-    {
+    if walk.iter().any(|path| is_lock(path)) {
         reasons.insert("a dependency lock file changed, so any test can run new code".to_owned());
     }
-    if walk.iter().any(|path| {
-        let name = path.rsplit('/').next().unwrap_or(path);
-        BUILD_DEFINITIONS.contains(&name) || name.ends_with(".cmake") || name.ends_with(".mk")
-    }) {
+    if walk.iter().any(|path| is_build_definition(path)) {
         reasons.insert(
             "a build definition file changed, and nothing links what it builds to the tests that load it"
                 .to_owned(),
         );
     }
+    let unmapped = unmapped(&walk);
     let code: Vec<String> = walk
         .into_iter()
         .filter(|path| CODE.contains(&extension(path)))
@@ -694,12 +714,13 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
         .map_err(|error| error.to_string())?;
     Ok(json!({"paths": paths, "complete": complete,
         "scope": if complete {"transitive-reverse-dependencies"} else {"full-test-inventory-fallback"},
-        "reasons": reasons, "generation": store.generation, "metadata": store.metadata}))
+        "reasons": reasons, "unmapped": unmapped,
+        "generation": store.generation, "metadata": store.metadata}))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{inventory, recorded_tests, tests_naming};
+    use super::{inventory, recorded_tests, tests_naming, unmapped};
     use crate::test_record_store::{self as store, RunRow, SessionRow, WindowRow};
     use serde_json::json;
     use std::collections::BTreeSet;
@@ -854,5 +875,20 @@ mod tests {
         );
         assert!(tests_naming(&root, &inventory, &[]).unwrap().is_empty());
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn only_paths_outside_code_locks_and_build_files_are_unmapped() {
+        let walk = [
+            ".forge/land.toml",
+            "data/table.json",
+            "pkg/m.py",
+            "run.sh",
+            "uv.lock",
+            "Makefile",
+            "rules.mk",
+        ]
+        .map(str::to_owned);
+        assert_eq!(unmapped(&walk), [".forge/land.toml", "data/table.json"]);
     }
 }

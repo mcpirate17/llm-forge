@@ -76,7 +76,7 @@ pub(super) fn plan(request: &Value) -> Result<Value, String> {
     let mut changed_tests = BTreeSet::new();
     let mut high_risk = false;
     let mut graph_paths = Vec::new();
-    let mut needs_graph = false;
+    let mut graph_triggers = Vec::new();
     for change in changes {
         let path = change["path"]
             .as_str()
@@ -88,7 +88,9 @@ pub(super) fn plan(request: &Value) -> Result<Value, String> {
         // non-source files (config, fixtures) reach tests the import graph
         // alone would miss.
         graph_paths.push(path.to_owned());
-        needs_graph |= !test && !has_class(change, "docs");
+        if !test && !has_class(change, "docs") {
+            graph_triggers.push(path.to_owned());
+        }
         if change["deleted"] == true {
             continue;
         }
@@ -100,10 +102,11 @@ pub(super) fn plan(request: &Value) -> Result<Value, String> {
         }
         high_risk |= !test && change["risk"] == "high";
     }
-    if !needs_graph {
+    if graph_triggers.is_empty() {
         graph_paths.clear();
     }
     Ok(json!({"sources": sources, "graph_paths": graph_paths,
+              "graph_triggers": graph_triggers,
               "changed_tests": changed_tests, "high_risk": high_risk}))
 }
 
@@ -159,6 +162,28 @@ pub(super) fn decide(request: &Value) -> Result<Value, String> {
             None,
             None,
             Some(json!({"source_paths": uncovered})),
+        ));
+    }
+    // A complete selection runs only what the graph reached; config and data
+    // it cannot map ran nothing. An incomplete one runs the whole inventory.
+    let triggers: BTreeSet<_> = strings(&request["graph_triggers"]).into_iter().collect();
+    let unmapped: Vec<_> = if graph.get("complete") == Some(&Value::Bool(true)) {
+        strings(graph.get("unmapped").unwrap_or(&Value::Null))
+            .into_iter()
+            .filter(|path| triggers.contains(path) && !contract_sources.contains(path))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    if !unmapped.is_empty() {
+        findings.push(finding(
+            "test-evidence",
+            "unmapped-changes",
+            "medium",
+            "changed config or data files map to no test, so no test ran because of them".into(),
+            None,
+            None,
+            Some(json!({"paths": unmapped})),
         ));
     }
     let mut evidence_tests: BTreeSet<_> = tests.union(&native_files).cloned().collect();

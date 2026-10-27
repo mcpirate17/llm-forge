@@ -137,6 +137,52 @@ fn selection_keeps_native_evidence_out_of_pytest_and_reports_uncovered_python() 
 }
 
 #[test]
+fn complete_selection_reports_changes_it_maps_to_no_test() {
+    let plan = decide(
+        "selection_plan",
+        &json!({"changes":[
+            {"path":".forge/land.toml", "classes":["config"], "risk":"normal", "deleted":false},
+            {"path":"contracts.tsv", "classes":["config"], "risk":"normal", "deleted":false},
+            {"path":"README.md", "classes":["docs"], "risk":"normal", "deleted":false},
+            {"path":"tests/fixture.json", "classes":["test"], "risk":"normal", "deleted":false}
+        ]}),
+    )
+    .unwrap();
+    assert_eq!(
+        plan["graph_triggers"],
+        json!([".forge/land.toml", "contracts.tsv"])
+    );
+    let unmapped = json!([
+        ".forge/land.toml",
+        "contracts.tsv",
+        "README.md",
+        "tests/fixture.json"
+    ]);
+    let decided = |complete: bool| {
+        decide(
+            "selection_decide",
+            &json!({
+                "sources":[], "changed_tests":[], "high_risk":false, "graph_tests":[],
+                "graph_triggers":plan["graph_triggers"], "native_tests":{},
+                "contract_sources":["contracts.tsv"],
+                "graph":{"complete":complete, "unmapped":unmapped},
+                "graph_error":null, "property_evidence":false
+            }),
+        )
+        .unwrap()
+    };
+    let findings = decided(true)["findings"].clone();
+    assert_eq!(findings.as_array().unwrap().len(), 1);
+    assert_eq!(findings[0]["rule_id"], "unmapped-changes");
+    assert_eq!(findings[0]["severity"], "medium");
+    assert_eq!(
+        findings[0]["evidence"]["paths"],
+        json!([".forge/land.toml"])
+    );
+    assert_eq!(decided(false)["findings"], json!([]));
+}
+
+#[test]
 fn evidence_rows_fail_closed_without_losing_order_or_metrics() {
     let findings = decide(
         "receipt_findings",

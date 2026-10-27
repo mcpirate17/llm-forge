@@ -56,6 +56,7 @@ def _graph_test_paths(
         "selection_scope": plan["scope"],
         "complete": plan["complete"],
         "fallback_reasons": plan["reasons"],
+        "unmapped": plan["unmapped"],
         "selected_edges": len(tests),
         "evidence_sha256": sha256_json(sorted(tests)),
     }
