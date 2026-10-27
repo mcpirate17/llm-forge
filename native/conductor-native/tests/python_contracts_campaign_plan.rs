@@ -105,8 +105,13 @@ fn write_manifest(
         .unwrap()
         .extract()
         .unwrap();
-    assert_eq!(written.len(), 1);
-    written[0].clone()
+    let [relative, fragment]: [String; 2] = written.try_into().unwrap();
+    let id = manifest["campaign_id"].as_str().unwrap();
+    assert!(
+        fragment.ends_with(&format!("/registry.d/{id}.json")),
+        "{fragment}"
+    );
+    relative
 }
 
 #[test]
