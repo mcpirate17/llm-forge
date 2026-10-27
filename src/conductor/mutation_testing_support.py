@@ -34,6 +34,12 @@ from typing import (
 
 # Imports nothing from `conductor`, so this stays circular-safe.
 from conductor.mutation_patch_apply import PatchApplyError, apply_patch_text
+from conductor.mutation_registry_rows import (
+    FRAGMENT_DIRECTORY,
+    is_fragment_name,
+    merge_registry_manifests,
+)
+from conductor.mutation_scope import CampaignError
 from conductor.project_paths import (
     DEFAULT_MUTATION_REGISTRY,
     host_root,
@@ -134,6 +140,33 @@ def _lexical_regular_file(path: Path, root: Path, label: str) -> tuple[str | Non
     return None, relative.as_posix()
 
 
+def _anchor_registry_fragments(
+    anchor_repo: Path, anchor_commit: str, registry_path: str
+) -> list[object]:
+    """Fragment payloads of the registry's `registry.d/` in the anchor commit's tree."""
+    directory = f"{Path(registry_path).parent.as_posix()}/{FRAGMENT_DIRECTORY}"
+    # A trailing slash lists the directory's entries; a directory absent from the
+    # commit lists nothing and still exits 0, unlike a `commit:path` blob lookup.
+    listing = _git_bytes(
+        anchor_repo,
+        ["ls-tree", "--full-tree", "--name-only", "-z", anchor_commit, f"{directory}/"],
+    )
+    if listing.returncode != 0:
+        raise CampaignError("anchor registry fragment directory is unreadable")
+    names = sorted(
+        entry
+        for entry in listing.stdout.decode("utf-8").split("\0")
+        if entry and is_fragment_name(entry)
+    )
+    fragments: list[object] = []
+    for name in names:
+        blob = _git_bytes(anchor_repo, ["cat-file", "blob", f"{anchor_commit}:{name}"])
+        if blob.returncode != 0:
+            raise CampaignError("anchor registry fragment is unreadable")
+        fragments.append(json.loads(blob.stdout))
+    return fragments
+
+
 def _registered_anchor_manifest_error(
     anchor_repo: Path,
     *,
@@ -150,13 +183,13 @@ def _registered_anchor_manifest_error(
         return "legacy receipt anchor registry is unavailable"
     try:
         payload = json.loads(registry.stdout)
-        rows = payload["campaigns"]
-        registered = {
-            row["manifest"]
-            for row in rows
-            if isinstance(row, dict) and "manifest" in row
-        }
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        registered = set(
+            merge_registry_manifests(
+                payload["campaigns"],
+                _anchor_registry_fragments(anchor_repo, anchor_commit, registry_path),
+            )
+        )
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError, CampaignError):
         return "legacy receipt anchor registry is malformed"
     if manifest_path not in registered:
         return "legacy receipt campaign was not registered at the anchor"
@@ -795,7 +828,9 @@ def reap_orphaned_runs(registry: Path, *, apply: bool) -> tuple[list[str], int]:
                 " -- in flight, untouched"
             )
         elif not _group_alive(pgid):
-            lines.append(f"pgid {pgid} ({argv0}): group empty -- stale entry, untouched")
+            lines.append(
+                f"pgid {pgid} ({argv0}): group empty -- stale entry, untouched"
+            )
         else:
             found += 1
             if not apply:

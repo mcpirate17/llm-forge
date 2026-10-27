@@ -40,6 +40,7 @@ from conductor.candidate_review.ownership import (
     paths_overlap,
 )
 from conductor.dead_tests import tracked_files
+from conductor.mutation_registry_rows import registry_manifests
 from conductor.project_paths import (
     campaigns_relative,
     host_root,
@@ -472,10 +473,7 @@ def manifest_state() -> tuple[list[str], list[str]]:
     registry_path = ROOT / REGISTRY
     if not registry_path.is_file():
         raise HygieneError(f"registry not found: {REGISTRY}")
-    payload = json.loads(registry_path.read_text())
-    registered = {
-        row["manifest"] for row in payload.get("campaigns", []) if "manifest" in row
-    }
+    registered = set(registry_manifests(registry_path))
     # glob("*.json") misses dotfile manifests; five such orphans hid from the
     # 2026-08-26 fleet sweep that way.
     on_disk = {

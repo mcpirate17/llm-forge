@@ -77,6 +77,8 @@ from conductor.mutation_receipt_slim import (
     expand_receipt,
     expand_receipt_field,
 )
+from conductor.mutation_registry_rows import registry_manifests
+from conductor.mutation_scope import CampaignError
 from conductor.project_paths import registry_path, registry_relative
 
 GRANDFATHER_SCHEMA_VERSION = 1
@@ -539,14 +541,12 @@ def _manifest_for_campaign(snapshot: Path, campaign_id: object) -> dict[str, obj
         return {}
     registry = registry_path(snapshot)
     try:
-        rows = json.loads(registry.read_text("utf-8")).get("campaigns", [])
-    except (OSError, UnicodeError, json.JSONDecodeError):
+        manifests = registry_manifests(registry)
+    except (OSError, UnicodeError, json.JSONDecodeError, CampaignError):
         return {}
-    for row in rows:
-        if not isinstance(row, dict) or not isinstance(row.get("manifest"), str):
-            continue
+    for manifest in manifests:
         try:
-            payload = json.loads((snapshot / row["manifest"]).read_text("utf-8"))
+            payload = json.loads((snapshot / manifest).read_text("utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError):
             continue
         if payload.get("campaign_id") == campaign_id:
