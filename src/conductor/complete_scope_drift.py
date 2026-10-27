@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from conductor.mutation_campaign_model import REPO_ROOT
+from conductor.mutation_registry_rows import registry_manifests
 from conductor.mutation_scope import CampaignError, _python_test_nodeids
 from conductor.project_paths import campaigns_relative, registry_relative
 
@@ -72,14 +73,7 @@ def _registered_manifests(repo_root: Path) -> frozenset[str]:
     the campaign directory are never loaded, so their drift cannot fail CI.
     Scanning them anyway would cry wolf.
     """
-    payload = json.loads(
-        (repo_root / registry_relative(repo_root)).read_text(encoding="utf-8")
-    )
-    return frozenset(
-        str(entry["manifest"])
-        for entry in payload.get("campaigns", ())
-        if isinstance(entry, dict) and entry.get("manifest")
-    )
+    return frozenset(registry_manifests(repo_root / registry_relative(repo_root)))
 
 
 def _changed_paths(base: str) -> frozenset[str]:
