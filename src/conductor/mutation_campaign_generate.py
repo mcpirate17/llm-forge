@@ -38,8 +38,9 @@ from conductor.candidate_review.ownership import (
 )
 from conductor.mutation_campaign_model import REPO_ROOT, _native_json_call
 from conductor.mutation_plan_bridge import plan_native as _plan_native
+from conductor.mutation_registry_rows import pending_fragment
 from conductor.mutation_scope import CampaignError
-from conductor.project_paths import campaigns_relative, campaigns_root
+from conductor.project_paths import campaigns_relative, campaigns_root, registry_path
 
 
 def _is_test(relative: str, name: str) -> bool:
@@ -160,14 +161,20 @@ def write(
     repo_root: Path = REPO_ROOT,
     force: bool = False,
 ) -> list[str]:
-    """Write each manifest under `conductor/mutation_campaigns/`.
+    """Write and register each manifest under `conductor/mutation_campaigns/`.
+
+    Registering is the `registry.d/<campaign-id>.json` fragment naming the
+    manifest; one already naming it is left as it is. Returns every file written,
+    each manifest followed by its new fragment.
 
     Refuses to overwrite an existing manifest without `force`: a manifest that
     has run carries a recorded survivor baseline, and replacing it with an empty
-    one would erase the ratchet while still reporting green.
+    one would erase the ratchet while still reporting green. Refuses a fragment
+    that registers a different manifest before writing that manifest.
     """
 
     written: list[str] = []
+    registry = registry_path(repo_root)
     for manifest in manifests:
         relative = f"{campaigns_relative(repo_root)}/{manifest['campaign_id']}.json"
         destination = repo_root / relative
@@ -176,11 +183,19 @@ def write(
                 f"{relative} already exists; refusing to replace a recorded "
                 "survivor baseline with an empty one (pass --force to overwrite)"
             )
+        fragment = pending_fragment(
+            registry, manifest["campaign_id"], relative, repo_root=repo_root
+        )
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
             json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         written.append(relative)
+        if fragment is not None:
+            path, body = fragment
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(body, encoding="utf-8")
+            written.append(path.relative_to(repo_root).as_posix())
     return written
 
 

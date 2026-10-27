@@ -193,18 +193,55 @@ fn write_refuses_to_replace_recorded_baseline() {
     Python::attach(|py| {
         let item = json!({"campaign_id":"x","survivor_baseline":[]});
         let written = write(py, case.root(), std::slice::from_ref(&item), false).unwrap();
-        assert_eq!(written, ["conductor/mutation_campaigns/x.json"]);
+        assert_eq!(
+            written,
+            [
+                "conductor/mutation_campaigns/x.json",
+                "conductor/mutation_campaigns/registry.d/x.json"
+            ]
+        );
         campaign_error(
             py,
             write(py, case.root(), std::slice::from_ref(&item), false).unwrap_err(),
             "refusing to replace",
         );
-        assert!(!write(py, case.root(), &[item], true).unwrap().is_empty());
+        assert_eq!(
+            write(py, case.root(), &[item], true).unwrap(),
+            ["conductor/mutation_campaigns/x.json"]
+        );
         assert!(
             fs::read_to_string(case.root().join("conductor/mutation_campaigns/x.json"))
                 .unwrap()
                 .ends_with('\n')
         );
+    });
+}
+
+#[test]
+fn write_registers_each_manifest_in_its_own_fragment() {
+    let case = Case::new();
+    let fragments = case.root().join("conductor/mutation_campaigns/registry.d");
+    write_json(
+        &fragments.join("taken.json"),
+        &json!({"manifest":"conductor/mutation_campaigns/other.json"}),
+    );
+    Python::attach(|py| {
+        let fresh = json!({"campaign_id":"fresh","survivor_baseline":[]});
+        write(py, case.root(), &[fresh], false).unwrap();
+        assert_eq!(
+            fs::read_to_string(fragments.join("fresh.json")).unwrap(),
+            "{\n  \"manifest\": \"conductor/mutation_campaigns/fresh.json\"\n}\n"
+        );
+        let taken = json!({"campaign_id":"taken","survivor_baseline":[]});
+        campaign_error(
+            py,
+            write(py, case.root(), &[taken], false).unwrap_err(),
+            "already registers a different manifest",
+        );
+        assert!(!case
+            .root()
+            .join("conductor/mutation_campaigns/taken.json")
+            .exists());
     });
 }
 
