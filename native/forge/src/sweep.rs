@@ -26,7 +26,9 @@ use clap::{Args, Subcommand};
 use serde::Deserialize;
 
 use crate::instant::{format_compact_utc, isoformat_utc, now};
-use crate::land::{acquire_lock, run_step, step_env, sync_clone, Config, Step, StepRun};
+use crate::land::{
+    acquire_lock, resolve_clone_dir, run_step, step_env, sync_clone, Config, Step, StepRun,
+};
 use crate::land_exec::{git, git_ok, tail, Outcome};
 
 #[path = "sweep_unit.rs"]
@@ -54,8 +56,10 @@ enum SweepCommand {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SweepConfig {
-    /// The sweep's own persistent clone; never the land clone.
-    pub clone_dir: PathBuf,
+    /// The sweep's own persistent clone; never the land clone. Defaults to
+    /// `<cache>/llm-forge/sweep/<repo>` under `$XDG_CACHE_HOME` (or `~/.cache`).
+    #[serde(default)]
+    pub clone_dir: Option<PathBuf>,
     /// Reports directory, relative to the invoking checkout.
     pub report_dir: PathBuf,
     /// Run directories kept under `report_dir`; older ones are deleted.
@@ -178,7 +182,8 @@ struct Header<'a> {
 
 fn sweep_now(here: &Path, boot_land: &Config, boot: &SweepConfig) -> Result<u8> {
     let url = git(here, &["remote", "get-url", &boot_land.remote])?;
-    let clone = boot.clone_dir.as_path();
+    let clone_dir = resolve_clone_dir(boot.clone_dir.as_deref(), "sweep", &url)?;
+    let clone = clone_dir.as_path();
     let _lock = acquire_lock(clone)?;
     sync_clone(clone, &boot_land.remote, &url)?;
     let target = format!("{}/{}", boot_land.remote, boot_land.target);

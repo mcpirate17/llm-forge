@@ -10,7 +10,8 @@ forge sweep install [--print]
 
 ## `forge sweep run`
 
-1. Takes an exclusive flock on `<clone_dir>.lock`. The sweep's `clone_dir` is its
+1. Takes an exclusive flock on `<clone_dir>.lock`. The sweep's `clone_dir` (unset:
+   `$XDG_CACHE_HOME/llm-forge/sweep/<repo>`, or `~/.cache/...`) is its
    own, so a sweep never waits on a landing and a landing never waits on a sweep.
 2. Brings the persistent clone up to date as `forge land` does, then checks out the
    target's head. The target's own `.forge/land.toml` and `.forge/sweep.toml` govern;
@@ -69,7 +70,7 @@ Reinstall after changing `calendar`, `launcher` or the forge binary path.
 ## `.forge/sweep.toml`
 
 ```toml
-clone_dir = "/data/sweep/repo"      # never the land clone
+# clone_dir = "/data/sweep/repo"    # optional override; never the land clone
 report_dir = "reports/sweep"        # relative to the checkout
 calendar = "*-*-* 00:30:00"
 launcher = ["tools/run_capped.sh", "-m", "48G", "-t", "10800", "--"]

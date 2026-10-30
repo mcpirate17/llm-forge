@@ -7,7 +7,10 @@ forge land <branch> [--dry-run] [--config PATH]
 ```
 
 1. Takes an exclusive flock on `<clone_dir>.lock`, so landings run one at a time.
-2. Brings the persistent clone at `clone_dir` up to date. It is created on first use,
+2. Brings the persistent clone at `clone_dir` up to date. `clone_dir` is optional: unset,
+   it is `$XDG_CACHE_HOME/llm-forge/land/<repo>` (`~/.cache/...` without the variable),
+   with `<repo>` the remote URL's last path component, so no repo has to name a
+   large disk. Set it to put the clone elsewhere. It is created on first use,
    then cleaned (`reset --hard`, `clean -fd`) and fetched. Ignored state is kept
    (`.venv`, cargo `target/`), so setup only redoes what changed.
 3. Reads the target branch's own `.forge/land.toml`. The config in the current

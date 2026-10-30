@@ -50,8 +50,10 @@ pub struct Config {
     #[serde(default = "default_remote")]
     pub remote: String,
     pub target: String,
-    /// The persistent clone; created on first use.
-    pub clone_dir: PathBuf,
+    /// The persistent clone; created on first use. Defaults to
+    /// `<cache>/llm-forge/land/<repo>` under `$XDG_CACHE_HOME` (or `~/.cache`).
+    #[serde(default)]
+    pub clone_dir: Option<PathBuf>,
     /// Trailer keys every landed commit must carry, e.g. `["Agent"]`.
     #[serde(default)]
     pub required_trailers: Vec<String>,
@@ -211,8 +213,9 @@ pub fn run(args: LandArgs) -> Result<u8> {
         .with_context(|| format!("reading {}", config_path.display()))?;
     let boot = Config::parse(&text)?;
     let url = git(&here, &["remote", "get-url", &boot.remote])?;
-    let _lock = acquire_lock(&boot.clone_dir)?;
-    let clone = prepare_clone(&boot, &url, &here)?;
+    let clone_dir = resolve_clone_dir(boot.clone_dir.as_deref(), "land", &url)?;
+    let _lock = acquire_lock(&clone_dir)?;
+    let clone = prepare_clone(&clone_dir, &boot, &url, &here)?;
     let config = target_config(&clone, &boot)?.unwrap_or(boot);
     let landing = rebase(&clone, &config, &args.branch)?;
     let failed = run_steps(&clone, &config, &landing)?;
@@ -262,8 +265,68 @@ pub(crate) fn acquire_lock(clone_dir: &Path) -> Result<File> {
     Ok(file)
 }
 
-fn prepare_clone(config: &Config, url: &str, here: &Path) -> Result<PathBuf> {
-    let clone = config.clone_dir.clone();
+/// The configured clone directory, else `<cache>/llm-forge/<kind>/<repo>` where
+/// `<cache>` is `$XDG_CACHE_HOME` or `~/.cache` and `<repo>` is the remote URL's
+/// last path component, so a repo needs no config and no spare data disk.
+pub(crate) fn resolve_clone_dir(
+    configured: Option<&Path>,
+    kind: &str,
+    url: &str,
+) -> Result<PathBuf> {
+    if let Some(dir) = configured {
+        return Ok(dir.to_path_buf());
+    }
+    let cache = match std::env::var_os("XDG_CACHE_HOME").filter(|v| !v.is_empty()) {
+        Some(dir) => PathBuf::from(dir),
+        None => PathBuf::from(std::env::var_os("HOME").context("HOME is unset")?).join(".cache"),
+    };
+    default_under_cache(&cache, kind, url)
+}
+
+fn default_under_cache(cache: &Path, kind: &str, url: &str) -> Result<PathBuf> {
+    let repo = url
+        .trim_end_matches('/')
+        .trim_end_matches(".git")
+        .rsplit(['/', ':'])
+        .next()
+        .filter(|name| !name.is_empty())
+        .with_context(|| format!("cannot derive a repo name from remote url {url}"))?;
+    Ok(cache.join("llm-forge").join(kind).join(repo))
+}
+
+#[cfg(test)]
+mod clone_dir_tests {
+    use super::*;
+
+    #[test]
+    fn default_is_per_repo_and_per_kind_under_the_cache() {
+        let cache = Path::new("/c");
+        for (url, repo) in [
+            ("git@github.com:tim/LLM.git", "LLM"),
+            ("https://github.com/tim/llm-forge.git/", "llm-forge"),
+            ("/home/tim/Projects/LLM", "LLM"),
+        ] {
+            assert_eq!(
+                default_under_cache(cache, "land", url).unwrap(),
+                Path::new("/c/llm-forge/land").join(repo)
+            );
+        }
+        assert_ne!(
+            default_under_cache(cache, "land", "x/r").unwrap(),
+            default_under_cache(cache, "sweep", "x/r").unwrap()
+        );
+        assert!(default_under_cache(cache, "land", "").is_err());
+    }
+
+    #[test]
+    fn configured_dir_wins() {
+        let dir = resolve_clone_dir(Some(Path::new("/d/x")), "land", "").unwrap();
+        assert_eq!(dir, Path::new("/d/x"));
+    }
+}
+
+fn prepare_clone(clone: &Path, config: &Config, url: &str, here: &Path) -> Result<PathBuf> {
+    let clone = clone.to_path_buf();
     sync_clone(&clone, &config.remote, url)?;
     // The rebase writes commits, so it needs the invoker's identity; a
     // machine without a global one would otherwise fail every real rebase.
