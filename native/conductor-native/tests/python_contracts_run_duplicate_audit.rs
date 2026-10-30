@@ -54,6 +54,130 @@ fn call_main(py: Python<'_>, argv: &[&str]) -> i32 {
         .unwrap()
 }
 
+fn write_full_file_package(root: &Path) {
+    fs::write(
+        root.join("package.json"),
+        json!({"jscpd":{
+            "ignore":["research/runtime/**","**/*_audit.py"],
+            "format":["python"],"pattern":"**/*_production.py","skipLocal":true,
+            "minLines":10,"minTokens":80,"maxLines":1000,"maxSize":"100kb"
+        }})
+        .to_string(),
+    )
+    .unwrap();
+}
+
+#[test]
+fn raw_jscpd_collector_preserves_ranges_and_full_file_coverage_in_temp_output() {
+    let case = support::Case::new();
+    let root = case.root().to_path_buf();
+    write_full_file_package(&root);
+    Python::attach(|py| {
+        let expected_root = root.clone();
+        let callback = PyCFunction::new_closure(py, None, None, move |args, kwargs| {
+            let py = args.py();
+            let command: Vec<String> = args.get_item(0)?.extract()?;
+            let after = |flag: &str| {
+                std::path::PathBuf::from(
+                    &command[command.iter().position(|item| item == flag).unwrap() + 1],
+                )
+            };
+            let config: Value =
+                serde_json::from_str(&fs::read_to_string(after("--config")).unwrap()).unwrap();
+            assert_eq!(config["maxLines"], (1u64 << 53) - 1);
+            assert_eq!(config["maxSize"], (1u64 << 53) - 1);
+            assert_eq!(config["minLines"], 10);
+            assert_eq!(config["minTokens"], 80);
+            assert_eq!(config["gitignore"], false);
+            assert_full_file_formats(&config);
+            assert_eq!(config["ignore"], json!([]));
+            assert_eq!(config["skipLocal"], false);
+            assert!(config.get("pattern").is_none());
+            assert_eq!(
+                config["path"],
+                json!([
+                    expected_root.join("pkg/a.py"),
+                    expected_root.join("pkg/b.py"),
+                    expected_root.join("research/runtime/kernel.cu")
+                ])
+            );
+            let output = after("--output");
+            assert!(!output.starts_with(&expected_root));
+            assert_eq!(
+                kwargs
+                    .unwrap()
+                    .get_item("cwd")?
+                    .unwrap()
+                    .extract::<PathBuf>()?,
+                expected_root
+            );
+            assert_eq!(
+                kwargs
+                    .unwrap()
+                    .get_item("timeout")?
+                    .unwrap()
+                    .extract::<i32>()?,
+                600
+            );
+            fs::write(
+                output.join("jscpd-report.json"),
+                json!({"duplicates":[{
+                    "fragment":"shared", "lines":10,"tokens":80,
+                    "firstFile":{"name":"pkg/a.py","start":4,"end":13},
+                    "secondFile":{"name":"pkg/b.py","start":9,"end":18}
+                }]})
+                .to_string(),
+            )
+            .unwrap();
+            Ok::<_, PyErr>(completed(py, &args.get_item(0)?, 0, ""))
+        })
+        .unwrap();
+        let _runner =
+            AttrPatch::replace(audit(py).as_any(), "_run_report_command", callback.as_any());
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("cwd", path(py, &root)).unwrap();
+        kwargs.set_item("executable", "jscpd-fixture").unwrap();
+        kwargs.set_item("full_files", true).unwrap();
+        let report = audit(py)
+            .getattr("collect_jscpd_report")
+            .unwrap()
+            .call(
+                (vec!["pkg/a.py", "pkg/b.py", "research/runtime/kernel.cu"],),
+                Some(&kwargs),
+            )
+            .unwrap();
+        assert_eq!(
+            report
+                .get_item("duplicates")
+                .unwrap()
+                .get_item(0)
+                .unwrap()
+                .get_item("firstFile")
+                .unwrap()
+                .get_item("start")
+                .unwrap()
+                .extract::<i32>()
+                .unwrap(),
+            4
+        );
+    });
+    assert!(!root.join("tasks").exists());
+}
+
+fn assert_full_file_formats(config: &Value) {
+    assert!(config["formatsExts"].get("json").is_none());
+    assert!(config["formatsExts"].get("yaml").is_none());
+    assert_eq!(
+        config["formatsExts"]["cpp"],
+        json!(["cpp", "c++", "cc", "cxx", "cu", "cuh"])
+    );
+    assert_eq!(config["formatsExts"]["python"], json!(["py"]));
+    assert_eq!(config["formatsExts"]["rust"], json!(["rs"]));
+    assert_eq!(config["formatsExts"]["c-header"], json!(["h"]));
+    assert_eq!(config["formatsExts"]["cpp-header"], json!(["hpp"]));
+    assert!(config["format"].as_array().unwrap().contains(&json!("cpp")));
+}
+
 fn run_with_root(py: Python<'_>, name: &str, root: &Path, check: bool, index: bool) -> i32 {
     let kwargs = kwargs_root(py, root);
     audit(py)

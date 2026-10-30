@@ -26,6 +26,7 @@ const SLOP_CONSUMERS: &[&str] = &[
     "python_contracts_reuse_inventory",
     "python_contracts_reuse_roi",
     "python_contracts_reuse_consolidation",
+    "python_contracts_reuse_sweep",
     "python_contracts_reuse_file_families",
     "python_contracts_reuse_audit_inventory",
     "python_contracts_reuse_file_family_lsh",

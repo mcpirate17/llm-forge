@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+forge_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+audit_target_root="${CARGO_TARGET_DIR:-$forge_root/native/conductor-native/target}"
+
+exec cargo +1.98.0 run \
+  --manifest-path "$forge_root/native/conductor-native/Cargo.toml" \
+  --target-dir "$audit_target_root/variants/source-analysis" \
+  --locked --release --jobs 2 \
+  --no-default-features --features source-analysis \
+  --bin dead-code-audit -- "$@"

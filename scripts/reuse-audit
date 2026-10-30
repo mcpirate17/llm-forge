@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+forge_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+audit_repo="$PWD"
+audit_expect_repo=0
+for audit_arg in "$@"; do
+  if [[ "$audit_expect_repo" == 1 ]]; then
+    audit_repo="$audit_arg"
+    audit_expect_repo=0
+  else
+    case "$audit_arg" in
+      --repo) audit_expect_repo=1 ;;
+      --repo=*) audit_repo="${audit_arg#--repo=}" ;;
+    esac
+  fi
+done
+audit_python="${FORGE_PYTHON:-$audit_repo/.venv/bin/python}"
+export PYTHONPATH="$forge_root/src${PYTHONPATH:+:$PYTHONPATH}"
+exec "$audit_python" -m conductor.reuse.sweep "$@"

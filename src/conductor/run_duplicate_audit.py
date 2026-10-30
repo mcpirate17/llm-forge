@@ -24,13 +24,13 @@ from conductor.duplicate_audit_config import (
     AUDIT_ERROR_EXIT_CODE,
     GENERATED_ARTIFACT_GLOBS,
     JSCPD_BASELINE_RELATIVE,
-    JSCPD_GENERATED_EVIDENCE_IGNORE,
     JSCPD_INDEX_CONFIG_PATHS,
     JSCPD_SOURCE_SUFFIXES,
     PMD_CPD_BASELINE_RELATIVE,
     PMD_EXCLUDES,
     VULTURE_SOURCE_DIRS,
     VULTURE_SOURCE_SUFFIXES,
+    jscpd_report_config,
     source_dirs,
 )
 from conductor.project_paths import host_root
@@ -149,7 +149,12 @@ def _existing_absolute(paths: tuple[str, ...], *, root: Path) -> list[str]:
     return [str(root / path) for path in paths if (root / path).exists()]
 
 
-def _live_jscpd_sources(*, root: Path) -> list[str] | None:
+def _live_jscpd_sources(
+    *,
+    root: Path,
+    paths: tuple[str, ...] | None = None,
+    suffixes: frozenset[str] = JSCPD_SOURCE_SUFFIXES,
+) -> list[str] | None:
     """Return Git-visible sources, or None for a caller-materialized export."""
     worktree = subprocess.run(
         ["git", "rev-parse", "--is-inside-work-tree"],
@@ -169,7 +174,7 @@ def _live_jscpd_sources(*, root: Path) -> list[str] | None:
             "--exclude-standard",
             "-z",
             "--",
-            *source_dirs(root),
+            *(source_dirs(root) if paths is None else paths),
         ],
         cwd=root,
         check=False,
@@ -184,7 +189,7 @@ def _live_jscpd_sources(*, root: Path) -> list[str] | None:
         disk_path = root / candidate
         return bool(
             candidate
-            and PurePosixPath(candidate).suffix.lower() in JSCPD_SOURCE_SUFFIXES
+            and PurePosixPath(candidate).suffix.lower() in suffixes
             and disk_path.is_file()
             and not disk_path.is_symlink()
         )
@@ -440,7 +445,7 @@ def run(cmd: list[str], *, allow_findings: bool = False, cwd: Path = ROOT) -> in
 
 
 def _run_report_command(
-    cmd: list[str], *, cwd: Path, tool_name: str
+    cmd: list[str], *, cwd: Path, tool_name: str, timeout: float | None = None
 ) -> subprocess.CompletedProcess[str]:
     """Run an analyzer whose report is required as trustworthy evidence."""
     print("+ " + " ".join(cmd), flush=True)
@@ -452,8 +457,9 @@ def _run_report_command(
             capture_output=True,
             text=True,
             errors="replace",
+            timeout=timeout,
         )
-    except OSError as exc:
+    except (OSError, subprocess.TimeoutExpired) as exc:
         raise DuplicateAuditError(f"{tool_name} could not execute: {exc}") from exc
     if completed.returncode:
         detail = (completed.stderr or completed.stdout).strip()
@@ -492,36 +498,26 @@ def _run_jscpd_paths(
     return run(cmd, allow_findings=not check, cwd=cwd)
 
 
-def _jscpd_collect_duplicates(
-    paths: list[str], *, cwd: Path, executable: str | None = None
-) -> list[dict]:
-    """Run jscpd with the JSON reporter and return normalized clone entries."""
+def collect_jscpd_report(
+    paths: list[str],
+    *,
+    cwd: Path,
+    executable: str | None = None,
+    full_files: bool = False,
+) -> dict:
+    """Collect validated token-clone evidence without writing into the source tree.
+
+    ``full_files`` trusts the caller's selected paths, removes inherited masks and
+    maximum file caps, and maps CUDA to C++; ordinary gate settings are unchanged.
+    """
     if not paths:
         raise DuplicateAuditError(NO_SOURCES)
     with tempfile.TemporaryDirectory(prefix="llm-jscpd-json-") as tmp:
         out_dir = Path(tmp)
         try:
-            package = json.loads((cwd / "package.json").read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-            raise DuplicateAuditError(
-                f"cannot load jscpd package config: {exc}"
-            ) from exc
-        config = package.get("jscpd") if isinstance(package, dict) else None
-        if not isinstance(config, dict):
-            raise DuplicateAuditError("package.json must contain a jscpd object")
-        ignore = config.get("ignore", [])
-        if not isinstance(ignore, list) or not all(
-            isinstance(pattern, str) and pattern for pattern in ignore
-        ):
-            raise DuplicateAuditError("package.json jscpd.ignore must be a string list")
-        portable_ignore = [
-            pattern if pattern.startswith("**/") else f"**/{pattern}"
-            for pattern in ignore
-        ]
-        config = {
-            **config,
-            "ignore": [*portable_ignore, JSCPD_GENERATED_EVIDENCE_IGNORE],
-        }
+            config = jscpd_report_config(cwd, paths, full_files=full_files)
+        except ValueError as exc:
+            raise DuplicateAuditError(str(exc)) from exc
         config_path = out_dir / "jscpd.config.json"
         config_path.write_text(json.dumps(config), encoding="utf-8")
         cmd = [
@@ -541,8 +537,11 @@ def _jscpd_collect_duplicates(
                 "100",
             ]
         )
-        cmd.extend(paths)
-        _run_report_command(cmd, cwd=cwd, tool_name="jscpd")
+        if not full_files:
+            cmd.extend(paths)
+        _run_report_command(
+            cmd, cwd=cwd, tool_name="jscpd", timeout=600 if full_files else None
+        )
         report = out_dir / "jscpd-report.json"
         if not report.is_file():
             raise DuplicateAuditError(
@@ -555,9 +554,30 @@ def _jscpd_collect_duplicates(
         from conductor._native import normalize_jscpd_report_native
 
         try:
-            return json.loads(normalize_jscpd_report_native(report_json, str(cwd)))
+            data = json.loads(report_json)
+            if not isinstance(data, dict) or not isinstance(
+                data.get("duplicates"), list
+            ):
+                raise ValueError("jscpd report must contain a duplicates list")
+            normalize_jscpd_report_native(report_json, str(cwd))
+            if full_files:
+                data["audit_config"] = {
+                    "min_lines": config.get("minLines", 5),
+                    "min_tokens": config.get("minTokens", 50),
+                }
+            return data
         except (ValueError, json.JSONDecodeError) as exc:
             raise DuplicateAuditError(str(exc)) from exc
+
+
+def _jscpd_collect_duplicates(
+    paths: list[str], *, cwd: Path, executable: str | None = None
+) -> list[dict]:
+    """Keep the baseline-gate representation on the shared strict collector."""
+    from conductor._native import normalize_jscpd_report_native
+
+    data = collect_jscpd_report(paths, cwd=cwd, executable=executable)
+    return json.loads(normalize_jscpd_report_native(json.dumps(data), str(cwd)))
 
 
 def _resolve_jscpd_executable(cwd: Path, executable: str | None) -> str:

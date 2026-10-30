@@ -12,6 +12,7 @@ use comm_support::py_json;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyFrozenSet, PyList, PySet, PyTuple};
 use serde_json::{json, Value};
+use std::ffi::CString;
 use support::{module, Case};
 
 fn families(py: Python<'_>) -> Bound<'_, pyo3::types::PyModule> {
@@ -255,3 +256,116 @@ fn native_complete_link_groups_and_ids_match_python() {
         );
     });
 }
+
+#[test]
+fn explicit_retirement_accounting_ranking_and_validation() {
+    let _case = Case::new();
+    Python::attach(|py| {
+        let globals = PyDict::new(py);
+        globals.set_item("families", families(py)).unwrap();
+        py.run(
+            &CString::new(RETIREMENT_CONTRACTS).unwrap(),
+            Some(&globals),
+            None,
+        )
+        .unwrap();
+    });
+}
+
+const RETIREMENT_CONTRACTS: &str = r#"
+import json
+from dataclasses import replace
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+with TemporaryDirectory() as directory:
+    root = Path(directory)
+    source = root / 'plans.json'
+    def load(rows):
+        source.write_text(json.dumps({'schema_version': 1, 'plans': rows}))
+        return families.load_retirement_plans(source)
+    def plan(identifier, removed, **extra):
+        return dict(id=identifier, remove=removed, **extra)
+    rows = [
+        plan('reviewed', ['a.py', 'b.py', 'a.py'], add=['shared.py'],
+             status='reviewed', reviewer='reviewer', callers=['consumer.py'],
+             semantic_constraints=['Keep both mechanisms distinct'],
+             provenance=['source revision and reviewed contracts'],
+             evidence_ids=['functions:C002', 'functions:C002']),
+        plan('planned', ['p1.py', 'p2.py', 'p3.py'], add=['p.py']),
+        plan('wrappers', [], retain=['w1.py', 'w2.py'], add=['base.py']),
+        plan('config', ['c1.py', 'c2.py', 'c3.py'], add=['config.json'],
+             add_configs=['config.json'], add_adapters=['adapter.py']),
+    ]
+    plans = load(rows)
+    evidence = [{'id': 'families:F002', 'files': ['a.py', 'b.py']},
+                {'id': 'functions:C002', 'files': ['a.py']},
+                {'id': 'functions:C003', 'files': ['b.py']}]
+    report = families.retirement_report(plans, evidence)
+    assert [row['id'] for row in report['plans']] == ['reviewed', 'planned', 'config', 'wrappers']
+    first = report['plans'][0]
+    assert (first['before_files'], first['after_files'], first['net_files_removed']) == (2, 1, 1)
+    assert first['evidence_ids'] == ['families:F002', 'functions:C002', 'functions:C003']
+    assert first['measurement_status'] == 'not_measured'
+    assert first['callers'] == ('consumer.py',) and first['provenance']
+    assert report['summary']['net_files_removed'] == 3
+    assert report['summary']['reviewed_net_files_removed'] == 1
+    assert report['plans'][-1]['net_files_removed'] == -1
+    config = next(row for row in report['plans'] if row['id'] == 'config')
+    assert config['after_files'] == 2  # overlapping add/config entries count once
+
+    for removed_count, expected in [(7, 6), (4, 3), (2, 1)]:
+        one = load([plan('compact', [f'old{i}.py' for i in range(removed_count)], add=['new.py'])])
+        assert families.retirement_report(one)['summary']['net_files_removed'] == expected
+
+    invalid = [
+        [plan('bad', ['../outside.py'])],
+        [plan('bad', ['/absolute.py'])],
+        [plan('bad', ['a.py'], retain=['a.py'])],
+        [plan('bad', ['a.py'], add_configs=['a.py'])],
+        [plan('bad', ['a.py'], status='measured')],
+        [plan('bad', ['a.py'], status=[])],
+        [plan('bad', ['a.py'], status='reviewed')],
+        [plan('bad', ['a.py'], ad=['unaccounted.py'])],
+        [plan('same', ['a.py']), plan('same', ['b.py'])],
+        [plan('one', ['a.py']), plan('two', ['a.py'])],
+        [plan('one', ['a.py'], add=['shared.py']), plan('two', ['b.py'], add=['shared.py'])],
+    ]
+    for items in invalid:
+        try:
+            load(items)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f'accepted invalid plan {items}')
+
+    family = families.FileFamily(
+        files=['a.py', 'b.py'], similarity_min=.8, similarity_avg=.8,
+        similarity_max=.8, containment_min=.9, shared_methods=[], variable_methods=[],
+        common_fields=[], recommended_abstraction='shared_module', suggested_home='shared.py',
+        gross_duplicate_loc=0, estimated_net_deleted_loc=0, confidence=.8,
+        risk='medium', band='80-89%', disposition='validate',
+        before_loc=100, after_loc=150, target_shape='2 files to 1', id='F002')
+    other = replace(family, files=['other.py', 'another.py'], estimated_net_deleted_loc=1000, id='F001')
+    stats = dict(families=2, files_profiled=4, lsh_candidate_pairs=1, pairs_scored=1,
+                 estimated_net_deleted_loc=1000)
+    plain = families.build_output([other, family], stats, {})
+    assert 'retirement_plans' not in plain and plain['families'][0]['net_files_removed'] is None
+    reviewed = families.build_output([other, family], stats, {}, plans)
+    assert [row['id'] for row in reviewed['families']] == ['F002', 'F001']
+    assert reviewed['families'][0]['after_loc'] > reviewed['families'][0]['before_loc']
+    assert reviewed['families'][0]['retirement_plan_ids'] == ['reviewed']
+    assert reviewed['retirement_summary']['net_files_removed'] == 3
+    families.write_markdown(root / 'report.md', reviewed)
+    assert 'not measured deletions' in (root / 'report.md').read_text()
+
+    # Explicit plans survive even if the scan emits no families due to its thresholds/caps.
+    load(rows)
+    empty = {**stats, 'families': 0}
+    with patch.object(families, 'scan_file_families', return_value=([], empty)):
+        assert families.main(['--repo', str(root), '--targets', '.', '--retirement-plans', str(source),
+                              '--out', str(root / 'out.json'), '--md', str(root / 'out.md')]) == 0
+    result = json.loads((root / 'out.json').read_text())
+    assert len(result['retirement_plans']) == 4 and not result['families']
+"#;
