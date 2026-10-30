@@ -28,6 +28,8 @@ pub mod context_projection;
 mod context_telemetry;
 pub mod context_telemetry_aggregate;
 pub mod context_telemetry_usage;
+#[cfg(feature = "source-analysis")]
+pub mod dead_code;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod dead_tests;
 #[cfg(feature = "python")]

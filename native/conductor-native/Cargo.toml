@@ -9,6 +9,11 @@ name = "conductor_native"
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
+name = "dead-code-audit"
+path = "src/bin/dead_code_audit.rs"
+required-features = ["source-analysis"]
+
+[[bin]]
 name = "crg_refresh_child"
 path = "tests/fixtures/crg_refresh_child.rs"
 required-features = ["python-compat-tests"]

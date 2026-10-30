@@ -8,6 +8,7 @@ of a second hardcoded literal. The directories scanned are the host's
 """
 
 import argparse
+import json
 import tomllib
 from pathlib import Path, PurePosixPath
 
@@ -111,6 +112,66 @@ JSCPD_SOURCE_SUFFIXES = frozenset(
         ".yml",
     }
 )
+# JSCPD replaces its default extension lookup when formatsExts is supplied.
+# Coverage audits must therefore retain every selected language while adding CUDA.
+JSCPD_FULL_FILE_FORMATS_EXTS = {
+    "python": ["py"],
+    "rust": ["rs"],
+    "bash": ["sh"],
+    "c": ["c"],
+    "c-header": ["h"],
+    "cpp": ["cpp", "c++", "cc", "cxx", "cu", "cuh"],
+    "cpp-header": ["hpp"],
+    "javascript": ["js"],
+    "jsx": ["jsx"],
+    "typescript": ["ts"],
+    "tsx": ["tsx"],
+}
+JSCPD_FULL_FILE_SUFFIXES = frozenset(
+    f".{extension}"
+    for extensions in JSCPD_FULL_FILE_FORMATS_EXTS.values()
+    for extension in extensions
+)
+
+
+def jscpd_report_config(
+    root: Path, paths: list[str], *, full_files: bool = False
+) -> dict:
+    """Load the host detector policy and apply the explicit broad-audit profile."""
+    try:
+        package = json.loads((root / "package.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot load jscpd package config: {exc}") from exc
+    config = package.get("jscpd") if isinstance(package, dict) else None
+    if not isinstance(config, dict):
+        raise ValueError("package.json must contain a jscpd object")
+    ignore = config.get("ignore", [])
+    if not isinstance(ignore, list) or not all(
+        isinstance(pattern, str) and pattern for pattern in ignore
+    ):
+        raise ValueError("package.json jscpd.ignore must be a string list")
+    portable_ignore = [
+        pattern if pattern.startswith("**/") else f"**/{pattern}" for pattern in ignore
+    ]
+    config = {
+        **config,
+        "ignore": [*portable_ignore, JSCPD_GENERATED_EVIDENCE_IGNORE],
+    }
+    if full_files:
+        config.update(
+            maxLines=2**53 - 1,
+            maxSize=2**53 - 1,
+            gitignore=False,
+            ignore=[],
+            format=list(JSCPD_FULL_FILE_FORMATS_EXTS),
+            formatsExts=JSCPD_FULL_FILE_FORMATS_EXTS,
+            skipLocal=False,
+            path=[str((root / path).resolve()) for path in paths],
+        )
+        config.pop("pattern", None)
+    return config
+
+
 VULTURE_SOURCE_DIRS = ("src",)
 VULTURE_SOURCE_SUFFIXES = frozenset({".py"})
 

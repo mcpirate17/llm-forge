@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
 from conductor.duplicate_audit_config import add_scan_root_arguments, scan_roots
@@ -87,6 +87,172 @@ class FileFamily:
     after_loc: int = 0
     target_shape: str = ""
     id: str = ""
+
+
+@dataclass(frozen=True)
+class RetirementPlan:
+    """User-reviewed proposal, never proof of completed deletion or equivalence."""
+
+    id: str
+    status: str
+    reviewer: str
+    remove: tuple[str, ...]
+    retain: tuple[str, ...]
+    add: tuple[str, ...]
+    add_adapters: tuple[str, ...]
+    add_configs: tuple[str, ...]
+    evidence_ids: tuple[str, ...]
+    callers: tuple[str, ...]
+    semantic_constraints: tuple[str, ...]
+    provenance: tuple[str, ...]
+
+    @property
+    def added_files(self) -> set[str]:
+        return set(self.add) | set(self.add_adapters) | set(self.add_configs)
+
+    @property
+    def affected_files(self) -> set[str]:
+        return set(self.remove) | set(self.retain) | self.added_files
+
+    @property
+    def net_files_removed(self) -> int:
+        return len(self.remove) - len(self.added_files)
+
+
+def _plan_strings(raw: dict, key: str, *, paths: bool = False) -> tuple[str, ...]:
+    values = raw.get(key, [])
+    if not isinstance(values, list) or any(
+        not isinstance(value, str) or not value.strip() for value in values
+    ):
+        raise ValueError(f"retirement plan {key} must be a list of nonempty strings")
+    if paths:
+        for value in values:
+            path = PurePosixPath(value)
+            if (
+                path.is_absolute()
+                or not path.parts
+                or ".." in path.parts
+                or "\\" in value
+                or "\0" in value
+                or path.as_posix() != value
+            ):
+                raise ValueError(
+                    f"retirement plan {key}: invalid repository path {value!r}"
+                )
+    return tuple(sorted(set(values)))
+
+
+def _retirement_plan(raw: dict) -> RetirementPlan:
+    if not isinstance(raw, dict):
+        raise ValueError("each retirement plan must be an object")
+    fields = set(RetirementPlan.__dataclass_fields__)
+    if unknown := set(raw) - fields:
+        raise ValueError(f"unknown retirement plan fields: {sorted(unknown)}")
+    identifier = raw.get("id")
+    if not isinstance(identifier, str) or not identifier.strip():
+        raise ValueError("retirement plan id must be a nonempty string")
+    status = raw.get("status", "planned")
+    reviewer = raw.get("reviewer", "")
+    if not isinstance(status, str) or status not in {"planned", "reviewed"}:
+        raise ValueError(
+            "retirement plan status must be planned or reviewed, never measured"
+        )
+    if not isinstance(reviewer, str):
+        raise ValueError("retirement plan reviewer must be a string")
+    paths = {
+        key: _plan_strings(raw, key, paths=True)
+        for key in ("remove", "retain", "add", "add_adapters", "add_configs", "callers")
+    }
+    metadata = {
+        key: _plan_strings(raw, key)
+        for key in ("evidence_ids", "semantic_constraints", "provenance")
+    }
+    plan = RetirementPlan(identifier, status, reviewer, **paths, **metadata)
+    if not plan.affected_files:
+        raise ValueError(f"retirement plan {identifier} has no maintained files")
+    if set(plan.remove) & set(plan.retain) or (
+        (set(plan.remove) | set(plan.retain)) & plan.added_files
+    ):
+        raise ValueError(
+            f"retirement plan {identifier}: removed, retained and added files overlap"
+        )
+    if status == "reviewed" and not (
+        reviewer.strip() and plan.semantic_constraints and plan.provenance
+    ):
+        raise ValueError(
+            "reviewed plans require reviewer, semantic_constraints and provenance"
+        )
+    return plan
+
+
+def load_retirement_plans(path: Path) -> list[RetirementPlan]:
+    """Validate explicit plans; reject overlapping alternatives before counting them."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(payload, dict)
+        or type(payload.get("schema_version")) is not int
+        or payload["schema_version"] != 1
+    ):
+        raise ValueError("retirement plan input requires schema_version 1")
+    if set(payload) != {"schema_version", "plans"} or not isinstance(
+        payload["plans"], list
+    ):
+        raise ValueError(
+            "retirement plan input must contain only schema_version and plans"
+        )
+    plans = [_retirement_plan(raw) for raw in payload["plans"]]
+    identifiers: set[str] = set()
+    maintained: set[str] = set()
+    for plan in plans:
+        if plan.id in identifiers or maintained & plan.affected_files:
+            raise ValueError(
+                f"overlapping retirement plans: combine {plan.id!r} into one plan"
+            )
+        identifiers.add(plan.id)
+        maintained.update(plan.affected_files)
+    return plans
+
+
+def retirement_report(
+    plans: list[RetirementPlan], evidence: list[dict] | None = None
+) -> dict:
+    """Group detector evidence by explicit plan and rank signed file retirement."""
+    rows = []
+    for plan in plans:
+        matched = [
+            row for row in evidence or [] if plan.affected_files & set(row["files"])
+        ]
+        row = asdict(plan)
+        row.update(
+            evidence_ids=sorted(
+                set(plan.evidence_ids) | {item["id"] for item in matched}
+            ),
+            added_files=sorted(plan.added_files),
+            before_files=len(plan.remove) + len(plan.retain),
+            after_files=len(plan.retain) + len(plan.added_files),
+            net_files_removed=plan.net_files_removed,
+            measurement_status="not_measured",
+        )
+        rows.append(row)
+    rows.sort(
+        key=lambda row: (
+            -(row["net_files_removed"] > 0 and row["status"] == "reviewed"),
+            -(row["net_files_removed"] > 0),
+            -row["net_files_removed"],
+            row["id"],
+        )
+    )
+    return {
+        "plans": rows,
+        "summary": {
+            "plans": len(rows),
+            "net_files_removed": sum(row["net_files_removed"] for row in rows),
+            "reviewed_net_files_removed": sum(
+                row["net_files_removed"] for row in rows if row["status"] == "reviewed"
+            ),
+            "measurement_status": "not_measured",
+        },
+    }
 
 
 def _profile_from_native(raw: dict) -> FileProfile:
@@ -558,19 +724,57 @@ def family_to_dict(family: FileFamily) -> dict:
         "suggested_home": family.suggested_home,
         "gross_duplicate_loc": family.gross_duplicate_loc,
         "estimated_net_deleted_loc": family.estimated_net_deleted_loc,
+        "before_loc": family.before_loc,
+        "after_loc": family.after_loc,
+        "target_shape": family.target_shape,
+        "net_files_removed": None,
         "confidence": family.confidence,
         "risk": family.risk,
         "disposition": family.disposition,
     }
 
 
-def build_output(families: list[FileFamily], stats: dict, settings: dict) -> dict:
-    return _support.generated_output(
+def build_output(
+    families: list[FileFamily],
+    stats: dict,
+    settings: dict,
+    retirement_plans: list[RetirementPlan] | None = None,
+) -> dict:
+    data = _support.generated_output(
         base={"settings": settings, "summary": stats},
         items_key="families",
         items=families,
         serialize=family_to_dict,
     )
+    if retirement_plans is not None:
+        evidence = [
+            {"id": f"families:{row['id']}", "files": row["files"]}
+            for row in data["families"]
+        ]
+        report = retirement_report(retirement_plans, evidence)
+        data["retirement_plans"] = report["plans"]
+        data["retirement_summary"] = report["summary"]
+        priorities = {
+            row["id"]: index
+            for index, row in enumerate(report["plans"])
+            if row["net_files_removed"] > 0
+        }
+        for row in data["families"]:
+            row["retirement_plan_ids"] = [
+                plan.id
+                for plan in retirement_plans
+                if plan.affected_files & set(row["files"])
+            ]
+        data["families"].sort(
+            key=lambda row: min(
+                (
+                    priorities.get(identifier, len(priorities))
+                    for identifier in row["retirement_plan_ids"]
+                ),
+                default=len(priorities),
+            )
+        )
+    return data
 
 
 def write_markdown(path: Path, data: dict) -> None:
@@ -603,6 +807,21 @@ def write_markdown(path: Path, data: dict) -> None:
         ],
         rows=rows,
     )
+    if "retirement_plans" in data:
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(
+                "\n## Explicit retirement plans\n\n"
+                "Declared plans, not measured deletions or equivalence proof. "
+                "Adapters and configuration files count as maintained files.\n\n"
+                "| plan | status | before | after | net files removed | evidence |\n"
+                "| --- | --- | ---: | ---: | ---: | --- |\n"
+            )
+            for row in data["retirement_plans"]:
+                handle.write(
+                    f"| {row['id']} | {row['status']} | {row['before_files']} | "
+                    f"{row['after_files']} | {row['net_files_removed']} | "
+                    f"{', '.join(row['evidence_ids'])} |\n"
+                )
 
 
 # --------------------------------------------------------------------------------
@@ -637,6 +856,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--band-size", type=int, default=DEFAULT_BAND_SIZE)
     parser.add_argument("--out", default=None, help="Output JSON path.")
     parser.add_argument("--md", default=None, help="Output markdown path.")
+    parser.add_argument(
+        "--retirement-plans",
+        type=Path,
+        help=(
+            "Optional reviewed/planned file-retirement JSON; ranks explicit plans by net "
+            "maintained files removed, independently of estimated LOC savings"
+        ),
+    )
     return parser
 
 
@@ -647,7 +874,16 @@ def main(argv: list[str] | None = None) -> int:
     thresholds from that loop's ``config.toml``. They are flags here, so the analyzer
     has an entry point of its own rather than depending on the retired audit loop.
     """
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        plans = (
+            load_retirement_plans(args.retirement_plans)
+            if args.retirement_plans
+            else None
+        )
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
     repo, targets = scan_roots(args)
     exclude = set(args.exclude) if args.exclude else set()
 
@@ -668,7 +904,9 @@ def main(argv: list[str] | None = None) -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     md_path.parent.mkdir(parents=True, exist_ok=True)
 
-    data = build_output(families, stats, settings)
+    data = build_output(families, stats, settings, plans)
+    if args.retirement_plans:
+        data["settings"]["retirement_plans"] = str(args.retirement_plans.resolve())
     out_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     write_markdown(md_path, data)
 

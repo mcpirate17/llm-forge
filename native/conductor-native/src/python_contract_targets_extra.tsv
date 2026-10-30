@@ -304,4 +304,6 @@ src/conductor/candidate_review/verification.py	python_contracts_mutation_registr
 src/conductor/complete_scope_drift.py	python_contracts_mutation_registry_rows
 src/conductor/mutation_testing_support.py	python_contracts_mutation_registry_rows
 src/conductor/workspace_hygiene.py	python_contracts_mutation_registry_rows
+src/conductor/reuse/sweep.py	python_contracts_reuse_sweep
+native/conductor-native/tests/python_contracts/support.rs	python_contracts_reuse_sweep
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_registry_rows
