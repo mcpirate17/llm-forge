@@ -8,7 +8,6 @@
 #
 # The timer: `.venv/bin/forge sweep install` (reinstall after changing calendar or
 # launcher). `systemctl --user list-timers 'forge-sweep-*'` shows the next run.
-clone_dir = "/mnt/data/llm/sweep/llm-forge"
 report_dir = "research/reports/sweep"
 # Local time. LLM's sweep runs 00:30-03:30, so this one starts after LLM's cap.
 calendar = "*-*-* 03:45:00"
@@ -50,7 +49,7 @@ timeout_s = 60
 # and also cleared first, because a hard kill skips the exit trap.
 [[step]]
 name = "clean-install"
-run = """venv=/mnt/data/llm/sweep/clean-venv-llm-forge && rm -rf "$venv" && trap 'rm -rf "$venv"' EXIT \
+run = """venv="${XDG_CACHE_HOME:-$HOME/.cache}/llm-forge/sweep/clean-venv-llm-forge" && rm -rf "$venv" && trap 'rm -rf "$venv"' EXIT \
   && UV_PROJECT_ENVIRONMENT="$venv" make install \
   && FORGE_INSTALL_SMOKE_VENV="$venv" PYO3_NO_PYTHON=1 FORGE_BIN="$venv/bin/forge" \
      cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml \

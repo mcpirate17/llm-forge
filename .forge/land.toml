@@ -2,7 +2,6 @@
 # Checks run in a persistent clone whose .venv and cargo target/ survive
 # between landings, so setup is incremental. The copy on `main` governs.
 target = "main"
-clone_dir = "/mnt/data/llm/land/llm-forge"
 required_trailers = ["Agent"]
 path_prepend = [".venv/bin"]
 
