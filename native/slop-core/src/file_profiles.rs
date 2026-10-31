@@ -815,6 +815,197 @@ fn profile_ast(tree: &Bound<'_, PyAny>, relative: String, source: &str) -> PyRes
     Ok(profile)
 }
 
+fn registration_imports(nodes: &[Bound<'_, PyAny>]) -> PyResult<Option<BTreeMap<String, String>>> {
+    let mut bindings = BTreeMap::new();
+    for node in nodes {
+        let kind = type_name(node)?;
+        if !matches!(kind.as_str(), "Import" | "ImportFrom") {
+            continue;
+        }
+        // Relative imports need a package-root resolver; do not guess one.
+        if kind == "ImportFrom" && node.getattr("level")?.extract::<usize>()? != 0 {
+            return Ok(None);
+        }
+        for alias in list_items(&node.getattr("names")?)? {
+            let name = string_attr(&alias, "name")?;
+            if name == "*" {
+                return Ok(None);
+            }
+            let renamed = optional_string_attr(&alias, "asname")?;
+            let (binding, origin) = if kind == "ImportFrom" {
+                let module = optional_string_attr(node, "module")?.unwrap_or_default();
+                (
+                    renamed.unwrap_or_else(|| name.clone()),
+                    format!("{module}.{name}"),
+                )
+            } else if let Some(renamed) = renamed {
+                (renamed, name)
+            } else {
+                let root = name.split('.').next().unwrap_or_default().to_owned();
+                (root.clone(), root)
+            };
+            if bindings.insert(binding, origin).is_some() {
+                return Ok(None);
+            }
+        }
+    }
+    Ok(Some(bindings))
+}
+
+fn imported_expression(
+    node: &Bound<'_, PyAny>,
+    bindings: &BTreeMap<String, String>,
+) -> PyResult<Option<String>> {
+    match type_name(node)?.as_str() {
+        "Name" => Ok(bindings.get(&string_attr(node, "id")?).cloned()),
+        "Attribute" => Ok(imported_expression(&node.getattr("value")?, bindings)?
+            .map(|base| string_attr(node, "attr").map(|attr| format!("{base}.{attr}")))
+            .transpose()?),
+        _ => Ok(None),
+    }
+}
+
+// Some(true) marks an inline implementation, not interchangeable configuration.
+// Only a lambda's body is deferred: calls in its defaults execute at import time.
+fn registration_argument(
+    node: &Bound<'_, PyAny>,
+    bindings: &BTreeMap<String, String>,
+) -> PyResult<Option<bool>> {
+    let kind = type_name(node)?;
+    match kind.as_str() {
+        "Constant" => return Ok(Some(false)),
+        "Name" | "Attribute" => return Ok(imported_expression(node, bindings)?.map(|_| false)),
+        "Lambda" => {
+            let args = node.getattr("args")?;
+            let mut defaults = list_items(&args.getattr("defaults")?)?;
+            defaults.extend(list_items(&args.getattr("kw_defaults")?)?);
+            for default in defaults {
+                if !default.is_none() && registration_argument(&default, bindings)?.is_none() {
+                    return Ok(None);
+                }
+            }
+            return Ok(Some(true));
+        }
+        "UnaryOp" => {
+            return Ok(
+                (matches!(type_name(&node.getattr("op")?)?.as_str(), "UAdd" | "USub")
+                    && type_name(&node.getattr("operand")?)? == "Constant")
+                    .then_some(false),
+            );
+        }
+        "List" | "Tuple" | "Set" | "Dict" => {}
+        _ => return Ok(None),
+    }
+    if kind == "Dict"
+        && list_items(&node.getattr("keys")?)?
+            .iter()
+            .any(|key| key.is_none())
+    {
+        return Ok(None);
+    }
+    let mut deferred = false;
+    for child in ast_children(node)? {
+        if type_name(&child)? == "Load" {
+            continue;
+        }
+        let Some(inline) = registration_argument(&child, bindings)? else {
+            return Ok(None);
+        };
+        deferred |= inline;
+    }
+    Ok(Some(deferred))
+}
+
+fn registration_assignment<'py>(tree: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
+    let mut assignment = None;
+    for node in list_items(&tree.getattr("body")?)? {
+        match type_name(&node)?.as_str() {
+            "Import" | "ImportFrom" if assignment.is_none() => {}
+            "Expr" if is_docstring(&node)? => {}
+            "Assign" if assignment.is_none() => {
+                let targets = list_items(&node.getattr("targets")?)?;
+                if targets.len() != 1 || type_name(&targets[0])? != "Name" {
+                    return Ok(None);
+                }
+                assignment = Some(node);
+            }
+            _ => return Ok(None),
+        }
+    }
+    Ok(assignment)
+}
+
+/// Syntactic review evidence only: neither the factory return type nor import,
+/// descriptor, or factory side effects are inferred from a naming convention.
+fn registration_candidate<'py>(
+    tree: &Bound<'py, PyAny>,
+    file: &str,
+) -> PyResult<Option<Bound<'py, PyDict>>> {
+    let Some(assignment) = registration_assignment(tree)? else {
+        return Ok(None);
+    };
+    let Some(bindings) = registration_imports(&list_items(&tree.getattr("body")?)?)? else {
+        return Ok(None);
+    };
+    let target = list_items(&assignment.getattr("targets")?)?.remove(0);
+    let name = string_attr(&target, "id")?;
+    let call = assignment.getattr("value")?;
+    if name.starts_with('_') || bindings.contains_key(&name) || type_name(&call)? != "Call" {
+        return Ok(None);
+    }
+    let Some(factory) = imported_expression(&call.getattr("func")?, &bindings)? else {
+        return Ok(None);
+    };
+    let leaf = factory.rsplit('.').next().unwrap_or_default();
+    if !["make_", "create_", "build_"]
+        .iter()
+        .any(|prefix| leaf.starts_with(prefix))
+    {
+        return Ok(None);
+    }
+    let py = tree.py();
+    let arguments = PyList::empty(py);
+    let keywords = PyList::empty(py);
+    let mut deferred = false;
+    for arg in list_items(&call.getattr("args")?)? {
+        let Some(inline) = registration_argument(&arg, &bindings)? else {
+            return Ok(None);
+        };
+        deferred |= inline;
+        arguments.append(exact_dump(&arg)?)?;
+    }
+    for keyword in list_items(&call.getattr("keywords")?)? {
+        let Some(name) = optional_string_attr(&keyword, "arg")? else {
+            return Ok(None);
+        };
+        let value = keyword.getattr("value")?;
+        let Some(inline) = registration_argument(&value, &bindings)? else {
+            return Ok(None);
+        };
+        deferred |= inline;
+        let item = PyDict::new(py);
+        item.set_item("name", name)?;
+        item.set_item("value", exact_dump(&value)?)?;
+        keywords.append(item)?;
+    }
+    let output = PyDict::new(py);
+    output.set_item("file", file)?;
+    output.set_item("name", name)?;
+    output.set_item("line_start", assignment.getattr("lineno")?)?;
+    output.set_item("line_end", assignment.getattr("end_lineno")?)?;
+    output.set_item("factory", factory)?;
+    output.set_item("factory_expression", exact_dump(&call.getattr("func")?)?)?;
+    output.set_item("import_bindings", bindings)?;
+    output.set_item("arguments", arguments)?;
+    output.set_item("keywords", keywords)?;
+    output.set_item("assignment", exact_dump(&assignment)?)?;
+    output.set_item("has_deferred_implementation", deferred)?;
+    output.set_item("binding_resolution", "unambiguous_absolute_import_syntax")?;
+    output.set_item("callable_return", "unknown")?;
+    output.set_item("side_effects", "unknown")?;
+    Ok(Some(output))
+}
+
 fn load_files(paths: Vec<String>, repo: String) -> Result<(Vec<LoadedFile>, usize), String> {
     let repo = PathBuf::from(repo);
     let mut loaded = Vec::with_capacity(paths.len());
@@ -866,10 +1057,12 @@ fn profile_to_dict<'py>(py: Python<'py>, profile: FileProfile) -> PyResult<Bound
 /// Read files without the GIL, then use CPython only to produce the canonical AST
 /// consumed by the native walkers.
 #[pyfunction]
+#[pyo3(signature = (paths, repo, registration_candidates=None))]
 pub(crate) fn audit_file_family_profiles(
     py: Python<'_>,
     paths: Vec<String>,
     repo: String,
+    registration_candidates: Option<&Bound<'_, PyList>>,
 ) -> PyResult<(Py<PyList>, usize)> {
     let (files, mut unparsable) = py
         .detach(move || load_files(paths, repo))
@@ -886,6 +1079,11 @@ pub(crate) fn audit_file_family_profiles(
             Err(error) => return Err(error),
         };
         let relative = file.relative;
+        if let Some(candidates) = registration_candidates {
+            if let Some(candidate) = registration_candidate(&tree, &relative)? {
+                candidates.append(candidate)?;
+            }
+        }
         let profile = profile_ast(&tree, relative.clone(), &file.source).map_err(|error| {
             PyRuntimeError::new_err(format!(
                 "native profile extraction failed for {relative}: {error}"

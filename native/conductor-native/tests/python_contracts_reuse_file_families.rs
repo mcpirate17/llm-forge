@@ -13,10 +13,86 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyFrozenSet, PyList, PySet, PyTuple};
 use serde_json::{json, Value};
 use std::ffi::CString;
+use std::fs;
 use support::{module, Case};
 
 fn families(py: Python<'_>) -> Bound<'_, pyo3::types::PyModule> {
     module(py, "conductor.reuse.file_families")
+}
+
+#[test]
+fn cli_publishes_tiny_registration_evidence_without_lowering_family_thresholds() {
+    let case = Case::new();
+    let package = case.root().join("pkg");
+    fs::create_dir(&package).unwrap();
+    for (name, expression) in [
+        ("abs", "torch.abs"),
+        ("sin", "torch.sin"),
+        ("square", "lambda x: x*x"),
+        ("offset", "lambda x: x+1"),
+    ] {
+        fs::write(package.join(format!("{name}.py")), format!(
+            "import torch\nfrom factories import make_handler\nComponentHandler = make_handler({expression}, mode='{name}')\n"
+        )).unwrap();
+    }
+    fs::write(package.join("data.py"), "CSS = 'body {{ color: red; }}'\n").unwrap();
+    let output = case.root().join("families.json");
+    let markdown = case.root().join("families.md");
+    Python::attach(|py| {
+        let args = vec![
+            "--repo".to_owned(),
+            case.root().to_string_lossy().into_owned(),
+            "--targets".into(),
+            "pkg".into(),
+            "--out".into(),
+            output.to_string_lossy().into_owned(),
+            "--md".into(),
+            markdown.to_string_lossy().into_owned(),
+        ];
+        assert!(families(py)
+            .getattr("main")
+            .unwrap()
+            .call1((args,))
+            .unwrap()
+            .eq(0)
+            .unwrap());
+        let repo = module(py, "pathlib")
+            .getattr("Path")
+            .unwrap()
+            .call1((case.root().to_string_lossy().as_ref(),))
+            .unwrap();
+        let args = (repo, vec!["pkg"], PySet::empty(py).unwrap());
+        let scan = families(py).getattr("scan_file_families").unwrap();
+        let legacy = scan.call1(args.clone()).unwrap();
+        let candidates = PyList::empty(py);
+        let options = PyDict::new(py);
+        options
+            .set_item("registration_candidates", &candidates)
+            .unwrap();
+        let extended = scan.call(args, Some(&options)).unwrap();
+        assert!(legacy.eq(extended).unwrap());
+        assert_eq!(candidates.len(), 4);
+    });
+    let report: Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
+    assert_eq!(report["settings"]["min_file_loc"], 40);
+    assert_eq!(report["summary"]["files_profiled"], 0);
+    assert_eq!(report["families"], json!([]));
+    assert_eq!(report["summary"]["registration_candidate_files"], 4);
+    let candidates = report["registration_candidates"].as_array().unwrap();
+    assert_eq!(candidates.len(), 4);
+    assert_eq!(
+        candidates
+            .iter()
+            .filter(|row| row["has_deferred_implementation"] == true)
+            .count(),
+        2
+    );
+    assert!(candidates
+        .iter()
+        .all(|row| row["callable_return"] == "unknown"));
+    assert!(candidates
+        .iter()
+        .all(|row| row["side_effects"] == "unknown"));
 }
 
 fn frozen<'py>(

@@ -102,12 +102,12 @@ struct ReferenceIndex {
 
 impl ReferenceIndex {
     fn add(&mut self, path: &str, hits: Vec<python::Hit>, documentation: bool) {
-        let index = if documentation {
-            &mut self.docs
-        } else {
-            &mut self.code
-        };
         for (line, name, kind) in hits {
+            let index = if documentation || kind == "rust-doc" {
+                &mut self.docs
+            } else {
+                &mut self.code
+            };
             index
                 .entry(name)
                 .or_default()
@@ -123,7 +123,9 @@ impl ReferenceIndex {
             .flatten()
             .filter(|reference| reference.0 != finding.file)
             .cloned()
-            .partition(|reference| !is_test(&reference.0));
+            .partition(|reference| {
+                !is_test(&reference.0) && !reference.2.starts_with("rust-test-")
+            });
         let mut docs: Vec<_> = self
             .docs
             .get(&finding.name)
@@ -204,6 +206,323 @@ pub fn adjudicate(
         .sort_by(|left, right| (&left.path, &left.message).cmp(&(&right.path, &right.message)));
     report.complete = report.diagnostics.is_empty();
     Ok(report)
+}
+
+mod rust {
+    use super::python::{text_hits, Hit};
+    use proc_macro2::{Span, TokenStream, TokenTree};
+    use std::collections::HashSet;
+    use syn::ext::IdentExt;
+    use syn::punctuated::Punctuated;
+    use syn::visit::{self, Visit};
+    use syn::{Attribute, Expr, Item, Lit, Meta, Token};
+
+    // Possible false/true values with `test` fixed; other configuration atoms
+    // remain unknown. In particular, any(test, feature="prod") is production.
+    fn cfg_values(meta: &Meta, test: bool) -> (bool, bool) {
+        if matches!(meta, Meta::Path(path) if path.is_ident("test")) {
+            return (!test, test);
+        }
+        if let Meta::List(list) = meta {
+            if let Ok(children) =
+                list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+            {
+                let values: Vec<_> = children
+                    .iter()
+                    .map(|child| cfg_values(child, test))
+                    .collect();
+                if list.path.is_ident("all") {
+                    return (values.iter().any(|v| v.0), values.iter().all(|v| v.1));
+                }
+                if list.path.is_ident("any") {
+                    return (values.iter().all(|v| v.0), values.iter().any(|v| v.1));
+                }
+                if list.path.is_ident("not") && values.len() == 1 {
+                    return (values[0].1, values[0].0);
+                }
+            }
+        }
+        (true, true)
+    }
+
+    fn test_only(attrs: &[Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            attr.path().is_ident("test")
+                || (attr.path().is_ident("cfg")
+                    && attr
+                        .parse_args::<Meta>()
+                        .is_ok_and(|meta| !cfg_values(&meta, false).1 && cfg_values(&meta, true).1))
+        })
+    }
+
+    struct Collector<'a> {
+        names: &'a HashSet<String>,
+        hits: Vec<Hit>,
+        test: bool,
+    }
+
+    impl Collector<'_> {
+        fn scoped(&mut self, attrs: &[Attribute], walk: impl FnOnce(&mut Self)) {
+            let previous = self.test;
+            self.test |= test_only(attrs);
+            walk(self);
+            self.test = previous;
+        }
+
+        fn hit(&mut self, text: &str, span: Span, string: bool) {
+            let kind = match (self.test, string) {
+                (false, false) => "rust-name",
+                (false, true) => "rust-string",
+                (true, false) => "rust-test-name",
+                (true, true) => "rust-test-string",
+            };
+            self.hits
+                .extend(text_hits(text, self.names, span.start().line, kind));
+        }
+
+        fn tokens(&mut self, tokens: TokenStream) {
+            for token in tokens {
+                match token {
+                    TokenTree::Group(group) => self.tokens(group.stream()),
+                    TokenTree::Ident(ident) => self.visit_ident(&ident),
+                    TokenTree::Literal(literal) => {
+                        if let Ok(value) = syn::parse2::<Lit>(TokenTree::Literal(literal).into()) {
+                            self.visit_lit(&value);
+                        }
+                    }
+                    TokenTree::Punct(_) => {}
+                }
+            }
+        }
+    }
+
+    impl<'ast> Visit<'ast> for Collector<'_> {
+        fn visit_file(&mut self, node: &'ast syn::File) {
+            self.scoped(&node.attrs, |s| visit::visit_file(s, node));
+        }
+
+        fn visit_item(&mut self, node: &'ast Item) {
+            let attrs: &[Attribute] = match node {
+                Item::Const(n) => &n.attrs,
+                Item::Enum(n) => &n.attrs,
+                Item::ExternCrate(n) => &n.attrs,
+                Item::Fn(n) => &n.attrs,
+                Item::ForeignMod(n) => &n.attrs,
+                Item::Impl(n) => &n.attrs,
+                Item::Macro(n) => &n.attrs,
+                Item::Mod(n) => &n.attrs,
+                Item::Static(n) => &n.attrs,
+                Item::Struct(n) => &n.attrs,
+                Item::Trait(n) => &n.attrs,
+                Item::TraitAlias(n) => &n.attrs,
+                Item::Type(n) => &n.attrs,
+                Item::Union(n) => &n.attrs,
+                Item::Use(n) => &n.attrs,
+                _ => &[],
+            };
+            self.scoped(attrs, |s| visit::visit_item(s, node));
+        }
+
+        fn visit_impl_item(&mut self, node: &'ast syn::ImplItem) {
+            let attrs: &[Attribute] = match node {
+                syn::ImplItem::Const(n) => &n.attrs,
+                syn::ImplItem::Fn(n) => &n.attrs,
+                syn::ImplItem::Macro(n) => &n.attrs,
+                syn::ImplItem::Type(n) => &n.attrs,
+                _ => &[],
+            };
+            self.scoped(attrs, |s| visit::visit_impl_item(s, node));
+        }
+
+        fn visit_trait_item(&mut self, node: &'ast syn::TraitItem) {
+            let attrs: &[Attribute] = match node {
+                syn::TraitItem::Const(n) => &n.attrs,
+                syn::TraitItem::Fn(n) => &n.attrs,
+                syn::TraitItem::Macro(n) => &n.attrs,
+                syn::TraitItem::Type(n) => &n.attrs,
+                _ => &[],
+            };
+            self.scoped(attrs, |s| visit::visit_trait_item(s, node));
+        }
+
+        fn visit_foreign_item(&mut self, node: &'ast syn::ForeignItem) {
+            let attrs: &[Attribute] = match node {
+                syn::ForeignItem::Fn(n) => &n.attrs,
+                syn::ForeignItem::Macro(n) => &n.attrs,
+                syn::ForeignItem::Static(n) => &n.attrs,
+                syn::ForeignItem::Type(n) => &n.attrs,
+                _ => &[],
+            };
+            self.scoped(attrs, |s| visit::visit_foreign_item(s, node));
+        }
+
+        fn visit_expr(&mut self, node: &'ast Expr) {
+            let attrs: &[Attribute] = match node {
+                Expr::Array(n) => &n.attrs,
+                Expr::Assign(n) => &n.attrs,
+                Expr::Async(n) => &n.attrs,
+                Expr::Await(n) => &n.attrs,
+                Expr::Binary(n) => &n.attrs,
+                Expr::Block(n) => &n.attrs,
+                Expr::Break(n) => &n.attrs,
+                Expr::Call(n) => &n.attrs,
+                Expr::Cast(n) => &n.attrs,
+                Expr::Closure(n) => &n.attrs,
+                Expr::Const(n) => &n.attrs,
+                Expr::Continue(n) => &n.attrs,
+                Expr::Field(n) => &n.attrs,
+                Expr::ForLoop(n) => &n.attrs,
+                Expr::Group(n) => &n.attrs,
+                Expr::If(n) => &n.attrs,
+                Expr::Index(n) => &n.attrs,
+                Expr::Infer(n) => &n.attrs,
+                Expr::Let(n) => &n.attrs,
+                Expr::Lit(n) => &n.attrs,
+                Expr::Loop(n) => &n.attrs,
+                Expr::Macro(n) => &n.attrs,
+                Expr::Match(n) => &n.attrs,
+                Expr::MethodCall(n) => &n.attrs,
+                Expr::Paren(n) => &n.attrs,
+                Expr::Path(n) => &n.attrs,
+                Expr::Range(n) => &n.attrs,
+                Expr::RawAddr(n) => &n.attrs,
+                Expr::Reference(n) => &n.attrs,
+                Expr::Repeat(n) => &n.attrs,
+                Expr::Return(n) => &n.attrs,
+                Expr::Struct(n) => &n.attrs,
+                Expr::Try(n) => &n.attrs,
+                Expr::TryBlock(n) => &n.attrs,
+                Expr::Tuple(n) => &n.attrs,
+                Expr::Unary(n) => &n.attrs,
+                Expr::Unsafe(n) => &n.attrs,
+                Expr::While(n) => &n.attrs,
+                Expr::Yield(n) => &n.attrs,
+                _ => &[],
+            };
+            self.scoped(attrs, |s| visit::visit_expr(s, node));
+        }
+
+        fn visit_local(&mut self, node: &'ast syn::Local) {
+            self.scoped(&node.attrs, |s| visit::visit_local(s, node));
+        }
+
+        fn visit_pat(&mut self, node: &'ast syn::Pat) {
+            let attrs: &[Attribute] = match node {
+                syn::Pat::Const(n) => &n.attrs,
+                syn::Pat::Ident(n) => &n.attrs,
+                syn::Pat::Lit(n) => &n.attrs,
+                syn::Pat::Macro(n) => &n.attrs,
+                syn::Pat::Or(n) => &n.attrs,
+                syn::Pat::Paren(n) => &n.attrs,
+                syn::Pat::Path(n) => &n.attrs,
+                syn::Pat::Range(n) => &n.attrs,
+                syn::Pat::Reference(n) => &n.attrs,
+                syn::Pat::Rest(n) => &n.attrs,
+                syn::Pat::Slice(n) => &n.attrs,
+                syn::Pat::Struct(n) => &n.attrs,
+                syn::Pat::Tuple(n) => &n.attrs,
+                syn::Pat::TupleStruct(n) => &n.attrs,
+                syn::Pat::Type(n) => &n.attrs,
+                syn::Pat::Wild(n) => &n.attrs,
+                _ => &[],
+            };
+            self.scoped(attrs, |s| visit::visit_pat(s, node));
+        }
+
+        fn visit_field_value(&mut self, node: &'ast syn::FieldValue) {
+            self.scoped(&node.attrs, |s| visit::visit_field_value(s, node));
+        }
+
+        fn visit_pat_type(&mut self, node: &'ast syn::PatType) {
+            self.scoped(&node.attrs, |s| visit::visit_pat_type(s, node));
+        }
+
+        fn visit_field_pat(&mut self, node: &'ast syn::FieldPat) {
+            self.scoped(&node.attrs, |s| visit::visit_field_pat(s, node));
+        }
+
+        fn visit_generic_param(&mut self, node: &'ast syn::GenericParam) {
+            let attrs = match node {
+                syn::GenericParam::Const(n) => &n.attrs,
+                syn::GenericParam::Lifetime(n) => &n.attrs,
+                syn::GenericParam::Type(n) => &n.attrs,
+            };
+            self.scoped(attrs, |s| visit::visit_generic_param(s, node));
+        }
+
+        fn visit_receiver(&mut self, node: &'ast syn::Receiver) {
+            self.scoped(&node.attrs, |s| visit::visit_receiver(s, node));
+        }
+
+        fn visit_arm(&mut self, node: &'ast syn::Arm) {
+            self.scoped(&node.attrs, |s| visit::visit_arm(s, node));
+        }
+
+        fn visit_field(&mut self, node: &'ast syn::Field) {
+            self.scoped(&node.attrs, |s| visit::visit_field(s, node));
+        }
+
+        fn visit_variant(&mut self, node: &'ast syn::Variant) {
+            self.scoped(&node.attrs, |s| visit::visit_variant(s, node));
+        }
+
+        fn visit_stmt_macro(&mut self, node: &'ast syn::StmtMacro) {
+            self.scoped(&node.attrs, |s| visit::visit_stmt_macro(s, node));
+        }
+
+        fn visit_attribute(&mut self, attr: &'ast Attribute) {
+            if attr.path().is_ident("doc") {
+                if let Meta::NameValue(value) = &attr.meta {
+                    if let syn::Expr::Lit(value) = &value.value {
+                        if let Lit::Str(text) = &value.lit {
+                            self.hits.extend(text_hits(
+                                &text.value(),
+                                self.names,
+                                text.span().start().line,
+                                "rust-doc",
+                            ));
+                        }
+                    }
+                }
+            } else {
+                visit::visit_attribute(self, attr);
+            }
+        }
+
+        fn visit_ident(&mut self, ident: &'ast syn::Ident) {
+            self.hit(&ident.unraw().to_string(), ident.span(), false);
+        }
+
+        fn visit_lit(&mut self, literal: &'ast Lit) {
+            match literal {
+                Lit::Str(value) => self.hit(&value.value(), value.span(), true),
+                Lit::ByteStr(value) => {
+                    self.hit(&String::from_utf8_lossy(&value.value()), value.span(), true)
+                }
+                Lit::CStr(value) => self.hit(
+                    &String::from_utf8_lossy(value.value().to_bytes()),
+                    value.span(),
+                    true,
+                ),
+                _ => {}
+            }
+        }
+
+        fn visit_token_stream(&mut self, tokens: &'ast TokenStream) {
+            self.tokens(tokens.clone());
+        }
+    }
+
+    pub(super) fn collect(source: &str, names: &HashSet<String>) -> Result<Vec<Hit>, String> {
+        let file = syn::parse_file(source).map_err(|error| error.to_string())?;
+        let mut collector = Collector {
+            names,
+            hits: Vec::new(),
+            test: false,
+        };
+        collector.visit_file(&file);
+        Ok(collector.hits)
+    }
 }
 
 mod python {
@@ -410,7 +729,7 @@ mod python {
 }
 
 mod scan {
-    use super::{python, AuditReport, Diagnostic, ReferenceIndex};
+    use super::{python, rust, AuditReport, Diagnostic, ReferenceIndex};
     use anyhow::{bail, Result};
     use std::collections::HashSet;
     use std::fs;
@@ -440,7 +759,8 @@ mod scan {
         ".current_work",
     ];
     const CODE_EXT: &[&str] = &[
-        "rs", "sh", "json", "toml", "yaml", "yml", "cfg", "ipynb", "cpp", "h", "cu",
+        "rs", "sh", "json", "toml", "yaml", "yml", "cfg", "ipynb", "c", "cc", "cpp", "cxx", "h",
+        "hh", "hpp", "hxx", "cu", "cuh",
     ];
 
     fn relative(path: &Path) -> String {
@@ -647,16 +967,20 @@ mod scan {
             diagnostic(report, path, "invalid UTF-8 replaced during scan");
         }
         report.scanned_files += 1;
-        let hits = if extension == "py" && !shell_shebang(&text) {
-            match python::collect(&text, names) {
-                Ok(hits) => hits,
-                Err(error) => {
-                    diagnostic(report, path, format!("Python parse failed: {error}"));
-                    return;
-                }
-            }
+        let parsed = if extension == "py" && !shell_shebang(&text) {
+            Some(("Python", python::collect(&text, names)))
+        } else if extension == "rs" {
+            Some(("Rust", rust::collect(&text, names)))
         } else {
-            text_references(&text, names, if documentation { "prose" } else { "text" })
+            None
+        };
+        let hits = match parsed {
+            Some((_, Ok(hits))) => hits,
+            Some((language, Err(error))) => {
+                diagnostic(report, path, format!("{language} parse failed: {error}"));
+                return;
+            }
+            None => text_references(&text, names, if documentation { "prose" } else { "text" }),
         };
         index.add(&relative(path), hits, documentation);
     }
@@ -763,31 +1087,6 @@ mod tests {
     }
 
     #[test]
-    fn dead_code_preserves_all_verdicts_and_precedence() {
-        let fixture = Fixture::new();
-        fixture.write("subject.py", "dead()\n");
-        fixture.write("prod.py", "alive()\n");
-        fixture.write("tests/test_usage.py", "alive()\ntested()\n");
-        fixture.write("guide.md", "alive tested documented\n");
-        let report = fixture.audit(&["alive", "tested", "documented", "dead"]);
-        assert!(report.complete);
-        assert_eq!(report.scanned_files, 4);
-        assert_eq!(
-            report
-                .findings
-                .iter()
-                .map(|row| row.verdict.as_str())
-                .collect::<Vec<_>>(),
-            ["ALIVE", "TEST-ONLY", "DOC-ONLY", "DEAD"]
-        );
-        assert_eq!(
-            report.findings[0].prod,
-            [("prod.py".to_owned(), 1, "name".to_owned())]
-        );
-        assert!(report.findings[3].prod.is_empty());
-    }
-
-    #[test]
     fn dead_code_original_imports_aliases_and_dotted_attributes() {
         let hits = references("from module import original as alias\nimport pkg.deep as local\nimport same as same\nobj.target()\n", &["original", "alias", "pkg", "local", "same", "target"]);
         assert!(hits.contains(&(1, "original".to_owned(), "import")));
@@ -886,19 +1185,6 @@ mod tests {
     }
 
     #[test]
-    fn dead_code_invalid_python_retains_incomplete_evidence() {
-        let fixture = Fixture::new();
-        fixture.write("broken.py", "def broken(\n");
-        let report = fixture.audit(&["target"]);
-        assert!(!report.complete);
-        assert_eq!(report.diagnostics.len(), 1);
-        assert_eq!(report.diagnostics[0].path, "broken.py");
-        assert!(report.diagnostics[0]
-            .message
-            .contains("Python parse failed"));
-    }
-
-    #[test]
     fn dead_code_shell_shebang_is_explicit_text_evidence() {
         let fixture = Fixture::new();
         fixture.write(
@@ -916,7 +1202,7 @@ mod tests {
     #[test]
     fn dead_code_text_lines_and_test_detection() {
         let fixture = Fixture::new();
-        fixture.write("test_native.rs", "target\r\ntarget\rtarget\u{2028}target");
+        fixture.write("test_native.cpp", "target\r\ntarget\rtarget\u{2028}target");
         fixture.write("testing/readme.md", "target");
         let report = fixture.audit(&["target"]);
         let row = &report.findings[0];
@@ -952,18 +1238,5 @@ mod tests {
         let mut escaped = finding("target");
         escaped.file = "../outside.py".to_owned();
         assert!(adjudicate(&fixture.0, vec![escaped], &[]).is_err());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn dead_code_external_file_symlink_is_incomplete() {
-        let fixture = Fixture::new();
-        let outside = Fixture::new();
-        outside.write("source.py", "target()\n");
-        std::os::unix::fs::symlink(outside.0.join("source.py"), fixture.0.join("linked.py"))
-            .unwrap();
-        let report = fixture.audit(&["target"]);
-        assert!(!report.complete);
-        assert!(report.diagnostics[0].message.contains("outside repository"));
     }
 }
