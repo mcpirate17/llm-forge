@@ -290,10 +290,14 @@ def collect_profiles(
     targets: list[str],
     exclude: set[str],
     min_file_loc: int,
+    *,
+    registration_candidates: list[dict] | None = None,
 ) -> tuple[list[FileProfile], int]:
     paths = consolidation.iter_python_files(repo, targets, exclude)
     raw_profiles, unparsable = slop_core.audit_file_family_profiles(
-        paths=[str(path) for path in paths], repo=str(repo)
+        paths=[str(path) for path in paths],
+        repo=str(repo),
+        registration_candidates=registration_candidates,
     )
     profiles = (_profile_from_native(raw) for raw in raw_profiles)
     return [
@@ -707,6 +711,7 @@ def scan_file_families(
     max_candidates: int = DEFAULT_MAX_CANDIDATES,
     permutations: int = DEFAULT_NUM_PERMUTATIONS,
     band_size: int = DEFAULT_BAND_SIZE,
+    registration_candidates: list[dict] | None = None,
 ) -> tuple[list[FileFamily], dict]:
     if not 0.0 < min_similarity <= 1.0:
         raise ValueError(f"min_similarity must be in (0, 1], got {min_similarity}")
@@ -718,7 +723,13 @@ def scan_file_families(
         raise ValueError(
             "minhash_permutations must be divisible by positive lsh_band_size"
         )
-    profiles, files_unparsable = collect_profiles(repo, targets, exclude, min_file_loc)
+    profiles, files_unparsable = collect_profiles(
+        repo,
+        targets,
+        exclude,
+        min_file_loc,
+        registration_candidates=registration_candidates,
+    )
     lsh_pairs = candidate_pairs(
         profiles, permutations=permutations, band_size=band_size
     )
@@ -783,12 +794,18 @@ def build_output(
     stats: dict,
     settings: dict,
     retirement_plans: list[RetirementPlan] | None = None,
+    *,
+    registration_candidates: list[dict] | None = None,
 ) -> dict:
     data = _support.generated_output(
         base={"settings": settings, "summary": stats},
         items_key="families",
         items=families,
         serialize=family_to_dict,
+    )
+    data["registration_candidates"] = registration_candidates or []
+    data["summary"]["registration_candidate_files"] = len(
+        data["registration_candidates"]
     )
     if retirement_plans is not None:
         evidence = [
@@ -941,14 +958,27 @@ def main(argv: list[str] | None = None) -> int:
         "permutations": args.permutations,
         "band_size": args.band_size,
     }
-    families, stats = scan_file_families(repo, targets, exclude, **settings)
+    registration_candidates: list[dict] = []
+    families, stats = scan_file_families(
+        repo,
+        targets,
+        exclude,
+        **settings,
+        registration_candidates=registration_candidates,
+    )
 
     out_path = Path(args.out) if args.out else repo / DEFAULT_OUT_REL
     md_path = Path(args.md) if args.md else repo / DEFAULT_MD_REL
     out_path.parent.mkdir(parents=True, exist_ok=True)
     md_path.parent.mkdir(parents=True, exist_ok=True)
 
-    data = build_output(families, stats, settings, plans)
+    data = build_output(
+        families,
+        stats,
+        settings,
+        plans,
+        registration_candidates=registration_candidates,
+    )
     if args.retirement_plans:
         data["settings"]["retirement_plans"] = str(args.retirement_plans.resolve())
     write_json_atomic(out_path, data)

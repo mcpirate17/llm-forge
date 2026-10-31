@@ -13,6 +13,7 @@ mod support;
 use profile_ref::reference_profile;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
 use support::{module, path, Case};
@@ -160,4 +161,109 @@ fn native_profiles_preserve_invalid_utf8_replacement_semantics() {
             .unwrap());
         assert!(actual.eq(expected).unwrap());
     });
+}
+
+fn registrations(sources: &[&str]) -> Vec<Value> {
+    let case = Case::new();
+    let paths: Vec<String> = sources
+        .iter()
+        .enumerate()
+        .map(|(index, source)| {
+            let path = case.root().join(format!("shim_{index}.py"));
+            fs::write(&path, source).unwrap();
+            path.to_string_lossy().into_owned()
+        })
+        .collect();
+    Python::attach(|py| {
+        let result = PyList::empty(py);
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("paths", paths).unwrap();
+        kwargs
+            .set_item("repo", case.root().to_string_lossy().as_ref())
+            .unwrap();
+        kwargs.set_item("registration_candidates", &result).unwrap();
+        let profile_result = module(py, "conductor.reuse")
+            .getattr("core")
+            .unwrap()
+            .getattr("audit_file_family_profiles")
+            .unwrap()
+            .call((), Some(&kwargs))
+            .unwrap();
+        assert_eq!(
+            profile_result.get_item(0).unwrap().len().unwrap(),
+            sources.len()
+        );
+        assert!(profile_result.get_item(1).unwrap().eq(0).unwrap());
+        let encoded: String = module(py, "json")
+            .call_method1("dumps", (result,))
+            .unwrap()
+            .extract()
+            .unwrap();
+        serde_json::from_str(&encoded).unwrap()
+    })
+}
+
+#[test]
+fn tiny_registrations_keep_import_aliases_arguments_and_deferred_boundaries() {
+    let rows = registrations(&[
+        "\"\"\"Tiny registration.\"\"\"\nfrom missing.factories import make_handler as factory\nimport torch as t\nComponentHandler = factory(t.abs, native_op_name='abs')\n",
+        "import missing.factories as f\nComponentHandler = f.make_handler(lambda x: x + 1, mode=-2)\n",
+        "import missing.factories\nComponentHandler = missing.factories.make_handler()\n",
+        "from missing.factories import make_handler\nComponentHandler = make_handler(lambda x, scale=2: x * scale)\n",
+    ]);
+    assert_eq!(rows.len(), 4);
+    for row in &rows {
+        assert_eq!(row["factory"], "missing.factories.make_handler");
+        assert_eq!(row["name"], "ComponentHandler");
+        assert_eq!(row["callable_return"], "unknown");
+        assert_eq!(row["side_effects"], "unknown");
+        assert_eq!(
+            row["binding_resolution"],
+            "unambiguous_absolute_import_syntax"
+        );
+    }
+    assert_eq!(rows[0]["line_start"], 4);
+    assert_eq!(
+        rows[0]["import_bindings"]["factory"],
+        "missing.factories.make_handler"
+    );
+    assert_eq!(rows[0]["import_bindings"]["t"], "torch");
+    assert_eq!(rows[0]["has_deferred_implementation"], false);
+    assert_eq!(rows[0]["keywords"][0]["name"], "native_op_name");
+    assert!(rows[0]["arguments"][0]
+        .as_str()
+        .unwrap()
+        .contains("attr='abs'"));
+    assert_eq!(rows[1]["has_deferred_implementation"], true);
+    assert!(rows[1]["arguments"][0]
+        .as_str()
+        .unwrap()
+        .contains("Lambda("));
+    assert_eq!(rows[2]["arguments"], serde_json::json!([]));
+    assert_eq!(rows[3]["has_deferred_implementation"], true);
+}
+
+#[test]
+fn registration_candidates_exclude_data_extra_execution_and_ambiguous_bindings() {
+    let sources = [
+        "HTML = '<script>function run() {}</script>'\n",
+        "from factory import make_handler\nDATA = {'name': 'run'}\n",
+        "from factory import make_handler\nComponentHandler = make_handler()\nprint('extra execution')\n",
+        "from factory import make_handler\nComponentHandler = make_handler(load())\n",
+        "from factory import make_handler\nComponentHandler = make_handler(lambda x=load(): x)\n",
+        "from factory import make_handler\nComponentHandler = make_handler(**{})\n",
+        "from factory import make_handler\nComponentHandler = make_handler(*[])\n",
+        "from factory import make_handler\nComponentHandler = make_handler\n",
+        "from factory import make_handler\nComponentHandler = make_handler()\nComponentHandler = make_handler()\n",
+        "from factory import make_handler\nfrom other import make_handler\nComponentHandler = make_handler()\n",
+        "from factory import *\nComponentHandler = make_handler()\n",
+        "from .factory import make_handler\nComponentHandler = make_handler()\n",
+        "from factory import make_handler\nobj.handler = make_handler()\n",
+        "from factory import make_handler\nA = B = make_handler()\n",
+        "from factory import make_handler\nmake_handler = make_handler()\n",
+        "from factory import make_handler\nComponentHandler = make_handler(config)\n",
+        "from factory import make_handler\nComponentHandler = make_handler()\nimport later\n",
+        "from factory import load_config\nCONFIG = load_config('config.json')\n",
+    ];
+    assert!(registrations(&sources).is_empty());
 }

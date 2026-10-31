@@ -371,9 +371,83 @@ fn clone_opportunities(
     Ok(())
 }
 
+fn registration_opportunities(
+    groups: &mut BTreeMap<String, Opportunity>,
+    families: &Value,
+) -> Result<(), String> {
+    let mut cohorts: BTreeMap<(String, String, bool), BTreeMap<String, Value>> = BTreeMap::new();
+    for row in rows(families, "registration_candidates")? {
+        let text = |key: &str| {
+            row[key]
+                .as_str()
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| format!("registration candidate lacks {key}"))
+        };
+        let factory = text("factory")?.to_owned();
+        let name = text("name")?.to_owned();
+        let file = text("file")?.to_owned();
+        text("assignment")?;
+        let deferred = row["has_deferred_implementation"]
+            .as_bool()
+            .ok_or("registration candidate lacks implementation boundary")?;
+        let start = row["line_start"].as_u64().filter(|line| *line > 0);
+        let end = row["line_end"].as_u64();
+        if start.is_none() || end.is_none() || end < start {
+            return Err("registration candidate has invalid source span".into());
+        }
+        if !row["import_bindings"].is_object()
+            || !row["arguments"].is_array()
+            || !row["keywords"].is_array()
+        {
+            return Err("registration candidate lacks import/argument evidence".into());
+        }
+        let cohort = cohorts.entry((factory, name, deferred)).or_default();
+        if let Some(previous) = cohort.insert(file, row.clone()) {
+            if previous != *row {
+                return Err("conflicting registration candidates for one file".into());
+            }
+        }
+    }
+    for ((factory, name, deferred), members) in cohorts {
+        if members.len() < 2 {
+            continue;
+        }
+        let boundary = if deferred {
+            "deferred_inline_implementation"
+        } else {
+            "registration_arguments"
+        };
+        let strategy = if deferred {
+            "review_inline_factory_implementation"
+        } else {
+            "review_factory_registration"
+        };
+        let encoded =
+            serde_json::to_vec(&(&factory, &name, boundary)).map_err(|error| error.to_string())?;
+        let digest = format!("{:x}", Sha256::digest(&encoded));
+        let sites: Vec<Value> = members.values().cloned().collect();
+        let row = json!({
+            "factory": factory, "export": name, "boundary": boundary,
+            "has_deferred_implementation": deferred, "files": members.keys().collect::<Vec<_>>(),
+            "sites": sites, "disposition": "REVIEW", "net_files_removed": null,
+            "callable_return": "unknown", "side_effects": "unknown",
+            "rationale": "Same imported factory and export binding; arguments and inline implementations require independent review. No return-type, purity, equivalence, or deletion proof."
+        });
+        add_opportunity(
+            groups,
+            strategy,
+            format!("registrations:{}", &digest[..16]),
+            row,
+            3,
+        )?;
+    }
+    Ok(())
+}
+
 fn gather_opportunities(payload: &Value) -> Result<Vec<Opportunity>, String> {
     let mut groups = BTreeMap::new();
     clone_opportunities(&mut groups, &payload["functions"])?;
+    registration_opportunities(&mut groups, &payload["families"])?;
     for row in rows(&payload["families"], "families")? {
         let rank = if row["disposition"] == "ignore" || row["disposition"] == "review-data" {
             6
@@ -511,11 +585,20 @@ fn caller_hint_index(payload: &Value) -> Result<BTreeMap<String, Option<Value>>,
     Ok(index)
 }
 
+fn has_callable_definitions(group: &Opportunity) -> bool {
+    !matches!(
+        group.strategy.as_str(),
+        "extract_shared_block"
+            | "review_factory_registration"
+            | "review_inline_factory_implementation"
+    )
+}
+
 fn existing_owner_candidates(
     group: &Opportunity,
     hints: &BTreeMap<String, Option<Value>>,
 ) -> Result<Vec<Value>, String> {
-    if group.strategy == "extract_shared_block" {
+    if !has_callable_definitions(group) {
         return Ok(Vec::new());
     }
     let mut candidates = Vec::new();
@@ -558,7 +641,7 @@ fn opportunity_row(
     hints: &BTreeMap<String, Option<Value>>,
 ) -> Result<Value, String> {
     let explicit_plan = group.strategy == "retire_planned_files";
-    let callable_sites = if group.strategy == "extract_shared_block" {
+    let callable_sites = if !has_callable_definitions(group) {
         0
     } else {
         group.sites.len()
@@ -609,7 +692,7 @@ fn opportunities(payload: &Value) -> Result<Value, String> {
             "measured_net_files_removed": Value::Null,
             "savings_are_additive": false
         },
-        "ranking": "Reviewed positive retirement plans, file families, existing callable reuse, parameterized abstractions, token blocks, name-only native hints; then unique file/site footprint. File footprint is not savings.",
+        "ranking": "Reviewed positive retirement plans, file families, existing callable reuse, parameterized abstractions and factory-registration review, token blocks, name-only native hints; then unique file/site footprint. File footprint is not savings.",
         "opportunities": report,
         "limits": [
             "Structural and name matches are review leads, not semantic equivalence or automatic deletion permission.",
@@ -696,6 +779,72 @@ pub use python::register;
 #[cfg(test)]
 mod opportunity_tests {
     use super::*;
+
+    fn registration_row(file: &str, deferred: bool) -> Value {
+        json!({"file":file, "line_start":3, "line_end":3, "name":"ComponentHandler",
+            "factory":"pkg.factories.make_handler", "import_bindings":{"f":"pkg.factories"},
+            "arguments":[file], "keywords":[], "assignment":format!("handler for {file}"),
+            "has_deferred_implementation":deferred})
+    }
+
+    #[test]
+    fn registration_cohorts_keep_deferred_code_separate_without_savings_claims() {
+        let input = vec![
+            registration_row("b.py", false),
+            registration_row("d.py", true),
+            registration_row("a.py", false),
+            registration_row("c.py", true),
+        ];
+        let report = opportunities(&json!({"families":{"registration_candidates":input}})).unwrap();
+        let reversed: Vec<Value> = input.into_iter().rev().collect();
+        assert_eq!(
+            report,
+            opportunities(&json!({"families":{"registration_candidates":reversed}})).unwrap()
+        );
+        let rows = report["opportunities"].as_array().unwrap();
+        assert_eq!(rows.len(), 2);
+        let strategies: BTreeSet<&str> = rows
+            .iter()
+            .map(|row| row["strategy"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            strategies,
+            BTreeSet::from([
+                "review_factory_registration",
+                "review_inline_factory_implementation"
+            ])
+        );
+        for row in rows {
+            assert!(row["net_files_removed"].is_null());
+            assert_eq!(row["review_only"], true);
+            assert_eq!(row["observed_callable_sites"], 0);
+            assert_eq!(row["existing_owner_candidates"], json!([]));
+            assert_eq!(row["sites"].as_array().unwrap().len(), 2);
+            assert_ne!(row["sites"][0]["arguments"], row["sites"][1]["arguments"]);
+        }
+    }
+
+    #[test]
+    fn registration_groups_deduplicate_identical_rows_and_reject_conflicts() {
+        let first = registration_row("a.py", false);
+        let report =
+            opportunities(&json!({"families":{"registration_candidates":[first,first]}})).unwrap();
+        assert!(report["opportunities"].as_array().unwrap().is_empty());
+        let mut different = first.clone();
+        different["arguments"] = json!(["changed"]);
+        assert!(
+            opportunities(&json!({"families":{"registration_candidates":[first,different]}}))
+                .unwrap_err()
+                .contains("conflicting registration")
+        );
+        let mut invalid = first;
+        invalid["line_end"] = json!(1);
+        assert!(
+            opportunities(&json!({"families":{"registration_candidates":[invalid]}}))
+                .unwrap_err()
+                .contains("invalid source span")
+        );
+    }
 
     fn clone_row(id: &str, left: &str, right: &str, line: i64) -> Value {
         json!({"id": id, "kind": "exact", "sites": [

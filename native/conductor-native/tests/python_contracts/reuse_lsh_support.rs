@@ -199,7 +199,12 @@ pub fn patch_scan<'py>(
 ) -> Vec<AttrPatch> {
     let module = file_families(py);
     let profiles = profiles.clone().into_any().unbind();
-    let collect_sig = signature(py, &["repo", "targets", "exclude", "min_file_loc"], &[]);
+    let collect_sig = py
+        .import("inspect")
+        .unwrap()
+        .call_method1("signature", (module.getattr("collect_profiles").unwrap(),))
+        .unwrap()
+        .unbind();
     let collect =
         PyCFunction::new_closure(py, None, None, move |args, kwargs| -> PyResult<Py<PyAny>> {
             bind_signature(&collect_sig, args, kwargs)?;
