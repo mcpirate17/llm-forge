@@ -142,7 +142,22 @@ fn native_profiles_preserve_invalid_utf8_replacement_semantics() {
     fs::write(&file, b"VALUE = 'ok'\n# invalid: \xff\n").unwrap();
     Python::attach(|py| {
         let expected = reference_profile(py, &file, case.root()).unwrap();
+        // The independent feature reference predates the literal-data marker.
+        // This fixture has one literal assignment; decoding its comment must
+        // preserve that classification as well as every pre-existing feature.
+        let flags = PyDict::new(py);
+        flags.set_item("literal_data_only", true).unwrap();
+        let expected = module(py, "dataclasses")
+            .getattr("replace")
+            .unwrap()
+            .call((&expected,), Some(&flags))
+            .unwrap();
         let actual = production_profile(py, &file, case.root());
+        assert!(actual
+            .getattr("literal_data_only")
+            .unwrap()
+            .extract::<bool>()
+            .unwrap());
         assert!(actual.eq(expected).unwrap());
     });
 }

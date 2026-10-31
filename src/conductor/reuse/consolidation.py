@@ -26,6 +26,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from conductor.atomic_json import atomic_write, write_json_atomic
 from conductor.duplicate_audit_config import (
     JSCPD_FULL_FILE_SUFFIXES,
     JSCPD_SOURCE_SUFFIXES,
@@ -128,12 +129,19 @@ def iter_python_files(repo: Path, targets: list[str], exclude: set[str]) -> list
 
 
 def collect_functions(
-    files: list[Path], repo: Path, min_lines: int
+    files: list[Path], repo: Path, min_lines: int, *, profiles: list[dict] | None = None
 ) -> tuple[list[FuncRecord], int]:
     """Return (qualifying function records, count of files that failed to parse)."""
-    records, files_unparsable = slop_core.audit_consolidation_collect(
+    settings = dict(
         paths=[str(path) for path in files], repo=str(repo), min_lines=min_lines
     )
+    if profiles is None:
+        records, files_unparsable = slop_core.audit_consolidation_collect(**settings)
+    else:
+        records, collected, files_unparsable = (
+            slop_core.audit_consolidation_collect_profiles(**settings)
+        )
+        profiles.extend(collected)
     return [FuncRecord(**record) for record in records], files_unparsable
 
 
@@ -185,11 +193,15 @@ def scan_clusters(
     exclude: set[str],
     min_lines: int = DEFAULT_MIN_LINES,
     batch_size: int = DEFAULT_BATCH_SIZE,
+    *,
+    profiles: list[dict] | None = None,
 ) -> tuple[list[Cluster], dict]:
     """Deterministic core scan reused by both the ROI oracle and the `consolidate`
     subcommand. Returns (ranked+id'd clusters, stats)."""
     files = iter_python_files(repo, targets, exclude)
-    records, files_unparsable = collect_functions(files, repo, min_lines)
+    records, files_unparsable = collect_functions(
+        files, repo, min_lines, profiles=profiles
+    )
     clusters = build_clusters(records)
     _assign_ids(clusters, batch_size)
     stats = {
@@ -454,7 +466,16 @@ def write_markdown(path: Path, data: dict) -> None:
         markdown += f"\nToken-clone detector: **{token['status']}**.\n"
         if "error" in token:
             markdown += f"\n{token['error']}\n"
-    path.write_text(markdown, encoding="utf-8")
+    abstraction = data.get("abstractions")
+    if abstraction:
+        coverage = abstraction["coverage"]
+        markdown += (
+            f"\nStructural abstraction candidates: **{len(abstraction['edges'])}** "
+            f"review-only pairs; coverage complete: **{coverage['complete']}**. "
+            "These pairs do not establish semantic equivalence or file retirement.\n"
+        )
+    with atomic_write(path) as handle:
+        handle.write(markdown)
 
 
 def _markdown_row(cluster: dict) -> str:
@@ -471,6 +492,119 @@ def resolve_settings(args: argparse.Namespace) -> tuple[Path, list[str], list[st
     repo, targets = scan_roots(args)
     exclude = args.exclude if args.exclude else []
     return repo, targets, exclude
+
+
+def add_abstraction_arguments(parser: argparse.ArgumentParser) -> None:
+    """Shared bounded structural-comparison controls for standalone and sweep CLIs."""
+    parser.add_argument("--abstraction-min-similarity", type=float, default=0.80)
+    parser.add_argument("--abstraction-min-shared-features", type=int, default=8)
+    parser.add_argument("--abstraction-max-pairs", type=int, default=2_000_000)
+    parser.add_argument("--abstraction-max-bucket-size", type=int, default=80)
+    parser.add_argument(
+        "--abstraction-exhaustive",
+        action="store_true",
+        help="Compare all function pairs within --abstraction-max-pairs; report incomplete at the cap.",
+    )
+    parser.add_argument(
+        "--abstraction-include-features",
+        action="store_true",
+        help="Keep raw profile feature arrays in the report (potentially very large).",
+    )
+
+
+def abstraction_settings(args: argparse.Namespace) -> dict:
+    """Validate CLI controls before running detectors or publishing reports."""
+    settings = {
+        name: getattr(args, f"abstraction_{name}")
+        for name in (
+            "min_similarity",
+            "min_shared_features",
+            "max_pairs",
+            "max_bucket_size",
+            "exhaustive",
+            "include_features",
+        )
+    }
+    if not 0 < settings["min_similarity"] <= 1:
+        raise ValueError("--abstraction-min-similarity must be in (0, 1]")
+    for name, minimum in (
+        ("min_shared_features", 1),
+        ("max_pairs", 1),
+        ("max_bucket_size", 2),
+    ):
+        if settings[name] < minimum:
+            raise ValueError(
+                f"--abstraction-{name.replace('_', '-')} must be at least {minimum}"
+            )
+    return settings
+
+
+def abstraction_cli_options(options: dict) -> list[str]:
+    """Serialize the shared controls for subprocess and reproduction commands."""
+    arguments = []
+    for name, value in options.items():
+        flag = f"--abstraction-{name.replace('_', '-')}"
+        if isinstance(value, bool):
+            arguments.extend([flag] if value else [])
+        else:
+            arguments.extend([flag, str(value)])
+    return arguments
+
+
+def add_abstraction_report(
+    data: dict, profiles: list[dict] | None, options: dict, repo: Path
+) -> None:
+    """Keep retrieval completion distinct from unknown approximate recall."""
+    status = {"status": "not_requested"}
+    if profiles is not None:
+        native_options = {
+            key: value for key, value in options.items() if key != "include_features"
+        }
+        evidence = slop_core.audit_abstraction_pairs(profiles, **native_options)
+        include_features = options["include_features"]
+        feature_keys = (
+            "structure",
+            "api",
+            "fields",
+            "calls",
+            "control",
+            "imports",
+            "schemas",
+        )
+        for profile in profiles:
+            profile["feature_counts"] = {key: len(profile[key]) for key in feature_keys}
+            if not include_features:
+                for key in feature_keys:
+                    del profile[key]
+        data["abstractions"] = {
+            "profiles": profiles,
+            **evidence,
+            "features_omitted_from_report": not include_features,
+            "feature_report_reason": "Raw retrieval features are omitted by default to bound report size; all identities, semantic values, counts and pair evidence are retained.",
+            "feature_reproduction_cli": [
+                sys.executable,
+                "-m",
+                "conductor.reuse.consolidation",
+                "--repo",
+                str(repo),
+                *(["--targets", *data["targets"]] if data["targets"] else []),
+                *(["--exclude", *data["exclude"]] if data["exclude"] else []),
+                "--min-lines",
+                str(data["min_lines"]),
+                "--with-abstractions",
+                *abstraction_cli_options({**options, "include_features": True}),
+            ],
+        }
+        coverage = evidence["coverage"]
+        complete = coverage["candidate_generation_complete"]
+        status = {
+            "status": "complete" if complete else "incomplete",
+            "coverage": coverage,
+        }
+        data["summary"]["abstraction_candidates"] = len(evidence["edges"])
+        data["summary"]["abstraction_candidate_generation_complete"] = complete
+        data["complete"] &= complete
+    data["detectors"]["abstractions"] = status
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -490,6 +624,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument("--out", default=None, help="Output JSON path.")
     parser.add_argument("--md", default=None, help="Output markdown path.")
+    parser.add_argument(
+        "--with-abstractions",
+        action="store_true",
+        help="Include review-only structural pairs separately from normalized clones.",
+    )
+    add_abstraction_arguments(parser)
     parser.add_argument(
         "--with-token-clones",
         action="store_true",
@@ -543,6 +683,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.token_clone_full_files and not args.with_token_clones:
         parser.error("--token-clone-full-files requires --with-token-clones")
+    try:
+        abstraction_options = abstraction_settings(args)
+    except ValueError as error:
+        parser.error(str(error))
 
     if args.selftest:
         _selftest()
@@ -551,8 +695,9 @@ def main(argv: list[str] | None = None) -> int:
     repo, targets, exclude = resolve_settings(args)
     exclude_set = set(exclude)
 
+    profiles = [] if args.with_abstractions else None
     clusters, stats = scan_clusters(
-        repo, targets, exclude_set, args.min_lines, args.batch_size
+        repo, targets, exclude_set, args.min_lines, args.batch_size, profiles=profiles
     )
 
     token_status = {"status": "not_requested"}
@@ -589,11 +734,13 @@ def main(argv: list[str] | None = None) -> int:
         functions_considered=stats["functions_considered"],
     )
     data["detectors"] = {"token_clones": token_status}
+    data["exclude"] = exclude
     data["complete"] = not stats["files_unparsable"] and token_status["status"] in {
         "complete",
         "not_requested",
     }
-    out_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    add_abstraction_report(data, profiles, abstraction_options, repo)
+    write_json_atomic(out_path, data)
     write_markdown(md_path, data)
 
     print(

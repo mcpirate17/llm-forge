@@ -14,6 +14,7 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
+from conductor.atomic_json import write_json_atomic
 from conductor.duplicate_audit_config import add_scan_root_arguments, scan_roots
 from conductor.reuse import _support, consolidation
 from conductor.reuse import core as slop_core
@@ -45,6 +46,7 @@ class FileProfile:
     imports: frozenset[str]
     structure: frozenset[str]
     schemas: frozenset[str] = frozenset()
+    literal_data_only: bool = False
 
     @property
     def lsh_features(self) -> frozenset[str]:
@@ -272,6 +274,7 @@ def _profile_from_native(raw: dict) -> FileProfile:
         imports=frozenset(raw["imports"]),
         structure=frozenset(raw["structure"]),
         schemas=frozenset(raw["schemas"]),
+        literal_data_only=raw["literal_data_only"],
     )
 
 
@@ -497,6 +500,8 @@ def _recommend_abstraction(
         if profiles
         else set()
     )
+    if all(profile.literal_data_only for profile in profiles) and not common_schemas:
+        return "data_template", [], [], []
     class_based = _class_abstraction(
         all_class_files, shared_methods, variable_methods, common_methods, common_fields
     )
@@ -526,6 +531,58 @@ def _recommend_abstraction(
     )
 
 
+def _data_template_family(
+    profiles: list[FileProfile], similarities: list[PairSimilarity]
+) -> FileFamily:
+    """Retain a syntax relation without treating literal payloads as shared code."""
+    scores = [similarity.score for similarity in similarities]
+    average = sum(scores) / len(scores)
+    loc = sum(profile.loc for profile in profiles)
+    return FileFamily(
+        files=sorted(profile.file for profile in profiles),
+        similarity_min=round(min(scores), 4),
+        similarity_avg=round(average, 4),
+        similarity_max=round(max(scores), 4),
+        containment_min=round(min(item.containment for item in similarities), 4),
+        shared_methods=[],
+        variable_methods=[],
+        common_fields=[],
+        recommended_abstraction="data_template",
+        suggested_home=None,
+        gross_duplicate_loc=0,
+        estimated_net_deleted_loc=0,
+        before_loc=loc,
+        after_loc=loc,
+        target_shape=(
+            "Data/template relation only: review literal contents; "
+            "no shared callable or deletion estimate."
+        ),
+        confidence=0.0,
+        risk="medium",
+        band="90%+" if average >= 0.90 else "80-89%" if average >= 0.80 else "70-79%",
+        disposition="review-data",
+    )
+
+
+def _family_risk_and_confidence(files: list[str], score: float) -> tuple[str, float]:
+    """Classify reuse risk and confidence from source scope and structural evidence."""
+    roots = {PurePosixPath(file).parts[0] for file in files}
+    directories = {PurePosixPath(file).parent for file in files}
+    semantic_risk = any(
+        set(PurePosixPath(file).parts) & _HIGH_RISK_PARTS for file in files
+    )
+    risk = (
+        "high"
+        if semantic_risk or len(roots) > 1
+        else "low"
+        if len(directories) == 1
+        else "medium"
+    )
+    locality = 1.0 if len(directories) == 1 else 0.88 if len(roots) == 1 else 0.70
+    confidence = max(0.05, round(score * locality - (0.08 if semantic_risk else 0), 2))
+    return risk, confidence
+
+
 def _family_from_profiles(
     profiles: list[FileProfile],
     similarities: list[PairSimilarity],
@@ -537,6 +594,8 @@ def _family_from_profiles(
     abstraction, shared_methods, variable_methods, common_fields = (
         _recommend_abstraction(profiles)
     )
+    if abstraction == "data_template":
+        return _data_template_family(profiles, similarities)
     # Net LOC from the PROPOSED COMPACT SHAPE, not `similarity × shortest file`: the shared
     # skeleton is written once (the fullest member approximates the union), each file keeps
     # only its non-shared remainder, and declarative/entrypoint families collapse most of
@@ -552,22 +611,7 @@ def _family_from_profiles(
     overhead = 4 * len(profiles) + 6 * len(variable_methods)
     after_loc = shared_loc + residual + overhead
     net = max(0, before_loc - after_loc)
-    roots = {PurePosixPath(file).parts[0] for file in files}
-    directories = {PurePosixPath(file).parent for file in files}
-    semantic_risk = any(
-        set(PurePosixPath(file).parts) & _HIGH_RISK_PARTS for file in files
-    )
-    risk = (
-        "high"
-        if semantic_risk or len(roots) > 1
-        else "low"
-        if len(directories) == 1
-        else "medium"
-    )
-    locality = 1.0 if len(directories) == 1 else 0.88 if len(roots) == 1 else 0.70
-    confidence = max(
-        0.05, round(min(scores) * locality - (0.08 if semantic_risk else 0), 2)
-    )
+    risk, confidence = _family_risk_and_confidence(files, min(scores))
     average = sum(scores) / len(scores)
     band = "90%+" if average >= 0.90 else "80-89%" if average >= 0.80 else "70-79%"
     disposition = (
@@ -907,7 +951,7 @@ def main(argv: list[str] | None = None) -> int:
     data = build_output(families, stats, settings, plans)
     if args.retirement_plans:
         data["settings"]["retirement_plans"] = str(args.retirement_plans.resolve())
-    out_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    write_json_atomic(out_path, data)
     write_markdown(md_path, data)
 
     print(

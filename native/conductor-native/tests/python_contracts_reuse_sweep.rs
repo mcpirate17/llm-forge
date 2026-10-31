@@ -73,6 +73,159 @@ fn reuse_sweep_cli_sigterm_reaps_detector_tree_and_restores_handler() {
     });
 }
 
+#[test]
+fn reuse_sweep_unifies_only_fresh_evidence_and_preserves_failed_writes() {
+    let _case = support::Case::new();
+    Python::attach(|py| {
+        let globals = PyDict::new(py);
+        globals
+            .set_item("sweep", support::module(py, "conductor.reuse.sweep"))
+            .unwrap();
+        py.run(
+            &CString::new(OPPORTUNITY_CONTRACTS).unwrap(),
+            Some(&globals),
+            None,
+        )
+        .unwrap();
+    });
+}
+
+#[test]
+fn reuse_sweep_caller_hints_require_current_unambiguous_function_identity() {
+    let _case = support::Case::new();
+    Python::attach(|py| {
+        let globals = PyDict::new(py);
+        globals
+            .set_item("sweep", support::module(py, "conductor.reuse.sweep"))
+            .unwrap();
+        py.run(
+            &CString::new(CALLER_CONTRACTS).unwrap(),
+            Some(&globals),
+            None,
+        )
+        .unwrap();
+    });
+}
+
+const CALLER_CONTRACTS: &str = r#"
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+sites = [{'file': f'pkg/{name}.py', 'name': 'helper', 'line_start': 10}
+         for name in ('popular', 'reference', 'unused', 'missing', 'ambiguous', 'shifted')]
+functions = {'clusters': [{'kind': 'exact', 'sites': sites + sites[:1]},
+                          {'kind': 'token', 'sites': [{'file': 'block.py', 'name': '<clone>', 'line_start': 1}]}],
+             'abstractions': {'profiles': [*sites[:2], {'file': 'not-a-candidate.py', 'name': 'unused', 'line_start': 1}],
+                              'edges': [{'left': 0, 'right': 1}]}}
+rows = [{**site, 'caller_count': count} for site, count in zip(sites, (55, 4, 0))]
+rows += [{**sites[4], 'caller_count': 7}, {**sites[4], 'caller_count': 9},
+         {**sites[5], 'line_start': 11, 'caller_count': 99}]
+fresh = {'available': True, 'complete': True, 'graph_head': 'head', 'repo_head': 'head', 'overlay_hash': 'clean'}
+
+def graph(statuses):
+    index = MagicMock()
+    index.status.side_effect = [MagicMock(as_dict=lambda value=value: value) for value in statuses]
+    index.native_reuse_rows.return_value = rows
+    return index
+
+index = graph([fresh, fresh])
+with patch.object(sweep, 'GraphIndex', return_value=index):
+    hints = sweep.caller_hints(Path('.'), functions)
+assert hints['complete'] and len(hints['sites']) == len(sites)
+assert index.status.call_args_list[0].args == index.status.call_args_list[1].args == (['.'],)
+index.native_reuse_rows.assert_called_once_with(caller_limit=None)
+counts = {site['file']: site['caller_count'] for site in hints['sites']}
+assert counts == {'pkg/popular.py': 55, 'pkg/reference.py': 4, 'pkg/unused.py': 0,
+                  'pkg/missing.py': None, 'pkg/ambiguous.py': None, 'pkg/shifted.py': None}
+assert hints['graph_status_before'] == hints['graph_status_after'] == fresh
+for after in ({**fresh, 'complete': False, 'overlay_hash': 'dirty'},
+              {**fresh, 'graph_head': 'next', 'repo_head': 'next'}):
+    index = graph([fresh, after])
+    with patch.object(sweep, 'GraphIndex', return_value=index):
+        hints = sweep.caller_hints(Path('.'), functions)
+    assert not hints['complete'] and all(site['caller_count'] is None for site in hints['sites'])
+index = graph([{**fresh, 'complete': False}])
+with patch.object(sweep, 'GraphIndex', return_value=index):
+    hints = sweep.caller_hints(Path('.'), functions)
+assert not hints['complete']
+index.native_reuse_rows.assert_not_called()
+index = graph([fresh])
+index.native_reuse_rows.side_effect = sweep.sqlite3.OperationalError('locked')
+with patch.object(sweep, 'GraphIndex', return_value=index):
+    hints = sweep.caller_hints(Path('.'), functions)
+assert not hints['complete'] and 'locked' in hints['reason']
+assert all(site['caller_count'] is None for site in hints['sites'])
+"#;
+
+const OPPORTUNITY_CONTRACTS: &str = r#"
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+with TemporaryDirectory() as directory:
+    root = Path(directory)
+    functions = {'clusters': [{'id': 'C001', 'kind': 'exact', 'sites': [
+        {'file': 'pkg/a.py', 'line_start': 1, 'line_end': 8, 'name': 'run'},
+        {'file': 'pkg/b.py', 'line_start': 1, 'line_end': 8, 'name': 'run'}]}],
+        'abstractions': {'profiles': [], 'edges': [], 'coverage': {
+            'candidate_generation_complete': False, 'complete': False, 'pair_limit_hit': True}}}
+    (root / 'functions.json').write_text(json.dumps(functions))
+    (root / 'families.json').write_text('old invalid report')
+    (root / 'native-reuse.json').write_text('old invalid report')
+    stages = {'functions': {'status': 'incomplete', 'fresh_report': True},
+              'families': {'status': 'failed', 'fresh_report': True},
+              'native_reuse': {'status': 'ok', 'fresh_report': False}}
+    summary = {'source_scans_complete': False, 'graph_evidence_complete': False, 'execution_complete': False}
+    with patch.object(sweep, '_native_decide', wraps=sweep._native_decide) as decide:
+        result = sweep.write_opportunity_report(stages, summary, root, root)
+        payload = decide.call_args_list[0].args[1]
+    assert payload['functions'] == functions
+    assert payload['families'] == payload['native_reuse'] == payload['retirement'] == {}
+    assert payload['coverage']['detectors']['families']['status'] == 'failed'
+    assert payload['coverage']['abstractions']['pair_limit_hit']
+    assert not payload['caller_hints']['complete']
+    assert all(site['caller_count'] is None for site in payload['caller_hints']['sites'])
+    report = json.loads((root / 'opportunities.json').read_text())
+    assert report['review_only'] and report['opportunities']
+    assert report['summary'] == result
+    assert (root / 'opportunities.md').read_text()
+    hints = {'complete': True, 'sites': [
+        {'file': 'pkg/a.py', 'name': 'run', 'line_start': 1, 'caller_count': 4},
+        {'file': 'pkg/b.py', 'name': 'run', 'line_start': 1, 'caller_count': 55}]}
+    with patch.object(sweep, 'caller_hints', return_value=hints):
+        sweep.write_opportunity_report(stages, summary, root, root)
+    owners = json.loads((root / 'opportunities.json').read_text())['opportunities'][0]['existing_owner_candidates']
+    assert [(site['file'], site['observed_graph_callers']) for site in owners] == [('pkg/b.py', 55), ('pkg/a.py', 4)]
+    # A current native report is included; a previous successful function report is not.
+    native = {'status': 'failed', 'error': 'current graph unavailable'}
+    (root / 'native-reuse.json').write_text(json.dumps(native))
+    stages['native_reuse']['fresh_report'] = True
+    stages['native_reuse']['status'] = 'failed'
+    stages['functions']['fresh_report'] = False
+    with patch.object(sweep, '_native_decide', wraps=sweep._native_decide) as decide:
+        sweep.write_opportunity_report(stages, summary, root, root)
+        payload = decide.call_args_list[0].args[1]
+    assert payload['functions'] == {} and payload['native_reuse'] == native
+    before = (root / 'opportunities.json').read_bytes()
+    with patch('conductor.atomic_json.json.dump', side_effect=OSError('injected write failure')):
+        try:
+            sweep.write_opportunity_report(stages, summary, root, root)
+        except OSError:
+            pass
+        else:
+            raise AssertionError('write failure was suppressed')
+    assert (root / 'opportunities.json').read_bytes() == before
+    assert not list(root.glob('.opportunities.json.*.tmp'))
+    args = sweep.build_parser().parse_args(['--abstraction-exhaustive', '--abstraction-max-pairs', '3'])
+    options = sweep.abstraction_settings(args)
+    full = sweep.detector_commands(root, root, ['pkg'], [], False, abstraction_options=options)[0][1]
+    quick = sweep.detector_commands(root, root, ['pkg'], [], True, abstraction_options=options)[0][1]
+    assert '--with-abstractions' in full and '--abstraction-exhaustive' in full
+    assert full[full.index('--abstraction-max-pairs') + 1] == '3'
+    assert '--with-abstractions' not in quick and '--abstraction-exhaustive' not in quick
+"#;
+
 const INPUT_CONTRACTS: &str = r#"
 import contextlib
 import io
@@ -226,8 +379,11 @@ with TemporaryDirectory() as directory:
     commands = sweep.detector_commands(root, root, ['pkg'], [], False, source)
     assert commands[1][1][-2:] == ['--retirement-plans', str(source)]
     assert '--retirement-plans' not in commands[0][1]
-    functions = {'clusters': [{'id': 'C001', 'sites': [{'file': 'pkg/a.py'}, {'file': 'pkg/b.py'}]},
-                              {'id': 'C002', 'sites': [{'file': 'pkg/a.py'}]}]}
+    functions = {'clusters': [{'id': 'C001', 'kind': 'exact', 'sites': [
+        {'file': 'pkg/a.py', 'name': 'run', 'line_start': 1, 'line_end': 8},
+        {'file': 'pkg/b.py', 'name': 'run', 'line_start': 1, 'line_end': 8}]},
+        {'id': 'C002', 'kind': 'exact', 'sites': [
+        {'file': 'pkg/a.py', 'name': 'other', 'line_start': 10, 'line_end': 18}]}]}
     (root / 'functions.json').write_text(json.dumps(functions))
     (root / 'families.json').write_text(json.dumps({'families': [{'id': 'F001', 'files': ['pkg/a.py', 'pkg/b.py']}]}))
     stages = {'functions': {'fresh_report': True, 'status': 'ok'},

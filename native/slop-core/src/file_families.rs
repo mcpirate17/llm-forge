@@ -16,17 +16,17 @@ const COMPONENTS: [(&str, f64); 6] = [
 ];
 
 #[derive(Clone, Debug)]
-struct Profile {
-    sets: [HashSet<String>; 6],
-    lsh_features: HashSet<String>,
+pub(crate) struct Profile {
+    pub(crate) sets: [HashSet<String>; 6],
+    pub(crate) lsh_features: HashSet<String>,
 }
 
 #[derive(Clone, Debug)]
-struct Similarity {
-    score: f64,
-    containment: f64,
-    shared_features: usize,
-    components: Vec<(String, f64)>,
+pub(crate) struct Similarity {
+    pub(crate) score: f64,
+    pub(crate) containment: f64,
+    pub(crate) shared_features: usize,
+    pub(crate) components: Vec<(String, f64)>,
 }
 
 type PythonSimilarity = (f64, f64, usize, Vec<(String, f64)>);
@@ -75,7 +75,7 @@ fn jaccard_upper_bound(left: &HashSet<String>, right: &HashSet<String>) -> Optio
     Some(left.len().min(right.len()) as f64 / larger as f64)
 }
 
-fn compare(left: &Profile, right: &Profile) -> Similarity {
+pub(crate) fn compare(left: &Profile, right: &Profile) -> Similarity {
     let mut components = Vec::with_capacity(COMPONENTS.len());
     let mut weighted_sum = 0.0;
     let mut weight_sum = 0.0;
@@ -104,7 +104,7 @@ fn compare(left: &Profile, right: &Profile) -> Similarity {
     }
 }
 
-fn safe_bound(left: &Profile, right: &Profile) -> Option<f64> {
+pub(crate) fn safe_bound(left: &Profile, right: &Profile) -> Option<f64> {
     let mut weighted = 0.0;
     let mut weight_sum = 0.0;
     for (index, (_, weight)) in COMPONENTS.iter().enumerate() {
@@ -115,6 +115,27 @@ fn safe_bound(left: &Profile, right: &Profile) -> Option<f64> {
         weight_sum += weight;
     }
     (weight_sum != 0.0).then_some(weighted / weight_sum)
+}
+
+/// Conservatively bound the rounded score without intersecting the large structure set.
+/// The other five feature sets are small enough to compare exactly during retrieval.
+pub(crate) fn abstraction_upper_bound(left: &Profile, right: &Profile) -> Option<f64> {
+    let mut weighted = 0.0;
+    let mut weight_sum = 0.0;
+    for (index, (_, weight)) in COMPONENTS.iter().enumerate() {
+        let component = if index == 0 {
+            jaccard_upper_bound(&left.sets[index], &right.sets[index])
+        } else {
+            jaccard(&left.sets[index], &right.sets[index])
+        };
+        if let Some(upper) = component {
+            weighted += weight * upper;
+            weight_sum += weight;
+        }
+    }
+    // compare() rounds its aggregate score to four places. An unrounded bound
+    // can fall below a threshold that the rounded exact score still reaches.
+    (weight_sum != 0.0).then(|| decimal_round(weighted / weight_sum, 4))
 }
 
 fn exact_pairs(
@@ -158,7 +179,7 @@ fn all_pairs(profile_count: usize) -> Vec<(usize, usize)> {
     pairs
 }
 
-fn minhash_signature(values: &[u64], permutations: usize) -> Vec<u64> {
+pub(crate) fn minhash_signature(values: &[u64], permutations: usize) -> Vec<u64> {
     (0..permutations)
         .map(|index| {
             let multiplier =
@@ -384,4 +405,60 @@ pub(crate) fn audit_file_family_groups(
             max_family_size,
         )
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn profile(sets: [HashSet<String>; 6]) -> Profile {
+        let lsh_features = sets[..5].iter().flatten().cloned().collect();
+        Profile { sets, lsh_features }
+    }
+
+    #[test]
+    fn abstraction_bound_preserves_rounded_acceptance_at_threshold() {
+        let left = profile(std::array::from_fn(|index| {
+            (0..if index == 0 { 3999 } else { 0 })
+                .map(|slot| slot.to_string())
+                .collect()
+        }));
+        let right = profile(std::array::from_fn(|index| {
+            (0..if index == 0 { 4999 } else { 0 })
+                .map(|slot| slot.to_string())
+                .collect()
+        }));
+        assert!(safe_bound(&left, &right).unwrap() < 0.8);
+        assert_eq!(compare(&left, &right).score, 0.8);
+        assert_eq!(abstraction_upper_bound(&left, &right), Some(0.8));
+    }
+
+    #[test]
+    fn abstraction_bound_is_safe_and_tighter_for_varied_component_sets() {
+        let mut tighter = false;
+        for seed in 0..128 {
+            let left = profile(std::array::from_fn(|component| {
+                (0..(seed + component * 7) % 41)
+                    .map(|slot| format!("{component}:{}", slot % 29))
+                    .collect()
+            }));
+            let right = profile(std::array::from_fn(|component| {
+                (0..(seed * 3 + component * 11) % 43)
+                    .map(|slot| format!("{component}:{}", (slot + seed % 13) % 31))
+                    .collect()
+            }));
+            let exact = compare(&left, &right).score;
+            let upper = abstraction_upper_bound(&left, &right).unwrap_or(0.0);
+            let cardinal = decimal_round(safe_bound(&left, &right).unwrap_or(0.0), 4);
+            assert!(upper >= exact, "seed {seed}: bound {upper} < exact {exact}");
+            assert!(upper <= cardinal);
+            for threshold in [0.0, 0.55, 0.70, 0.80, 0.90, 1.0] {
+                assert!(exact < threshold || upper >= threshold);
+            }
+            tighter |= upper < cardinal;
+        }
+        assert!(tighter);
+        let empty = profile(std::array::from_fn(|_| HashSet::new()));
+        assert_eq!(abstraction_upper_bound(&empty, &empty), None);
+    }
 }

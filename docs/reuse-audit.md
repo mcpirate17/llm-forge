@@ -4,7 +4,7 @@ Use these advisory commands from the repository you want to inspect:
 
 | Question | Command | Report |
 | --- | --- | --- |
-| Which functions, files and native implementations could be reused? | `scripts/reuse-audit` | Clone families and native-name evidence |
+| Which functions, files and native implementations could be reused? | `scripts/reuse-audit` | Ranked opportunities, structural abstractions, clone families and native-name evidence |
 | Which reviewed consolidation plans remove maintained files? | `scripts/reuse-audit --retirement-plans plans.json` | Signed file-retirement accounting |
 | Which Vulture candidates have references elsewhere? | `scripts/dead-code-audit` | Production, test and documentation evidence |
 
@@ -36,21 +36,31 @@ the audited repository's `node_modules/.bin` or the existing detector discovery
 path. Nothing is installed and no refactoring is performed by the command.
 
 For more frequent function checks, add `--quick`. This keeps normalized AST
-function clones and the native-name inventory, skips expensive token-block and
-whole-file pair analysis, and records that mode in `summary.json`.
+function clones and the native-name inventory, skips structural abstraction,
+token-block and whole-file pair analysis, and records that mode in `summary.json`.
 
 ## Coverage
 
 The command composes the existing native-backed analyzers:
 
 1. Normalized Python AST function clusters, with a four-line minimum.
-2. JSCPD token/block clones, including native source formats, without the default
+   Both `exact` and `near` require the same normalized AST hash; `near` means
+   source spelling differs, not approximate structural similarity.
+2. Separate Python callable abstraction candidates. Rust reuses the existing
+   AST feature extraction and compares callable structure, API shape, calls,
+   fields, control flow and schemas. Candidate pairs retain differences in
+   literals, operators, globals, callees, defaults, signatures and decorators.
+   These are leads for parameterization or shared subroutines, not equivalence
+   claims. Module-body opportunities remain covered by whole-file analysis.
+3. JSCPD token/block clones, including native source formats, without the default
    maximum file-size/line caps that can hide large files. This mode uses the
    explicit code inputs instead of inherited narrow gate exclusions, maps CUDA
    to the C++ tokenizer, and excludes generated data/configuration formats.
-3. Whole-file structural families at similarity 0.70, with up to 10,000 reported
+4. Whole-file structural families at similarity 0.70, with up to 10,000 reported
    families and 32 members per family.
-4. Existing Python/native name-match candidates, carrying graph freshness and
+   Literal-only containers without a shared schema are labeled data/template
+   relations; shared Python AST shape does not earn a code-deletion estimate.
+5. Existing Python/native name-match candidates, carrying graph freshness and
    completeness separately from the source scans. This stage deliberately checks
    the entire repository graph, including when `--targets` narrows the clone
    scans, so it can find reusable native implementations elsewhere. Its freshness
@@ -67,7 +77,8 @@ targets fail before reports are written.
 
 Default reports live under `ROOT/.forge/reports/reuse/`. Function and family JSON
 retain the full returned candidate lists; Markdown reports provide a readable
-entry point. Requested token-scanner failures retain the AST findings, mark the
+entry point. Start with `opportunities.md` and inspect `opportunities.json` for
+the original evidence and behavioral differences. Requested token-scanner failures retain the AST findings, mark the
 report incomplete and return nonzero.
 Unexplained selected files missing from token-scanner statistics also mark the
 report incomplete and return nonzero; the AST findings remain available.
@@ -86,6 +97,58 @@ stage. This setting affects only that child process. Quick mode does not set it.
 coverage. Top-level `complete` requires both execution and graph completeness.
 A dirty graph can make `complete` false while the successfully executed command
 returns zero. Detector execution failures or incomplete source scans return 2.
+
+Abstraction retrieval uses bounded candidate indexing rather than comparing every
+pair in a large repository. Its coverage records candidate limits, omitted
+buckets and truncation separately from parsing. An uncapped indexed run still
+has unknown retrieval recall: no static tool establishes every possible semantic
+abstraction. The function report keeps the profiles and individual pair edges in
+`abstractions`; neither a matching name nor a chain of similar pairs establishes
+an interchangeable family. Standalone function scans enable this with
+`python -m conductor.reuse.consolidation --with-abstractions`.
+
+## Read the opportunity queue
+
+The combined queue prioritizes reviewed positive retirement plans, whole-file
+families, existing callable reuse, parameterized abstractions, token blocks, and
+finally name-only native hints. Within those evidence levels, it considers the
+number of files and callable sites involved. A large file footprint indicates
+review scope; it is not a claim that those files can be removed.
+
+Evidence with the same proposed work and identical file set is bundled together.
+Other bundles that share files are cross-referenced through `shares_files_with`.
+The queue does not join A–B and B–C into an A–B–C equivalence claim, and does not
+sum overlapping clone or family savings. Source reports retain all pair-level
+differences and detector IDs.
+
+Use the queue to make three different decisions:
+
+- Reuse an existing callable when its dependency and caller contracts fit.
+  Listed sites are candidates for that owner; the tool does not automatically
+  create another helper or select a canonical implementation.
+- Parameterize differing configuration or extract shared orchestration when
+  the differences are intentional. Preserve distinct scientific workers,
+  frozen evidence, subprocess isolation and error semantics.
+- Retire a file only after migrating every remaining responsibility and caller.
+  Enter removed files and added implementations, adapters, configs and tests in
+  an explicit retirement plan. Function deduplication may remove implementations
+  while establishing zero file removals.
+
+`net_files_removed` is unknown for detector-only leads. Explicit plans carry
+signed counts and `measurement_status: not_measured`; confirm actual reduction
+with a Git tree diff. The report never turns similarity or confidence into
+automatic deletion authority. JSON report publication reuses Forge's existing
+atomic writer so a failed write preserves the previous report.
+
+`existing_owner_candidates` lists existing callable sites, ordered by observed
+distinct graph `CALLS`/`REFERENCES` sources when the whole graph is complete and
+unchanged before and after the query. Counts are uncapped. Unknown, ambiguous or
+stale evidence remains null, not zero. These are static reference counts, not
+invocation frequency or a canonical-owner decision. Token blocks are not counted
+as callable owners. Raw structural feature arrays are compacted to counts after
+scoring; identities, semantic details and every returned edge remain available.
+Use `--abstraction-include-features` to retain the full feature arrays for a
+diagnostic rerun; the report records its exact reproduction command.
 
 ## Review before consolidating
 
