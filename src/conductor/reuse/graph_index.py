@@ -184,12 +184,24 @@ class GraphIndex:
             )
         return out
 
-    def native_reuse_rows(self) -> list[dict[str, object]]:
-        """Return reuse-candidate inputs with caller counts in one graph query."""
+    def native_reuse_rows(
+        self, *, caller_limit: int | None = 20
+    ) -> list[dict[str, object]]:
+        """Return reuse inputs in one query; ``None`` preserves uncapped caller counts.
+
+        Counts are distinct graph CALLS/REFERENCES sources, not dynamic invocation
+        counts or a canonical-owner decision. Callers must check graph freshness.
+        """
+        if caller_limit is not None and (
+            type(caller_limit) is not int or caller_limit < 0
+        ):
+            raise ValueError("caller_limit must be a nonnegative integer or None")
 
         query = """
             SELECT n.name, n.file_path, n.line_start,
-                   n.language, n.params, MIN(COALESCE(c.caller_count, 0), 20)
+                   n.language, n.params,
+                   CASE WHEN ? IS NULL THEN COALESCE(c.caller_count, 0)
+                        ELSE MIN(COALESCE(c.caller_count, 0), ?) END AS caller_count
             FROM nodes AS n
             LEFT JOIN (
                 SELECT target_qualified, COUNT(DISTINCT source_qualified) AS caller_count
@@ -204,7 +216,7 @@ class GraphIndex:
         """
         prefix = f"{self.repo}/"
         with self._connect() as connection:
-            rows = connection.execute(query).fetchall()
+            rows = connection.execute(query, (caller_limit, caller_limit)).fetchall()
         output: list[dict[str, object]] = []
         for row in rows:
             absolute = str(row["file_path"])

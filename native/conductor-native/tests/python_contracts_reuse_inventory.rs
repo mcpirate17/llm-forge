@@ -150,13 +150,12 @@ fn native_reuse_rows_batch_filters_and_caps_callers() {
     let database = case.root().join("graph.db");
     graph_fixture(case.root(), &database);
     Python::attach(|py| {
-        let rows = module(py, "conductor.reuse.graph_index")
+        let index = module(py, "conductor.reuse.graph_index")
             .getattr("GraphIndex")
             .unwrap()
             .call1((path(py, case.root()), path(py, &database)))
-            .unwrap()
-            .call_method0("native_reuse_rows")
             .unwrap();
+        let rows = index.call_method0("native_reuse_rows").unwrap();
         let expected = py_json(
             py,
             json!([{
@@ -165,6 +164,36 @@ fn native_reuse_rows_batch_filters_and_caps_callers() {
             }]),
         );
         assert!(rows.eq(expected).unwrap());
+        // CALLS and REFERENCES from the same source count once. An uncapped
+        // inventory exposes all 25, while existing consumers still receive 20.
+        for (limit, expected_count) in [(json!(null), 25), (json!(5), 5), (json!(0), 0)] {
+            let options = PyDict::new(py);
+            options
+                .set_item("caller_limit", py_json(py, limit))
+                .unwrap();
+            let rows = index
+                .call_method("native_reuse_rows", (), Some(&options))
+                .unwrap();
+            assert_eq!(rows.len().unwrap(), 1);
+            let count: i64 = rows
+                .get_item(0)
+                .unwrap()
+                .get_item("caller_count")
+                .unwrap()
+                .extract()
+                .unwrap();
+            assert_eq!(count, expected_count);
+        }
+        for invalid in [json!(-1), json!(true), json!("20"), json!(1.5)] {
+            let options = PyDict::new(py);
+            options
+                .set_item("caller_limit", py_json(py, invalid))
+                .unwrap();
+            let error = index
+                .call_method("native_reuse_rows", (), Some(&options))
+                .unwrap_err();
+            assert!(error.is_instance_of::<pyo3::exceptions::PyValueError>(py));
+        }
     });
 }
 

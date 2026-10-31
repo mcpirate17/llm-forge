@@ -263,6 +263,11 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m
     )?)?;
     m.add_function(wrap_pyfunction!(
+        consolidation::audit_consolidation_collect_profiles,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(consolidation::audit_abstraction_pairs, m)?)?;
+    m.add_function(wrap_pyfunction!(
         consolidation::audit_consolidation_build,
         m
     )?)?;

@@ -16,6 +16,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TextIO
 
+from conductor.atomic_json import atomic_write, write_json_atomic
+from conductor.reuse.consolidation import (
+    _native_decide,
+    abstraction_cli_options,
+    abstraction_settings,
+    add_abstraction_arguments,
+)
 from conductor.reuse.graph_index import GraphIndex
 from conductor.reuse.file_families import (
     RetirementPlan,
@@ -71,6 +78,8 @@ OUTPUT_NAMES = (
     "native-reuse.json",
     "retirement-plan-input.json",
     "retirement-plans.json",
+    "opportunities.json",
+    "opportunities.md",
     *(
         f"{stage}.{suffix}"
         for stage in ("functions", "families")
@@ -146,12 +155,6 @@ def discover_scope(repo: Path, exclude: set[str]) -> dict:
     }
 
 
-def write_json(path: Path, payload: object) -> None:
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-
-
 def detector_commands(
     repo: Path,
     out: Path,
@@ -159,8 +162,10 @@ def detector_commands(
     exclude: list[str],
     quick: bool,
     retirement_plans: Path | None = None,
+    abstraction_options: dict | None = None,
 ) -> list[tuple[str, list[str]]]:
     common = ["--repo", str(repo), "--targets", *targets, "--exclude", *exclude]
+    abstraction_args = abstraction_cli_options(abstraction_options or {})
     functions = [
         sys.executable,
         "-m",
@@ -168,7 +173,16 @@ def detector_commands(
         *common,
         "--min-lines",
         "4",
-        *([] if quick else ["--with-token-clones", "--token-clone-full-files"]),
+        *(
+            []
+            if quick
+            else [
+                "--with-token-clones",
+                "--token-clone-full-files",
+                "--with-abstractions",
+                *abstraction_args,
+            ]
+        ),
         "--out",
         str(out / "functions.json"),
         "--md",
@@ -221,7 +235,117 @@ def write_retirement_report(
             files = row.get("files") or [site["file"] for site in row.get("sites", [])]
             evidence.append({"id": f"{name}:{row['id']}", "files": files})
     report = retirement_report(plans, evidence)
-    write_json(out / "retirement-plans.json", report)
+    write_json_atomic(out / "retirement-plans.json", report)
+    return report["summary"]
+
+
+def candidate_sites(functions: dict) -> list[dict]:
+    """Deduplicate only callable sites participating in review evidence."""
+    sites = [
+        site
+        for row in functions.get("clusters", [])
+        if row.get("kind") in {"exact", "near"}
+        for site in row.get("sites", [])
+    ]
+    abstractions = functions.get("abstractions", {})
+    profiles = abstractions.get("profiles", [])
+    for edge in abstractions.get("edges", []):
+        sites.extend(profiles[edge[side]] for side in ("left", "right"))
+    identities = {
+        (site["file"], site["name"], site["line_start"])
+        for site in sites
+        if site.get("file") and site.get("name") and site.get("line_start", 0) > 0
+    }
+    return [
+        {"file": file, "name": name, "line_start": start, "caller_count": None}
+        for file, name, start in sorted(identities)
+    ]
+
+
+def caller_hints(repo: Path, functions: dict) -> dict:
+    """Expose observed caller counts only across a stable, wholly current graph."""
+    hints = {
+        "complete": False,
+        "sites": candidate_sites(functions),
+        "graph_status_before": {},
+        "graph_status_after": {},
+    }
+    if not hints["sites"]:
+        return {**hints, "reason": "no callable candidate identities"}
+    try:
+        index = GraphIndex(repo)
+        before = index.status(["."]).as_dict()
+        hints["graph_status_before"] = before
+        if not before.get("complete"):
+            return {**hints, "reason": "whole-repository graph is incomplete"}
+        rows = index.native_reuse_rows(caller_limit=None)
+        after = index.status(["."]).as_dict()
+        hints["graph_status_after"] = after
+        if not after.get("complete") or before != after:
+            return {**hints, "reason": "graph freshness changed during caller query"}
+        counts: dict[tuple, list[int]] = {}
+        for row in rows:
+            key = (row["file"], row["name"], row["line_start"])
+            counts.setdefault(key, []).append(row["caller_count"])
+        for site in hints["sites"]:
+            matches = counts.get((site["file"], site["name"], site["line_start"]), [])
+            if len(matches) == 1:
+                site["caller_count"] = matches[0]
+            else:
+                site["reason"] = (
+                    "ambiguous graph identity" if matches else "no exact graph identity"
+                )
+        hints.update(
+            complete=True, reason="observed distinct graph callers; review hints only"
+        )
+    except (OSError, ValueError, RuntimeError, sqlite3.Error) as error:
+        hints["reason"] = f"caller query failed: {error}"
+    return hints
+
+
+def write_opportunity_report(
+    stages: dict, summary: dict, out: Path, repo: Path
+) -> dict:
+    """Unify fresh evidence while retaining per-detector limits and failure status."""
+    payload = {
+        name: {} for name in ("functions", "families", "native_reuse", "retirement")
+    }
+    for name, filename in (
+        ("functions", "functions.json"),
+        ("families", "families.json"),
+        ("native_reuse", "native-reuse.json"),
+    ):
+        stage = stages.get(name, {})
+        usable = name == "native_reuse" or stage.get("status") in {"ok", "incomplete"}
+        if stage.get("fresh_report") and usable:
+            payload[name] = json.loads((out / filename).read_text(encoding="utf-8"))
+    if "retirement_summary" in summary:
+        payload["retirement"] = json.loads(
+            (out / "retirement-plans.json").read_text(encoding="utf-8")
+        )
+    payload["coverage"] = {
+        key: summary[key]
+        for key in (
+            "source_scans_complete",
+            "graph_evidence_complete",
+            "execution_complete",
+        )
+    }
+    payload["coverage"]["detectors"] = stages
+    payload["coverage"]["abstractions"] = (
+        payload["functions"]
+        .get("abstractions", {})
+        .get(
+            "coverage",
+            {"status": "not_requested" if payload["functions"] else "unavailable"},
+        )
+    )
+    payload["caller_hints"] = caller_hints(repo, payload["functions"])
+    report = _native_decide("opportunities", payload)
+    markdown = _native_decide("opportunity_markdown", report)
+    write_json_atomic(out / "opportunities.json", report)
+    with atomic_write(out / "opportunities.md") as handle:
+        handle.write(markdown)
     return report["summary"]
 
 
@@ -326,7 +450,7 @@ def native_inventory(repo: Path, targets: list[str], out: Path) -> dict:
             "candidate_limit": 100000,
             "limit_reached": len(rows) == 100000,
         }
-        write_json(out / "native-reuse.json", report)
+        write_json_atomic(out / "native-reuse.json", report)
         freshness = "complete" if graph_status.get("complete") else "incomplete"
         print(
             f"native reuse: {len(rows)} name-match candidates; graph evidence {freshness}",
@@ -334,6 +458,7 @@ def native_inventory(repo: Path, targets: list[str], out: Path) -> dict:
         )
         return {
             "status": "ok",
+            "fresh_report": True,
             "candidates": len(rows),
             "graph_status": graph_status,
             "limit_reached": len(rows) == 100000,
@@ -345,7 +470,8 @@ def native_inventory(repo: Path, targets: list[str], out: Path) -> dict:
             "error": str(error),
             "elapsed_seconds": time.monotonic() - started,
         }
-        write_json(out / "native-reuse.json", failure)
+        write_json_atomic(out / "native-reuse.json", failure)
+        failure["fresh_report"] = True
         print(f"native reuse: {error}", file=sys.stderr)
         return failure
 
@@ -370,6 +496,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run normalized function clones and native-name inventory; skip token blocks and whole-file pair analysis",
     )
+    add_abstraction_arguments(parser)
     parser.add_argument(
         "--timeout",
         type=int,
@@ -393,6 +520,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.node_heap_mb < 128:
         parser.error("--node-heap-mb must be at least 128")
     try:
+        abstraction_options = abstraction_settings(args)
         plans = (
             load_retirement_plans(args.retirement_plans)
             if args.retirement_plans
@@ -409,7 +537,7 @@ def main(argv: list[str] | None = None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     plan_input = out / "retirement-plan-input.json" if plans is not None else None
     if plan_input is not None:
-        write_json(
+        write_json_atomic(
             plan_input, {"schema_version": 1, "plans": [asdict(plan) for plan in plans]}
         )
     scope = (
@@ -422,7 +550,7 @@ def main(argv: list[str] | None = None) -> int:
             "selection": "explicit roots",
         }
     )
-    write_json(out / "scope.json", scope)
+    write_json_atomic(out / "scope.json", scope)
     commands = detector_commands(
         repo,
         out,
@@ -430,6 +558,7 @@ def main(argv: list[str] | None = None) -> int:
         scope["exclude"],
         args.quick,
         plan_input,
+        abstraction_options,
     )
     stages = {
         name: run_detector(name, command, out, args.timeout, args.node_heap_mb)
@@ -453,7 +582,8 @@ def main(argv: list[str] | None = None) -> int:
         "graph_evidence_complete": graph_complete,
         "review_only": True,
         "limits": [
-            "AST matches omit decorator/import context; preserve scientific mechanisms and controls.",
+            "Normalized clone matches omit decorator/import context; preserve scientific mechanisms and controls.",
+            "Structural pairs are review-only; uncapped approximate retrieval still has unknown recall.",
             "est_bytes/tokens are AST structural units, not measured bytes saved; family LOC savings are estimates.",
             "Native-name evidence has separate graph freshness; it does not prove runtime equivalence or speedup.",
             "Inputs are live, not an atomic source snapshot. Full candidates are retained; inspect explicit cap fields.",
@@ -462,7 +592,10 @@ def main(argv: list[str] | None = None) -> int:
     if plans is not None:
         summary["retirement_plans"] = str(args.retirement_plans.resolve())
         summary["retirement_summary"] = write_retirement_report(plans, stages, out)
-    write_json(out / "summary.json", summary)
+    summary["opportunity_summary"] = write_opportunity_report(
+        stages, summary, out, repo
+    )
+    write_json_atomic(out / "summary.json", summary)
     print(f"Reports: {out}")
     return 0 if execution_complete else 2
 

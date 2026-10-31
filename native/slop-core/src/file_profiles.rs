@@ -35,6 +35,7 @@ struct FileProfile {
     imports: BTreeSet<String>,
     structure: BTreeSet<String>,
     schemas: BTreeSet<String>,
+    literal_data_only: bool,
 }
 
 struct LoadedFile {
@@ -430,11 +431,297 @@ pub(crate) fn normalized_function_hash(node: &Bound<'_, PyAny>) -> PyResult<Stri
     Ok(sha1_hex(&method_canonical(node)?))
 }
 
+fn literal_value(node: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let kind = type_name(node)?;
+    if kind == "Constant" {
+        return Ok(true);
+    }
+    if !matches!(kind.as_str(), "List" | "Tuple" | "Set" | "Dict") {
+        return Ok(false);
+    }
+    for child in ast_children(node)? {
+        if type_name(&child)? != "Load" && !literal_value(&child)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn literal_module(tree: &Bound<'_, PyAny>) -> PyResult<bool> {
+    if type_name(tree)? != "Module" {
+        return Ok(false);
+    }
+    for node in list_items(&tree.getattr("body")?)? {
+        match type_name(&node)?.as_str() {
+            "Import" | "ImportFrom" => {}
+            "Expr" if is_docstring(&node)? => {}
+            "Assign" => {
+                if !literal_value(&node.getattr("value")?)?
+                    || list_items(&node.getattr("targets")?)?
+                        .iter()
+                        .any(|target| type_name(target).is_ok_and(|kind| kind != "Name"))
+                {
+                    return Ok(false);
+                }
+            }
+            _ => return Ok(false),
+        }
+    }
+    Ok(true)
+}
+
+fn exact_dump(value: &Bound<'_, PyAny>) -> PyResult<String> {
+    if is_ast(value)? {
+        return value
+            .py()
+            .import("ast")?
+            .call_method1("dump", (value,))?
+            .extract();
+    }
+    if let Ok(items) = value.cast::<PyList>() {
+        let parts = items
+            .iter()
+            .map(|item| exact_dump(&item))
+            .collect::<PyResult<Vec<_>>>()?;
+        return Ok(format!("[{}]", parts.join(",")));
+    }
+    py_repr(value)
+}
+
+/// Binding fingerprints are context evidence, never a name-resolution proof.
+/// Conditional/reassigned bindings deliberately retain every source assignment.
+pub(crate) fn module_bindings(
+    tree: &Bound<'_, PyAny>,
+) -> PyResult<BTreeMap<String, BTreeSet<String>>> {
+    let mut output: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut pending = list_items(&tree.getattr("body")?)?;
+    while let Some(node) = pending.pop() {
+        let kind = type_name(&node)?;
+        if matches!(
+            kind.as_str(),
+            "FunctionDef" | "AsyncFunctionDef" | "ClassDef"
+        ) {
+            output
+                .entry(string_attr(&node, "name")?)
+                .or_default()
+                .insert(sha1_hex(&exact_dump(&node)?));
+            continue;
+        }
+        if matches!(kind.as_str(), "Import" | "ImportFrom") {
+            let fingerprint = exact_dump(&node)?;
+            for alias in list_items(&node.getattr("names")?)? {
+                let raw = string_attr(&alias, "name")?;
+                let name = optional_string_attr(&alias, "asname")?.unwrap_or_else(|| {
+                    if kind == "Import" {
+                        raw.split('.').next().unwrap_or_default().to_owned()
+                    } else {
+                        raw
+                    }
+                });
+                output.entry(name).or_default().insert(fingerprint.clone());
+            }
+            continue;
+        }
+        if matches!(kind.as_str(), "Assign" | "AnnAssign" | "AugAssign") {
+            let targets = if kind == "Assign" {
+                list_items(&node.getattr("targets")?)?
+            } else {
+                vec![node.getattr("target")?]
+            };
+            let digest = sha1_hex(&exact_dump(&node)?);
+            for target in targets {
+                for item in descendants(&target)? {
+                    if type_name(&item)? == "Name" {
+                        output
+                            .entry(string_attr(&item, "id")?)
+                            .or_default()
+                            .insert(digest.clone());
+                    }
+                }
+            }
+        }
+        pending.extend(ast_children(&node)?);
+    }
+    Ok(output)
+}
+
+fn compact_evidence(value: String) -> String {
+    if value.chars().count() <= 160 {
+        value
+    } else {
+        format!(
+            "{}… [sha1:{}]",
+            value.chars().take(120).collect::<String>(),
+            sha1_hex(&value)
+        )
+    }
+}
+
+fn semantic_features(
+    node: &Bound<'_, PyAny>,
+    bindings: &BTreeMap<String, BTreeSet<String>>,
+) -> PyResult<BTreeMap<String, BTreeSet<String>>> {
+    let mut evidence: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut locals = BTreeSet::new();
+    collect_local_names(&node.getattr("args")?, &mut locals)?;
+    for statement in list_items(&node.getattr("body")?)? {
+        collect_local_names(&statement, &mut locals)?;
+    }
+    let nodes = descendants(node)?;
+    for item in &nodes {
+        if matches!(type_name(item)?.as_str(), "Global" | "Nonlocal") {
+            for name in item.getattr("names")?.extract::<Vec<String>>()? {
+                locals.remove(&name);
+            }
+        }
+    }
+    for item in nodes {
+        let kind = type_name(&item)?;
+        let feature = match kind.as_str() {
+            "Constant" => Some(("literals", compact_evidence(exact_dump(&item)?))),
+            "Call" => Some((
+                "callees",
+                compact_evidence(exact_dump(&item.getattr("func")?)?),
+            )),
+            "Name" if type_name(&item.getattr("ctx")?)? == "Load" => {
+                let name = string_attr(&item, "id")?;
+                if !locals.contains(&name) {
+                    let values = bindings
+                        .get(&name)
+                        .cloned()
+                        .unwrap_or_else(|| BTreeSet::from(["unresolved".to_owned()]));
+                    evidence
+                        .entry("global_bindings".to_owned())
+                        .or_default()
+                        .extend(values.iter().map(|value| format!("{name}:{value}")));
+                    Some(("globals", name))
+                } else {
+                    None
+                }
+            }
+            "Import" | "ImportFrom" => Some(("import_bindings", exact_dump(&item)?)),
+            "Add" | "Sub" | "Mult" | "Div" | "FloorDiv" | "Mod" | "Pow" | "MatMult" | "LShift"
+            | "RShift" | "BitOr" | "BitXor" | "BitAnd" | "And" | "Or" | "Not" | "Invert"
+            | "UAdd" | "USub" | "Eq" | "NotEq" | "Lt" | "LtE" | "Gt" | "GtE" | "Is" | "IsNot"
+            | "In" | "NotIn" => Some(("operators", kind.clone())),
+            "Await" | "Yield" | "YieldFrom" | "Raise" | "Try" | "Global" | "Nonlocal"
+            | "Delete" => Some(("effects", kind.clone())),
+            "Attribute" | "Subscript" if type_name(&item.getattr("ctx")?)? == "Store" => {
+                Some(("effects", format!("write:{kind}")))
+            }
+            _ => None,
+        };
+        if let Some((key, value)) = feature {
+            evidence.entry(key.to_owned()).or_default().insert(value);
+        }
+    }
+    for (key, value) in [
+        ("signature", node.getattr("args")?),
+        ("returns", node.getattr("returns")?),
+        ("decorators", node.getattr("decorator_list")?),
+    ] {
+        evidence
+            .entry(key.to_owned())
+            .or_default()
+            .insert(exact_dump(&value)?);
+    }
+    let args = node.getattr("args")?;
+    evidence.insert(
+        "defaults".to_owned(),
+        BTreeSet::from([
+            exact_dump(&args.getattr("defaults")?)?,
+            exact_dump(&args.getattr("kw_defaults")?)?,
+        ]),
+    );
+    Ok(evidence)
+}
+
+pub(crate) fn function_profile<'py>(
+    node: &Bound<'py, PyAny>,
+    bindings: &BTreeMap<String, BTreeSet<String>>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let py = node.py();
+    let mut profile = profile_ast(node, String::new(), "")?;
+    profile.api = BTreeSet::from([function_signature(node)?.1]);
+    let output = profile_to_dict(py, profile)?;
+    for key in [
+        "classes",
+        "function_names",
+        "method_names",
+        "method_hashes",
+        "loc",
+        "literal_data_only",
+    ] {
+        output.del_item(key)?;
+    }
+    for key in [
+        "api",
+        "fields",
+        "calls",
+        "control",
+        "imports",
+        "structure",
+        "schemas",
+    ] {
+        let values: BTreeSet<String> = output.get_item(key)?.expect("profile field").extract()?;
+        output.set_item(key, values.into_iter().collect::<Vec<_>>())?;
+    }
+    let body = list_items(&node.getattr("body")?)?
+        .into_iter()
+        .filter(|item| !is_docstring(item).unwrap_or(false))
+        .collect::<Vec<_>>();
+    let shaped = body.iter().map(dump_shape).collect::<PyResult<Vec<_>>>()?;
+    output.set_item("coarse_shape_hash", sha1_hex(&shaped.join("\n")))?;
+    let nodes = body
+        .iter()
+        .map(descendants)
+        .collect::<PyResult<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    let meaningful = nodes
+        .iter()
+        .filter(|item| {
+            type_name(item).is_ok_and(|kind| {
+                matches!(
+                    kind.as_str(),
+                    "Call"
+                        | "BinOp"
+                        | "Compare"
+                        | "For"
+                        | "AsyncFor"
+                        | "While"
+                        | "If"
+                        | "Match"
+                        | "Try"
+                        | "With"
+                        | "AsyncWith"
+                        | "Await"
+                        | "Yield"
+                )
+            })
+        })
+        .count();
+    output.set_item("meaningful_operations", meaningful)?;
+    output.set_item("body_statements", body.len())?;
+    let semantic: BTreeMap<String, Vec<String>> = semantic_features(node, bindings)?
+        .into_iter()
+        .map(|(key, values)| (key, values.into_iter().collect()))
+        .collect();
+    output.set_item("semantic", semantic)?;
+    output.set_item(
+        "binding_resolution",
+        "syntactic_module_context; closures and dynamic bindings unresolved",
+    )?;
+    Ok(output)
+}
+
 fn profile_ast(tree: &Bound<'_, PyAny>, relative: String, source: &str) -> PyResult<FileProfile> {
     let nodes = descendants(tree)?;
     let mut profile = FileProfile {
         file: relative,
         loc: source.matches('\n').count() + 1,
+        literal_data_only: literal_module(tree)?,
         ..FileProfile::default()
     };
     let mut method_ids = BTreeSet::new();
@@ -572,6 +859,7 @@ fn profile_to_dict<'py>(py: Python<'py>, profile: FileProfile) -> PyResult<Bound
     output.set_item("imports", profile.imports)?;
     output.set_item("structure", profile.structure)?;
     output.set_item("schemas", profile.schemas)?;
+    output.set_item("literal_data_only", profile.literal_data_only)?;
     Ok(output)
 }
 

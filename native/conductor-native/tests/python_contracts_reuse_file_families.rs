@@ -369,3 +369,70 @@ with TemporaryDirectory() as directory:
     result = json.loads((root / 'out.json').read_text())
     assert len(result['retirement_plans']) == 4 and not result['families']
 "#;
+
+#[test]
+fn literal_templates_do_not_claim_code_deletion_but_cli_and_schemas_remain_candidates() {
+    let _case = Case::new();
+    Python::attach(|py| {
+        let globals = PyDict::new(py);
+        globals.set_item("families", families(py)).unwrap();
+        py.run(
+            &CString::new(LITERAL_TEMPLATE_CONTRACTS).unwrap(),
+            Some(&globals),
+            None,
+        )
+        .unwrap();
+    });
+}
+
+const LITERAL_TEMPLATE_CONTRACTS: &str = r#"
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+with TemporaryDirectory() as directory:
+    root = Path(directory)
+    def profile(name, source):
+        path = root / name
+        path.write_text(source)
+        return families.profile_file(path, root)
+    def family(left, right):
+        result, _ = families.build_families(
+            [left, right], {(0, 1)}, min_similarity=.7, min_shared_features=1,
+            min_net_deleted_loc=0, max_family_size=8, max_candidates=50)
+        assert len(result) == 1
+        return result[0]
+
+    # Arbitrarily large, different payloads have the same normalized Assign/Constant AST.
+    script = profile('javascript.py', "JAVASCRIPT = '''" + 'console.log(1);\n' * 100 + "'''\n")
+    style = profile('stylesheet.py', "CSS = '''" + 'body { color: red; }\n' * 100 + "'''\n")
+    assert script.literal_data_only and style.literal_data_only
+    assert script.loc > 100 and style.loc > 100
+    assert not script.function_names and not style.method_names
+    assert families.compare_profiles(script, style).score == 1.0
+    result = family(script, style)
+    assert result.recommended_abstraction == 'data_template'
+    assert result.disposition == 'review-data' and result.confidence == 0.0
+    assert result.suggested_home is None
+    assert result.estimated_net_deleted_loc == result.gross_duplicate_loc == 0
+    assert result.before_loc == result.after_loc
+    assert 'no shared callable or deletion estimate' in result.target_shape
+    report = families.family_to_dict(result)
+    assert report['net_files_removed'] is None
+
+    # Top-level CLI control flow has reusable execution even with no defined functions.
+    body = 'import json\nfrom pathlib import Path\nrows = json.loads(Path("data.json").read_text())\n'
+    body += 'for row in rows:\n    if row["score"] > 0:\n        print(row["name"])\n'
+    cli_a = profile('pick_best_split.py', body)
+    cli_b = profile('pick_ccn_split.py', body.replace('data.json', 'other.json'))
+    assert not cli_a.function_names and not cli_b.method_names
+    assert not cli_a.literal_data_only and not cli_b.literal_data_only
+    assert family(cli_a, cli_b).disposition == 'validate'
+
+    # Common dictionary keys retain the existing declarative-schema opportunity.
+    schema_a = profile('schema_a.py', 'ROWS = [{"name": "a", "width": 8, "depth": 2}]\n')
+    schema_b = profile('schema_b.py', 'ROWS = [{"name": "b", "width": 9, "depth": 3}]\n')
+    assert schema_a.literal_data_only and schema_b.literal_data_only
+    schema_family = family(schema_a, schema_b)
+    assert schema_family.recommended_abstraction == 'declarative_builder'
+    assert schema_family.disposition == 'validate'
+"#;

@@ -598,3 +598,75 @@ with TemporaryDirectory() as directory:
         .unwrap();
     });
 }
+
+#[test]
+fn abstraction_cli_preserves_clone_ids_and_reports_bounded_coverage() {
+    let _case = Case::new();
+    Python::attach(|py| {
+        let globals = PyDict::new(py);
+        globals.set_item("tool", native(py)).unwrap();
+        py.run(&std::ffi::CString::new(r#"
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+with TemporaryDirectory() as directory:
+    root = Path(directory)
+    source = root / 'pkg'
+    source.mkdir()
+    body = 'def helper(value):\n    first = value + 1\n    second = first * 2\n    third = second - 3\n    fourth = third + 4\n    return fourth\n'
+    for index, name in enumerate(('a.py', 'b.py', 'c.py', 'd.py')):
+        text = body if index < 2 else body.replace('+ 1', f'+ {index + 1}')
+        (source / name).write_text(text)
+    output = root / 'result.json'
+    argv = ['--repo', str(root), '--targets', 'pkg', '--out', str(output), '--md', str(root / 'result.md')]
+    assert tool.main(argv) == 0
+    old = json.loads(output.read_text())
+    assert old['clusters'] and 'abstractions' not in old
+    assert tool.main([*argv, '--with-abstractions']) == 0
+    approximate = json.loads(output.read_text())
+    assert approximate['clusters'] == old['clusters'], 'profiling changed established clone evidence or IDs'
+    coverage = approximate['abstractions']['coverage']
+    assert coverage['candidate_generation_complete'] and not coverage['complete']
+    assert not coverage['exhaustive']
+    assert approximate['detectors']['abstractions']['status'] == 'complete'
+    assert len(approximate['abstractions']['profiles']) == 4
+    compact = approximate['abstractions']
+    assert compact['features_omitted_from_report']
+    assert '--abstraction-include-features' in compact['feature_reproduction_cli']
+    assert all('structure' not in profile and profile['feature_counts']['structure'] > 0
+               and profile['semantic'] and profile['meaningful_operations'] > 0
+               for profile in compact['profiles'])
+    assert tool.main([*argv, '--with-abstractions', '--abstraction-include-features']) == 0
+    raw = json.loads(output.read_text())['abstractions']
+    assert not raw['features_omitted_from_report'] and raw['edges'] == compact['edges']
+    for full, reduced in zip(raw['profiles'], compact['profiles']):
+        assert full['semantic'] == reduced['semantic']
+        for key, count in reduced['feature_counts'].items():
+            assert len(full.pop(key)) == count
+        assert full == reduced, 'compaction discarded identity or semantic evidence'
+    assert tool.main([*argv, '--with-abstractions', '--abstraction-exhaustive']) == 0
+    exhaustive = json.loads(output.read_text())
+    assert exhaustive['abstractions']['coverage']['complete']
+    assert exhaustive['abstractions']['edges'], 'literal variants were not surfaced separately'
+    assert all(edge['review_only'] for edge in exhaustive['abstractions']['edges'])
+    assert tool.main([*argv, '--with-abstractions', '--abstraction-exhaustive', '--abstraction-max-pairs', '1']) == 2
+    partial = json.loads(output.read_text())
+    assert not partial['complete'] and partial['clusters'] == old['clusters']
+    assert partial['detectors']['abstractions']['status'] == 'incomplete'
+    assert partial['abstractions']['coverage']['pair_limit_hit']
+    assert not partial['summary']['abstraction_candidate_generation_complete']
+    previous = output.read_bytes()
+    with patch('conductor.atomic_json.json.dump', side_effect=OSError('injected write failure')):
+        try:
+            tool.main(argv)
+        except OSError as error:
+            assert 'injected write failure' in str(error)
+        else:
+            raise AssertionError('write failure was suppressed')
+    assert output.read_bytes() == previous
+    assert not list(root.glob('.result.json.*.tmp'))
+"#).unwrap(), Some(&globals), None).unwrap();
+    });
+}
