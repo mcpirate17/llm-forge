@@ -13,6 +13,7 @@ mod support;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -461,6 +462,62 @@ fn command_check_context<'py>(
         .call((), Some(&ctx_args))
         .unwrap();
     (ctx, check)
+}
+
+#[test]
+fn command_cache_stays_in_isolated_home_and_explicit_overrides_win() {
+    let mut case = Case::new();
+    let repo = fixture(&case, true);
+    let parent_home = case.mkdir("parent-home");
+    let parent_cache = case.mkdir("parent-cache");
+    case.set_env("HOME", parent_home.to_str().unwrap());
+    case.set_env("XDG_CACHE_HOME", parent_cache.to_str().unwrap());
+    Python::attach(|py| {
+        let (ctx, _) = command_check_context(py, &case, &repo);
+        let runner = module(py, "conductor.candidate_review.command_runner");
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("include_git_metadata", false).unwrap();
+        let environment: HashMap<String, String> = runner
+            .getattr("_environment")
+            .unwrap()
+            .call((&ctx,), Some(&kwargs))
+            .unwrap()
+            .extract()
+            .unwrap();
+        let isolated_home = Path::new(&environment["HOME"]);
+        let cache = Path::new(&environment["XDG_CACHE_HOME"]);
+        assert!(isolated_home.is_dir());
+        assert!(isolated_home.starts_with(case.root().join("runtime")));
+        assert_ne!(isolated_home, parent_home);
+        assert!(
+            cache.starts_with(isolated_home.join(".cache")),
+            "compiled artifact caches must remain within the isolated home cache"
+        );
+        assert!(!cache.starts_with(&parent_cache));
+        assert!(!cache.starts_with(&repo));
+        assert!(!environment.contains_key("GIT_DIR"));
+        assert!(!environment.contains_key("GIT_INDEX_FILE"));
+        assert!(!environment.contains_key("GIT_WORK_TREE"));
+
+        let explicit_cache = case.mkdir("explicit-cache");
+        let extra = PyDict::new(py);
+        extra
+            .set_item("XDG_CACHE_HOME", explicit_cache.to_str().unwrap())
+            .unwrap();
+        kwargs.set_item("extra", extra).unwrap();
+        kwargs.set_item("include_git_metadata", true).unwrap();
+        let overridden: HashMap<String, String> = runner
+            .getattr("_environment")
+            .unwrap()
+            .call((&ctx,), Some(&kwargs))
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(Path::new(&overridden["XDG_CACHE_HOME"]), explicit_cache);
+        assert_eq!(overridden["HOME"], environment["HOME"]);
+        assert_eq!(Path::new(&overridden["GIT_WORK_TREE"]), repo);
+        assert!(Path::new(&overridden["GIT_DIR"]).starts_with(case.root()));
+    });
 }
 
 #[test]

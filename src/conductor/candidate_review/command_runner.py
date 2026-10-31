@@ -200,7 +200,7 @@ def _environment(
             "MYPY_CACHE_DIR": str(ctx.runtime_dir / "mypy-cache"),
             "COVERAGE_FILE": str(ctx.runtime_dir / ".coverage"),
             "GIT_OPTIONAL_LOCKS": "0",
-            "XDG_CACHE_HOME": str(ctx.runtime_dir / "xdg-cache"),
+            "XDG_CACHE_HOME": str(isolated_home / ".cache"),
             "XDG_CONFIG_HOME": str(ctx.runtime_dir / "xdg-config"),
             "XDG_DATA_HOME": str(ctx.runtime_dir / "xdg-data"),
         }
