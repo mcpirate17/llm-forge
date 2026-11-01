@@ -10,6 +10,9 @@ mod integrity;
 #[path = "candidate_checks_scan.rs"]
 mod scan;
 
+/// Select paths from a captured change inventory without cloning it per check.
+pub use integrity::select_files;
+
 use serde::Serialize;
 use serde_json::{json, Value};
 

@@ -59,6 +59,8 @@ sha2 = "0.10"
 libc = "0.2"
 landlock = "0.4.7"
 toml = "0.8"
+# Candidate policy order affects check execution and receipt bindings.
+toml_edit = { version = "0.22", default-features = false, features = ["parse"] }
 # Native, offline tokenization only; no HTTP client, Python binding or trainer UI.
 tokenizers = { version = "=0.23.2", default-features = false, features = ["fancy-regex"] }
 # `bundled` vendors and builds sqlite3 (no system libsqlite3 dependency);

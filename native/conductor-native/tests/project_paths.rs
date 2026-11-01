@@ -49,6 +49,60 @@ fn relative_paths_follow_posix_normalization_and_reject_escape() {
 }
 
 #[test]
+fn captured_policy_config_is_not_reopened_from_a_replaced_path() {
+    let case = Case::new();
+    let path = case.root().join("forge.toml");
+    let config = conductor_native::project_config::parse_native(
+        &path,
+        "schema_version=1\n[conductor]\ncandidate_policy='policy/original.toml'\n",
+    )
+    .unwrap();
+    fs::write(&path, "invalid replacement TOML [[").unwrap();
+    assert_eq!(
+        conductor_native::project_paths::candidate_policy_relative(&config).unwrap(),
+        ("policy/original.toml".into(), true)
+    );
+    assert!(resolve(case.root()).is_err());
+}
+
+#[test]
+fn invalid_utf8_policy_override_is_refused_without_config_fallback() {
+    const CHILD: &str = "FORGE_PROJECT_PATH_UTF8_TEST_CHILD";
+    if std::env::var(CHILD).as_deref() == Ok("1") {
+        let config = conductor_native::project_config::parse_native(
+            Path::new("absent.toml"),
+            "schema_version=1\n[conductor]\ncandidate_policy='fallback.toml'\n",
+        )
+        .unwrap();
+        let error =
+            conductor_native::project_paths::candidate_policy_relative(&config).unwrap_err();
+        assert_eq!(error, "CONDUCTOR_CANDIDATE_POLICY must be UTF-8");
+        assert_eq!(resolve(Path::new("absent-root")).unwrap_err(), error);
+        return;
+    }
+    use std::os::unix::ffi::OsStringExt;
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "invalid_utf8_policy_override_is_refused_without_config_fallback",
+            "--nocapture",
+        ])
+        .env(CHILD, "1")
+        .env(
+            "CONDUCTOR_CANDIDATE_POLICY",
+            std::ffi::OsString::from_vec(b"invalid\xff".to_vec()),
+        )
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn eleven_paths_resolve_independently_with_configured_flags() {
     let case = Case::new();
     let defaults = resolve(case.root()).unwrap();

@@ -881,7 +881,7 @@ publication. The published verification receipt is
 `.git/forge-checks/run-1793514496983537219-452360/receipt.json`, SHA-256
 `49a71ca2303ac14fd530eca388649aba0dc3a1faee07956365466c5b52df90ee`.
 
-The next candidate-review milestone adds `forge candidate inspect`,
+The candidate-review foundation adds `forge candidate inspect`,
 `materialize`, and `verify-receipt`. It resolves staged, commit and range
 candidates through libgit2; validates and writes one Git blob at a time into
 a private standalone snapshot; and verifies legacy candidate receipt digests
@@ -891,8 +891,8 @@ publication refuses existing destinations. A valid receipt digest is not an
 approval. Optional ref binding compares the exact candidate tree with a resolved
 commit. See [candidate contracts](docs/native-candidate-review.md).
 
-The remaining independently compilable candidate slices are policy and waiver
-classification; bounded check execution and evidence collection; then review
+At that foundation boundary, the remaining candidate slices were policy and
+waiver classification; bounded check execution and evidence collection; then review
 orchestration, reporting and attestation. The existing Python package remains
 until these interconnected consumers move. No Python candidate implementation
 is retired by this foundation alone. Targeted validation passed 27 unit tests
@@ -902,8 +902,12 @@ hashed CPython fixtures without an interpreter at test or runtime. Strict
 all-target Forge Clippy passed. Fifty further concurrent-publication runs
 passed, each with 16 competing writers, exactly one winner and no staging leaks.
 Index admission now parses the exact checked bytes from a sealed memory file,
-closing the original-path replacement race. Full committed release checks and
-publication are pending at this snapshot.
+closing the original-path replacement race. It is pushed to `main` as
+`229a54e677426c10609f72b00ad76bf8cebfda97`. Full release checks passed 2,308
+tests with 39 optional ignores, plus two installed-binary smoke tests, before
+and after publication. The published verification receipt is
+`.git/forge-checks/run-1793516427617319797-496007/receipt.json`, SHA-256
+`724144368c70aba9cf3298564355369243774be2a9cc63624c3292eb36a16c2d`.
 
 The current-only Rust 1.98.0 release candidate benchmark measured median batch
 means of 2.773 microseconds for receipt digest verification, 29.601 microseconds
@@ -914,3 +918,43 @@ microseconds. Each workload used 31 batches after 100 warmup operations, with
 unisolated-host, in-process costs, not model/HTTP latency or a matched improvement
 claim. Benchmark executable SHA-256:
 `816c72281995161c694c7e3a98d6667a590f8508bacadedac00d1ec46346b6e5`.
+
+Native `forge candidate plan` now loads policy and required baselines from a
+private snapshot of the exact Git candidate, classifies both sides of renamed
+paths, preserves ordered profile checks, and reports selected files. It does
+not execute checks or issue review approval. Candidate-only configuration
+capture prevents mutable-path reopens; confined policy reads support safe
+internal symlinks. Ordered TOML conversion preserves check/tool declaration
+order and literal calendar dates. Raw source bytes bind the policy digest.
+Explicit UTC-date validation and bounded classification/selection work fail
+before unsafe or excessive inputs are processed. Successful planning explicitly
+discards its private snapshot before returning.
+
+The shared Rust classifier now compiles glob patterns once per batch and reuses
+path/matching buffers, replacing allocations for every pattern character and
+match. Stateless compatibility APIs retain their contracts. Check file
+selection borrows the captured changes instead of copying them for every check.
+Targeted validation passed 34 Forge unit tests, 14 candidate CLI tests, 250
+native-core unit/contract cases, and 34 selected optional Python compatibility
+cases using a private extension overlay. Strict all-target Clippy passed for
+both crates. Twenty-five further runs of eight concurrent plans completed with
+no private snapshots left behind. Non-UTF-8 environment overrides now fail
+explicitly instead of falling through to another policy; CLI and core
+regressions preserve higher-priority override semantics. Full committed release
+validation and publication of this policy milestone remain pending.
+
+The final policy benchmark used the same 128 renamed-path inputs, glob rules,
+Rust 1.98.0 executable and measurement loop for both classification APIs.
+Prepared classification measured 1.397 microseconds per change (p95 batch mean
+1.419), versus 2.332 microseconds (p95 2.475) for the stateless API that recompiles
+patterns on each call. Each used 31 batches of 1,000 operations after 100 warmup
+operations. This isolates API reuse within the current implementation; it is
+not a historical-version or end-to-end planning comparison. The host was not
+isolated. Benchmark executable SHA-256:
+`14492324d575ab6d4d13a2abc3d5083837403f31d047e919feb0b301c53ed867`.
+
+The remaining candidate work is bounded check execution, evidence and waiver
+activation, findings/exception application, then review reporting, attestation
+and caller migration. Python candidate policy wrappers still have callers in
+gate, verification and shared tooling; deleting them before those consumers move
+would break existing workflows. The overall native migration remains incomplete.

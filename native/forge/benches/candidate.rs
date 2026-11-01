@@ -65,4 +65,25 @@ fn main() {
             .unwrap(),
         );
     });
+    classification();
+}
+
+fn classification() {
+    use conductor_native::candidate_policy::{classify, PreparedClassifier};
+    use serde_json::json;
+    let globs = json!({"class_globs":{"rust":["native/*.rs"],"test":["native/*/test_*.rs","native/*_test.rs"],
+        "docs":["docs/*.md"],"source":["native/*","src/*"]},"generated_globs":["native/generated/*"],"high_risk_globs":["native/security/*"]});
+    let changes: Vec<_> = (0..128).map(|index| json!({"path":format!("native/module{index}/test_file.rs"),
+        "old_path":format!("src/module{index}/test_file.rs"),"old_mode":"100644","new_mode":"100644"})).collect();
+    let mut index = 0usize;
+    measure("policy_stateless_change", 1000, || {
+        black_box(classify(&changes[index % changes.len()], &globs).unwrap());
+        index += 1;
+    });
+    let mut prepared = PreparedClassifier::new(&globs).unwrap();
+    let mut index = 0usize;
+    measure("policy_prepared_change", 1000, || {
+        black_box(prepared.classify(&changes[index % changes.len()]).unwrap());
+        index += 1;
+    });
 }

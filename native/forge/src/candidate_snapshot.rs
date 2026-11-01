@@ -185,6 +185,14 @@ impl Snapshot {
         &self.report
     }
 
+    /// Explicit cleanup lets callers refuse success when a private snapshot remains.
+    pub fn discard(mut self) -> Result<()> {
+        self.verify_staging()?;
+        self.destination.parent.remove_dir_all(&self.staging)?;
+        self.keep = true;
+        Ok(())
+    }
+
     fn populate(&mut self, source: &Source, plan: &Plan) -> Result<()> {
         for entry in &plan.entries {
             if entry.mode == "160000" {

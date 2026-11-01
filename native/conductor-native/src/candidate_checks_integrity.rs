@@ -266,19 +266,23 @@ pub fn dependency_integrity(payload: &Value) -> Result<Value, String> {
 }
 
 pub fn files_for_policy(payload: &Value) -> Result<Value, String> {
-    let included: HashSet<&str> = array(payload, "classes")?
+    Ok(json!({"files": select_files(array(payload, "changes")?, payload)?}))
+}
+
+pub fn select_files<'a>(changes: &'a [Value], policy: &Value) -> Result<Vec<&'a str>, String> {
+    let included: HashSet<&str> = array(policy, "classes")?
         .iter()
         .filter_map(Value::as_str)
         .collect();
-    let excluded: HashSet<&str> = array(payload, "exclude_classes")?
+    let excluded: HashSet<&str> = array(policy, "exclude_classes")?
         .iter()
         .filter_map(Value::as_str)
         .collect();
-    let deletions = payload["run_on_deletions"]
+    let deletions = policy["run_on_deletions"]
         .as_bool()
         .ok_or("run_on_deletions must be boolean")?;
     let mut files = Vec::new();
-    for change in array(payload, "changes")? {
+    for change in changes {
         let classes = array(change, "classes")?;
         let selected = included.is_empty()
             || classes
@@ -295,5 +299,5 @@ pub fn files_for_policy(payload: &Value) -> Result<Value, String> {
     }
     files.sort_unstable();
     files.dedup();
-    Ok(json!({"files": files}))
+    Ok(files)
 }

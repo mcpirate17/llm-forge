@@ -1,15 +1,20 @@
 # Native candidate review foundation
 
 The native candidate foundation exposes exact Git candidate metadata, safe
-materialization of a candidate tree, and candidate receipt digest verification.
-These commands provide inputs for review; they are not an end-to-end review
-gate. Full policy evaluation, checks and test execution, mutation evidence,
-attestation, claims, reporting, and approval workflows remain in the Python
-`conductor.candidate_review` package until their later native slices land.
+materialization of a candidate tree, candidate policy classification, check
+planning, and candidate receipt digest verification. These commands provide
+inputs for review; they are not an end-to-end review gate. Check execution,
+mutation evidence, attestation, claims, reporting, and approval workflows
+remain in the Python `conductor.candidate_review` package until their later
+native slices land.
 
 ## Commands
 
 ```text
+forge candidate plan [--repo PATH] --kind index|commit|range
+    [--target-ref HEAD] [--base-ref REF] [--policy CANDIDATE_RELATIVE]
+    [--profile fast|full|nightly] [--today YYYY-MM-DD]
+    [--scratch-parent DIRECTORY]
 forge candidate inspect [--repo PATH] --kind index|commit|range
     [--target-ref HEAD] [--base-ref REF]
 forge candidate materialize [--repo PATH] --tree FULL_TREE_OID
@@ -18,8 +23,44 @@ forge candidate materialize [--repo PATH] --tree FULL_TREE_OID
 forge candidate verify-receipt FILE [--repo PATH --ref REF] [--json]
 ```
 
-All three commands default `--repo` to the current directory. Receipt binding
-requires `--repo` and `--ref` together.
+Planning, inspection, and materialization default `--repo` to the current
+directory. Receipt binding requires `--repo` and `--ref` together.
+
+### Plan candidate checks
+
+`plan` resolves the candidate tree and creates a private, automatically removed
+snapshot under the system temporary directory, or under the existing directory
+given by `--scratch-parent`. It loads the policy from that candidate snapshot,
+classifies its changes, selects the active checks in policy order, and reports
+each check's selected files and whether it is scheduled. It also reports
+SHA-256 digests for candidate baseline files required by the selected profile
+and touched classes. The JSON result has `schema_version: 1`,
+`plan_only: true`, `profile`, `today`, `candidate`, `policy` (`path`, `sha256`,
+and parsed `configuration`), `checks`, and `baselines`.
+
+Policy selection is `--policy`, then `CONDUCTOR_POLICY`, then
+`CONDUCTOR_CANDIDATE_POLICY`, then the policy path configured by the candidate's
+`forge.toml` or legacy `pyproject.toml`, then the central project-path default.
+An explicit or environment path skips configuration-file loading. A selected
+environment override that is not UTF-8 is an error. A supplied policy path must
+be candidate-relative; there is no
+working-tree or installed-package fallback. Policy and baseline reads stay
+inside the candidate snapshot. The policy is limited to 1 MiB; paths and
+strings to 4096 bytes; structural admission to 20,000 nodes and depth 32.
+Planning admits at most 10 million change/check pairs and 32 MiB of selected
+file paths. Classification admits 100,000 changes, 64 MiB of path metadata and
+100 million estimated pattern/path character operations. Required baseline files
+are regular files, at most 64 MiB each,
+with a 2 GiB aggregate read limit. The private planning snapshot uses the
+standard 64 MiB per-blob and 2 GiB total-tree limits.
+
+`--profile` defaults to `fast`; `--today` defaults to the current UTC calendar
+date and accepts a valid `YYYY-MM-DD`. The baseline expiry date must be today
+or later. Expired check exceptions and mutation waivers are excluded from the
+active policy and retained in its expired-entry fields; active exceptions and
+mutation waivers may expire no more than 90 days after `today`. The planner
+returns inputs and schedule flags only: it does not execute checks, create
+review findings, or approve a candidate.
 
 ### Inspect
 
@@ -97,12 +138,12 @@ does not replace them.
 
 ## Current boundary
 
-The native commands expose candidate source facts and a bounded standalone tree
-snapshot. They do not choose or apply candidate policy, run analyzers or tests,
-admit or authenticate mutation evidence, issue attestations, acquire claims, or
+The native commands can apply candidate policy to classify changes and plan
+checks, but they do not run analyzers or tests, admit or authenticate mutation
+evidence, issue attestations, acquire claims, produce a complete review, or
 decide whether work may land. Continue to use the existing candidate-review
 workflow for those decisions. The interdependent Python candidate-review
-package remains in place while the native policy and execution slices are
+package remains in place while the native execution and review slices are
 completed.
 
 This page records the native command contract only. It makes no build, test,

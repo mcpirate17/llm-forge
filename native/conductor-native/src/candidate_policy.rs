@@ -10,7 +10,7 @@ mod candidate_policy_value;
 mod candidate_policy_waivers;
 
 pub use candidate_policy_classify::classify;
-pub use candidate_policy_classify::glob_match;
+pub use candidate_policy_classify::{glob_match, PreparedClassifier};
 pub use candidate_policy_parse::{fragment, parse_policy};
 pub use candidate_policy_waivers::parse_value_waivers;
 

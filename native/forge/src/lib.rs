@@ -6,6 +6,10 @@ pub mod bounded_file;
 #[cfg(target_os = "linux")]
 pub mod candidate_cli;
 #[cfg(target_os = "linux")]
+pub mod candidate_plan;
+#[cfg(target_os = "linux")]
+pub mod candidate_policy;
+#[cfg(target_os = "linux")]
 pub mod candidate_receipt;
 #[cfg(target_os = "linux")]
 pub mod candidate_snapshot;

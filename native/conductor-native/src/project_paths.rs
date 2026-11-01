@@ -133,20 +133,18 @@ pub fn relative(raw: &str, source: &str) -> Result<String, String> {
     Ok(parts.join("/"))
 }
 
-fn configured(
-    root: &Path,
-    config: &mut Option<ProjectConfig>,
-    spec: PathSpec,
-) -> Result<(String, bool), String> {
-    if let Ok(raw) = env::var(spec.env) {
-        if !raw.trim().is_empty() {
-            return relative(&raw, &format!("${}", spec.env)).map(|path| (path, true));
+fn environment_path(spec: PathSpec) -> Result<Option<(String, bool)>, String> {
+    match env::var(spec.env) {
+        Ok(raw) if !raw.trim().is_empty() => {
+            return relative(&raw, &format!("${}", spec.env)).map(|path| Some((path, true)));
         }
+        Err(env::VarError::NotUnicode(_)) => return Err(format!("{} must be UTF-8", spec.env)),
+        Ok(_) | Err(env::VarError::NotPresent) => {}
     }
-    if config.is_none() {
-        *config = Some(project_config::load(root)?);
-    }
-    let config = config.as_ref().expect("loaded above");
+    Ok(None)
+}
+
+fn configured_value(config: &ProjectConfig, spec: PathSpec) -> Result<(String, bool), String> {
     if let Some(value) = config.conductor.get(spec.key) {
         let label = config.label(spec.key);
         let raw = value
@@ -155,6 +153,31 @@ fn configured(
         return relative(raw, &label).map(|path| (path, true));
     }
     Ok((spec.default.to_owned(), false))
+}
+
+fn configured(
+    root: &Path,
+    config: &mut Option<ProjectConfig>,
+    spec: PathSpec,
+) -> Result<(String, bool), String> {
+    if let Some(selected) = environment_path(spec)? {
+        return Ok(selected);
+    }
+    if config.is_none() {
+        *config = Some(project_config::load(root)?);
+    }
+    let config = config.as_ref().expect("loaded above");
+    configured_value(config, spec)
+}
+
+/// Resolve candidate policy from one admitted manifest without reopening its path.
+/// The existing environment override, validation and default remain authoritative.
+pub fn candidate_policy_relative(config: &ProjectConfig) -> Result<(String, bool), String> {
+    let spec = PATHS[0];
+    if let Some(selected) = environment_path(spec)? {
+        return Ok(selected);
+    }
+    configured_value(config, spec)
 }
 
 /// Values are in ProjectPaths dataclass field order, followed by matching flags.

@@ -16,6 +16,8 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Classify an exact candidate and plan ordered policy checks without executing them.
+    Plan(crate::candidate_plan::PlanArgs),
     /// Resolve staged/committed objects and unclassified changes, without executing checks.
     Inspect {
         #[arg(long, default_value = ".")]
@@ -66,6 +68,7 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::Plan(args) => print_json(&crate::candidate_plan::run(args)?)?,
         Action::Inspect {
             repo,
             kind,
