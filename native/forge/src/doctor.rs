@@ -534,25 +534,55 @@ mod tests {
         assert_eq!(parsed["ok"], json!(false), "the settings FAIL must flip ok");
     }
 
-    /// Native child processes exercise quiet success, invalid-output success,
-    /// and a nonzero exit without creating executable fixtures.
+    /// Every native fixture consumes stdin before quiet success, invalid-output
+    /// success, or a nonzero exit, so process-exit timing cannot mask diagnostics.
     #[test]
     fn roundtrip_check_passes_a_quiet_child_and_fails_a_noisy_one() {
         let scratch = ScratchDir::new("roundtrip");
-        let pass = check_roundtrip(Path::new("/bin/true"), scratch.path());
+        let source =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/support/doctor_roundtrip.rs");
+        let executable = scratch.path().join("roundtrip-fixture");
+        let compiler = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+        let compiled = Command::new(compiler)
+            .args([
+                "--edition=2021",
+                "--crate-name=forge_doctor_roundtrip_fixture",
+            ])
+            .args(["-C", "codegen-units=1", "-C", "debuginfo=0"])
+            .arg(source)
+            .arg("-o")
+            .arg(&executable)
+            .output()
+            .expect("launch native doctor fixture compiler");
+        assert!(
+            compiled.status.success(),
+            "doctor fixture compilation failed: {}",
+            String::from_utf8_lossy(&compiled.stderr)
+        );
+        let quiet = scratch.path().join("quiet");
+        let noisy = scratch.path().join("noisy");
+        let failed = scratch.path().join("failed");
+        for path in [&quiet, &noisy, &failed] {
+            std::fs::hard_link(&executable, path).unwrap();
+        }
+        let pass = check_roundtrip(&quiet, scratch.path());
         assert_eq!(pass.status, Status::Pass, "{}", pass.detail);
+        assert!(pass.detail.contains("stdout empty"), "{}", pass.detail);
         assert!(pass.detail.contains("ms"), "{}", pass.detail);
-        // check_roundtrip supplies "hook PreToolUse", which echo emits as
-        // nonempty text that cannot parse as JSON.
-        let fail = check_roundtrip(Path::new("/bin/echo"), scratch.path());
+        let fail = check_roundtrip(&noisy, scratch.path());
         assert_eq!(fail.status, Status::Fail);
         assert!(
             fail.detail.contains("neither empty nor JSON"),
             "{}",
             fail.detail
         );
-        let failed = check_roundtrip(Path::new("/bin/false"), scratch.path());
+        let failed = check_roundtrip(&failed, scratch.path());
         assert_eq!(failed.status, Status::Fail);
         assert!(failed.detail.contains("exited 1"), "{}", failed.detail);
+        assert!(
+            failed.detail.contains("native fixture failure"),
+            "{}",
+            failed.detail
+        );
     }
 }
