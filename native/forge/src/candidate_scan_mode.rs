@@ -7,39 +7,46 @@ use clap::ValueEnum;
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, ValueEnum)]
-#[serde(rename_all = "kebab-case")]
 pub enum Mode {
-    StyleScan,
-    RustStyleScan,
-    HotLoopScan,
-    TestValueScan,
-    VerbosityScan,
+    #[serde(rename = "style-scan")]
+    #[value(name = "style-scan")]
+    Style,
+    #[serde(rename = "rust-style-scan")]
+    #[value(name = "rust-style-scan")]
+    RustStyle,
+    #[serde(rename = "hot-loop-scan")]
+    #[value(name = "hot-loop-scan")]
+    HotLoop,
+    #[serde(rename = "test-value-scan")]
+    #[value(name = "test-value-scan")]
+    TestValue,
+    #[serde(rename = "verbosity-scan")]
+    #[value(name = "verbosity-scan")]
+    Verbosity,
 }
 
 impl Mode {
     pub fn checks(self) -> &'static [Check] {
         match self {
-            Self::StyleScan => &[Check::Style, Check::Fallback],
-            Self::RustStyleScan => &[Check::Rust],
-            Self::HotLoopScan => &[Check::HotLoop],
-            Self::TestValueScan => &[Check::TestValue],
-            Self::VerbosityScan => &[Check::Verbosity],
+            Self::Style => &[Check::Style, Check::Fallback],
+            Self::RustStyle => &[Check::Rust],
+            Self::HotLoop => &[Check::HotLoop],
+            Self::TestValue => &[Check::TestValue],
+            Self::Verbosity => &[Check::Verbosity],
         }
     }
 
     pub fn exclusion(self, path: &str, hot_paths: &[String]) -> Option<&'static str> {
-        let suffix = if self == Self::RustStyleScan {
+        let suffix = if self == Self::RustStyle {
             ".rs"
         } else {
             ".py"
         };
         if !path.ends_with(suffix) {
             Some("unsupported file type")
-        } else if self == Self::RustStyleScan && slop_core::rust_scan::is_test_file(path) {
+        } else if self == Self::RustStyle && slop_core::rust_scan::is_test_file(path) {
             Some("Rust test file")
-        } else if self == Self::HotLoopScan
-            && !slop_core::hot_loop_scan::in_hot_path(path, hot_paths)
-        {
+        } else if self == Self::HotLoop && !slop_core::hot_loop_scan::in_hot_path(path, hot_paths) {
             Some("outside configured production hot paths")
         } else {
             None
@@ -47,7 +54,7 @@ impl Mode {
     }
 
     pub fn includes(self, finding: &Finding, ranges: &[LineRange]) -> bool {
-        let end = if matches!(self, Self::TestValueScan | Self::VerbosityScan) {
+        let end = if matches!(self, Self::TestValue | Self::Verbosity) {
             finding.end_line
         } else {
             finding.line
@@ -79,15 +86,15 @@ mod tests {
             (8, 9, false, false),
         ] {
             let ranges = [LineRange { start, end }];
-            for mode in [Mode::StyleScan, Mode::RustStyleScan, Mode::HotLoopScan] {
+            for mode in [Mode::Style, Mode::RustStyle, Mode::HotLoop] {
                 assert_eq!(mode.includes(&finding, &ranges), line);
             }
-            for mode in [Mode::TestValueScan, Mode::VerbosityScan] {
+            for mode in [Mode::TestValue, Mode::Verbosity] {
                 assert_eq!(mode.includes(&finding, &ranges), span);
             }
         }
-        assert!(!Mode::TestValueScan.includes(&finding, &[]));
-        assert!(Mode::TestValueScan.includes(
+        assert!(!Mode::TestValue.includes(&finding, &[]));
+        assert!(Mode::TestValue.includes(
             &finding,
             &[
                 LineRange { start: 1, end: 2 },

@@ -82,7 +82,7 @@ impl Plan {
             source_bytes: 0,
             sources: Vec::new(),
         };
-        if mode == Mode::HotLoopScan {
+        if mode == Mode::HotLoop {
             plan.capture_config(source, &candidate.tree_oid)?;
         }
         let mut selected = Vec::new();
