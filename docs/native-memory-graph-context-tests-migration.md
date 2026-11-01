@@ -16,7 +16,7 @@ test inventory.
 
 Before removing the compatibility target, `python_contracts_index_notes`
 passed 2 tests across 4 fixture runs against a freshly built native CLI. The
-native notes suite passed 15 unit tests and 14 CLI tests. These are focused
+native notes suite passed 17 unit tests and 14 CLI tests. These are focused
 notes-index results; they are not a full repository gate.
 
 ## Historical cohort record

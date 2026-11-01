@@ -125,13 +125,32 @@ fn sidecars(path: &Path) -> Result<()> {
     for suffix in ["-journal", "-wal", "-shm"] {
         let mut name = path.as_os_str().to_os_string();
         name.push(suffix);
-        match fs::symlink_metadata(Path::new(&name)) {
-            Ok(meta) => validate(&meta, true).context("unsafe notes database sidecar")?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        inspect_sidecar(|| fs::symlink_metadata(Path::new(&name)))
+            .context("unsafe notes database sidecar")?;
+    }
+    Ok(())
+}
+
+fn inspect_sidecar(mut metadata: impl FnMut() -> std::io::Result<Metadata>) -> Result<()> {
+    // SQLite removes journals during commit. Path lookup can pin the inode just
+    // before unlink and return metadata with nlink=0 afterward. Re-stat its name
+    // instead of treating that transient observation as a persistent unsafe file.
+    for _ in 0..8 {
+        match metadata() {
+            Ok(meta)
+                if meta.is_file()
+                    && meta.nlink() == 0
+                    && meta.uid() == unsafe { libc::geteuid() }
+                    && meta.len() <= MAX_DB_BYTES =>
+            {
+                continue
+            }
+            Ok(meta) => return validate(&meta, true),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
             Err(error) => return Err(error.into()),
         }
     }
-    Ok(())
+    anyhow::bail!("notes database sidecar is busy changing; retry")
 }
 
 fn configure(connection: &Connection, writable: bool) -> Result<()> {
@@ -237,4 +256,64 @@ pub(super) fn open_search(path: &Path) -> Result<Option<Connection>> {
     );
     configure(&connection, false)?;
     Ok(Some(connection))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unlinked_sidecar_observation_is_rechecked_and_retry_is_bounded() {
+        let directory = std::env::temp_dir().join(crate::native_id::new("notes-sidecar").unwrap());
+        fs::create_dir(&directory).unwrap();
+        let path = directory.join("index.db-journal");
+        let held = File::create(&path).unwrap();
+        fs::remove_file(&path).unwrap();
+        assert_eq!(held.metadata().unwrap().nlink(), 0);
+        let mut calls = 0;
+        inspect_sidecar(|| {
+            calls += 1;
+            if calls == 1 {
+                held.metadata()
+            } else {
+                fs::symlink_metadata(&path)
+            }
+        })
+        .unwrap();
+        assert_eq!(calls, 2);
+        calls = 0;
+        let error = inspect_sidecar(|| {
+            calls += 1;
+            held.metadata()
+        })
+        .unwrap_err();
+        assert!(error.to_string().contains("busy"));
+        assert_eq!(calls, 8);
+        fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn unsafe_replacement_after_unlink_is_still_refused() {
+        let directory = std::env::temp_dir().join(crate::native_id::new("notes-sidecar").unwrap());
+        fs::create_dir(&directory).unwrap();
+        let path = directory.join("index.db-journal");
+        let held = File::create(&path).unwrap();
+        fs::remove_file(&path).unwrap();
+        let destination = directory.join("other");
+        fs::write(&destination, "preserve").unwrap();
+        std::os::unix::fs::symlink(&destination, &path).unwrap();
+        let mut calls = 0;
+        assert!(inspect_sidecar(|| {
+            calls += 1;
+            if calls == 1 {
+                held.metadata()
+            } else {
+                fs::symlink_metadata(&path)
+            }
+        })
+        .is_err());
+        assert_eq!(calls, 2);
+        assert_eq!(fs::read_to_string(&destination).unwrap(), "preserve");
+        fs::remove_dir_all(directory).unwrap();
+    }
 }

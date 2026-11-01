@@ -30,6 +30,10 @@ optional `IF NOT EXISTS`. It refuses ordinary-table impostors, nonstandard FTS
 options or constraints, and custom triggers on the index tables or FTS shadow
 tables. Rebuilds of `notes_fts` and `note_tables` run in one SQLite transaction
 and print the indexed note and table counts.
+SQLite can unlink a journal during metadata lookup. Observations of an owned,
+regular, just-unlinked sidecar are rechecked, with at most eight inspections;
+continued churn reports a busy error. Every replacement still undergoes the
+regular-file, ownership, size and single-link checks.
 
 SQLite uses a 250 ms busy timeout and VM execution timers of 2 seconds for
 read-only connections and 30 seconds for the writer, plus a 2 MiB page cache.
@@ -80,7 +84,7 @@ refresh it.
 
 Before retirement, the focused `python_contracts_index_notes` compatibility
 target passed 2 tests across 4 fixture runs against a freshly built native CLI.
-The native notes suite passed 15 unit tests and 14 CLI tests. Twenty additional
-repetitions of the concurrent rebuild/read test passed, exercising 320 competing
-rebuild attempts and 160 search reads, plus successful retry and final integrity
+The native notes suite passed 17 unit tests and 14 CLI tests. After repairing the
+journal-unlink race, 100 repetitions of the concurrent rebuild/read test passed,
+exercising 1,600 competing rebuild attempts and 800 search reads, plus successful retry and final integrity
 checks. These are the notes-specific results; they are not a full repository gate.

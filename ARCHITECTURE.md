@@ -863,11 +863,16 @@ implementation and exclusive compatibility target are deleted; shared native and
 compatibility helpers remain. There are 132 Python source files under `src/`.
 This migration remains incomplete; candidate review, mutation orchestration and
 other Python adapters still need native replacements.
-Notes validation passed 15 unit tests and 14 CLI integration tests, including
+Notes validation passed 17 unit tests and 14 CLI integration tests, including
 rollback, schema/sidecar refusal, WAL compatibility and concurrent snapshots.
-Twenty further concurrency-test repetitions passed (320 competing rebuild
-attempts and 160 read queries, with successful retries and final integrity
+The initial `9df7722` release gate passed 2,272 tests with 39 optional ignores,
+but its post-push concurrency check exposed a transient journal-unlink race:
+path lookup could return an inode whose link count had just reached zero.
+The repair performs bounded sidecar reinspection and retains refusal of unsafe
+replacements. Deterministic regressions use actual held, unlinked inodes.
+After repair, 100 further concurrency-test repetitions passed (1,600 competing
+rebuild attempts and 800 read queries, with successful retries and final integrity
 checks). Native core tests passed 406 cases with one optional ignore; strict
 all-target Clippy passed for both crates. The selected contract discovery,
 runner and project-path compatibility targets passed 53 tests. Full committed
-release validation and publication for the notes milestone remain pending.
+release validation and publication of the repair are pending at this snapshot.
