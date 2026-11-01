@@ -22,6 +22,8 @@ enum Action {
     ExecuteBatch(crate::candidate_batch::BatchArgs),
     /// Assess supplied findings against the candidate policy; does not verify execution.
     Assess(crate::candidate_assess_cli::AssessArgs),
+    /// Export a digest-checked receipt; recorded decisions are not execution proof.
+    Report(crate::candidate_report_cli::ReportArgs),
     /// Classify an exact candidate and plan ordered policy checks without executing them.
     Plan(crate::candidate_plan::PlanArgs),
     /// Resolve staged/committed objects and unclassified changes, without executing checks.
@@ -74,6 +76,7 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::Report(args) => crate::candidate_report_cli::run(args)?,
         Action::ExecuteBatch(args) => {
             let report = crate::candidate_batch::run(args)?;
             let failed = report["success"] != true;
@@ -138,15 +141,17 @@ fn verify(
     reference: Option<String>,
     as_json: bool,
 ) -> Result<()> {
-    let receipt =
-        candidate_receipt::parse_and_verify(&crate::bounded_file::read(&file, 16 * 1024 * 1024)?)?;
+    let receipt = candidate_receipt::parse_and_verify(&crate::bounded_file::read(
+        &file,
+        candidate_receipt::MAX_BYTES,
+    )?)?;
     let binding = match (repo, reference) {
         (Some(repo), Some(reference)) => {
             let source = Source::open(&repo)?;
             let commit = source.resolve_commit(&reference)?;
             let tree = source.commit_tree(&commit)?;
             let recorded = receipt
-                .payload
+                .payload()
                 .get("candidate")
                 .and_then(|value| value.get("tree_oid"))
                 .and_then(Value::as_str)
@@ -158,14 +163,16 @@ fn verify(
         _ => anyhow::bail!("receipt tree binding requires both --repo and --ref"),
     };
     if as_json {
-        print_json(&json!({"digest_valid":true,"receipt_id":receipt.receipt_id,
-            "receipt_digest":receipt.digest,"decision":receipt.decision,"tree_binding":binding}))?;
+        print_json(
+            &json!({"digest_valid":true,"receipt_id":receipt.receipt_id(),
+            "receipt_digest":receipt.digest(),"decision":receipt.decision(),"tree_binding":binding}),
+        )?;
     } else {
         // JSON-escape display fields so a receipt cannot inject terminal control sequences.
         println!(
             "digest valid; receipt {}; decision {}; tree binding {}",
-            serde_json::to_string(&receipt.receipt_id)?,
-            serde_json::to_string(&receipt.decision)?,
+            serde_json::to_string(receipt.receipt_id())?,
+            serde_json::to_string(receipt.decision())?,
             if binding.is_some() {
                 "verified"
             } else {

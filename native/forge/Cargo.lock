@@ -671,6 +671,7 @@ dependencies = [
  "git2",
  "landlock",
  "libc",
+ "quick-xml",
  "regex",
  "rusqlite",
  "rustls",

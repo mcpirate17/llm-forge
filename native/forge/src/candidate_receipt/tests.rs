@@ -112,3 +112,58 @@ fn rejects_duplicate_keys_nonfinite_numbers_and_excessive_limits() {
     );
     assert!(parse_and_verify(deep.as_bytes()).is_err());
 }
+
+#[test]
+fn sealing_matches_independent_legacy_digest_and_only_replaces_identity_fields() {
+    let original = fixture()["digest_valid_failed_receipt"].clone();
+    let receipt = seal(&serde_json::to_vec(&original).unwrap()).unwrap();
+    assert_eq!(
+        receipt.digest(),
+        original["receipt_digest"].as_str().unwrap()
+    );
+    assert_eq!(
+        receipt.receipt_id(),
+        format!("gr-{}", &receipt.digest()[..24])
+    );
+    let mut expected = original;
+    expected["receipt_id"] = json!(receipt.receipt_id());
+    assert_eq!(receipt.payload(), &expected);
+    assert_eq!(receipt.decision(), "fail");
+    let again = seal(&serde_json::to_vec(receipt.payload()).unwrap()).unwrap();
+    assert_eq!(again.payload(), receipt.payload());
+}
+
+#[test]
+fn sealing_preserves_unicode_numbers_and_records_unverified_pass_without_authority() {
+    let input = br#"{"message":"\u00e9\ud83d\ude80","decision":"pass","numbers":[-0.0,9007199254740993,1e-999,1.000]}"#;
+    let receipt = seal(input).unwrap();
+    assert_eq!(receipt.payload()["message"], "é🚀");
+    assert_eq!(receipt.decision(), "pass");
+    assert!(receipt.payload().get("execution_verified").is_none());
+    assert!(receipt.payload().get("review_complete").is_none());
+    assert_eq!(
+        receipt.payload()["numbers"][1].as_u64(),
+        Some(9007199254740993)
+    );
+    let roundtrip = parse_and_verify(&serde_json::to_vec(receipt.payload()).unwrap()).unwrap();
+    assert_eq!(roundtrip.digest(), receipt.digest());
+    let reordered = br#"{"numbers":[-0.0,9007199254740993,1e-999,1.000],"decision":"pass","message":"\u00e9\ud83d\ude80","receipt_digest":"ignored","receipt_id":17}"#;
+    assert_eq!(seal(reordered).unwrap().digest(), receipt.digest());
+}
+
+#[test]
+fn sealing_refuses_invalid_inputs_and_reserves_space_for_integrity_fields() {
+    for input in [
+        b"[]".as_slice(),
+        b"{\"x\":1,\"x\":2}",
+        b"{\"x\":1e999}",
+        b"{\"x\":\"\xff\"}",
+    ] {
+        assert!(seal(input).is_err());
+    }
+    let padding = format!("{{\"padding\":\"{}\"}}", "x".repeat(MAX_BYTES - 20));
+    assert!(padding.len() < MAX_BYTES);
+    assert!(seal(padding.as_bytes()).is_err());
+    let deep = format!("{{\"x\":{}0{}}}", "[".repeat(80), "]".repeat(80));
+    assert!(seal(deep.as_bytes()).is_err());
+}

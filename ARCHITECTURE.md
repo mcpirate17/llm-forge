@@ -1202,8 +1202,14 @@ controls, Unicode, empty inputs and multiple files. Component benchmarks record
 their measured scopes and source bindings in
 [performance](docs/performance.md#native-scan-admission-and-line-lookup).
 
+Standalone receipt sealing and Human/JSON/SARIF/JUnit export are native. Export
+verifies self-consistency, labels execution unverified and publishes complete
+bounded output atomically through pinned parent directories. It does not infer
+review completeness from imported records. See the
+[report contract](docs/native-candidate-review.md#export-a-recorded-receipt).
+
 Full review orchestration, cache integration, evidence and waiver verification,
-test-engine migration, reporting and attestation remain. The existing Python
+test-engine migration, review-integrated reporting and attestation remain. The existing Python
 command runner still has these callers and has not been deleted prematurely;
 128 Python source files remain under `src/`. The native migration goal stays
 active until those consumers are replaced and their interpreted code is removed.

@@ -471,6 +471,58 @@ verification of existing local-check receipts. Those formats and trust paths
 have distinct owners and contracts; candidate receipt digest verification
 does not replace them.
 
+### Export a recorded receipt
+
+```sh
+forge candidate report receipt.json
+forge candidate report receipt.json --format json --output report.json
+forge candidate report receipt.json --format sarif --output report.sarif
+forge candidate report receipt.json --format junit --output report.xml
+```
+
+`report` verifies the digest and admits the schema-1 rendering fields before
+producing output. It never runs checks, recomputes an assessment, or approves a
+candidate. Exit zero means the export succeeded, even for a recorded failing
+decision. Human, SARIF and JUnit reports explicitly mark execution unverified;
+JSON preserves the recorded payload and digest. The display identifier remains
+unbound by the legacy digest. JSON uses indented UTF-8, with a final newline;
+export whitespace and key order are not the canonical bytes used by the digest.
+
+The human report uses the recorded `policy.block_at` threshold, separates
+waived, excepted and inherited findings, shows every waiver, then prioritizes
+blocking findings within the next twenty displayed entries. All dynamic terminal
+controls and directional overrides are escaped. Empty policy data is accepted
+only for failure receipts and uses the high threshold. Surface/profile labels,
+tree identifiers, status/severity enums and report field types are checked.
+
+SARIF retains all findings and recorded waiver/exception/inheritance annotations
+as properties, without authorizing standard suppressions or baseline states. It
+percent-encodes artifact paths and preserves first-occurrence rule order. Legacy receipts do not specify
+column units, so the raw zero-based column is retained in `properties.recordedColumn`
+instead of inventing a SARIF character offset. JUnit preserves each check's
+recorded status, escapes XML text and attributes, and refuses XML-invalid
+characters. A synthetic failing testcase prevents a recorded failure without
+failed/error checks, or blocking findings not represented by those checks, from
+becoming a green suite. Recorded policy and annotations remain unverified; the
+export cannot serve as independent gate evidence.
+
+Receipt input and each rendered output are capped at 16 MiB. Rendering also
+limits nesting to 32 levels, nodes to one million, checks to 20,000 and combined
+top-level/check findings to 100,000. The full output is prepared before writing.
+An output file's parent must already exist. Publication walks and pins each
+parent without following symlinks, rejects traversal and unsafe existing leaves,
+uses a random exclusive mode-0600 staging inode, and synchronizes the file and
+directory around atomic replacement. Symlinks, special files, hardlinks and
+foreign-owned destinations are refused. Cooperating concurrent writers leave
+one complete report. Same-UID hostile directory moves or entry swaps are outside
+the trusted-parent contract; rename does not follow or truncate a target inode.
+A directory-sync error after replacement explicitly says publication occurred.
+
+The Rust `candidate_receipt::seal` API produces the same canonical checksum and
+derived `gr-` identifier for bounded JSON without an interpreter. Sealed values
+are immutable through the public API. Sealing is an integrity operation and
+adds no execution, authorship, authentication or approval evidence.
+
 ## Current boundary
 
 The native commands can apply candidate policy, plan checks, and explicitly run
@@ -483,7 +535,8 @@ workflow for those decisions. The interdependent Python candidate-review
 package remains in place: its CLI and engine still call the Python command
 runner for the legacy complete-review workflow. The native execution paths
 do not silently replace those callers. Full orchestration, mutation evidence,
-attestation, claims, reporting, and approval remain separate migration work.
+attestation, claims, review-integrated reporting, and approval remain separate
+migration work. Standalone native report export is available as described above.
 
 This page records the native command contract only. It makes no build, test,
 parity, approval, or release-readiness claim.

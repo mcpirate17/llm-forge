@@ -32,6 +32,12 @@ pub mod candidate_policy;
 #[cfg(target_os = "linux")]
 pub mod candidate_receipt;
 #[cfg(target_os = "linux")]
+pub mod candidate_report;
+#[cfg(target_os = "linux")]
+pub mod candidate_report_cli;
+#[cfg(target_os = "linux")]
+pub mod candidate_report_store;
+#[cfg(target_os = "linux")]
 pub mod candidate_snapshot;
 #[cfg(target_os = "linux")]
 pub mod candidate_source;
