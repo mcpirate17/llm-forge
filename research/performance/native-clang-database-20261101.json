@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "recorded_at_utc": "2026-11-01T20:51:48Z",
-  "base_commit": "2c831ca6d818ab134d46f5bd43acc8ff33be98a8",
-  "source_state": "dirty native clang-tidy milestone; exact compiled inputs bound below",
+  "recorded_at_utc": "2026-11-01T21:14:32Z",
+  "base_commit": "1c768f5632f4db238fff2e0d23e0cf7d8ae7cf63",
+  "source_state": "benchmark oracle lint correction; exact compiled inputs bound below",
   "host": {
     "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
     "architecture": "x86_64",
@@ -15,10 +15,10 @@
     "native/conductor-native/src/candidate_clang_args.rs": "886697e20c89fc3ff0bf76c0cffdd8328b025c71962bde0027cdfc9dfd6bfa50",
     "native/conductor-native/src/candidate_clang_db.rs": "0d0aedea7f5b702ff78bb29ed56ff37928e8954b068098e10e2ecfcb06a39906",
     "native/conductor-native/src/command_lex.rs": "521d7398cd01d764483e90a062937e1e889507d9d62b5013b76c119b99822912",
-    "native/conductor-native/benches/candidate_clang.rs": "a461757b000effa10724798717d470f8fcd9a75db681a00a0c46ad75a5640071",
+    "native/conductor-native/benches/candidate_clang.rs": "d59984b272e2e134330f18cbb13fc1fce8059347fc7e3549285b9a05e4900c37",
     "native/conductor-native/Cargo.toml": "18d3be44438d982b6e33c9878ea630531620260dc8bb295d8888bf079ab2227f",
     "native/conductor-native/Cargo.lock": "5301ab10b78b9fcece7035d1f54c07d0124eb10c8f175067c7c2b682d217b14b",
-    "native/conductor-native/target/release/deps/candidate_clang-82765f76cc90b564": "0593e1a6964b9fa8c159b2647059a6d70e3ad798ecae078da57a50a8e8ff6635"
+    "native/conductor-native/target/release/deps/candidate_clang-82765f76cc90b564": "19bf30f44673d8e0a153c716f2caabd8177add671f7d11fceb0b200b34a74198"
   },
   "result": {
     "scope": "current-only synthetic pure API; no inferred baseline improvement or CLI latency claim",
@@ -47,9 +47,9 @@
         "samples": 31,
         "iterations_per_sample": 20,
         "timed_calls": 620,
-        "median_sample_mean_ns": 963581.75,
-        "p95_sample_mean_ns": 981484.35,
-        "mean_ns": 964367.6951612906
+        "median_sample_mean_ns": 995747.55,
+        "p95_sample_mean_ns": 1008655.6,
+        "mean_ns": 996887.3290322584
       },
       {
         "name": "rebase_17_argument_compile_record",
@@ -57,12 +57,12 @@
         "samples": 31,
         "iterations_per_sample": 20,
         "timed_calls": 620,
-        "median_sample_mean_ns": 2775,
-        "p95_sample_mean_ns": 2878,
-        "mean_ns": 2782.0483870967746
+        "median_sample_mean_ns": 2678.5,
+        "p95_sample_mean_ns": 2801.05,
+        "mean_ns": 2689.6709677419362
       }
     ],
-    "elapsed_seconds": 0.607465833,
+    "elapsed_seconds": 0.629618846,
     "deadline_seconds": 30
   }
 }

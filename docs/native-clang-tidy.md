@@ -106,8 +106,8 @@ HOME/TMPDIR. Unique mode-0700 runtime directories contain mode-0600 generated
 databases/configs and are removed explicitly; cleanup failures identify residue.
 
 The current-only release API benchmark measured a 1,000-record database at
-963.582 microseconds median / 981.484 microseconds p95, and a 17-argument rebase
-at 2.775 / 2.878 microseconds. Five warmups preceded 31 samples of 20 calls,
+995.748 microseconds median / 1008.656 microseconds p95, and a 17-argument rebase
+at 2.679 / 2.801 microseconds. Five warmups preceded 31 samples of 20 calls,
 including result destruction. CLI startup, filesystem planning, process launch,
 LLVM analysis and sandboxing are excluded; this establishes no baseline speedup
 or end-to-end dispatch claim. [Raw results and source hashes](../research/performance/native-clang-database-20261101.json)

@@ -77,7 +77,7 @@ fn database_oracle(db: &Database) -> Result<()> {
             && db.entries[999].file == "../src/module499/unit_雪.c",
         "database order oracle"
     );
-    for pair in db.entries.chunks_exact(2) {
+    for pair in db.entries.as_chunks::<2>().0 {
         ensure!(
             pair[0].file == pair[1].file
                 && pair.iter().all(|entry| entry.directory == DIRECTORY
