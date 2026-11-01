@@ -98,6 +98,8 @@ enum Command {
     Claim(claims::ClaimArgs),
     /// Compile and query immutable native workspace-memory snapshots.
     Memory(forge::recall::cli::MemoryArgs),
+    /// Build and search knowledge cards through pinned native embeddings.
+    Cards(forge::cards_cli::CardsArgs),
     /// Bind, check or remove a project MCP connection to an existing native harness.
     Mcp(mcp_setup::McpArgs),
     /// Plan, initialize, inspect or roll back native host configuration.
@@ -333,6 +335,7 @@ fn main() -> ExitCode {
         }
         Command::Claim(args) => command_exit("claim", claims::run(args).map(|()| 0), 2),
         Command::Memory(args) => command_exit("memory", forge::recall::cli::run(args), 2),
+        Command::Cards(args) => command_exit("cards", forge::cards_cli::run(args), 2),
         Command::Mcp(args) => command_exit("MCP configuration", mcp_setup::run(args), 2),
         Command::Project(args) => command_exit("project", project::run(args), 2),
         Command::Providers(args) => command_exit("providers", providers::run(args), 2),

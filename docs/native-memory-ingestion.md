@@ -40,8 +40,7 @@ are reported. An empty result is refused without replacing the current index.
 
 The native recipe includes the query instruction prefix and differs from legacy
 broker fingerprints. Existing Python indexes are not silently adopted: build a
-new native store. The Python memory and knowledge-card adapters remain pending
-their separate caller and ranking migration. Native code search's HNSW/BM25
+new native store. Native code search's HNSW/BM25
 index is a separate surface; this memory service performs exact mapped scoring.
 
 Publication validates and seals the JSONL, sidecar and manifest before atomically
@@ -57,6 +56,37 @@ the ingestion deadline from 1 to 3,600 seconds (120 by default); individual HTTP
 calls retain the configured finite deadline. The report distinguishes embedded,
 reused, preserved and removed rows and reports embedding input tokens. Unchanged
 runs reuse rows without HTTP requests or a new generation.
+
+## Knowledge cards
+
+```sh
+forge cards build --host /path/to/host --notes /path/to/host/notes \
+  --output /private/cards.json --embedding /private/embedding.json
+forge cards search --index /private/cards.json \
+  --embedding /private/embedding.json --task 'compiler diagnostics' --top-k 8
+```
+
+The builder embeds complete top-level `kb_*.md` and `KB-*.md` cards in stable
+filename order. Without `--notes`, it resolves the host's configured notes root.
+It requires an existing output parent, preflights the output and writer lock,
+and checks the source inventory and bytes again before atomic publication.
+Failed inference or changed inputs leave the previous index intact.
+
+Card text is preserved whole. Cards over the embedding client's 16 KiB document
+limit are refused before inference; they are not silently shortened. The index
+uses schema 2, with at most 4,096 cards and a 16 MiB serialized limit. Native
+card search and memory search use the same query instruction and recipe
+fingerprint, so an offline task-bound query can retrieve both indexes when their
+embedding configurations match. Online search refuses an index with a different
+recipe. Existing legacy schema-2 indexes remain usable for explicit offline
+recall with their own matching fingerprint, without adopting their vectors into
+the native recipe.
+
+The Python memory, card, session-state and session-policy adapters are retired.
+Use `forge memory`, `forge cards`, `forge session state` and `forge session
+preamble`. The unwired Python auto-index marker queue and recency/dedup utility
+are deleted; indexing is explicit through ingestion or configured session close.
+Their obsolete memory-specific equivalence replay substitutions are also removed.
 
 ## Session status and close
 

@@ -124,7 +124,7 @@ fn allows_safe_shell_mentions_and_bounded_utilities() {
             "echo '.current_work.md is a compatibility log'",
             "rg -n '\\.current_work\\.md' README.md",
             "forge session append --host . --owner codex --title x --body y",
-            "python -m conductor.active_state update",
+            "forge session state",
         ] {
             assert_eq!(shell(py, command), None, "{command}");
         }

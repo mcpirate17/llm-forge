@@ -1,17 +1,9 @@
 //! Retrieval scoring for the knowledge-base card index.
 //!
-//! The Python boundary owns the embedding HTTP request and the index JSON. Rust
-//! owns the per-query float arithmetic: one dot product per card over the whole
-//! index, which ran as a generator-expression `sum()` per card in Python.
+//! Native card builders and readers share normalization and stable per-query
+//! scoring without a language binding or embedding-runtime dependency.
 
 use std::cmp::Ordering;
-
-#[cfg(feature = "python")]
-use pyo3::exceptions::PyValueError;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-#[cfg(feature = "python")]
-use pyo3::types::{PyDict, PyList};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KbCard {
@@ -63,14 +55,6 @@ fn sort_descending_python_stable(scores: &mut [(f64, usize)]) {
     });
 }
 
-#[cfg(feature = "python")]
-fn dict_string(row: &Bound<'_, PyDict>, field: &str) -> PyResult<String> {
-    row.get_item(field)?
-        .ok_or_else(|| PyValueError::new_err(format!("index card is missing {field:?}")))?
-        .extract()
-        .map_err(|_| PyValueError::new_err(format!("index card field {field:?} must be a string")))
-}
-
 /// Mirror ``kb_retrieve._l2_normalize``: ``math.sqrt(sum(x * x))`` then divide.
 pub fn l2_normalize(vector: &[f64]) -> Result<Vec<f64>, String> {
     let norm = compensated_sum(vector.iter().map(|value| value * value)).sqrt();
@@ -80,20 +64,33 @@ pub fn l2_normalize(vector: &[f64]) -> Result<Vec<f64>, String> {
     Ok(vector.iter().map(|value| value / norm).collect())
 }
 
-#[cfg(feature = "python")]
-#[pyfunction]
-fn kb_retrieve_l2_normalize_native(vector: Vec<f64>) -> PyResult<Vec<f64>> {
-    l2_normalize(&vector).map_err(PyValueError::new_err)
+/// Borrowed card data for scoring without copying the index.
+#[derive(Clone, Copy)]
+pub struct CardRef<'a> {
+    pub name: &'a str,
+    pub path: &'a str,
+    pub text: &'a str,
+    pub vector: &'a [f64],
 }
 
-/// Score every index card against ``query`` and return the top ``top_k`` rows
-/// as ``(name, path, score, text)`` tuples: highest score first, ties keep
-/// index order (Python's stable sort).
-pub fn score_cards(
+impl<'a> From<&'a KbCard> for CardRef<'a> {
+    fn from(card: &'a KbCard) -> Self {
+        Self {
+            name: &card.name,
+            path: &card.path,
+            text: &card.text,
+            vector: &card.vector,
+        }
+    }
+}
+
+/// Score borrowed cards with stable ties, copying only selected result fields.
+pub fn score_card_refs<'a>(
     query: &[f64],
-    cards: &[KbCard],
+    cards: impl IntoIterator<Item = CardRef<'a>>,
     top_k: usize,
 ) -> Result<Vec<ScoredKbCard>, String> {
+    let cards: Vec<_> = cards.into_iter().collect();
     let mut scored: Vec<(f64, usize)> = Vec::with_capacity(cards.len());
     for (ordinal, card) in cards.iter().enumerate() {
         if card.vector.len() != query.len() {
@@ -104,63 +101,31 @@ pub fn score_cards(
                 query.len()
             ));
         }
-        scored.push((compensated_dot(query, &card.vector), ordinal));
+        scored.push((compensated_dot(query, card.vector), ordinal));
     }
     sort_descending_python_stable(&mut scored);
     scored.truncate(top_k);
     Ok(scored
         .into_iter()
         .map(|(score, ordinal)| {
-            let card = &cards[ordinal];
+            let card = cards[ordinal];
             ScoredKbCard {
-                name: card.name.clone(),
-                path: card.path.clone(),
+                name: card.name.to_owned(),
+                path: card.path.to_owned(),
                 score,
-                text: card.text.clone(),
+                text: card.text.to_owned(),
             }
         })
         .collect())
 }
 
-#[cfg(feature = "python")]
-#[pyfunction]
-#[pyo3(signature = (query, cards, top_k))]
-fn kb_retrieve_score_cards_native(
-    query: Vec<f64>,
-    cards: &Bound<'_, PyList>,
+/// Score cards with the same stable ordering as the borrowed adapter.
+pub fn score_cards(
+    query: &[f64],
+    cards: &[KbCard],
     top_k: usize,
-) -> PyResult<Vec<(String, String, f64, String)>> {
-    let mut rows = Vec::with_capacity(cards.len());
-    for card in cards.iter() {
-        let row = card
-            .cast::<PyDict>()
-            .map_err(|_| PyValueError::new_err("index card must be a JSON object"))?;
-        let name = dict_string(row, "name")?;
-        let path = dict_string(row, "path")?;
-        let text = dict_string(row, "text")?;
-        let vector = row
-            .get_item("vector")?
-            .ok_or_else(|| PyValueError::new_err("index card is missing \"vector\""))?
-            .extract::<Vec<f64>>()?;
-        rows.push(KbCard {
-            name,
-            path,
-            text,
-            vector,
-        });
-    }
-    let scored = score_cards(&query, &rows, top_k).map_err(PyValueError::new_err)?;
-    Ok(scored
-        .into_iter()
-        .map(|row| (row.name, row.path, row.score, row.text))
-        .collect())
-}
-
-#[cfg(feature = "python")]
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(kb_retrieve_l2_normalize_native, module)?)?;
-    module.add_function(wrap_pyfunction!(kb_retrieve_score_cards_native, module)?)?;
-    Ok(())
+) -> Result<Vec<ScoredKbCard>, String> {
+    score_card_refs(query, cards.iter().map(CardRef::from), top_k)
 }
 
 #[cfg(test)]
@@ -276,6 +241,24 @@ mod tests {
         assert_eq!(
             score_cards(&[1.0, 2.0, 3.0], &cards, 1).unwrap_err(),
             "vector dim mismatch for c3: 2 != 3"
+        );
+    }
+
+    #[test]
+    fn borrowed_scoring_matches_owned_for_ties_and_dimension_errors() {
+        let cards = [
+            card(0, vec![1.0, 0.0]),
+            card(1, vec![1.0, 0.0]),
+            card(2, vec![0.0, 1.0]),
+        ];
+        let refs = || cards.iter().map(CardRef::from);
+        assert_eq!(
+            score_card_refs(&[1.0, 0.0], refs(), 2),
+            score_cards(&[1.0, 0.0], &cards, 2)
+        );
+        assert_eq!(
+            score_card_refs(&[1.0], refs(), 2),
+            score_cards(&[1.0], &cards, 2)
         );
     }
 

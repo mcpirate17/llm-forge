@@ -26,17 +26,17 @@ fn forge_root() -> PathBuf {
 }
 
 fn contract_fixture(repo: &GraphRepo<'_>) {
-    repo.write("src/conductor/memory_vectors.py", "def probe(): return 1\n");
+    repo.write("src/conductor/gate_rollout.py", "def probe(): return 1\n");
     repo.write(
         "native/conductor-native/src/python_contract_targets.tsv",
-        "src/conductor/memory_vectors.py\tpython_contracts_memory_vectors\n",
+        "src/conductor/gate_rollout.py\tpython_contracts_gate_rollout\n",
     );
     repo.write(
         "native/conductor-native/Cargo.toml",
         "[package]\nname='probe'\n",
     );
     repo.write(
-        "native/conductor-native/tests/python_contracts_memory_vectors.rs",
+        "native/conductor-native/tests/python_contracts_gate_rollout.rs",
         "#[test] fn probe() {}\n",
     );
 }
@@ -370,10 +370,10 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
         let namespace = types.getattr("SimpleNamespace").unwrap();
         let change_args = PyDict::new(py);
         change_args
-            .set_item("path", "src/conductor/active_state.py")
+            .set_item("path", "src/conductor/current_work_guard.py")
             .unwrap();
         change_args
-            .set_item("old_path", "src/conductor/memory_vectors.py")
+            .set_item("old_path", "src/conductor/gate_rollout.py")
             .unwrap();
         change_args.set_item("classes", vec!["python"]).unwrap();
         change_args.set_item("deleted", false).unwrap();
@@ -421,9 +421,8 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
                 .extract::<Vec<String>>()
                 .unwrap(),
             vec![
-                "python_contracts_active_state",
-                "python_contracts_installed_layout",
-                "python_contracts_memory_vectors",
+                "python_contracts_current_work_guard",
+                "python_contracts_gate_rollout",
             ]
         );
         let graph = selection.getattr("graph").unwrap();
@@ -433,7 +432,7 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
                 .unwrap()
                 .extract::<usize>()
                 .unwrap(),
-            3
+            2
         );
     });
 }
@@ -444,13 +443,13 @@ fn native_policy_reports_unmapped_source_in_mixed_contract_change() {
     Python::attach(|py| {
         let native = module(py, "conductor._native");
         let request = json!({
-            "sources": ["src/conductor/memory_vectors.py", "src/conductor/unmapped.py"],
+            "sources": ["src/conductor/gate_rollout.py", "src/conductor/unmapped.py"],
             "changed_tests": [],
             "graph_tests": [],
             "native_tests": {},
-            "contract_sources": ["src/conductor/memory_vectors.py"],
-            "contract_targets": ["python_contracts_memory_vectors"],
-            "contract_test_paths": ["native/conductor-native/tests/python_contracts_memory_vectors.rs"],
+            "contract_sources": ["src/conductor/gate_rollout.py"],
+            "contract_targets": ["python_contracts_gate_rollout"],
+            "contract_test_paths": ["native/conductor-native/tests/python_contracts_gate_rollout.rs"],
             "graph": {},
             "graph_error": null,
             "high_risk": false,
@@ -479,7 +478,7 @@ fn graph_cli_exposes_and_launches_cargo_without_passing_rust_to_pytest() {
     Python::attach(|py| {
         let graph = module(py, "conductor.graph_test_select");
         let root = repo.root().to_string_lossy().into_owned();
-        let args = vec!["--repo", &root, "--json", "src/conductor/memory_vectors.py"];
+        let args = vec!["--repo", &root, "--json", "src/conductor/gate_rollout.py"];
         let (code, stdout, _) = capture(py, || {
             graph
                 .getattr("main")
@@ -494,7 +493,7 @@ fn graph_cli_exposes_and_launches_cargo_without_passing_rust_to_pytest() {
         assert_eq!(result["selected_tests"], json!([]));
         assert_eq!(
             result["contract_targets"],
-            json!(["python_contracts_memory_vectors"])
+            json!(["python_contracts_gate_rollout"])
         );
         assert_eq!(result["count"], 1);
         let (subprocess_run, _guards) = mock_graph_cargo(py, &graph, &repo);
@@ -506,7 +505,7 @@ fn graph_cli_exposes_and_launches_cargo_without_passing_rust_to_pytest() {
                     "--repo",
                     &root,
                     "--run",
-                    "src/conductor/memory_vectors.py",
+                    "src/conductor/gate_rollout.py",
                 ],))
                 .unwrap()
                 .extract::<i64>()
@@ -539,7 +538,7 @@ fn graph_cli_exposes_and_launches_cargo_without_passing_rust_to_pytest() {
         assert_eq!(argv[0], "cargo");
         assert!(argv
             .windows(2)
-            .any(|pair| pair == ["--test", "python_contracts_memory_vectors"]));
+            .any(|pair| pair == ["--test", "python_contracts_gate_rollout"]));
         assert!(!argv.iter().any(|arg| arg.ends_with(".rs")));
         subprocess_run
             .getattr("return_value")
@@ -554,7 +553,7 @@ fn graph_cli_exposes_and_launches_cargo_without_passing_rust_to_pytest() {
                     "--repo",
                     &root,
                     "--run",
-                    "src/conductor/memory_vectors.py",
+                    "src/conductor/gate_rollout.py",
                 ],))
                 .unwrap()
                 .extract::<i64>()
@@ -568,14 +567,14 @@ fn graph_cli_exposes_and_launches_cargo_without_passing_rust_to_pytest() {
 fn default_graph_cli_diff_keeps_both_sides_of_a_rename() {
     let case = Case::new();
     let repo = GraphRepo::new(&case);
-    repo.write("src/conductor/memory_vectors.py", "MARKER = 'old'\n");
-    git(repo.root(), &["add", "src/conductor/memory_vectors.py"]);
+    repo.write("src/conductor/gate_rollout.py", "MARKER = 'old'\n");
+    git(repo.root(), &["add", "src/conductor/gate_rollout.py"]);
     git(repo.root(), &["commit", "-m", "add probe", "--quiet"]);
     git(
         repo.root(),
         &[
             "mv",
-            "src/conductor/memory_vectors.py",
+            "src/conductor/gate_rollout.py",
             "src/conductor/renamed_vectors.py",
         ],
     );
@@ -587,7 +586,7 @@ fn default_graph_cli_diff_keeps_both_sides_of_a_rename() {
             .unwrap()
             .extract()
             .unwrap();
-        assert!(changed.contains(&"src/conductor/memory_vectors.py".to_owned()));
+        assert!(changed.contains(&"src/conductor/gate_rollout.py".to_owned()));
         assert!(changed.contains(&"src/conductor/renamed_vectors.py".to_owned()));
     });
 }
@@ -598,7 +597,7 @@ fn mixed_selection<'py>(py: Python<'py>) -> Bound<'py, PyAny> {
         .unwrap()
         .call1((
             forge_root().display().to_string(),
-            vec!["src/conductor/memory_vectors.py"],
+            vec!["src/conductor/gate_rollout.py"],
         ))
         .unwrap();
     let plan = module(py, "json")
@@ -731,7 +730,7 @@ fn candidate_runner_executes_mixed_commands_and_reports_coverage_limit() {
         assert!(pytest.contains(&"test_probe.py".to_owned()));
         assert!(!pytest.iter().any(|arg| arg.ends_with(".rs")));
         assert_eq!(cargo[0], "cargo");
-        assert!(cargo.contains(&"python_contracts_memory_vectors".to_owned()));
+        assert!(cargo.contains(&"python_contracts_gate_rollout".to_owned()));
         kwargs.set_item("coverage", false).unwrap();
         let passed = verification
             .getattr("run_targeted_tests")

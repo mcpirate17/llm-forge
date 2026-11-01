@@ -2,7 +2,7 @@
 use crate::support::{module, path, AttrPatch, Case};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyCFunction, PyDict, PyList};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 const MODULE: &str = include_str!("../fixtures/equivalence_probe/fixture_mod.py");
@@ -12,7 +12,6 @@ const LOOPING_TESTS: &str =
 const METHOD_MODULE: &str = include_str!("../fixtures/equivalence_probe/method_fixture_mod.py");
 const METHOD_TESTS: &str = include_str!("../fixtures/equivalence_probe/test_method_fixture_mod.py");
 const UNARY_MODULE: &str = include_str!("../fixtures/equivalence_probe/unary_fixture.py");
-const REPLAY_SUBJECTS: &str = include_str!("../fixtures/equivalence_probe/replay_subjects.py");
 
 pub struct ProbeWorkspace {
     pub _cwd: crate::support::CwdRestore,
@@ -68,10 +67,6 @@ pub fn ep(py: Python<'_>) -> Bound<'_, pyo3::types::PyModule> {
 pub fn abl(py: Python<'_>) -> Bound<'_, pyo3::types::PyModule> {
     module(py, "conductor.equivalence_ablations")
 }
-pub fn prs(py: Python<'_>) -> Bound<'_, pyo3::types::PyModule> {
-    module(py, "conductor.probe_replay_stubs")
-}
-
 pub fn probe<'py>(py: Python<'py>, ws: &ProbeWorkspace, qualname: &str) -> Bound<'py, PyAny> {
     let kwargs = PyDict::new(py);
     kwargs.set_item("module_name", "fixture_mod").unwrap();
@@ -239,43 +234,11 @@ fn consume(payload: &Bound<'_, PyAny>) -> PyResult<usize> {
     Ok(value.len())
 }
 
-#[pyfunction(name = "_real_embed")]
-fn real_embed(_text: &str) -> PyResult<Vec<f64>> {
-    Err(pyo3::exceptions::PyAssertionError::new_err(
-        "live broker reached",
-    ))
-}
-
-#[pyfunction(name = "_stub_embed")]
-fn stub_embed(_text: &str) -> Vec<f64> {
-    vec![0.0]
-}
-
 pub fn clone_subject_module(py: Python<'_>) -> Bound<'_, pyo3::types::PyModule> {
-    let subjects = pyo3::types::PyModule::from_code(
-        py,
-        &std::ffi::CString::new(REPLAY_SUBJECTS).unwrap(),
-        c"replay_subjects.py",
-        c"replay_subjects",
-    )
-    .unwrap();
+    let subjects = pyo3::types::PyModule::new(py, "replay_subjects").unwrap();
     subjects.add_class::<Uncopyable>().unwrap();
     subjects
         .add_function(wrap_pyfunction!(consume, &subjects).unwrap())
-        .unwrap();
-    subjects
-        .add_function(wrap_pyfunction!(real_embed, &subjects).unwrap())
-        .unwrap();
-    subjects
-        .add_function(wrap_pyfunction!(stub_embed, &subjects).unwrap())
-        .unwrap();
-    let real_path = path(py, Path::new("/server/real/index.jsonl"));
-    subjects.add("real_path", &real_path).unwrap();
-    let real = subjects.getattr("_real_embed").unwrap();
-    subjects
-        .getattr("query")
-        .unwrap()
-        .setattr("__defaults__", (&real, &real_path))
         .unwrap();
     subjects
 }
@@ -297,75 +260,4 @@ pub fn count_pytest_runs(py: Python<'_>) -> (AttrPatch, Arc<Mutex<usize>>) {
         AttrPatch::replace(pytest.as_any(), "main", callback.as_any()),
         count,
     )
-}
-
-pub fn create_stub_target<'py>(py: Python<'py>, name: &str) -> Bound<'py, PyAny> {
-    module(py, "types")
-        .getattr("ModuleType")
-        .unwrap()
-        .call1((name,))
-        .unwrap()
-}
-
-/// Restore the Python context and test registry even when a Rust assertion unwinds.
-pub struct ReplayStubOverride {
-    context: Py<PyAny>,
-    stubs: Py<PyAny>,
-    key: String,
-    active: bool,
-}
-
-impl ReplayStubOverride {
-    pub fn new(py: Python<'_>, target: &Bound<'_, PyAny>, spec: &Bound<'_, PyDict>) -> Self {
-        let key = target
-            .getattr("__name__")
-            .unwrap()
-            .extract::<String>()
-            .unwrap();
-        let stubs = prs(py).getattr("REPLAY_STUBS").unwrap();
-        stubs.set_item(&key, spec).unwrap();
-        let context = prs(py)
-            .getattr("replay_stub_overrides")
-            .unwrap()
-            .call1((target,))
-            .unwrap();
-        if let Err(error) = context.call_method0("__enter__") {
-            stubs.del_item(&key).unwrap();
-            panic!("enter replay stub override: {error}");
-        }
-        Self {
-            context: context.unbind(),
-            stubs: stubs.unbind(),
-            key,
-            active: true,
-        }
-    }
-
-    pub fn close(&mut self, py: Python<'_>) -> PyResult<()> {
-        if !self.active {
-            return Ok(());
-        }
-        let exit = self
-            .context
-            .bind(py)
-            .call_method1("__exit__", (py.None(), py.None(), py.None()));
-        let delete = self.stubs.bind(py).del_item(self.key.as_str());
-        self.active = false;
-        exit?;
-        delete
-    }
-}
-
-impl Drop for ReplayStubOverride {
-    fn drop(&mut self) {
-        if self.active {
-            Python::attach(|py| {
-                if let Err(error) = self.close(py) {
-                    if !std::thread::panicking() {
-                        panic!("restore replay stub override: {error}");
-                    }
-                }
-            });
-        }
-    }
 }

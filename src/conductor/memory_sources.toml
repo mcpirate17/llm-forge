@@ -5,7 +5,7 @@
 # host data: it names directories in that host's tree, and often absolute paths
 # outside it, which is precisely what must not travel inside a wheel. A host
 # takes ownership by writing `conductor/memory_sources.toml`; from that moment
-# this file is not read at all. See `conductor.memory_index.host_catalog_path`.
+# this file is not read at all. Native `forge memory ingest` resolves the catalog.
 schema_version = 1
 
 [[source]]

@@ -44,10 +44,10 @@ TEST_SUFFIXES: Final[tuple[str, ...]] = (
     "Test.java",
 )
 DENY_HINT: Final[str] = (
-    "Use `python -m conductor.kb_retrieve query ...` and "
-    "`python -m conductor.memory_index query ...` to read workspace context. "
+    "Use `forge cards search ...` and "
+    "`forge memory search ...` to read workspace context. "
     "Write findings to research/notes/<topic>.md, then "
-    "`python -m conductor.memory_index index`. Short status: "
+    "`forge memory ingest`. Short status: "
     "`forge session append --host <repo> --owner <you> --title '...' --body '...'` "
     "(max 12 lines)."
 )

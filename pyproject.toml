@@ -67,8 +67,6 @@ graph = ["code-review-graph==2.3.8"]
 # conductor/_native.py, which decides its absence once at import time.
 
 [project.scripts]
-kb_retrieve = "conductor.kb_retrieve:main"
-memory_index = "conductor.memory_index:main"
 candidate_review = "conductor.candidate_review.cli:main"
 # The mutation front door is the automatic path. `mutation_testing` inspects and
 # verifies; it cannot run anything -- the hand runner was removed 2026-09-08.

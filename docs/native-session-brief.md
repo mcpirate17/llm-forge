@@ -37,6 +37,12 @@ forge session brief --host /path/to/host --task 'compiler diagnostics' \
   --query query.json --memory-index memory.jsonl --cards-index cards.json
 ```
 
+Native catalog ingestion and full-card creation are documented in
+[native memory ingestion](native-memory-ingestion.md). Both builders share the
+same native query recipe when given the same pinned embedding configuration.
+Their indexes can therefore be queried together; legacy indexes still require
+their own exact matching fingerprints.
+
 Either index can be supplied independently. The query file contains exactly:
 
 ```json

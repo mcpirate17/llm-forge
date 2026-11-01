@@ -12,8 +12,6 @@ use anyhow::{ensure, Result};
 pub use format::Metadata;
 use format::{Header, Stamp, HEADER_LEN, MAX_FILE};
 use memmap2::Mmap;
-#[cfg(feature = "python")]
-use pyo3::{exceptions::PyValueError, prelude::*};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fs::{File, OpenOptions};
@@ -257,52 +255,6 @@ pub fn sidecar_is_fresh(jsonl: &Path, sidecar: &Path) -> Result<bool, String> {
         }
         Err(_) => Ok(false),
     }
-}
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn memory_index_build_sidecar_native(jsonl_path: &str, sidecar_path: &str) -> PyResult<usize> {
-    build_sidecar(Path::new(jsonl_path), Path::new(sidecar_path)).map_err(PyValueError::new_err)
-}
-#[cfg(feature = "python")]
-#[pyfunction]
-fn memory_index_sidecar_is_fresh_native(jsonl_path: &str, sidecar_path: &str) -> PyResult<bool> {
-    sidecar_is_fresh(Path::new(jsonl_path), Path::new(sidecar_path)).map_err(PyValueError::new_err)
-}
-#[cfg(feature = "python")]
-#[pyfunction]
-fn memory_index_sidecar_header_native(path: &str) -> PyResult<(String, usize, usize)> {
-    header(Path::new(path)).map_err(PyValueError::new_err)
-}
-#[cfg(feature = "python")]
-#[pyfunction]
-fn memory_index_query_snapshot_native(
-    source: &str,
-    snapshot: &str,
-    query: Vec<f64>,
-    count: usize,
-    fingerprint: &str,
-) -> PyResult<Vec<NativeHit>> {
-    Reader::open(Path::new(source), Path::new(snapshot))
-        .and_then(|reader| reader.query(&query, count, fingerprint))
-        .map_err(|error| PyValueError::new_err(format!("{error:#}")))
-}
-#[cfg(feature = "python")]
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(memory_index_build_sidecar_native, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        memory_index_sidecar_is_fresh_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        memory_index_sidecar_header_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        memory_index_query_snapshot_native,
-        module
-    )?)?;
-    Ok(())
 }
 
 #[cfg(test)]

@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 const MAX_INDEX_BYTES: usize = 512 * 1024 * 1024;
-const QUERY_PREFIX: &str =
+pub const QUERY_PREFIX: &str =
     "Instruct: Retrieve the developer note that answers the search query.\nQuery: ";
 
 pub struct Settings {
@@ -55,6 +55,15 @@ pub fn fingerprint(config: &embedding::Config) -> Result<String> {
         "sha256:{:x}",
         Sha256::digest(serde_json::to_vec(&recipe)?)
     ))
+}
+
+/// Whole cards and chunked memory share this query-vector recipe.
+pub fn query_text(task: &str) -> Result<String> {
+    ensure!(
+        !task.trim().is_empty() && task.len() <= 4096,
+        "invalid memory search task"
+    );
+    Ok(format!("{QUERY_PREFIX}{}", task.trim()))
 }
 
 pub(crate) fn validate_missing_roots(
@@ -384,7 +393,7 @@ pub fn search(
         "query embedding recipe differs from memory generation"
     );
     let vector = embedding::Client::new(config)?
-        .embed(&format!("{QUERY_PREFIX}{}", task.trim()))?
+        .embed(&query_text(task)?)?
         .vector;
     let vector: Vec<_> = vector.into_iter().map(f64::from).collect();
     let hits = pin

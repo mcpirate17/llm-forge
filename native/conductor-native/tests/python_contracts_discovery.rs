@@ -115,10 +115,10 @@ fn native_fixture_source_selects_contract_and_must_stay_local() {
     fs::write(&file, "fn main() {}\n").unwrap();
     let registry = fixture.root.join(REGISTRY_PATH);
     let mut rows = fs::read_to_string(&registry).unwrap();
-    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+    rows.push_str(&format!("{relative}\tpython_contracts_gate_rollout\n"));
     fs::write(registry, rows).unwrap();
     let selected = plan(&fixture.root, std::slice::from_ref(&relative)).unwrap();
-    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert_eq!(selected.targets, ["python_contracts_gate_rollout"]);
     fs::remove_file(&file).unwrap();
     assert!(plan(&fixture.root, std::slice::from_ref(&relative)).is_err());
     std::os::unix::fs::symlink(
@@ -139,8 +139,7 @@ fn native_fixture_source_selects_contract_and_must_stay_local() {
 #[test]
 fn python_fixture_and_toml_provider_select_their_contracts_and_stay_safe() {
     let root = repo_root();
-    let python_fixture =
-        "native/conductor-native/tests/fixtures/equivalence_probe/replay_subjects.py";
+    let python_fixture = "native/conductor-native/tests/fixtures/equivalence_probe/fixture_mod.py";
     let selected = plan(&root, &[python_fixture.to_owned()]).unwrap();
     assert_eq!(selected.targets, ["python_contracts_equivalence_probe"]);
     assert_eq!(selected.source_paths, [python_fixture]);
@@ -215,10 +214,10 @@ fn native_provider_paths_select_contracts_without_becoming_python_sources() {
     fs::write(fixture.root.join(relative), "fn probe() {}\n").unwrap();
     let registry = fixture.root.join(REGISTRY_PATH);
     let mut rows = fs::read_to_string(&registry).unwrap();
-    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+    rows.push_str(&format!("{relative}\tpython_contracts_gate_rollout\n"));
     fs::write(registry, rows).unwrap();
     let selected = plan(&fixture.root, &[relative.to_owned()]).unwrap();
-    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert_eq!(selected.targets, ["python_contracts_gate_rollout"]);
     assert!(selected.source_paths.is_empty());
     assert_eq!(selected.commands[0].targets, selected.targets);
     let unrelated = plan(
@@ -230,7 +229,7 @@ fn native_provider_paths_select_contracts_without_becoming_python_sources() {
     let registry = fixture.root.join(REGISTRY_PATH);
     let mut rows = fs::read_to_string(&registry).unwrap();
     rows.push_str(
-        "native/conductor-native/src/nested/provider.rs\tpython_contracts_memory_vectors\n",
+        "native/conductor-native/src/nested/provider.rs\tpython_contracts_gate_rollout\n",
     );
     fs::write(registry, rows).unwrap();
     let error = plan(&fixture.root, &[relative.to_owned()]).unwrap_err();
@@ -254,11 +253,11 @@ fn forge_provider_paths_select_contracts_across_nested_modules() {
         let rows = fs::read_to_string(&registry).unwrap();
         fs::write(
             &registry,
-            format!("{rows}{relative}\tpython_contracts_memory_vectors\n"),
+            format!("{rows}{relative}\tpython_contracts_gate_rollout\n"),
         )
         .unwrap();
         let selected = plan(&fixture.root, &[relative.to_owned()]).unwrap();
-        assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+        assert_eq!(selected.targets, ["python_contracts_gate_rollout"]);
         assert_eq!(selected.commands[0].targets, selected.targets);
         assert!(selected.source_paths.is_empty());
         for invalid in [
@@ -269,7 +268,7 @@ fn forge_provider_paths_select_contracts_across_nested_modules() {
         ] {
             fs::write(
                 &registry,
-                format!("{rows}{invalid}\tpython_contracts_memory_vectors\n"),
+                format!("{rows}{invalid}\tpython_contracts_gate_rollout\n"),
             )
             .unwrap();
             let error = plan(&fixture.root, &[relative.to_owned()]).unwrap_err();
@@ -292,17 +291,17 @@ fn corpus_dependencies_select_contract_and_are_validated_when_source_changes() {
         fs::write(&file, "[]").unwrap();
         let registry = fixture.root.join(REGISTRY_PATH);
         let mut rows = fs::read_to_string(&registry).unwrap();
-        rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+        rows.push_str(&format!("{relative}\tpython_contracts_gate_rollout\n"));
         fs::write(registry, rows).unwrap();
         assert_eq!(
             plan(&fixture.root, &[relative.to_owned()]).unwrap().targets,
-            ["python_contracts_memory_vectors"]
+            ["python_contracts_gate_rollout"]
         );
-        let changed = ["src/conductor/memory_vectors.py".to_owned()];
+        let changed = ["src/conductor/gate_rollout.py".to_owned()];
         assert!(plan(&fixture.root, &changed)
             .unwrap()
             .targets
-            .contains(&"python_contracts_memory_vectors".to_owned()));
+            .contains(&"python_contracts_gate_rollout".to_owned()));
         fs::remove_file(&file).unwrap();
         assert!(plan(&fixture.root, &changed).is_err());
         std::os::unix::fs::symlink(
@@ -326,10 +325,10 @@ fn slop_core_provider_paths_select_contracts_within_the_declared_crate() {
     fs::write(file, "fn provider() {}\n").unwrap();
     let registry = fixture.root.join(REGISTRY_PATH);
     let mut rows = fs::read_to_string(&registry).unwrap();
-    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+    rows.push_str(&format!("{relative}\tpython_contracts_gate_rollout\n"));
     fs::write(&registry, &rows).unwrap();
     let selected = plan(&fixture.root, &[relative.to_owned()]).unwrap();
-    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert_eq!(selected.targets, ["python_contracts_gate_rollout"]);
     assert!(selected.source_paths.is_empty());
     for invalid in [
         "native/slop-core/src/nested/provider.rs",
@@ -337,7 +336,7 @@ fn slop_core_provider_paths_select_contracts_within_the_declared_crate() {
     ] {
         fs::write(
             &registry,
-            format!("{rows}{invalid}\tpython_contracts_memory_vectors\n"),
+            format!("{rows}{invalid}\tpython_contracts_gate_rollout\n"),
         )
         .unwrap();
         let error = plan(&fixture.root, &[relative.to_owned()]).unwrap_err();
@@ -358,12 +357,12 @@ fn patch_fixture_dependencies_are_bounded_and_required_for_selected_targets() {
     fs::write(&file, "historical fixture bytes\n").unwrap();
     let registry = fixture.root.join(REGISTRY_PATH);
     let mut rows = fs::read_to_string(&registry).unwrap();
-    rows.push_str(&format!("{relative}\tpython_contracts_memory_vectors\n"));
+    rows.push_str(&format!("{relative}\tpython_contracts_gate_rollout\n"));
     fs::write(&registry, &rows).unwrap();
     let selected = plan(&fixture.root, &[relative.to_owned()]).unwrap();
-    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert_eq!(selected.targets, ["python_contracts_gate_rollout"]);
     assert!(selected.source_paths.is_empty());
-    let changed = ["src/conductor/memory_vectors.py".to_owned()];
+    let changed = ["src/conductor/gate_rollout.py".to_owned()];
     fs::remove_file(&file).unwrap();
     assert!(plan(&fixture.root, &changed).is_err());
     std::os::unix::fs::symlink(
@@ -382,7 +381,7 @@ fn patch_fixture_dependencies_are_bounded_and_required_for_selected_targets() {
     ] {
         fs::write(
             &registry,
-            format!("{rows}{invalid}\tpython_contracts_memory_vectors\n"),
+            format!("{rows}{invalid}\tpython_contracts_gate_rollout\n"),
         )
         .unwrap();
         let error = plan(&fixture.root, &changed).unwrap_err();
@@ -601,17 +600,23 @@ fn benchmark_native_and_python_providers_select_its_contract() {
 #[test]
 fn production_sources_select_nonconvention_and_reexport_contracts() {
     let root = repo_root();
-    let memory = plan(&root, &["src/conductor/memory_vectors.py".to_owned()]).unwrap();
-    assert_eq!(memory.targets, ["python_contracts_memory_vectors"]);
-    let active = plan(&root, &["src/conductor/active_state.py".to_owned()]).unwrap();
+    let gate_rollout = plan(&root, &["src/conductor/gate_rollout.py".to_owned()]).unwrap();
+    assert_eq!(gate_rollout.targets, ["python_contracts_gate_rollout"]);
+    let current_work_guard =
+        plan(&root, &["src/conductor/current_work_guard.py".to_owned()]).unwrap();
     assert_eq!(
-        active.targets,
-        [
-            "python_contracts_active_state",
-            "python_contracts_installed_layout",
-        ]
+        current_work_guard.targets,
+        ["python_contracts_current_work_guard"]
     );
     for retired in [
+        "active_state.py",
+        "session_policy.py",
+        "grok_inspect_stub.py",
+        "memory_index.py",
+        "memory_auto_index.py",
+        "memory_vectors.py",
+        "kb_retrieve.py",
+        "probe_replay_stubs.py",
         "handoff.py",
         "session_close.py",
         "session_preamble.py",
@@ -637,7 +642,7 @@ fn selection_is_stable_deduplicated_and_has_explicit_safe_argv() {
     let root = repo_root();
     let changed = [
         "src/conductor/graph_context.py".to_owned(),
-        "./src/conductor/../conductor/memory_vectors.py".to_owned(),
+        "./src/conductor/../conductor/gate_rollout.py".to_owned(),
         root.join("src/conductor/graph_context.py")
             .display()
             .to_string(),
@@ -648,8 +653,8 @@ fn selection_is_stable_deduplicated_and_has_explicit_safe_argv() {
     assert_eq!(
         selected.source_paths,
         [
-            "src/conductor/graph_context.py",
-            "src/conductor/memory_vectors.py"
+            "src/conductor/gate_rollout.py",
+            "src/conductor/graph_context.py"
         ]
     );
     assert_eq!(selected.commands.len(), 1);
@@ -697,10 +702,10 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
     let root = repo_root();
     let one = plan(
         &root,
-        &[format!("{TEST_DIR}/python_contracts_memory_vectors.rs")],
+        &[format!("{TEST_DIR}/python_contracts_gate_rollout.rs")],
     )
     .unwrap();
-    assert_eq!(one.targets, ["python_contracts_memory_vectors"]);
+    assert_eq!(one.targets, ["python_contracts_gate_rollout"]);
     assert!(one.source_paths.is_empty());
     let helper = plan(
         &root,
@@ -753,15 +758,12 @@ fn missing_or_unregistered_contract_target_fails_closed() {
     fs::remove_file(
         fixture
             .root
-            .join(format!("{TEST_DIR}/python_contracts_memory_vectors.rs")),
+            .join(format!("{TEST_DIR}/python_contracts_gate_rollout.rs")),
     )
     .unwrap();
-    let error = plan(
-        &fixture.root,
-        &["src/conductor/memory_vectors.py".to_owned()],
-    )
-    .unwrap_err()
-    .to_string();
+    let error = plan(&fixture.root, &["src/conductor/gate_rollout.py".to_owned()])
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("mapped contract file missing"), "{error}");
     fs::write(
         fixture
@@ -773,9 +775,8 @@ fn missing_or_unregistered_contract_target_fails_closed() {
     fs::write(
         fixture
             .root
-            .join(format!("{TEST_DIR}/python_contracts_memory_vectors.rs")),
-        fs::read(repo_root().join(format!("{TEST_DIR}/python_contracts_memory_vectors.rs")))
-            .unwrap(),
+            .join(format!("{TEST_DIR}/python_contracts_gate_rollout.rs")),
+        fs::read(repo_root().join(format!("{TEST_DIR}/python_contracts_gate_rollout.rs"))).unwrap(),
     )
     .unwrap();
     let error = plan(
@@ -794,7 +795,7 @@ fn missing_or_unregistered_contract_target_fails_closed() {
 #[test]
 fn selected_helper_must_exist_be_registered_and_stay_inside_snapshot() {
     let fixture = Fixture::new();
-    let changed = ["src/conductor/memory_vectors.py".to_owned()];
+    let changed = ["src/conductor/gate_rollout.py".to_owned()];
     let helper = fixture
         .root
         .join(format!("{TEST_DIR}/python_contracts/support.rs"));
@@ -816,7 +817,7 @@ fn selected_helper_must_exist_be_registered_and_stay_inside_snapshot() {
     fs::write(&helper, "// helper\n").unwrap();
     let target = fixture
         .root
-        .join(format!("{TEST_DIR}/python_contracts_memory_vectors.rs"));
+        .join(format!("{TEST_DIR}/python_contracts_gate_rollout.rs"));
     fs::write(&target, "#[path = \"../outside.rs\"]\nmod outside;\n").unwrap();
     assert!(plan(&fixture.root, &changed)
         .unwrap_err()
@@ -850,7 +851,7 @@ fn retired_hook_paths_are_unmapped_and_unsafe_registry_rows_fail() {
     ] {
         fs::write(
             fixture.root.join(REGISTRY_PATH),
-            format!("{unsafe_path}\tpython_contracts_memory_vectors\n"),
+            format!("{unsafe_path}\tpython_contracts_gate_rollout\n"),
         )
         .unwrap();
         assert!(
@@ -865,12 +866,12 @@ fn rust_syntax_cannot_hide_an_external_helper_from_the_registry() {
     let fixture = Fixture::new();
     fs::write(
         fixture.root.join(REGISTRY_PATH),
-        "src/conductor/memory_vectors.py\tpython_contracts_memory_vectors\n",
+        "src/conductor/gate_rollout.py\tpython_contracts_gate_rollout\n",
     )
     .unwrap();
     let target = fixture
         .root
-        .join(format!("{TEST_DIR}/python_contracts_memory_vectors.rs"));
+        .join(format!("{TEST_DIR}/python_contracts_gate_rollout.rs"));
     for source in [
         "#[path=\"../outside.rs\"] mod hidden;",
         "#[path = r#\"../outside.rs\"#]\nmod hidden;",
@@ -882,11 +883,7 @@ fn rust_syntax_cannot_hide_an_external_helper_from_the_registry() {
     ] {
         fs::write(&target, source).unwrap();
         assert!(
-            plan(
-                &fixture.root,
-                &["src/conductor/memory_vectors.py".to_owned()]
-            )
-            .is_err(),
+            plan(&fixture.root, &["src/conductor/gate_rollout.py".to_owned()]).is_err(),
             "{source}"
         );
     }
@@ -895,11 +892,7 @@ fn rust_syntax_cannot_hide_an_external_helper_from_the_registry() {
         "const FIXTURE: &str = include_str!(\"../fixture.txt\");",
     )
     .unwrap();
-    assert!(plan(
-        &fixture.root,
-        &["src/conductor/memory_vectors.py".to_owned()]
-    )
-    .is_ok());
+    assert!(plan(&fixture.root, &["src/conductor/gate_rollout.py".to_owned()]).is_ok());
 }
 
 #[cfg(unix)]
@@ -913,7 +906,7 @@ fn slop_consuming_contract_stages_candidate_extension_before_ambient_sites() {
         "snapshot": fixture.root, "runtime_dir": "/tmp/contract-runtime",
         "python_executable": "/usr/bin/python3",
         "python_sites": ["/ambient/site-packages"],
-        "targets": ["python_contracts_memory_vectors", "python_contracts_policy_engine_crash"],
+        "targets": ["python_contracts_gate_rollout", "python_contracts_policy_engine_crash"],
     });
     let runtime =
         || conductor_native::candidate_verification::decide("contract_runtime_plan", &request);
@@ -985,7 +978,7 @@ fn runtime_requires_both_native_manifests_inside_the_candidate_snapshot() {
     fs::write(&forge, "[package]\nname='forge'\n").unwrap();
     let request = serde_json::json!({
         "snapshot": fixture.root, "runtime_dir": "/tmp/contract-runtime",
-        "python_executable": "/usr/bin/python3", "targets": ["python_contracts_memory_vectors"],
+        "python_executable": "/usr/bin/python3", "targets": ["python_contracts_gate_rollout"],
     });
     let runtime =
         || conductor_native::candidate_verification::decide("contract_runtime_plan", &request);
@@ -1017,11 +1010,11 @@ fn candidate_registry_addition_is_seen_without_rebuilding_the_planner() {
     assert!(!registered_sources().unwrap().contains(&added.to_owned()));
     let registry = fixture.root.join(REGISTRY_PATH);
     let mut contents = fs::read_to_string(&registry).unwrap();
-    contents.push_str(&format!("{added}\tpython_contracts_memory_vectors\n"));
+    contents.push_str(&format!("{added}\tpython_contracts_gate_rollout\n"));
     fs::write(registry, contents).unwrap();
     let selected = plan(&fixture.root, &[added.to_owned()]).unwrap();
     assert_eq!(selected.source_paths, [added]);
-    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert_eq!(selected.targets, ["python_contracts_gate_rollout"]);
     assert_eq!(selected.commands.len(), 1);
 }
 
@@ -1063,7 +1056,7 @@ fn registry_change_cannot_drop_the_last_mapping_for_an_existing_target() {
     let contents = fs::read_to_string(&registry).unwrap();
     let filtered = contents
         .lines()
-        .filter(|line| !line.ends_with("\tpython_contracts_memory_vectors"))
+        .filter(|line| !line.ends_with("\tpython_contracts_gate_rollout"))
         .collect::<Vec<_>>()
         .join("\n");
     fs::write(registry, format!("{filtered}\n")).unwrap();
@@ -1081,11 +1074,7 @@ fn missing_malformed_or_unregistered_registry_target_cannot_pass_as_empty() {
     let fixture = Fixture::new();
     let registry = fixture.root.join(REGISTRY_PATH);
     fs::remove_file(&registry).unwrap();
-    for changed in [
-        "src/conductor/memory_vectors.py",
-        REGISTRY_PATH,
-        "README.md",
-    ] {
+    for changed in ["src/conductor/gate_rollout.py", REGISTRY_PATH, "README.md"] {
         let error = plan(&fixture.root, &[changed.to_owned()])
             .unwrap_err()
             .to_string();
@@ -1126,15 +1115,12 @@ fn mapped_contract_cannot_be_a_symlink_outside_its_crate() {
     let fixture = Fixture::new();
     let target = fixture
         .root
-        .join(format!("{TEST_DIR}/python_contracts_memory_vectors.rs"));
+        .join(format!("{TEST_DIR}/python_contracts_gate_rollout.rs"));
     fs::remove_file(&target).unwrap();
     std::os::unix::fs::symlink("/tmp/outside-contract.rs", &target).unwrap();
-    let error = plan(
-        &fixture.root,
-        &["src/conductor/memory_vectors.py".to_owned()],
-    )
-    .unwrap_err()
-    .to_string();
+    let error = plan(&fixture.root, &["src/conductor/gate_rollout.py".to_owned()])
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("not regular"), "{error}");
 }
 
@@ -1144,11 +1130,11 @@ fn absolute_changed_path_accepts_the_given_symlinked_repo_root() {
     let fixture = Fixture::new();
     let alias = fixture.root.with_extension("alias");
     std::os::unix::fs::symlink(&fixture.root, &alias).unwrap();
-    let changed = alias.join("src/conductor/memory_vectors.py");
+    let changed = alias.join("src/conductor/gate_rollout.py");
     let selected = plan(&alias, &[changed.display().to_string()]).unwrap();
     fs::remove_file(alias).unwrap();
-    assert_eq!(selected.source_paths, ["src/conductor/memory_vectors.py"]);
-    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
+    assert_eq!(selected.source_paths, ["src/conductor/gate_rollout.py"]);
+    assert_eq!(selected.targets, ["python_contracts_gate_rollout"]);
 }
 
 #[test]
@@ -1157,8 +1143,8 @@ fn path_boundaries_and_unmapped_paths_do_not_create_shell_arguments() {
     for escaped in [
         "../outside.py".to_owned(),
         "/tmp/outside.py".to_owned(),
-        "src/conductor/memory_vectors.py\n--test=bad".to_owned(),
-        "src\\conductor\\memory_vectors.py".to_owned(),
+        "src/conductor/gate_rollout.py\n--test=bad".to_owned(),
+        "src\\conductor\\gate_rollout.py".to_owned(),
     ] {
         assert!(plan(&root, &[escaped]).is_err());
     }
@@ -1176,7 +1162,7 @@ fn unrelated_host_paths_need_no_forge_crate_or_contract_files() {
     let empty = plan(
         &fixture.root,
         &[
-            "conductor/memory_vectors.py".to_owned(),
+            "conductor/gate_rollout.py".to_owned(),
             "README.md".to_owned(),
             "src/conductor/unmapped.py".to_owned(),
         ],
@@ -1186,12 +1172,9 @@ fn unrelated_host_paths_need_no_forge_crate_or_contract_files() {
     assert!(empty.source_paths.is_empty());
     assert!(empty.test_paths.is_empty());
     assert!(empty.commands.is_empty());
-    let error = plan(
-        &fixture.root,
-        &["src/conductor/memory_vectors.py".to_owned()],
-    )
-    .unwrap_err()
-    .to_string();
+    let error = plan(&fixture.root, &["src/conductor/gate_rollout.py".to_owned()])
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("contract registry missing"), "{error}");
 }
 
@@ -1208,7 +1191,7 @@ fn python_binding_returns_targets_paths_and_argv_as_data() {
             .unwrap()
             .call1((
                 root.display().to_string(),
-                vec!["src/conductor/memory_vectors.py"],
+                vec!["src/conductor/gate_rollout.py"],
             ))
             .unwrap()
             .extract()
@@ -1216,16 +1199,16 @@ fn python_binding_returns_targets_paths_and_argv_as_data() {
         let value: serde_json::Value = serde_json::from_str(&response).unwrap();
         assert_eq!(
             value["targets"],
-            serde_json::json!(["python_contracts_memory_vectors"])
+            serde_json::json!(["python_contracts_gate_rollout"])
         );
         assert_eq!(
             value["test_paths"],
-            serde_json::json!(["native/conductor-native/tests/python_contracts_memory_vectors.rs"])
+            serde_json::json!(["native/conductor-native/tests/python_contracts_gate_rollout.rs"])
         );
         assert_eq!(value["commands"][0]["argv"][0], "cargo");
         assert_eq!(
             value["source_paths"],
-            serde_json::json!(["src/conductor/memory_vectors.py"])
+            serde_json::json!(["src/conductor/gate_rollout.py"])
         );
         assert_eq!(value["commands"][0]["targets"], value["targets"]);
         assert_eq!(value["commands"][0]["test_paths"], value["test_paths"]);

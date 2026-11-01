@@ -102,10 +102,6 @@ bindings = "pyo3"
 # These adapters remain explicitly opt-in until their interpreted callers retire.
 
 [[test]]
-name = "python_contracts_active_state"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_audit_root"
 required-features = ["python-compat-tests"]
 
@@ -382,10 +378,6 @@ name = "python_contracts_installed_layout"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_kb_retrieve"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_killer_attribution"
 required-features = ["python-compat-tests"]
 
@@ -395,26 +387,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_local_clerk"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_memory_auto_index"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_memory_chunking"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_memory_index"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_memory_index_streaming"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_memory_vectors"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -663,10 +635,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_sandbox"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_session_policy"
 required-features = ["python-compat-tests"]
 
 [[test]]

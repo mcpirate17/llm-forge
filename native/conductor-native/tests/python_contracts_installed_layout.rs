@@ -140,9 +140,6 @@ fn installed_layout_resolves_host_not_site() {
     let host = fake_host(case.root());
     let started = Instant::now();
 
-    let dump = run(&["conductor.active_state", "dump"], &host, &site);
-    assert_no_site_leak(&dump, &site, "active_state dump");
-
     let gate_help = run(&["conductor.gate", "--help"], &host, &site);
     assert_no_site_leak(&gate_help, &site, "gate --help");
 

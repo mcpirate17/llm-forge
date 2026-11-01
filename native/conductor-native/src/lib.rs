@@ -144,10 +144,6 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     mutation_coverage::register(module)?;
     mutation_evidence::register(module)?;
     mutation_plan::register(module)?;
-    kb_retrieve::register(module)?;
-    memory_chunking::register(module)?;
-    memory_index::register(module)?;
-    memory_index_sidecar::register(module)?;
     mutation_value::register(module)?;
     native_reuse::register(module)?;
     project_context::register(module)?;

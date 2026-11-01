@@ -1,10 +1,6 @@
 //! Validation and preview decoding for native mapped workspace memory.
 use std::io::BufRead;
 
-#[cfg(feature = "python")]
-use crate::top_k::{Ranked, TopK};
-#[cfg(feature = "python")]
-use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
 use serde_json::{Map, Value};
 pub(crate) const MAX_ROW_BYTES: usize = 1024 * 1024;
 
@@ -18,16 +14,6 @@ pub type NativeHit = (f64, String, String, String, String);
 pub(crate) struct EmbeddingMeta<'a> {
     pub(crate) fingerprint: &'a str,
     pub(crate) dimension: usize,
-}
-
-#[cfg(feature = "python")]
-#[derive(Debug)]
-struct Hit {
-    score: f64,
-    source: String,
-    path: String,
-    title: String,
-    text: String,
 }
 
 fn python_repr(value: Option<&Value>) -> String {
@@ -203,75 +189,4 @@ pub(crate) fn preview(row: &Map<String, Value>, score: f64) -> Result<NativeHit,
             .take(MAX_HIT_TEXT_CHARS)
             .collect(),
     ))
-}
-
-#[cfg(feature = "python")]
-fn finish_hits(hits: TopK<Hit>) -> Vec<NativeHit> {
-    hits.sorted()
-        .into_iter()
-        .map(|(_, hit)| (hit.score, hit.source, hit.path, hit.title, hit.text))
-        .collect()
-}
-
-#[cfg(feature = "python")]
-fn dict_string(row: &Bound<'_, PyDict>, field: &str) -> PyResult<String> {
-    row.get_item(field)?
-        .ok_or_else(|| PyValueError::new_err(format!("memory index row is missing {field:?}")))?
-        .extract::<String>()
-        .map_err(|_| {
-            PyValueError::new_err(format!("memory index row field {field:?} must be a string"))
-        })
-}
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn memory_index_score_rows_native(
-    query: Vec<f64>,
-    rows: Vec<Bound<'_, PyDict>>,
-    top_k: usize,
-) -> PyResult<Vec<NativeHit>> {
-    if query.is_empty() || query.iter().any(|v| !v.is_finite()) {
-        return Err(PyValueError::new_err(
-            "query vector must be nonempty and finite",
-        ));
-    }
-    let mut hits = TopK::new(top_k).map_err(PyValueError::new_err)?;
-    for (ordinal, row) in rows.into_iter().enumerate() {
-        let path = dict_string(&row, "path")?;
-        let vector = row
-            .get_item("vector")?
-            .ok_or_else(|| PyValueError::new_err("memory index row is missing \"vector\""))?
-            .extract::<Vec<f64>>()?;
-        if vector.len() != query.len() {
-            return Err(PyValueError::new_err(format!("dim mismatch in {path}")));
-        }
-        let score = compensated_dot(&query, vector.into_iter());
-        if !score.is_finite() {
-            return Err(PyValueError::new_err("memory index score is non-finite"));
-        }
-        let text = dict_string(&row, "text")?
-            .chars()
-            .take(MAX_HIT_TEXT_CHARS)
-            .collect();
-        hits.push(
-            Ranked {
-                score,
-                index: ordinal,
-            },
-            Hit {
-                score,
-                source: dict_string(&row, "source")?,
-                path,
-                title: dict_string(&row, "title")?,
-                text,
-            },
-        );
-    }
-    Ok(finish_hits(hits))
-}
-
-#[cfg(feature = "python")]
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(memory_index_score_rows_native, module)?)?;
-    Ok(())
 }

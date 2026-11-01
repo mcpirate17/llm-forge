@@ -1,11 +1,7 @@
 //! Deterministic markdown chunking for the workspace memory index.
 //!
-//! The Python boundary keeps catalog walking, embedding requests and index
-//! writes. Rust owns the line-loop chunker that ran as a Python closure over
-//! every line of every indexed file.
-
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+//! Native catalog ingestion shares one line-loop chunker with deterministic
+//! whitespace, heading, and character-limit behavior.
 
 const MAX_CHUNK_CHARS: usize = 1500;
 const HEADING_FLUSH_SIZE: usize = 400;
@@ -125,24 +121,6 @@ pub fn chunk_text(
     }
 }
 
-#[cfg(feature = "python")]
-#[pyfunction]
-#[pyo3(signature = (text, source_id, path, title, mode))]
-fn memory_index_chunk_text_native(
-    text: &str,
-    source_id: &str,
-    path: &str,
-    title: &str,
-    mode: &str,
-) -> PyResult<Vec<(String, String, String, String)>> {
-    Ok(chunk_text(text, source_id, path, title, mode))
-}
-
-#[cfg(feature = "python")]
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(memory_index_chunk_text_native, module)?)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,5 +183,52 @@ mod tests {
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].3.chars().count(), 1_500);
         assert_eq!(out[0].3, text);
+    }
+
+    #[test]
+    fn exotic_line_boundaries_and_outer_whitespace_keep_chunk_values() {
+        for (input, expected) in [
+            ("\x1cA\x1dB\x1eC", "A\nB\nC"),
+            ("a\r\nb\rc\x0bd\x0cf", "a\nb\nc\nd\nf"),
+            ("a\u{2028}b\u{2029}c", "a\nb\nc"),
+            ("\u{a0}x\u{a0}", "x"),
+        ] {
+            let rows = chunk_text(input, "src", "docs/n.md", "n.md", "heading");
+            assert_eq!(
+                rows,
+                vec![(
+                    "src".into(),
+                    "docs/n.md".into(),
+                    "n.md".into(),
+                    expected.into()
+                )]
+            );
+        }
+        let rows = chunk_text("\x1cA\x1dB\x1eC", "src", "docs/n.md", "n.md", "whole");
+        assert_eq!(rows[0].3, "A\x1dB\x1eC");
+        for input in ["\x1c\x1d", "\u{a0}\u{85}", "\u{2028}\u{2029}"] {
+            for mode in ["heading", "whole"] {
+                assert!(chunk_text(input, "s", "p", "t", mode).is_empty());
+            }
+        }
+        let rows = chunk_text(&"🦀".repeat(3001), "s", "p", "t", "whole");
+        assert_eq!(rows[0].3, "🦀".repeat(3000));
+    }
+
+    #[test]
+    fn heading_threshold_and_whole_line_flush_preserve_legacy_values() {
+        let below = format!("{}\n## Next\nbody", "a".repeat(398));
+        let at = format!("{}\n## Next\nbody", "a".repeat(399));
+        assert_eq!(chunk_text(&below, "s", "p", "fallback", "heading").len(), 1);
+        let rows = chunk_text(&at, "s", "p", "fallback", "heading");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1].2, "Next");
+        assert_eq!(rows[1].3, "## Next\nbody");
+        let a = "a".repeat(1000);
+        let b = "b".repeat(1000);
+        let rows = chunk_text(&format!("{a}\n{b}\ntail"), "s", "p", "t", "heading");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].3, format!("{a}\n{b}"));
+        assert_eq!(rows[1].3, "tail");
     }
 }

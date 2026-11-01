@@ -752,7 +752,7 @@ is 154. The remaining gate adapter only resolves and dispatches the native cost
 phase; the wider governance and session migration is still open. See
 `docs/native-claims.md` and `docs/ledger.md` for command contracts and limits.
 
-The next working-tree milestone adds bounded catalog-driven native memory
+The memory and session milestone adds bounded catalog-driven native memory
 ingestion with pinned embedding recipes, immutable mapped generations, streaming
 incremental reuse and reader-safe collection. Native status append and session
 close now connect status, claims and explicit memory sync without interpreter
@@ -768,4 +768,31 @@ compatibility checks also passed. The installed-layout fixture now stages the
 fresh native extension instead of inheriting an older shared-venv dependency.
 The workspace embedding mock reuses the bounded complete-request HTTP fixture;
 100 consecutive repetitions passed after replacing its unbounded accept/read loop.
-Canonical committed-tree receipts are still pending for this milestone.
+The milestone is committed and pushed to `main` as
+`c587a2efca6451452cbbd4ba65d497b399925f37`. Full canonical local checks and
+verification passed before publication and again after `origin/main` advanced.
+The published receipt is
+`.git/forge-checks/run-1793506230933333695-146382/receipt.json`, SHA-256
+`7918fff3838b49694dab5f47f2e9e427319f2f813b1aef3ee927e0f0e8174b2d`.
+That committed milestone leaves 146 Python source files under `src/`.
+
+The current working-tree milestone adds native `forge cards build|search`.
+Builders retain complete bounded card text, use the same pinned embedding/query
+recipe as memory ingestion, recheck sources before atomic publication and keep
+the previous index intact on failure. Offline recall validates native metadata,
+text/source hashes and vector dimensions; partial removal of native metadata
+cannot downgrade validation to the legacy schema. Valid legacy indexes remain
+available for explicit offline queries with the exact matching fingerprint.
+Queries borrow stored text and vectors and copy only selected results.
+
+The Python memory ingestion, indexing, card retrieval, automatic indexing,
+memory-vector utilities, state/policy adapters and obsolete inspection/replay
+helpers are deleted, together with their exclusive bindings and compatibility
+targets. Native memory/session commands supply the active behavior; unused
+auto-index queues, recency/dedup utilities and memory-only replay substitutions
+are retired. Shared compatibility coverage remains, with 98 selected checks
+passing. There are 138 remaining Python source files under `src/`; this is an
+intermediate migration milestone, not a completed native-only repository.
+The complete native core and Forge development suites passed 2,033 tests with
+39 optional tests ignored, and both crates passed strict all-target Clippy.
+The committed-tree release receipt is a separate publication check.

@@ -137,73 +137,9 @@ pub fn memory(path: &Path, sidecar: Option<&Path>, query: &Query) -> Result<Vec<
         .collect())
 }
 
-#[derive(Deserialize)]
-struct CardIndex {
-    schema_version: u32,
-    embedding: Metadata,
-    cards: Vec<Card>,
-}
-#[derive(Deserialize)]
-struct Metadata {
-    fingerprint: String,
-    dimension: usize,
-    paid: bool,
-    num_gpu: Option<u32>,
-    num_ctx: Option<u32>,
-}
-#[derive(Deserialize)]
-struct Card {
-    name: String,
-    path: String,
-    text: String,
-    vector: Vec<f64>,
-}
-
 pub fn cards(path: &Path, query: &Query) -> Result<Vec<String>> {
-    let bytes = crate::bounded_file::read(path, 16 * 1024 * 1024)?;
-    // Typed deserialization rejects duplicate declared keys and bounds recursion.
-    let index: CardIndex = serde_json::from_slice(&bytes).context("knowledge-card index")?;
-    ensure!(index.schema_version == 2, "unsupported card index schema");
-    ensure!(
-        index.embedding.fingerprint == query.embedding_fingerprint,
-        "card embedding fingerprint mismatch"
-    );
-    ensure!(
-        index.embedding.dimension == query.vector.len(),
-        "card embedding dimension mismatch"
-    );
-    ensure!(
-        index.embedding.paid
-            || (matches!(index.embedding.num_gpu, Some(0 | 99))
-                && index.embedding.num_ctx == Some(2048)),
-        "invalid card embedding metadata"
-    );
-    ensure!(
-        !index.cards.is_empty() && index.cards.len() <= 4096,
-        "card index must contain 1..4096 cards"
-    );
-    let cards: Vec<_> = index
-        .cards
-        .into_iter()
-        .map(|card| {
-            ensure!(
-                card.vector.len() == query.vector.len()
-                    && card.vector.iter().all(|v| v.is_finite()),
-                "invalid card vector"
-            );
-            Ok(kb_retrieve::KbCard {
-                name: card.name,
-                path: card.path,
-                text: card.text,
-                vector: card.vector,
-            })
-        })
-        .collect::<Result<_>>()?;
-    let hits = kb_retrieve::score_cards(&query.vector, &cards, 3).map_err(anyhow::Error::msg)?;
-    ensure!(
-        hits.iter().all(|hit| hit.score.is_finite()),
-        "card score is non-finite"
-    );
+    let index = crate::cards::load(path)?;
+    let hits = crate::cards::score_query(&index, query, 3)?;
     Ok(hits
         .into_iter()
         .map(|hit| {
