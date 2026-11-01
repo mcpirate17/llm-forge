@@ -2,6 +2,8 @@
 //! These cases cover the CLI wire format and its side effects, while the
 //! module tests and frozen corpora cover each kernel's full behavior.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -36,7 +38,7 @@ impl Drop for Scratch {
 
 fn call(op: &str, input: &Value, env: &[(&str, &str)]) -> (Value, String) {
     use std::io::Write;
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut cmd = Command::new(forge_binary::path());
     cmd.args(["legacy-hook", op]);
     for (key, value) in env {
         cmd.env(key, value);
@@ -231,7 +233,7 @@ fn read_budget_and_gate_start_write_native_state() {
 #[test]
 fn unknown_operation_fails_closed_with_a_useful_error() {
     use std::io::Write;
-    let mut child = Command::new(env!("CARGO_BIN_EXE_forge"))
+    let mut child = Command::new(forge_binary::path())
         .args(["legacy-hook", "not-an-operation"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

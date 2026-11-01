@@ -21,7 +21,7 @@ fn file(root: &Path, name: &str, text: &str) -> PathBuf {
     path
 }
 fn command(host: &support::Host, home: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = Command::new(support::forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")

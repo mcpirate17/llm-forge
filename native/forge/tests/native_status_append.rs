@@ -204,7 +204,7 @@ fn cli_without_path_reports_durable_append_with_failed_refresh_distinctly() {
     fs::create_dir(&outside).unwrap();
     fs::write(outside.join("active_state.json"), "retained bytes").unwrap();
     std::os::unix::fs::symlink(&outside, host.0.join("conductor")).unwrap();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = Command::new(support::forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")

@@ -322,7 +322,7 @@ fn wait_for_child_pid(host: &Host) -> i32 {
 fn supervisor_sigterm_kills_its_child_and_records_failure() {
     let host = Host::new();
     create_command(&host, "signal", &["pid-sleep", "20000"]);
-    let mut runner = Command::new(env!("CARGO_BIN_EXE_forge"))
+    let mut runner = Command::new(support::forge_binary::path())
         .args(["task", "run", "signal", "--owner", "agent"])
         .current_dir(&host.0)
         .stdout(std::process::Stdio::null())
@@ -349,7 +349,7 @@ fn supervisor_sigterm_kills_its_child_and_records_failure() {
 fn sqlite_contention_cannot_extend_command_execution_or_report_success() {
     let host = Host::new();
     create_command(&host, "locked", &["pid-sleep", "4000"]);
-    let mut runner = Command::new(env!("CARGO_BIN_EXE_forge"))
+    let mut runner = Command::new(support::forge_binary::path())
         .args([
             "task",
             "run",

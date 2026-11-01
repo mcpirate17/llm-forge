@@ -1,5 +1,7 @@
 //! End-to-end native graph indexing fixtures. No Python interpreter or external indexer.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -27,7 +29,7 @@ impl Fixture {
     }
 
     fn run(&self, args: &[&str]) -> Value {
-        let output = Command::new(env!("CARGO_BIN_EXE_forge"))
+        let output = Command::new(forge_binary::path())
             .args(["graph", "--host"])
             .arg(&self.0)
             .args(args)
@@ -42,7 +44,7 @@ impl Fixture {
     }
 
     fn fails(&self, args: &[&str], expected: &str) {
-        let output = Command::new(env!("CARGO_BIN_EXE_forge"))
+        let output = Command::new(forge_binary::path())
             .args(["graph", "--host"])
             .arg(&self.0)
             .args(args)

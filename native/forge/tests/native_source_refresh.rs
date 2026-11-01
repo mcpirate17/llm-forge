@@ -226,7 +226,7 @@ fn cli_planning_is_read_only_and_refresh_uses_only_the_configured_native_client(
         serde_json::to_vec(&options(&["a.rs"], 512)).unwrap(),
     )
     .unwrap();
-    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = std::process::Command::new(support::forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")
@@ -252,7 +252,7 @@ fn cli_planning_is_read_only_and_refresh_uses_only_the_configured_native_client(
         serde_json::to_vec(&settings(endpoint, &["a.rs"])).unwrap(),
     )
     .unwrap();
-    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = std::process::Command::new(support::forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")

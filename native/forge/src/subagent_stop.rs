@@ -142,7 +142,7 @@ mod tests {
 
     // The end-to-end path (a real `forge ledger rollup-agent` child over a
     // real synthetic subagent transcript through `forge hook SubagentStop`)
-    // needs the compiled `forge` binary (`CARGO_BIN_EXE_forge`), which only
+    // needs the compiled `forge` binary (`FORGE_TEST_BIN`), which only
     // integration tests get -- lives in `tests/hook_delegation.rs` beside
     // `session_end_rolls_the_ending_session_into_the_ledger`, same reason
     // `session_end.rs` documents for its own child-process path.

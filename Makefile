@@ -48,7 +48,7 @@ BASELINE_EXPIRES ?= $(shell $(UV) run python -c \
   'import tomllib; from conductor.project_paths import project_paths; \
    print(tomllib.loads(project_paths(".").policy_path.read_text(encoding="utf-8"))["baseline_expires"])')
 
-.PHONY: build install test native gate candidate-review local-preview local-check local-verify \
+.PHONY: build install test test-install native gate candidate-review local-preview local-check local-verify \
 	mutation-plan mutation-generate mutation-engine-run mutation-evidence \
 	mutation-canary mutation-coverage baselines baseline-jscpd baseline-pmd \
 	baseline-complexity baseline-vulture help
@@ -60,15 +60,18 @@ FORGE_TARGET_ROOT = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(CURDIR)/nativ
 NATIVE_ENV = CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 RUSTUP_TOOLCHAIN=1.98.0 PYO3_PYTHON=/nonexistent/forbidden-python
 
 build:  ## Build the release executable and its native core libraries
-	$(NATIVE_ENV) cargo +1.98.0 build --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml --bin forge
+	$(NATIVE_ENV) cargo +1.98.0 build --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml --bin forge --target-dir "$(FORGE_TARGET_ROOT)"
 
 install:  ## Install the native executable into INSTALL_ROOT (default target/install)
-	$(NATIVE_ENV) cargo +1.98.0 install --path native/forge --bin forge --locked --jobs 2 --force --root "$(INSTALL_ROOT)" --target-dir "$(FORGE_TARGET_ROOT)"
+	$(NATIVE_ENV) cargo +1.98.0 install --path native/forge-cli --bin forge --locked --jobs 2 --force --root "$(INSTALL_ROOT)" --target-dir "$(FORGE_TARGET_ROOT)"
 
-test:  ## Run all default native release tests without interpreter discovery
+test-install: build
+	$(NATIVE_ENV) cargo +1.98.0 install --path native/forge-cli --bin forge --locked --jobs 2 --force --root "$(FORGE_TARGET_ROOT)/test-install" --target-dir "$(FORGE_TARGET_ROOT)"
+
+test: test-install  ## Run all default native release tests without interpreter discovery
 	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite
 	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml
-	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml
+	$(NATIVE_ENV) FORGE_TEST_BIN="$$(cd "$(FORGE_TARGET_ROOT)/test-install" && pwd -P)/bin/forge" cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml --target-dir "$(FORGE_TARGET_ROOT)"
 
 native: build  ## Build native Forge; test fixtures compile natively on demand
 

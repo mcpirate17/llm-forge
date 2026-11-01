@@ -1,6 +1,7 @@
 //! Shared owned Git and operator-grant fixtures for candidate execution CLI tests.
 #[path = "candidate_policy_fixture.rs"]
 mod candidate_policy_fixture;
+use crate::support::forge_binary;
 use candidate_policy_fixture::{policy, Fixture};
 use git2::{Repository, Signature};
 use serde_json::{json, Value};
@@ -72,7 +73,7 @@ impl Case {
             std::fs::Permissions::from_mode(0o600),
         )
         .unwrap();
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .args(["candidate", action, "--repo"])
             .arg(self.fixture.root.join("repo"))

@@ -539,8 +539,8 @@ mod tests {
     #[test]
     fn roundtrip_check_passes_a_quiet_child_and_fails_a_noisy_one() {
         let scratch = ScratchDir::new("roundtrip");
-        let source =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/support/doctor_roundtrip.rs");
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../forge/tests/support/doctor_roundtrip.rs");
         let executable = scratch.path().join("roundtrip-fixture");
         let compiler = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
         let compiled = Command::new(compiler)

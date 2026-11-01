@@ -15,6 +15,8 @@ mod json_canon;
 #[allow(dead_code)]
 mod ledger;
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use ledger::agent_upsert::{run as agent_upsert_run, AgentRouteResolution, AgentUpsertArgs};
 use ledger::rollup::{run, today_utc_date, RollupArgs};
 use std::fs;
@@ -46,7 +48,7 @@ fn expected_dry_run() -> String {
 /// byte total growing past the first's).
 #[test]
 fn dry_run_matches_frozen_scenario() {
-    let exe = env!("CARGO_BIN_EXE_forge");
+    let exe = forge_binary::path();
     let output = std::process::Command::new(exe)
         .args(["ledger", "rollup", "--dry-run"])
         .arg(scenario_dir())
@@ -287,7 +289,7 @@ fn no_subagents_flag_restores_the_flat_walk() {
 /// absence of every subagent-derived row.
 #[test]
 fn subagent_dry_run_matches_frozen_scenario() {
-    let exe = env!("CARGO_BIN_EXE_forge");
+    let exe = forge_binary::path();
     let output = std::process::Command::new(exe)
         .args(["ledger", "rollup", "--dry-run", "--no-subagents"])
         .arg(subagent_scenario_dir())

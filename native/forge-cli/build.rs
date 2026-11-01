@@ -5,7 +5,7 @@
 
 use std::path::Path;
 use std::process::Command;
-#[path = "src/source_fingerprint.rs"]
+#[path = "../forge/src/source_fingerprint.rs"]
 mod source_fingerprint;
 
 fn git_text(args: &[&str]) -> Option<String> {
@@ -51,7 +51,7 @@ fn main() {
         println!("cargo:rerun-if-changed={}", root.join(path).display());
     }
     // Watching the source directories also detects newly added/deleted modules.
-    for name in ["forge", "conductor-native"] {
+    for name in ["forge", "conductor-native", "slop-core"] {
         println!(
             "cargo:rerun-if-changed={}",
             root.join("native").join(name).join("src").display()

@@ -3,10 +3,14 @@ name = "forge"
 version = "0.8.9"
 edition = "2021"
 description = "Native hooks, resource-aware task execution, audit and cost tooling for AI agents"
+autobins = false
+build = false
 
-[[bin]]
-name = "forge"
-path = "src/main.rs"
+[workspace]
+members = ["../forge-cli"]
+default-members = [".", "../forge-cli"]
+exclude = ["../conductor-native", "../slop-core"]
+resolver = "2"
 
 [[bench]]
 name = "tool_schema"
@@ -104,6 +108,3 @@ codegen-units = 1
 
 [dev-dependencies]
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-
-[build-dependencies]
-sha2 = "0.10"

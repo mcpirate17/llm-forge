@@ -63,7 +63,7 @@ forge performance profile --tool hyperfine --output timing.json -- \
 forge performance profile --tool py-spy --output profile.svg -- \
   -- python workload.py
 forge performance profile --tool cargo-flamegraph --output flamegraph.svg -- \
-  --manifest-path native/forge/Cargo.toml --bin forge -- --help
+  --manifest-path native/forge-cli/Cargo.toml --bin forge -- --help
 ```
 
 Requested tools must exist on PATH and successfully write a new output file.

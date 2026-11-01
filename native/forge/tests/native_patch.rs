@@ -1,3 +1,5 @@
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use conductor_native::syntax::fingerprint;
 use forge::{
     patch::{self, Edit, Request},
@@ -308,7 +310,7 @@ fn cli_inspection_folding_and_patching_need_no_external_runtime() {
     let source = "fn answer() -> u32 { 42 }\n";
     f.source("lib.rs", source);
     let command = |args: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_forge"))
+        Command::new(forge_binary::path())
             .env("PATH", "")
             .args(["code", "--root"])
             .arg(&f.0)

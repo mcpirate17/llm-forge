@@ -2,6 +2,8 @@
 #[path = "support/candidate_policy_fixture.rs"]
 #[allow(dead_code)]
 mod candidate_policy_fixture;
+#[allow(dead_code)]
+mod support;
 
 use candidate_policy_fixture::{policy, Fixture};
 use serde_json::{json, Value};

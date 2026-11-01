@@ -2,6 +2,8 @@
 //! as a fast-forward and is deleted; a red blocking check, a missing
 //! trailer, or a branch loosening its own gate leaves the target untouched.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -99,7 +101,7 @@ impl Fixture {
         );
     }
     fn land(&self, branch: &str) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_forge"))
+        Command::new(forge_binary::path())
             .args(["land", branch])
             .current_dir(self.work())
             .env("GIT_CONFIG_GLOBAL", "/dev/null")

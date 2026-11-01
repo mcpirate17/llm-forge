@@ -2,8 +2,8 @@
 
 `forge task` supplies a Rust/SQLite task lifecycle for manual agent work and
 explicit command execution. It is independent of a particular model or harness.
-Build the current checkout with `cargo build --manifest-path native/forge/Cargo.toml`
-and use `native/forge/target/debug/forge` (or install that reviewed build locally).
+`make build` builds the CLI package and places the release executable at
+`native/forge/target/release/forge` (or install that reviewed build locally).
 
 All commands accept `--host /path/to/project`. State is stored under that host's
 `.agents/forge/tasks.sqlite3`, using WAL, full synchronous writes, and transactions
@@ -13,6 +13,8 @@ host's ignore rules if it does not already ignore `.agents/`.
 ## Assign and run
 
 ```sh
+make build
+export FORGE_TEST_BIN="$PWD/native/forge/target/release/forge"
 forge task create --host /path/to/project --id checks --title "Run focused checks" \
   --owner agent-a --session session-id --max-attempts 2 \
   -- cargo test --locked --test task_lifecycle -- --test-threads=1

@@ -1,4 +1,6 @@
 #![cfg(target_os = "linux")]
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use git2::{Repository, RepositoryInitOptions, Signature};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -37,7 +39,7 @@ impl Fixture {
             .to_string()
     }
     fn command(&self) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .arg("candidate")
             .current_dir(self.root.join("repo"))

@@ -8,7 +8,7 @@ use std::process::{Command, Output, Stdio};
 use std::time::Duration;
 
 fn command(host: &support::Host, args: &[&str]) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = Command::new(support::forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")

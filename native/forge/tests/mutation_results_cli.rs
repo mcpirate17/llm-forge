@@ -1,3 +1,5 @@
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use serde_json::Value;
 use std::fs;
 use std::process::Command;
@@ -19,7 +21,7 @@ impl Report {
     }
 
     fn parse(&self, adapter: &str, tests: &[&str]) -> std::process::Output {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .env("PATH", "")
             .args(["mutation", "results", "--adapter", adapter, "--report"])

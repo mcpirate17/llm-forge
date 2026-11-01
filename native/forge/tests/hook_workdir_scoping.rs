@@ -10,6 +10,8 @@ mod crg_gate;
 mod crg_refresh;
 #[path = "../src/current_work_guard.rs"]
 mod current_work_guard;
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 #[path = "../src/identity.rs"]
 mod identity;
 #[path = "../src/instant.rs"]
@@ -164,7 +166,7 @@ fn legacy_native_bridge_exposes_the_same_workdir_boundary() {
                 "tool_input": {"command": command, "workdir": forge}
             }
         });
-        let mut child = Command::new(env!("CARGO_BIN_EXE_forge"))
+        let mut child = Command::new(forge_binary::path())
             .args(["legacy-hook", "gate-verify-bash"])
             .env("CRG_GATE_STATE_DIR", scratch.0.join("state"))
             .stdin(Stdio::piped())

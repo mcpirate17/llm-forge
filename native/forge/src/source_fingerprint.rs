@@ -44,6 +44,10 @@ pub fn files(root: &Path) -> io::Result<Vec<PathBuf>> {
         }
     }
     for path in [
+        // The CLI shares Forge's source directory and workspace lockfile, but
+        // its manifest/stamp script are independent required build inputs.
+        "native/forge-cli/Cargo.toml",
+        "native/forge-cli/build.rs",
         "ledger/routing_policy.toml",
         "native/forge/tests/fixtures/ledger/calibration.json",
     ] {

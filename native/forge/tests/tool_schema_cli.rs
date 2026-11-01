@@ -1,3 +1,5 @@
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use forge::tool_schema::MAX_INPUT_BYTES;
 use serde_json::Value;
 use std::fs;
@@ -22,7 +24,7 @@ impl Fixture {
     }
 
     fn command(&self, action: &str, flag: &str) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .env("PATH", "")
             .args(["schema", action, flag])

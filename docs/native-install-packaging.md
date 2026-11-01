@@ -1,95 +1,61 @@
 # Native runtimes at install time
 
-The root `conductor-tooling` package depends on three local native distributions:
-`conductor-native` and `slop-core` are Python extension wheels, and `forge-cli`
-is a Maturin `bin` wheel that installs `forge` into the environment's scripts
-directory. A fresh `uv sync --frozen` builds all three before any application
-command runs. Rust and the SQLite development headers must be available for that
-install; a compiler is not required when running the installed commands.
-
-For this checkout, install into an isolated environment without writing the
-checkout's shared `.venv`:
+`make install` builds the `forge-cli` Cargo package and installs the `forge`
+executable under `target/install/bin`. Use `INSTALL_ROOT=/absolute/prefix` for
+another destination and `CARGO_TARGET_DIR` for another compiler artifact directory.
+The executable links the Forge, conductor-native and slop-core libraries without
+Python bindings. SQLite is bundled. Rust 1.98.0 and at most two Cargo jobs are
+selected explicitly; GPU visibility is masked.
 
 ```sh
-export UV_PROJECT_ENVIRONMENT=/tmp/forge-native-install-venv
-export CARGO_BUILD_JOBS=2
-export CUDA_VISIBLE_DEVICES=
-uv sync --frozen --no-dev
-FORGE_INSTALL_SMOKE_VENV="$UV_PROJECT_ENVIRONMENT" \
-  cargo test --locked --jobs 2 --manifest-path native/forge/Cargo.toml \
-  --test install_packaging -- --ignored --test-threads=1
+make install INSTALL_ROOT="$PWD/target/install"
+FORGE_TEST_BIN="$PWD/target/install/bin/forge" \
+FORGE_INSTALL_ROOT="$PWD/target/install" \
+  cargo +1.98.0 test --release --locked --jobs 2 \
+  --manifest-path native/forge/Cargo.toml --test install_packaging \
+  -- --include-ignored --test-threads=1
 ```
 
-The explicitly ignored Rust smoke case fails if the venv is missing. It runs
-`$UV_PROJECT_ENVIRONMENT/bin/forge --version` and a real
-`forge legacy-hook guard-check` JSON request, then imports both native Python
-modules. Those child processes see only the venv's scripts directory on `PATH`,
-invalid `CARGO`/`RUSTC` paths, and no inherited `PYTHONPATH` or `PYTHONHOME`.
-Rust assertions verify the output and that both extension files came from that
-venv. The regular Rust case checks the three root dependency/source declarations,
-the Forge `bin` binding, and each extension's explicit Python/Cargo version
-agreement. CI runs the ignored smoke case explicitly after `uv sync`; ordinary
-`cargo test` still runs the manifest case without installing packages.
+Adjust `FORGE_TEST_BIN` when selecting another installation prefix. The ordinary
+smoke test relocates that executable. The explicitly ignored case requires
+`FORGE_INSTALL_ROOT` and exercises its installed executable. Both cases run
+with an empty `PATH`, invalid compiler paths, isolated home/configuration
+locations and no source checkout. They cover version output, native hook guards,
+AST analysis and provider configuration. Neither case proves Python compatibility.
 
-Maturin reads the Forge version dynamically from `native/forge/Cargo.toml`.
-The extension wheel versions remain explicit in their `pyproject.toml` files
-because the extension freshness check reads those strings; they must match
-their Cargo versions. The Forge wheel omits `module-name` because it is a
-binary, so extension freshness checks do not mistake it for an importable
-Python module. The native pyprojects declare uv cache keys for Cargo metadata
-and Rust sources. Forge's key also watches its `conductor-native` path
-dependency, embedded routing and calibration data, and the Git commit stamped
-into the executable. For a deliberately fresh rebuild after changing native sources,
-use `uv sync --reinstall-package conductor-native --reinstall-package slop-core
---reinstall-package forge-cli`.
+`make test` installs the release CLI into a dedicated target-directory prefix
+and runs default release tests for all native
+libraries and both Forge workspace packages. CLI tests require the explicit
+runtime `FORGE_TEST_BIN` handoff described in [local checks](local-checks.md).
+Source-bound committed verification installs into `.git/forge-tools/native-install`
+and runs the installed case explicitly. There is no hosted CI.
 
-A downstream uv project needs all four source pins for a local or Git source
-install: `conductor-tooling`, `conductor-native`, `slop-core`, and `forge-cli`.
-uv source overrides in this repository do not propagate to the downstream
-project. The current local-source example is in the [README](../README.md).
+Tests reuse developer fixture binaries only when their source, manifest/lockfile
+where applicable, executable permissions and binary hashes match. Missing or
+stale fixtures compile on demand. Tests whose purpose is compilation still
+compile their temporary inputs.
 
-## Developer installation
+## Remaining compatibility distribution
 
-`make install` performs the runtime sync and precompiles all three crates' test
-targets: the core's Python compatibility, default, and Python-free
-source-analysis configurations, plus Forge and slop-core. It also builds the
-compatibility child binaries, standalone task worker, and nested dispatcher fixture. The
-dispatcher keeps its own Cargo dependency graph so its arbitrary-precision JSON
-feature cannot change the production CLI's JSON behavior.
+While interpreted host adapters are being retired, the root Python package
+still declares local `conductor-native`, `slop-core` and `forge-cli` distributions.
+This compatibility installation is separate from the native build, install and
+verification commands above. Its Python extension wheels are outside the native
+gate's coverage.
 
-Installation pins Rust 1.98.0, runs sequentially with two Cargo workers, and
-masks GPU visibility even under `make -j`. `UV_PROJECT_ENVIRONMENT` selects an isolated venv;
-`CARGO_TARGET_DIR` selects an alternate Cargo output directory. Optional package
-extras can be passed as `INSTALL_SYNC_ARGS='--extra mutation --extra graph'`.
-`make native` deliberately rebuilds all three runtimes and repeats the prebuild.
+The Forge compatibility distribution remains at `native/forge/pyproject.toml`.
+Its Maturin configuration selects `../forge-cli/Cargo.toml`, reads version 0.8.9
+from that package, and packages the `forge` executable as a `bin` wheel. It omits
+`module-name`. Cache keys cover both Forge manifests, the CLI build script,
+shared lockfile and sources, conductor-native and slop-core inputs, embedded
+routing/calibration data and the stamped Git revision. Existing local source pins
+remain at `native/forge`.
 
-`make test` runs the precompiled Rust compatibility contracts with one test
-thread, then the core's default and Python-free source-analysis tests and the
-Forge and slop-core tests. It binds PyO3 to the installed venv, caps Cargo at
-two jobs, and masks GPU visibility. Focused development can still use Cargo's
-`--test` selector directly.
+## Historical compatibility evidence
 
-Tests reuse fixture binaries only when their source, manifest/lockfile where
-applicable, executable permissions, and binary hashes match. Missing or stale
-fixtures use the existing local compilation path for standalone `cargo test`.
-Tests whose purpose is compilation still compile their temporary inputs.
-
-## Validation
-
-On 2026-09-27, a source snapshot installed all three native runtimes into a fresh
-isolated venv: conductor-native 0.1.62, slop-core 0.1.11, and forge-cli 0.8.2.
-Building the four local packages took 3m 25s with two Cargo workers; this includes
-the editable Python package and is an installation measurement, not a runtime
-speedup claim. The Rust installation smoke passed with compilers unavailable to
-its child processes.
-
-A subsequent unchanged `uv sync --dry-run` reported no changes. Touching the
-embedded routing policy or calibration data selected a Forge CLI reinstall;
-touching conductor-native source selected both conductor-native and Forge CLI.
-These were isolated cache-selection checks; they did not modify checkout source.
-
-An earlier isolated `make install` passed for the then-configured Rust targets
-and reusable fixtures. The additional default and Python-free core prebuilds
-above still need the final local gate. Direct execution of the dispatcher JSON-contract case and
-task GPU-masking case reused the prebuilt binaries. Their `strace` execution
-records contained no Cargo or rustc launches.
+On 2026-09-27, a source snapshot installed conductor-native 0.1.62, slop-core
+0.1.11 and forge-cli 0.8.2 into an isolated environment. Building four local
+packages took 3m 25s with two Cargo workers, including the editable Python
+package. The then-current compatibility smoke passed. Those results describe
+the former installation workflow; they do not validate the current package split
+or establish a native runtime speedup.

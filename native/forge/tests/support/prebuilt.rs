@@ -1,5 +1,6 @@
 //! Reuse developer-install fixtures only while their inputs and bytes match.
 
+use super::forge_binary;
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Read;
@@ -24,7 +25,7 @@ pub fn verified_prebuilt(
     proof_name: &str,
     sources: &[PathBuf],
 ) -> Option<PathBuf> {
-    let profile_dir = Path::new(env!("CARGO_BIN_EXE_forge")).parent()?;
+    let profile_dir = Path::new(forge_binary::path()).parent()?;
     let fixture_dir = profile_dir.join("prebuilt-fixtures");
     let binary = fixture_dir.join(binary_relative);
     #[cfg(unix)]

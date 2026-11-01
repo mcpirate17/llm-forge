@@ -7,7 +7,7 @@ use std::process::{Command, Output};
 use std::time::Duration;
 
 fn run(host: &support::Host, args: &[&str]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = Command::new(support::forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")
@@ -118,7 +118,7 @@ fn budget_report_is_a_cost_table_and_routing_report_retains_its_interface() {
     assert!(text.starts_with("cost-budget report  window "));
     assert!(text.contains("overall NO_BASELINE"));
     assert!(text.contains("tokens_per_landed_pr") && text.contains("1,000.0"));
-    let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = Command::new(support::forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")
@@ -133,7 +133,7 @@ fn budget_report_is_a_cost_table_and_routing_report_retains_its_interface() {
     );
     assert!(!String::from_utf8_lossy(&output.stdout).contains("cost-budget report"));
     let explicit_output = output.stdout;
-    let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = Command::new(support::forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")

@@ -22,7 +22,7 @@ timeout_s = 1800
 
 [[step]]
 name = "compilerless-runtime"
-run = 'FORGE_INSTALL_ROOT="$FORGE_SWEEP_OUT/native-install" cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml --test install_packaging -- --include-ignored'
+run = 'FORGE_INSTALL_ROOT="$FORGE_SWEEP_OUT/native-install" FORGE_TEST_BIN="$FORGE_SWEEP_OUT/native-install/bin/forge" cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml --test install_packaging -- --include-ignored'
 timeout_s = 900
 
 # cargo-audit is a native test-only tool (development host: 0.22.2). An absent

@@ -1,5 +1,7 @@
 #[path = "support/tokenizer_fixture.rs"]
 mod fixture;
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use fixture::Fixture;
 use forge::tokenizer::{Counter, MAX_TEXT_BYTES};
 use std::fs;
@@ -96,7 +98,7 @@ fn tokenizer_cli_is_native_with_an_empty_path() {
     let input = fixture.root.join("prompt.txt");
     fs::write(&config, serde_json::to_vec(&fixture.config).unwrap()).unwrap();
     fs::write(&input, "hello world!").unwrap();
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_forge"))
+    let output = std::process::Command::new(forge_binary::path())
         .env("PATH", "")
         .args(["context", "tokens", "--tokenizer"])
         .arg(config)

@@ -164,7 +164,9 @@ is an execution capability declaration, not a scientific approval or gate receip
 The live integration tests are opt-in because they start transient services:
 
 ```sh
-cargo +1.98.0 test --locked --manifest-path native/forge/Cargo.toml \
+make build
+FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
+  cargo +1.98.0 test --locked --manifest-path native/forge/Cargo.toml \
   --test native_harness --test managed_service -- --include-ignored --test-threads=1
 ```
 

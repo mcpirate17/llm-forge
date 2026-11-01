@@ -293,7 +293,8 @@ not a matched speedup or per-call tail latency. The Forge binary SHA-256 was
 `f7324d5e3d67d1a0031883a0bdb26f4c910d3659acdcaedae111c8533c2722fc`;
 benchmark executable SHA-256 was
 `437c5d7c3bffb3f2ede6a9f770ba57702644de178fc10d9e5c28b1a89390ff02`.
-Run explicitly with `FORGE_BENCH_SERVICE=1 cargo +1.98.0 bench --locked
+Build with `make build`, then run explicitly with
+`FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" FORGE_BENCH_SERVICE=1 cargo +1.98.0 bench --locked
 --manifest-path native/forge/Cargo.toml --bench harness`. The benchmark owns and
 stops its finite-lived service; it installs no persistent timer or unit.
 
@@ -1206,3 +1207,19 @@ test-engine migration, reporting and attestation remain. The existing Python
 command runner still has these callers and has not been deleted prematurely;
 128 Python source files remain under `src/`. The native migration goal stays
 active until those consumers are replaced and their interpreted code is removed.
+
+## Executable identity and reusable builds
+
+The Forge workspace separates the `forge` library from the `forge-cli` binary
+package. Both are default members; only the CLI runs the Git/source stamp build
+script. Source identity still covers all native libraries, the shared lockfile,
+CLI manifest and stamp script. Package versions and installed identity remain
+checked. Integration tests select an explicit executable at runtime, avoiding a
+compile-time dependency on each Git revision.
+
+Automated checks and previews hand off the executable from a successful isolated
+Cargo install. This remains correct when Cargo target configuration changes its
+compiler output directory. Preview regressions exercise split packages, a host
+triple, unchanged-cache reuse, same-length source edits and an obsolete binary.
+The standalone test command uses its own installation prefix; optional verified
+fixtures may compile on demand. See [native local checks](docs/local-checks.md).

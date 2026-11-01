@@ -1,6 +1,8 @@
 //! Native PreToolUse coverage with an empty executable search path and invalid
 //! interpreter overrides. Obsolete selectors must never disable native guards.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use serde_json::{json, Value};
 use std::fs;
 use std::io::Write;
@@ -30,7 +32,7 @@ impl Project {
     }
 
     fn run(&self, payload: &Value, native_hooks: Option<&str>, standalone: bool) -> Output {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .args(["hook", "PreToolUse"])
             .current_dir(self.path())

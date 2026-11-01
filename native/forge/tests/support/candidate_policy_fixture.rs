@@ -1,4 +1,5 @@
 //! Shared private Git fixtures for native candidate planning and assessment tests.
+use crate::support::forge_binary;
 use git2::{Repository, RepositoryInitOptions};
 use std::{
     path::{Path, PathBuf},
@@ -45,7 +46,7 @@ impl Fixture {
         self.command_for("plan")
     }
     pub fn command_for(&self, action: &str) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .args([
                 "candidate",

@@ -170,7 +170,7 @@ impl Running {
         )
         .unwrap();
         let service = Service::launch(
-            Path::new(env!("CARGO_BIN_EXE_forge")),
+            Path::new(support::forge_binary::path()),
             &[
                 "harness".into(),
                 "serve".into(),
@@ -704,7 +704,7 @@ async fn public_start_reports_verified_ready_socket_and_grammar() {
     let policy_file = host.0.join("operator.json");
     fs::write(&policy_file, serde_json::to_vec(&policy).unwrap()).unwrap();
     let output = forge::process_probe::run(
-        std::process::Command::new(env!("CARGO_BIN_EXE_forge"))
+        std::process::Command::new(support::forge_binary::path())
             .args(["harness", "start", "--policy"])
             .arg(&policy_file)
             .arg("--state-parent")
@@ -752,7 +752,7 @@ struct Mcp {
 impl Mcp {
     fn new(socket: &Path) -> Self {
         use std::process::Command;
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(support::forge_binary::path());
         command.args(["harness", "stdio", "--socket"]).arg(socket);
         Self::from_command(command)
     }
@@ -817,7 +817,7 @@ fn modern_request(id: u64, method: &str, mut params: Value) -> Value {
 async fn project_mcp_configuration_runs_against_the_bound_live_service() {
     let service = Running::new().await;
     fs::set_permissions(&service.source, fs::Permissions::from_mode(0o700)).unwrap();
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_forge"))
+    let output = std::process::Command::new(support::forge_binary::path())
         .env("PATH", "")
         .args(["mcp", "--host"])
         .arg(&service.source)
@@ -863,7 +863,7 @@ async fn project_mcp_configuration_runs_against_the_bound_live_service() {
         service.request(json!({"method":"status"})).await["ok"],
         true
     );
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_forge"))
+    let output = std::process::Command::new(support::forge_binary::path())
         .env("PATH", "")
         .args(["mcp", "--host"])
         .arg(&service.source)

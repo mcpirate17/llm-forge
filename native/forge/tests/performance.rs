@@ -1,4 +1,6 @@
 //! Numerical evidence, identity drift and dirty preview contracts.
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -32,7 +34,7 @@ fn fixture() -> PathBuf {
     path
 }
 fn forge(root: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_forge"))
+    Command::new(forge_binary::path())
         .args(args)
         .current_dir(root)
         .output()
@@ -273,7 +275,7 @@ fn preview_reports_excluded_interpreter_contracts_and_keeps_native_dependents() 
 #[test]
 fn unavailable_requested_profiler_fails_before_workload() {
     let root = fixture();
-    let run = Command::new(env!("CARGO_BIN_EXE_forge"))
+    let run = Command::new(forge_binary::path())
         .args([
             "performance",
             "profile",
@@ -297,17 +299,57 @@ fn unavailable_requested_profiler_fails_before_workload() {
     fs::remove_dir_all(root).unwrap();
 }
 
+fn preview_host_target() -> String {
+    let compiler = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+    let mut command = Command::new(compiler);
+    command.arg("-vV");
+    let output =
+        forge::process_probe::run(&mut command, std::time::Duration::from_secs(5), 4096).unwrap();
+    assert!(output.status.success());
+    let text = std::str::from_utf8(&output.stdout).unwrap();
+    let host = text
+        .lines()
+        .find_map(|line| line.strip_prefix("host: "))
+        .unwrap();
+    assert!(
+        !host.is_empty()
+            && host
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+    );
+    host.into()
+}
+
+fn preview_fixture_source(version: u8) -> String {
+    assert!(matches!(version, 1 | 2));
+    format!(
+        r#"fn main() {{ println!("{version}"); }}
 #[test]
-fn executing_dirty_preview_reuses_exact_configuration_and_invalidates_changed_bytes() {
-    let root = fixture();
+fn preview_smoke() {{
+    let binary = std::env::var_os("FORGE_TEST_BIN").expect("explicit installed fixture binary");
+    let output = std::process::Command::new(binary).output().unwrap();
+    assert!(output.status.success());
+    assert_eq!(output.stdout.as_slice(), b"{version}\n");
+}}
+"#
+    )
+}
+
+fn preview_workspace(root: &Path, target: &str) -> PathBuf {
     // A stale interpreter in the checkout must not be discovered or executed.
     fs::create_dir_all(root.join(".venv/bin")).unwrap();
     fs::write(root.join(".venv/bin/python"), "not an executable\n").unwrap();
     fs::write(root.join(".gitignore"), ".venv/\n").unwrap();
     fs::create_dir_all(root.join("native/forge/src")).unwrap();
+    fs::write(root.join("native/forge/Cargo.toml"),
+        "[package]\nname='forge'\nversion='0.1.0'\nedition='2021'\nautobins=false\nbuild=false\n[workspace]\nmembers=['../forge-cli']\ndefault-members=['.','../forge-cli']\nexclude=['../conductor-native','../slop-core']\nresolver='2'\n").unwrap();
+    fs::create_dir_all(root.join("native/forge-cli")).unwrap();
+    fs::write(root.join("native/forge-cli/Cargo.toml"),
+        "[package]\nname='forge-cli'\nversion='0.1.0'\nedition='2021'\nworkspace='../forge'\nautobins=false\n[[bin]]\nname='forge'\npath='../forge/src/main.rs'\n[dependencies]\nforge={path='../forge'}\n").unwrap();
+    fs::create_dir(root.join(".cargo")).unwrap();
     fs::write(
-        root.join("native/forge/Cargo.toml"),
-        "[package]\nname='forge'\nversion='0.1.0'\nedition='2021'\n",
+        root.join(".cargo/config.toml"),
+        format!("[build]\ntarget=\"{target}\"\n"),
     )
     .unwrap();
     fs::write(
@@ -316,11 +358,7 @@ fn executing_dirty_preview_reuses_exact_configuration_and_invalidates_changed_by
     )
     .unwrap();
     let source = root.join("native/forge/src/main.rs");
-    fs::write(
-        &source,
-        "fn main() {}\n#[test] fn preview_smoke() { assert_eq!(2+2,4); }\n",
-    )
-    .unwrap();
+    fs::write(&source, preview_fixture_source(1)).unwrap();
     assert!(Command::new("cargo")
         .args([
             "generate-lockfile",
@@ -328,47 +366,88 @@ fn executing_dirty_preview_reuses_exact_configuration_and_invalidates_changed_by
             "--manifest-path",
             "native/forge/Cargo.toml"
         ])
-        .current_dir(&root)
+        .current_dir(root)
         .status()
         .unwrap()
         .success());
-    let run = || {
-        let result = forge(
-            &root,
-            &[
-                "preview",
-                "--path",
-                "native/forge/src/main.rs",
-                "--execute",
-                "--filter",
-                "preview_smoke",
-            ],
-        );
-        assert!(
-            result.status.success(),
-            "{}",
-            String::from_utf8_lossy(&result.stderr)
-        );
-        let report: Value = serde_json::from_slice(&result.stdout).unwrap();
-        assert_eq!(report["native_only"], true);
-        assert_eq!(report["excluded_compatibility_test_count"], 0);
-        serde_json::from_slice::<Value>(&fs::read(report["receipt"].as_str().unwrap()).unwrap())
-            .unwrap()
-    };
-    let first = run();
+    source
+}
+
+fn execute_preview_fixture(root: &Path) -> Value {
+    let result = Command::new(forge_binary::path())
+        .args([
+            "preview",
+            "--path",
+            "native/forge/src/main.rs",
+            "--execute",
+            "--filter",
+            "preview_smoke",
+        ])
+        .current_dir(root)
+        .env_remove("CARGO_BUILD_TARGET")
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let report: Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(report["native_only"], true);
+    assert_eq!(report["excluded_compatibility_test_count"], 0);
+    serde_json::from_slice::<Value>(&fs::read(report["receipt"].as_str().unwrap()).unwrap())
+        .unwrap()
+}
+
+fn preview_binary_stdout(binary: &Path) -> Vec<u8> {
+    let mut command = Command::new(binary);
+    command.env("PATH", "");
+    let output =
+        forge::process_probe::run(&mut command, std::time::Duration::from_secs(5), 4096).unwrap();
+    assert!(output.status.success());
+    output.stdout
+}
+
+#[test]
+fn executing_dirty_preview_reuses_exact_configuration_and_invalidates_changed_bytes() {
+    let root = fixture();
+    let target = preview_host_target();
+    let source = preview_workspace(&root, &target);
+    let first = execute_preview_fixture(&root);
     assert_eq!(first["records"][0]["build_reused"], false);
-    assert_eq!(run()["records"][0]["build_reused"], true);
-    fs::write(
-        &source,
-        "fn main() {}\n#[test] fn preview_smoke() { assert_eq!(3+3,6); }\n",
-    )
-    .unwrap();
-    let changed = run();
+    let cache = Path::new(first["records"][0]["cache"].as_str().unwrap());
+    let artifacts = cache.join("artifacts");
+    let installed = cache.join("test-install/bin/forge");
+    assert_eq!(preview_binary_stdout(&installed).as_slice(), b"1\n");
+    assert!(artifacts.join(&target).join("debug/forge").is_file());
+    let obsolete = artifacts.join("debug/forge");
+    assert!(
+        !obsolete.exists(),
+        "custom target must not produce the unqualified path"
+    );
+    fs::create_dir_all(obsolete.parent().unwrap()).unwrap();
+    fs::copy(&installed, &obsolete).unwrap();
+    assert_eq!(
+        execute_preview_fixture(&root)["records"][0]["build_reused"],
+        true
+    );
+    let old_source = preview_fixture_source(1);
+    let new_source = preview_fixture_source(2);
+    assert_eq!(old_source.len(), new_source.len());
+    fs::write(&source, new_source).unwrap();
+    let changed = execute_preview_fixture(&root);
     assert_eq!(changed["records"][0]["build_reused"], false);
     assert_ne!(
         first["records"][0]["source_sha256"],
         changed["records"][0]["source_sha256"]
     );
+    assert_eq!(first["records"][0]["cache"], changed["records"][0]["cache"]);
+    assert_eq!(preview_binary_stdout(&installed).as_slice(), b"2\n");
+    // Cargo may remove the orphan during package cleanup. Either absence or
+    // stale1 would make a guessed-path handoff fail the unit test expecting2.
+    if obsolete.exists() {
+        assert_eq!(preview_binary_stdout(&obsolete).as_slice(), b"1\n");
+    }
     assert!(!root.join(".git/forge-checks").exists());
     fs::remove_dir_all(root).unwrap();
 }
@@ -386,7 +465,7 @@ fn cargo_flamegraph_receives_its_required_literal_subcommand() {
     fs::write(&perf, "#!/bin/sh\nexit 0\n").unwrap();
     fs::set_permissions(&perf, fs::Permissions::from_mode(0o755)).unwrap();
     let path = format!("{}:{}", tools.display(), std::env::var("PATH").unwrap());
-    let run = Command::new(env!("CARGO_BIN_EXE_forge"))
+    let run = Command::new(forge_binary::path())
         .args([
             "performance",
             "profile",

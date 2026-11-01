@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use clap::Args;
 use regex::Regex;
 use serde::Deserialize;
@@ -242,6 +242,17 @@ fn environment(
     all: bool,
 ) -> Result<Vec<(String, String)>> {
     let mut env: Vec<(String, String)> = policy.env.clone().into_iter().collect();
+    let inherited = std::env::var_os("CARGO_TARGET_DIR");
+    let target = target_dir(
+        root,
+        policy.env.get("CARGO_TARGET_DIR").map(String::as_str),
+        inherited,
+    )?;
+    env.retain(|(key, _)| key != "CARGO_TARGET_DIR" && key != "FORGE_TEST_BIN");
+    env.push((
+        "CARGO_TARGET_DIR".into(),
+        target.to_string_lossy().into_owned(),
+    ));
     let mut path: Vec<String> = policy
         .path_prepend
         .iter()
@@ -250,6 +261,12 @@ fn environment(
     path.push(std::env::var("PATH").unwrap_or_default());
     let tools = root.join(".git/forge-tools");
     let prefix = tools.join("native-install");
+    // A successful setup install chooses the current artifact even when Cargo
+    // build.target places compiler outputs under a target-triple subdirectory.
+    env.push((
+        "FORGE_TEST_BIN".into(),
+        prefix.join("bin/forge").display().to_string(),
+    ));
     path.insert(0, prefix.join("bin").display().to_string());
     env.push(("PATH".into(), path.join(":")));
     env.push(("FORGE_CHECK_TOOLS".into(), tools.display().to_string()));
@@ -271,6 +288,35 @@ fn environment(
     ));
     env.push(("FORGE_CHECK_ALL".into(), if all { "1" } else { "0" }.into()));
     Ok(env)
+}
+
+fn target_dir(
+    root: &Path,
+    configured: Option<&str>,
+    inherited: Option<std::ffi::OsString>,
+) -> Result<std::path::PathBuf> {
+    ensure!(root.is_absolute(), "checkout root must be absolute");
+    let raw = match configured {
+        Some(value) => value.to_owned(),
+        None => match inherited {
+            Some(value) => value
+                .into_string()
+                .map_err(|_| anyhow::anyhow!("CARGO_TARGET_DIR must be UTF-8"))?,
+            None => "native/forge/target".into(),
+        },
+    };
+    ensure!(!raw.is_empty(), "CARGO_TARGET_DIR must not be empty");
+    let path = Path::new(&raw);
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        root.join(path)
+    };
+    ensure!(
+        absolute.to_str().is_some(),
+        "CARGO_TARGET_DIR must be UTF-8"
+    );
+    Ok(absolute)
 }
 
 fn clean_command(command: &str, child_env: &[(String, String)]) -> String {
@@ -497,6 +543,7 @@ fn effective_all(requested: bool, changed: &[String]) -> bool {
                 || path.starts_with(".forge/")
                 || path.starts_with(".github/workflows/")
                 || path.starts_with("native/forge/")
+                || path.starts_with("native/forge-cli/")
         })
 }
 
@@ -655,3 +702,30 @@ pub fn verify(args: VerifyArgs) -> Result<u8> {
 #[cfg(test)]
 #[path = "local_check_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod target_dir_tests {
+    use super::target_dir;
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+    use std::path::Path;
+
+    #[test]
+    fn target_dir_precedence_and_invalid_values() {
+        let root = Path::new("/checkout");
+        assert_eq!(
+            target_dir(root, Some("custom"), Some("ignored".into())).unwrap(),
+            root.join("custom")
+        );
+        assert_eq!(
+            target_dir(root, None, Some("/inherited".into())).unwrap(),
+            Path::new("/inherited")
+        );
+        assert_eq!(
+            target_dir(root, None, None).unwrap(),
+            root.join("native/forge/target")
+        );
+        assert!(target_dir(root, Some(""), None).is_err());
+        assert!(target_dir(root, None, Some(OsString::from_vec(vec![0xff]))).is_err());
+    }
+}

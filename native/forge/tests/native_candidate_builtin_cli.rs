@@ -2,6 +2,8 @@
 #[path = "support/candidate_execution_fixture.rs"]
 #[allow(dead_code)]
 mod candidate_execution_fixture;
+#[allow(dead_code)]
+mod support;
 use candidate_execution_fixture::{value, Case};
 use git2::{Oid, Repository, Signature};
 use serde_json::{json, Value};

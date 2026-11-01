@@ -8,6 +8,7 @@ use std::sync::{
     OnceLock,
 };
 
+pub mod forge_binary;
 mod prebuilt;
 
 pub struct Host(pub PathBuf);
@@ -25,7 +26,7 @@ impl Host {
     }
 
     pub fn command(&self) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .current_dir(&self.0)
             .env_remove("CONDUCTOR_HOST_ROOT")

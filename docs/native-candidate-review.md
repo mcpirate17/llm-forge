@@ -243,8 +243,11 @@ review completion, or permission to land.
 
 Native integration validation commands (not a claim of results):
 
-```text
-cargo +1.98.0 test --manifest-path native/forge/Cargo.toml --test native_candidate_execute_cli
+```sh
+make build
+FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
+  cargo +1.98.0 test --manifest-path native/forge/Cargo.toml --test native_candidate_execute_cli
+FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
 FORGE_TEST_CGROUP_PARENT=/sys/fs/cgroup/operator-delegated \
   cargo +1.98.0 test --manifest-path native/forge/Cargo.toml --test native_candidate_execute_cli \
   -- --ignored --test-threads=1

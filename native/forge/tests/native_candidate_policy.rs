@@ -2,10 +2,13 @@
 #[path = "support/candidate_policy_fixture.rs"]
 #[allow(dead_code)]
 mod candidate_policy_fixture;
+#[allow(dead_code)]
+mod support;
 use candidate_policy_fixture::{policy, Fixture};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::process::{Command, Output};
+use support::forge_binary;
 
 fn value(output: Output) -> Value {
     assert!(
@@ -183,7 +186,7 @@ fn internal_policy_and_baseline_symlinks_are_confined_and_supported() {
 fn date_refusal_and_parallel_plans_leave_no_private_snapshots() {
     let fixture = Fixture::new();
     fixture.configured();
-    let mut invalid = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut invalid = Command::new(forge_binary::path());
     let output = invalid
         .args([
             "candidate",

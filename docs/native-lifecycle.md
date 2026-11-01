@@ -169,7 +169,12 @@ artifact, not the final migration build.
 The first 128-file index took 15.666 ms including process startup, producing 256
 definitions and 128 resolved calls. These are current-only lifecycle measurements,
 not a Python comparison, cold-filesystem study, or model-quality result. Run
-`cargo +1.98.0 bench --locked --manifest-path native/forge/Cargo.toml --bench lifecycle`.
+`make build`, then:
+
+```sh
+FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
+  cargo +1.98.0 bench --locked --manifest-path native/forge/Cargo.toml --bench lifecycle
+```
 
 Native hook installation no longer accepts `--python` or embeds interpreter
 bindings. Reinstalling strips obsolete bindings from owned entries and preserves

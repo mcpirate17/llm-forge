@@ -1,0 +1,34 @@
+# Executable identity belongs here; the library workspace is rooted at ../forge.
+[package]
+name = "forge-cli"
+version = "0.8.9"
+edition = "2021"
+description = "Native Forge command-line executable and build identity"
+autobins = false
+build = "build.rs"
+workspace = "../forge"
+
+[[bin]]
+name = "forge"
+path = "../forge/src/main.rs"
+
+[dependencies]
+forge = { path = "../forge" }
+anyhow = "1"
+axum = { version = "0.8", default-features = false, features = ["tokio", "http1", "json"] }
+clap = { version = "4", features = ["derive"] }
+conductor-native = { path = "../conductor-native", default-features = false, features = ["source-analysis", "vector-search", "bundled-sqlite"] }
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
+libc = "0.2"
+regex = "1"
+rusqlite = { version = "0.32", features = ["bundled", "hooks", "limits"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order", "float_roundtrip", "raw_value"] }
+sha2 = "0.10"
+tokio = { version = "1.53.3", features = ["rt", "macros", "net", "time", "sync", "signal", "fs", "io-util"] }
+toml = "0.8"
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+walkdir = "2"
+
+[build-dependencies]
+sha2 = "0.10"

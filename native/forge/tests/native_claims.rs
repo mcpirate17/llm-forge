@@ -1,3 +1,5 @@
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use forge::{
     ownership,
     ownership_lifecycle::{self as lifecycle, Create},
@@ -134,7 +136,7 @@ fn legacy_readable_lock_is_accepted_but_writable_or_linked_locks_are_rejected() 
 }
 
 fn cli(repo: &Repo, args: &[&str]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = Command::new(forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")
@@ -187,7 +189,7 @@ fn inherited_lease_environment_cannot_authorize_a_native_mutation() {
     let repo = Repo::new();
     let claim = repo.create("lane-a", "src/a.rs").unwrap();
     let before = fs::read(repo.0.join(".git/governance/ownership-claims.json")).unwrap();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = Command::new(forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")

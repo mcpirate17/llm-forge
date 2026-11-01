@@ -122,7 +122,9 @@ No external grammar engine is required by the shipped binary.
 ## Validation and measurement
 
 ```sh
-cargo test --release --locked --manifest-path native/forge/Cargo.toml \
+make build
+FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
+  cargo test --release --locked --manifest-path native/forge/Cargo.toml \
   --test tool_schema --test tool_schema_allocations --test tool_schema_cli
 cargo bench --locked --manifest-path native/forge/Cargo.toml --bench tool_schema
 ```

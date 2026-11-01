@@ -208,6 +208,17 @@ fn native_tree(host: &support::Host) {
         fs::create_dir_all(host.0.join(path).parent().unwrap()).unwrap();
         fs::write(host.0.join(path), "fixture").unwrap();
     }
+    for (path, body) in [
+        (
+            "native/forge-cli/Cargo.toml",
+            "[package]\nname='forge-cli'\nversion='0.8.9'\n",
+        ),
+        ("native/forge-cli/build.rs", "fn main() {}\n"),
+        ("native/forge/src/main.rs", "fn main() {}\n"),
+    ] {
+        fs::create_dir_all(host.0.join(path).parent().unwrap()).unwrap();
+        fs::write(host.0.join(path), body).unwrap();
+    }
 }
 
 #[test]
@@ -236,4 +247,75 @@ fn source_fingerprint_detects_same_length_edits_paths_and_missing_inputs() {
     assert!(context(hook(&host, &json!({}).to_string())).contains("Native Forge binary differs"));
     fs::remove_file(host.0.join("native/forge/Cargo.lock")).unwrap();
     assert!(source_fingerprint::files(&host.0).is_err());
+}
+
+fn source_hash(host: &support::Host) -> String {
+    source_fingerprint::fingerprint(&host.0, &source_fingerprint::files(&host.0).unwrap()).unwrap()
+}
+
+#[test]
+fn source_identity_binds_cli_manifest_stamp_main_and_shared_workspace_lock() {
+    let host = host();
+    native_tree(&host);
+    let original_hash = source_hash(&host);
+    for (path, before, after) in [
+        ("native/forge-cli/Cargo.toml", "0.8.9", "0.8.8"),
+        ("native/forge-cli/build.rs", "main", "noop"),
+        ("native/forge/src/main.rs", "main", "noop"),
+        ("native/forge/Cargo.lock", "version = 4", "version = 3"),
+    ] {
+        let destination = host.0.join(path);
+        let original = fs::read_to_string(&destination).unwrap();
+        assert!(original.contains(before));
+        let changed = original.replacen(before, after, 1);
+        assert_eq!(
+            original.len(),
+            changed.len(),
+            "same-length identity regression"
+        );
+        fs::write(&destination, changed).unwrap();
+        assert_ne!(
+            source_hash(&host),
+            original_hash,
+            "unbound source input: {path}"
+        );
+        fs::write(&destination, original).unwrap();
+        assert_eq!(source_hash(&host), original_hash);
+    }
+    assert!(!host.0.join("native/forge-cli/Cargo.lock").exists());
+    assert!(!host.0.join("native/forge-cli/src").exists());
+}
+
+#[test]
+fn cli_manifest_and_stamp_are_required_even_with_shared_lock_and_source() {
+    let host = host();
+    native_tree(&host);
+    for path in ["native/forge-cli/Cargo.toml", "native/forge-cli/build.rs"] {
+        let destination = host.0.join(path);
+        let original = fs::read(&destination).unwrap();
+        fs::remove_file(&destination).unwrap();
+        assert!(
+            source_fingerprint::files(&host.0).is_err(),
+            "missing required CLI input: {path}"
+        );
+        fs::write(destination, original).unwrap();
+        assert!(source_fingerprint::files(&host.0).is_ok());
+    }
+}
+
+#[test]
+fn cli_package_version_matches_library_and_native_version_output() {
+    let manifest: toml::Value = toml::from_str(include_str!("../../forge-cli/Cargo.toml")).unwrap();
+    let version = env!("CARGO_PKG_VERSION");
+    assert_eq!(manifest["package"]["version"].as_str(), Some(version));
+    let host = host();
+    let mut command = host.command();
+    command.arg("--version").env("PATH", "");
+    let output =
+        forge::process_probe::run(&mut command, std::time::Duration::from_secs(3), 4096).unwrap();
+    assert!(output.status.success());
+    let text = std::str::from_utf8(&output.stdout).unwrap().trim_end();
+    assert!(text.starts_with(&format!("forge {version} (git ")));
+    assert!(text.ends_with(')'));
+    assert_eq!(text.lines().count(), 1);
 }

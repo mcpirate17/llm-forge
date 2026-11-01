@@ -182,8 +182,14 @@ on the shared development host. Every sample includes process startup:
 
 The memory fixture is 4,096 rows x 64 dimensions and 2,987,860 JSONL bytes. These
 measurements are the pre-migration baseline; the scan implementation has since
-been removed. Run `cargo +1.98.0 bench --locked --manifest-path
-native/forge/Cargo.toml --bench lifecycle` to reproduce on another host.
+been removed. Run `make build`, then:
+
+```sh
+FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
+  cargo +1.98.0 bench --locked --manifest-path native/forge/Cargo.toml --bench lifecycle
+```
+
+This reproduces the workload on another host.
 
 ## Current memory benchmark
 

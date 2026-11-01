@@ -1,5 +1,7 @@
 //! Native CLI contracts for bounded graph-backed code context. No Python or indexer.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use rusqlite::{params, Connection};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -50,7 +52,7 @@ impl Fixture {
     }
 
     fn command(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_forge"))
+        Command::new(forge_binary::path())
             .args(["graph", "--host"])
             .arg(&self.host)
             .args(args)

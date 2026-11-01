@@ -12,7 +12,7 @@ make local-verify
 `local-check` runs the native inventory in
 [`.forge/local-check.toml`](../.forge/local-check.toml): CPU and memory admission,
 an isolated native installation, relocated/installed executable smoke tests,
-and formatting, strict Clippy and release tests for all three Rust crates.
+and formatting, strict Clippy and release tests for the native libraries and CLI.
 Rust 1.98.0 is selected explicitly. CUDA is masked, Cargo uses at most two jobs,
 and each Rust test harness uses at most two concurrent tests. SQLite is bundled
 for the conductor and Forge builds. The initial install can fetch Cargo
@@ -30,6 +30,35 @@ and isolated home/configuration directories. They exercise native hook guards,
 AST analysis and provider configuration without a compiler or interpreter in
 the runtime environment.
 
+The Forge Cargo workspace contains the reusable `forge` library and the
+`forge-cli` executable package. Only the CLI build script stamps Git revision
+and source identity, so a commit does not invalidate library and integration
+test compilation. Both packages are default workspace members; use
+`cargo fmt --manifest-path native/forge/Cargo.toml --all --check` to format-check
+both, including the CLI build script. `make install` installs `forge-cli` while
+the executable remains named `forge`.
+
+Tests and CLI benchmarks require `FORGE_TEST_BIN` at runtime. It must name an
+absolute, regular executable; missing, relative, nonexecutable and symlink paths
+fail without searching for another binary. `make test` installs the release CLI
+into the target directory's dedicated `test-install` prefix and supplies its
+path only after installation succeeds. For a selected test or CLI benchmark:
+
+```sh
+make build
+FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
+  cargo +1.98.0 test --release --locked --manifest-path native/forge/Cargo.toml \
+  --test native_session_start
+```
+
+Use the selected target directory in that path if overriding `CARGO_TARGET_DIR`.
+The committed check runner resolves the policy setting, then the inherited
+setting, then `native/forge/target`, and passes an absolute target directory to
+installation and tests. `FORGE_TEST_BIN` and `FORGE_BIN` name the isolated
+installed executable. Automated checks never guess a compiler output path:
+Cargo target-triple configuration can change that layout. Path admission is an operator-owned test handoff,
+not binary authentication; the source-bound gate builds and verifies the artifact.
+
 Child check and preview commands remove Cargo launcher package/manifest
 metadata and `OUT_DIR`, including values supplied in check environment entries.
 These identify the launcher package and otherwise contaminate dependent build
@@ -38,7 +67,7 @@ count, compiler flags and toolchain remain available. A native re-execution
 test exercises the measured command path with synthetic metadata and settings.
 
 `make test` runs the default release test inventory for conductor-native,
-slop-core and Forge. Explicit Python compatibility features remain outside this
+slop-core and both Forge workspace packages. Explicit Python compatibility features remain outside this
 native gate while their adapters are being retired; a native PASS does not
 attest those adapters. Existing ignored tests retain their stated prerequisites.
 
@@ -84,6 +113,10 @@ cached workspace; source hash drift invalidates package artifacts even when an
 edit preserved timestamps. Tests still rerun. Source changes during execution
 invalidate the current-source preview receipt. Preview files never update
 `.git/forge-checks/latest` and cannot pass `forge verify`.
+Forge previews install the ordinary debug CLI into the locked cache's dedicated
+prefix before selected tests and pass it through `FORGE_TEST_BIN`. The preview
+report records CLI build/install usage and its log separately; source drift
+cleans both Forge packages. Missing optional prebuilt fixtures compile on demand.
 
 Receipt schema 2 records wall time, child CPU time, Linux `wait4` maximum process
 RSS and retained/discarded log bytes per step. Logs have a 16 MiB retention cap

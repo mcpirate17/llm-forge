@@ -1,5 +1,7 @@
 //! Native-only A2A enqueue tests against the existing transport's SQLite shape.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -91,7 +93,7 @@ impl Fixture {
     }
 
     fn command(&self) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .args(["mailbox", "--host"])
             .arg(&self.host)

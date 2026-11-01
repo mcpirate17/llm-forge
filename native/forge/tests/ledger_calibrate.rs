@@ -1,7 +1,7 @@
 //! `forge ledger calibrate sample` integration tests (design step 3):
 //! the sampler is deterministic under a seed, stratifies per session, caps
 //! at `--per-session`, and never emits block text. The CLI tests exercise
-//! the compiled binary (`CARGO_BIN_EXE_forge`); the frozen-fixture test
+//! the compiled binary (`FORGE_TEST_BIN`); the frozen-fixture test
 //! compiles the ledger module in via `#[path]`, the same pattern as
 //! `tests/ledger_fixtures.rs` (this crate has no lib target).
 
@@ -14,6 +14,8 @@ mod json_canon;
 // cover the sampler end to end through the binary itself.
 mod ledger;
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -60,7 +62,7 @@ fn scenario() -> PathBuf {
 }
 
 fn run_sample(files: &[PathBuf], per_session: usize, seed: u64) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_forge"))
+    let output = Command::new(forge_binary::path())
         .args(["ledger", "calibrate", "sample"])
         .arg("--per-session")
         .arg(per_session.to_string())

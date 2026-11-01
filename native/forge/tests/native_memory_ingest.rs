@@ -344,7 +344,7 @@ fn public_ingest_search_and_inspect_work_without_path_or_an_interpreter() {
     let config_path = fixture.0 .0.join("embedding.json");
     fs::write(&config_path, serde_json::to_vec(&config).unwrap()).unwrap();
     let command = |action: &str| {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(support::forge_binary::path());
         command
             .env_clear()
             .env("PATH", "")

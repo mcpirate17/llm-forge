@@ -1,5 +1,7 @@
 #[path = "support/tokenizer_fixture.rs"]
 mod fixture;
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use conductor_native::syntax::Language;
 use fixture::Fixture;
 use forge::context_store::{Store, DEFAULT_QUOTA};
@@ -230,7 +232,7 @@ fn native_cli_compacts_recovers_and_reports_protected_overflow_with_empty_path()
     fs::write(&config, serde_json::to_vec(&fixture.config).unwrap()).unwrap();
     let req = request(vec![entry("policy", Kind::Policy, "z".repeat(500))], 200);
     fs::write(&input, serde_json::to_vec(&req).unwrap()).unwrap();
-    let out = std::process::Command::new(env!("CARGO_BIN_EXE_forge"))
+    let out = std::process::Command::new(forge_binary::path())
         .env("PATH", "")
         .args(["context", "compact", "--tokenizer"])
         .arg(config)
@@ -248,7 +250,7 @@ fn native_cli_compacts_recovers_and_reports_protected_overflow_with_empty_path()
     );
     let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(value["protected_overflow"], true);
-    let out = std::process::Command::new(env!("CARGO_BIN_EXE_forge"))
+    let out = std::process::Command::new(forge_binary::path())
         .env("PATH", "")
         .args(["context", "recover", "--spill-dir"])
         .arg(recovery)

@@ -36,8 +36,8 @@ timeout_s = 900
 
 [[check]]
 name = "rust-forge-format"
-paths = ['^native/forge/', '^\.forge/']
-run = 'cargo +1.98.0 fmt --manifest-path native/forge/Cargo.toml --check'
+paths = ['^native/forge/', '^native/forge-cli/', '^\.forge/']
+run = 'cargo +1.98.0 fmt --manifest-path native/forge/Cargo.toml --all --check'
 timeout_s = 60
 
 [[check]]

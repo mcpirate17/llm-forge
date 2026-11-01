@@ -1,5 +1,7 @@
 //! End-to-end current-checkout check/verify behavior in disposable Git fixtures.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -59,7 +61,7 @@ timeout_s = {timeout}
 }
 
 fn forge(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_forge"))
+    Command::new(forge_binary::path())
         .args(args)
         .current_dir(dir)
         .env("GIT_DIR", "/definitely/wrong")
@@ -78,12 +80,14 @@ fn receipt(root: &Path) -> PathBuf {
 #[test]
 fn native_check_environment_binds_runner_and_isolated_install_without_venv_injection() {
     let root = fixture(
-        r#"test -x "$FORGE_CHECK_BIN" && "$FORGE_CHECK_BIN" --version && test "$FORGE_BIN" = "$FORGE_INSTALL_ROOT/bin/forge" && test "$PYO3_PYTHON" = /nonexistent/forbidden-python && test -z "${PYTHONPATH+x}" && test -z "${UV_PROJECT_ENVIRONMENT+x}" && test -z "${PYTHONPYCACHEPREFIX+x}""#,
+        r#"test -x "$FORGE_CHECK_BIN" && "$FORGE_CHECK_BIN" --version && test "$FORGE_BIN" = "$FORGE_INSTALL_ROOT/bin/forge" && test "$CARGO_TARGET_DIR" = "$PWD/owned artifacts" && test "$FORGE_TEST_BIN" = "$FORGE_INSTALL_ROOT/bin/forge" && test "$PYO3_PYTHON" = /nonexistent/forbidden-python && test -z "${PYTHONPATH+x}" && test -z "${UV_PROJECT_ENVIRONMENT+x}" && test -z "${PYTHONPYCACHEPREFIX+x}""#,
         2,
     );
-    let output = Command::new(env!("CARGO_BIN_EXE_forge"))
+    let output = Command::new(forge_binary::path())
         .args(["check", "--all"])
         .current_dir(&root)
+        .env("CARGO_TARGET_DIR", "owned artifacts")
+        .env("FORGE_TEST_BIN", "/invalid/inherited-forge")
         .env_remove("PYTHONPATH")
         .env_remove("UV_PROJECT_ENVIRONMENT")
         .env_remove("PYTHONPYCACHEPREFIX")

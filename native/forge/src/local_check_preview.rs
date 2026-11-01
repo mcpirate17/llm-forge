@@ -68,7 +68,7 @@ fn dirty_paths(root: &Path) -> Result<Vec<String>> {
 }
 
 fn crate_for(path: &str) -> Vec<&'static str> {
-    if path.starts_with("native/forge/") {
+    if path.starts_with("native/forge/") || path.starts_with("native/forge-cli/") {
         vec!["forge"]
     } else if path.starts_with("native/conductor-native/") {
         vec!["conductor-native", "forge"]
@@ -242,6 +242,50 @@ fn commands(row: &Target, cache: &Path, no_run: bool, filter: &Option<String>) -
     argv
 }
 
+fn cli_build(cache: &Path) -> Vec<String> {
+    vec![
+        "cargo".into(),
+        "install".into(),
+        "--debug".into(),
+        "--force".into(),
+        "--offline".into(),
+        "--locked".into(),
+        "--jobs".into(),
+        "2".into(),
+        "--path".into(),
+        "native/forge-cli".into(),
+        "--root".into(),
+        cache.with_file_name("test-install").display().to_string(),
+        "--target-dir".into(),
+        cache.display().to_string(),
+        "--bin".into(),
+        "forge".into(),
+    ]
+}
+
+fn clean_commands(row: &Target, cache: &Path) -> Vec<Vec<String>> {
+    let packages = if row.crate_name == "forge" {
+        vec!["forge", "forge-cli"]
+    } else {
+        vec![row.crate_name.as_str()]
+    };
+    packages
+        .into_iter()
+        .map(|package| {
+            vec![
+                "cargo".into(),
+                "clean".into(),
+                "--manifest-path".into(),
+                row.manifest.clone(),
+                "--target-dir".into(),
+                cache.display().to_string(),
+                "--package".into(),
+                package.into(),
+            ]
+        })
+        .collect()
+}
+
 fn invoke(
     root: &Path,
     argv: &[String],
@@ -343,7 +387,7 @@ fn run_target(
     args: &PreviewArgs,
 ) -> Result<serde_json::Value> {
     let config = serde_json::to_vec(&(
-        "native-preview-v2",
+        "native-preview-v3",
         (&row.crate_name, &row.manifest, &row.features),
         identity::toolchain()?,
         identity::environment(&[])?,
@@ -376,26 +420,30 @@ fn run_target(
     };
     let reused = source_same && target_digest.as_deref() == Some(digest.as_str());
     let snap = cache_workspace(&cache, &dir.join("snapshot"), inputs)?;
-    let env = preview_env()?;
+    let env = preview_env(&artifacts)?;
     // Source hashes invalidate package artifacts even if a same-size edit kept mtime.
     if !source_same && previous.is_some() {
-        invoke(
-            &snap,
-            &[
-                "cargo".into(),
-                "clean".into(),
-                "--manifest-path".into(),
-                row.manifest.clone(),
-                "--target-dir".into(),
-                artifacts.display().to_string(),
-                "--package".into(),
-                row.crate_name.clone(),
-            ],
-            &env,
-            &dir.join("clean.log"),
-            args.timeout_seconds,
-        )?;
+        for (index, command) in clean_commands(row, &artifacts).iter().enumerate() {
+            invoke(
+                &snap,
+                command,
+                &env,
+                &dir.join(format!("clean-{index}.log")),
+                args.timeout_seconds,
+            )?;
+        }
     }
+    let cli = if row.crate_name == "forge" {
+        Some(invoke(
+            &snap,
+            &cli_build(&artifacts),
+            &env,
+            &dir.join("cli-build.log"),
+            args.timeout_seconds,
+        )?)
+    } else {
+        None
+    };
     let build = invoke(
         &snap,
         &commands(row, &artifacts, true, &args.filter),
@@ -419,11 +467,11 @@ fn run_target(
     evidence::write_atomic(&state, digest.as_bytes())?;
     evidence::write_atomic(&target_state, digest.as_bytes())?;
     Ok(
-        json!({"target":row,"cache":cache,"source_sha256":digest,"build_reused":reused,"build":build,"tests":tests}),
+        json!({"target":row,"cache":cache,"source_sha256":digest,"build_reused":reused,"cli_build":cli,"cli_build_log": if row.crate_name == "forge" { Some(dir.join("cli-build.log")) } else { None },"build":build,"tests":tests}),
     )
 }
 
-fn preview_env() -> Result<Vec<(String, String)>> {
+fn preview_env(artifacts: &Path) -> Result<Vec<(String, String)>> {
     Ok(vec![
         ("CUDA_VISIBLE_DEVICES".into(), "".into()),
         ("CARGO_BUILD_JOBS".into(), "2".into()),
@@ -431,6 +479,15 @@ fn preview_env() -> Result<Vec<(String, String)>> {
         ("OMP_NUM_THREADS".into(), "1".into()),
         ("OPENBLAS_NUM_THREADS".into(), "1".into()),
         ("PYO3_PYTHON".into(), "/nonexistent/forbidden-python".into()),
+        (
+            "FORGE_TEST_BIN".into(),
+            artifacts
+                .with_file_name("test-install")
+                .join("bin/forge")
+                .to_str()
+                .context("preview artifact path must be UTF-8")?
+                .into(),
+        ),
         (
             "FORGE_BIN".into(),
             std::env::current_exe()?.display().to_string(),
@@ -517,5 +574,30 @@ mod tests {
             !commands(&target("forge", None), Path::new("cache"), true, &None)
                 .contains(&"--all-targets".into())
         );
+    }
+}
+
+#[cfg(test)]
+mod split_workspace_tests {
+    use super::*;
+
+    #[test]
+    fn selects_cli_and_prepares_binary_and_both_cleans() {
+        assert_eq!(crate_for("native/forge-cli/build.rs"), vec!["forge"]);
+        let row = target("forge", Some("native_notes"));
+        let artifacts = Path::new("/cache/artifacts");
+        let build = cli_build(artifacts);
+        assert!(build.windows(2).any(|v| v == ["--bin", "forge"]));
+        assert!(!build.iter().any(|s| s == "--no-run"));
+        let clean = clean_commands(&row, artifacts);
+        assert_eq!(clean.len(), 2);
+        assert!(clean[0].windows(2).any(|v| v == ["--package", "forge"]));
+        assert!(clean[1].windows(2).any(|v| v == ["--package", "forge-cli"]));
+        let env = preview_env(artifacts).unwrap();
+        assert!(env.contains(&(
+            "FORGE_TEST_BIN".into(),
+            "/cache/test-install/bin/forge".into()
+        )));
+        assert!(env.iter().any(|(key, _)| key == "FORGE_BIN"));
     }
 }

@@ -1,5 +1,7 @@
 //! Local fixture tests for native A2A send and retry. No Python runtime or peer is launched.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::fs;
@@ -85,7 +87,7 @@ impl Fixture {
     }
 
     fn command(&self, action: &str) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .args(["mailbox", "--host"])
             .arg(&self.host)

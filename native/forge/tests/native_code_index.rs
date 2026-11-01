@@ -1,3 +1,5 @@
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use conductor_native::{
     syntax::fingerprint,
     vector_index::{Config, Space},
@@ -275,7 +277,7 @@ fn cli_build_query_and_status_work_with_empty_path_and_reject_oversized_frames()
             .map(|row| serde_json::to_string(&row.unwrap()).unwrap()),
     );
     fs::write(&input, lines.join("\n")).unwrap();
-    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_forge"));
+    let mut command = std::process::Command::new(forge_binary::path());
     command
         .env_clear()
         .env("PATH", "")
@@ -299,7 +301,7 @@ fn cli_build_query_and_status_work_with_empty_path_and_reject_oversized_frames()
     )
     .unwrap();
     for action in ["query", "status"] {
-        let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = std::process::Command::new(forge_binary::path());
         command
             .env_clear()
             .env("PATH", "")

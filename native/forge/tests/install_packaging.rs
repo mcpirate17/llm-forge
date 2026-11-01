@@ -108,7 +108,7 @@ fn relocated_executable_runs_without_interpreters_compilers_or_source_checkout()
         .create(&directory)
         .unwrap();
     let binary = directory.join("forge");
-    fs::copy(env!("CARGO_BIN_EXE_forge"), &binary).unwrap();
+    fs::copy(support::forge_binary::path(), &binary).unwrap();
     fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
     runtime_smoke(&binary);
 }

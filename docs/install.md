@@ -3,7 +3,7 @@
 From a checked-out source tree, build the native binary with the pinned toolchain:
 
 ```sh
-cargo +1.98.0 install --path native/forge --locked
+cargo +1.98.0 install --path native/forge-cli --locked
 ```
 
 The default executable dependency graph contains no Python interpreter, PyO3 or

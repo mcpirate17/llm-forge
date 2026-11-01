@@ -2,6 +2,8 @@
 //! reports, records its head, and the next sweep's range starts there; a red
 //! blocking check or a failed setup leaves the swept ref where it was.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -97,7 +99,7 @@ impl Fixture {
     /// waits one out first.
     fn sweep(&self) -> Output {
         std::thread::sleep(std::time::Duration::from_millis(1100));
-        Command::new(env!("CARGO_BIN_EXE_forge"))
+        Command::new(forge_binary::path())
             .args(["sweep", "run"])
             .current_dir(self.work())
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
@@ -212,7 +214,7 @@ fn a_failed_setup_runs_no_check_and_reports_them_not_run() {
 fn install_print_shows_the_units_and_writes_nothing() {
     let f = Fixture::new("true", "true");
     let config = f.root.join("xdg");
-    let out = Command::new(env!("CARGO_BIN_EXE_forge"))
+    let out = Command::new(forge_binary::path())
         .args(["sweep", "install", "--print"])
         .current_dir(f.work())
         .env("XDG_CONFIG_HOME", &config)

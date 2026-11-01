@@ -1,4 +1,6 @@
 //! Opt-in, current-only roundtrip measurements against an owned native service.
+#[path = "../tests/support/forge_binary.rs"]
+mod forge_binary;
 #[path = "support/memory_fixture.rs"]
 mod memory_fixture;
 use anyhow::{ensure, Context, Result};
@@ -55,10 +57,7 @@ fn prepare() -> Result<(Directory, PathBuf, Service)> {
     let parsed: Policy = serde_json::from_value(policy.clone())?;
     parsed.clone().validate(&state)?;
     fs::write(state.join("policy.json"), serde_json::to_vec(&policy)?)?;
-    let forge = Path::new(
-        option_env!("CARGO_BIN_EXE_forge")
-            .context("Cargo must build the Forge executable for this benchmark")?,
-    );
+    let forge = Path::new(forge_binary::path());
     let service = Service::launch(
         forge,
         &[
@@ -159,7 +158,7 @@ async fn measure(state: &Path) -> Result<()> {
         "{}",
         json!({"workload":"validated calls over persistent Unix socket, including client parse",
         "measurement":"current-only; shared host; one-CPU service quota","source_bytes":SOURCE.len(),
-        "binary_sha256":format!("{:x}",Sha256::digest(fs::read(Path::new(option_env!("CARGO_BIN_EXE_forge").context("Forge binary")?))?)),
+        "binary_sha256":format!("{:x}",Sha256::digest(fs::read(Path::new(forge_binary::path()))?)),
         "service_rss":rss,"measurements":measurements})
     );
     Ok(())

@@ -1,5 +1,7 @@
 //! Native retention contract tests against disposable SQLite fixtures only.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use rusqlite::{params, Connection};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -62,7 +64,7 @@ impl Fixture {
         conn
     }
     fn command(&self, args: &[&str]) -> Output {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .args(["mailbox", "--host"])
             .arg(&self.host)

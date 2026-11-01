@@ -53,7 +53,7 @@ fn reinstall_removes_obsolete_bindings_and_preserves_unrelated_entries() {
     let host = support::Host::new();
     let root = host.0.to_str().unwrap();
     fs::create_dir_all(host.0.join(".claude")).unwrap();
-    let binary = env!("CARGO_BIN_EXE_forge");
+    let binary = support::forge_binary::path();
     let external =
         json!({"matcher":".*","hooks":[{"type":"command","command":"operator-owned-hook"}]});
     let old = json!({"hooks":{"SessionStart":[external.clone(),{"matcher":".*","hooks":[{"type":"command","command":format!("env CONDUCTOR_PYTHON=/old/python FORGE_MODE=warn {binary} hook SessionStart")}]}]}});

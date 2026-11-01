@@ -687,6 +687,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "forge-cli"
+version = "0.8.9"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "conductor-native",
+ "forge",
+ "git2",
+ "libc",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "toml",
+ "ureq",
+ "walkdir",
+]
+
+[[package]]
 name = "fs-set-times"
 version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

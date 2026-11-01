@@ -130,6 +130,6 @@ mod tests {
     // transcript through `forge hook SessionEnd` -- lives in
     // tests/hook_delegation.rs (`session_end_rolls_the_ending_session_into_
     // the_ledger`): it needs the compiled `forge` binary, which only
-    // integration tests get (`CARGO_BIN_EXE_forge`); under `cargo test` this
+    // integration tests get (`FORGE_TEST_BIN`); under `cargo test` this
     // module's own `current_exe()` is the test harness binary, not the CLI.
 }

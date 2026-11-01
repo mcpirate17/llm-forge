@@ -4,6 +4,8 @@
 #[path = "../src/pre_read.rs"]
 mod pre_read;
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use serde_json::{json, Value};
 use std::fs;
 use std::io::Write;
@@ -35,7 +37,7 @@ impl Project {
     }
 
     fn run(&self, payload: &str, native_hooks: Option<&str>, standalone: bool) -> Output {
-        let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut cmd = Command::new(forge_binary::path());
         cmd.args(["hook", "PreToolUse"])
             .current_dir(&self.0)
             .env("CLAUDE_PROJECT_DIR", &self.0)

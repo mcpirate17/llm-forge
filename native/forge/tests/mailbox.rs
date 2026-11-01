@@ -1,5 +1,7 @@
 //! Real native CLI checks against synthetic A2A SQLite stores. No Python/server.
 
+#[path = "support/forge_binary.rs"]
+mod forge_binary;
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -72,7 +74,7 @@ impl Fixture {
     }
 
     fn command(&self, args: &[&str]) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_forge"));
+        let mut command = Command::new(forge_binary::path());
         command
             .args(["mailbox", "--host"])
             .arg(&self.host)
@@ -609,7 +611,7 @@ fn explicit_state_directory_and_human_output_work_without_python() {
     let fixture = Fixture::new();
     let connection = fixture.store(false);
     insert(&connection, "human", "inbound", "a friendly message", None);
-    let output = Command::new(env!("CARGO_BIN_EXE_forge"))
+    let output = Command::new(forge_binary::path())
         .args(["mailbox", "--state-dir"])
         .arg(fixture.root())
         .args(["inbox", "--as-name", "receiver"])

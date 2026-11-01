@@ -9,6 +9,7 @@ description = "Native Forge command-line runtime for conductor tooling"
 requires-python = ">=3.12"
 
 [tool.maturin]
+manifest-path = "../forge-cli/Cargo.toml"
 # The Cargo `forge` binary is installed into the environment's scripts directory.
 # Keep module-name absent: this is a CLI wheel, not a Python extension module.
 bindings = "bin"
@@ -22,12 +23,16 @@ cache-keys = [
   { file = "pyproject.toml" },
   { file = "Cargo.toml" },
   { file = "Cargo.lock" },
-  { file = "build.rs" },
+  { file = "../forge-cli/Cargo.toml" },
+  { file = "../forge-cli/build.rs" },
   { file = "src/**/*" },
   { file = "../../ledger/routing_policy.toml" },
   { file = "tests/fixtures/ledger/calibration.json" },
   { file = "../conductor-native/Cargo.toml" },
   { file = "../conductor-native/Cargo.lock" },
   { file = "../conductor-native/src/**/*" },
+  { file = "../slop-core/Cargo.toml" },
+  { file = "../slop-core/Cargo.lock" },
+  { file = "../slop-core/src/**/*" },
   { git = { commit = true } },
 ]

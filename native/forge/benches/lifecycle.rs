@@ -1,7 +1,9 @@
 //! Current-only lifecycle CLI timings, including process startup and durable I/O.
+#[path = "../tests/support/forge_binary.rs"]
+mod forge_binary;
 #[path = "support/memory_fixture.rs"]
 mod memory_fixture;
-use anyhow::{ensure, Context, Result};
+use anyhow::{ensure, Result};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -19,9 +21,7 @@ struct Fixture {
 }
 impl Fixture {
     fn create() -> Result<Self> {
-        let binary = PathBuf::from(
-            option_env!("CARGO_BIN_EXE_forge").context("Cargo must build the Forge executable")?,
-        );
+        let binary = PathBuf::from(forge_binary::path());
         let root = std::env::temp_dir().join(forge::resource_id("forge-lifecycle-bench")?);
         fs::DirBuilder::new().mode(0o700).create(&root)?;
         git2::Repository::init(&root)?;
