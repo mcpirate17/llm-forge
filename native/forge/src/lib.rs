@@ -4,6 +4,14 @@ pub mod analysis;
 #[cfg(target_os = "linux")]
 pub mod bounded_file;
 #[cfg(target_os = "linux")]
+pub mod candidate_cli;
+#[cfg(target_os = "linux")]
+pub mod candidate_receipt;
+#[cfg(target_os = "linux")]
+pub mod candidate_snapshot;
+#[cfg(target_os = "linux")]
+pub mod candidate_source;
+#[cfg(target_os = "linux")]
 pub mod cards;
 #[cfg(target_os = "linux")]
 pub mod cards_cli;

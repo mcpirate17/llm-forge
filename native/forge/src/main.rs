@@ -96,6 +96,8 @@ enum Command {
     WorkspaceRuntime(workspace_runtime::RuntimeArgs),
     /// Create, release, touch and inspect structured repository ownership claims.
     Claim(claims::ClaimArgs),
+    /// Inspect Git candidates, materialize snapshots and verify receipt digests.
+    Candidate(forge::candidate_cli::CandidateArgs),
     /// Compile and query immutable native workspace-memory snapshots.
     Memory(forge::recall::cli::MemoryArgs),
     /// Build and search knowledge cards through pinned native embeddings.
@@ -336,6 +338,7 @@ fn main() -> ExitCode {
             command_exit("workspace-runtime", workspace_runtime::run(args), 2)
         }
         Command::Claim(args) => command_exit("claim", claims::run(args).map(|()| 0), 2),
+        Command::Candidate(args) => command_exit("candidate", forge::candidate_cli::run(args), 1),
         Command::Memory(args) => command_exit("memory", forge::recall::cli::run(args), 2),
         Command::Cards(args) => command_exit("cards", forge::cards_cli::run(args), 2),
         Command::EmbeddingBroker(args) => command_exit(

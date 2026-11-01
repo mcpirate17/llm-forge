@@ -874,5 +874,43 @@ After repair, 100 further concurrency-test repetitions passed (1,600 competing
 rebuild attempts and 800 read queries, with successful retries and final integrity
 checks). Native core tests passed 406 cases with one optional ignore; strict
 all-target Clippy passed for both crates. The selected contract discovery,
-runner and project-path compatibility targets passed 53 tests. Full committed
-release validation and publication of the repair are pending at this snapshot.
+runner and project-path compatibility targets passed 53 tests. The repair is
+pushed to `main` as `664dd76a685611063dc040a4c2dd7a1ddf35bbaa`. Full committed
+release checks passed 2,274 tests with 39 optional ignores before and after
+publication. The published verification receipt is
+`.git/forge-checks/run-1793514496983537219-452360/receipt.json`, SHA-256
+`49a71ca2303ac14fd530eca388649aba0dc3a1faee07956365466c5b52df90ee`.
+
+The next candidate-review milestone adds `forge candidate inspect`,
+`materialize`, and `verify-receipt`. It resolves staged, commit and range
+candidates through libgit2; validates and writes one Git blob at a time into
+a private standalone snapshot; and verifies legacy candidate receipt digests
+using native canonicalization of finite JSON values. Snapshot preflight checks
+paths, modes, object sizes and transitive relative symlinks before writing;
+publication refuses existing destinations. A valid receipt digest is not an
+approval. Optional ref binding compares the exact candidate tree with a resolved
+commit. See [candidate contracts](docs/native-candidate-review.md).
+
+The remaining independently compilable candidate slices are policy and waiver
+classification; bounded check execution and evidence collection; then review
+orchestration, reporting and attestation. The existing Python package remains
+until these interconnected consumers move. No Python candidate implementation
+is retired by this foundation alone. Targeted validation passed 27 unit tests
+and seven CLI integration tests; every CLI fixture runs with an empty `PATH`.
+The receipt canonicalizer matches 7,525 finite-number reference cases and 26
+hashed CPython fixtures without an interpreter at test or runtime. Strict
+all-target Forge Clippy passed. Fifty further concurrent-publication runs
+passed, each with 16 competing writers, exactly one winner and no staging leaks.
+Index admission now parses the exact checked bytes from a sealed memory file,
+closing the original-path replacement race. Full committed release checks and
+publication are pending at this snapshot.
+
+The current-only Rust 1.98.0 release candidate benchmark measured median batch
+means of 2.773 microseconds for receipt digest verification, 29.601 microseconds
+for a one-file staged candidate, and 4.149 microseconds for one-file snapshot
+preflight. Corresponding p95 batch means were 2.970, 29.881 and 4.319
+microseconds. Each workload used 31 batches after 100 warmup operations, with
+1,000 operations per receipt batch and 100 per Git/snapshot batch. These are
+unisolated-host, in-process costs, not model/HTTP latency or a matched improvement
+claim. Benchmark executable SHA-256:
+`816c72281995161c694c7e3a98d6667a590f8508bacadedac00d1ec46346b6e5`.
