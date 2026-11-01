@@ -2,6 +2,7 @@
 
 use rusqlite::{params, Connection};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -82,6 +83,10 @@ impl Drop for Fixture {
     }
 }
 
+fn sha256(path: &Path) -> String {
+    format!("{:x}", Sha256::digest(std::fs::read(path).unwrap()))
+}
+
 fn node(conn: &Connection, name: &str, file: &Path, line: i64, hash: Option<&str>) {
     let qualified = format!("{}::{name}", file.display());
     conn.execute(
@@ -130,10 +135,13 @@ fn context_projects_exact_symbol_and_directed_edges() {
     let caller = fixture.write("pkg/caller.py", "def invoke():\n    ping()\n");
     let callee = fixture.write("pkg/helper.py", "def help():\n    return 1\n");
     let conn = fixture.graph();
-    node(&conn, "ping", &target, 1, None);
-    node(&conn, "other", &target, 4, None);
-    node(&conn, "invoke", &caller, 1, None);
-    node(&conn, "help", &callee, 1, None);
+    let target_hash = sha256(&target);
+    let caller_hash = sha256(&caller);
+    let callee_hash = sha256(&callee);
+    node(&conn, "ping", &target, 1, Some(&target_hash));
+    node(&conn, "other", &target, 4, Some(&target_hash));
+    node(&conn, "invoke", &caller, 1, Some(&caller_hash));
+    node(&conn, "help", &callee, 1, Some(&callee_hash));
     edge(&conn, &caller, "invoke", &target, "ping", "CALLS", 2);
     edge(&conn, &target, "ping", &callee, "help", "CALLS", 2);
     edge(&conn, &target, "ping", &callee, "help", "CONTAINS", 0);
@@ -178,6 +186,37 @@ fn missing_or_stale_index_is_visible_and_never_created() {
 }
 
 #[test]
+fn missing_hash_is_unverified_suppresses_edges_and_keeps_live_symbols() {
+    let fixture = Fixture::new();
+    let target = fixture.write(
+        "pkg/mod.py",
+        "def indexed():\n    return 1\n\ndef current_only():\n    return 2\n",
+    );
+    let caller = fixture.write("pkg/caller.py", "def invoke():\n    indexed()\n");
+    let conn = fixture.graph();
+    node(&conn, "indexed", &target, 1, None);
+    node(&conn, "invoke", &caller, 1, None);
+    edge(&conn, &caller, "invoke", &target, "indexed", "CALLS", 2);
+    drop(conn);
+
+    let context = fixture.ok(&["context", "pkg/mod.py"]);
+    assert!(context["graph_status"]
+        .as_str()
+        .unwrap()
+        .starts_with("unverified"));
+    let names: Vec<_> = context["symbols"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|symbol| symbol["name"].as_str())
+        .collect();
+    assert!(names.contains(&"indexed"));
+    assert!(names.contains(&"current_only"));
+    assert_eq!(context["callers"].as_array().unwrap().len(), 0);
+    assert_eq!(context["callees"].as_array().unwrap().len(), 0);
+}
+
+#[test]
 fn optional_edge_line_uses_caller_definition_line() {
     let fixture = Fixture::new();
     let target = fixture.write("pkg/target.py", "def target(): pass\n");
@@ -186,23 +225,25 @@ fn optional_edge_line_uses_caller_definition_line() {
     std::fs::create_dir_all(&graph_dir).unwrap();
     let conn = Connection::open(graph_dir.join("graph.db")).unwrap();
     conn.execute_batch(
-        "CREATE TABLE nodes (qualified_name TEXT, name TEXT, kind TEXT, file_path TEXT, line_start INTEGER, line_end INTEGER);
+        "CREATE TABLE nodes (qualified_name TEXT, name TEXT, kind TEXT, file_path TEXT, line_start INTEGER, line_end INTEGER, file_hash TEXT);
          CREATE TABLE edges (source_qualified TEXT, target_qualified TEXT, kind TEXT);",
     )
     .unwrap();
     conn.execute(
-        "INSERT INTO nodes VALUES (?1,'target','Function',?2,1,1)",
+        "INSERT INTO nodes VALUES (?1,'target','Function',?2,1,1,?3)",
         params![
             format!("{}::target", target.display()),
-            target.to_string_lossy()
+            target.to_string_lossy(),
+            sha256(&target)
         ],
     )
     .unwrap();
     conn.execute(
-        "INSERT INTO nodes VALUES (?1,'invoke','Function',?2,3,3)",
+        "INSERT INTO nodes VALUES (?1,'invoke','Function',?2,3,3,?3)",
         params![
             format!("{}::invoke", caller.display()),
-            caller.to_string_lossy()
+            caller.to_string_lossy(),
+            sha256(&caller)
         ],
     )
     .unwrap();
@@ -268,7 +309,7 @@ fn missing_schema_is_explicit_and_outside_source_is_rejected() {
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(&outside, fixture.host.join("pkg/link.py")).unwrap();
-        fixture.error(&["context", "pkg/link.py"], "code path escapes host");
+        fixture.error(&["context", "pkg/link.py"], "without symlinks");
     }
     std::fs::remove_file(outside).unwrap();
 }
@@ -330,12 +371,151 @@ fn unicode_nul_and_source_limits_fail_without_partial_output() {
 }
 
 #[test]
+fn source_paths_reject_aliases_and_fifos_and_preserve_literal_backslashes() {
+    use std::os::unix::{ffi::OsStrExt, fs::symlink};
+    let fixture = Fixture::new();
+    let real = fixture.write("pkg/real.py", "def real(): pass\n");
+    symlink(&real, fixture.host.join("pkg/link.py")).unwrap();
+    symlink(fixture.host.join("pkg"), fixture.host.join("alias")).unwrap();
+    fixture.error(&["context", "pkg/link.py"], "without symlinks");
+    fixture.error(&["context", "alias/real.py"], "without symlinks");
+    fixture.error(&["context", "pkg/../pkg/real.py"], "unsafe components");
+    fixture.write("literal\\name.py", "def literal(): pass\n");
+    let result = fixture.ok(&["context", "literal\\name.py"]);
+    assert_eq!(result["file_path"], "literal\\name.py");
+    let fifo = fixture.host.join("pipe.py");
+    let name = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+    fixture.error(&["context", "pipe.py"], "regular file");
+}
+
+#[test]
+fn unverified_projections_are_never_cached_as_fresh() {
+    let fixture = Fixture::new();
+    let target = fixture.write("target.py", "def target():\n    pass\n");
+    let conn = fixture.graph();
+    node(&conn, "target", &target, 1, None);
+    drop(conn);
+    for _ in 0..2 {
+        let result = fixture.ok(&["context", "target.py"]);
+        assert!(result["graph_status"]
+            .as_str()
+            .unwrap()
+            .starts_with("unverified"));
+        assert_eq!(result["cache_status"], "miss");
+    }
+    assert!(!fixture.host.join(".forge/context-cache").exists());
+}
+
+#[test]
+fn changed_transitive_peer_invalidates_cache_and_restoring_bytes_recovers() {
+    let fixture = Fixture::new();
+    let target = fixture.write("target.py", "def target():\n    middle()\n");
+    let middle = fixture.write("middle.py", "def middle():\n    leaf()\n");
+    let text = "def leaf():\n    return 1\n";
+    let leaf = fixture.write("leaf.py", text);
+    let conn = fixture.graph();
+    for (name, path) in [("target", &target), ("middle", &middle), ("leaf", &leaf)] {
+        node(&conn, name, path, 1, Some(&sha256(path)));
+    }
+    edge(&conn, &target, "target", &middle, "middle", "CALLS", 2);
+    edge(&conn, &middle, "middle", &leaf, "leaf", "CALLS", 2);
+    drop(conn);
+    let args = ["context", "target.py", "--max-depth", "2"];
+    let first = fixture.ok(&args);
+    assert_eq!(first["graph_status"], "ok");
+    assert_eq!(first["callees"].as_array().unwrap().len(), 2);
+    assert_eq!(fixture.ok(&args)["cache_status"], "hit");
+    std::fs::write(&leaf, "def leaf():\n    return 2\n").unwrap();
+    for _ in 0..2 {
+        let dirty = fixture.ok(&args);
+        assert!(dirty["graph_status"].as_str().unwrap().starts_with("stale"));
+        assert_eq!(dirty["cache_status"], "miss");
+        assert!(!dirty["callees"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| row["file_path"] == "leaf.py"));
+    }
+    std::fs::write(&leaf, text).unwrap();
+    let restored = fixture.ok(&args);
+    assert_eq!(restored["graph_status"], "ok");
+    assert_eq!(restored["callees"].as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn cache_fifo_is_refused_without_hanging_or_partial_output() {
+    use std::os::unix::ffi::OsStrExt;
+    let fixture = Fixture::new();
+    let target = fixture.write("target.py", "def target():\n    pass\n");
+    let conn = fixture.graph();
+    node(&conn, "target", &target, 1, Some(&sha256(&target)));
+    drop(conn);
+    fixture.ok(&["context", "target.py"]);
+    let entries: Vec<_> = std::fs::read_dir(fixture.host.join(".forge/context-cache"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .collect();
+    assert_eq!(entries.len(), 1);
+    std::fs::remove_file(&entries[0]).unwrap();
+    let name = std::ffi::CString::new(entries[0].as_os_str().as_bytes()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+    fixture.error(&["context", "target.py"], "regular inode");
+}
+
+#[test]
+fn cache_records_require_identity_and_complete_visible_dependency_membership() {
+    let fixture = Fixture::new();
+    let target = fixture.write("target.py", "def target():\n    pass\n");
+    let caller = fixture.write("caller.py", "def caller():\n    target()\n");
+    let conn = fixture.graph();
+    node(&conn, "target", &target, 1, Some(&sha256(&target)));
+    node(&conn, "caller", &caller, 1, Some(&sha256(&caller)));
+    edge(&conn, &caller, "caller", &target, "target", "CALLS", 2);
+    drop(conn);
+    fixture.ok(&["context", "target.py"]);
+    let entry = std::fs::read_dir(fixture.host.join(".forge/context-cache"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .unwrap();
+    let original: Value = serde_json::from_slice(&std::fs::read(&entry).unwrap()).unwrap();
+    for defect in 0..8 {
+        let mut cache = original.clone();
+        match defect {
+            0 => cache["output"]["generation"] = "wrong-generation".into(),
+            1 => cache["output"]["source_hash"] = "0".repeat(64).into(),
+            2 => cache["output"]["file_path"] = "caller.py".into(),
+            3 => cache["output"]["symbol"] = "other".into(),
+            4 => cache["dependency_count"] = 0.into(),
+            5 => {
+                cache["dependencies"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("caller.py");
+                cache["dependency_count"] = 1.into();
+            }
+            6 => cache["dependencies"]["target.py"] = "invalid".into(),
+            _ => cache["output"]["graph_status"] = "unverified".into(),
+        }
+        std::fs::write(&entry, serde_json::to_vec(&cache).unwrap()).unwrap();
+        let refreshed = fixture.ok(&["context", "target.py"]);
+        assert_eq!(refreshed["cache_status"], "miss", "defect {defect}");
+        assert_eq!(refreshed["graph_status"], "ok");
+        assert_eq!(refreshed["callers"].as_array().unwrap().len(), 1);
+        assert_eq!(fixture.ok(&["context", "target.py"])["cache_status"], "hit");
+    }
+}
+
+#[test]
 fn indexed_many_row_fixture_keeps_query_and_output_bounded() {
     let fixture = Fixture::new();
     let target = fixture.write("pkg/mod.rs", "fn target() {\n    helper();\n}\n");
     let conn = fixture.graph();
     conn.execute_batch("BEGIN").unwrap();
-    node(&conn, "target", &target, 1, None);
+    let target_hash = sha256(&target);
+    node(&conn, "target", &target, 1, Some(&target_hash));
     for index in 0..4_000 {
         conn.execute(
             "INSERT INTO nodes VALUES (?1,?2,'Function','noise/unrelated.rs',1,1,NULL,NULL)",
@@ -343,10 +523,14 @@ fn indexed_many_row_fixture_keeps_query_and_output_bounded() {
         )
         .unwrap();
     }
-    let caller_path = fixture.host.join("noise/caller.rs");
     for index in 0..80 {
         let name = format!("caller_{index:03}");
-        node(&conn, &name, &caller_path, index + 1, None);
+        let caller_path = fixture.write(
+            &format!("noise/caller_{index:03}.rs"),
+            &format!("fn {name}() {{ target(); }}\n"),
+        );
+        let caller_hash = sha256(&caller_path);
+        node(&conn, &name, &caller_path, 1, Some(&caller_hash));
         edge(
             &conn,
             &caller_path,
@@ -383,7 +567,7 @@ fn indexed_many_row_fixture_keeps_query_and_output_bounded() {
     assert_eq!(context["truncated"], true);
     assert_eq!(
         context["callers"][0]["qualified_name"],
-        "noise/caller.rs::caller_000"
+        "noise/caller_000.rs::caller_000"
     );
 
     let tighter = fixture.command(&[

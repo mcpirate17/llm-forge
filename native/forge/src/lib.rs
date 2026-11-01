@@ -35,6 +35,8 @@ pub mod embedding_broker;
 #[cfg(target_os = "linux")]
 pub mod file_lock;
 #[cfg(target_os = "linux")]
+pub mod graph_context_cache_storage;
+#[cfg(target_os = "linux")]
 pub mod harness;
 pub mod instant;
 pub mod json_canon;

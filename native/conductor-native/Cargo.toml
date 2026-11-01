@@ -34,6 +34,7 @@ bench = false
 
 [dependencies]
 anyhow = "1"
+cap-std = "4"
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 pyo3 = { version = "0.29", optional = true }
@@ -42,7 +43,7 @@ quick-xml = { version = "0.41", features = ["encoding"] }
 regex = "1"
 # The Python binding shares CPython's dynamic SQLite library; Forge opts into
 # bundled-sqlite because its standalone process has no Python SQLite connection.
-rusqlite = { version = "0.32", features = ["modern_sqlite"] }
+rusqlite = { version = "0.32", features = ["modern_sqlite", "hooks", "limits"] }
 libloading = { version = "0.8", optional = true }
 libc = "0.2"
 ruff_python_ast = { package = "rustpython-ruff_python_ast", version = "0.15.8", optional = true }

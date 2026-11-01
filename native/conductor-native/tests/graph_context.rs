@@ -60,6 +60,11 @@ fn query(repo: &Repo, file: &str, symbol: Option<&str>) -> Value {
     .unwrap()
 }
 
+fn sha256(path: &Path) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(fs::read(path).unwrap()))
+}
+
 #[test]
 fn absent_graph_uses_bounded_syntactic_callers_without_own_or_hidden_file() {
     let repo = Repo::new();
@@ -89,22 +94,34 @@ fn absent_graph_uses_bounded_syntactic_callers_without_own_or_hidden_file() {
 fn graph_edges_are_distinct_ordered_filtered_and_limited_to_fifty() {
     let repo = Repo::new();
     let source = repo.write("pkg/engine.py", "def run(): pass\n");
+    let helper = repo.write("pkg/sub.py", "def helper(): pass\n");
     let conn = repo.database();
+    conn.execute_batch("ALTER TABLE nodes ADD COLUMN file_hash TEXT")
+        .unwrap();
+    let source_hash = sha256(&source);
+    let helper_hash = sha256(&helper);
     conn.execute(
-        "INSERT INTO nodes VALUES (?1, ?2, ?3)",
-        params!["pkg.engine.run", "run", source.to_str().unwrap()],
+        "INSERT INTO nodes VALUES (?1, ?2, ?3, ?4)",
+        params![
+            "pkg.engine.run",
+            "run",
+            source.to_str().unwrap(),
+            source_hash
+        ],
     )
     .unwrap();
     conn.execute(
-        "INSERT INTO nodes VALUES (?1, ?2, ?3)",
-        params!["pkg.sub.helper", "helper", "pkg/sub.py"],
+        "INSERT INTO nodes VALUES (?1, ?2, ?3, ?4)",
+        params!["pkg.sub.helper", "helper", "pkg/sub.py", helper_hash],
     )
     .unwrap();
     for index in (0..55).rev() {
         let name = format!("caller.{index:03}");
+        let caller = repo.write(&format!("pkg/caller{index:03}.py"), "def invoke(): pass\n");
+        let caller_hash = sha256(&caller);
         conn.execute(
-            "INSERT INTO nodes VALUES (?1, ?2, ?3)",
-            params![name, "invoke", format!("pkg/caller{index:03}.py")],
+            "INSERT INTO nodes VALUES (?1, ?2, ?3, ?4)",
+            params![name, "invoke", caller.to_string_lossy(), caller_hash],
         )
         .unwrap();
         conn.execute(
@@ -157,7 +174,10 @@ fn malformed_database_fails_closed_and_a_rebuilt_database_can_be_read() {
     fs::remove_file(db).unwrap();
     let conn = repo.database();
     drop(conn);
-    assert_eq!(query(&repo, "sample.py", None)["status"], "ok");
+    assert_eq!(
+        query(&repo, "sample.py", None)["status"],
+        "unindexed (file or symbol absent from graph)"
+    );
 }
 
 #[test]
@@ -194,7 +214,6 @@ fn rust_skeleton_preserves_impl_traits_attributes_and_multiline_signatures() {
 
 #[test]
 fn external_adapter_validates_dirty_and_deleted_peer_hashes() {
-    use sha2::{Digest, Sha256};
     let repo = Repo::new();
     let target = repo.write("pkg/target.py", "def target(): return 1\n");
     let caller = repo.write(
@@ -206,7 +225,7 @@ fn external_adapter_validates_dirty_and_deleted_peer_hashes() {
         .execute_batch("ALTER TABLE nodes ADD COLUMN file_hash TEXT")
         .unwrap();
     for (name, path) in [("target", target), ("caller", caller)] {
-        let hash = format!("{:x}", Sha256::digest(fs::read(&path).unwrap()));
+        let hash = sha256(&path);
         connection
             .execute(
                 "INSERT INTO nodes VALUES (?1,?1,?2,?3)",
@@ -264,12 +283,95 @@ fn external_selection_broadens_unverified_coverage_and_exposes_build_revision() 
 #[test]
 fn nullable_external_symbol_columns_keep_relationships_available() {
     let repo = Repo::new();
+    let target = repo.write("pkg/target.py", "def run(): pass\n");
+    let caller = repo.write("pkg/caller.py", "def caller(): run()\n");
+    let target_hash = sha256(&target);
+    let caller_hash = sha256(&caller);
     let connection = repo.database();
-    connection.execute_batch("ALTER TABLE nodes ADD COLUMN kind TEXT; ALTER TABLE nodes ADD COLUMN line_start INTEGER; ALTER TABLE nodes ADD COLUMN line_end INTEGER; INSERT INTO nodes VALUES ('target','run','pkg/target.py',NULL,NULL,NULL); INSERT INTO nodes VALUES ('caller','caller','pkg/caller.py',NULL,NULL,NULL); INSERT INTO edges VALUES ('caller','target','CALLS')").unwrap();
+    connection.execute_batch("ALTER TABLE nodes ADD COLUMN kind TEXT; ALTER TABLE nodes ADD COLUMN line_start INTEGER; ALTER TABLE nodes ADD COLUMN line_end INTEGER; ALTER TABLE nodes ADD COLUMN file_hash TEXT;").unwrap();
+    connection
+        .execute(
+            "INSERT INTO nodes VALUES ('target','run','pkg/target.py',NULL,NULL,NULL,?1)",
+            params![target_hash],
+        )
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO nodes VALUES ('caller','caller','pkg/caller.py',NULL,NULL,NULL,?1)",
+            params![caller_hash],
+        )
+        .unwrap();
+    connection
+        .execute("INSERT INTO edges VALUES ('caller','target','CALLS')", [])
+        .unwrap();
     drop(connection);
     let result = query(&repo, "pkg/target.py", Some("run"));
     assert_eq!(result["status"], "ok");
     assert_eq!(result["callers"][0]["qualified_name"], "caller");
+}
+
+#[test]
+fn missing_endpoint_hash_is_unverified_and_withholds_indexed_edges() {
+    let repo = Repo::new();
+    repo.write("pkg/target.py", "def run(): pass\n");
+    let connection = repo.database();
+    connection
+        .execute_batch("ALTER TABLE nodes ADD COLUMN file_hash TEXT;")
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO nodes VALUES ('target','run','pkg/target.py',NULL)",
+            [],
+        )
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO nodes VALUES ('caller','caller','pkg/caller.py',NULL)",
+            [],
+        )
+        .unwrap();
+    connection
+        .execute("INSERT INTO edges VALUES ('caller','target','CALLS')", [])
+        .unwrap();
+    drop(connection);
+    let result = query(&repo, "pkg/target.py", Some("run"));
+    assert!(result["status"].as_str().unwrap().starts_with("unverified"));
+    assert_eq!(result["callers"], json!([]));
+    assert_eq!(result["callees"], json!([]));
+}
+
+#[test]
+fn syntactic_fallback_keeps_distinct_provenance_beside_verified_rows() {
+    let repo = Repo::new();
+    let target = repo.write("pkg/target.py", "def target(): pass\n");
+    let caller = repo.write("pkg/indexed.py", "def indexed(): pass\n");
+    repo.write("pkg/fresh.py", "def fresh(): target()\n");
+    let connection = repo.database();
+    connection
+        .execute_batch("ALTER TABLE nodes ADD COLUMN file_hash TEXT")
+        .unwrap();
+    for (name, path) in [("target", target), ("indexed", caller)] {
+        connection
+            .execute(
+                "INSERT INTO nodes VALUES (?1,?1,?2,?3)",
+                params![name, path.to_string_lossy(), sha256(&path)],
+            )
+            .unwrap();
+    }
+    connection
+        .execute("INSERT INTO edges VALUES ('indexed','target','CALLS')", [])
+        .unwrap();
+    drop(connection);
+    let result = query(&repo, "pkg/target.py", Some("target"));
+    assert_eq!(result["status"], "ok");
+    let rows = result["callers"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    assert!(rows
+        .iter()
+        .any(|row| row["file_path"] == "pkg/indexed.py" && row["kind"] == "CALLS"));
+    assert!(rows
+        .iter()
+        .any(|row| row["file_path"] == "pkg/fresh.py" && row["kind"] == "calls (syntactic)"));
 }
 
 #[test]
@@ -278,10 +380,23 @@ fn full_test_inventory_excludes_fixtures_and_unknown_edges_are_preserved() {
     repo.write("tests/fixtures/config.json", "{}");
     repo.write("tests/Cargo.toml", "[package]\nname='fixture'\n");
     repo.write("tests/README.md", "fixture documentation");
-    repo.write("tests/test_real.py", "def test_real(): pass\n");
+    let caller = repo.write("tests/test_real.py", "def test_real(): pass\n");
+    let target = repo.write("pkg/target.py", "def target(): pass\n");
     repo.write("src/inline.rs", "#[test]\nfn inline() {}\n");
     let connection = repo.database();
-    connection.execute_batch("INSERT INTO nodes VALUES ('target','target','pkg/target.py'); INSERT INTO nodes VALUES ('caller','test_real','tests/test_real.py'); INSERT INTO edges VALUES ('caller','target',NULL)").unwrap();
+    connection.execute_batch("ALTER TABLE nodes ADD COLUMN file_hash TEXT; INSERT INTO edges VALUES ('caller','target',NULL)").unwrap();
+    connection
+        .execute(
+            "INSERT INTO nodes VALUES ('target','target','pkg/target.py',?1)",
+            params![sha256(&target)],
+        )
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO nodes VALUES ('caller','test_real','tests/test_real.py',?1)",
+            params![sha256(&caller)],
+        )
+        .unwrap();
     drop(connection);
     let relations = query(&repo, "pkg/target.py", Some("target"));
     assert_eq!(relations["callers"][0]["kind"], "UNKNOWN");
@@ -437,4 +552,142 @@ fn candidate_snapshot_lacking_a_tracked_base_source_still_falls_back() {
     let candidate = Repo::new();
     candidate.write("other.py", "z = 3\n");
     assert!(removal_reasons(&repo, &candidate).contains(&json!(REMOVED)));
+}
+
+fn coverage_selection(
+    metadata: Option<&str>,
+    coverage: Option<i64>,
+    alias: bool,
+    reverse: bool,
+) -> Value {
+    use sha2::{Digest, Sha256};
+    let repo = Repo::new();
+    let fixtures = [
+        ("pkg/source.py", "def source(): pass\n", "source"),
+        (
+            "tests/test_targeted.py",
+            "def test_targeted(): pass\n",
+            "targeted",
+        ),
+        ("tests/test_other.py", "def test_other(): pass\n", "other"),
+    ];
+    for (path, source, _) in fixtures {
+        repo.write(path, source);
+    }
+    let connection = repo.database();
+    connection.execute_batch("ALTER TABLE nodes ADD COLUMN file_hash TEXT;
+        CREATE TABLE files(file_path TEXT,file_hash TEXT,unresolved INTEGER);
+        CREATE TABLE metadata(key TEXT,value TEXT);
+        INSERT INTO metadata VALUES('git_head_sha','coverage-fixture'),('coverage_complete','true');").unwrap();
+    if let Some(value) = metadata {
+        connection
+            .execute(
+                "INSERT INTO metadata VALUES('unresolved_files',?1)",
+                [value],
+            )
+            .unwrap();
+    }
+    let mut source_hash = String::new();
+    for (path, source, name) in fixtures {
+        let hash = format!("{:x}", Sha256::digest(source.as_bytes()));
+        connection
+            .execute(
+                "INSERT INTO nodes VALUES(?1,?1,?2,?3)",
+                params![name, path, hash],
+            )
+            .unwrap();
+        if path == "pkg/source.py" {
+            source_hash = hash;
+        } else {
+            connection
+                .execute("INSERT INTO files VALUES(?1,?2,0)", params![path, hash])
+                .unwrap();
+        }
+    }
+    let mut source_rows = Vec::new();
+    if let Some(value) = coverage {
+        source_rows.push(("pkg/source.py".to_owned(), value));
+    }
+    if alias {
+        source_rows.push((
+            repo.path()
+                .join("pkg/source.py")
+                .to_str()
+                .unwrap()
+                .to_owned(),
+            1,
+        ));
+    }
+    if reverse {
+        source_rows.reverse();
+    }
+    for (path, value) in source_rows {
+        connection
+            .execute(
+                "INSERT INTO files VALUES(?1,?2,?3)",
+                params![path, source_hash, value],
+            )
+            .unwrap();
+    }
+    connection
+        .execute("INSERT INTO edges VALUES('targeted','source','calls')", [])
+        .unwrap();
+    drop(connection);
+    dispatch(
+        "test_selection",
+        &json!({"repo":repo.path(),"paths":["pkg/source.py"],
+        "expected_head":"coverage-fixture"}),
+    )
+    .unwrap()
+}
+
+#[test]
+fn missing_per_file_coverage_needs_valid_explicit_legacy_metadata() {
+    for metadata in [None, Some("not-json"), Some("{}"), Some("[]")] {
+        for coverage in [None, Some(0)] {
+            let plan = coverage_selection(metadata, coverage, false, false);
+            let fallback = coverage.is_none() && metadata != Some("[]");
+            assert_eq!(
+                plan["complete"], !fallback,
+                "metadata={metadata:?} coverage={coverage:?}: {plan}"
+            );
+            if fallback {
+                assert_eq!(plan["scope"], "full-test-inventory-fallback");
+                assert_eq!(
+                    plan["paths"],
+                    json!(["tests/test_other.py", "tests/test_targeted.py"])
+                );
+                assert!(plan["reasons"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|reason| reason
+                        .as_str()
+                        .is_some_and(|v| v.contains("unresolved or dynamic"))));
+            } else {
+                assert_eq!(plan["scope"], "transitive-reverse-dependencies");
+                assert_eq!(plan["paths"], json!(["tests/test_targeted.py"]));
+            }
+        }
+    }
+}
+
+#[test]
+fn same_hash_alias_coverage_conflict_broadens_selection_in_either_row_order() {
+    for reverse in [false, true] {
+        let plan = coverage_selection(Some("[]"), Some(0), true, reverse);
+        assert_eq!(plan["complete"], false);
+        assert_eq!(plan["scope"], "full-test-inventory-fallback");
+        assert_eq!(
+            plan["paths"],
+            json!(["tests/test_other.py", "tests/test_targeted.py"])
+        );
+        assert!(plan["reasons"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|reason| reason
+                .as_str()
+                .is_some_and(|v| v.contains("unresolved or dynamic"))));
+    }
 }

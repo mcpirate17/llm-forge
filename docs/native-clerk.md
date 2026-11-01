@@ -77,7 +77,11 @@ for invalid output destinations. Strict all-target Clippy passed. The native
 AST scan retained every definition in the 12 inspected files; no function
 exceeded 79 lines. The native discovery suite passed 33 tests, and the changed
 optional compatibility selection case passed through a private binding overlay.
-Full committed verification and publication are pending.
+Published on `main` at `5971c1c6d41d3026faec5a6c37f77cc96aadb22b`.
+Full checks passed before and after publication: 2,406 release tests and two
+installed-runtime tests, with 39 intentional ignores. The post-publication
+receipt SHA-256 is
+`fa6c43f9ee678ee7de412521e409764025882ccda90801ff0e6a2cfc4d7cc2c5`.
 
 The current-only Rust 1.98.0 release benchmark measured three 2 KiB sources at
 27.252 microseconds median batch mean (p95 29.203), and one fully hashed 1 MiB

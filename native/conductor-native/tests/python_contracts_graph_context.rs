@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList, PyModule};
 use rusqlite::{params, Connection};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -126,6 +127,10 @@ fn database(repo: &Path) -> Connection {
     let conn = Connection::open(file).unwrap();
     conn.execute_batch(GRAPH_SCHEMA).unwrap();
     conn
+}
+
+fn file_hash(path: &Path) -> String {
+    format!("{:x}", Sha256::digest(fs::read(path).unwrap()))
 }
 
 fn skeleton(
@@ -268,32 +273,33 @@ fn extract_ast_skeleton_filter_target_symbol() {
 fn query_graph_relationships() {
     let case = Case::new();
     let repo = context_repo(&case);
-    let resolved_repo = repo.canonicalize().unwrap();
+    let engine = case.write("ctx_ws/pkg/engine.py", "def run(): pass\n");
+    let caller = case.write("ctx_ws/pkg/caller.py", "def invoke(): pass\n");
+    let helper = case.write("ctx_ws/pkg/sub.py", "def helper(): pass\n");
     let conn = database(&repo);
-    for (qualified, name, file) in [
+    for (qualified, name, file, hash) in [
         (
             "pkg.engine.run",
             "run",
-            resolved_repo
-                .join("pkg/engine.py")
-                .to_str()
-                .unwrap()
-                .to_owned(),
+            engine.to_string_lossy().into_owned(),
+            file_hash(&engine),
         ),
         (
             "pkg.caller.invoke",
             "invoke",
-            resolved_repo
-                .join("pkg/caller.py")
-                .to_str()
-                .unwrap()
-                .to_owned(),
+            caller.to_string_lossy().into_owned(),
+            file_hash(&caller),
         ),
-        ("pkg.sub.helper", "helper", "pkg/sub.py".to_owned()),
+        (
+            "pkg.sub.helper",
+            "helper",
+            helper.to_string_lossy().into_owned(),
+            file_hash(&helper),
+        ),
     ] {
         conn.execute(
-            "INSERT INTO nodes (qualified_name, name, file_path) VALUES (?1, ?2, ?3)",
-            params![qualified, name, file],
+            "INSERT INTO nodes (qualified_name, name, file_path, file_hash) VALUES (?1, ?2, ?3, ?4)",
+            params![qualified, name, file, hash],
         )
         .unwrap();
     }
@@ -525,20 +531,15 @@ fn graph_relationship_immutability() {
 fn query_graph_with_target_symbol() {
     let case = Case::new();
     let repo = context_repo(&case);
+    let engine = case.write("ctx_ws/pkg/engine.py", "def run(): pass\n");
+    let caller = case.write("ctx_ws/pkg/caller.py", "def invoke(): pass\n");
     let conn = database(&repo);
-    let source = repo
-        .canonicalize()
-        .unwrap()
-        .join("pkg/engine.py")
-        .to_str()
-        .unwrap()
-        .to_owned();
     conn.execute(
-        "INSERT INTO nodes (qualified_name, name, file_path) VALUES ('pkg.engine.run', 'run', ?1)",
-        params![source],
+        "INSERT INTO nodes (qualified_name, name, file_path, file_hash) VALUES ('pkg.engine.run', 'run', ?1, ?2)",
+        params![engine.to_string_lossy(), file_hash(&engine)],
     )
     .unwrap();
-    conn.execute("INSERT INTO nodes (qualified_name, name, file_path) VALUES ('pkg.caller.invoke', 'invoke', 'pkg/caller.py')", []).unwrap();
+    conn.execute("INSERT INTO nodes (qualified_name, name, file_path, file_hash) VALUES ('pkg.caller.invoke', 'invoke', ?1, ?2)", params![caller.to_string_lossy(), file_hash(&caller)]).unwrap();
     conn.execute("INSERT INTO edges (source_qualified, target_qualified, kind) VALUES ('pkg.caller.invoke', 'pkg.engine.run', 'calls')", []).unwrap();
     drop(conn);
     Python::attach(|py| {

@@ -1065,10 +1065,41 @@ all-target Clippy passed. The 12-file native AST scan retained every symbol;
 one reference list hit its explicit cap, while all function spans were retained
 and no function exceeded 79 lines. The native discovery suite passed 33 tests;
 the affected optional compatibility selection case passed using a private
-binding overlay. Full committed checks and publication of this clerk milestone
-are pending.
+binding overlay. The clerk milestone was published on `main` at
+`5971c1c6d41d3026faec5a6c37f77cc96aadb22b`. Full checks passed before and
+after publication: 2,406 release tests and two installed-runtime tests, with
+39 intentional ignores. The post-publication receipt SHA-256 is
+`fa6c43f9ee678ee7de412521e409764025882ccda90801ff0e6a2cfc4d7cc2c5`.
 
 Current-only inventory timing measured three 2 KiB sources at 27.252 microseconds
 median batch mean and one full 1 MiB hash at 404.523 microseconds on a warm,
 unisolated host. See [native clerk](docs/native-clerk.md) for workloads,
 measurement limits, source bounds, trust boundaries and executable hash.
+
+## Graph evidence and cache hardening
+
+The shared native graph store now admits read-only SQLite databases through
+regular-file, sidecar and ancestor checks, bounded schema/value limits and a
+nested execution budget. Source hashes and UTF-8 snapshots use one confined
+reader with bounded streaming and descriptor/path/root identity checks.
+Missing, invalid or conflicting hashes cannot produce verified indexed rows.
+External absolute/relative aliases participate in the same evidence check;
+conflicting dependency-coverage flags broaden test selection. Missing coverage
+also broadens selection unless a valid explicit legacy inventory supplies it.
+
+The native CLI validates graph rows before following edges or admitting cache
+dependencies. Cache hits require matching generation, requested source, bounds
+and dependency hashes. Stale and unverified projections remain misses. Cache
+publication uses private exclusive staging, validates destination identity,
+syncs the renamed entry before pruning, preserves unrelated files and reports
+partial publication failures explicitly. Textual fallback callers retain their
+`calls (syntactic)` provenance. Current AST symbols remain available when
+indexed evidence is rejected.
+
+These checks establish evidence for bounded returned rows, not global graph
+completeness or an OS sandbox against same-UID writers. SQLite VM deadlines do
+not bound filesystem I/O. The existing Python skeleton/CLI adapter remains for
+the next native migration milestone; no shared runtime installation is changed.
+See [graph context](docs/graph-context.md) for limits and trust boundaries, and
+the native `graph_context` benchmark for reproducible source-read and graph
+projection workloads.

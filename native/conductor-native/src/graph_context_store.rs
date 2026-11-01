@@ -1,12 +1,17 @@
 //! Read-only, bounded queries against a Forge or external structural index.
 
 use anyhow::{ensure, Context, Result};
-use rusqlite::{params, Connection, OpenFlags};
+use rusqlite::{params, Connection};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+
+use super::database::{QueryScope as Operation, Reader};
+use super::files::SourceRoot;
+#[path = "graph_context_evidence.rs"]
+mod evidence;
 
 pub const DEFAULT_DB: &str = ".forge/graph.db";
 const REQUIRED_NODES: &[&str] = &["qualified_name", "file_path"];
@@ -41,7 +46,7 @@ pub struct Projection {
 }
 
 pub struct GraphStore {
-    pub(super) conn: Option<Connection>,
+    pub(super) conn: Option<Reader>,
     pub generation: String,
     pub metadata: std::collections::BTreeMap<String, String>,
     pub database: Option<PathBuf>,
@@ -66,116 +71,69 @@ struct QueryScope<'a> {
 }
 
 impl GraphStore {
+    /// Nested queries share the same absolute deadline and VM budget.
+    pub fn operation(&self) -> Result<Option<Operation<'_>>> {
+        self.conn.as_ref().map(Reader::operation).transpose()
+    }
+
     pub fn verify_generation(&self) -> Result<()> {
+        let _operation = self.operation()?;
         if let (Some(conn), Some(path)) = (&self.conn, &self.database) {
+            conn.verify()?;
             ensure!(
                 database_generation(path, &read_metadata(conn)?)? == self.generation,
                 "graph changed during retrieval; retry against the current generation"
             );
+            conn.verify()?;
         }
         Ok(())
     }
     pub fn database_path(host: &Path) -> PathBuf {
         let native = host.join(DEFAULT_DB);
-        if native.is_file() {
+        if std::fs::symlink_metadata(&native).map_or_else(
+            |error| error.kind() != std::io::ErrorKind::NotFound,
+            |_| true,
+        ) {
             native
         } else {
             host.join(".code-review-graph/graph.db")
         }
     }
 
-    pub fn indexed_hash(&self, host: &Path, relative: &str) -> Result<Option<String>> {
-        let Some(conn) = &self.conn else {
-            return Ok(None);
-        };
-        let absolute = host.join(relative).to_string_lossy().to_string();
-        let query = if self.has_files {
-            "SELECT file_hash FROM files WHERE file_path IN (?1,?2) LIMIT 1"
-        } else if self.has_hash {
-            "SELECT file_hash FROM nodes WHERE file_path IN (?1,?2) LIMIT 1"
-        } else {
-            return Ok(None);
-        };
-        match conn.query_row(query, params![absolute, relative], |row| {
-            row.get::<_, Option<String>>(0)
-        }) {
-            Ok(Some(hash)) if valid_hash(&hash) => Ok(Some(hash)),
-            Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(error) => Err(error).context("read indexed source hash"),
-        }
-    }
-
     pub fn file_unresolved(&self, host: &Path, relative: &str) -> Result<Option<bool>> {
+        let _operation = self.operation()?;
+        let sources = SourceRoot::open(host)?;
+        let path = sources.normalize(relative)?;
+        let relative = path.to_str().context("graph path must be UTF-8")?;
         if !self.has_file_coverage {
             return Ok(None);
         }
         let Some(conn) = &self.conn else {
             return Ok(None);
         };
-        let absolute = host.join(relative).to_string_lossy().to_string();
-        match conn.query_row(
-            "SELECT unresolved FROM files WHERE file_path IN (?1,?2) LIMIT 1",
-            params![absolute, relative],
-            |row| row.get::<_, i64>(0),
-        ) {
-            Ok(value) => Ok(Some(value != 0)),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(error) => Err(error).context("read indexed file dependency coverage"),
-        }
-    }
-
-    /// Validate every bounded endpoint, including deleted and dirty callers.
-    pub fn validate_projection(
-        &self,
-        host: &Path,
-        relative: &str,
-        projection: &mut Projection,
-    ) -> Result<()> {
-        if let Some(indexed) = self.indexed_hash(host, relative)? {
-            if current_hash(host, relative)?.as_deref() != Some(&indexed) {
-                projection.graph_status = "stale (indexed source hash differs)".to_owned();
-                projection.symbols.clear();
-                projection.callers.clear();
-                projection.callees.clear();
-                return Ok(());
-            }
-        }
-        let mut invalid = HashSet::new();
-        for row in projection.callers.iter().chain(&projection.callees) {
-            if let Some(indexed) = self.indexed_hash(host, &row.file_path)? {
-                if current_hash(host, &row.file_path)?.as_deref() != Some(&indexed) {
-                    invalid.insert(row.file_path.clone());
-                }
-            }
-        }
-        if !invalid.is_empty() {
-            projection
-                .callers
-                .retain(|row| !invalid.contains(&row.file_path));
-            projection
-                .callees
-                .retain(|row| !invalid.contains(&row.file_path));
-            projection.graph_status = "stale (relationship endpoint differs)".to_owned();
-            projection.relationship_limit_reached = true;
-        }
-        Ok(())
+        let absolute = sources.host().join(relative);
+        // All absolute/relative aliases must explicitly store integer zero.
+        // MAX over no rows is NULL; NULL/text/blob/nonzero rows are unknown.
+        // The shared operation guard bounds scanning adversarial alias counts.
+        let value=conn.query_row(
+            "SELECT max(CASE WHEN typeof(unresolved)='integer' AND unresolved=0 THEN 0 ELSE 1 END) FROM files WHERE file_path IN (?1,?2)",
+            params![absolute.to_str().context("graph path must be UTF-8")?, relative],
+            |row| row.get::<_, Option<i64>>(0),
+        ).context("read indexed file dependency coverage")?;
+        Ok(value.map(|value| value != 0))
     }
 
     pub fn open(host: &Path, explicit_db: Option<&Path>) -> Result<Self> {
         let path = match explicit_db {
             Some(path) if path.is_absolute() => path.to_path_buf(),
             Some(path) => host.join(path),
-            None if host.join(DEFAULT_DB).is_file() => host.join(DEFAULT_DB),
-            None => host.join(".code-review-graph/graph.db"),
+            None => Self::database_path(host),
         };
-        if !path.is_file() {
+        let Some(conn) = Reader::open(&path)? else {
             return Ok(Self::unavailable("unavailable (graph.db missing)"));
-        }
-        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX;
-        let conn = Connection::open_with_flags(&path, flags)
-            .with_context(|| format!("open graph index read-only: {}", path.display()))?;
-        conn.busy_timeout(Duration::from_secs(2))?;
-        conn.execute_batch("PRAGMA query_only=ON")?;
+        };
+        let path = conn.path().to_owned();
+        let operation = conn.operation()?;
         let nodes = columns(&conn, "nodes")?;
         let edges = columns(&conn, "edges")?;
         let files = columns(&conn, "files")?;
@@ -190,6 +148,8 @@ impl GraphStore {
         }
         let metadata = read_metadata(&conn)?;
         let generation = database_generation(&path, &metadata)?;
+        conn.verify()?;
+        drop(operation);
         Ok(Self {
             generation,
             metadata,
@@ -236,6 +196,19 @@ impl GraphStore {
         symbol: Option<&str>,
         max_edges: usize,
     ) -> Result<Projection> {
+        ensure!(
+            (1..=100).contains(&max_edges),
+            "graph edge limit must be 1..100"
+        );
+        ensure!(
+            symbol.is_none_or(|s| s.len() <= 512 && !s.contains('\0')),
+            "invalid graph symbol"
+        );
+        let _operation = self.operation()?;
+        let sources = SourceRoot::open(host)?;
+        let host = sources.host();
+        let relative_path = sources.normalize(relative)?;
+        let relative = relative_path.to_str().context("graph path must be UTF-8")?;
         let Some(conn) = &self.conn else {
             return Ok(Projection {
                 graph_status: self.unavailable.clone().unwrap_or_default(),
@@ -276,7 +249,7 @@ impl GraphStore {
         } else if symbols.is_empty() {
             "unindexed (file or symbol absent from graph)"
         } else {
-            "ok"
+            "unverified (source hashes not checked)"
         };
         if symbols.is_empty() {
             transaction.commit().context("finish graph snapshot")?;
@@ -542,8 +515,26 @@ pub(super) fn columns(conn: &Connection, table: &str) -> Result<HashSet<String>>
         "index_meta" => "PRAGMA table_info(index_meta)",
         _ => unreachable!(),
     };
+    let mut schema = conn.prepare(
+        "SELECT type,upper(substr(ltrim(sql),1,13)) FROM sqlite_schema WHERE name=?1 COLLATE NOCASE LIMIT 1",
+    )?;
+    let kind = schema.query_row([table], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+    });
+    match kind {
+        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(HashSet::new()),
+        Ok((kind, Some(prefix))) if kind == "table" && prefix == "CREATE TABLE " => {}
+        Ok(_) => anyhow::bail!("graph {table} must be an ordinary table"),
+        Err(error) => return Err(error).context("inspect graph table kind"),
+    }
     let mut stmt = conn.prepare(sql)?;
-    let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    let rows = stmt.query_map([], |row| {
+        let name = row.get_ref(1)?.as_str()?;
+        if name.len() > 128 || name.contains('\0') {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(name.to_owned())
+    })?;
     rows.collect::<rusqlite::Result<HashSet<_>>>()
         .with_context(|| format!("read {table} schema"))
 }
@@ -560,7 +551,7 @@ fn short_path(host: &Path, value: &str) -> String {
     let absolute = PathBuf::from(value);
     absolute
         .strip_prefix(host)
-        .map(|relative| relative.to_string_lossy().replace('\\', "/"))
+        .map(|relative| relative.to_string_lossy().into_owned())
         .unwrap_or_else(|_| value.to_string())
 }
 
@@ -577,27 +568,7 @@ pub fn valid_hash(hash: &str) -> bool {
 }
 
 pub fn current_hash(host: &Path, relative: &str) -> Result<Option<String>> {
-    let path = host.join(relative);
-    let canonical = match path.canonicalize() {
-        Ok(path) => path,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error).context("resolve graph endpoint"),
-    };
-    ensure!(
-        canonical.starts_with(host.canonicalize()?),
-        "graph endpoint escapes host: {relative}"
-    );
-    let size = canonical.metadata()?.len();
-    ensure!(
-        size <= 1 << 20,
-        "graph endpoint exceeds source byte budget: {relative}"
-    );
-    let bytes = std::fs::read(&canonical)?;
-    ensure!(
-        bytes.len() <= 1 << 20,
-        "graph endpoint grew beyond source byte budget: {relative}"
-    );
-    Ok(Some(format!("{:x}", Sha256::digest(bytes))))
+    SourceRoot::open(host)?.hash(relative)
 }
 
 fn read_metadata(conn: &Connection) -> Result<BTreeMap<String, String>> {
@@ -622,22 +593,36 @@ fn read_metadata(conn: &Connection) -> Result<BTreeMap<String, String>> {
 }
 
 fn database_generation(path: &Path, metadata: &BTreeMap<String, String>) -> Result<String> {
-    let stat = path.metadata()?;
+    let stat = std::fs::symlink_metadata(path)?;
+    ensure!(
+        stat.is_file(),
+        "graph database generation is not a regular file"
+    );
     let modified = stat.modified()?.duration_since(std::time::UNIX_EPOCH)?;
     let mut wal_path = path.as_os_str().to_owned();
     wal_path.push("-wal");
-    let wal = match std::fs::metadata(wal_path) {
-        Ok(stat) => Some((
-            stat.len(),
-            stat.modified()?
-                .duration_since(std::time::UNIX_EPOCH)?
-                .as_nanos(),
-        )),
+    let wal = match std::fs::symlink_metadata(wal_path) {
+        Ok(stat) => {
+            ensure!(stat.is_file(), "graph WAL generation is not a regular file");
+            Some((
+                stat.dev(),
+                stat.ino(),
+                stat.len(),
+                stat.mtime(),
+                stat.mtime_nsec(),
+                stat.ctime(),
+                stat.ctime_nsec(),
+            ))
+        }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => return Err(error).context("stat external graph WAL generation"),
     };
     let stamp = format!(
-        "{}:{}:{:?}:{wal:?}",
+        "{}:{}:{}:{}:{}:{}:{:?}:{wal:?}",
+        stat.dev(),
+        stat.ino(),
+        stat.ctime(),
+        stat.ctime_nsec(),
         stat.len(),
         modified.as_nanos(),
         metadata

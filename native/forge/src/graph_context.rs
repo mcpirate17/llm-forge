@@ -356,40 +356,33 @@ fn resolve_code_path(host: &Path, raw: &str) -> Result<(PathBuf, String)> {
         !raw.is_empty() && raw.len() <= MAX_PATH_BYTES && !raw.contains('\0'),
         "invalid code path (empty, NUL, or over {MAX_PATH_BYTES} bytes)"
     );
-    let path = Path::new(raw);
-    let candidate = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        host.join(path)
-    };
-    let canonical = candidate
-        .canonicalize()
-        .with_context(|| format!("code file not found: {raw}"))?;
-    let relative = canonical
-        .strip_prefix(host)
-        .with_context(|| format!("code path escapes host: {raw}"))?;
+    let root = conductor_native::graph_context::files::SourceRoot::open(host)?;
+    let relative = root
+        .normalize(raw)
+        .with_context(|| format!("code path escapes host or contains unsafe components: {raw}"))?;
     ensure!(
         relative
             .components()
             .all(|c| { !c.as_os_str().to_string_lossy().starts_with('.') }),
         "hidden code path is not allowed: {raw}"
     );
-    let relative = relative.to_string_lossy().replace('\\', "/");
-    Ok((canonical, relative))
+    let absolute = root.host().join(&relative);
+    let relative = relative
+        .to_str()
+        .context("code path must be UTF-8")?
+        .to_owned();
+    Ok((absolute, relative))
 }
 
 fn read_source_resolved(host: &Path, relative: String) -> Result<SourceFile> {
-    let snapshot = forge::source_file::SourceRoot::open(host)?.read(Path::new(&relative))?;
-    ensure!(
-        snapshot.content().len() <= MAX_SOURCE_BYTES,
-        "code file exceeds {MAX_SOURCE_BYTES} bytes: {relative}"
-    );
-    let digest = snapshot.sha256().to_owned();
-    let text = snapshot.into_content();
+    let root = conductor_native::graph_context::files::SourceRoot::open(host)?;
+    let snapshot = root
+        .read_text(&relative, MAX_SOURCE_BYTES)?
+        .context("code file not found")?;
     Ok(SourceFile {
         relative,
-        text,
-        digest,
+        text: snapshot.text,
+        digest: snapshot.sha256,
     })
 }
 
@@ -400,6 +393,7 @@ fn project_context(
     symbol: Option<&str>,
     max_edges: usize,
 ) -> Result<ContextOutput> {
+    let _operation = store.operation()?;
     let mut projection = store.project(host, &file.relative, symbol, max_edges)?;
     store.validate_projection(host, &file.relative, &mut projection)?;
     store.verify_generation()?;
@@ -419,7 +413,10 @@ fn project_context(
         projection.callees.clear();
         projection.symbols.clear();
     }
-    if projection.graph_status.starts_with("stale") || projection.symbols.is_empty() {
+    if projection.graph_status.starts_with("stale")
+        || projection.graph_status.starts_with("unverified")
+        || projection.symbols.is_empty()
+    {
         let language = conductor_native::syntax::Language::from_path(Path::new(&file.relative))
             .context("unsupported source language")?
             .name();

@@ -3,6 +3,10 @@
 //! Python retains AST canonicalization and CLI presentation. This core is
 //! callable without an interpreter and never opens a writable graph database.
 
+#[path = "graph_context_database.rs"]
+pub mod database;
+#[path = "graph_context_files.rs"]
+pub mod files;
 #[cfg(feature = "source-analysis")]
 #[path = "graph_context_skeleton.rs"]
 mod skeleton;

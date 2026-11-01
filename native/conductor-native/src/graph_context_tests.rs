@@ -456,11 +456,10 @@ fn visit_dependencies(
     let mut queue: VecDeque<(String, usize)> =
         paths.iter().cloned().map(|path| (path, 0)).collect();
     let config = pytest_config(root);
-    let unresolved: HashSet<String> = store
+    let unresolved: Option<HashSet<String>> = store
         .metadata
         .get("unresolved_files")
-        .and_then(|text| serde_json::from_str(text).ok())
-        .unwrap_or_default();
+        .and_then(|text| serde_json::from_str(text).ok());
     while let Some((path, depth)) = queue.pop_front() {
         if !seen.insert(path.clone()) {
             continue;
@@ -487,7 +486,11 @@ fn visit_dependencies(
         let unknown = store
             .file_unresolved(root, &path)
             .map_err(|error| error.to_string())?
-            .unwrap_or_else(|| unresolved.contains(&path));
+            .unwrap_or_else(|| {
+                unresolved
+                    .as_ref()
+                    .is_none_or(|known| known.contains(&path))
+            });
         if unknown {
             reasons.insert("affected source has unresolved or dynamic dependencies".to_owned());
         }
@@ -643,6 +646,7 @@ pub(super) fn select(input: &Value) -> Result<Value, String> {
     if store.conn.is_none() {
         return Err("code-review graph missing or incompatible; run forge graph index".to_owned());
     }
+    let _operation = store.operation().map_err(|error| error.to_string())?;
     let mut reasons = reasons(&store, &root, input)?;
     let inventory_root = match input.get("inventory_root") {
         Some(value) => Path::new(

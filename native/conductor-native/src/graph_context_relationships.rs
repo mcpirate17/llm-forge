@@ -42,6 +42,7 @@ fn read_graph(
     target: Option<&str>,
 ) -> Result<(Vec<GraphRelationship>, Vec<GraphRelationship>, String), String> {
     let store = super::store::GraphStore::open(repo, None).map_err(|error| error.to_string())?;
+    let _operation = store.operation().map_err(|error| error.to_string())?;
     let mut projection = store
         .project(repo, file_path, target, 50)
         .map_err(|error| error.to_string())?;
@@ -60,15 +61,10 @@ fn read_graph(
             })
             .collect()
     };
-    let status = if projection.graph_status.starts_with("unindexed") {
-        "ok".to_owned()
-    } else {
-        projection.graph_status
-    };
     Ok((
         convert(projection.callers),
         convert(projection.callees),
-        status,
+        projection.graph_status,
     ))
 }
 
@@ -78,21 +74,13 @@ pub(super) fn query(
     target: Option<&str>,
 ) -> Result<GraphResult, String> {
     let db_path = super::store::GraphStore::database_path(repo);
-    let (mut callers, callees, status) = if db_path.is_file() {
-        match read_graph(repo, &db_path, file_path, target) {
-            Ok((callers, callees, status)) => (callers, callees, status),
-            Err(error) => (
-                Vec::new(),
-                Vec::new(),
-                format!("unavailable (sqlite error: {error})"),
-            ),
-        }
-    } else {
-        (
+    let (mut callers, callees, status) = match read_graph(repo, &db_path, file_path, target) {
+        Ok((callers, callees, status)) => (callers, callees, status),
+        Err(error) => (
             Vec::new(),
             Vec::new(),
-            "unavailable (graph.db missing)".to_owned(),
-        )
+            format!("unavailable (sqlite error: {error})"),
+        ),
     };
     if let Some(symbol) = target {
         let mut seen: HashSet<String> = callers.iter().map(|row| row.file_path.clone()).collect();
