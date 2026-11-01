@@ -45,6 +45,10 @@ name = "candidate"
 harness = false
 
 [[bench]]
+name = "candidate_lines"
+harness = false
+
+[[bench]]
 name = "candidate_execution"
 harness = false
 
@@ -87,6 +91,7 @@ sha2 = "0.10"
 libc = "0.2"
 landlock = "0.4.7"
 toml = "0.8"
+yaml-rust2 = { version = "=0.13.0", default-features = false }
 # Candidate policy order affects check execution and receipt bindings.
 toml_edit = { version = "0.22", default-features = false, features = ["parse"] }
 # Native, offline tokenization only; no HTTP client, Python binding or trainer UI.
@@ -107,5 +112,6 @@ lto = "thin"
 codegen-units = 1
 
 [dev-dependencies]
+tempfile = "3"
 quick-xml = "0.41"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

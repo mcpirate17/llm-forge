@@ -5,7 +5,7 @@ use git2::{Index, Oid, Repository, RepositoryInitOptions, Signature, Time};
 use std::{
     fs::{self, OpenOptions},
     io::Write,
-    os::unix::fs::OpenOptionsExt,
+    os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
 };
 
@@ -19,6 +19,8 @@ pub(super) fn prepare(
     let mut options = RepositoryInitOptions::new();
     options.bare(true).external_template(false);
     let repo = Repository::init_opts(&git_dir, &options)?;
+    // Explicit private metadata permissions must not depend on the caller's umask.
+    fs::set_permissions(&git_dir, fs::Permissions::from_mode(0o700))?;
     let object_path = source.common_dir().join("objects");
     let object_path = object_path.canonicalize()?;
     let object_path = object_path
@@ -50,10 +52,12 @@ pub(super) fn prepare(
         &[],
     )?;
     repo.set_head_detached(commit)?;
+    fs::set_permissions(git_dir.join("HEAD"), fs::Permissions::from_mode(0o600))?;
     let index = runtime.join("index");
     let mut staged = Index::open(&index)?;
     staged.read_tree(&tree)?;
     staged.write()?;
+    fs::set_permissions(&index, fs::Permissions::from_mode(0o600))?;
     let mut config = repo.config()?;
     config.set_bool("core.bare", false)?;
     config.set_str(

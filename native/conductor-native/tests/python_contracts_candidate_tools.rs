@@ -1,5 +1,5 @@
 #![cfg(feature = "python-compat-tests")]
-//! Clang candidate-check command and scope contracts, asserted in Rust.
+//! Clang-tidy candidate-check command and scope contracts, asserted in Rust.
 
 #[path = "python_contracts/support.rs"]
 #[allow(dead_code)]
@@ -27,36 +27,10 @@ fn mock_return<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> Bound<'py, Py
 }
 
 #[test]
-fn clang_format_and_tidy_commands_scope_lines_and_database() {
+fn clang_tidy_command_scopes_lines_and_database() {
     let _case = Case::new();
     Python::attach(|py| {
         let clang = module(py, "conductor.candidate_review.clang_files");
-        let format = clang.getattr("_format_command").unwrap();
-        let command: Vec<String> = format
-            .call1(("clang-format", "f.c", vec![(3, 5), (9, 9)]))
-            .unwrap()
-            .extract()
-            .unwrap();
-        assert_eq!(
-            command,
-            [
-                "clang-format",
-                "--style=file",
-                "--dry-run",
-                "--Werror",
-                "--lines=3:5",
-                "--lines=9:9",
-                "f.c"
-            ]
-        );
-        let whole: Vec<String> = format
-            .call1(("clang-format", "f.c", py.None()))
-            .unwrap()
-            .extract()
-            .unwrap();
-        assert_eq!(whole.last().unwrap(), "f.c");
-        assert!(!whole.iter().any(|item| item.starts_with("--lines")));
-
         let tidy = clang.getattr("_tidy_command").unwrap();
         let db = path(py, Path::new("/db/compile_commands.json"));
         let scoped: Vec<String> = tidy
@@ -123,28 +97,25 @@ fn clang_analyzable_distinguishes_cuda_missing_database_and_present_database() {
         );
         let analyzable = clang.getattr("_analyzable").unwrap();
         let kwargs = kwargs(py, case.root());
-        let format = analyzable.call(("format", "k.cu"), Some(&kwargs)).unwrap();
-        assert!(format.get_item(0).unwrap().extract::<bool>().unwrap());
-        assert!(format.get_item(1).unwrap().is_none());
-        let cuda = analyzable.call(("tidy", "k.cu"), Some(&kwargs)).unwrap();
+        let cuda = analyzable.call(("k.cu",), Some(&kwargs)).unwrap();
         assert!(!cuda.get_item(0).unwrap().extract::<bool>().unwrap());
         assert!(text(&stderr.call_method0("getvalue").unwrap())
             .contains("not a host C/C++ translation unit"));
-        let missing = analyzable.call(("tidy", "f.cpp"), Some(&kwargs)).unwrap();
+        let missing = analyzable.call(("f.cpp",), Some(&kwargs)).unwrap();
         assert!(!missing.get_item(0).unwrap().extract::<bool>().unwrap());
         assert!(text(&stderr.call_method0("getvalue").unwrap())
             .contains("CMAKE_EXPORT_COMPILE_COMMANDS"));
         let db = case.write("compile_commands.json", "[]");
-        let present = analyzable.call(("tidy", "f.cpp"), Some(&kwargs)).unwrap();
+        let present = analyzable.call(("f.cpp",), Some(&kwargs)).unwrap();
         assert!(present.get_item(0).unwrap().extract::<bool>().unwrap());
         assert_eq!(text(&present.get_item(1).unwrap()), db.to_string_lossy());
     });
 }
 
 #[test]
-fn clang_tool_prefers_binary_beside_interpreter() {
+fn clang_tidy_tool_prefers_binary_beside_interpreter() {
     let case = Case::new();
-    let beside = case.write("bin/clang-format", "synthetic tool\n");
+    let beside = case.write("bin/clang-tidy", "synthetic tool\n");
     Python::attach(|py| {
         let sys = PyModule::import(py, "sys").unwrap();
         let executable = case.root().join("bin/python");
@@ -152,25 +123,18 @@ fn clang_tool_prefers_binary_beside_interpreter() {
         let tool = module(py, "conductor.candidate_review.clang_files")
             .getattr("_tool")
             .unwrap();
-        assert_eq!(
-            text(&tool.call1(("format",)).unwrap()),
-            beside.to_string_lossy()
-        );
+        assert_eq!(text(&tool.call0().unwrap()), beside.to_string_lossy());
     });
 }
 
 #[test]
-fn clang_unchanged_file_never_invokes_subprocess() {
+fn clang_tidy_unchanged_file_never_invokes_subprocess() {
     let case = Case::new();
     Python::attach(|py| {
         let clang = module(py, "conductor.candidate_review.clang_files");
         let empty = pyo3::types::PyList::empty(py).into_any();
         let _ranges = AttrPatch::replace(&clang, "_ranges", &mock_return(py, &empty));
-        let database = path(py, &case.root().join("db.json"));
-        let allowed = pyo3::types::PyList::new(py, [py.None(), database.unbind()]).unwrap();
-        allowed.set_item(0, true).unwrap();
-        let allowed = allowed.into_any();
-        let _analyzable = AttrPatch::replace(&clang, "_analyzable", &mock_return(py, &allowed));
+        case.write("compile_commands.json", "[]");
         let error = PyModule::import(py, "builtins")
             .unwrap()
             .getattr("AssertionError")
@@ -192,7 +156,7 @@ fn clang_unchanged_file_never_invokes_subprocess() {
             clang
                 .getattr("_check_one")
                 .unwrap()
-                .call(("format", "clang-format", "f.c"), Some(&kwargs))
+                .call(("clang-tidy", "f.cpp"), Some(&kwargs))
                 .unwrap()
                 .extract::<i64>()
                 .unwrap(),

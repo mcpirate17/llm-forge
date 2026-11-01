@@ -27,6 +27,13 @@ under `src/`; the native migration is incomplete. See the
 [native Cargo lint contract](native-cargo-lint.md), and
 [scan measurements](performance.md#native-scan-admission-and-line-lookup).
 
+The [native Clang formatter](native-clang-format.md) uses bounded changed-line
+planning from exact Git objects, explicit tool grants, captured styles and
+snapshot drift checks. Its Python mode is deleted. The next Clang milestone is
+native clang-tidy with pinned compile databases and validated path mapping;
+missing build context must report an incomplete check. Shared Python diff-range
+consumers remain until their replacements are wired and verified.
+
 Executable identity stamping now belongs to the separate `forge-cli` workspace
 package. Git/source identities, installed-artifact checks and source-bound
 receipts remain enforced while reusable library and test builds retain their

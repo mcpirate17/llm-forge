@@ -1,6 +1,9 @@
 //! Exact, bounded Git object identities for candidate review, without a Git child.
 mod changes;
+pub mod lines;
 mod resolve;
+mod tool_context;
+pub use tool_context::ToolBinding;
 #[cfg(test)]
 mod tests;
 

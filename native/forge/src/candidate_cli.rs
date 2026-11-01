@@ -16,6 +16,8 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Check exact changed lines using an explicitly provisioned native formatter.
+    ClangFormat(crate::candidate_clang_format_cli::FormatArgs),
     /// Plan or run Cargo lint tools; isolated execution belongs to the parent stage.
     CargoLint(crate::candidate_cargo_lint_cli::LintArgs),
     /// Prepare or execute one isolated external check using operator grants.
@@ -78,6 +80,7 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::ClangFormat(args) => return crate::candidate_clang_format_cli::run(args),
         Action::CargoLint(args) => return crate::candidate_cargo_lint_cli::run(args),
         Action::Report(args) => crate::candidate_report_cli::run(args)?,
         Action::ExecuteBatch(args) => {

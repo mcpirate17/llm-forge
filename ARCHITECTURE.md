@@ -1226,12 +1226,12 @@ wrapper is deleted; the remaining legacy dispatcher forwards metadata to the
 same evaluator. Missing, stale or inconsistent evidence fails. See the
 [audit contract](docs/native-cargo-audit.md).
 
-Native candidate Cargo lint now plans bounded workspace and borrowed-target
-scope and runs fmt/clippy through granted external stages with an explicit Cargo
-binary and private runtime directories. Its Python wrapper, ambient toolchain
-shim, and compatibility target are retired; policy keeps the check IDs and
-routes commands uncached through Forge. There are 125 Python files under `src/`.
-See the [native Cargo lint contract](docs/native-cargo-lint.md).
+Native [Cargo lint](docs/native-cargo-lint.md) plans bounded workspace/borrowed
+scope and runs fmt/clippy through granted stages with private runtime directories.
+Its Python wrapper, ambient shim and compatibility target are deleted.
+Native [clang-format](docs/native-clang-format.md) uses exact Git blob ranges,
+snapshot-bound styles and an explicit ELF. Its Python mode is deleted; native
+clang-tidy compile-database capture and shared diff-range retirement remain.
 
 ## Executable identity and reusable builds
 

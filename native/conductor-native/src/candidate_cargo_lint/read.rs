@@ -4,7 +4,9 @@ use std::io::Read;
 
 /// Strict descriptor-relative optional read. None means only an initially missing
 /// component; changes after admission are errors. No elapsed I/O deadline claim.
-/// Maximum must be1..=1MiB. UTF8 decoding/schema validation belong to the caller.
+/// Maximum must be1..=8MiB. Cargo config/manifest callers retain their 1MiB cap;
+/// native snapshot consumers may request the larger bound. Decoding/schema
+/// validation belong to the caller.
 pub fn read_optional(root: &Dir, path: &str, maximum: usize) -> Result<Option<Vec<u8>>, String> {
     read_shared(root, path, maximum, &mut Budget::new())
 }
@@ -52,8 +54,8 @@ fn read_checked(
     budget: &mut Budget,
     before_finish: impl FnOnce(),
 ) -> Result<Option<Vec<u8>>, String> {
-    if !(1..=1024 * 1024).contains(&maximum) {
-        return Err("lint read maximum must be 1..1048576 bytes".into());
+    if !(1..=8 * 1024 * 1024).contains(&maximum) {
+        return Err("lint read maximum must be 1..8388608 bytes".into());
     }
     let parts = path_parts(path, false)?;
     let name = parts.last().expect("validated nonempty path");
@@ -107,6 +109,21 @@ mod tests {
         fn drop(&mut self) {
             std::fs::remove_dir_all(&self.0).expect("remove owned read fixture");
         }
+    }
+    #[test]
+    fn snapshot_reader_accepts_large_bounded_blobs_without_relaxing_caller_caps() {
+        let path = std::env::temp_dir().join(crate::native_id::new("snapshot-read-test").unwrap());
+        std::fs::create_dir(&path).unwrap();
+        let _cleanup = Cleanup(path.clone());
+        let root = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
+        let bytes = vec![b'x'; 2 * 1024 * 1024];
+        std::fs::write(path.join("source.cpp"), &bytes).unwrap();
+        assert!(read_optional(&root, "source.cpp", 1024 * 1024).is_err());
+        assert_eq!(
+            read_optional(&root, "source.cpp", 8 * 1024 * 1024).unwrap(),
+            Some(bytes)
+        );
+        assert!(read_optional(&root, "source.cpp", 8 * 1024 * 1024 + 1).is_err());
     }
     #[test]
     fn read_identity_rechecks_confined_path_without_timing_race() {

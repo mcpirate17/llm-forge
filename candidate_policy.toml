@@ -667,35 +667,14 @@ memory_mb = 8192
 max_output_chars = 30000
 
 [checks.clang-format]
-# The 125 host C/C++ files match no base clang-format style -- measured, see
-# .clang-format -- so this is line-scoped: {base} lets the wrapper ask git which
-# lines the candidate wrote and pass them as --lines. The tree converges file by
-# file as people edit it, instead of in one unreviewed sweep.
-#
-# .cu/.cuh are excluded by class: clang parses CUDA only with a toolkit and
-# --cuda-gpu-arch, which is not a formatter's business.
+# Native Forge owns changed-line selection and invokes the explicitly granted
+# formatter binary through the supervised candidate stage.
 kind = "command"
 profiles = ["fast", "full"]
 classes = ["cfamily_host"]
-command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.clang_files",
-  "--mode",
-  "format",
-  "--base",
-  "{base}",
-  "{files}",
-]
-version_command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.clang_files",
-  "--mode",
-  "format",
-  "--version",
-]
-cache = true
+command = ["forge", "candidate", "clang-format", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "clang-format", "--tool-version"]
+cache = false
 severity = "high"
 timeout_seconds = 300
 memory_mb = 4096
@@ -1150,12 +1129,12 @@ provided_by = "rustup component add rustfmt"
 rationale = "checks.cargo-fmt; the pinned CI toolchain installs it as a component, so no version to compare against here"
 
 [tools.clang-format]
-executable = "clang-format"
-version_command = ["clang-format", "--version"]
+executable = "forge"
+version_command = ["forge", "candidate", "clang-format", "--tool-version"]
 expected_version = "23.1.0"
 required_profiles = ["fast", "full"]
-provided_by = "uv sync --group dev (clang-format>=20.1.0)"
-rationale = "checks.clang-format; a PyPI-packaged LLVM binary rather than the distro's, so uv.lock pins the version every lane formats with"
+provided_by = "operator-provisioned native clang-format 23.1.0, granted as FORGE_CLANG_FORMAT"
+rationale = "The native Forge stage resolves changed lines and invokes an explicitly granted ELF; the test wheel is operator-provisioned and is not pinned by uv.lock."
 
 [tools.clang-tidy]
 executable = "clang-tidy"
