@@ -779,9 +779,8 @@ def files_for_policy(ctx: ReviewContext, check: CheckPolicy) -> list[str]:
         "files-for-policy",
         {
             "changes": [asdict(change) for change in ctx.candidate.changes],
-            "classes": check.classes,
-            "exclude_classes": check.exclude_classes,
-            "run_on_deletions": check.run_on_deletions,
+            **asdict(check),
+            "snapshot": str(ctx.snapshot),
         },
     )
     return native["files"]

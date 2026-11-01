@@ -391,10 +391,25 @@ pub fn dependency_integrity_with(
 }
 
 pub fn files_for_policy(payload: &Value) -> Result<Value, String> {
-    Ok(json!({"files": select_files(array(payload, "changes")?, payload)?}))
+    let files = select_files(array(payload, "changes")?, payload)?;
+    if !files.is_empty()
+        && crate::candidate_checks::file_inputs::parse(payload)?
+            == crate::candidate_checks::file_inputs::FileInput::CppcheckList
+    {
+        let snapshot = payload
+            .get("snapshot")
+            .and_then(Value::as_str)
+            .ok_or("cppcheck-list requires a snapshot path")?;
+        let root = cap_std::fs::Dir::open_ambient_dir(snapshot, cap_std::ambient_authority())
+            .map_err(|error| format!("open candidate snapshot: {error}"))?;
+        crate::candidate_checks::preflight_file_inputs(payload, &files, &root)?;
+    }
+    Ok(json!({"files": files}))
 }
 
 pub fn select_files<'a>(changes: &'a [Value], policy: &Value) -> Result<Vec<&'a str>, String> {
+    let input = crate::candidate_checks::file_inputs::parse(policy)?;
+    let suffixes = crate::candidate_policy::PathSuffixes::new(policy.get("path_suffixes"))?;
     let included = string_set(array(policy, "classes")?)?;
     let excluded = string_set(array(policy, "exclude_classes")?)?;
     let deletions = policy["run_on_deletions"]
@@ -415,7 +430,13 @@ pub fn select_files<'a>(changes: &'a [Value], policy: &Value) -> Result<Vec<&'a 
         let blocked = classes
             .iter()
             .any(|class| excluded.contains(class.as_str().unwrap()));
-        if (deletions || mode != "000000") && selected && !blocked {
+        if (deletions || mode != "000000") && selected && !blocked && suffixes.matches(path) {
+            if input == crate::candidate_checks::file_inputs::FileInput::CppcheckList {
+                crate::candidate_checks::file_inputs::path(path)?;
+                if !matches!(mode, "100644" | "100755") {
+                    return Err("cppcheck-list input must be a regular Git file".into());
+                }
+            }
             files.push(path);
         }
     }

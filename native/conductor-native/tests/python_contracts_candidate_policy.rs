@@ -282,3 +282,137 @@ fn value_waiver_parser_keeps_exact_nodeids_and_date_objects() {
         );
     });
 }
+
+fn cppcheck_compat_check<'py>(py: Python<'py>, fixture: &std::path::Path) -> Bound<'py, PyAny> {
+    let policy_module = module(py, "conductor.candidate_review.policy");
+    let loaded = policy_module
+        .getattr("load_policy")
+        .unwrap()
+        .call1((path(py, fixture),))
+        .unwrap();
+    let check = loaded
+        .getattr("checks")
+        .unwrap()
+        .try_iter()
+        .unwrap()
+        .map(|check| check.unwrap())
+        .find(|check| attr_text(check, "check_id") == "cppcheck")
+        .unwrap();
+    assert_eq!(
+        check
+            .getattr("path_suffixes")
+            .unwrap()
+            .cast::<PyTuple>()
+            .unwrap()
+            .extract::<Vec<String>>()
+            .unwrap(),
+        [".c", ".cpp"]
+    );
+    assert_eq!(attr_text(&check, "file_input"), "cppcheck-list");
+    let raw = module(py, "dataclasses")
+        .getattr("asdict")
+        .unwrap()
+        .call1((&check,))
+        .unwrap();
+    let rebuilt = policy_module
+        .getattr("_check")
+        .unwrap()
+        .call1((raw,))
+        .unwrap();
+    assert!(rebuilt
+        .getattr("path_suffixes")
+        .unwrap()
+        .is_instance_of::<PyTuple>());
+    assert_eq!(attr_text(&rebuilt, "file_input"), "cppcheck-list");
+    rebuilt
+}
+
+fn cppcheck_compat_context<'py>(
+    py: Python<'py>,
+    snapshot: &std::path::Path,
+    paths: &[(&str, &str)],
+) -> Bound<'py, PyAny> {
+    let change = module(py, "conductor.candidate_review.model")
+        .getattr("Change")
+        .unwrap();
+    let changes = pyo3::types::PyList::empty(py);
+    for (name, mode) in paths {
+        changes
+            .append(
+                change
+                    .call1((
+                        "M",
+                        *name,
+                        Option::<String>::None,
+                        "100644",
+                        *mode,
+                        "a".repeat(40),
+                        "b".repeat(40),
+                        ("native",),
+                    ))
+                    .unwrap(),
+            )
+            .unwrap();
+    }
+    let namespace = module(py, "types").getattr("SimpleNamespace").unwrap();
+    let candidate = namespace.call0().unwrap();
+    candidate.setattr("changes", changes).unwrap();
+    let context = namespace.call0().unwrap();
+    context.setattr("candidate", candidate).unwrap();
+    context.setattr("snapshot", path(py, snapshot)).unwrap();
+    context
+}
+
+#[test]
+fn cppcheck_dataclass_metadata_and_snapshot_reach_real_native_selector() {
+    let case = Case::new();
+    let fixture=case.write("cppcheck-policy.toml",&format!("{POLICY}\n[checks.cppcheck]\nkind='command'\nprofiles=['full']\nclasses=['native']\npath_suffixes=['.C','.CPP']\nfile_input='cppcheck-list'\ncommand=['cppcheck','--file-list={{changed_files_file}}']\nversion_command=['cppcheck','--version']\n"));
+    let snapshot = case.mkdir("snapshot");
+    case.write("snapshot/yes.CPP", "int staged;\n");
+    case.write("snapshot/no.rs", "fn no() {}\n");
+    case.write("snapshot/a\\b.cpp", "int backslash;\n");
+    case.write("snapshot/a/b.cpp", "int directory;\n");
+    std::os::unix::fs::symlink("yes.CPP", snapshot.join("link.cpp")).unwrap();
+    Python::attach(|py| {
+        let check = cppcheck_compat_check(py, &fixture);
+        let select = module(py, "conductor.candidate_review.checks")
+            .getattr("files_for_policy")
+            .unwrap();
+        let context =
+            cppcheck_compat_context(py, &snapshot, &[("yes.CPP", "100644"), ("no.rs", "100644")]);
+        assert_eq!(
+            select
+                .call1((context, &check))
+                .unwrap()
+                .extract::<Vec<String>>()
+                .unwrap(),
+            ["yes.CPP"]
+        );
+        for (paths, message) in [
+            (
+                vec![("a\\b.cpp", "100644"), ("a/b.cpp", "100644")],
+                "without backslashes",
+            ),
+            (vec![("link.cpp", "120000")], "regular Git file"),
+            (vec![("link.cpp", "100644")], "not a regular file"),
+            (vec![("missing.cpp", "100644")], "inspect input missing.cpp"),
+        ] {
+            let context = cppcheck_compat_context(py, &snapshot, &paths);
+            let error = select.call1((context, &check)).unwrap_err();
+            assert_error(
+                py,
+                error,
+                &module(py, "builtins").getattr("ValueError").unwrap(),
+                message,
+            );
+        }
+    });
+    assert_eq!(
+        std::fs::read(snapshot.join("yes.CPP")).unwrap(),
+        b"int staged;\n"
+    );
+    assert_eq!(
+        std::fs::read_link(snapshot.join("link.cpp")).unwrap(),
+        std::path::Path::new("yes.CPP")
+    );
+}

@@ -225,6 +225,15 @@ impl CheckPlan {
             .context("stage requires external command")?;
         let source = selection.source()?;
         let workspace = Workspace::new(&source, &selection.candidate.tree_oid, &selection.grants)?;
+        if self.normalized["file_input"] == "cppcheck-list" {
+            let files: Vec<&str> = self.files.iter().map(String::as_str).collect();
+            conductor_native::candidate_checks::preflight_file_inputs(
+                &self.normalized,
+                &files,
+                &workspace.directory()?,
+            )
+            .map_err(anyhow::Error::msg)?;
+        }
         let path = workspace.path();
         let runtime = workspace.runtime();
         let prepared = crate::candidate_command::prepare(

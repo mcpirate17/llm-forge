@@ -5,11 +5,14 @@
 mod ast;
 #[path = "candidate_checks_evidence.rs"]
 mod evidence;
+#[path = "candidate_file_inputs.rs"]
+pub(crate) mod file_inputs;
 #[path = "candidate_checks_integrity.rs"]
 mod integrity;
 #[path = "candidate_checks_scan.rs"]
 mod scan;
 
+pub use file_inputs::preflight_file_inputs;
 pub use integrity::dependency_integrity_with;
 /// Select paths from a captured change inventory without cloning it per check.
 pub use integrity::select_files;

@@ -78,6 +78,46 @@ mutation waivers may expire no more than 90 days after `today`. The planner
 returns inputs and schedule flags only: it does not execute checks, create
 review findings, or approve a candidate.
 
+### Native file selection and cppcheck inputs
+
+Checks may set `path_suffixes` to at most 64 distinct literal suffixes, each a
+dot followed by 1–31 ASCII letters, digits, underscores, pluses or hyphens.
+Normalization lowercases them and rejects duplicates without regard to case.
+An absent or empty list leaves selection unrestricted. Suffix matching uses
+the current basename after class, exclusion and deletion selection, allocates
+nothing per path, and keeps the existing sorted, deduplicated result. A lone
+dotfile such as `.c` has no suffix; `.hidden.c` does. Rename-side class unions
+do not make a current `.rs` path match `.c`.
+
+The shipped cppcheck check now uses this selector and invokes the C++ binary
+directly. Its Python wrapper has been deleted. The packaged policy is a symlink
+to the same root policy. The remaining legacy review bridge forwards dataclass
+metadata and the snapshot path into the shared Rust implementation; it contains
+no duplicate suffix or file-input algorithm.
+
+`file_input = "cppcheck-list"` requires a command check with exactly one
+`--file-list={changed_files_file}` argument and no `{files}` splice. The default
+`"paths"` preserves other checks' existing behavior. A list avoids interpreting
+leading-dash filenames as options. Cppcheck 2.13's
+[input parser](https://github.com/cppcheck-opensource/cppcheck/blob/2.13.0/cli/cmdlineparser.cpp)
+reads its entries as paths, but its
+[path handling](https://github.com/cppcheck-opensource/cppcheck/blob/2.13.0/lib/path.cpp)
+can reinterpret backslashes, so this protocol explicitly rejects them along
+with NUL, CR/LF and noncanonical relative paths. Selected Git entries must be
+regular files. Before either stage, native execution checks every entry through
+the private snapshot directory without following parent or leaf symlinks;
+missing files and special files fail. The legacy bridge uses the same native
+preflight. Admission bounds are 100,000 files, 4,096 bytes per path and 8 MiB
+of newline-delimited paths, checked before filesystem inspection.
+
+Cppcheck keeps its existing flags, severity and resource limits. A native-only
+change with no eligible C-family suffix now skips both version and analyzer
+stages instead of launching a wrapper that does nothing. No executable grant is
+needed for that skip. Selected checks still need an explicit cppcheck grant,
+usable version evidence and sandbox resources. Input preflight proves those
+files exist in the snapshot; it does not attest to an external analyzer's
+behavior or completeness of analysis.
+
 ### Assess supplied candidate results
 
 `assess` uses the same candidate selection, policy, profile, date, and scratch

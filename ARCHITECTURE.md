@@ -1208,10 +1208,16 @@ bounded output atomically through pinned parent directories. It does not infer
 review completeness from imported records. See the
 [report contract](docs/native-candidate-review.md#export-a-recorded-receipt).
 
+Cppcheck now runs directly through native command supervision. Shared Rust
+suffix selection and confined file-list preflight replace its deleted Python
+wrapper, preserving current-path selection and refusing ambiguous or missing
+inputs. The [file-input contract](docs/native-candidate-review.md#native-file-selection-and-cppcheck-inputs)
+defines the remaining legacy metadata bridge and explicit no-file skip.
+
 Full review orchestration, cache integration, evidence and waiver verification,
 test-engine migration, review-integrated reporting and attestation remain. The existing Python
 command runner still has these callers and has not been deleted prematurely;
-128 Python source files remain under `src/`. The native migration goal stays
+127 Python source files remain under `src/`. The native migration goal stays
 active until those consumers are replaced and their interpreted code is removed.
 
 ## Executable identity and reusable builds

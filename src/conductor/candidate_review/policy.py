@@ -20,56 +20,6 @@ from conductor.candidate_review.model import (
     sha256_file,
 )
 
-ALLOWED_TOP_LEVEL = {
-    "schema_version",
-    "block_at",
-    "max_workers",
-    "cache_ttl_days",
-    "claim_max_age_hours",
-    "max_file_bytes",
-    "max_binary_bytes",
-    "coverage_threshold",
-    "high_risk_coverage_threshold",
-    "baseline_expires",
-    "classes",
-    "risk",
-    "paths",
-    "checks",
-    "baselines",
-    "exceptions",
-    "mutation_waivers",
-    "value_waivers",
-    "tools",
-}
-ALLOWED_CHECK_KEYS = {
-    "kind",
-    "profiles",
-    "classes",
-    "exclude_classes",
-    "command",
-    "version_command",
-    "severity",
-    "timeout_seconds",
-    "wall_timeout_seconds",
-    "memory_mb",
-    "always",
-    "cache",
-    "run_on_deletions",
-    "max_output_chars",
-    "attribution",
-    "shard_max_files",
-    "shard_workers",
-}
-ALLOWED_EXCEPTION_KEYS = {
-    "id",
-    "check",
-    "rule",
-    "path",
-    "fingerprint",
-    "owner",
-    "justification",
-    "expires",
-}
 # Moved 2026-08-29 from 58da5608 to d3697f22. Waivers activate only when the
 # candidate's base commit equals this value, so the constant and the 100
 # [[mutation_waivers]] must move together -- which is the point: relocating the
@@ -104,47 +54,6 @@ TEST_NAME_SUFFIXES = (
     "Test.java",
 )
 
-ALLOWED_WAIVER_KEYS = {
-    "id",
-    "path",
-    "owner",
-    "justification",
-    "expires",
-    "milestone",
-    "integration_base",
-    "source_anchor",
-    "sha256",
-    "binding_clause",
-    "sources",
-}
-VALID_CLASSES = {
-    "binary",
-    "cfamily",
-    "cfamily_host",
-    "config",
-    "cuda",
-    "dependency",
-    "docs",
-    "generated",
-    "governance",
-    "native",
-    "notebook",
-    "novel",
-    "node_dependency",
-    "python",
-    "python_dependency",
-    "research_result",
-    "rust",
-    "rust_dependency",
-    "shell",
-    "source",
-    "symlink",
-    "test",
-    "toml",
-    "workflow",
-    "web",
-}
-
 
 class PolicyError(RuntimeError):
     """The candidate policy is absent, malformed, broad, or stale."""
@@ -175,6 +84,8 @@ class CheckPolicy:
     shard_workers: int = 1
     # 0 means "same as timeout_seconds"; read via `wall_timeout_seconds`.
     wall_timeout_override: int = 0
+    path_suffixes: tuple[str, ...] = ()
+    file_input: str = "paths"
 
     @property
     def wall_timeout_seconds(self) -> int:
@@ -365,6 +276,7 @@ def _check(raw: dict[str, Any]) -> CheckPolicy:
                     "profiles",
                     "classes",
                     "exclude_classes",
+                    "path_suffixes",
                     "command",
                     "version_command",
                 )

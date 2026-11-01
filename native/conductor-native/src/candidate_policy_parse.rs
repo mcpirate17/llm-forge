@@ -4,6 +4,9 @@ use super::candidate_policy_value::*;
 use super::candidate_policy_waivers::{mutation_waivers, parse_value_waivers};
 use serde_json::{json, Value};
 use std::collections::HashSet;
+#[path = "candidate_path_suffixes.rs"]
+mod candidate_path_suffixes;
+pub(crate) use candidate_path_suffixes::PathSuffixes;
 
 const TOP: &[&str] = &[
     "schema_version",
@@ -60,6 +63,8 @@ const CHECK_KEYS: &[&str] = &[
     "profiles",
     "classes",
     "exclude_classes",
+    "path_suffixes",
+    "file_input",
     "command",
     "version_command",
     "severity",
@@ -114,6 +119,9 @@ fn check(id: &str, entry: &Value) -> Result<Value> {
         &default(raw, "exclude_classes", json!([])),
         &format!("{field}.exclude_classes"),
     )?;
+    let path_suffixes = PathSuffixes::new(raw.get("path_suffixes"))
+        .map_err(|error| format!("{field}.{error}"))?
+        .into_strings();
     let command = strings(
         &default(raw, "command", json!([])),
         &format!("{field}.command"),
@@ -124,6 +132,12 @@ fn check(id: &str, entry: &Value) -> Result<Value> {
         &format!("{field}.version_command"),
         true,
     )?;
+    let file_input = crate::candidate_checks::file_inputs::parse(entry)
+        .map_err(|error| format!("{field}.{error}"))?;
+    let file_input = match file_input {
+        crate::candidate_checks::file_inputs::FileInput::Paths => "paths",
+        crate::candidate_checks::file_inputs::FileInput::CppcheckList => "cppcheck-list",
+    };
     if kind == "command" && (command.is_empty() || version_command.is_empty()) {
         return Err(format!(
             "command check {id} requires command and version_command"
@@ -141,7 +155,7 @@ fn check(id: &str, entry: &Value) -> Result<Value> {
     }
     Ok(
         json!({"check_id": id, "kind": kind, "profiles": profiles, "classes": classes,
-        "exclude_classes": exclude_classes, "command": command, "version_command": version_command,
+        "exclude_classes": exclude_classes, "path_suffixes":path_suffixes, "file_input":file_input, "command": command, "version_command": version_command,
         "severity": sev, "timeout_seconds": positive(&default(raw,"timeout_seconds",json!(60)), &format!("{field}.timeout_seconds"), Some(3600))?,
         "memory_mb": positive(&default(raw,"memory_mb",json!(2048)), &format!("{field}.memory_mb"), Some(65536))?,
         "attribution": attribution, "always": boolean(&default(raw,"always",json!(false)), &format!("{field}.always"))?,
@@ -446,5 +460,25 @@ pub fn fragment(operation: &str, raw: &Value, today: &str) -> Result<Value> {
             raw["field"].as_str().unwrap_or("value")
         )?)),
         _ => Err(format!("unknown candidate policy fragment: {operation}")),
+    }
+}
+
+#[cfg(test)]
+mod file_input_policy_tests {
+    use super::*;
+    #[test]
+    fn normalization_defaults_and_rejects_invalid_protocol() {
+        let mut input = json!({"kind":"command","profiles":["fast"],"command":["cppcheck", "--file-list={changed_files_file}"],"version_command":["cppcheck", "--version"]});
+        assert_eq!(check("test", &input).unwrap()["file_input"], "paths");
+        input["file_input"] = json!("cppcheck-list");
+        assert_eq!(
+            check("test", &input).unwrap()["file_input"],
+            "cppcheck-list"
+        );
+        input["file_input"] = Value::Null;
+        assert!(check("test", &input).is_err());
+        input["file_input"] = json!("cppcheck-list");
+        input["command"] = json!(["cppcheck", "{files}"]);
+        assert!(check("test", &input).is_err());
     }
 }

@@ -600,11 +600,16 @@ max_output_chars = 30000
 kind = "command"
 profiles = ["full"]
 classes = ["native"]
+path_suffixes = [".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".cu", ".cuh"]
+file_input = "cppcheck-list"
 command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.cppcheck_files",
-  "{files}",
+  "cppcheck",
+  "--enable=warning,performance,portability",
+  "--error-exitcode=1",
+  "--inline-suppr",
+  "--language=c++",
+  "--std=c++17",
+  "--file-list={changed_files_file}",
 ]
 version_command = ["cppcheck", "--version"]
 cache = true

@@ -11,6 +11,7 @@ mod candidate_policy_waivers;
 
 pub use candidate_policy_classify::classify;
 pub use candidate_policy_classify::{glob_match, GlobWorkspace, PreparedClassifier, PreparedGlob};
+pub(crate) use candidate_policy_parse::PathSuffixes;
 pub use candidate_policy_parse::{fragment, parse_policy};
 pub use candidate_policy_waivers::parse_value_waivers;
 
