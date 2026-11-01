@@ -19,7 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::civil::civil_from_days;
 
 #[derive(Args)]
-pub struct PlanArgs {
+pub struct PriorityArgs {
     /// Rank only changed production/validation sources in this policy's [risk].high.
     #[arg(long, requires = "priority_base")]
     pub priority_policy: Option<String>,
@@ -31,6 +31,12 @@ pub struct PlanArgs {
     /// Select using supplied cost hints; this is an estimate, not an execution cap.
     #[arg(long, requires = "priority_policy")]
     pub priority_budget_seconds: Option<f64>,
+}
+
+#[derive(Args)]
+pub struct PlanArgs {
+    #[command(flatten)]
+    pub priority: Box<PriorityArgs>,
     /// "python" or "rust"
     pub language: String,
 
@@ -75,6 +81,7 @@ pub struct PlanArgs {
 }
 
 pub fn run(args: PlanArgs) -> Result<i32> {
+    let priority_args = *args.priority;
     let repo_root = match args.repo_root {
         Some(path) => path,
         None => find_repo_root(&env::current_dir().context("reading the current directory")?)
@@ -93,12 +100,16 @@ pub fn run(args: PlanArgs) -> Result<i32> {
     };
 
     let request = PlanRequest {
-        priority: args.priority_policy.map(|policy_path| PriorityOptions {
-            policy_path,
-            base_ref: args.priority_base.expect("clap requires priority base"),
-            telemetry_path: args.priority_telemetry,
-            budget_seconds: args.priority_budget_seconds,
-        }),
+        priority: priority_args
+            .priority_policy
+            .map(|policy_path| PriorityOptions {
+                policy_path,
+                base_ref: priority_args
+                    .priority_base
+                    .expect("clap requires priority base"),
+                telemetry_path: priority_args.priority_telemetry,
+                budget_seconds: priority_args.priority_budget_seconds,
+            }),
         language: args.language,
         repo_root: repo_root.to_string_lossy().into_owned(),
         owner: args.owner,
