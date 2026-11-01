@@ -27,6 +27,8 @@ pub mod cards_cli;
 pub mod cgroup;
 pub mod civil;
 #[cfg(target_os = "linux")]
+pub mod code_context;
+#[cfg(target_os = "linux")]
 pub mod code_index;
 pub mod code_tools;
 pub mod embedding;

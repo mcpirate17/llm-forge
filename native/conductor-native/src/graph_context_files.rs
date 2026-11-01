@@ -34,6 +34,10 @@ impl SourceRoot {
     pub fn host(&self) -> &Path {
         &self.host
     }
+    pub(super) fn directory(&self) -> Result<Dir> {
+        self.check_root()?;
+        Ok(self.directory.try_clone()?)
+    }
     pub fn open(host: &Path) -> Result<Self> {
         Self::with_limit(host, MAX_SOURCE_BYTES)
     }
@@ -170,6 +174,10 @@ impl SourceRoot {
         );
         self.check_root()?;
         Ok(Some((digest, bytes)))
+    }
+    /// Revalidate the pinned host directory after a multi-file operation.
+    pub fn verify(&self) -> Result<()> {
+        self.check_root()
     }
     fn check_root(&self) -> Result<()> {
         let current = open_absolute_directory(&self.host)

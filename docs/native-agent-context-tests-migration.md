@@ -2,9 +2,13 @@
 
 > **Historical inventory:** This map records an earlier Python test cohort and
 > its then-current mappings. The CPU embedding and embedding-contract targets
-> listed below have since been retired with the Python broker adapters. Current
-> native broker coverage and interfaces are documented in
-> [`native-embedding-broker.md`](native-embedding-broker.md); this inventory is
+> listed below have since been retired with the Python broker adapters. The
+> `python_contracts_graph_context` target is also retired after native coverage;
+> its historical 18-case Python cohort is listed in the graph migration inventory.
+> The former integrated CLI is replaced by `forge code context FILE --root ROOT
+> [--symbol NAME] [--no-graph] [--json]`; `forge graph --host HOST context PATH` remains a separate
+> graph-index surface. Current native broker coverage and interfaces are documented
+> in [`native-embedding-broker.md`](native-embedding-broker.md); this inventory is
 > not a current target list or validation receipt.
 
 This map tracks the exact 40-file agent context and hook cohort below. A
@@ -118,7 +122,8 @@ leases, backpressure, regular-file output and unsafe input refusal using native
 processes. Two mixed wrapper tests in `python_contracts_agent_a2a.rs` were
 retired after those behaviors moved to the native suite.
 
-Source-context retrieval is an explicit operation through `forge graph refs`
-or `forge code inspect`. `native/forge/tests/graph_context.rs` covers contained
+Source-context retrieval is explicit through `forge graph refs`, `forge code inspect`,
+or the former integrated context replacement `forge code context FILE --root ROOT
+[--symbol NAME] [--no-graph] [--json]`. `native/forge/tests/graph_context.rs` covers contained
 references, deduplication, output bounds, symbol context, directed graph edges
 and invalid source handling. Watch no longer reads referenced source implicitly.

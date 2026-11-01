@@ -18,6 +18,8 @@ pub struct CodeArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Python/Rust signatures, source snapshot hashes and graph relationships.
+    Context(crate::code_context::ContextArgs),
     /// Definitions, signatures, lexical references, scopes and dependency spellings.
     Inspect {
         #[command(flatten)]
@@ -102,6 +104,7 @@ pub(crate) fn project(inspection: &Inspection, symbol: Option<&str>, limit: usiz
 
 pub fn run(args: CodeArgs) -> Result<u8> {
     match args.action {
+        Action::Context(context) => return crate::code_context::run(&args.root, context),
         Action::Inspect {
             source,
             symbol,

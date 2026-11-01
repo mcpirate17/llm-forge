@@ -1,10 +1,13 @@
 # Native graph context
 
 `forge graph index` builds a syntax-only Python/Rust index at `.forge/graph.db`.
-CLI context, Python context and graph test selection share one native storage
-adapter: they prefer that index and otherwise read `.code-review-graph/graph.db`
-without modifying it. Context retrieval starts no interpreter, embedding model
-or background service. Semantic similarity is not inferred from syntax edges.
+`forge graph context` and graph test selection use the native graph index,
+while `forge code context` is the direct replacement for the former
+`conductor.graph_context` file-context CLI. The commands are separate surfaces:
+`forge graph context` retrieves indexed graph relationships; `forge code context`
+combines a source projection with optional graph context and supports `--no-graph`.
+They do not start an interpreter, embedding model or background service. Semantic
+similarity is not inferred from syntax edges.
 
 ```sh
 forge graph --host /path/to/project index
@@ -101,9 +104,33 @@ refresh currently rewrites the bounded snapshot and resolves
 its calls; it does not claim incremental edge updates. Reports expose parsed and
 reused file counts, unresolved/dynamic calls and elapsed milliseconds.
 
-`conductor.graph_context` keeps Python's AST skeleton and uses the native Rust
-parser for Rust signatures, impls, traits and attributes. The bounded source
-skeleton cache keys on actual content, so same-size/same-mtime edits are safe.
+Use `forge code context FILE --root ROOT [--symbol NAME] [--no-graph] [--json]`
+for the former integrated file-context and source-skeleton operation. Python
+projection uses `source-preserving-v1` and preserves Python source layout. Rust
+projection uses `rust-signatures-v1`: source signature text is retained and Rust
+wrappers are reconstructed, with no original-layout guarantee. Each code-context
+invocation reads source afresh and rechecks its hash; it has no skeleton cache.
+The verified projection cache described above belongs only to `forge graph context`.
+Python module documentation is retained, and selecting a Python class includes
+its methods. Sources are capped at 1 MiB and serialized output at 4 MiB; exceeding
+a bound fails without partial output. `--expected-hash SHA256` requires the exact
+64-character lowercase source digest from an earlier result. JSON includes that
+digest, the projection format, symbols, callers, callees and explicit graph status;
+Markdown is the default. These projections are context data, not executable code.
+Use `forge graph --host HOST context PATH` when you want the graph-index
+relationship surface directly.
+
+Source discovery uses `ignore` 0.4.34 and authored `.rgignore`, `.ignore`, and
+`.gitignore` files. Ignore-type priority is `.rgignore` over `.ignore` over
+`.gitignore`, independent of depth; the closest rule within a type wins. Hidden
+entries and discovered symlinks are excluded without following their targets.
+Directly requested source paths and ignore files still reject symlinks. Discovery
+does not load global ignore config, rules above the root,
+or `.git/info/exclude`. Reads are pinned, no-follow, and bounded: 64,000,000
+aggregate source bytes, 100,000 entries, 10,000 hits, depth 128, and a cooperative
+5-second scan budget (not a blocking-I/O deadline); each Python source is at most
+1 MiB. Ignore inputs are capped at 64 KiB per file, 4 MiB aggregate, 20,000 lines,
+12,288 probes, and 8 MiB of paths.
 
 Graph test selection walks reverse dependencies transitively with cycle, depth
 and node caps. It checks native source inventory against indexed content before
@@ -122,16 +149,31 @@ metadata broadens selection. Matching source hashes alone cannot conceal a
 conflicting coverage flag.
 
 The current-only Rust 1.98.0 release benchmark uses 31 batches of 20 operations
-after 10 warmups. With warm filesystem caches on an unisolated host, a confined
-4 KiB hash measured 6.585 microseconds median batch mean (p95 6.755), and a
-4 KiB text-plus-hash snapshot measured 6.858 microseconds (p95 6.991). A
-projection with 12 caller edges across thirteen 2 KiB files, including source
-hash validation and generation checks, measured 207.902 microseconds (p95
-232.349). These exclude fixture setup, SQLite open, JSON serialization and
-process startup; they are not a historical speedup comparison. Run
+after 10 warmups, with warm filesystem caches on an unisolated host. Times are
+median and p95 batch means, in microseconds:
+
+| Workload | Source bytes | Median | p95 |
+| --- | ---: | ---: | ---: |
+| Confined 4 KiB hash | 4,096 | 6.503 | 8.488 |
+| Confined text and hash | 4,096 | 6.786 | 6.933 |
+| Verified 12 caller edges across 13 files | 26,624 | 207.444 | 232.502 |
+| Python skeleton, 256 functions | 18,102 | 1,719.050 | 1,723.198 |
+| Rust skeleton, 256 functions | 16,310 | 1,192.247 | 1,194.061 |
+| Rust skeleton, 2,048 functions on one line after Unicode | 81,780 | 7,890.328 | 7,906.534 |
+| Native syntactic scan, 32 Python files and authored ignore rules | 2,011 | 298.137 | 300.905 |
+
+All exclude fixture setup, final output serialization and process startup. The
+pre-opened graph workload excludes SQLite open; dispatch workloads include
+parser/admission/projection, allocation, internal serialization budget checks,
+or unavailable-store probing and ignore-file loading, as applicable. The scan
+reads its target but excludes it from the 31 returned callers and prunes 32
+generated files. Output records fixture hashes and exact per-workload scopes.
+These measurements are not a historical speedup or model-quality comparison. Run
 `cargo +1.98.0 bench --manifest-path native/forge/Cargo.toml --bench graph_context`
 to reproduce the workloads. Benchmark executable SHA-256:
-`5e9ff91f9692dab65a0b50a02ffb71b7b832a5367a2684eea88db712b8deb814`.
+`ded4540985e8ce18d8c9e277551d636924c3196d44139d68a74fd69b07e63f5b`.
+Recorded result SHA-256:
+`4b0a837aeabe7e9f39ab0a71c3100520e58a99619461634dd8331a32e52b0887`.
 
 The command follows the practical pattern of filtering data inside tools before
 returning it to the agent, described in Anthropic's

@@ -630,17 +630,11 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
         "embedding_contract.py",
         "http_transport.py",
         "index_notes.py",
+        "graph_context.py",
     ] {
         let selected = plan(&root, &[format!("src/conductor/{retired}")]).unwrap();
         assert!(selected.targets.is_empty(), "retired adapter: {retired}");
     }
-    let graph = plan(&root, &["src/conductor/graph_context.py".to_owned()]).unwrap();
-    assert!(graph
-        .targets
-        .contains(&"python_contracts_graph_context".to_owned()));
-    assert!(!graph
-        .targets
-        .contains(&"python_contracts_agent_a2a_graph_context".to_owned()));
     let hook = plan(&root, &["src/tooling/hooks/agent/crg_gate.py".to_owned()]).unwrap();
     assert!(hook.targets.is_empty());
 }
@@ -649,9 +643,9 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
 fn selection_is_stable_deduplicated_and_has_explicit_safe_argv() {
     let root = repo_root();
     let changed = [
-        "src/conductor/graph_context.py".to_owned(),
+        "src/conductor/ci_history_fetch.py".to_owned(),
         "./src/conductor/../conductor/gate_rollout.py".to_owned(),
-        root.join("src/conductor/graph_context.py")
+        root.join("src/conductor/ci_history_fetch.py")
             .display()
             .to_string(),
     ];
@@ -661,8 +655,8 @@ fn selection_is_stable_deduplicated_and_has_explicit_safe_argv() {
     assert_eq!(
         selected.source_paths,
         [
-            "src/conductor/gate_rollout.py",
-            "src/conductor/graph_context.py"
+            "src/conductor/ci_history_fetch.py",
+            "src/conductor/gate_rollout.py"
         ]
     );
     assert_eq!(selected.commands.len(), 1);

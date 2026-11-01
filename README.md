@@ -88,6 +88,16 @@ that exact host and socket. Filesystem roots, command capabilities and embedding
 endpoints are
 explicit configuration, not inferred grants from model output.
 
+Read Python or Rust signatures with optional graph relationships through the
+native context command:
+
+```sh
+forge code context path/to/source.py --root /path/to/project --symbol Service.run --json
+```
+
+Use `--no-graph` for source-only context. Results carry a source hash and explicit
+graph status; see [graph context](docs/graph-context.md) for bounds and formats.
+
 ## Verification and development
 
 ```sh

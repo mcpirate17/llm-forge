@@ -1,12 +1,13 @@
-//! Native graph relationship and Markdown policy for `conductor.graph_context`.
-//!
-//! Python retains AST canonicalization and CLI presentation. This core is
-//! callable without an interpreter and never opens a writable graph database.
+//! Native source skeletons, graph relationships and Markdown context policy.
+//! Callable without an interpreter; graph databases are opened read-only.
 
 #[path = "graph_context_database.rs"]
 pub mod database;
 #[path = "graph_context_files.rs"]
 pub mod files;
+#[cfg(feature = "source-analysis")]
+#[path = "graph_context_python.rs"]
+mod python_skeleton;
 #[cfg(feature = "source-analysis")]
 #[path = "graph_context_skeleton.rs"]
 mod skeleton;
@@ -75,6 +76,10 @@ pub fn dispatch(operation: &str, input: &Value) -> Result<Value, String> {
         "is_test_path" => Ok(json!(markdown::is_test_path(string_field(input, "path")?))),
         "markdown" => Ok(json!(markdown::format(input)?)),
         "test_selection" => test_selection::select(input),
+        #[cfg(feature = "source-analysis")]
+        "python_skeleton" => {
+            python_skeleton::python(string_field(input, "source")?, target_symbol(input)?)
+        }
         #[cfg(feature = "source-analysis")]
         "rust_skeleton" => skeleton::rust(string_field(input, "source")?, target_symbol(input)?),
         other => Err(format!("unknown graph context operation: {other}")),

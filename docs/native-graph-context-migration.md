@@ -1,4 +1,13 @@
-# Native graph context relationships and Markdown
+# Historical graph context migration: relationships and Markdown
+
+> Historical migration record. It describes the Python adapter stage before its
+> retirement and is not current interface or validation guidance. The direct
+> replacement for the former integrated file-context CLI is
+> `forge code context FILE --root ROOT [--symbol NAME] [--no-graph] [--json]`.
+> `forge graph --host HOST context PATH` remains the separate graph-index relationship surface.
+> Python projection uses `source-preserving-v1` and preserves Python layout;
+> Rust uses `rust-signatures-v1`, retains source signature text, and reconstructs
+> wrappers without preserving original layout. Results below are historical only.
 
 `conductor.graph_context` now delegates graph relationship reads, syntactic
 caller discovery, test-path classification, and Markdown grouping to the

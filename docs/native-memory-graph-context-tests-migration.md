@@ -10,7 +10,7 @@ test inventory.
 |---|---|---|
 | `test_memory_auto_index.py` (6) | `python_contracts_memory_auto_index` (6) | Indexed-path filter; coalesced markers and receipt; concurrent single writer; marker arrival during refresh; fail-closed marker retention; clean session-end scan. |
 | `test_index_notes.py` (2 functions, 4 pytest invocations) | `python_contracts_index_notes` (2 tests, 4 fixture runs; now retired) | FTS rows, titles, bodies, source, paths, table content, excluded audit paths, and ordered search parity against the native notes CLI. |
-| `test_graph_context.py` (18) | `python_contracts_graph_context` (18) | AST skeleton forms; graph callers/callees and target symbols; Markdown role binning; syntax-only caller scan; errors, CLI output, and test-path classification. |
+| `test_graph_context.py` (18) | `python_contracts_graph_context` (18; retired after native coverage) | Historical AST skeleton, graph caller/callee, Markdown, syntactic scan, CLI and test-path cases. The retired Rust compatibility harness had 19 tests including one Rust-only cache case. Current native surfaces: `forge code context FILE --root ROOT [--symbol NAME] [--no-graph] [--json]` and `forge graph --host HOST context PATH`. |
 
 ## Focused notes results
 

@@ -1098,8 +1098,47 @@ indexed evidence is rejected.
 
 These checks establish evidence for bounded returned rows, not global graph
 completeness or an OS sandbox against same-UID writers. SQLite VM deadlines do
-not bound filesystem I/O. The existing Python skeleton/CLI adapter remains for
-the next native migration milestone; no shared runtime installation is changed.
+not bound filesystem I/O. At this milestone the Python skeleton/CLI adapter
+remained; the replacement below retires it without changing a shared installation.
 See [graph context](docs/graph-context.md) for limits and trust boundaries, and
 the native `graph_context` benchmark for reproducible source-read and graph
 projection workloads.
+
+## Native file context and adapter retirement
+
+`forge code context` now provides the integrated Python/Rust signature, graph
+relationship and Markdown/JSON surface without an interpreter or `rg` subprocess.
+Tree-sitter byte spans replace Python AST unparsing and the Rust projector's
+repeated source-prefix scans. Python retains signature spelling, decorators,
+annotations and documentation; selected classes include their methods. Rust
+retains signature/attribute text and reconstructs scope wrappers. Both formats
+are explicitly versioned context data, with bounded admission and output.
+
+Requested source snapshots use the confined graph reader, recheck their content
+hash after projection and relationships, and support an expected-hash guard.
+There is no skeleton cache. The separate graph projection cache still requires
+verified source evidence. Syntactic discovery uses native authored ignore rules,
+skips hidden/ignored/symlink entries, and reports textual provenance separately
+from indexed graph status. Visible Python FIFOs and unsafe requested source or
+ignore files fail explicitly. Its five-second budget is cooperative, not a
+filesystem I/O timeout; see [graph context](docs/graph-context.md) for all limits.
+
+The superseded `src/conductor/graph_context.py`, its dedicated compatibility
+target and target mappings are deleted. Shared graph/test-selection bindings
+remain for their existing consumers. This leaves 128 Python source files under
+`src/`; the complete native migration remains active.
+
+Focused validation passed 66 graph-core tests, 18 native graph integration
+tests, seven CLI tests with an empty executable search path, and 33 adapter
+discovery checks. Eleven remaining graph-selection compatibility tests passed
+through a private binding overlay; they are separate from the native runtime
+gate. Both native crates passed strict all-target Clippy. CLI tests cover
+same-size/same-mtime edits, old-hash rejection, graph freshness, unsafe source
+types, bounded escaped output and source immutability. A real-checkout smoke
+test also passed with no executable search path.
+
+Current-only release timings measured 256-function Python and Rust projection
+at 1.719 ms and 1.192 ms median batch means, respectively. A 32-file native
+syntactic scan measured 298.137 microseconds. The benchmark records hashes,
+workload sizes, included operations and limits in [graph context](docs/graph-context.md);
+these are costs, not a measured speedup against the deleted adapter.
