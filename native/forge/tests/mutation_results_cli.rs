@@ -38,17 +38,38 @@ impl Drop for Report {
 }
 
 #[test]
-fn native_results_cover_junit_and_libtest_without_an_interpreter() {
+fn native_results_cover_junit_without_an_interpreter() {
     for (adapter, nodeid, report) in [
         ("pytest-junit", "pkg/test_math.py::test_add", "<testsuite><testcase classname=\"pkg.test_math\" name=\"test_add\" time=\"0.25\"/></testsuite>"),
         ("ctest-junit", "tests/math.c::test_add", "<testsuite><testcase name=\"math.test_add\"><failure/></testcase></testsuite>"),
-        ("cargo-libtest", "tests/math.rs::test_add", "test tests::test_add ... ok\n"),
     ] {
         let output = Report::new(report).parse(adapter, &[nodeid]);
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(parsed["status"], "COMPLETE");
         assert!(parsed["missing_nodeids"].as_array().unwrap().is_empty());
+    }
+}
+
+#[test]
+fn unbound_cargo_names_cannot_credit_matching_or_other_module_tests() {
+    for (nodeid, report) in [
+        ("tests/math.rs::test_add", "test test_add ... ok\n"),
+        (
+            "tests/math.rs::test_add",
+            "test other::test_add ... FAILED\n",
+        ),
+        (
+            "tests/math.rs::tests::test_add",
+            "test tests::test_add ... ok\n",
+        ),
+    ] {
+        let output = Report::new(report).parse("cargo-libtest", &[nodeid]);
+        assert_eq!(output.status.code(), Some(1));
+        let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(parsed["status"], "INCOMPLETE");
+        assert_eq!(parsed["missing_nodeids"][0], nodeid);
+        assert!(parsed["tests"].as_object().unwrap().is_empty());
     }
 }
 

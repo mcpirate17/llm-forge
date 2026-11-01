@@ -396,6 +396,7 @@ def _run_campaign_command(
             return collect_cargo_libtest_batch(
                 argv=campaign.test_argv,
                 ranked_nodeids=ranked_nodeids,
+                snapshot_root=snapshot_root,
                 run_command=lambda argv, sink: _run_command(
                     argv,
                     cwd=snapshot_root,

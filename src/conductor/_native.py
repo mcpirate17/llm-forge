@@ -323,10 +323,15 @@ def mutation_value_parse_junit_native(
     return implementation(path, adapter, ranked)
 
 
-def mutation_value_parse_cargo_native(stdout: str, ranked: list[str]) -> str:
+def mutation_value_parse_cargo_native(
+    stdout: str,
+    ranked: list[str],
+    repo_root: str | None = None,
+    argv: list[str] | None = None,
+) -> str:
     from conductor_native import mutation_value_parse_cargo_native as implementation
 
-    return implementation(stdout, ranked)
+    return implementation(stdout, ranked, repo_root, argv)
 
 
 def mutation_evidence_exit_code_native(result_json: str) -> int:

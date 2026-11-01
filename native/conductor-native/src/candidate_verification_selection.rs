@@ -29,14 +29,14 @@ pub(super) fn gated_nodeids(request: &Value) -> Result<Value, String> {
         .ok_or("grandfathered nodeids must be an object")?;
     let mut gated = Map::new();
     for change in entries {
-        if !has_class(change, "test") {
+        if !has_class(change, "test") && !has_class(change, "native") {
             continue;
         }
         let path = change["path"].as_str().ok_or("gated test requires path")?;
         if path.ends_with(".patch") {
             continue;
         }
-        if !path.ends_with(".py") {
+        if !path.ends_with(".py") && !has_class(change, "native") {
             let added = change["old_mode"] == "000000"
                 || change["old_oid"] == "0000000000000000000000000000000000000000";
             if added && !grandfathered.contains_key(path) {
@@ -48,6 +48,26 @@ pub(super) fn gated_nodeids(request: &Value) -> Result<Value, String> {
             .as_object()
             .ok_or_else(|| format!("candidate definitions missing for {path}"))?;
         let base = change["base"].as_object();
+        if definitions.iter().any(|(label, body)| {
+            label.starts_with("__unsupported_test_module__")
+                && base.is_none_or(|old| old.get(label) != Some(body))
+        }) {
+            return Err(format!(
+                "native test module wiring changed in {path}; test identity expansion is required"
+            ));
+        }
+        if has_class(change, "native")
+            && !path.ends_with(".rs")
+            && (has_class(change, "test") && definitions.is_empty()
+                || definitions
+                    .iter()
+                    .any(|(label, body)| base.is_none_or(|old| old.get(label) != Some(body))))
+        {
+            return Err(format!("native C/C++ test identity unsupported in {path}; an explicit verified CTest-to-source mapping is required"));
+        }
+        if has_class(change, "native") && has_class(change, "test") && definitions.is_empty() {
+            return Err(format!("native test identity unsupported in {path}; zero parsed tests cannot rule out test-generating macros"));
+        }
         let excluded: HashSet<_> = grandfathered
             .get(path)
             .map(strings)
@@ -56,6 +76,7 @@ pub(super) fn gated_nodeids(request: &Value) -> Result<Value, String> {
             .collect();
         let mut labels: Vec<_> = definitions
             .keys()
+            .filter(|label| !label.starts_with("__unsupported_test_module__"))
             .filter(|label| base.is_none_or(|base| base.get(*label) != definitions.get(*label)))
             .filter(|label| !excluded.contains(label.as_str()))
             .map(|label| format!("{path}::{label}"))

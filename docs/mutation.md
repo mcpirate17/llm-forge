@@ -8,6 +8,79 @@ How campaigns are generated, run and audited. The commands live in
 Forge ships these capabilities without requiring mutation campaigns or receipts for
 its own changes. A host such as LLM can adopt a separate evidence policy.
 
+## Optional risk-ranked planning
+
+The existing native planner can rank an exact changed-file scope without running
+an engine or writing campaigns:
+
+```bash
+forge mutation plan rust \
+  --priority-policy candidate_policy.toml --priority-base origin/main \
+  --only native/forge/src/mutation_plan.rs
+```
+
+`--priority-policy` must name the host's configured candidate policy, resolved
+through `[tool.conductor]` and the existing environment override. Only its
+explicit `[risk].high` production/validation paths are eligible. A different
+permissive policy cannot widen the host's scope. Missing policy data fails
+explicitly; discovery paths remain exempt. Priority requires exact `--only`
+paths and a verifiable base commit; it does not support a whole-tree inventory.
+The Python `mutation_campaign_generate plan/write` wrapper exposes the same
+`--priority-policy` option and uses its existing `--base` and owner-limited scope.
+Commands without the priority option retain ordinary planner behavior.
+
+Priority produces one campaign per eligible changed source. Cargo `--file`
+patterns remain package-relative; source/test hash keys remain repository-relative.
+Parsed Cargo target/module reachability excludes proven test-only files, defers
+unknown roles, and preserves production files containing inline tests. A changed
+test cannot pull an unchanged production file into the authorized scope. Missing
+in-scope test/source pairings are visible diagnostics, without inventing a new
+mutation obligation for exempt discovery code.
+
+The deterministic order is source novelty, changed paired tests, a matching
+caller-supplied impact hint, then source path. New source precedes changed source;
+a byte-identical rename gets no novelty bonus. This is an ordinal heuristic,
+not a calibrated failure probability. Unknown test identities are reported as
+gaps, not counted as demonstrated new tests. Existing manifests never establish
+current mutation PASS or coverage: those fields remain unknown in this plan.
+
+`--priority-telemetry PATH` accepts optional **unverified caller-supplied hints**
+under `campaigns[CAMPAIGN_ID]`. A hint row must match the emitted `tree_oid`,
+`worktree_sha256`, `policy_sha256`, `source_sha256` and `test_sha256` fields.
+Optional numeric fields are `cost_hint_seconds` and `dependency_impact_hint`.
+Matching public hashes do not authenticate the producer or establish observed
+runtime, current graph reachability, binary dependencies, or ignored artifacts.
+Missing or mismatched hints remain unknown.
+
+`--priority-budget-seconds N` uses matching supplied cost hints to select campaigns.
+Unknown costs and campaigns exceeding the remaining estimated budget are visibly
+deferred. This budget is an estimate, not an engine timeout or execution cap.
+Every deferred row remains in `priority.ranked`; no engine is launched implicitly.
+
+### Native test admission
+
+When a host enables its mutation-evidence admission check, native-only changes
+participate alongside Python tests. Rust test identities come from parsed test
+definitions and actual Cargo/module context, including external test modules;
+source hashes include those external test files. Attribution must also bind the
+Cargo test target. A matching leaf function name or another executable's result
+cannot prove a test ran or killed a mutant.
+
+Recognized test-generating macros, ambiguous module/target contexts and unavailable execution
+mappings fail explicitly as unsupported evidence. Ordinary production macros
+are not compiler-expanded by this parser; accepting an ordinary production macro
+does not prove that it cannot generate tests. C/C++ function spelling alone cannot
+establish a CTest case: without a verified CTest-to-source mapping, admission remains
+unsupported. These checks neither enable a host gate nor launch a campaign.
+
+The current Cargo generator still emits a generic multi-target command and does
+not bind `ranked_tests` or `value_analysis`. Consequently its generated campaigns
+cannot yet satisfy per-test Rust value admission through this workflow. The bound
+collector is usable only when an existing governed campaign supplies a verified
+single-target command and ranked tests; raw or multi-target output remains
+incomplete. Detecting native admission debt is separate from producing that
+evidence, and no campaign or receipt is authored manually to bridge this gap.
+
 ## Receipt format
 
 A mutation receipt is one JSON file with two blocks (slice L):

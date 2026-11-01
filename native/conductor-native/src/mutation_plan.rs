@@ -21,6 +21,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
+#[path = "mutation_plan_priority.rs"]
+mod priority;
+pub use priority::PriorityOptions;
+
 const SKIP_PARTS: &[&str] = &[
     ".git",
     ".mutation-native-crate",
@@ -394,7 +398,10 @@ fn rust_test_files(subject: &RustCrate, repo_root: &Path) -> Result<Vec<String>,
         let path = repo_root.join(relative);
         let text = fs::read_to_string(&path)
             .map_err(|error| format!("cannot read {relative}: {error}"))?;
-        if text.contains("#[cfg(test)]") {
+        let has_tests = rust_source_has_tests(&text).map_err(|error| {
+            format!("native test definitions unavailable in {relative}: {error}")
+        })?;
+        if has_tests {
             found.insert(relative.clone());
         }
     }
@@ -405,6 +412,19 @@ fn rust_test_files(subject: &RustCrate, repo_root: &Path) -> Result<Vec<String>,
         ));
     }
     Ok(found.into_iter().collect())
+}
+
+fn rust_source_has_tests(source: &str) -> Result<bool, String> {
+    #[cfg(feature = "source-analysis")]
+    {
+        crate::candidate_verification::native_rust_file_has_tests(source)
+    }
+    #[cfg(not(feature = "source-analysis"))]
+    {
+        // Retain the ordinary planner's pre-existing heuristic in minimal builds.
+        // Priority still defers roles when native source analysis is unavailable.
+        Ok(source.contains("#[cfg(test)]"))
+    }
 }
 
 const SURVIVOR_BASELINE_NOTE: &str = "Empty and unrecorded. The FIRST engine run writes this list itself and flips survivor_baseline_recorded to true; every later run is scored against it, so a survivor that appears afterwards is a test that stopped defending its code. No agent ever writes this field -- hand-authored baselines are forbidden (KB-MUT-02), and an unrecorded baseline is why a fresh campaign used to be red on every run.";
@@ -760,6 +780,8 @@ fn plan_rust(
 
 #[derive(Debug, Deserialize)]
 pub struct PlanRequest {
+    #[serde(default)]
+    pub priority: Option<PriorityOptions>,
     pub language: String,
     pub repo_root: String,
     pub owner: String,
@@ -806,7 +828,7 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
         return Err("Python worker count must be positive".into());
     }
     let repo_root = Path::new(&request.repo_root);
-    let covered = if request.include_covered {
+    let covered = if request.include_covered || request.priority.is_some() {
         BTreeSet::new()
     } else {
         existing_subjects(repo_root, &request.campaigns_root)
@@ -816,7 +838,7 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
         .as_ref()
         .map(|paths| paths.iter().cloned().collect());
 
-    let (manifests, unpaired_json, untested_json, already): (
+    let (mut manifests, unpaired_json, untested_json, already): (
         Vec<Value>,
         Vec<Value>,
         Vec<Value>,
@@ -855,14 +877,23 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
         .filter_map(|u| u.get("lines").and_then(Value::as_u64))
         .sum();
 
-    Ok(json!({
+    let priority = request
+        .priority
+        .as_ref()
+        .map(|_| priority::apply(request, &mut manifests))
+        .transpose()?;
+    let mut result = json!({
         "language": request.language,
         "manifests": manifests,
         "unpaired": unpaired_json,
         "unpaired_lines": unpaired_lines,
         "already_covered": already,
         "untested": untested_json,
-    }))
+    });
+    if let Some(priority) = priority {
+        result["priority"] = priority;
+    }
+    Ok(result)
 }
 
 include!("mutation_plan_refresh.rs");
@@ -997,6 +1028,7 @@ mod fixture_parity_tests {
     fn unknown_language_is_refused() {
         let repo_root = scratch_dir();
         let request = PlanRequest {
+            priority: None,
             language: "cobol".to_string(),
             repo_root: repo_root.to_string_lossy().to_string(),
             owner: "llm-b0".to_string(),
