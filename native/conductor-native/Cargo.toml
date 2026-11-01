@@ -278,14 +278,6 @@ name = "python_contracts_contract_runner"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_cost_budget_audit"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_cost_ledger"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_cpu_embed"
 required-features = ["python-compat-tests"]
 

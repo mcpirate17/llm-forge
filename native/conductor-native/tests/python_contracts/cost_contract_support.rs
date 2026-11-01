@@ -1,13 +1,11 @@
-//! Rust-owned fixtures shared by cost-budget and ledger Python API contracts.
+//! Rust-owned fixtures for the remaining ledger calibration Python adapter.
 
 use crate::comm_support::{bind_signature, py_json, signature};
-use crate::support::{module, path, AttrPatch, Case};
+use crate::support::{module, Case};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyCFunction, PyDict, PyList, PyModule};
 use serde_json::{json, Value};
-use std::fs;
-use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 pub fn equal(actual: &Bound<'_, PyAny>, expected: &Bound<'_, PyAny>) {
@@ -32,146 +30,6 @@ where
         body(args.py(), bound.getattr("arguments")?)
     })
     .unwrap()
-}
-
-pub fn kwargs_callback<'py, F>(py: Python<'py>, body: F) -> Bound<'py, PyCFunction>
-where
-    F: Fn(Python<'_>, Option<&Bound<'_, PyDict>>) -> PyResult<Py<PyAny>> + Send + Sync + 'static,
-{
-    PyCFunction::new_closure(py, None, None, move |args, kwargs| {
-        if !args.is_empty() {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "unexpected positional arguments",
-            ));
-        }
-        body(args.py(), kwargs)
-    })
-    .unwrap()
-}
-
-pub fn completed<'py>(
-    py: Python<'py>,
-    payload: &str,
-    returncode: i32,
-    stderr: &str,
-    args: &[&str],
-) -> Bound<'py, PyAny> {
-    let subprocess = py.import("subprocess").unwrap();
-    subprocess
-        .getattr("CompletedProcess")
-        .unwrap()
-        .call1((PyList::new(py, args).unwrap(), returncode, payload, stderr))
-        .unwrap()
-}
-
-pub fn metric(status: &str, value: Option<f64>, baseline: Option<f64>) -> Value {
-    json!({
-        "value":value,
-        "n":10,
-        "baseline":baseline,
-        "delta_pct":baseline.map(|base| (value.unwrap_or(0.0)-base)/base*100.0),
-        "status":status
-    })
-}
-
-pub fn audit_payload(status: &str, metric_status: &str) -> Value {
-    let mut metrics = serde_json::Map::new();
-    for name in [
-        "median_hook_ms",
-        "resend_bytes_per_session",
-        "tokens_per_landed_pr",
-        "cap_breach_rate",
-        "cheap_tier_rework_rate",
-    ] {
-        metrics.insert(name.to_owned(), metric(metric_status, Some(1.0), Some(0.9)));
-    }
-    json!({
-        "window":{"from":"2026-09-06","to":"2026-09-13","days":7},
-        "metrics":metrics,
-        "status":status
-    })
-}
-
-pub fn patch_constant<'py>(
-    py: Python<'py>,
-    subject: &Bound<'py, PyAny>,
-    name: &str,
-    value: &Bound<'py, PyAny>,
-    positional: &[&str],
-) -> AttrPatch {
-    let captured = value.clone().unbind();
-    let callback = strict_callback(py, positional, &[], move |py, _args| {
-        Ok(captured.clone_ref(py))
-    });
-    AttrPatch::replace(subject, name, callback.as_any())
-}
-
-pub fn patch_kwargs_result(
-    py: Python<'_>,
-    subject: &Bound<'_, PyAny>,
-    name: &str,
-    value: &Bound<'_, PyAny>,
-) -> AttrPatch {
-    let captured = value.clone().unbind();
-    let callback = kwargs_callback(py, move |py, _kwargs| Ok(captured.clone_ref(py)));
-    AttrPatch::replace(subject, name, callback.as_any())
-}
-
-pub fn json_python<'py>(py: Python<'py>, value: Value) -> Bound<'py, PyAny> {
-    py_json(py, value)
-}
-
-pub fn forge_script(case: &mut Case) -> (PathBuf, PathBuf, PathBuf) {
-    let script = case.write(
-        "stub-forge.sh",
-        "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$FORGE_ARGV\"\nexit \"${FORGE_EXIT:-0}\"\n",
-    );
-    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
-    let binary = case.root().join("forge");
-    std::os::unix::fs::symlink(&script, &binary).unwrap();
-    let argv_file = case.root().join("argv.txt");
-    case.set_env("FORGE_ARGV", argv_file.to_str().unwrap());
-    (binary, script, argv_file)
-}
-
-pub fn write_script(script: &Path, contents: &str) {
-    fs::write(script, contents).unwrap();
-    fs::set_permissions(script, fs::Permissions::from_mode(0o700)).unwrap();
-}
-
-pub fn config<'py>(py: Python<'py>, root: &Path) -> Bound<'py, PyAny> {
-    let transcripts = root.join("-home-x-project");
-    fs::create_dir(&transcripts).unwrap();
-    let kwargs = PyDict::new(py);
-    kwargs
-        .set_item("ledger_root", path(py, &root.join("ledger")))
-        .unwrap();
-    kwargs
-        .set_item("repo_path", path(py, &root.join("repo")))
-        .unwrap();
-    kwargs.set_item("project", "-home-x-project").unwrap();
-    kwargs
-        .set_item("transcripts_dir", path(py, &transcripts))
-        .unwrap();
-    kwargs
-        .set_item(
-            "baseline",
-            path(py, &root.join("repo/ledger/cost_budget_baseline.json")),
-        )
-        .unwrap();
-    module(py, "conductor.cost_ledger")
-        .getattr("LedgerConfig")
-        .unwrap()
-        .call((), Some(&kwargs))
-        .unwrap()
-}
-
-pub fn argv(path: &Path) -> Vec<String> {
-    fs::read_to_string(path)
-        .unwrap()
-        .lines()
-        .map(str::to_owned)
-        .collect()
 }
 
 /// Replaces a sys.modules entry and restores the exact prior object on drop.

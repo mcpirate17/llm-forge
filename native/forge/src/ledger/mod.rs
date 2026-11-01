@@ -6,6 +6,7 @@
 pub mod agent;
 pub mod agent_upsert;
 pub mod audit;
+pub mod budget;
 pub mod calibrate;
 pub mod landed;
 pub mod outcome;

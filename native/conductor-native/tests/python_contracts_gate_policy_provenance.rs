@@ -39,6 +39,40 @@ fn isolated_case() -> Case {
     case
 }
 
+#[test]
+fn native_cost_phase_round_trips_evidence_and_refuses_execution_failure() {
+    let binary = std::env::var("FORGE_BIN").expect("set FORGE_BIN to the native Forge binary");
+    let mut case = isolated_case();
+    let host = case.mkdir("budget-host");
+    let ledger = case.mkdir("budget-ledger");
+    case.set_env("FORGE_BIN", &binary);
+    case.set_env("LEDGER_ROOT", ledger.to_str().unwrap());
+    Python::attach(|py| {
+        let gate = module(py, "conductor.gate");
+        let phase = gate
+            .getattr("cost_budget_audit")
+            .unwrap()
+            .call1((path(py, &host),))
+            .unwrap();
+        assert!(phase.getattr("ok").unwrap().extract::<bool>().unwrap());
+        assert_eq!(text(&phase.getattr("name").unwrap()), "cost-budget-audit");
+        let evidence = phase.getattr("evidence").unwrap();
+        assert_eq!(text(&evidence.get_item("status").unwrap()), "NO_DATA");
+    });
+    case.set_env("FORGE_BIN", "/bin/false");
+    Python::attach(|py| {
+        let gate = module(py, "conductor.gate");
+        let failure = gate
+            .getattr("cost_budget_audit")
+            .unwrap()
+            .call1((path(py, &host),))
+            .unwrap_err();
+        assert!(failure
+            .to_string()
+            .contains("cost budget audit did not run"));
+    });
+}
+
 fn git(repo: &Path, args: &[&str]) {
     let output = Command::new("git")
         .args(args)

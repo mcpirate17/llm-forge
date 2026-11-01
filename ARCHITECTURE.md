@@ -717,8 +717,8 @@ wrappers and their six compatibility targets have now been deleted, together
 with the exclusive PyO store bridge and compaction/retention adapters. The
 unused A2A SDK dependency and eleven now-unneeded transitive packages were
 removed by regenerating the lockfile. Filtering
-`rg --files src` for `\.py$` currently finds 157 Python source files. The whole
-native migration and direct-main delivery remain incomplete. This memory
+`rg --files src` for `\.py$` found 157 Python source files at the foundation
+milestone. The whole native migration remains incomplete. This memory
 surface is distinct from the existing mmap HNSW/BM25 native code-search service.
 
 The native telemetry CLI now supplies record, byte-preserving hook tee and
@@ -727,13 +727,27 @@ an adjacent lock, rejects unsafe sinks and prunes only validated generated
 rotation names. The Python telemetry adapter, optional PyO module and two
 dedicated targets were deleted after the six native CLI integration tests passed.
 State publication also uses exclusive private staging files and durable rename;
-claim-activity read-modify-write still needs a shared transaction protocol before
-concurrent lifecycle writers can be claimed safe. Stored claim paths are now
+native claim lifecycle and activity updates now share a transaction lock;
+remaining unlocked Python writers still prevent a mixed-runtime concurrency
+guarantee. Stored claim paths are now
 normalized and validated before identity verification and overlap matching.
 
-The selected release run passed **767 Forge tests** (one optional grammar test
-remained ignored), **268 core tests**, and **50 compatibility tests** for remaining
-memory, preamble and contract-runner callers. These are working-tree checks,
-not the final clean-tree delivery receipt. The checkout was advanced to upstream
-`2e667a9`, preserving working files and the three landed peer changes; native
-package versions now match upstream. No migration commit has yet been pushed.
+The committed native foundation milestone at `15593893e5a6baf414c58a89a16c98f30a30b35d`
+is pushed to `main`. Its manual suite passed **2,161 tests** with **39 ignored**;
+the canonical full local check and verification also passed for that commit, as
+recorded in `.git/forge-checks/run-1793499534968020846-3980898/receipt.json`.
+At this milestone, `src/` contained 157 Python source files and the native
+migration remained incomplete. The receipt covers that committed tree only; it
+does not validate later uncommitted claims or ledger work.
+
+The next migration adds `forge claim create|release|touch|list` and
+`forge ledger budget rollup|audit|report|gate`. Native claim transactions
+serialize overlapping creation and activity updates, with explicit lock errors.
+Ledger history and origin lookup now use libgit2, and cache paths reject
+spoofed GitHub hosts and unsafe path components. Budget CLI tests run with an
+empty `PATH`; the cost verdict algorithm is shared with native ledger audit.
+The cost-ledger, cost-budget and binary-selection Python adapters and their
+two dedicated compatibility targets were deleted. Current Python source count
+is 154. The remaining gate adapter only resolves and dispatches the native cost
+phase; the wider governance and session migration is still open. See
+`docs/native-claims.md` and `docs/ledger.md` for command contracts and limits.

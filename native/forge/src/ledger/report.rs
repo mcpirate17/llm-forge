@@ -17,9 +17,9 @@ use serde_json::Value;
 
 #[derive(Args)]
 pub struct ReportArgs {
-    /// Ledger root to read `task_dispatch/*.jsonl` under.
+    /// Ledger root; otherwise LEDGER_ROOT or the native XDG/HOME state default.
     #[arg(long = "ledger-root")]
-    pub ledger_root: PathBuf,
+    pub ledger_root: Option<PathBuf>,
 
     /// Only rows whose `dispatch_ts` (falling back to `first_ts`) falls in
     /// the trailing N days from now; omit to use every row on disk.
@@ -61,7 +61,8 @@ pub struct TierReportRow {
 }
 
 pub fn run(args: ReportArgs) -> Result<i32> {
-    let rows = load_task_dispatch_rows(&args.ledger_root, args.window_days)?;
+    let ledger_root = super::resolve_ledger_root(args.ledger_root)?;
+    let rows = load_task_dispatch_rows(&ledger_root, args.window_days)?;
     let report = build_report(&rows);
     if args.json {
         for row in &report {

@@ -376,7 +376,12 @@ fn claim_allows(
                     &repo_root.to_string_lossy(),
                 );
             }
-            let _ = ownership::touch_claim(repo_root, &claim.claim_id, now);
+            if let Err(error) = ownership::touch_claim(repo_root, &claim.claim_id, now) {
+                return (
+                    false,
+                    format!("claim activity could not be recorded: {error}"),
+                );
+            }
             return (true, digest);
         }
         let deadline = claim.deadline(now).unwrap_or(now);

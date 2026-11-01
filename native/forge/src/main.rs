@@ -5,6 +5,7 @@ mod bash_guard;
 mod bash_impact;
 mod bounded_child;
 mod cap_enforce;
+mod claims;
 use forge::civil;
 mod config_store;
 mod context_telemetry;
@@ -88,6 +89,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Create, release, touch and inspect structured repository ownership claims.
+    Claim(claims::ClaimArgs),
     /// Compile and query immutable native workspace-memory snapshots.
     Memory(forge::recall::cli::MemoryArgs),
     /// Bind, check or remove a project MCP connection to an existing native harness.
@@ -216,6 +219,8 @@ enum SessionCommand {
 
 #[derive(Subcommand)]
 enum LedgerCommand {
+    /// Host cost budget defaults, reports and gate evidence.
+    Budget(ledger::budget::BudgetArgs),
     /// Parse transcript or telemetry JSONL file(s) into ledger summaries.
     Read(ledger::ReadArgs),
     /// Roll transcript/telemetry JSONL up into `turn_attribution`,
@@ -314,6 +319,7 @@ fn command_exit(label: &str, result: anyhow::Result<u8>, failure: u8) -> ExitCod
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
+        Command::Claim(args) => command_exit("claim", claims::run(args).map(|()| 0), 2),
         Command::Memory(args) => command_exit("memory", forge::recall::cli::run(args), 2),
         Command::Mcp(args) => command_exit("MCP configuration", mcp_setup::run(args), 2),
         Command::Project(args) => command_exit("project", project::run(args), 2),
@@ -434,6 +440,11 @@ fn main() -> ExitCode {
 
 fn run_ledger(action: LedgerCommand) -> ExitCode {
     match action {
+        LedgerCommand::Budget(args) => command_exit(
+            "ledger budget",
+            ledger::budget::run(args).map(|code| code as u8),
+            2,
+        ),
         LedgerCommand::Read(args) => match ledger::run(args) {
             Ok(code) => ExitCode::from(code as u8),
             Err(err) => {

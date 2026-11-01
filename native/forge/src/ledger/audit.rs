@@ -189,7 +189,34 @@ struct BaselineFile {
 
 // ---------------------------------------------------------------------------
 
+/// One native audit computation, reusable by human output and the gate adapter.
+pub(super) enum Evaluation {
+    NoData(String),
+    Output { value: serde_json::Value, code: i32 },
+}
+
 pub fn run(args: AuditArgs) -> Result<i32> {
+    let record = args.record;
+    match evaluate(args)? {
+        Evaluation::NoData(message) => {
+            eprintln!("{message}");
+            Ok(3)
+        }
+        Evaluation::Output { value, code } => {
+            println!(
+                "{}",
+                if record {
+                    serde_json::to_string_pretty(&value)?
+                } else {
+                    serde_json::to_string(&value)?
+                }
+            );
+            Ok(code)
+        }
+    }
+}
+
+pub(super) fn evaluate(args: AuditArgs) -> Result<Evaluation> {
     let ledger_root = resolve_ledger_root(args.ledger_root)?;
     let today = today_utc_date();
     let days = window_days(&today, args.window_days);
@@ -209,14 +236,13 @@ pub fn run(args: AuditArgs) -> Result<i32> {
         read_table::<TaskDispatchRow>(&ledger_root, "task_dispatch", &days)?;
 
     if hooks.is_empty() && sessions.is_empty() && agents.is_empty() {
-        eprintln!(
+        return Ok(Evaluation::NoData(format!(
             "forge ledger audit: window {}..{} has zero rows across hook_rollup, \
 session_rollup and agent_rollup under {} -- run `forge ledger rollup` first",
             window.from,
             window.to,
             ledger_root.display()
-        );
-        return Ok(3);
+        )));
     }
 
     let raw = compute_raw_metrics(&hooks, &sessions, &agents, &dispatches);
@@ -230,48 +256,13 @@ cache file yet, so every row's required_rework stays null"
     }
 
     if args.record {
-        let mut files: Vec<PathBuf> = Vec::new();
-        files.extend(hook_files);
-        files.extend(session_files);
-        files.extend(agent_files);
-        files.extend(dispatch_files);
-        let ledger_root_sha = sha256_of_files(&files)?;
-        let mut metrics = BTreeMap::new();
-        for name in METRIC_NAMES {
-            match raw.get(name).copied().flatten_pair() {
-                Some((value, n)) => {
-                    metrics.insert(
-                        name.to_string(),
-                        Some(BaselineMetric {
-                            value,
-                            n,
-                            tolerance_pct: DEFAULT_TOLERANCE_PCT,
-                        }),
-                    );
-                }
-                None => {
-                    eprintln!(
-                        "forge ledger audit --record: {name} has no data in this window, \
-recorded as a null baseline (debt, not a failure)"
-                    );
-                    metrics.insert(name.to_string(), None);
-                }
-            }
-        }
-        let baseline_file = BaselineFile {
-            recorded_utc: now_iso8601_utc(),
-            window,
-            metrics,
-            ledger_root_sha,
-        };
-        let body = serde_json::to_string_pretty(&baseline_file)?;
-        if let Some(parent) = args.baseline.parent() {
-            fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
-        }
-        fs::write(&args.baseline, format!("{body}\n"))
-            .with_context(|| format!("writing {}", args.baseline.display()))?;
-        println!("{body}");
-        return Ok(0);
+        let files = hook_files
+            .into_iter()
+            .chain(session_files)
+            .chain(agent_files)
+            .chain(dispatch_files)
+            .collect::<Vec<_>>();
+        return record_baseline(&args.baseline, window, &raw, &files);
     }
 
     let recorded = read_baseline(&args.baseline)?;
@@ -290,11 +281,61 @@ recorded as a null baseline (debt, not a failure)"
         metrics,
         status: status.clone(),
     };
-    println!("{}", serde_json::to_string(&output)?);
-    Ok(if status == "PASS" || status == "RATCHET_HELD" {
+    let code = if status == "PASS" || status == "RATCHET_HELD" {
         0
     } else {
         1
+    };
+    Ok(Evaluation::Output {
+        value: serde_json::to_value(output)?,
+        code,
+    })
+}
+
+fn record_baseline(
+    baseline: &Path,
+    window: Window,
+    raw: &BTreeMap<&'static str, (Option<f64>, u64)>,
+    files: &[PathBuf],
+) -> Result<Evaluation> {
+    let ledger_root_sha = sha256_of_files(files)?;
+    let mut metrics = BTreeMap::new();
+    for name in METRIC_NAMES {
+        match raw.get(name).copied().flatten_pair() {
+            Some((value, n)) => {
+                metrics.insert(
+                    name.to_string(),
+                    Some(BaselineMetric {
+                        value,
+                        n,
+                        tolerance_pct: DEFAULT_TOLERANCE_PCT,
+                    }),
+                );
+            }
+            None => {
+                eprintln!(
+                    "forge ledger audit --record: {name} has no data in this window, \
+recorded as a null baseline (debt, not a failure)"
+                );
+                metrics.insert(name.to_string(), None);
+            }
+        }
+    }
+    let baseline_file = BaselineFile {
+        recorded_utc: now_iso8601_utc(),
+        window,
+        metrics,
+        ledger_root_sha,
+    };
+    let body = serde_json::to_string_pretty(&baseline_file)?;
+    if let Some(parent) = baseline.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+    }
+    fs::write(baseline, format!("{body}\n"))
+        .with_context(|| format!("writing {}", baseline.display()))?;
+    Ok(Evaluation::Output {
+        value: serde_json::to_value(&baseline_file)?,
+        code: 0,
     })
 }
 

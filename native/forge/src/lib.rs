@@ -21,6 +21,7 @@ pub mod mailbox_preview;
 pub mod managed_service;
 pub mod notes_index;
 pub mod ownership;
+pub mod ownership_lifecycle;
 pub mod repository;
 pub mod session_brief;
 pub mod session_policy;

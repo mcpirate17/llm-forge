@@ -1,10 +1,7 @@
 //! `forge ledger landed`: design step 4 (`docs/design/cost_ledger.md`
 //! section 6 step 4). Scans `git log --first-parent <branch>` on a repo and
 //! emits one JSONL row per landed commit, carrying its `Agent:` trailer
-//! names and harness session ids for `agent_rollup`'s join -- shells out to
-//! `git`, no libgit2, matching this crate's other native tools
-//! (`bash_guard`, `crg_refresh`) that already shell out to `git` the same
-//! way rather than link a git library. The branch defaults to whatever
+//! names and harness session ids for `agent_rollup`'s join using libgit2. The branch defaults to whatever
 //! `refs/remotes/origin/HEAD` points at, else `main` (the LLM monorepo
 //! integrates on `master`, which is why the default is resolved, not
 //! hardcoded).
@@ -17,7 +14,6 @@
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::OnceLock;
 
 use anyhow::{bail, Context, Result};
@@ -27,24 +23,15 @@ use serde::Serialize;
 
 use super::session_ids::find_session_ids;
 
-/// Record separator placed before every commit's fields (`git log
-/// --format`); chosen because it cannot occur in a commit subject/body.
-const RECORD_SEP: char = '\u{1e}';
-/// Field separator between sha/date/subject/body within one record.
-const FIELD_SEP: char = '\u{1f}';
-/// Marks the end of the formatted fields, right before whatever
-/// `--shortstat` appends (a blank line then one stat line, or nothing for
-/// a commit with no first-parent diff).
-const STAT_SEP: char = '\u{2}';
-
 #[derive(Args)]
 pub struct LandedArgs {
     /// Path to the git repository to scan.
     #[arg(long)]
     pub repo: PathBuf,
 
-    /// Only commits at or after this date (any form `git log --since`
-    /// accepts, e.g. `2026-08-01`). Mutually exclusive with `--last`.
+    /// ISO date (using current UTC time of day), RFC3339 timestamp, or a
+    /// relative interval such as `7 days ago`.
+    /// Mutually exclusive with `--last`.
     #[arg(long)]
     pub since: Option<String>,
 
@@ -108,96 +95,123 @@ pub fn run(args: LandedArgs) -> Result<i32> {
 /// The ref `refs/remotes/origin/HEAD` points at (e.g.
 /// `refs/remotes/origin/master`), or `main` when the repo has no origin/HEAD
 /// (git prints that ref only when a remote has been fetched or configured;
-/// a fresh `git init` has none). Never an error: a repo whose integration
-/// branch really is `main` and has no origin/HEAD gets `main`, which is
-/// what it would have resolved to anyway.
-fn default_branch(repo: &Path) -> String {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(repo)
-        .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
-        .output();
-    match output {
-        Ok(output)
-            if output.status.success()
-                && !String::from_utf8_lossy(&output.stdout).trim().is_empty() =>
-        {
-            String::from_utf8_lossy(&output.stdout).trim().to_string()
-        }
-        _ => "main".to_string(),
+/// a fresh `git init` has none). An absent ref selects `main`; malformed or
+/// unreadable references remain errors.
+fn default_branch(repo: &git2::Repository) -> Result<String> {
+    match repo.find_reference("refs/remotes/origin/HEAD") {
+        Ok(reference) => Ok(reference
+            .symbolic_target()?
+            .filter(|name| !name.is_empty())
+            .unwrap_or("main")
+            .to_owned()),
+        Err(error) if error.code() == git2::ErrorCode::NotFound => Ok("main".into()),
+        Err(error) => Err(error.into()),
     }
 }
 
-/// Scans `repo`'s `git log --first-parent <branch>` into one
-/// `LandedCommitRow` per commit, newest first (git log's own default order).
-/// `branch: None` means the default resolution (`default_branch`).
+fn since_cutoff(raw: &str) -> Result<i64> {
+    let value = raw.trim();
+    if value.len() == 10
+        && value.as_bytes().get(4) == Some(&b'-')
+        && value.as_bytes().get(7) == Some(&b'-')
+    {
+        let now = forge::instant::isoformat_utc(forge::instant::now());
+        let date = format!("{value}{}", &now[10..19]);
+        let parsed = forge::instant::parse(&format!("{date}+00:00"))
+            .with_context(|| format!("invalid --since date {raw:?}"))?;
+        if &forge::instant::isoformat_utc(parsed)[..10] != value {
+            bail!("invalid --since date {raw:?}");
+        }
+        return Ok(parsed as i64);
+    }
+    if let Some(value) = forge::instant::parse(value) {
+        return Ok(value as i64);
+    }
+    let parts: Vec<_> = value.split_whitespace().collect();
+    if let [amount, unit, "ago"] = parts.as_slice() {
+        let number: i64 = amount.parse().context("invalid --since interval")?;
+        let seconds = match *unit {
+            "second" | "seconds" => 1,
+            "minute" | "minutes" => 60,
+            "hour" | "hours" => 3600,
+            "day" | "days" => 86400,
+            "week" | "weeks" => 604800,
+            _ => bail!("unsupported --since interval {raw:?}"),
+        };
+        let duration = number
+            .checked_mul(seconds)
+            .context("--since interval overflow")?;
+        if number < 0 {
+            bail!("--since interval must be nonnegative");
+        }
+        return (forge::instant::now() as i64)
+            .checked_sub(duration)
+            .context("--since interval overflow");
+    }
+    bail!("unsupported --since {raw:?}; use ISO date, RFC3339 timestamp, or an interval such as '7 days ago'")
+}
+
+/// Scan first-parent commits and compute native tree-diff statistics.
 pub fn scan(
     repo: &Path,
     since: Option<&str>,
     last: Option<u64>,
     branch: Option<&str>,
 ) -> Result<Vec<LandedCommitRow>> {
-    let rev = branch.unwrap_or(&default_branch(repo)).to_string();
-    let format = format!("{RECORD_SEP}%H{FIELD_SEP}%cd{FIELD_SEP}%s{FIELD_SEP}%b{STAT_SEP}");
-    let mut cmd = Command::new("git");
-    cmd.env("TZ", "UTC")
-        .arg("-C")
-        .arg(repo)
-        .args(["log", "--first-parent", &rev, "--shortstat"])
-        .arg("--date=format-local:%Y-%m-%dT%H:%M:%SZ")
-        .arg(format!("--format={format}"));
-    if let Some(since) = since {
-        cmd.arg(format!("--since={since}"));
+    if since.is_some() && last.is_some() {
+        bail!("--since and --last are mutually exclusive");
     }
-    if let Some(last) = last {
-        cmd.arg(format!("-n{last}"));
+    let repository = git2::Repository::discover(repo)
+        .with_context(|| format!("opening repository {}", repo.display()))?;
+    let default = default_branch(&repository)?;
+    let revision = branch.unwrap_or(&default);
+    let mut commit = repository.revparse_single(revision)?.peel_to_commit()?;
+    let cutoff = since.map(since_cutoff).transpose()?;
+    let mut rows = Vec::new();
+    loop {
+        if last.is_some_and(|max| rows.len() as u64 >= max) {
+            break;
+        }
+        if cutoff.is_some_and(|cutoff| commit.time().seconds() < cutoff) {
+            break;
+        }
+        rows.push(commit_row(&repository, &commit)?);
+        if commit.parent_count() == 0 {
+            break;
+        }
+        commit = commit.parent(0)?;
     }
-    let output = cmd
-        .output()
-        .with_context(|| format!("running git log in {}", repo.display()))?;
-    if !output.status.success() {
-        bail!(
-            "git log in {} exited {:?}: {}",
-            repo.display(),
-            output.status.code(),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    let stdout = String::from_utf8(output.stdout).context("git log output is not valid UTF-8")?;
-    Ok(parse_log(&stdout))
+    Ok(rows)
 }
 
-fn parse_log(stdout: &str) -> Vec<LandedCommitRow> {
-    stdout
-        .split(RECORD_SEP)
-        .filter(|chunk| !chunk.trim().is_empty())
-        .map(parse_commit_chunk)
-        .collect()
-}
-
-fn parse_commit_chunk(chunk: &str) -> LandedCommitRow {
-    let (fields, stat) = chunk.split_once(STAT_SEP).unwrap_or((chunk, ""));
-    let mut parts = fields.splitn(4, FIELD_SEP);
-    let sha = parts.next().unwrap_or("").to_string();
-    let merged_at = parts.next().unwrap_or("").to_string();
-    let subject = parts.next().unwrap_or("");
-    let body = parts.next().unwrap_or("");
-
-    let mut harness_session_ids = BTreeSet::new();
-    find_session_ids(body, &mut harness_session_ids);
-    let (files_changed, insertions, deletions) = parse_shortstat(stat);
-
-    LandedCommitRow {
-        sha,
+fn commit_row(repo: &git2::Repository, commit: &git2::Commit<'_>) -> Result<LandedCommitRow> {
+    std::str::from_utf8(commit.message_bytes()).context("commit message is not UTF-8")?;
+    let subject = commit.summary()?.unwrap_or("");
+    let body = commit.body()?.unwrap_or("");
+    let mut ids = BTreeSet::new();
+    find_session_ids(body, &mut ids);
+    let tree = commit.tree()?;
+    let parent = if commit.parent_count() == 0 {
+        None
+    } else {
+        Some(commit.parent(0)?.tree()?)
+    };
+    let mut diff = repo.diff_tree_to_tree(parent.as_ref(), Some(&tree), None)?;
+    diff.find_similar(None)?;
+    let stats = diff.stats()?;
+    let stamp = forge::instant::isoformat_utc(commit.time().seconds() as f64);
+    let merged_at = stamp.strip_suffix("+00:00").unwrap_or(&stamp).to_owned() + "Z";
+    Ok(LandedCommitRow {
+        sha: commit.id().to_string(),
         merged_at,
         pr_number: pr_number_from_subject(subject),
         agent_names: agent_names_from_body(body),
-        harness_session_ids: harness_session_ids.into_iter().collect(),
+        harness_session_ids: ids.into_iter().collect(),
         subject_digest: super::subject::subject_digest(subject),
-        files_changed,
-        insertions,
-        deletions,
-    }
+        files_changed: stats.files_changed() as u64,
+        insertions: stats.insertions() as u64,
+        deletions: stats.deletions() as u64,
+    })
 }
 
 fn pr_number_pattern() -> &'static Regex {
@@ -238,83 +252,82 @@ fn agent_names_from_body(body: &str) -> Vec<String> {
         .collect()
 }
 
-fn shortstat_pattern() -> &'static Regex {
-    static PATTERN: OnceLock<Regex> = OnceLock::new();
-    PATTERN.get_or_init(|| {
-        Regex::new(
-            r"(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?",
-        )
-        .expect("valid shortstat regex")
-    })
-}
-
-/// Parses a `git --shortstat` block (" N files changed, M insertions(+),
-/// K deletions(-)", any of the two counts optionally absent). All zero for
-/// a commit `--shortstat` printed nothing for (no first-parent diff --
-/// rare, but not an error: an empty merge is still a landed commit).
-fn parse_shortstat(stat: &str) -> (u64, u64, u64) {
-    let Some(caps) = shortstat_pattern().captures(stat) else {
-        return (0, 0, 0);
-    };
-    let num = |i: usize| -> u64 {
-        caps.get(i)
-            .and_then(|m| m.as_str().parse().ok())
-            .unwrap_or(0)
-    };
-    (num(1), num(2), num(3))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// Fixture built from three real commit messages copied from this
-    /// repo's own `git log` (commit messages are public repo content --
-    /// `brief_ledger_agent_rollup.md` item 2 says copying them is fine).
-    /// Shapes: one Claude commit (sha, PR number, one `Agent:`, one
-    /// `Claude-Session` URL), one GLM commit (`ab153e2`-shaped: several
-    /// `Agent: glm` trailers, zero URLs), one commit with no `(#N)` suffix.
-    const FIXTURE_LOG: &str = "\u{1e}d90ffdfd9a1b4db0d58794da574b20e7f66d6414\u{1f}2026-09-13T08:29:48Z\u{1f}feat(forge): ledger rollup writes turn, session and hook tables with compaction and resend detection (#37)\u{1f}Design step 2 of the cost ledger.\n\nAgent: llm-b0\n\nClaude-Session: https://claude.ai/code/session_01PoLjRxqVQGqy41fMDG26vX\n\nCo-authored-by: llm-b0 <llm-b0@users.noreply.github.com>\u{2}\n\n 21 files changed, 980 insertions(+), 31 deletions(-)\u{1e}ab153e246e234caaa4f1daa51c9fda7e83f51bdf\u{1f}2026-09-11T12:00:00Z\u{1f}feat(forge): workspace_hygiene reads the configured integration branch, runs native at SessionStart (#32)\u{1f}Squashed body.\n\nAgent: glm\n\nAgent: glm\n\nAgent: glm\u{2}\n\n 41 files changed, 64292 insertions(+), 132 deletions(-)\u{1e}0000000000000000000000000000000000000000\u{1f}2026-09-01T00:00:00Z\u{1f}chore: direct push, no PR\u{1f}No trailers at all.\u{2}\n\n 1 file changed, 1 insertion(+)\u{1e}";
-
     #[test]
-    fn claude_commit_has_pr_number_agent_and_session_id() {
-        let rows = parse_log(FIXTURE_LOG);
-        let row = &rows[0];
-        assert_eq!(row.sha, "d90ffdfd9a1b4db0d58794da574b20e7f66d6414");
-        assert_eq!(row.merged_at, "2026-09-13T08:29:48Z");
-        assert_eq!(row.pr_number, Some(37));
-        assert_eq!(row.agent_names, vec!["llm-b0".to_string()]);
+    fn native_scan_selects_origin_head_and_reads_first_parent_stats() {
+        let dir = std::env::temp_dir().join(forge::resource_id("landed-native-test").unwrap());
+        std::fs::create_dir(&dir).unwrap();
+        let repo = git2::Repository::init(&dir).unwrap();
+        let blob = repo.blob(b"one\ntwo\n").unwrap();
+        let mut builder = repo.treebuilder(None).unwrap();
+        builder.insert("file.txt", blob, 0o100644).unwrap();
+        let tree = repo.find_tree(builder.write().unwrap()).unwrap();
+        drop(builder);
+        let signature = git2::Signature::new(
+            "agent",
+            "a@example.invalid",
+            &git2::Time::new(1_700_000_000, 540),
+        )
+        .unwrap();
+        let first = repo
+            .commit(
+                None,
+                &signature,
+                &signature,
+                "first landed change\n",
+                &tree,
+                &[],
+            )
+            .unwrap();
+        let first_commit = repo.find_commit(first).unwrap();
+        let empty = repo.treebuilder(None).unwrap().write().unwrap();
+        let empty_tree = repo.find_tree(empty).unwrap();
+        let second = repo
+            .commit(
+                None,
+                &signature,
+                &signature,
+                "second landed change (#8)\n\nAgent: lane-b\nAgent: lane-b\nClaude-Session: https://claude.ai/code/session_abc123\n",
+                &empty_tree,
+                &[&first_commit],
+            )
+            .unwrap();
+        repo.reference("refs/remotes/origin/master", second, true, "fixture")
+            .unwrap();
+        repo.reference_symbolic(
+            "refs/remotes/origin/HEAD",
+            "refs/remotes/origin/master",
+            true,
+            "fixture",
+        )
+        .unwrap();
+        let rows = scan(&dir, None, None, None).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].merged_at, "2023-11-14T22:13:20Z");
+        assert_eq!(rows[0].pr_number, Some(8));
+        assert_eq!(rows[0].agent_names, ["lane-b"]);
+        assert_eq!(rows[0].harness_session_ids, ["session_abc123"]);
         assert_eq!(
-            row.harness_session_ids,
-            vec!["session_01PoLjRxqVQGqy41fMDG26vX".to_string()]
+            rows[0].subject_digest,
+            super::super::subject::subject_digest("second landed change")
         );
-        assert_eq!(row.files_changed, 21);
-        assert_eq!(row.insertions, 980);
-        assert_eq!(row.deletions, 31);
-    }
-
-    #[test]
-    fn glm_commit_has_no_session_id_and_dedupes_agent_lines() {
-        let rows = parse_log(FIXTURE_LOG);
-        let row = &rows[1];
-        assert_eq!(row.pr_number, Some(32));
-        assert_eq!(row.agent_names, vec!["glm".to_string()]);
-        assert!(row.harness_session_ids.is_empty());
-        assert_eq!(row.files_changed, 41);
-        assert_eq!(row.insertions, 64292);
-        assert_eq!(row.deletions, 132);
-    }
-
-    #[test]
-    fn commit_with_no_pr_suffix_and_no_trailers_is_null_not_an_error() {
-        let rows = parse_log(FIXTURE_LOG);
-        let row = &rows[2];
-        assert_eq!(row.pr_number, None);
-        assert!(row.agent_names.is_empty());
-        assert!(row.harness_session_ids.is_empty());
-        assert_eq!(row.files_changed, 1);
-        assert_eq!(row.insertions, 1);
-        assert_eq!(row.deletions, 0);
+        assert_eq!(rows[1].pr_number, None);
+        assert!(rows[1].agent_names.is_empty() && rows[1].harness_session_ids.is_empty());
+        assert_eq!((rows[0].files_changed, rows[0].deletions), (1, 2));
+        assert_eq!((rows[1].files_changed, rows[1].insertions), (1, 2));
+        assert_eq!(scan(&dir, None, Some(1), None).unwrap().len(), 1);
+        assert!(scan(&dir, Some("2099-01-01T00:00:00Z"), None, None)
+            .unwrap()
+            .is_empty());
+        assert!(scan(&dir, Some("not a date"), None, None).is_err());
+        drop(empty_tree);
+        drop(first_commit);
+        drop(tree);
+        drop(repo);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
@@ -327,31 +340,6 @@ mod tests {
         assert_eq!(
             ids.into_iter().collect::<Vec<_>>(),
             vec!["session_abc123".to_string()]
-        );
-    }
-
-    #[test]
-    fn the_subject_digest_strips_the_squash_suffix() {
-        // The landed subject carries ` (#N)`; the session that typed it ran
-        // `gh pr create --title "<title>"` with no suffix. The strip is
-        // what makes the two digests meet.
-        let rows = parse_log(FIXTURE_LOG);
-        assert_eq!(
-            rows[0].subject_digest,
-            super::super::subject::subject_digest(
-                "feat(forge): ledger rollup writes turn, session and hook tables with compaction and resend detection"
-            )
-        );
-        assert_eq!(
-            rows[1].subject_digest,
-            super::super::subject::subject_digest(
-                "feat(forge): workspace_hygiene reads the configured integration branch, runs native at SessionStart"
-            )
-        );
-        // No suffix on this one: the digest hashes the subject verbatim.
-        assert_eq!(
-            rows[2].subject_digest,
-            super::super::subject::subject_digest("chore: direct push, no PR")
         );
     }
 }

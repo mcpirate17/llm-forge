@@ -4,9 +4,9 @@ Every later spend decision (model routing, hook budgets, cache policy) needs
 one instrument: tokens by category, attributed per turn, rolled up per
 session, per agent and per landed PR, with a ratchet that fails a PR when the
 numbers regress. `forge ledger` is that instrument. The commands live in the
-native binary (`native/forge/src/ledger/`); `python -m conductor.cost_ledger`
-is the forwarding shim and `make ledger-rollup` / `make ledger-report` /
-`make cost-budget-audit` the everyday flows. Design:
+native binary (`native/forge/src/ledger/`). For host budget operations, use
+`forge ledger budget rollup|audit|report|gate --host <path>`; the independent
+per-tier routing table remains `forge ledger report`. Design:
 `docs/design/cost_ledger.md`.
 
 **Model, in one paragraph.** Harness transcripts are the source of truth:
@@ -25,8 +25,10 @@ so the hook rolls it up then (2 s bound, best-effort to stderr, escape hatch
 
 ## Tables
 
-`<ledger_root>` (env `LEDGER_ROOT`, else `${XDG_STATE_HOME:-$HOME/.local/state}/llm-forge/ledger/`) holds six
-tables plus `archive/`. Day-file names are UTC dates; a session's rows land
+`<ledger_root>` (explicit `--ledger-root` or env `LEDGER_ROOT`, else
+`${XDG_STATE_HOME}/llm-forge/ledger/`, falling back to
+`${HOME}/.local/state/llm-forge/ledger/`) holds six tables plus `archive/`.
+Day-file names are UTC dates; a session's rows land
 under the day of its own timestamps.
 
 ### `turn_attribution`
@@ -204,6 +206,9 @@ boundary. One invocation joins exactly one project. A project name that
 begins with `-` (every munged path does: `-home-tim-...`) needs the `=` form,
 `--project=-home-tim-Projects-LLM`, or the value parses as a flag. `--cap`,
 `--since`/`--last` and `--branch` pass through to the landed scan.
+`--since` accepts `YYYY-MM-DD` (using the current UTC time of day), an
+RFC3339 timestamp, or common relative intervals such as `7 days ago`; it does
+not implement full Git `--since` approxidate syntax.
 
 ## `forge ledger landed` (step 4)
 
@@ -212,8 +217,7 @@ forge ledger landed --repo <path> [--since <date> | --last <n>] [--branch <name>
 ```
 
 One JSON row per landed first-parent commit: `sha`, `merged_at` (committer
-date, UTC, `YYYY-MM-DDTHH:MM:SSZ` -- `%cd` with `--date=format-local:...` and
-`TZ=UTC`, never `%cI`, which ignores `--date`), `pr_number` (trailing `(#N)`
+date, UTC, `YYYY-MM-DDTHH:MM:SSZ`), `pr_number` (trailing `(#N)`
 in the subject, `null` when absent), `agent_names` (every `Agent: <name>`
 trailer, sorted, deduplicated -- a squash commit can carry several),
 `harness_session_ids`, `files_changed`, `insertions`, `deletions`.
@@ -344,12 +348,13 @@ live break worth noticing), while a metric that has *never* had a real
 baseline -- because `--record` wrote `null` for it, or because the baseline
 file predates it -- is `NO_BASELINE` every time, even on a window with no
 data either. `cheap_tier_rework_rate` is the running example: its baseline
-is `null` until the `ci_history` fetcher exists, so every check reports it
+is `null` until a `ci_history` cache is explicitly populated, so checks report it
 as `NO_BASELINE`, never as a `NO_DATA` regression from an established metric
 that never actually existed.
 
-Overall status is the worst of the five, ranked
-`REGRESSION > NO_DATA > NO_BASELINE > RATCHET_HELD > PASS`. If *every* row
+Overall status ranks
+`REGRESSION > NO_DATA > NO_BASELINE > RATCHET_HELD > PASS`. `NO_DATA` and
+`NO_BASELINE` are unmeasured states, not measured regressions. If *every* row
 across `hook_rollup`, `session_rollup` and `agent_rollup` (the three
 original tables; `task_dispatch` is not part of this check, see
 `audit.rs`'s module doc) is zero, the command fails loud: exit `3`, nothing
@@ -362,24 +367,18 @@ names is always a key in `metrics`, whether the value is a real receipt or
 over every day file read, `task_dispatch` files included now), so a receipt
 names exactly which rows it was computed from.
 
-### Gate wiring: `cost-budget-audit`
+### Gate: `forge ledger budget gate`
 
-`src/conductor/cost_budget_audit.py` wraps the command as gate phase
-`cost-budget-audit`. The ok rule, verbatim from the module:
-
-```python
-OK_STATUSES = frozenset({"PASS", "RATCHET_HELD"})
-ok = not any(metric.status == "REGRESSION" for metric in result.metrics.values())
+```sh
+forge ledger budget gate --host <path> [--ledger-root <dir>]
 ```
 
-`PASS`, `RATCHET_HELD`, `NO_BASELINE` and `NO_DATA` -- including the
-hard-empty exit-3 case -- are all `ok`: a fresh clone or CI runner has no
-baseline and no ledger rows yet, and there is nothing to regress against, so
-`make gate` must not go permanently red. `detail` still names every metric's
-status verbatim, never rounded up to `PASS`. Only a missing `forge` binary or
-unparseable output raises loud (`CostBudgetAuditError` -> `GateRefusal`). The
-direct CLI path keeps failing loud: exit 3 on the hard-empty window, exit 1
-on anything but `PASS`/`RATCHET_HELD`.
+This emits gate-phase JSON. `NO_DATA` and `NO_BASELINE` are unmeasured states,
+not measured regressions. Only an actual `REGRESSION` sets `ok` false. A
+command error (for example an invalid host, unreadable ledger or malformed
+baseline) remains a refusal and does not become a passing gate result. Gate
+uses the same budget defaults and window options as `audit`, but does not roll
+transcripts up implicitly.
 
 ## `forge ledger prune` (step 6)
 
@@ -421,34 +420,39 @@ The hooks' own telemetry (one JSON line per `forge hook` call: `event`,
 `elapsed_ms`, `delegated`, `ts`; plus the PostToolUse context-size records)
 writes to `<ledger_root>/telemetry/context_telemetry/events.jsonl` --
 `CONTEXT_TELEMETRY_PATH` overrides, `LEDGER_ROOT` else
-`${XDG_STATE_HOME:-$HOME/.local/state}/llm-forge/ledger/`, in both the Rust writer and the transitional Python adapter, with a
-byte-identical record format. The default used to live inside the checkout
+`${XDG_STATE_HOME}/llm-forge/ledger/` (or `${HOME}/.local/state/llm-forge/ledger/`
+when `XDG_STATE_HOME` is unset). The default used to live inside the checkout
 (`<root>/src/research/tmp/...`, inherited from PR #36): a read-only checkout
 must never be a hook's write target, and keeping telemetry under the ledger
 root is what lets the SessionEnd rollup feed `hook_rollup` from the same root
 it writes tables to. The file rotates at 10 MiB, five rotations kept.
 
-## The Python shim and the make targets (step 6)
+## Native budget commands (step 6)
 
 ```
-python -m conductor.cost_ledger <read|rollup|landed|audit|record|report> [args...]
+forge ledger budget rollup --host HOST [--ledger-root DIR] [--transcripts DIR]
+forge ledger budget audit --host HOST [--ledger-root DIR] [--baseline FILE] [--window-days N]
+forge ledger budget audit --host HOST --record [--ledger-root DIR] [--baseline FILE] [--window-days N]
+forge ledger budget report --host HOST [--ledger-root DIR] [--baseline FILE] [--window-days N]
+forge ledger budget gate --host HOST [--ledger-root DIR] [--baseline FILE] [--window-days N]
 ```
 
-Locates the `forge` binary the way `conductor.cost_budget_audit` does
-(`resolve_forge_binary`), forwards arguments verbatim, propagates the exit
-code, never re-implements a computation. Two conveniences: `rollup` with no
-paths fills this project's defaults (the repo's own transcript directory --
-`~/.claude/projects/` + the repo path with `/` -> `-` -- rolled up into the
-ledger root with `--repo`/`--project`), and `report` renders the audit
-verdict as one line per metric with its status, exiting by the same
-`OK_STATUSES` rule as `make cost-budget-audit`.
+`--host` selects the repository, transcript project and default tracked
+baseline (`HOST/ledger/cost_budget_baseline.json`). `--ledger-root` overrides
+the state root; otherwise Forge uses `LEDGER_ROOT`, then
+`${XDG_STATE_HOME}/llm-forge/ledger/`, falling back to
+`${HOME}/.local/state/llm-forge/ledger/`. With no explicit paths,
+`rollup` reads this host's transcript project under `~/.claude/projects/` and
+joins the host's landed commits. It does not fetch CI history. Pass `audit
+--record` only to replace the baseline. `report` prints the cost budget metric
+table; `gate` prints gate-phase JSON and rejects only measured regressions.
+An invalid ledger or other command error remains a refusal. `forge ledger
+report` is a separate per-tier routing table and retains its existing meaning.
 
-- `make ledger-rollup` -- the default rollup above (`LEDGER_ROOT` overrides,
-  default `${XDG_STATE_HOME:-$HOME/.local/state}/llm-forge/ledger/`). Idempotence makes reruns free.
-- `make ledger-report` -- the human table.
-- `make cost-budget-audit` -- depends on `ledger-rollup`, so the audit reads
-  fresh rows instead of a stale or empty root; same for
-  `cost-budget-record`.
+The `make ledger-rollup`, `make ledger-report`, `make cost-budget-audit` and
+`make cost-budget-record` targets remain convenience wrappers around these
+native operations. `make ci-history` is a separate legacy opt-in cache refresh;
+ledger rollup never invokes it implicitly.
 
 ## Known limits
 
@@ -559,7 +563,7 @@ Field derivation in `apply()`:
   The first commit is treated as the dispatch's own work; the cache has no
   other way to say which commit was whose.
 
-### `ci_history` fetcher (built)
+### Legacy explicit `ci_history` fetcher
 
 This file is never written by `native/forge` -- `conductor.ci_history_fetch`
 (Python glue over `gh` and local `git`, per `CLAUDE.md`'s language
@@ -588,10 +592,10 @@ fresh `fetched_utc`, written atomically (temp file + rename). Failures are
 graded: an unusable environment (no `gh`, unauthenticated, an unreadable
 existing file) exits 2 having written nothing; a PR that could not be
 resolved is named on stderr while every resolvable PR is still written, and
-the run exits 1. `make ledger-rollup` refreshes this cache first when `gh`
-is on PATH (a failed fetch never fails the rollup) because the join always
-reads whatever is on disk *now*; `--dry-run` prints the plan -- cached PRs
-left alone and the calls it would make -- without touching `gh`.
+the run exits 1. The fetch is opt-in through `make ci-history`; ledger rollup
+reads any existing cache and never invokes the fetcher or requires `gh`.
+`--dry-run` prints the plan -- cached PRs left alone and the calls it would
+make -- without touching `gh`.
 
 A verdict will be `unknown` whenever the PR's oldest commit was never a
 branch tip on GitHub: check runs attach to the tip at push time, so a PR

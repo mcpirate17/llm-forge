@@ -188,7 +188,10 @@ pub fn claim_activity_path(repo_root: &Path) -> Option<PathBuf> {
     common_dir(repo_root).map(|d| d.join("governance").join("claim-activity.json"))
 }
 
-fn checked_claim_path(repo: &Path, filename: &str) -> Result<Option<PathBuf>, OwnershipError> {
+pub(crate) fn checked_claim_path(
+    repo: &Path,
+    filename: &str,
+) -> Result<Option<PathBuf>, OwnershipError> {
     crate::repository::checkout_of_checked(repo)
         .map(|checkout| checkout.map(|(_, common)| common.join("governance").join(filename)))
         .map_err(|error| OwnershipError(format!("claim repository metadata: {error:#}")))
@@ -241,7 +244,10 @@ pub fn load_activity(repo_root: &Path) -> Result<HashMap<String, String>, Owners
     Ok(out)
 }
 
-fn write_activity(repo_root: &Path, seen: &HashMap<String, String>) -> Result<(), OwnershipError> {
+pub(crate) fn write_activity(
+    repo_root: &Path,
+    seen: &HashMap<String, String>,
+) -> Result<(), OwnershipError> {
     let Some(path) = checked_claim_path(repo_root, "claim-activity.json")? else {
         return err("claim activity log: repository has no resolvable common directory");
     };
@@ -267,8 +273,17 @@ fn write_activity(repo_root: &Path, seen: &HashMap<String, String>) -> Result<()
 /// `touch_claim`: record a write under `claim_id`, resetting its idle timer.
 /// Debounced. Returns whether the stamp was persisted.
 pub fn touch_claim(repo_root: &Path, claim_id: &str, now: f64) -> Result<bool, OwnershipError> {
-    // Atomic publication prevents torn JSON, but does not serialize this
-    // read-modify-write transaction with other native or Python writers.
+    let _lease =
+        crate::ownership_lifecycle::acquire(repo_root, std::time::Duration::from_millis(200))
+            .map_err(|error| OwnershipError(format!("claim lock unavailable: {error:#}")))?;
+    touch_claim_unlocked(repo_root, claim_id, now)
+}
+
+pub(crate) fn touch_claim_unlocked(
+    repo_root: &Path,
+    claim_id: &str,
+    now: f64,
+) -> Result<bool, OwnershipError> {
     let mut seen = load_activity(repo_root)?;
     if let Some(previous) = seen.get(claim_id) {
         let last = instant::parse(previous);
@@ -291,7 +306,7 @@ pub fn paths_overlap(first: &str, second: &str) -> bool {
 }
 
 /// Normalize POSIX separators before matching or verifying the claim identity.
-fn normalize_claim_path(raw: &str) -> Result<String, OwnershipError> {
+pub(crate) fn normalize_claim_path(raw: &str) -> Result<String, OwnershipError> {
     let value = raw.trim().trim_end_matches('/');
     let components: Vec<&str> = value
         .split('/')

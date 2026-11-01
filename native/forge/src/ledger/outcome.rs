@@ -104,37 +104,68 @@ pub fn ci_history_path(repo: &Path) -> Result<std::path::PathBuf> {
 }
 
 /// Parses `owner_name` out of `origin`'s remote URL (`git@github.com:o/n.git`
-/// or `https://github.com/o/n`), lower-cased and `.git`-stripped.
+/// or `https://github.com/o/n`), preserving case and stripping `.git`.
 fn owner_repo_slug(repo: &Path) -> Result<String> {
-    let output = std::process::Command::new("git")
-        .args(["-C"])
-        .arg(repo)
-        .args(["remote", "get-url", "origin"])
-        .output()
-        .context("running git remote get-url origin")?;
-    if !output.status.success() {
-        anyhow::bail!(
-            "git remote get-url origin exited {}: {}",
-            output.status.code().unwrap_or(-1),
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let repository = git2::Repository::discover(repo)
+        .with_context(|| format!("opening repository {}", repo.display()))?;
+    let remote = repository
+        .find_remote("origin")
+        .context("finding origin remote")?;
+    let url = remote
+        .url()
+        .context("origin URL is missing or not UTF-8")?
+        .trim()
+        .to_string();
     parse_owner_repo(&url)
         .with_context(|| format!("could not parse an owner/repo out of remote URL {url:?}"))
 }
 
 fn parse_owner_repo(url: &str) -> Option<String> {
-    let stripped = url.trim_end_matches(".git").trim_end_matches('/');
-    let tail = stripped
-        .split("github.com")
-        .nth(1)?
-        .trim_start_matches([':', '/']);
-    let (owner, name) = tail.rsplit_once('/')?;
-    if owner.is_empty() || name.is_empty() {
+    let path = if let Some((scheme, rest)) = url.split_once("://") {
+        if !scheme.eq_ignore_ascii_case("https") && !scheme.eq_ignore_ascii_case("ssh") {
+            return None;
+        }
+        let (authority, path) = rest.split_once('/')?;
+        let host = if let Some((user, host)) = authority.split_once('@') {
+            if !safe_component(user) {
+                return None;
+            }
+            host
+        } else {
+            authority
+        };
+        let (host, port) = host
+            .split_once(':')
+            .map_or((host, None), |(host, port)| (host, Some(port)));
+        if !host.eq_ignore_ascii_case("github.com")
+            || port.is_some_and(|port| port.parse::<u16>().ok().is_none_or(|port| port == 0))
+        {
+            return None;
+        }
+        path
+    } else {
+        let (host, path) = url.split_once(':')?;
+        if !host.eq_ignore_ascii_case("git@github.com") {
+            return None;
+        }
+        path
+    };
+    let path = path.strip_suffix('/').unwrap_or(path);
+    let (owner, name) = path.split_once('/')?;
+    let name = name.strip_suffix(".git").unwrap_or(name);
+    if !safe_component(owner) || !safe_component(name) {
         return None;
     }
     Some(format!("{owner}_{name}"))
+}
+
+fn safe_component(value: &str) -> bool {
+    !value.is_empty()
+        && value != "."
+        && value != ".."
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'))
 }
 
 /// The routing policy's own tier order (`ledger/routing_policy.toml`),
@@ -255,6 +286,25 @@ pub fn apply(
 mod tests {
     use super::*;
 
+    #[test]
+    fn native_remote_lookup_parses_origin_without_git_executable() {
+        let dir = std::env::temp_dir().join(forge::resource_id("outcome-native-test").unwrap());
+        std::fs::create_dir(&dir).unwrap();
+        let repo = git2::Repository::init(&dir).unwrap();
+        repo.remote("origin", "git@github.com:example/project.git")
+            .unwrap();
+        assert_eq!(owner_repo_slug(&dir).unwrap(), "example_project");
+        repo.config()
+            .unwrap()
+            .set_str("url.https://github.com/.insteadof", "gh:")
+            .unwrap();
+        repo.remote_set_url("origin", "gh:example/project.git")
+            .unwrap();
+        assert_eq!(owner_repo_slug(&dir).unwrap(), "example_project");
+        drop(repo);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// The frozen fixture the brief asks for: one PR that needed a
     /// higher-tier follow-up (glm -> llm-b0) and went red on first push,
     /// one clean single-commit PR, and one PR the cache does not cover yet.
@@ -333,6 +383,31 @@ mod tests {
             Some("mcpirate17_llm-forge".to_string())
         );
         assert_eq!(parse_owner_repo("https://example.com/x/y"), None);
+        for url in [
+            "ssh://git@github.com/mcpirate17/llm-forge.git",
+            "https://git@github.com:443/mcpirate17/llm-forge.git/",
+        ] {
+            assert_eq!(
+                parse_owner_repo(url).as_deref(),
+                Some("mcpirate17_llm-forge")
+            );
+        }
+        for url in [
+            "https://github.com.attacker.test/a/b",
+            "https://github.com@evil.test/a/b",
+            "https://github.com/../../outside/repo",
+            "git@github.com:../repo",
+            "ssh://git@github.com/a/../repo",
+            "https://github.com/a%2fb/repo",
+            "https://github.com/a/repo%2f..",
+            "https://github.com/a/repo?x=1",
+            "https://github.com/a/repo#ref",
+            "https://github.com/a/b/c",
+            "https://github.com/a/..",
+            "https://github.com/a\\b/repo",
+        ] {
+            assert!(parse_owner_repo(url).is_none(), "{url}");
+        }
     }
 
     #[test]

@@ -705,8 +705,6 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
         [
             "python_contracts_baseline_merge",
             "python_contracts_branch_policy_native",
-            "python_contracts_cost_budget_audit",
-            "python_contracts_cost_ledger",
             "python_contracts_crg_mcp_probe",
             "python_contracts_handoff",
             "python_contracts_import_ablation",

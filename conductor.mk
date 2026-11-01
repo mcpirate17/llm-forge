@@ -102,22 +102,22 @@ governance-commit:  ## Hold the commit mutex; pass COMMIT_ARGS='-m ... path ...'
 
 governance-claim:  ## Claim exact paths; set CLAIM_PATHS and CLAIM_JUSTIFICATION (OWNER defaults to this lane)
 	@test -n "$(CLAIM_PATHS)" -a -n "$(CLAIM_JUSTIFICATION)" || { echo "Set CLAIM_PATHS and CLAIM_JUSTIFICATION"; exit 2; }
-	$(PYTHON) -m conductor.candidate_review.cli claim --repo "$(CONDUCTOR_HOST_ROOT)" \
+	"$(FORGE)" claim create --repo "$(CONDUCTOR_HOST_ROOT)" \
 		$(if $(OWNER),--owner "$(OWNER)") --justification "$(CLAIM_JUSTIFICATION)" \
 		$(if $(CLAIM_HOURS),--hours "$(CLAIM_HOURS)") \
 		$(CLAIM_PATHS)
 
 governance-release-claim:  ## Release CLAIM_ID as OWNER
 	@test -n "$(OWNER)" -a -n "$(CLAIM_ID)" || { echo "Set OWNER and CLAIM_ID"; exit 2; }
-	$(PYTHON) -m conductor.candidate_review.cli release-claim --repo "$(CONDUCTOR_HOST_ROOT)" \
+	"$(FORGE)" claim release --repo "$(CONDUCTOR_HOST_ROOT)" \
 		--owner "$(OWNER)" "$(CLAIM_ID)"
 
 governance-claims:  ## Show active claims, one line each (CLAIM_PATH="a b" filters by overlap)
-	$(PYTHON) -m conductor.candidate_review.cli claims --repo "$(CONDUCTOR_HOST_ROOT)" --compact \
+	"$(FORGE)" claim list --repo "$(CONDUCTOR_HOST_ROOT)" --compact \
 		$(foreach p,$(CLAIM_PATH),--path $(p))
 
 governance-claims-json:  ## Show the full machine-readable claim store (active and expired)
-	$(PYTHON) -m conductor.candidate_review.cli claims --repo "$(CONDUCTOR_HOST_ROOT)"
+	"$(FORGE)" claim list --repo "$(CONDUCTOR_HOST_ROOT)"
 
 governance-close-session:  ## Atomically close session: release claims, append handoff, update state
 	@test -n "$(OWNER)" || { echo "Set OWNER='<agent>' (optional: SESSION_TITLE, SESSION_BODY, CLAIM_ID)"; exit 2; }
@@ -237,13 +237,14 @@ mutation-reap:  ## List engine runs orphaned by a dead engine (MUTATION_REAP_APP
 		--repo-root "$(CONDUCTOR_HOST_ROOT)" $(if $(MUTATION_REAP_APPLY),--apply,)
 
 # ── Cost ledger budget ratchet (docs/design/cost_ledger.md section 4) ───
-# Shells to `forge ledger audit` (native/forge/src/ledger/audit.rs); the Python
-# side only resolves the binary and maps its verdict to a gate phase / exit
-# code -- see src/conductor/cost_budget_audit.py. ledger-rollup/ledger-report
-# go through conductor.cost_ledger, the verbatim-forwarding shim (step 6).
+# Native budget orchestration shares the ledger audit computation. Reporting
+# names measured statuses directly; only explicit --record changes a baseline.
+# Refresh the optional outcome cache separately with `make ci-history`.
 
 COST_BUDGET_ARGS ?=
-LEDGER_ROOT ?= /mnt/data/llm/ledger
+LEDGER_ROOT ?=
+# An unset root is resolved by native code from LEDGER_ROOT/XDG_STATE_HOME/HOME.
+LEDGER_ROOT_ARG = $(if $(strip $(LEDGER_ROOT)),--ledger-root "$(LEDGER_ROOT)",)
 LEDGER_ARGS ?=
 
 # Rolls this project's harness transcripts (~/.claude/projects/<this repo,
@@ -260,18 +261,12 @@ ci-history:  ## Fetch the ci_history cache the ledger's outcome join reads
 .PHONY: ci-history
 
 ledger-rollup:  ## Roll this project's harness transcripts into the ledger root
-	@if command -v gh >/dev/null 2>&1; then \
-		$(MAKE) --no-print-directory ci-history \
-			|| echo "ci_history fetch failed; rolling up with the cache as it stands"; \
-	else \
-		echo "gh not on PATH: skipping the ci_history fetch (outcome join columns stay as cached)"; \
-	fi
-	$(PYTHON) -m conductor.cost_ledger --repo-root "$(CONDUCTOR_HOST_ROOT)" \
-		--ledger-root "$(LEDGER_ROOT)" rollup $(LEDGER_ARGS)
+	"$(FORGE)" ledger budget --host "$(CONDUCTOR_HOST_ROOT)" \
+		$(LEDGER_ROOT_ARG) rollup $(LEDGER_ARGS)
 
-ledger-report:  ## Print the three budget metrics for the window, one line per metric with status
-	$(PYTHON) -m conductor.cost_ledger --repo-root "$(CONDUCTOR_HOST_ROOT)" \
-		--ledger-root "$(LEDGER_ROOT)" report $(LEDGER_ARGS)
+ledger-report:  ## Print cost budget metrics and their measured statuses
+	"$(FORGE)" ledger budget --host "$(CONDUCTOR_HOST_ROOT)" \
+		$(LEDGER_ROOT_ARG) report $(LEDGER_ARGS)
 
 # The routing side of the same ledger: forge's per-tier dispatch table incl.
 # over_cap, would_deny, would_route, rework and ci_red over a trailing
@@ -285,20 +280,20 @@ route-report:  ## Per-tier dispatch table: over_cap, would_deny, would_route, re
 		echo "forge is not on PATH: cargo install --git https://github.com/mcpirate17/llm-forge --locked forge" >&2; \
 		exit 2; \
 	fi
-	"$(FORGE)" ledger report --ledger-root "$(LEDGER_ROOT)" $(ROUTE_REPORT_ARGS)
+	"$(FORGE)" ledger report $(LEDGER_ROOT_ARG) $(ROUTE_REPORT_ARGS)
 
 # The audit reads whatever rows sit in the ledger root, so refresh them first
 # (ledger-rollup above) rather than auditing a stale window.
 cost-budget-audit: ledger-rollup  ## Check hook latency, resend bytes and tokens/landed-PR against the recorded baseline
-	$(PYTHON) -m conductor.cost_budget_audit --repo-root "$(CONDUCTOR_HOST_ROOT)" \
-		--ledger-root "$(LEDGER_ROOT)" $(COST_BUDGET_ARGS)
+	"$(FORGE)" ledger budget --host "$(CONDUCTOR_HOST_ROOT)" \
+		$(LEDGER_ROOT_ARG) audit $(COST_BUDGET_ARGS)
 
 # Records this window's metrics as the new baseline. Run only after a deliberate
 # improvement or an accepted regression -- recording a grown baseline is how the
 # ratchet is defeated.
 cost-budget-record:  ## Re-record the cost-ledger budget baseline for the current window
-	$(PYTHON) -m conductor.cost_budget_audit --repo-root "$(CONDUCTOR_HOST_ROOT)" \
-		--ledger-root "$(LEDGER_ROOT)" --record $(COST_BUDGET_ARGS)
+	"$(FORGE)" ledger budget --host "$(CONDUCTOR_HOST_ROOT)" \
+		$(LEDGER_ROOT_ARG) audit --record $(COST_BUDGET_ARGS)
 
 # ── Worktree and graph maintenance ───────────────────────────────────────
 # graph-seed-worktree and worktree-reap manage OTHER worktrees a host project

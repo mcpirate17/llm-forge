@@ -674,24 +674,23 @@ def mutation_corpus_audit(
 
 
 def cost_budget_audit(export_root: Path) -> PhaseResult:
-    """`cost-budget-audit`: the three-metric budget ratchet (design step 5).
+    """Dispatch the cost phase to native code; verdict policy lives in Rust."""
+    from conductor._native import resolve_forge_binary_native
 
-    Delegates entirely to `conductor.cost_budget_audit.phase`, imported lazily
-    (module-body, not top-of-file) so that module's own `from conductor.gate
-    import PhaseResult` never becomes an import cycle -- the same reason
-    `mutation_corpus_audit` imports `conductor.mutation_patch_audit` inside its
-    own body instead of at the top of this file.
-    """
-
+    binary = resolve_forge_binary_native(
+        str(export_root), sys.executable, os.environ.get("FORGE_BIN"), shutil.which("forge")
+    )
+    if binary is None:
+        raise GateRefusal("no forge binary found -- cannot compute cost-ledger metrics")
     try:
-        from conductor.cost_budget_audit import CostBudgetAuditError
-        from conductor.cost_budget_audit import phase as cost_budget_phase
-    except ImportError as exc:
-        raise GateRefusal(f"cost budget audit is unavailable: {exc}") from exc
-
-    try:
-        return cost_budget_phase(export_root)
-    except CostBudgetAuditError as exc:
+        completed = _run(
+            [str(binary), "ledger", "budget", "gate", "--host", str(export_root)],
+            cwd=export_root,
+        )
+        if completed.returncode:
+            raise GateRefusal(f"cost budget audit did not run: {completed.stderr.strip()}")
+        return PhaseResult(**json.loads(completed.stdout))
+    except (OSError, subprocess.TimeoutExpired, ValueError, TypeError) as exc:
         raise GateRefusal(f"cost budget audit did not run: {exc}") from exc
 
 
