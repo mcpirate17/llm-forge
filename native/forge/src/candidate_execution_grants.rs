@@ -1,6 +1,6 @@
 use crate::{candidate_source::Source, cgroup};
 use anyhow::{ensure, Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
@@ -25,6 +25,7 @@ pub(crate) struct Grants {
     pub max_cpu_seconds: u64,
     pub max_address_space_mib: u64,
     pub python: Option<String>,
+    pub batch: Option<BatchBudget>,
     #[serde(skip)]
     digest: String,
 }
@@ -76,6 +77,9 @@ impl Grants {
     }
     fn validate(&mut self, source: &Source) -> Result<()> {
         ensure!(self.version == 1, "unsupported grants version");
+        if let Some(budget) = &self.batch {
+            budget.validate()?;
+        }
         self.source_root = absolute(&self.source_root)?;
         ensure!(
             self.source_root == source.root(),
@@ -155,6 +159,44 @@ impl Grants {
             "scratch parent must be outside source repository"
         );
         Ok(())
+    }
+}
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct BatchBudget {
+    pub max_workers: usize,
+    pub cpu_millis: u32,
+    pub memory_mib: u64,
+    pub processes: u32,
+}
+impl BatchBudget {
+    fn validate(&self) -> Result<()> {
+        ensure!(
+            (1..=32).contains(&self.max_workers)
+                && (10..=1_024_000).contains(&self.cpu_millis)
+                && (16..=1_048_576).contains(&self.memory_mib)
+                && (1..=4096).contains(&self.processes),
+            "invalid operator batch budget"
+        );
+        Ok(())
+    }
+    pub(crate) fn parallelism(&self, policy_workers: u64, stage: cgroup::Limits) -> Result<usize> {
+        self.validate()?;
+        ensure!(
+            (1..=32).contains(&policy_workers),
+            "invalid policy worker count"
+        );
+        ensure!(
+            stage.cpu_millis > 0 && stage.memory_mib > 0 && stage.processes > 0,
+            "stage resource ceilings must be positive"
+        );
+        let workers = (self.max_workers as u64)
+            .min(policy_workers)
+            .min(u64::from(self.cpu_millis / stage.cpu_millis))
+            .min(self.memory_mib / stage.memory_mib)
+            .min(u64::from(self.processes / stage.processes));
+        ensure!(workers > 0, "operator batch budget cannot admit one stage");
+        Ok(usize::try_from(workers)?)
     }
 }
 fn absolute(path: &Path) -> Result<PathBuf> {

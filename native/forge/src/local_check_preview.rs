@@ -254,7 +254,7 @@ fn invoke(
         .map(|s| identity::quote(s))
         .collect::<Vec<_>>()
         .join(" ");
-    let command = super::clean_command(&command);
+    let command = super::clean_command(&command, env);
     let measured = run_measured(
         &ShellRun {
             command: &command,

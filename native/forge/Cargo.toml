@@ -45,6 +45,10 @@ name = "candidate_execution"
 harness = false
 
 [[bench]]
+name = "batch_execution"
+harness = false
+
+[[bench]]
 name = "hook_guard"
 harness = false
 

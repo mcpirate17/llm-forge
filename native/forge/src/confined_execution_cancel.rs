@@ -7,7 +7,7 @@ pub struct Cancellation {
     cancelled: AtomicBool,
 }
 impl Cancellation {
-    pub(super) fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         // SAFETY: a successful eventfd syscall returns a newly owned descriptor.
         let fd = unsafe { libc::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK) };
         if fd < 0 {
@@ -20,6 +20,25 @@ impl Cancellation {
     }
     pub fn is_cancelled(&self) -> bool {
         self.cancelled.load(Ordering::Acquire)
+    }
+    /// Level-triggered; no waiter consumes the shared cancellation event.
+    pub async fn cancelled(&self) -> Result<()> {
+        if self.is_cancelled() {
+            return Ok(());
+        }
+        // SAFETY: AsyncFd exclusively owns this cloned descriptor; its identity
+        // remains unchanged until reactor deregistration and destruction.
+        let event = unsafe { tokio::io::unix::AsyncFd::register(self.event.try_clone()?)? };
+        loop {
+            if self.is_cancelled() {
+                return Ok(());
+            }
+            let mut ready = event.readable().await.context("wait for cancellation")?;
+            if self.is_cancelled() {
+                return Ok(());
+            }
+            ready.clear_ready();
+        }
     }
     pub fn cancel(&self) -> Result<()> {
         self.cancelled.store(true, Ordering::Release);

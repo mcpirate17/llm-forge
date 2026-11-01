@@ -25,6 +25,11 @@ forge candidate execute [--repo PATH] --kind index|commit|range
     [--profile fast|full|nightly] [--today YYYY-MM-DD]
     --check ID --grants ABSOLUTE_JSON_PATH [--expected-tree FULL_TREE_OID]
     [--execute]
+forge candidate execute-batch [--repo PATH] --kind index|commit|range
+    [--target-ref HEAD] [--base-ref REF] [--policy CANDIDATE_RELATIVE]
+    [--profile fast|full|nightly] [--today YYYY-MM-DD]
+    --grants ABSOLUTE_JSON_PATH [--expected-tree FULL_TREE_OID]
+    [--check ID ...] [--execute]
 forge candidate inspect [--repo PATH] --kind index|commit|range
     [--target-ref HEAD] [--base-ref REF]
 forge candidate materialize [--repo PATH] --tree FULL_TREE_OID
@@ -244,6 +249,88 @@ FORGE_TEST_CGROUP_PARENT=/sys/fs/cgroup/operator-delegated \
   -- --ignored --test-threads=1
 ```
 
+### Execute a selected batch
+
+`execute-batch` uses the same candidate selection and operator grants as
+`execute`. It defaults to preparation without launching children; `--execute`
+requests fresh execution. Repeated `--check ID` selects exact active IDs;
+omitting it selects all active checks for the profile. Duplicate, absent, and
+inactive requested IDs are errors. Report order always follows policy
+declaration order, regardless of request order or completion order.
+
+Batch execution additionally requires the grants file's `batch` object. For
+example, replace `resources` and add `batch` in the complete grants above with
+this fragment; it does not constitute a complete grants file:
+
+```json
+{
+  "resources": {"cpu_millis": 1000, "memory_mib": 128, "processes": 16},
+  "batch": {"max_workers": 2, "cpu_millis": 2000, "memory_mib": 256, "processes": 32}
+}
+```
+
+`resources` is the per-stage cgroup ceiling. `batch` is a separate aggregate
+operator admission budget; its CPU, memory, and process units are identical.
+Admitted concurrency is the minimum of policy `max_workers`, operator
+`batch.max_workers`, and each aggregate budget divided by its per-stage
+ceiling, rounding down. Worker counts must be 1–32. A missing budget or a
+budget unable to admit even one stage fails before launching. These aggregate
+fields admit concurrent stages; they do not enable controllers or modify the
+borrowed cgroup parent. Individual stages still have their own cgroups,
+CPU-time/address-space limits, wall deadlines, and Unicode capture limits.
+
+```text
+PATH= /absolute/path/to/forge candidate execute-batch --repo /home/operator/project \
+  --kind index --grants /home/operator/candidate-grants.json
+PATH= /absolute/path/to/forge candidate execute-batch --repo /home/operator/project \
+  --kind index --grants /home/operator/candidate-grants.json \
+  --check lint --check format --execute
+```
+
+A check without selected files and with `always=false` is an explicit skipped
+row, including a builtin check. It has no stages or result and does not make
+the batch incomplete. A scheduled builtin has no native implementation in
+this command: it appears in `unexecuted` and as an error row, making
+`success=false` and exit 1 even in dry-run. Explicitly selecting supported
+external checks avoids implying that unselected builtins ran.
+
+Each command check requires usable version evidence before its analyzer
+stage, in separate private workspaces as described above. A failed version
+blocks that check's analyzer, while other checks still return their own
+results. Ordinary analyzer failures produce failed `CheckResult` rows; queued
+cancellation and per-job infrastructure errors produce an error row with a
+null result. Owner-level failures remain command errors. SIGINT/SIGTERM cancel
+queued work and active stages; the independent batch owner awaits registered
+resource owners before the CLI runtime exits. Dropping a client does not drop
+cleanup ownership. The same SIGKILL/runtime-destruction/uninterruptible-I/O
+limits and unsafe-workspace retention rules apply as for single execution.
+
+The report has `schema_version: 1`,
+`execution_scope: "selected_regular_commands"`, `review_complete: false`,
+`cache: "disabled_fresh_execution"`, `executed`, `success`, `cancelled`, common
+candidate/policy/grants identities, and `budget` with `admitted_parallelism`.
+`checks` contains policy-ordered rows with `check_id`, normalized `check`,
+`files`, `skipped`, `stages`, `result`, and `error`; `unexecuted` names scheduled
+unsupported checks. Dry-run retains null results and stage reports. Exit 0
+means the selected scope prepared or executed successfully; exit 1 means
+failed or incomplete selected scope. Cancellation cannot yield success.
+
+Admission caps selection at 256 checks, 10 million change/check pairs, 8 MiB of
+paths per check, and 32 MiB of aggregate selected paths. Serialized report
+retention is capped at 128 MiB, with reserved bounded error rows. Every
+execution is fresh: this command neither reads nor writes a result cache. A
+successful batch is not a complete review, an assessment, attestation, receipt,
+approval, or evidence that an analyzer examined every selected file. The
+legacy full-review callers remain in place.
+
+The batch integration target is `native_candidate_execute_batch_cli`;
+delegated-cgroup cases are explicitly ignored by default and require
+`FORGE_TEST_CGROUP_PARENT` when run with `--ignored --test-threads=1`, using the
+manifest-path command pattern above. Those fixtures create their own child
+delegation and enable controllers only there, never on the borrowed parent.
+This describes validation commands and boundaries, not test or performance
+results.
+
 ### Inspect
 
 `inspect` reads Git object and index data through the native Git library and
@@ -321,14 +408,15 @@ does not replace them.
 ## Current boundary
 
 The native commands can apply candidate policy, plan checks, and explicitly run
-one granted external check. They do not orchestrate all analyzers or tests,
+one granted external check or a bounded selected batch. They do not orchestrate
+the complete review pipeline,
 admit or authenticate mutation
 evidence, issue attestations, acquire claims, produce a complete review, or
 decide whether work may land. Continue to use the existing candidate-review
 workflow for those decisions. The interdependent Python candidate-review
 package remains in place: its CLI and engine still call the Python command
-runner for the legacy complete-review workflow. The native single-check path
-does not silently replace those callers. Full orchestration, mutation evidence,
+runner for the legacy complete-review workflow. The native execution paths
+do not silently replace those callers. Full orchestration, mutation evidence,
 attestation, claims, reporting, and approval remain separate migration work.
 
 This page records the native command contract only. It makes no build, test,

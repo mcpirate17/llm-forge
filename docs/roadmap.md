@@ -4,6 +4,17 @@ The [2026-10-31 native orchestration blueprint](../ARCHITECTURE.md) records the
 current substrate audit and the next independently buildable capability milestones.
 The historical baseline and delivery phases below remain as provenance.
 
+The current native candidate slice includes single-check execution and bounded
+`forge candidate execute-batch`, with default dry-run, explicit operator
+aggregate budgets, policy-ordered results and interruption-owned cleanup.
+Scheduled unsupported checks remain visibly incomplete; execution is fresh and
+does not reuse a result cache. Full review orchestration, evidence and waiver
+verification, test-engine migration, reporting, attestation and legacy caller
+retirement remain. There are still 128 Python source files under `src/`; the
+native migration is incomplete. See the
+[execution contract](native-candidate-review.md#execute-a-selected-batch) and
+[scheduling measurements](performance.md#native-batch-scheduling).
+
 Status as of 2026-09-13; source of truth for llm-forge direction
 
 Synthesized 2026-09-13 from three measured reports in this directory:

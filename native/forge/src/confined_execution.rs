@@ -17,7 +17,7 @@ use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::process::{ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, watch};
 static EXECUTIONS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(32);
 
 /// Extra resources transfer to the independent owner before launch. Once armed,
@@ -65,12 +65,47 @@ pub struct Report {
     pub cpu_seconds: Option<u64>,
     pub address_space_bytes: Option<u64>,
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Terminal {
+    pub outcome: Outcome,
+    pub cleanup_complete: bool,
+}
+#[derive(Clone)]
+pub struct Completion {
+    receiver: watch::Receiver<Option<Terminal>>,
+}
+impl Completion {
+    #[cfg(test)]
+    pub(crate) fn test_channel() -> (watch::Sender<Option<Terminal>>, Self) {
+        let (sender, receiver) = watch::channel(None);
+        (sender, Self { receiver })
+    }
+
+    pub fn finished(&self) -> Option<Terminal> {
+        *self.receiver.borrow()
+    }
+    pub async fn wait(&mut self) -> Result<Terminal> {
+        loop {
+            if let Some(terminal) = self.finished() {
+                return Ok(terminal);
+            }
+            self.receiver
+                .changed()
+                .await
+                .context("execution owner stopped without terminal cleanup evidence")?;
+        }
+    }
+}
 pub struct Execution {
     cancellation: Arc<Cancellation>,
     receiver: Option<oneshot::Receiver<Report>>,
     completed: bool,
+    completion: Completion,
 }
 impl Execution {
+    pub fn completion(&self) -> Completion {
+        self.completion.clone()
+    }
     pub fn cancellation(&self) -> Arc<Cancellation> {
         self.cancellation.clone()
     }
@@ -141,6 +176,7 @@ pub fn start_with_resources(
     group.configure_command(plan.command())?;
     let cancellation = Arc::new(Cancellation::new()?);
     let (sender, receiver) = oneshot::channel();
+    let (terminal_sender, terminal_receiver) = watch::channel(None);
     let cancel = cancellation.clone();
     tokio::spawn(async move {
         let _admission = admission;
@@ -161,6 +197,10 @@ pub fn start_with_resources(
             report.errors.push(format!("workspace cleanup: {error:#}"));
         }
         report.duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        terminal_sender.send_replace(Some(Terminal {
+            outcome: report.outcome,
+            cleanup_complete: report.cleanup_complete,
+        }));
         // A departed client does not change cleanup obligations.
         if let Err(report) = sender.send(report) {
             if !report.errors.is_empty() {
@@ -175,6 +215,9 @@ pub fn start_with_resources(
         cancellation,
         receiver: Some(receiver),
         completed: false,
+        completion: Completion {
+            receiver: terminal_receiver,
+        },
     })
 }
 fn limit_value(resource: libc::__rlimit_resource_t, requested: Option<u64>) -> Result<Option<u64>> {

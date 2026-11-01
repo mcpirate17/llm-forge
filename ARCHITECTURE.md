@@ -1171,6 +1171,23 @@ byte cap; candidate capture instead retains separate bounded Unicode tails
 while continuing to drain. Details and operator configuration are in
 [native candidate review](docs/native-candidate-review.md).
 
+Native `forge candidate execute-batch` extends this path to selected external
+checks with a separate aggregate operator budget. Concurrency is capped by
+policy and operator worker limits and the aggregate CPU/memory/process budgets
+divided by per-stage ceilings. Results remain in policy order. No-file checks
+are explicit skips; scheduled builtins remain visibly unexecuted and make the
+selected scope incomplete, including during default dry-run. Execution is fresh,
+without result-cache reuse. The independent batch owner cancels queued work and
+waits for registered stage cleanup on interruption or client departure; the
+same runtime/SIGKILL/kernel-I/O boundary applies. This adds no approval or
+complete-review authority. Operator contracts are in
+[native candidate review](docs/native-candidate-review.md#execute-a-selected-batch).
+Focused release validation passed 622 existing and new tests, followed by two
+output-budget tests. Eleven explicitly delegated cgroup cases passed, including
+overlapping checks, failed-version isolation, SIGTERM, worker panic and dropped
+batch cleanup. The scheduling benchmark and its measured scope are recorded in
+[performance](docs/performance.md#native-batch-scheduling).
+
 Full review orchestration, cache integration, evidence and waiver verification,
 test-engine migration, reporting and attestation remain. The existing Python
 command runner still has these callers and has not been deleted prematurely;

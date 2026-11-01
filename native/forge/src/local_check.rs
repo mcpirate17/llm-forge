@@ -273,14 +273,31 @@ fn environment(
     Ok(env)
 }
 
-fn clean_command(command: &str) -> String {
-    let mut names = vec!["PYO3_CONFIG_FILE".to_string()];
-    for (key, _) in std::env::vars_os() {
+fn clean_command(command: &str, child_env: &[(String, String)]) -> String {
+    // Cargo-run's package metadata belongs to this launcher, not child builds.
+    // Retain caller build settings (CARGO_HOME/TARGET_DIR/BUILD_JOBS, flags,
+    // toolchain); only package/manifest metadata and OUT_DIR are removed.
+    let mut names = vec![
+        "PYO3_CONFIG_FILE".to_string(),
+        "CARGO_MANIFEST_DIR".to_string(),
+        "CARGO_MANIFEST_PATH".to_string(),
+        "OUT_DIR".to_string(),
+    ];
+    let keys = std::env::vars_os().map(|(key, _)| key).chain(
+        child_env
+            .iter()
+            .map(|(key, _)| std::ffi::OsString::from(key.as_str())),
+    );
+    for key in keys {
         let key = key.to_string_lossy();
-        if key.starts_with("GIT_") && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        if (key.starts_with("GIT_") || key.starts_with("CARGO_PKG_"))
+            && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
             names.push(key.into_owned());
         }
     }
+    names.sort();
+    names.dedup();
     format!("unset {}; {command}", names.join(" "))
 }
 
@@ -342,7 +359,7 @@ fn run_step(
     let log_file = format!("{index:02}-{stage}.log");
     let log = dir.join(&log_file);
     let start = Instant::now();
-    let command = clean_command(&step.run);
+    let command = clean_command(&step.run, env);
     let measurement = run_measured(
         &ShellRun {
             command: &command,

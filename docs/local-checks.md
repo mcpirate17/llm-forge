@@ -30,6 +30,13 @@ and isolated home/configuration directories. They exercise native hook guards,
 AST analysis and provider configuration without a compiler or interpreter in
 the runtime environment.
 
+Child check and preview commands remove Cargo launcher package/manifest
+metadata and `OUT_DIR`, including values supplied in check environment entries.
+These identify the launcher package and otherwise contaminate dependent build
+fingerprints. Caller build settings such as Cargo home/target directory, job
+count, compiler flags and toolchain remain available. A native re-execution
+test exercises the measured command path with synthetic metadata and settings.
+
 `make test` runs the default release test inventory for conductor-native,
 slop-core and Forge. Explicit Python compatibility features remain outside this
 native gate while their adapters are being retired; a native PASS does not

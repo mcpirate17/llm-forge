@@ -2,17 +2,23 @@
 pub mod active_state;
 pub mod analysis;
 #[cfg(target_os = "linux")]
+pub mod batch_execution;
+#[cfg(target_os = "linux")]
 pub mod bounded_file;
 #[cfg(target_os = "linux")]
 pub mod candidate_assess_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_assessment;
 #[cfg(target_os = "linux")]
+pub mod candidate_batch;
+#[cfg(target_os = "linux")]
 pub mod candidate_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_command;
 #[cfg(target_os = "linux")]
 pub mod candidate_execute;
+#[cfg(target_os = "linux")]
+mod candidate_execution_plan;
 #[cfg(target_os = "linux")]
 pub mod candidate_execution_result;
 #[cfg(target_os = "linux")]

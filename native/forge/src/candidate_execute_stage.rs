@@ -1,31 +1,33 @@
 use super::*;
 use crate::{
+    batch_execution::Owners,
     cgroup::Cgroup,
-    confined_execution::{self, Report},
+    confined_execution::{self, Cancellation, Execution, Report},
+    process_signals::ChildSignalMask,
     sandbox::CommandPlan,
 };
+use std::{future::Future, sync::Arc};
 
-pub(super) struct Stage {
+pub(crate) struct Stage {
     pub workspace: Workspace,
     pub plan: CommandPlan,
     pub limits: Limits,
     pub argv: Vec<String>,
     pub data: Value,
 }
+struct Launched {
+    execution: Execution,
+    data: Value,
+    argv: Vec<String>,
+}
 impl Stage {
-    pub(super) fn dry_run(self) -> Result<Value> {
+    pub(crate) fn dry_run(self) -> Result<Value> {
         drop(self.plan);
         self.workspace.discard()?;
         Ok(self.data)
     }
-    pub(super) async fn execute(
-        mut self,
-        grants: &Grants,
-        interrupts: &Interrupts,
-    ) -> Result<(Value, confined_execution::Report, Vec<String>)> {
-        let signal = interrupts.register_reactor()?;
-        let already_interrupted = interrupts.interrupted()?;
-        interrupts.configure_child(self.plan.command());
+    fn launch(mut self, grants: &Grants, mask: ChildSignalMask) -> Result<Launched> {
+        mask.configure(self.plan.command());
         let group = Cgroup::create(&grants.cgroup_parent, grants.resources)?;
         let execution = confined_execution::start_with_resources(
             self.plan,
@@ -33,32 +35,99 @@ impl Stage {
             self.limits,
             Box::new(self.workspace),
         )?;
-        let cancel = execution.cancellation();
-        let initial_cancel = if already_interrupted {
-            cancel.cancel()
+        Ok(Launched {
+            execution,
+            data: self.data,
+            argv: self.argv,
+        })
+    }
+    pub(crate) async fn execute(
+        self,
+        grants: &Grants,
+        interrupts: &Interrupts,
+    ) -> Result<(Value, Report, Vec<String>)> {
+        let signal = interrupts.register_reactor()?;
+        let interrupted = interrupts.interrupted()?;
+        let Launched {
+            execution,
+            mut data,
+            argv,
+        } = self.launch(grants, interrupts.child_mask())?;
+        let wake = if interrupted {
+            execution.cancellation().cancel()
         } else {
             Ok(())
         };
-        let wait = execution.wait();
-        tokio::pin!(wait);
-        let mut signal_bytes = [0u8; std::mem::size_of::<libc::signalfd_siginfo>()];
-        let report: Report = tokio::select! {
-            report = &mut wait => report?,
-            received = signal.read(&mut signal_bytes) => {
-                // Finish the independent resource owner even if signal observation
-                // fails. Returning early would shut down this CLI's runtime.
-                let cancellation = cancel.cancel();
-                let mut report = wait.await?;
-                received.context("observe candidate interrupt")?;
-                cancellation?;
-                if report.outcome == confined_execution::Outcome::Exited {
-                    report.outcome = confined_execution::Outcome::Cancelled;
-                }
-                report
+        let report = await_report(execution, async {
+            let mut bytes = [0u8; std::mem::size_of::<libc::signalfd_siginfo>()];
+            ensure!(
+                signal.read(&mut bytes).await? > 0,
+                "interrupt descriptor closed"
+            );
+            Ok(())
+        })
+        .await?;
+        wake.with_context(|| format!("stage cancellation; cleanup: {}", report.errors.join("; ")))?;
+        data["report"] = serde_json::to_value(&report)?;
+        Ok((data, report, argv))
+    }
+    pub(crate) async fn execute_batch(
+        self,
+        grants: &Grants,
+        mask: ChildSignalMask,
+        global: Arc<Cancellation>,
+        owners: Arc<Owners>,
+    ) -> Result<(Value, Report, Vec<String>)> {
+        ensure!(
+            !global.is_cancelled(),
+            "batch cancelled before stage launch"
+        );
+        let Launched {
+            execution,
+            mut data,
+            argv,
+        } = self.launch(grants, mask)?;
+        // Registration and owner transfer precede any await or worker callback.
+        let guard = match owners.register(&execution) {
+            Ok(guard) => guard,
+            Err(error) => {
+                let wake = execution.cancellation().cancel();
+                let cleanup = execution.wait().await;
+                let report = cleanup?;
+                anyhow::bail!(
+                    "batch registration: {error:#}; cancellation: {wake:?}; cleanup: {:?}",
+                    report.errors
+                );
             }
         };
-        initial_cancel?;
-        self.data["report"] = serde_json::to_value(&report)?;
-        Ok((self.data, report, self.argv))
+        let result = await_report(execution, global.cancelled()).await;
+        let finished = guard.finish();
+        let report = result.with_context(|| match &finished {
+            Ok(()) => "stage observation failed after cleanup".to_owned(),
+            Err(error) => format!("stage observation and owner cleanup failed: {error:#}"),
+        })?;
+        finished
+            .with_context(|| format!("stage resource cleanup: {}", report.errors.join("; ")))?;
+        data["report"] = serde_json::to_value(&report)?;
+        Ok((data, report, argv))
+    }
+}
+async fn await_report(
+    execution: Execution,
+    interrupted: impl Future<Output = Result<()>>,
+) -> Result<Report> {
+    let cancel = execution.cancellation();
+    let wait = execution.wait();
+    tokio::pin!(wait);
+    tokio::select! {
+        report = &mut wait => report,
+        received = interrupted => {
+            let wake = cancel.cancel();
+            let mut report = wait.await?;
+            received.with_context(|| format!("stage interrupt observation; cleanup: {}",report.errors.join("; ")))?;
+            wake.with_context(|| format!("stage cancellation; cleanup: {}",report.errors.join("; ")))?;
+            if report.outcome==confined_execution::Outcome::Exited { report.outcome=confined_execution::Outcome::Cancelled; }
+            Ok(report)
+        }
     }
 }

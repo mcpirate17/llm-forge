@@ -18,6 +18,8 @@ pub struct CandidateArgs {
 enum Action {
     /// Prepare or execute one isolated external check using operator grants.
     Execute(crate::candidate_execute::ExecuteArgs),
+    /// Prepare or execute ordered regular commands within an operator batch budget.
+    ExecuteBatch(crate::candidate_batch::BatchArgs),
     /// Assess supplied findings against the candidate policy; does not verify execution.
     Assess(crate::candidate_assess_cli::AssessArgs),
     /// Classify an exact candidate and plan ordered policy checks without executing them.
@@ -72,6 +74,12 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::ExecuteBatch(args) => {
+            let report = crate::candidate_batch::run(args)?;
+            let failed = report["success"] != true;
+            print_json(&report)?;
+            return Ok(u8::from(failed));
+        }
         Action::Execute(args) => {
             let report = crate::candidate_execute::run(args)?;
             let failed = report["result"]["status"] == "failed";

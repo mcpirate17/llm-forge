@@ -109,3 +109,37 @@ Measured source SHA-256 bindings:
 | `native/forge/benches/candidate_execution.rs` | `51cc5ffadb399f992d726454c972a5ff6cd37e7b79da3f287a81126f77105fd5` |
 | `native/forge/src/candidate_command.rs` | `6d5d6e080523059412cb002b77ee3306f42e79bde26ab6c320273bbb8d983860` |
 | `native/forge/src/process_capture_tail.rs` | `d5392281bfa1c0b12bd5443c06f3d22e4712ae616a1ed5de935e4724a14f19a6` |
+
+## Native batch scheduling
+
+`cargo +1.98.0 bench --manifest-path native/forge/Cargo.toml --bench batch_execution`
+measures the native batch owner, task scheduling, cancellation observation and
+ordered result collection with 64 no-op jobs on one Tokio reactor thread.
+The 2026-11-01 release run used an unisolated warm host, 10 warmup batches and
+31 samples of 50 batches per admission limit. Result order and contents are
+checked before timing. Total measured execution took 213 ms.
+
+| Admitted jobs | Median batch mean | p95 batch mean | Median per-job mean | p95 per-job mean |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 53.316 µs | 63.739 µs | 0.833 µs | 0.996 µs |
+| 2 | 43.845 µs | 49.912 µs | 0.685 µs | 0.780 µs |
+| 8 | 34.989 µs | 42.420 µs | 0.547 µs | 0.663 µs |
+
+Per-job values divide whole-batch timing by 64; they are not individual job
+latency percentiles. Admission limits here allow overlapping async tasks on
+one thread. These current-only measurements exclude candidate selection,
+snapshots, cgroups, sandbox/process launch and analyzer work, and establish no
+end-to-end speedup or model-quality improvement.
+
+Benchmark executable SHA-256:
+`9c5125c2f91531c39b623c4624906a32c80615a10df6e4b21a15a0e33f0e7353`.
+Result JSON SHA-256:
+`fd39c8aac26fa1a84785240756c42b64e31f262173d6ccab88565681289fcb28`.
+Measured source SHA-256 bindings:
+
+| File | SHA-256 |
+| --- | --- |
+| `native/forge/benches/batch_execution.rs` | `3e5be42c34f0d5039edd1652a8beffac72ee14245f02b72add4dc0988b768e79` |
+| `native/forge/src/batch_execution.rs` | `1c3fe4fb6396bdb53420ea6b3e124d4929902a1555848308b3b56670a7b2e3b7` |
+| `native/forge/src/confined_execution_cancel.rs` | `e830f7660c36c86507273829f226d422cf51a60b800c15e406b4b4ed56670f80` |
+| `native/forge/src/confined_execution.rs` | `5fa31aedfeb950bb9a6544ab17282a5cc23a23920e718fa81bf591b960247db6` |

@@ -99,8 +99,24 @@ impl Interrupts {
         Descriptor::new(self.descriptor.try_clone()?)
     }
 
+    pub fn child_mask(&self) -> ChildSignalMask {
+        ChildSignalMask {
+            previous: self.previous,
+        }
+    }
     /// Child commands must not inherit the supervisor's interrupt-blocking mask.
     pub fn configure_child(&self, command: &mut Command) {
+        self.child_mask().configure(command);
+    }
+}
+
+/// Copy of the pre-supervisor child mask; safe to move to batch worker tasks.
+#[derive(Clone, Copy)]
+pub struct ChildSignalMask {
+    previous: libc::sigset_t,
+}
+impl ChildSignalMask {
+    pub fn configure(&self, command: &mut Command) {
         let previous = self.previous;
         // SAFETY: sigprocmask is async-signal-safe and touches no allocated state.
         unsafe {
