@@ -47,6 +47,7 @@ The three native crates are:
 | Retrieval | SQLite FTS5/BM25, exact or HNSW vector search, immutable mapped indexes, source freshness and optional pinned local embedding endpoints; [code search](docs/native-code-search.md) |
 | Execution | Persistent PTYs, readiness-driven I/O, pidfds, bounded output and Linux Landlock/seccomp/cgroup isolation; [execution](docs/native-execution.md) |
 | Context | Offline BPE tokenization, protected message groups, AST folding, diagnostic projection and durable recovery before compaction; [context](docs/native-context.md) |
+| Local clerk | Explicit source inventory, bounded loopback drafts, provenance validation and exclusive output; [clerk](docs/native-clerk.md) |
 | Orchestration | Persistent local service, capability policy, request/output limits, receipts and MCP stdio; [harness](docs/native-harness.md) |
 | Source quality | Native Rust/Python source inspection and read-only checked ablation proposals; [analysis](docs/native-analysis.md) |
 

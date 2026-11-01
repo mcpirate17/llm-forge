@@ -7,6 +7,7 @@ pub mod lifecycle;
 pub mod quality;
 pub mod service;
 mod transport;
+pub(crate) use transport::post_json_limited;
 
 use anyhow::{ensure, Result};
 use config::{Env, RoutingConfig};

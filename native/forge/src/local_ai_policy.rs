@@ -1,4 +1,4 @@
-//! Native port of `conductor.local_ai_policy`: fail-closed authority boundary
+//! Native fail-closed authority boundary
 //! for local generative models. Local models are clerical (notes, summaries,
 //! organization, compaction) and never approve or authorize work; enforcement
 //! lives on the *prompt* side (`prompt_requests_authority`) and, for a shell
@@ -24,6 +24,15 @@ pub const UNCLASSIFIED_REASON: &str =
     "BLOCKED: local generative inference requires an explicit clerical task class. \
 Set LOCAL_AI_TASK to notes, summary, organization, or compaction. Local AI \
 cannot be used for approval or run decisions.";
+
+pub const CLERK_SYSTEM_PROMPT: &str =
+    "You are a low-risk local workspace clerk. You may only help with notes, \
+summaries, organization, and compaction. You have zero authority to approve, \
+authorize, sign off, promote, launch, resume, continue, or otherwise permit \
+work, experiments, evaluations, optimizer steps, GPU use, or training runs. \
+Never provide a go/no-go or approval verdict. If asked for one, refuse and say \
+that Tim or a runtime-verified frontier model is required; multi-hour runs \
+still require Tim's explicit approval.";
 
 const ALLOWED_LOCAL_TASKS: [&str; 4] = ["notes", "summary", "organization", "compaction"];
 const SHELL_OPERATORS: [&str; 5] = [";", "&", "&&", "|", "||"];
@@ -79,7 +88,7 @@ pub fn prompt_requests_authority(prompt: &str) -> bool {
 /// reason is either `DENY_REASON` (authority request) or a class-invalid
 /// message mirroring `LocalAIPolicyError`'s text (not itself matched against
 /// by any caller, so an approximate wording is safe).
-fn require_clerical_task(task_class: &str, prompt: &str) -> Result<String, String> {
+pub fn require_clerical_task(task_class: &str, prompt: &str) -> Result<String, String> {
     let normalized = task_class.trim().to_lowercase().replace('-', "_");
     if !ALLOWED_LOCAL_TASKS.contains(&normalized.as_str()) {
         let mut expected: Vec<&str> = ALLOWED_LOCAL_TASKS.to_vec();
@@ -206,6 +215,17 @@ mod tests {
     #[test]
     fn plain_command_is_allowed() {
         assert_eq!(deny_local_ai_command("ls -la", false), None);
+    }
+
+    #[test]
+    fn direct_task_and_malformed_shell_fail_closed() {
+        assert!(require_clerical_task("approval", "summarize notes")
+            .unwrap_err()
+            .contains("not clerical"));
+        assert_eq!(
+            deny_local_ai_command("ollama run \"unterminated", false),
+            Some(UNCLASSIFIED_REASON.to_owned())
+        );
     }
 
     #[test]

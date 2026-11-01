@@ -607,11 +607,6 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
     let root = repo_root();
     let gate_rollout = plan(&root, &["src/conductor/gate_rollout.py".to_owned()]).unwrap();
     assert_eq!(gate_rollout.targets, ["python_contracts_gate_rollout"]);
-    let local_ai_policy = plan(&root, &["src/conductor/local_ai_policy.py".to_owned()]).unwrap();
-    assert_eq!(
-        local_ai_policy.targets,
-        ["python_contracts_local_ai_policy"]
-    );
     for retired in [
         "current_work_guard.py",
         "active_state.py",
@@ -628,6 +623,8 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
         "workspace_runtime_matrix.py",
         "workspace_runtime_support.py",
         "project_context.py",
+        "local_ai_policy.py",
+        "local_clerk.py",
         "package_resources.py",
         "cpu_embed.py",
         "embedding_contract.py",
@@ -731,7 +728,6 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_crg_mcp_probe",
             "python_contracts_import_ablation",
             "python_contracts_ledger_calibrate",
-            "python_contracts_local_clerk",
             "python_contracts_mutation_coverage",
             "python_contracts_mutation_engine_mull_args",
             "python_contracts_mutation_engine_mull_rows",

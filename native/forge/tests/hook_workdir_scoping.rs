@@ -20,8 +20,7 @@ mod interpreter;
 #[path = "../src/json_canon.rs"]
 #[allow(dead_code)]
 mod json_canon;
-#[path = "../src/local_ai_policy.rs"]
-mod local_ai_policy;
+use forge::local_ai_policy;
 use forge::ownership;
 #[path = "../src/write_targets.rs"]
 mod write_targets;

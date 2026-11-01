@@ -1041,7 +1041,7 @@ pub fn repo_write_targets_from(command: &str, command_cwd: &Path, repo_root: &Pa
 
 /// Lexical `..`/`.` collapse (no filesystem access), mirroring `Path.resolve()`
 /// closely enough for repo-relative targets that need not exist on disk yet.
-pub(crate) fn normalize_lexically(path: &Path) -> PathBuf {
+pub fn normalize_lexically(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
     for component in path.components() {
         use std::path::Component;

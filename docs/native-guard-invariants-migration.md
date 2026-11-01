@@ -9,13 +9,14 @@ dispatch so access and claim handlers inspect the same object; malformed
 populated inputs fail closed. The guard also recognizes `notebook_path`.
 These remain cooperative tool-policy checks, not OS isolation.
 
-The independent local-clerk policy contract remains in
-`python_contracts_local_ai_policy.rs`, registered against
-`src/conductor/local_ai_policy.py` and the shared compatibility support. Its
-live consumer is `src/conductor/local_clerk.py`. Twenty guard-mediated cases
-were retired after their surviving behavior was covered natively. The old
-Python module's stdin API and unsupported-protocol exceptions are retired;
-native dispatch owns parsing and rejects malformed hook JSON.
+Native `local_ai_policy.rs` remains part of Forge's current-work hook
+policy. The separate Python `local_ai_policy.py` and `local_clerk.py` adapters
+and their dedicated compatibility targets are retired; the native clerk
+surface and current validation evidence are documented in
+[`native-clerk.md`](native-clerk.md).
+
+The historical mapping below records the earlier guard and external-invariant
+migration. Its old `local_ai_policy.py` row is not a current target mapping.
 
 The record below describes the earlier PyO3 migration and its historical
 source-to-target mappings, not the current runtime or registry.

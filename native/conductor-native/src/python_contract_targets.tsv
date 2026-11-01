@@ -70,7 +70,6 @@ src/conductor/dead_tests.py	python_contracts_dead_tests
 src/conductor/graph_context.py	python_contracts_graph_context
 src/conductor/graph_test_select.py	python_contracts_graph_test_select
 src/conductor/graph_test_select.py	python_contracts_contract_runner
-src/conductor/local_clerk.py	python_contracts_local_clerk
 src/conductor/mutation_campaign_generate.py	python_contracts_campaign_plan
 src/conductor/mutation_campaign_generate.py	python_contracts_mutation_campaign_model
 src/conductor/mutation_campaign_model.py	python_contracts_mutation_campaign_model
@@ -108,7 +107,6 @@ native/conductor-native/tests/python_contracts/source_dirs_support.rs	python_con
 src/conductor/duplicate_audit_config.py	python_contracts_reuse_consolidation
 src/conductor/duplicate_audit_config.py	python_contracts_reuse_detector_scan
 src/conductor/duplicate_audit_config.py	python_contracts_reuse_file_family_profiles
-native/conductor-native/tests/python_contracts/agent_comm_support.rs	python_contracts_local_clerk
 native/conductor-native/tests/python_contracts/candidate_review_support.rs	python_contracts_candidate_review_isolation
 native/conductor-native/tests/python_contracts/candidate_structure_support.rs	python_contracts_candidate_crate_version
 native/conductor-native/tests/python_contracts/candidate_structure_support.rs	python_contracts_candidate_structure_audit
@@ -150,7 +148,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_gover
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_context
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_selection
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_test_select
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_local_clerk
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_campaign_model
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_gate_edges
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_guard
@@ -586,8 +583,6 @@ src/conductor/candidate_review/git_source.py	python_contracts_ownership_claim_ex
 src/conductor/candidate_review/model.py	python_contracts_ownership_claim_expiry
 src/conductor/project_paths.py	python_contracts_ownership_claim_expiry
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_ownership_claim_expiry
-src/conductor/local_ai_policy.py	python_contracts_local_ai_policy
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_local_ai_policy
 src/conductor/candidate_review/external_invariants.py	python_contracts_external_invariants
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_external_invariants
 src/conductor/radon_complexity.py	python_contracts_radon_complexity

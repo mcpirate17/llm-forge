@@ -3,14 +3,7 @@
 #[path = "../src/current_work_guard.rs"]
 #[allow(dead_code)]
 mod current_work_guard;
-#[path = "../src/local_ai_policy.rs"]
-// `harness = false` omits their test functions while all-target checking still
-// enables cfg(test), leaving the source-local test imports unused here.
-#[allow(dead_code, unused_imports)]
-mod local_ai_policy;
-#[path = "../src/write_targets.rs"]
-#[allow(dead_code, unused_imports)]
-mod write_targets;
+use forge::{local_ai_policy, write_targets};
 
 use serde_json::json;
 use std::hint::black_box;

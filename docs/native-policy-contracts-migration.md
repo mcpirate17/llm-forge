@@ -1,9 +1,11 @@
 # Native policy contract migration
 
-The three Python suites below have Rust-owned PyO3 contracts. Each Rust target
-calls the shipped Python behavior and keeps assertions in Rust. The original
-Python files remain in place for independent review. No production Python code,
-Cargo manifest, discovery registry, or package metadata changes in this draft.
+This table preserves the earlier PyO3 migration record; it is not a current
+compatibility-target inventory. The `local_ai_policy.py` row is historical:
+the Python policy and clerk adapters and their dedicated targets have been
+retired in favor of the native Forge clerk. See [`native-clerk.md`](native-clerk.md).
+That guide records the current native validation evidence.
+The sandbox and policy-path rows retain their separate historical scope.
 
 | Original suite | Expanded Python cases | Rust target | Rust cases |
 | --- | ---: | --- | ---: |

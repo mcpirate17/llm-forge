@@ -1014,17 +1014,21 @@ Root scalar `input` strings remain available as provider patch/text data.
 Conflicting path fields cannot hide a protected notebook path behind a safe
 file path. Direct guard calls also reject malformed populated tool-name and
 command aliases; dispatch retains its stricter conflict checks.
-The independent Python local-clerk policy remains with its own compatibility
-target. There are 131 Python source files under `src/`; this is another bounded
-retirement, not completion of the native migration.
+At the guard milestone, the independent Python local-clerk policy remained
+with its own compatibility target and 131 Python source files remained under
+`src/`. The clerk replacement below advances that separate retirement.
 
 Focused release validation passed 601 native tests with two intentional ignores,
 including the frozen hook corpus, dispatch, Read, protocol and workdir checks.
 All 34 contract-discovery tests and the two affected optional compatibility cases
 passed using a private extension overlay. Strict Forge all-target Clippy and
 scoped compatibility-target Clippy passed. Six inspected Rust files had complete
-AST results and no function above 52 lines. Full committed checks and publication
-for this guard retirement are pending.
+AST results and no function above 52 lines. Guard retirement was published as
+`1c9ffa4d6796ff25b144e06a254ac31bf2466003`. Full release checks passed 2,375
+tests with 39 intentional ignores, plus two installed-runtime tests, before and
+after publication. The published receipt is
+`.git/forge-checks/run-1793523438983199297-688428/receipt.json`, SHA-256
+`d8081194559a94a372115f84b019864def76839beca6e769142c8c7b9beaf4d2`.
 
 The current-only guard benchmark used Rust 1.98.0 release, 31 batches of 1,000
 operations and 100 warmups on an unisolated host. Canonical normalization of a
@@ -1036,3 +1040,35 @@ command (p95 1.843). These timings exclude JSON parsing, process startup and
 other hook handlers; they are not a historical comparison or model latency.
 Benchmark executable SHA-256:
 `ee1d05b7ce6c62e3a4a989f635e1016f2460185c7c7ddd869d659ee2efaa0306`.
+
+The local clerk now runs through native `forge clerk inventory|draft|validate`.
+The CLI captures configuration explicitly and reuses the native local-model
+authority policy. Full source hashes remain distinct from bounded prompt
+prefixes. Generation uses bounded, proxy-free loopback HTTP with an explicit
+clerical task, strict response parsing, exact reported model-label checking,
+and full source revalidation after inference. The model label is not artifact
+attestation and a valid document grants no approval. A read-only destination
+preflight precedes inference; exclusive, descriptor-relative publication
+rechecks roots, parents, sources and staging identity. Competing destinations
+remain intact, and errors retain cleanup failures. Source files are never
+rewritten. These are capability/path checks, not protection against an
+unconfined same-UID process after the final check.
+
+The Python clerk and local-policy modules and their dedicated compatibility
+targets are deleted. Shared hook behavior uses the same library policy and
+lexer. Existing hook fixtures now import that policy instead of recompiling
+duplicate unit tests; the independent policy edge case is covered natively.
+There are 129 Python source files remaining under `src/`; migration is still
+incomplete. Focused release checks passed 369 native tests, including the
+broker's TLS transport fixtures and native-only CLI execution. Strict
+all-target Clippy passed. The 12-file native AST scan retained every symbol;
+one reference list hit its explicit cap, while all function spans were retained
+and no function exceeded 79 lines. The native discovery suite passed 33 tests;
+the affected optional compatibility selection case passed using a private
+binding overlay. Full committed checks and publication of this clerk milestone
+are pending.
+
+Current-only inventory timing measured three 2 KiB sources at 27.252 microseconds
+median batch mean and one full 1 MiB hash at 404.523 microseconds on a warm,
+unisolated host. See [native clerk](docs/native-clerk.md) for workloads,
+measurement limits, source bounds, trust boundaries and executable hash.

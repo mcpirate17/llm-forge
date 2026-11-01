@@ -38,6 +38,8 @@ pub mod file_lock;
 pub mod harness;
 pub mod instant;
 pub mod json_canon;
+pub mod local_ai_policy;
+pub mod local_clerk;
 pub mod mailbox_preview;
 #[cfg(target_os = "linux")]
 pub mod managed_service;
@@ -98,3 +100,4 @@ pub mod terminal_session;
 #[cfg(target_os = "linux")]
 pub mod tokenizer;
 pub mod tool_schema;
+pub mod write_targets;

@@ -29,7 +29,7 @@ mod land;
 mod land_exec;
 mod ledger;
 mod legacy_hook_api;
-mod local_ai_policy;
+use forge::local_ai_policy;
 mod local_check;
 mod local_check_receipt;
 mod mailbox;
@@ -70,7 +70,7 @@ mod telemetry;
 mod tool_quiet;
 mod workspace_hygiene;
 mod workspace_runtime;
-mod write_targets;
+use forge::write_targets;
 
 use clap::{Parser, Subcommand};
 use forge::tool_schema;
@@ -102,6 +102,8 @@ enum Command {
     Memory(forge::recall::cli::MemoryArgs),
     /// Build and search knowledge cards through pinned native embeddings.
     Cards(forge::cards_cli::CardsArgs),
+    /// Inventory, draft and validate bounded local clerical summaries.
+    Clerk(forge::local_clerk::cli::ClerkArgs),
     /// Serve bounded, provider-neutral embedding routes without an interpreter.
     EmbeddingBroker(forge::embedding_broker::cli::BrokerArgs),
     /// Bind, check or remove a project MCP connection to an existing native harness.
@@ -341,6 +343,7 @@ fn main() -> ExitCode {
         Command::Candidate(args) => command_exit("candidate", forge::candidate_cli::run(args), 1),
         Command::Memory(args) => command_exit("memory", forge::recall::cli::run(args), 2),
         Command::Cards(args) => command_exit("cards", forge::cards_cli::run(args), 2),
+        Command::Clerk(args) => command_exit("clerk", forge::local_clerk::cli::run(args), 2),
         Command::EmbeddingBroker(args) => command_exit(
             "embedding-broker",
             forge::embedding_broker::cli::run(args),

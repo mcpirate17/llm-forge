@@ -78,6 +78,24 @@ pub(super) fn post_json(
     post_with_agent(&agent(), endpoint, body, authorization, deadline)
 }
 
+/// Shared bounded JSON transport. Caller admits endpoint and bounds the request.
+pub(crate) fn post_json_limited(
+    endpoint: &str,
+    body: &Value,
+    authorization: Option<&str>,
+    deadline: Instant,
+    max_response: usize,
+) -> Result<Value> {
+    post_with_agent_limit(
+        &agent(),
+        endpoint,
+        body,
+        authorization,
+        deadline,
+        max_response,
+    )
+}
+
 fn post_with_agent(
     agent: &ureq::Agent,
     endpoint: &str,
@@ -85,6 +103,21 @@ fn post_with_agent(
     authorization: Option<&str>,
     deadline: Instant,
 ) -> Result<Value> {
+    post_with_agent_limit(agent, endpoint, body, authorization, deadline, MAX_RESPONSE)
+}
+
+fn post_with_agent_limit(
+    agent: &ureq::Agent,
+    endpoint: &str,
+    body: &Value,
+    authorization: Option<&str>,
+    deadline: Instant,
+    max_response: usize,
+) -> Result<Value> {
+    ensure!(
+        (1..=MAX_RESPONSE).contains(&max_response),
+        "invalid backend response limit"
+    );
     let encoded = serde_json::to_vec(body).context("encoding backend request")?;
     let mut request = agent
         .post(endpoint)
@@ -98,7 +131,7 @@ fn post_with_agent(
         .build()
         .send(encoded.as_slice())
         .map_err(|_| anyhow::anyhow!("embedding backend request failed"))?;
-    read_json(response, deadline, MAX_RESPONSE)
+    read_json(response, deadline, max_response)
 }
 
 #[cfg(test)]

@@ -15,6 +15,12 @@ The table is a historical mapping of the retired Python cases to their former
 Rust compatibility assertions. The agent A2A, handoff, and local-clerk cases
 remain separate from the retired session-brief adapter.
 
+The local-clerk rows below describe the retired Python adapter and its former
+compatibility target. The current native interface is documented in
+[`native-clerk.md`](native-clerk.md): `forge clerk --host HOST inventory`,
+`draft`, and `validate`. The dedicated Python clerk and local-policy targets
+have been retired. See the native guide for current validation evidence.
+
 | Retired Python case | Rust case | Contract retained |
 | --- | --- | --- |
 | `test_agent_a2a.py::test_rpc_rejects_missing_or_wrong_token` | `python_contracts_agent_a2a::rpc_rejects_missing_or_wrong_token_for_both_rows` | Public agent card, skills/interface, missing and wrong token rows, HTTP 401 |

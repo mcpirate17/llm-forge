@@ -275,10 +275,6 @@ name = "python_contracts_crg_seed_worktree"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_local_ai_policy"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_dead_tests"
 required-features = ["python-compat-tests"]
 
@@ -364,10 +360,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_ledger_calibrate"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_local_clerk"
 required-features = ["python-compat-tests"]
 
 [[test]]
