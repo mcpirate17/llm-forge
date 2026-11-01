@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.84"
+version = "0.1.85"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -33,6 +33,11 @@ harness = false
 [[bench]]
 name = "candidate_clang"
 harness = false
+
+[[bench]]
+name = "candidate_crate"
+harness = false
+required-features = ["source-analysis"]
 
 [[bin]]
 name = "dead-code-audit"
@@ -156,10 +161,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_candidate_cli"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_crate_version"
 required-features = ["python-compat-tests"]
 
 [[test]]

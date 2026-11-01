@@ -160,12 +160,13 @@ memory_mb = 1024
 max_output_chars = 12000
 
 [checks.crate-version]
-kind = "builtin"
-# attribution = "candidate": every finding names a manifest of a crate this
-# candidate edited, so there is no pre-existing-debt shape to inherit.
+kind = "command"
 profiles = ["fast", "full"]
 classes = ["native"]
+command = ["forge", "candidate", "crate-version", "--repo", "{snapshot}", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "crate-version", "--tool-version"]
 cache = false
+run_on_deletions = true
 severity = "critical"
 timeout_seconds = 30
 memory_mb = 512

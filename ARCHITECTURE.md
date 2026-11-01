@@ -1217,7 +1217,7 @@ defines the remaining legacy metadata bridge and explicit no-file skip.
 Full review orchestration, cache integration, evidence and waiver verification,
 test-engine migration, review-integrated reporting and attestation remain. The existing Python
 command runner still has these callers and has not been deleted prematurely;
-118 Python source files remain under `src/`. The native migration goal stays
+117 Python source files remain under `src/`. The native migration goal stays
 active until those consumers are replaced and their interpreted code is removed.
 
 Cargo audit evaluates pinned offline evidence directly with native RustSec,

@@ -24,7 +24,11 @@ pub mod candidate_cargo_run;
 pub mod candidate_checks;
 pub mod candidate_clang_args;
 pub mod candidate_clang_db;
+#[cfg(feature = "source-analysis")]
+pub mod candidate_crate_version;
 pub mod candidate_policy;
+#[cfg(feature = "source-analysis")]
+pub mod candidate_rust_artifact;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_structure;
 pub mod candidate_unicode;

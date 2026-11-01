@@ -16,6 +16,8 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Compare captured crate production inputs, versions and installed metadata.
+    CrateVersion(crate::candidate_crate_cli::CrateArgs),
     /// Plan or run native source checks against exact candidate changed lines.
     Scan(crate::candidate_scan_cli::ScanArgs),
     /// Check exact changed lines using an explicitly provisioned native formatter.
@@ -84,6 +86,7 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::CrateVersion(args) => return crate::candidate_crate_cli::run(args),
         Action::Scan(args) => return crate::candidate_scan_cli::run(args),
         Action::ClangFormat(args) => return crate::candidate_clang_format_cli::run(args),
         Action::ClangTidy(args) => return crate::candidate_clang_tidy_cli::run(args),

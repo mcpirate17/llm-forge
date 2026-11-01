@@ -24,6 +24,8 @@ pub mod candidate_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_command;
 #[cfg(target_os = "linux")]
+pub mod candidate_crate_cli;
+#[cfg(target_os = "linux")]
 pub mod candidate_execute;
 #[cfg(target_os = "linux")]
 mod candidate_execution_plan;
@@ -33,6 +35,8 @@ pub mod candidate_execution_result;
 mod candidate_execution_workspace;
 #[cfg(target_os = "linux")]
 mod candidate_inputs;
+#[cfg(target_os = "linux")]
+mod candidate_installed;
 #[cfg(target_os = "linux")]
 pub mod candidate_plan;
 #[cfg(target_os = "linux")]

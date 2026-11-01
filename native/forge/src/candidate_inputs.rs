@@ -202,7 +202,7 @@ fn metadata(
 fn capture(
     parent: DirectoryBinding,
     name: String,
-    expected: Expected,
+    expected: Option<Expected>,
     maximum: usize,
     external: bool,
 ) -> Result<(BoundFile, Vec<u8>)> {
@@ -215,6 +215,7 @@ fn capture(
     let bytes = read_optional(&parent.dir, &name, maximum)
         .map_err(anyhow::Error::msg)?
         .context("input disappeared")?;
+    let expected = expected.unwrap_or_else(|| Expected::Sha256(Sha256::digest(&bytes).into()));
     parent.verify()?;
     ensure!(
         before == metadata(&parent, &name, external, maximum)?,
@@ -280,7 +281,7 @@ fn external_with_tmp(
     capture(
         parent,
         filename(path)?,
-        Expected::Sha256(expected_sha256(hash)?),
+        Some(Expected::Sha256(expected_sha256(hash)?)),
         maximum,
         true,
     )
@@ -314,10 +315,19 @@ pub fn snapshot(
     capture(
         parent,
         filename(&path)?,
-        Expected::Blob(expected_blob(expected_blob_oid)?),
+        Some(Expected::Blob(expected_blob(expected_blob_oid)?)),
         maximum,
         false,
     )
+}
+
+/// Capture observed operator metadata. This binds bytes and identity for this
+/// operation; it does not assert that a package was loaded by another process.
+pub fn observed(path: &Path, maximum: usize, snapshot: &Path) -> Result<(BoundFile, Vec<u8>)> {
+    canonical(path)?;
+    exclude(path, Some(snapshot))?;
+    let parent = DirectoryBinding::open(path.parent().context("metadata has no parent")?, None)?;
+    capture(parent, filename(path)?, None, maximum, true)
 }
 
 #[cfg(test)]

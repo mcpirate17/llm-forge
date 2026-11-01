@@ -21,7 +21,7 @@ toolchain shim, and compatibility target are retired; the existing policy IDs
 route uncached command and version calls through Forge. Execution is fresh and
 does not reuse a result cache. Full review orchestration, remaining builtins,
 evidence and waiver verification, test-engine migration, reporting, attestation
-and legacy caller retirement remain. There are still 118 Python source files
+and legacy caller retirement remain. There are still 117 Python source files
 under `src/`; the native migration is incomplete. See the
 [execution contract](native-candidate-review.md#execute-a-selected-batch),
 [native Cargo lint contract](native-cargo-lint.md), and
@@ -41,6 +41,12 @@ shared Python style/diff wrappers and all hot-loop, test-value and verbosity
 callers together, retaining start-line filtering for style/hot loops and full
 span overlap for test-value/verbosity. Exclusions are explicit and unreadable
 eligible scope fails; no truncated finding list may be reported as clean.
+
+The [native crate-version gate](native-crate-version.md) compares captured
+production inputs and versions, including deleted sources and AST-scoped test
+exclusions. Installed-version checks use explicitly scoped distribution metadata
+with before/after identity checks. Metadata does not establish loaded artifact
+identity. The Python evaluator and its compatibility target are retired.
 
 Executable identity stamping now belongs to the separate `forge-cli` workspace
 package. Git/source identities, installed-artifact checks and source-bound

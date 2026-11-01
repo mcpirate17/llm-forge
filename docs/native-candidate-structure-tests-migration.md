@@ -1,19 +1,17 @@
-# Candidate crate-version and structure-audit test migration
+# Historical candidate crate-version and structure-audit test migration
 
-The two retired Python modules contained 38 declared tests: 21 crate-version
-tests and 17 structure-audit tests. Three structure tests had three parameter
-rows each, so pytest collected 44 cases. The two Rust integration targets below
-own all 44 assertions. They call the shipped Python checks through PyO3 and do
-not import or execute the retired pytest modules.
+Historical record: the retired Python crate-version and structure-audit modules
+contained 38 declared tests (21 and 17); parameterization made 44 pytest cases.
+The crate-version compatibility target has since been retired in favor of the
+native CLI documented in `native-crate-version.md`; the table below records its
+former case mapping only. The structure-audit target remains a separate Python
+compatibility surface and is not retired by that change.
 
-The crate fixture creates a real temporary Git repository, commits a base
-tree, writes a separate candidate snapshot, and passes the actual base tree
-OID to `check_crate_version`. Its changes, tree entries, policy, manual/full
-review context, and one `installed_version` callback reproduce the original
-fixture. The structure fixture writes only temporary Python source snapshots
-and uses the original change metadata and review context. All 20 named source
-snippets in its positive and negative cases match the former Python strings.
-`Case` removes the temporary files after each Rust test.
+The former crate fixture exercised the Python evaluator through PyO3; its
+installed-version callback is historical and does not describe the current
+operator metadata-root interface. Native CLI parity validation is pending. The
+structure fixture continues to use temporary Python source snapshots and its
+existing review context.
 
 | Retired crate-version test | Rust test in `python_contracts_candidate_crate_version.rs` |
 | --- | --- |

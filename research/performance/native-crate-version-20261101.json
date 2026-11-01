@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "scope": "current-only warm native evaluator including AST/TOML and result allocation/drop; excludes input JSON parsing, Git, file reads, hashing output, process and sandbox costs; no baseline or speedup claim",
+  "measurements": [
+    {
+      "crates": 1,
+      "changed_sources": 1,
+      "tests_only": false,
+      "findings": 1,
+      "input_bytes": 388,
+      "input_sha256": "544f10058bc75d824fe1ce858b0f8c90a98e93eb529e23368dbc4ef6e20b636e",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 18.773100000000003,
+      "p95_sample_mean_us": 29.863099999999996
+    },
+    {
+      "crates": 1,
+      "changed_sources": 1,
+      "tests_only": true,
+      "findings": 0,
+      "input_bytes": 403,
+      "input_sha256": "77fe96b40443621320c81c9677c17530e903f58bbe681e543c42a262e02450c8",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 16.4531,
+      "p95_sample_mean_us": 17.145
+    },
+    {
+      "crates": 128,
+      "changed_sources": 128,
+      "tests_only": false,
+      "findings": 128,
+      "input_bytes": 44914,
+      "input_sha256": "c63e345007c94a20641164f8f80900abd3e11926ec598a039dfa65563fd41587",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 2254.7313999999997,
+      "p95_sample_mean_us": 2264.4853
+    },
+    {
+      "crates": 128,
+      "changed_sources": 128,
+      "tests_only": true,
+      "findings": 0,
+      "input_bytes": 46834,
+      "input_sha256": "24ff8dc9160610240f036d4d153993459f2b6231ce409ab94e1d57e630f94093",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 2029.4095000000002,
+      "p95_sample_mean_us": 2042.6226
+    }
+  ],
+  "recorded_at_utc": "2026-11-01T22:34:07Z",
+  "base_commit": "7bed31c3125bf492b85eb37c878046270e20f768",
+  "source_state": "native crate-version migration; evaluator source inputs and executable bound by SHA-256",
+  "host": {
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "architecture": "x86_64",
+    "kernel": "7.0.0-38-generic",
+    "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+    "isolation": "unisolated host; no concurrent owned build during timed region"
+  },
+  "command": "cargo +1.98.0 bench --offline --locked --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite --bench candidate_crate",
+  "sha256": {
+    "native/conductor-native/Cargo.toml": "dabff81453c743ee4a25cbfa58ef4b9d26cfe1bf14d2630e8fc1e7809897af0b",
+    "native/conductor-native/Cargo.lock": "6fca38b102aeef0be9139dfad177fc0b59d236c04674b5744663cba2658a2e92",
+    "native/conductor-native/benches/candidate_crate.rs": "922a0d579b741c8e9621559a993e02f56c2b6c3ab64dd387216718ffde137250",
+    "native/conductor-native/src/lib.rs": "edb7734567925da87749c56cfd0c2becbca0670f942e9fda956a78509c51887b",
+    "native/conductor-native/src/candidate_checks.rs": "11c4c8f08b5f21584848f70aa0df8fe0163006153c01888ac402dd8aeabe61b4",
+    "native/conductor-native/src/candidate_crate_version.rs": "e874de90ae5c30327be47ab7ff89859ba316c394fa8def72f15f72402bfa5fa3",
+    "native/conductor-native/src/candidate_rust_artifact.rs": "e15d3f5592523b6c25cbe9ed8e98d15876ba3ef786d04da6ec37a0dae7a7e7fa",
+    "native/conductor-native/src/syntax.rs": "f162fc5aea73745aa03dddec4ef931be7191505c0d5b3d4e25aa8c66399f9617",
+    "native/conductor-native/target/release/deps/candidate_crate-aec37179a4f425c9": "2ef34b17c8d9e3152af2c1e0b79980f31f745d6c430d657ecaf58d1c42e76935"
+  }
+}

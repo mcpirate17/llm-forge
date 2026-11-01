@@ -111,6 +111,8 @@ pub fn evaluate(operation: &str, payload: &Value) -> Result<Value, String> {
         "dependency-integrity" => integrity::dependency_integrity(payload),
         "files-for-policy" => integrity::files_for_policy(payload),
         "cargo-audit" => crate::candidate_cargo_run::evaluate_payload(payload),
+        #[cfg(feature = "source-analysis")]
+        "crate-version" => crate::candidate_crate_version::evaluate(payload),
         "secret-scan" => scan::secret_scan(payload),
         "native-source" => scan::native_source(payload),
         "performance-selection" => evidence::performance_selection(payload),
