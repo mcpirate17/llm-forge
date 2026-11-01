@@ -119,11 +119,12 @@ forwards selection metadata to this same Rust evaluator. It requires
 containing `path`, `sha256`, and `max_age_seconds`; that spec has the same path and
 ownership restrictions and a 64 KiB limit. A missing specification fails.
 
-Cargo fmt/clippy migration is separate. Their remaining toolchain-environment
-bridge now calls bounded native compatibility recovery, preserving explicit
-`RUSTUP_HOME`/`CARGO_HOME`, then usable `HOME` and login-home candidates. This
-ambient compatibility behavior grants no capabilities and is never used by the
-new audit path. Crate roster selection and lint execution still need migration.
+Native Cargo lint uses the same explicit Cargo grant and private runtime model
+documented in [the Cargo lint contract](native-cargo-lint.md). The Python lint
+wrapper and ambient toolchain-recovery shim have been retired; candidate policy
+routes fmt/clippy command and version calls through the uncached native Forge
+stage. This lint path is separate from the legacy audit dispatcher described
+above.
 
 ## Measured API latency
 

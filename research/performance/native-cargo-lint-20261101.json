@@ -1,0 +1,55 @@
+{
+  "scope": "current-only synthetic; no baseline improvement or end-to-end claim",
+  "timing": "API including object destruction; plan includes filesystem enumeration and reads; excludes fixture/oracle/toolchain/cache/Cargo/process/sandbox/CLI costs",
+  "roster_sha256": "beb50144ecaf82f184c9333dd0e3b2f7f01883215cd149ad06feb0655a755f68",
+  "manifests_sha256": "86656722822af9b1da06876b8354677c411249329896ba37753291a992339534",
+  "selected_sha256": "ab3cac11f67685f59a730a4ea1bbd44efdd75a7de0ae523ded902018bfb3b20a",
+  "plan_sha256": "8726a8b38f04b3179fe8c0855c73e1d2a3f0f87d5f8e023cc3d39574177fbc56",
+  "build_profile": "release-like",
+  "measurements": [
+    {
+      "name": "parse_16_crate_roster",
+      "warmup_calls": 5,
+      "samples": 31,
+      "iterations_per_sample": 20,
+      "timed_calls": 620,
+      "median_sample_mean_us": 6.1610499999999995,
+      "p95_sample_mean_us": 6.3815,
+      "mean_us": 6.199748387096775
+    },
+    {
+      "name": "plan_16_crates_with_filesystem_reads",
+      "warmup_calls": 5,
+      "samples": 31,
+      "iterations_per_sample": 20,
+      "timed_calls": 620,
+      "median_sample_mean_us": 138.3499,
+      "p95_sample_mean_us": 143.7219,
+      "mean_us": 139.01577258064515
+    }
+  ],
+  "elapsed_seconds": 0.091507963,
+  "deadline_seconds": 30,
+  "provenance": {
+    "date": "2026-11-01",
+    "base_commit": "dc839342df6c802d185b37174fa3e1f940d5fada",
+    "compiler": "rustc 1.98.0",
+    "kernel": "Linux 7.0.0-38-generic",
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "features": [
+      "bundled-sqlite",
+      "default"
+    ],
+    "host_isolation": "unisolated; concurrent Forge release build",
+    "source_sha256": {
+      "native/conductor-native/benches/candidate_cargo_lint.rs": "e5a04bb985826fc73d4b251d571c4684b9a0a96667af947a13272cc68e9d20ab",
+      "native/conductor-native/src/candidate_cargo_lint.rs": "a3175d5dc28b6c09e155034ee63bfb1888e2ec09d4f530d94a3acf83843ca873",
+      "native/conductor-native/src/candidate_cargo_lint/inventory.rs": "046a6124b158cc53f992b3e6acfa9ec85c5bdc256f64c0c31d2ad0dd72ce66d3",
+      "native/conductor-native/src/candidate_cargo_lint/read.rs": "d9900208e0d93053beaab86c9afd1657b2abfdbc7bc71b2c15414e42f72abb00",
+      "native/conductor-native/src/candidate_cargo_lint/roster.rs": "0472e267158b7fee61d98c6e69b0d89eb9bf689b636a3517536177a6eb1de8b1",
+      "native/conductor-native/src/candidate_cargo_lint/scope.rs": "c5f7feb7afefef7c4ab53e54863096fefc13e1c7ba2c24c82dcb28276b7fa44e",
+      "native/conductor-native/src/candidate_cargo_lint/scope_manifest.rs": "ad01edf6942740f5a725e12ac1ba6a787a18151c6bccdaa2dafa71be44d34329"
+    },
+    "benchmark_binary_sha256": "fdff6cd3e67d75b344694ffbe0a3c88231d11b2f3f326c5792966a2ebdf135e1"
+  }
+}

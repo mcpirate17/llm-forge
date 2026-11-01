@@ -1217,15 +1217,21 @@ defines the remaining legacy metadata bridge and explicit no-file skip.
 Full review orchestration, cache integration, evidence and waiver verification,
 test-engine migration, review-integrated reporting and attestation remain. The existing Python
 command runner still has these callers and has not been deleted prematurely;
-126 Python source files remain under `src/`. The native migration goal stays
+125 Python source files remain under `src/`. The native migration goal stays
 active until those consumers are replaced and their interpreted code is removed.
 
-Cargo audit now evaluates pinned offline evidence directly with native RustSec,
+Cargo audit evaluates pinned offline evidence directly with native RustSec,
 including exact crates.io checksum and yanked-state coverage. Its Python command
-wrapper is deleted; the legacy dispatcher forwards metadata to the same native
-evaluator. Missing, stale or inconsistent evidence fails. The
-[audit contract](docs/native-cargo-audit.md) documents operator provenance and
-scope limits; cargo-lint execution and evidence production still need migration.
+wrapper is deleted; the remaining legacy dispatcher forwards metadata to the
+same evaluator. Missing, stale or inconsistent evidence fails. See the
+[audit contract](docs/native-cargo-audit.md).
+
+Native candidate Cargo lint now plans bounded workspace and borrowed-target
+scope and runs fmt/clippy through granted external stages with an explicit Cargo
+binary and private runtime directories. Its Python wrapper, ambient toolchain
+shim, and compatibility target are retired; policy keeps the check IDs and
+routes commands uncached through Forge. There are 125 Python files under `src/`.
+See the [native Cargo lint contract](docs/native-cargo-lint.md).
 
 ## Executable identity and reusable builds
 

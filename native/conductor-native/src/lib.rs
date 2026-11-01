@@ -19,8 +19,8 @@ mod candidate_benchmark;
 pub mod candidate_cargo_audit;
 pub mod candidate_cargo_engine;
 pub mod candidate_cargo_evidence;
+pub mod candidate_cargo_lint;
 pub mod candidate_cargo_run;
-pub mod candidate_cargo_toolchain;
 pub mod candidate_checks;
 pub mod candidate_policy;
 #[cfg(feature = "source-analysis")]

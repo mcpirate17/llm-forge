@@ -14,12 +14,17 @@ checksum/yanked coverage. Other scheduled unsupported checks remain
 visibly incomplete. Builtin execution uses a private capability-rooted snapshot,
 bounded inputs/results and no analyzer process; scan reads are strict UTF-8,
 finite and cooperatively cancellable, with sanitized incomplete-read findings.
-Execution is fresh and does not reuse a result cache. Full review
-orchestration, remaining builtins, evidence and waiver verification, test-engine
-migration, reporting, attestation and legacy caller retirement remain. There are
-still 126 Python source files under `src/`; the native migration is incomplete.
-See the
-[execution contract](native-candidate-review.md#execute-a-selected-batch) and
+Native `forge candidate cargo-lint` plans bounded workspace/borrowed-target
+scope and runs fmt/clippy per selected manifest through granted external stages,
+with explicit tool grants and private runtime directories. The Python wrapper,
+toolchain shim, and compatibility target are retired; the existing policy IDs
+route uncached command and version calls through Forge. Execution is fresh and
+does not reuse a result cache. Full review orchestration, remaining builtins,
+evidence and waiver verification, test-engine migration, reporting, attestation
+and legacy caller retirement remain. There are still 125 Python source files
+under `src/`; the native migration is incomplete. See the
+[execution contract](native-candidate-review.md#execute-a-selected-batch),
+[native Cargo lint contract](native-cargo-lint.md), and
 [scan measurements](performance.md#native-scan-admission-and-line-lookup).
 
 Executable identity stamping now belongs to the separate `forge-cli` workspace

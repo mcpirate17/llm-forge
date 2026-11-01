@@ -21,11 +21,40 @@ FORGE_TEST_BIN=/absolute/installed/bin/forge cargo +1.98.0 test --release --lock
   --manifest-path native/forge/Cargo.toml --test native_candidate_cargo_audit_cli
 ```
 
-The remaining cargo-lint adapter still handles roster and crate selection and
-external fmt/clippy execution. Its environment recovery is now a metadata-only
-call to native code. `python_contracts_candidate_cargo_lint` retains roster,
-prerequisite, selection and execution coverage and adds a real native recovery
-contract. `python_contracts_candidate_policy` exercises the remaining audit
-dispatch seam against the actual native evaluator and verifies digest refusal.
-These explicit compatibility targets require a freshly built Python binding;
-they are separate from the native gate and remain until their callers retire.
+Native Cargo lint now has shared Rust roster, owner-selection, workspace and
+borrowed-target planning, a Forge CLI, and an external-stage integration path.
+The focused native filter is `candidate_cargo_lint` in
+`native/conductor-native` and the targets are `native_candidate_cargo_lint_{cli,stage,seed}` in
+`native/forge`; they cover plan/selection, scope expansion, tool grants,
+sequential fmt/clippy execution, private runtime cleanup, and result codes.
+Focused release validation passed all 49 planner/runtime/CLI/stage/seed tests.
+
+The Python `cargo_lint_files.py` wrapper, `python_contracts_candidate_cargo_lint`
+target, and ambient `candidate_cargo_toolchain` compatibility shim are retired.
+Candidate policy keeps the `cargo-fmt` and `cargo-clippy` IDs but routes their
+commands and version probes through the uncached native Forge CLI stage. The
+remaining `python_contracts_candidate_policy` target covers the separate Python
+audit-dispatch seam; audit and lint are distinct paths.
+
+Run all lint integration cases, including the six explicitly provisioned tests:
+
+```sh
+FORGE_TEST_BIN=/absolute/installed/bin/forge \
+FORGE_TEST_CARGO_BIN=/absolute/native/toolchain/bin \
+FORGE_TEST_CARGO_HOME_SEED=/absolute/cargo/cache-home \
+FORGE_TEST_CGROUP_PARENT=/sys/fs/cgroup/delegated-parent \
+RUST_TEST_THREADS=2 CARGO_BUILD_JOBS=2 PYO3_PYTHON=/nonexistent/forbidden-python \
+  cargo +1.98.0 test --release --offline --locked \
+  --manifest-path native/forge/Cargo.toml \
+  --test native_candidate_cargo_lint_cli \
+  --test native_candidate_cargo_lint_stage \
+  --test native_candidate_cargo_lint_seed -- --include-ignored
+```
+
+The seed fixture requires cached crates.io `version_check` 0.9.5, its matching
+sparse index entry and registry config. It copies only those files into an owned
+minimal seed, verifies the pinned archive checksum, tests failure without that
+seed and success with it, and checks source/cache identity and cleanup. Missing
+tools, cgroup delegation or cache prerequisites fail explicitly when requested;
+the test does not fetch dependencies. The core planner and eight runtime unit
+tests do not need those external inputs.

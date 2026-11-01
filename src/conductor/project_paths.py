@@ -64,9 +64,8 @@ DEFAULT_GUARDRAIL_ALLOWLIST = PurePosixPath("conductor/guardrail_allowlist.json"
 # fresh install still indexes something; see ``memory_index.host_catalog_path``.
 DEFAULT_MEMORY_SOURCES = PurePosixPath("conductor/memory_sources.toml")
 # The native crate roster: which crates are tested, linted, unstyled or excluded.
-# A consumer repo's CI and its local gate both read this one file, so a crate
-# cannot be linted in one place and not the other -- see
-# ``candidate_review.cargo_lint_files``. Host data, never a packaged copy: a
+# ``forge candidate cargo-lint`` uses the shared native path configuration.
+# This compatibility accessor also resolves host data, never a packaged copy: a
 # host that ships one at another path names it via ``[tool.conductor]``.
 DEFAULT_CRATE_ROSTER = PurePosixPath("tooling/native/crates.toml")
 # Where the extension crates' sources sit: the directory `native_freshness`
@@ -417,8 +416,8 @@ def crate_roster_relative(root: Path | str) -> PurePosixPath:
 def crate_roster_path(root: Path | str) -> Path:
     """The host's crate roster, joined onto the root the caller already holds.
 
-    ``candidate_review.cargo_lint_files`` resolves through this at call time,
-    never from the package literal: a host names its own roster path via
+    Compatibility callers resolve this at call time, never from the package
+    literal: a host names its own roster path via
     ``[tool.conductor]`` and the reader follows. A configured path that does not
     exist on disk is not this function's problem to catch -- the caller that
     reads the file fails loud naming the resolved path, exactly as it would for

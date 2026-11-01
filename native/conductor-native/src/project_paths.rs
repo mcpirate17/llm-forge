@@ -180,6 +180,15 @@ pub fn candidate_policy_relative(config: &ProjectConfig) -> Result<(String, bool
     configured_value(config, spec)
 }
 
+/// Resolve the crate roster from captured configuration without reopening files.
+pub fn crate_roster_relative(config: &ProjectConfig) -> Result<(String, bool), String> {
+    let spec = PATHS[8];
+    if let Some(selected) = environment_path(spec)? {
+        return Ok(selected);
+    }
+    configured_value(config, spec)
+}
+
 /// Values are in ProjectPaths dataclass field order, followed by matching flags.
 pub fn resolve(root: &Path) -> Result<Vec<(String, bool)>, String> {
     let mut config = None;

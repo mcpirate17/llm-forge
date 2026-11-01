@@ -607,60 +607,60 @@ memory_mb = 8192
 max_output_chars = 30000
 
 [checks.cargo-fmt]
-# CI formats every crate on every native change; the gate formats the crates the
-# candidate touched, with the same command. The crate roster is
-# tooling/native/crates.toml, which the CI job reads too, so a crate cannot be
-# formatted in one place and not the other.
+# Native roster/workspace planning, executed as an operator-granted Forge stage.
+# Toolchain and offline cache inputs are explicit; no ambient Rustup discovery.
 kind = "command"
 profiles = ["fast", "full"]
 classes = ["rust", "rust_dependency"]
 command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.cargo_lint_files",
+  "forge",
+  "candidate",
+  "cargo-lint",
   "--mode",
   "fmt",
+  "--execute",
+  "--",
   "{files}",
 ]
 version_command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.cargo_lint_files",
+  "forge",
+  "candidate",
+  "cargo-lint",
   "--mode",
   "fmt",
-  "--version",
+  "--tool-version",
 ]
-cache = true
+cache = false
 severity = "high"
 timeout_seconds = 300
 memory_mb = 4096
 max_output_chars = 20000
 
 [checks.cargo-clippy]
-# `full` only: clippy has to compile, so unlike cargo-fmt it is minutes, not
-# seconds. A crate whose build.rs needs an artifact that is not in the checkout
-# (aria-scheduler's C archive) is skipped with the build command on stderr
-# rather than failed -- CI builds it before linting, so nothing is lost there.
+# Full-only compilation in private Cargo/target directories, offline and locked.
+# Missing declared prerequisites are incomplete (exit 2), never a clean pass.
 kind = "command"
 profiles = ["full"]
 classes = ["rust", "rust_dependency"]
 command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.cargo_lint_files",
+  "forge",
+  "candidate",
+  "cargo-lint",
   "--mode",
   "clippy",
+  "--execute",
+  "--",
   "{files}",
 ]
 version_command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.cargo_lint_files",
+  "forge",
+  "candidate",
+  "cargo-lint",
   "--mode",
   "clippy",
-  "--version",
+  "--tool-version",
 ]
-cache = true
+cache = false
 severity = "high"
 timeout_seconds = 900
 memory_mb = 8192

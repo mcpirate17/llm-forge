@@ -26,6 +26,10 @@ harness = false
 name = "candidate_cargo_audit"
 harness = false
 
+[[bench]]
+name = "candidate_cargo_lint"
+harness = false
+
 [[bin]]
 name = "dead-code-audit"
 path = "src/bin/dead_code_audit.rs"
@@ -144,10 +148,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_candidate_call_evidence"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_cargo_lint"
 required-features = ["python-compat-tests"]
 
 [[test]]

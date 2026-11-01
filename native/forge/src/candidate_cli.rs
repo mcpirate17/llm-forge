@@ -16,6 +16,8 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Plan or run Cargo lint tools; isolated execution belongs to the parent stage.
+    CargoLint(crate::candidate_cargo_lint_cli::LintArgs),
     /// Prepare or execute one isolated external check using operator grants.
     Execute(crate::candidate_execute::ExecuteArgs),
     /// Prepare or execute ordered regular commands within an operator batch budget.
@@ -76,6 +78,7 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::CargoLint(args) => return crate::candidate_cargo_lint_cli::run(args),
         Action::Report(args) => crate::candidate_report_cli::run(args)?,
         Action::ExecuteBatch(args) => {
             let report = crate::candidate_batch::run(args)?;

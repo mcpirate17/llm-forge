@@ -125,6 +125,19 @@ builtin. It requires separately pinned operator evidence; see the
 [Cargo audit contract](native-cargo-audit.md) for its bundle, grants, scope,
 bounds and remaining legacy bridge.
 
+### Native Cargo lint
+
+`forge candidate cargo-lint --mode fmt|clippy -- FILE...` prints a bounded
+plan without running a compiler; `--execute` runs sequentially and
+`--tool-version` probes the explicit toolchain. Workspace and borrowed-target
+scope are included in the plan. Direct execution is not sandboxed; for governed
+use, call the CLI through an explicitly granted external stage. The native
+runtime uses a canonical Cargo binary and private directories. See the
+[native Cargo lint contract](native-cargo-lint.md) for roster resolution,
+scope limits, exclusions, prerequisite status, and tool grants. Candidate policy
+keeps the existing IDs and routes their commands through the uncached native
+Forge stage.
+
 ### Assess supplied candidate results
 
 `assess` uses the same candidate selection, policy, profile, date, and scratch

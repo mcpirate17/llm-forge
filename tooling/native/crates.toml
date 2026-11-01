@@ -1,0 +1,23 @@
+# Native production packages and the checked-in mutation-planner data fixtures.
+# Fixtures intentionally retain their exact source bytes; they are not lint targets.
+[crates]
+tested = ["native/conductor-native", "native/forge", "native/forge-cli", "native/slop-core"]
+linted = ["native/conductor-native", "native/forge", "native/forge-cli", "native/slop-core"]
+excluded = [
+  "native/conductor-native/tests/fixtures/mutation_plan/case09_rust_inline_test/tree/crate_a",
+  "native/conductor-native/tests/fixtures/mutation_plan/case10_rust_tests_dir/tree/crate_b",
+  "native/conductor-native/tests/fixtures/mutation_plan/case11_rust_untested/tree/crate_c",
+  "native/conductor-native/tests/fixtures/mutation_plan/case12_rust_scoped/tree/crate_d",
+]
+unstyled = [
+  "native/conductor-native/tests/fixtures/mutation_plan/case09_rust_inline_test/tree/crate_a",
+  "native/conductor-native/tests/fixtures/mutation_plan/case10_rust_tests_dir/tree/crate_b",
+  "native/conductor-native/tests/fixtures/mutation_plan/case11_rust_untested/tree/crate_c",
+  "native/conductor-native/tests/fixtures/mutation_plan/case12_rust_scoped/tree/crate_d",
+]
+
+[globs]
+manifests = [
+  "native/*/Cargo.toml",
+  "native/conductor-native/tests/fixtures/mutation_plan/*/tree/*/Cargo.toml",
+]
