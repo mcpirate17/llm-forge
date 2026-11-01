@@ -34,10 +34,14 @@ impl JsonString<'_> {
 
 impl<'a> Parser<'a> {
     pub fn new(input: &'a str) -> Result<Self> {
-        if input.len() > MAX_INPUT_BYTES {
+        Self::with_limit(input, MAX_INPUT_BYTES)
+    }
+
+    pub fn with_limit(input: &'a str, max_bytes: usize) -> Result<Self> {
+        if input.len() > max_bytes {
             return Err(ValidationError {
                 code: "input_limit",
-                offset: MAX_INPUT_BYTES,
+                offset: max_bytes,
             });
         }
         Ok(Self { input, pos: 0 })

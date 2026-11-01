@@ -146,7 +146,6 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     mutation_plan::register(module)?;
     mutation_value::register(module)?;
     native_reuse::register(module)?;
-    project_context::register(module)?;
     project_paths::register_py(module)?;
     candidate_policy::register(module)?;
     receipt_auth::register(module)?;

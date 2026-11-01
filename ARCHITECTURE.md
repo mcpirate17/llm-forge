@@ -776,7 +776,7 @@ The published receipt is
 `7918fff3838b49694dab5f47f2e9e427319f2f813b1aef3ee927e0f0e8174b2d`.
 That committed milestone leaves 146 Python source files under `src/`.
 
-The current working-tree milestone adds native `forge cards build|search`.
+The card milestone adds native `forge cards build|search`.
 Builders retain complete bounded card text, use the same pinned embedding/query
 recipe as memory ingestion, recheck sources before atomic publication and keep
 the previous index intact on failure. Offline recall validates native metadata,
@@ -795,4 +795,42 @@ passing. There are 138 remaining Python source files under `src/`; this is an
 intermediate migration milestone, not a completed native-only repository.
 The complete native core and Forge development suites passed 2,033 tests with
 39 optional tests ignored, and both crates passed strict all-target Clippy.
-The committed-tree release receipt is a separate publication check.
+The milestone is pushed to `main` as
+`b8ba54e81100295ced844ad12409e1c33a00d9f3`. The full committed release gate
+passed 2,214 tests with 39 optional tests ignored; publication and the updated
+`origin/main` were verified with receipt
+`.git/forge-checks/run-1793508061255354039-244882/receipt.json`, SHA-256
+`ec3f4c39bf8f4332b44cf6378970c4e716fa168663c99503a6a7ad2a719c4d6d`.
+
+The next milestone replaces the live Python embedding broker with native
+`forge embedding-broker serve|ensure|status|warm`. It preserves accepted legacy
+route fingerprints and the port-7317 health/model/embedding protocol, including
+quality-bound selection, pinned vector spaces, explicit paid-route enablement,
+bounded native TLS and Ollama resource controls. Concurrency admission, absolute
+header deadlines, body limits and an overall backend deadline bound work.
+Native startup serializes contenders, refuses mismatched occupied endpoints,
+verifies newly started listener ownership and never downloads models. Service
+lifetime remains persistent by default; an explicit finite limit is available.
+Paid attempts reserve estimated cost against both their route cap and a cumulative
+request ceiling, retaining reservations after ambiguous failures. Reservations
+are not actual billing evidence. See [broker contracts](docs/native-embedding-broker.md).
+
+The broker, routing and HTTP Python modules and their exclusive compatibility
+fixtures are deleted. Unwired Python project-context and wheel-resource APIs
+are also deleted; native context primitives/tests and embedded runtime assets
+remain. Optional package metadata no longer directly requires Starlette or
+Uvicorn. The working tree now contains 133 Python source files under `src/`;
+candidate review, mutation orchestration and other adapters still require migration.
+
+Native fixture tests exercise HTTP/CLI startup with an empty `PATH`, concurrent
+ensure, saturation/recovery, slow GPU probes, finite shutdown, TLS trust and
+credential refusal, routing, budgets and validation. No live model, paid backend,
+shared service or installed environment is used. A shared bounded JSON document
+parser now supports explicit storage/backend limits while preserving the 1 MiB
+tool-call default and duplicate-key checks; this fixes the card reader's former
+1 MiB parse limit beneath its documented 16 MiB index bound. Full native core
+and Forge development suites passed 2,068 tests with 39 optional tests ignored;
+strict all-target Clippy passed for both crates. All 54 selected compatibility
+checks passed. Concurrent ensure and saturated-worker recovery each passed
+25 repeated runs, with no fixture brokers left running. Committed-tree release
+checks and publication evidence for this milestone remain pending.

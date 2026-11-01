@@ -23,6 +23,16 @@ pub fn parse_document(text: &str) -> anyhow::Result<Value> {
     compile::document(text)
 }
 
+/// Storage/backend documents may have a separate explicit bound. This does not
+/// raise the one-MiB tool argument or registration default.
+pub fn parse_document_with_limit(text: &str, max_bytes: usize) -> anyhow::Result<Value> {
+    anyhow::ensure!(
+        (1..=32 * 1024 * 1024).contains(&max_bytes),
+        "invalid JSON document byte limit"
+    );
+    compile::document_with_limit(text, max_bytes)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ValidationError {
     pub code: &'static str,

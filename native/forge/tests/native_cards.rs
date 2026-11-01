@@ -374,3 +374,17 @@ fn one_bound_query_scores_native_memory_and_whole_cards_together() {
     .unwrap()
     .is_empty());
 }
+#[test]
+fn card_storage_accepts_valid_indexes_larger_than_tool_argument_limit() {
+    let host = fixture();
+    let text = "x".repeat(600_000);
+    let value = json!({"schema_version":2,"embedding":{"fingerprint":format!("sha256:{}","a".repeat(64)),
+        "dimension":2,"paid":false,"num_gpu":0,"num_ctx":2048},"cards":[
+        {"name":"one","path":"/one","text":text,"vector":[1.0,0.0]},
+        {"name":"two","path":"/two","text":text,"vector":[0.0,1.0]}]});
+    let bytes = serde_json::to_vec(&value).unwrap();
+    assert!(bytes.len() > 1024 * 1024);
+    let path = host.0.join("large.json");
+    fs::write(&path, bytes).unwrap();
+    assert_eq!(cards::load(&path).unwrap().len(), 2);
+}

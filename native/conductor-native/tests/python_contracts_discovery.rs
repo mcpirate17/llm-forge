@@ -143,11 +143,16 @@ fn python_fixture_and_toml_provider_select_their_contracts_and_stay_safe() {
     let selected = plan(&root, &[python_fixture.to_owned()]).unwrap();
     assert_eq!(selected.targets, ["python_contracts_equivalence_probe"]);
     assert_eq!(selected.source_paths, [python_fixture]);
-    let selected = plan(&root, &["src/conductor/embedding_routes.toml".to_owned()]).unwrap();
-    assert_eq!(selected.targets, ["python_contracts_cpu_embed"]);
-    assert!(selected.source_paths.is_empty());
-
     let fixture = Fixture::new();
+    let provider = "src/conductor/test_routes.toml";
+    fs::write(fixture.root.join(provider), "schema_version = 1\n").unwrap();
+    let registry = fixture.root.join(REGISTRY_PATH);
+    let mut rows = fs::read_to_string(&registry).unwrap();
+    rows.push_str(&format!("{provider}\tpython_contracts_gate_rollout\n"));
+    fs::write(registry, rows).unwrap();
+    let selected = plan(&fixture.root, &[provider.to_owned()]).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_gate_rollout"]);
+    assert!(selected.source_paths.is_empty());
     let file = fixture.root.join(python_fixture);
     fs::remove_file(&file).unwrap();
     assert!(plan(&fixture.root, &[python_fixture.to_owned()])
@@ -622,6 +627,11 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
         "session_preamble.py",
         "workspace_runtime_matrix.py",
         "workspace_runtime_support.py",
+        "project_context.py",
+        "package_resources.py",
+        "cpu_embed.py",
+        "embedding_contract.py",
+        "http_transport.py",
     ] {
         let selected = plan(&root, &[format!("src/conductor/{retired}")]).unwrap();
         assert!(selected.targets.is_empty(), "retired adapter: {retired}");

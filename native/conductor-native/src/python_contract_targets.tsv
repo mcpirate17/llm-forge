@@ -67,7 +67,6 @@ src/conductor/check_json_in_notes.py	python_contracts_repo_utilities
 src/conductor/check_root_junk.py	python_contracts_repo_utilities
 src/conductor/codex_journal.py	python_contracts_codex_journal
 src/conductor/dead_tests.py	python_contracts_dead_tests
-src/conductor/embedding_contract.py	python_contracts_embedding_contract
 src/conductor/graph_context.py	python_contracts_graph_context
 src/conductor/graph_test_select.py	python_contracts_graph_test_select
 src/conductor/graph_test_select.py	python_contracts_contract_runner
@@ -98,8 +97,6 @@ src/conductor/mutation_value.py	python_contracts_mutation_value
 src/conductor/mutation_value.py	python_contracts_mutation_value_core
 src/conductor/mutation_value.py	python_contracts_mutation_value_routing
 src/conductor/notebooklm_bundle.py	python_contracts_repo_utilities
-src/conductor/package_resources.py	python_contracts_project_paths
-src/conductor/project_context.py	python_contracts_project_context
 src/conductor/project_paths.py	python_contracts_branch_policy
 src/conductor/project_paths.py	python_contracts_candidate_cargo_lint
 src/conductor/project_paths.py	python_contracts_candidate_engine
@@ -150,7 +147,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_codex
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_contextual_mutation_evidence
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_contract_runner
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_dead_tests
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_embedding_contract
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_governance_lock
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_context
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_selection
@@ -169,7 +165,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutat
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_value_core
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_value_routing
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_verdicts
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_project_context
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_project_paths
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_repo_utilities
 src/conductor/candidate_review/import_declaration.py	python_contracts_candidate_import_declaration_core
@@ -795,15 +790,10 @@ src/conductor/mutation_patch_apply.py	python_contracts_mutation_attribution
 src/conductor/project_paths.py	python_contracts_mutation_attribution
 src/conductor/snapshot_worktree.py	python_contracts_mutation_attribution
 native/conductor-native/src/project_paths.rs	python_contracts_mutation_attribution
-src/conductor/package_resources.py	python_contracts_package_resources
-src/conductor/project_context.py	python_contracts_package_resources
-native/conductor-native/tests/python_contracts/package_resources_support.rs	python_contracts_package_resources
-native/conductor-native/tests/fixtures/package_resources_child.rs	python_contracts_package_resources
 src/conductor/gate.py	python_contracts_installed_layout
 src/conductor/project_paths.py	python_contracts_installed_layout
 src/conductor/_native.py	python_contracts_installed_layout
 native/conductor-native/src/project_paths.rs	python_contracts_installed_layout
-native/conductor-native/tests/python_contracts/package_resources_support.rs	python_contracts_installed_layout
 src/conductor/candidate_review/ownership.py	python_contracts_installed_layout
 src/conductor/candidate_review/git_source.py	python_contracts_installed_layout
 src/conductor/candidate_review/model.py	python_contracts_installed_layout

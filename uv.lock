@@ -451,8 +451,6 @@ dependencies = [
     { name = "pyyaml" },
     { name = "radon" },
     { name = "slop-core" },
-    { name = "starlette" },
-    { name = "uvicorn" },
     { name = "vulture" },
 ]
 
@@ -492,10 +490,8 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "radon", specifier = ">=6.0.1" },
     { name = "slop-core", directory = "native/slop-core" },
-    { name = "starlette", specifier = ">=0.45" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'test'", specifier = ">=2.4.1", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "(platform_machine != 'x86_64' and extra == 'test') or (sys_platform != 'linux' and extra == 'test')", specifier = ">=2.4.1" },
-    { name = "uvicorn", specifier = ">=0.30" },
     { name = "vulture", specifier = ">=2.11" },
 ]
 provides-extras = ["test", "mutation", "graph"]

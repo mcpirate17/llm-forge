@@ -1,5 +1,13 @@
 # Python boundary contract migration
 
+> **Historical mapping:** The case table below records its original Python to
+> Rust/PyO3 mapping. The dedicated `project_context` PyO3 compatibility target
+> and Python facade have since been retired. Current pure Rust project-context
+> APIs and filesystem tests remain; see
+> [`native-project-context-migration.md`](native-project-context-migration.md).
+> Counts and validation receipts below describe that earlier state, not current
+> targets or current validation.
+
 Three Python suites cover `project_paths`, `branch_policy`, and `project_context` across 1,942 source lines. Their 156 named test functions and methods now map to 29 Rust integration tests: 85 path cases map to 8 tests, 61 branch cases to 12, and 10 context cases to 9. The exact case-by-case map follows below.
 
 The Rust suites are `native/conductor-native/tests/python_contracts_{project_paths,branch_policy,project_context}.rs`. They call the existing Python APIs through PyO3 and assert results in Rust. Git histories live in temporary directories; callbacks written in Rust exercise the equal-SHA shortcut, configuration-open races, bounded Git output, timeout, and malformed topology. `tests/python_contracts/support.rs` serializes process state and restores environment variables, Python's `os.environb`, `sys.path`, current directory, and patched Python attributes.

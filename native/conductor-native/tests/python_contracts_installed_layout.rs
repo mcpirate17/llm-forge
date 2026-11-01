@@ -1,15 +1,33 @@
 #![cfg(feature = "python-compat-tests")]
 //! Rust-owned parity for test_installed_layout.py (one integration case).
 
-#[path = "python_contracts/package_resources_support.rs"]
-#[allow(dead_code)]
-mod fixtures;
-
-use fixtures::rust_test_temp;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
+
+struct TempCase(PathBuf);
+impl TempCase {
+    fn new(label: &str) -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "forge-installed-layout-{}-{}-{label}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create installed layout fixture root");
+        Self(root)
+    }
+    fn root(&self) -> &Path {
+        &self.0
+    }
+}
+impl Drop for TempCase {
+    fn drop(&mut self) {
+        fs::remove_dir_all(&self.0).expect("remove installed layout fixture root");
+    }
+}
 
 fn python() -> PathBuf {
     std::env::var_os("PYO3_PYTHON")
@@ -133,7 +151,7 @@ fn assert_no_site_leak(result: &Output, site: &Path, label: &str) -> String {
 
 #[test]
 fn installed_layout_resolves_host_not_site() {
-    let case = rust_test_temp("installed-layout");
+    let case = TempCase::new("installed-layout");
     let site = case.root().join("site");
     fs::create_dir(&site).unwrap();
     install_site(&site);

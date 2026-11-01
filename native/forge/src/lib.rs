@@ -15,6 +15,8 @@ pub mod code_index;
 pub mod code_tools;
 pub mod embedding;
 #[cfg(target_os = "linux")]
+pub mod embedding_broker;
+#[cfg(target_os = "linux")]
 pub mod file_lock;
 #[cfg(target_os = "linux")]
 pub mod harness;
@@ -34,6 +36,8 @@ pub mod memory_store;
 pub mod notes_index;
 pub mod ownership;
 pub mod ownership_lifecycle;
+#[cfg(target_os = "linux")]
+pub mod process_listener;
 pub mod repository;
 pub mod session_brief;
 pub mod session_close;

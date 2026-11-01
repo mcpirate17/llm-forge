@@ -61,7 +61,6 @@ from conductor_native import (
     normalize_jscpd_report_native,
     normalize_mutation_path_native,
     plan_mutation_evidence_native,
-    project_context_parse_config_native,
     receipt_compact_directory_native,
     receipt_expand_detail_native,
     receipt_inventory_digest_native,
@@ -168,12 +167,6 @@ def mutation_refresh_native(request_json: str) -> str:
 
 def reuse_consolidation_native(operation: str, payload_json: str) -> str:
     from conductor_native import reuse_consolidation_native as evaluate
-
-    return evaluate(operation, payload_json)
-
-
-def project_context_native(operation: str, payload_json: str) -> str:
-    from conductor_native import project_context_native as evaluate
 
     return evaluate(operation, payload_json)
 
@@ -415,8 +408,6 @@ __all__ = [
     "normalize_jscpd_report_native",
     "normalize_mutation_path_native",
     "plan_mutation_evidence_native",
-    "project_context_native",
-    "project_context_parse_config_native",
     "project_paths_enclosing_repo_native",
     "project_paths_host_root_native",
     "project_paths_integration_branch_native",

@@ -635,10 +635,9 @@ fn package_and_native_root_match_this_checkout() {
             call_path(&pp, "native_root", &path(py, &root)),
             root.join("native").display().to_string()
         );
-        let package_resources = module(py, "conductor.package_resources");
         assert_eq!(
-            text(&package_resources.getattr("_DISTRIBUTION_NAME").unwrap()),
-            text(&pp.getattr("DISTRIBUTION_NAME").unwrap())
+            text(&pp.getattr("DISTRIBUTION_NAME").unwrap()),
+            "conductor-tooling"
         );
         let _ = case;
     });

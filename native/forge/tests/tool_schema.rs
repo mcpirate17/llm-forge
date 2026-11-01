@@ -402,3 +402,20 @@ fn grammar_is_deterministic_bounded_and_declares_runtime_numeric_checks() {
         "optional fields must not expand permutations"
     );
 }
+#[test]
+fn storage_size_override_preserves_duplicate_checks_and_tool_input_limit() {
+    let text = "x".repeat(1024 * 1024);
+    let input = format!("{{\"text\":\"{text}\"}}");
+    assert!(forge::tool_schema::parse_document(&input).is_err());
+    let parsed = forge::tool_schema::parse_document_with_limit(&input, 2 * 1024 * 1024).unwrap();
+    assert_eq!(parsed["text"], text);
+    let duplicate = format!("{{\"text\":\"{text}\",\"nested\":{{\"key\":1,\"k\\u0065y\":2}}}}");
+    assert!(
+        forge::tool_schema::parse_document_with_limit(&duplicate, 2 * 1024 * 1024)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate")
+    );
+    assert!(forge::tool_schema::parse_document_with_limit("{}", 33 * 1024 * 1024).is_err());
+    assert!(forge::tool_schema::parse_document_with_limit("{}", 0).is_err());
+}

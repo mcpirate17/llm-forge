@@ -95,7 +95,7 @@ pub fn server(replies: Vec<Reply>) -> (String, JoinHandle<Requests>) {
     });
     (endpoint, worker)
 }
-fn read_request(input: &mut BufReader<TcpStream>) -> (String, Vec<u8>) {
+pub fn read_request(input: &mut BufReader<TcpStream>) -> (String, Vec<u8>) {
     let mut line = String::new();
     assert!(
         input.read_line(&mut line).unwrap() > 0,

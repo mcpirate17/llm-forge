@@ -3,7 +3,6 @@ use super::{cell, dispatch};
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
@@ -99,58 +98,7 @@ fn embedding_at(port: u16, inventory_port: u16) -> Value {
 
 /// Confirm the selected same-UID PID owns the loopback listening socket.
 fn listener_owned(port: u16, pid: u32) -> Result<u64> {
-    let proc = std::path::PathBuf::from(format!("/proc/{pid}"));
-    ensure!(
-        std::fs::metadata(&proc)?.uid() == unsafe { libc::geteuid() },
-        "server PID belongs to another user"
-    );
-    let mut inodes = Vec::new();
-    for table_path in ["/proc/net/tcp", "/proc/net/tcp6"] {
-        let table = forge::bounded_file::read(Path::new(table_path), 4 * 1024 * 1024)?;
-        for row in std::str::from_utf8(&table)?.lines().skip(1) {
-            let fields: Vec<_> = row.split_whitespace().collect();
-            if fields.len() < 10
-                || fields[3] != "0A"
-                || !fields[1].ends_with(&format!(":{port:04X}"))
-            {
-                continue;
-            }
-            ensure!(
-                table_path == "/proc/net/tcp" && fields[1] == format!("0100007F:{port:04X}"),
-                "dedicated port has an ambiguous listener"
-            );
-            inodes.push(fields[9].to_string());
-        }
-    }
-    ensure!(
-        inodes.len() == 1,
-        "dedicated port must have exactly one loopback listener"
-    );
-    for (count, entry) in std::fs::read_dir(proc.join("fd"))?.enumerate() {
-        ensure!(count < 8192, "server descriptor inventory exceeds limit");
-        let link = match std::fs::read_link(entry?.path()) {
-            Ok(link) => link,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(error) => return Err(error.into()),
-        };
-        if inodes
-            .iter()
-            .any(|inode| link == Path::new(&format!("socket:[{inode}]")))
-        {
-            let stat = forge::bounded_file::read(&proc.join("stat"), 8192)?;
-            let stat = std::str::from_utf8(&stat)?;
-            let fields = stat
-                .rsplit_once(')')
-                .context("malformed server process stat")?
-                .1;
-            return Ok(fields
-                .split_whitespace()
-                .nth(19)
-                .context("server start time missing")?
-                .parse()?);
-        }
-    }
-    anyhow::bail!("specified server PID does not own selected listener")
+    forge::process_listener::owned(([127, 0, 0, 1], port).into(), pid)
 }
 fn gpu_preflight(root: &Path, smi: &Path, port: u16) -> Result<Value> {
     forge::repository::checkout_of_checked(root)?

@@ -6,7 +6,11 @@ use std::collections::HashSet;
 /// Registration-only parse: reject duplicates before Value's last-key-wins
 /// behavior can change a schema, catalog or tool name.
 pub(super) fn document(text: &str) -> anyhow::Result<Value> {
-    let mut parser = Parser::new(text)?;
+    document_with_limit(text, super::MAX_INPUT_BYTES)
+}
+
+pub(super) fn document_with_limit(text: &str, max_bytes: usize) -> anyhow::Result<Value> {
+    let mut parser = Parser::with_limit(text, max_bytes)?;
     unique_keys(&mut parser, 0)?;
     parser.finish()?;
     Ok(serde_json::from_str(text)?)

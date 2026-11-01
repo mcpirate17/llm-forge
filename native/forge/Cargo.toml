@@ -50,7 +50,7 @@ slop-core = { path = "../slop-core", default-features = false }
 git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 regex = "1"
 walkdir = "2"
-ureq = { version = "3", default-features = false }
+ureq = { version = "3", default-features = false, features = ["rustls"] }
 sha2 = "0.10"
 libc = "0.2"
 landlock = "0.4.7"
@@ -71,6 +71,9 @@ conductor-native = { path = "../conductor-native", default-features = false, fea
 opt-level = 3
 lto = "thin"
 codegen-units = 1
+
+[dev-dependencies]
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 
 [build-dependencies]
 sha2 = "0.10"

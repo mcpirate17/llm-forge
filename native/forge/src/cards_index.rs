@@ -247,8 +247,9 @@ impl CardIndex {
 }
 pub fn load(path: &Path) -> Result<CardIndex> {
     let bytes = crate::bounded_file::read(path, MAX_INDEX_BYTES)?;
-    let index: CardIndex = serde_json::from_value(crate::tool_schema::parse_document(
+    let index: CardIndex = serde_json::from_value(crate::tool_schema::parse_document_with_limit(
         std::str::from_utf8(&bytes)?,
+        MAX_INDEX_BYTES,
     )?)
     .context("knowledge-card index")?;
     index.validate()?;

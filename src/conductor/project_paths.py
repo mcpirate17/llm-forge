@@ -90,10 +90,6 @@ DEFAULT_RADON_BASELINE = PurePosixPath("conductor/radon_complexity_baseline.json
 # `importlib.metadata`'s reverse map from package to distribution is blind to an
 # editable install, which is how this repository installs itself, so asking the
 # interpreter answers `None` exactly where the tooling is being developed.
-# `package_resources` keeps its own copy on purpose -- it is a byte-verifying
-# reader whose import graph is deliberately two modules wide, and importing this
-# one would break the minimal wheel its tests install. `test_project_paths` pins
-# the two spellings together so a rename cannot take only one of them.
 DISTRIBUTION_NAME = "conductor-tooling"
 
 CANDIDATE_POLICY_ENV = "CONDUCTOR_CANDIDATE_POLICY"

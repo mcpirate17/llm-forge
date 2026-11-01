@@ -1,5 +1,12 @@
 # Agent context and hook test migration
 
+> **Historical inventory:** This map records an earlier Python test cohort and
+> its then-current mappings. The CPU embedding and embedding-contract targets
+> listed below have since been retired with the Python broker adapters. Current
+> native broker coverage and interfaces are documented in
+> [`native-embedding-broker.md`](native-embedding-broker.md); this inventory is
+> not a current target list or validation receipt.
+
 This map tracks the exact 40-file agent context and hook cohort below. A
 Python test file is retired only after a Rust assertion covers its public
 behavior or a cited existing Rust test exercises the same contract. The shared
