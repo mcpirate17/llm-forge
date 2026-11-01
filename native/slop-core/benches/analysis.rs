@@ -29,6 +29,14 @@ fn measure(name: &str, source: &str, mut operation: impl FnMut() -> usize) {
 }
 
 fn main() {
+    let bindings: String = (0..300)
+        .map(|i| format!("array_{i} = torch.zeros(4)\nplain_{i} = 1\n"))
+        .collect();
+    let hot = format!("{bindings}for item in array_0:\n    pass\n");
+    measure("hot_loop_300_bindings", &hot, || {
+        let parsed = slop_core::source::PythonSource::new(black_box(&hot)).unwrap();
+        hot_loop_scan::scan_parsed("models/hot.py", &parsed).len()
+    });
     let source: String = (0..128).map(|i| format!(
         "def function_{i}(x: Tensor):\n    try:\n        for j in range(len(x)):\n            print(x[j].item())\n        return x.clamp(min=0)\n    except Exception:\n        return 0\n\n"
     )).collect();

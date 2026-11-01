@@ -21,7 +21,7 @@ toolchain shim, and compatibility target are retired; the existing policy IDs
 route uncached command and version calls through Forge. Execution is fresh and
 does not reuse a result cache. Full review orchestration, remaining builtins,
 evidence and waiver verification, test-engine migration, reporting, attestation
-and legacy caller retirement remain. There are still 124 Python source files
+and legacy caller retirement remain. There are still 118 Python source files
 under `src/`; the native migration is incomplete. See the
 [execution contract](native-candidate-review.md#execute-a-selected-batch),
 [native Cargo lint contract](native-cargo-lint.md), and
@@ -33,8 +33,14 @@ snapshot drift checks. [Native clang-tidy](native-clang-tidy.md) captures pinned
 compile databases, rebases typed arguments, preserves every selected build
 configuration and checks mapped-header inclusion. Missing or unsupported build
 context fails explicitly. Both Clang policy paths are native and uncached;
-the Python wrapper and its compatibility target are deleted. Shared Python
-diff-range consumers remain until their own replacements are wired and verified.
+the Python wrappers and their compatibility targets are deleted.
+
+The [native candidate scanner](native-candidate-scan.md) joins detector dispatch with
+captured candidate ranges and pinned hot-folder configuration. It replaces the
+shared Python style/diff wrappers and all hot-loop, test-value and verbosity
+callers together, retaining start-line filtering for style/hot loops and full
+span overlap for test-value/verbosity. Exclusions are explicit and unreadable
+eligible scope fails; no truncated finding list may be reported as clean.
 
 Executable identity stamping now belongs to the separate `forge-cli` workspace
 package. Git/source identities, installed-artifact checks and source-bound

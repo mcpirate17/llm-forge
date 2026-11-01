@@ -138,6 +138,19 @@ fn an_array_in_another_function_does_not_leak_in() {
 }
 
 #[test]
+fn module_function_and_nested_scopes_remain_independent_with_many_bindings() {
+    let mut source = String::new();
+    for i in 0..300 {
+        source.push_str(&format!("array_{i} = torch.zeros(4)\n"));
+    }
+    for _ in 0..300 {
+        source.push_str("plain = 1\n");
+    }
+    source.push_str("def outer(local: torch.Tensor):\n    for item in array_0:\n        pass\n    def inner():\n        for item in local:\n            pass\n        nested = np.zeros(2)\n        for item in nested:\n            pass\n\ndef sibling(nested):\n    for item in nested:\n        pass\n");
+    assert_eq!(lines(&source), [602, 605, 608]);
+}
+
+#[test]
 fn the_waiver_on_the_loop_or_above_it_silences_the_loop() {
     let above = "def f(x):\n    # guardrail: allow-python-loop: 3 layers\n    for i in range(len(x)):\n        pass\n";
     let same = "def f(x):\n    for i in range(len(x)):  # guardrail: allow-python-loop: 3 layers\n        pass\n";

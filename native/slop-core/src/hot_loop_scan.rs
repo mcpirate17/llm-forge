@@ -406,16 +406,17 @@ impl<'a> Scan<'a> {
     }
 
     fn visit(&mut self, node: Node, arrays: &BTreeSet<String>) {
-        let mut scope = arrays.clone();
-        let mut inner = None;
-        if node.kind() == "function_definition" {
+        let scope = if node.kind() == "function_definition" {
+            let mut scope = arrays.clone();
             self.array_params(node, &mut scope);
             if let Some(body) = node.child_by_field_name("body") {
                 self.array_names(body, &mut scope);
             }
-            inner = Some(&scope);
-        }
-        let arrays = inner.unwrap_or(arrays);
+            Some(scope)
+        } else {
+            None
+        };
+        let arrays = scope.as_ref().unwrap_or(arrays);
         if LOOP_KINDS.contains(&node.kind()) {
             self.judge(node, arrays);
         }

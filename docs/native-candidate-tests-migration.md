@@ -12,6 +12,14 @@ tests now cover those surfaces; their stricter context and refusal semantics are
 described in [native clang-format](native-clang-format.md) and
 [native clang-tidy](native-clang-tidy.md).
 
+The diff-range/style-scan rows below are historical as well: the Python wrappers
+and their compatibility targets have been retired. The current interface is the
+native `forge candidate scan`, which uses candidate-bound Git ranges and the
+existing `slop-core` detectors. The old target-to-case table records past
+compatibility work; it is not current scan validation evidence. Native detector
+unit tests remain in `native/slop-core`. Current focused validation is recorded
+in the [native scanner contract](native-candidate-scan.md).
+
 | Retired Python case | Rust replacement |
 | --- | --- |
 | `test_diff_ranges::test_hunk_without_a_count_is_a_single_line` | `diff_hunks_keep_counts_deletions_anchoring_and_all_hunks` |

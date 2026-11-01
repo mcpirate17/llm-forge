@@ -719,76 +719,24 @@ memory_mb = 2048
 max_output_chars = 30000
 
 [checks.style-scan]
-# The three concerns with no detector anywhere: "no effort-signaling code" (no
-# Python linter reads comments -- ruff discards them before it starts), dead
-# scaffolding (ruff's dead-code rules stop at unused *names*, so a stub body, an
-# unreachable statement and a constant condition all pass), and a name for
-# something outside this repository written into the call that uses it -- a
-# host, a port, an id -- which no linter has an opinion about at all.
-#
-# The rules are tree-sitter over the whole file, in Rust; this entry is the
-# argv. Line-scoped like clang-format, and for the same reason: the rules find
-# 129 pre-existing findings across the 3303 tracked Python files, and reporting
-# those would red-gate a candidate for lines it never touched. {base} lets the
-# wrapper ask git which lines this candidate wrote and drop the rest, so the
-# tree converges as people edit it.
 kind = "command"
 profiles = ["fast", "full"]
 classes = ["python"]
-command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.style_scan",
-  "--base",
-  "{base}",
-  "{files}",
-]
-version_command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.style_scan",
-  "--version",
-]
-cache = true
+command = ["forge", "candidate", "scan", "--check", "style-scan", "--repo", "{snapshot}", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "scan", "--check", "style-scan", "--tool-version"]
+cache = false
 severity = "high"
 timeout_seconds = 300
 memory_mb = 4096
 max_output_chars = 20000
 
 [checks.rust-style-scan]
-# "Fail loud" in the language the compute is written in. `.unwrap()` does not
-# hide an error, it discards the reason and aborts: the backtrace names
-# core::option rather than the call that was wrong. `todo!()` and
-# `unimplemented!()` are scaffolding that type-checks, so nothing else in the
-# toolchain notices them. clippy has lints for both, but they are `full`-only
-# here because clippy compiles -- this is tree-sitter, 0.2 s over all 127
-# tracked Rust files, so it fires ahead of the commit.
-#
-# Test scope is read from `#[cfg(test)]` and `#[test]` rather than from the
-# path: of the 332 `.unwrap()` calls in non-test-path files, 294 are inside an
-# inline test module and only 38 are production. `.expect("why")` is allowed --
-# it fails as loudly and carries the reason, which is all the rule asks for.
-# Line-scoped like style-scan, so those 38 land on whoever next edits them.
 kind = "command"
 profiles = ["fast", "full"]
 classes = ["rust"]
-command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.style_scan",
-  "--language",
-  "rust",
-  "--base",
-  "{base}",
-  "{files}",
-]
-version_command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.style_scan",
-  "--version",
-]
-cache = true
+command = ["forge", "candidate", "scan", "--check", "rust-style-scan", "--repo", "{snapshot}", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "scan", "--check", "rust-style-scan", "--tool-version"]
+cache = false
 severity = "high"
 timeout_seconds = 300
 memory_mb = 4096

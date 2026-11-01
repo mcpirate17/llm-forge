@@ -229,7 +229,6 @@ fn slop_build_is_selected_only_for_observed_consumers() {
         for (target, expected) in [
             ("python_contracts_probe", false),
             ("python_contracts_native_ablations", true),
-            ("python_contracts_candidate_style", true),
             ("python_contracts_policy_engine_crash", true),
             ("python_contracts_probe_budget", true),
             ("python_contracts_candidate_call_evidence", true),
@@ -300,7 +299,7 @@ fn selected_slop_requires_a_regular_candidate_manifest() {
     std::os::unix::fs::symlink(outside, &manifest).unwrap();
     Python::attach(|py| {
         let error =
-            native_runtime_plan(py, &root, &["python_contracts_candidate_style"]).unwrap_err();
+            native_runtime_plan(py, &root, &["python_contracts_native_ablations"]).unwrap_err();
         assert!(error.to_string().contains("candidate slop_core"));
     });
 }

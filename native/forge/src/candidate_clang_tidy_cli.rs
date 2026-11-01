@@ -5,8 +5,7 @@ mod config;
 mod context;
 #[path = "candidate_clang_tidy_coverage.rs"]
 mod coverage;
-#[path = "candidate_clang_tidy_inputs.rs"]
-mod inputs;
+use crate::candidate_inputs as inputs;
 #[path = "candidate_clang_tidy_plan.rs"]
 mod plan;
 #[path = "candidate_clang_tidy_state.rs"]

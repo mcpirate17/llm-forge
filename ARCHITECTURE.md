@@ -1217,7 +1217,7 @@ defines the remaining legacy metadata bridge and explicit no-file skip.
 Full review orchestration, cache integration, evidence and waiver verification,
 test-engine migration, review-integrated reporting and attestation remain. The existing Python
 command runner still has these callers and has not been deleted prematurely;
-124 Python source files remain under `src/`. The native migration goal stays
+118 Python source files remain under `src/`. The native migration goal stays
 active until those consumers are replaced and their interpreted code is removed.
 
 Cargo audit evaluates pinned offline evidence directly with native RustSec,
@@ -1231,7 +1231,7 @@ scope and runs fmt/clippy through granted stages with private runtime directorie
 Its Python wrapper, ambient shim and compatibility target are deleted.
 Native [clang-format](docs/native-clang-format.md) and [clang-tidy](docs/native-clang-tidy.md)
 use captured ranges/styles, explicit ELFs, pinned databases and typed path rebasing.
-Their Python wrapper is deleted; shared diff-range consumer retirement remains.
+Their wrappers and shared diff consumers are deleted; see [native scans](docs/native-candidate-scan.md).
 
 ## Executable identity and reusable builds
 

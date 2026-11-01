@@ -123,6 +123,9 @@ impl Private {
         self.tool_command("clang-format", files)
     }
     pub fn tool_command(&self, action: &str, files: &[&str]) -> Command {
+        self.tool_command_options(action, &[], files)
+    }
+    pub fn tool_command_options(&self, action: &str, options: &[&str], files: &[&str]) -> Command {
         let mut command = Command::new(support::forge_binary::path());
         command
             .env_clear()
@@ -140,7 +143,9 @@ impl Private {
             .current_dir(self.snapshot.path())
             .args(["candidate", action, "--repo"])
             .arg(self.snapshot.path())
-            .args(["--base", &self.base, "--tree", &self.tree, "--"])
+            .args(["--base", &self.base, "--tree", &self.tree])
+            .args(options)
+            .arg("--")
             .args(files);
         command
     }

@@ -1,19 +1,20 @@
 # Candidate style and Vulture test migration
 
-The assertions from `src/conductor/candidate_review/test_style_scan.py` and
-`src/conductor/candidate_review/test_vulture_baseline_init.py` now live in two
-Rust integration targets under `native/conductor-native/tests/`. The targets
-call the shipped Python entry points through PyO3 and use Rust assertions for
-the results, errors, mock calls, output streams, and file contents. Python is
-used only for mock objects, attribute patching, and input fixtures. The source
-snippets passed to the scanners are parser input, not test programs.
+This file preserves historical Python-to-Rust case mappings. The style-scan
+wrapper and its `python_contracts_candidate_style` compatibility target have
+since been retired; the rows below do not claim current CLI validation. Native
+candidate scanning now uses candidate-bound Git ranges and the existing
+`slop-core` detectors. Detector implementation tests remain native unit tests in
+`native/slop-core`.
 
-There were no parameterized rows in either original module. Each of the 34
-named Python cases maps to one named Rust case below.
+The Vulture baseline adapter and its compatibility target remain separate. Its
+11-case map below is still current. The original style-scan and Vulture case
+maps had 34 named cases in total; the historical style target's prior results
+are retained as provenance only.
 
-## Style scan: 23 cases
+## Style scan: 23 historical cases
 
-Rust target: `python_contracts_candidate_style`.
+Historical Rust target: `python_contracts_candidate_style` (retired).
 
 | Original Python case | Rust case | Contract retained |
 | --- | --- | --- |
@@ -59,7 +60,9 @@ Rust target: `python_contracts_candidate_vulture`.
 | `test_main_reports_current_findings_as_debt_on_stderr` | `main_reports_current_findings_as_debt_on_stderr` | Zero exit and exact debt banner/finding on stderr. |
 | `test_main_reports_analyzer_error_without_writing_a_file` | `main_reports_analyzer_error_without_writing_file` | Exit two, no output file, error on stderr. |
 
-Validation uses the two exact `cargo +1.98.0 test --offline --locked` targets
-with `python-compat-tests` and one test thread. Neither retired Python module
-has a code import consumer; the Vulture module remains named in a historical
-mutation campaign and receipt, which are retained as provenance.
+Historical wrapper compatibility was previously exercised through the
+`python_contracts_candidate_style` and `python_contracts_candidate_vulture`
+targets. The style target is retired; current native validation is recorded
+in the [scanner contract](native-candidate-scan.md). Vulture remains active and continues
+to use `python_contracts_candidate_vulture`. Its historical mutation campaign
+and receipt remain provenance records.

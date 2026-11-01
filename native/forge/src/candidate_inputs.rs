@@ -1,4 +1,4 @@
-//! Pinned clang-tidy file and operator-directory inputs. Directory bindings do
+//! Pinned candidate file and operator-directory inputs. Directory bindings do
 //! not hash recursive contents; operator-owned parents and contents must remain
 //! stable. Same-UID hostile replacement is outside this binding's guarantee.
 use anyhow::{ensure, Context, Result};
@@ -321,5 +321,5 @@ pub fn snapshot(
 }
 
 #[cfg(test)]
-#[path = "candidate_clang_tidy_inputs_tests.rs"]
+#[path = "candidate_inputs_tests.rs"]
 mod tests;

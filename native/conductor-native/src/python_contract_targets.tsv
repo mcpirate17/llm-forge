@@ -18,8 +18,6 @@ src/conductor/candidate_review/command_runner.py	python_contracts_candidate_file
 src/conductor/candidate_review/contract_runtime.py	python_contracts_contract_runner
 src/conductor/candidate_review/contextual_mutation_evidence.py	python_contracts_contextual_mutation_evidence
 src/conductor/candidate_review/crate_version.py	python_contracts_candidate_crate_version
-src/conductor/candidate_review/diff_ranges.py	python_contracts_candidate_files
-src/conductor/candidate_review/diff_ranges.py	python_contracts_candidate_style
 src/conductor/candidate_review/engine.py	python_contracts_candidate_cli
 src/conductor/candidate_review/engine.py	python_contracts_candidate_engine
 src/conductor/candidate_review/engine.py	python_contracts_candidate_policy_regressions
@@ -28,10 +26,6 @@ src/conductor/candidate_review/git_source.py	python_contracts_candidate_cli
 src/conductor/candidate_review/git_source.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/graph_selection.py	python_contracts_graph_selection
 src/conductor/candidate_review/identity.py	python_contracts_candidate_cli
-src/conductor/candidate_review/hot_loop_scan.py	python_contracts_hot_loop_scan
-src/conductor/hot_paths_config.py	python_contracts_hot_loop_scan
-src/conductor/candidate_review/style_scan.py	python_contracts_hot_loop_scan
-native/slop-core/src/hot_loop_scan.rs	python_contracts_hot_loop_scan
 src/conductor/candidate_review/model.py	python_contracts_candidate_cli
 src/conductor/candidate_review/model.py	python_contracts_candidate_crate_version
 src/conductor/candidate_review/model.py	python_contracts_candidate_policy
@@ -47,10 +41,6 @@ src/conductor/candidate_review/policy.py	python_contracts_candidate_policy_regre
 src/conductor/candidate_review/quality_checks.py	python_contracts_candidate_structure_audit
 src/conductor/candidate_review/reporters.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/sharding.py	python_contracts_contract_runner
-src/conductor/candidate_review/style_scan.py	python_contracts_candidate_style
-src/conductor/candidate_review/style_scan.py	python_contracts_test_value_scan
-src/conductor/candidate_review/style_scan.py	python_contracts_verbosity_scan
-src/conductor/candidate_review/test_value_scan.py	python_contracts_test_value_scan
 src/conductor/candidate_review/value_waivers.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/verification.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/verification.py	python_contracts_candidate_verification
@@ -127,8 +117,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_candi
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_policy_regressions
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_review_isolation
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_structure_audit
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_style
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_hot_loop_scan
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_verification
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_vulture
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_codex_journal
@@ -266,16 +254,6 @@ native/slop-core/src/engine.rs	python_contracts_native_ablations
 native/slop-core/src/rules.rs	python_contracts_native_ablations
 src/conductor/testdata/native_ablations/sample.py	python_contracts_native_ablations
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_native_ablations
-native/slop-core/src/lib.rs	python_contracts_candidate_style
-native/slop-core/src/style_scan.rs	python_contracts_candidate_style
-native/slop-core/src/lib.rs	python_contracts_hot_loop_scan
-native/slop-core/src/test_value_scan.rs	python_contracts_test_value_scan
-native/slop-core/src/lib.rs	python_contracts_test_value_scan
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_test_value_scan
-native/slop-core/src/rust_scan.rs	python_contracts_candidate_style
-native/slop-core/src/detector_scan.rs	python_contracts_candidate_style
-native/slop-core/src/engine.rs	python_contracts_candidate_style
-native/slop-core/src/python_ast.rs	python_contracts_candidate_style
 native/conductor-native/src/candidate_verification_runtime.rs	python_contracts_contract_runner
 src/conductor/reuse/__init__.py	python_contracts_reuse_inventory
 src/conductor/reuse/graph_index.py	python_contracts_reuse_inventory
@@ -792,10 +770,6 @@ native/conductor-native/src/tooling_boundary.rs	python_contracts_tooling_boundar
 native/conductor-native/src/project_paths.rs	python_contracts_tooling_boundary
 native/conductor-native/src/lib.rs	python_contracts_tooling_boundary
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_tooling_boundary
-src/conductor/candidate_review/verbosity_scan.py	python_contracts_verbosity_scan
-native/slop-core/src/verbosity_scan.rs	python_contracts_verbosity_scan
-native/slop-core/src/lib.rs	python_contracts_verbosity_scan
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_verbosity_scan
 # include: python_contract_targets_extra.tsv
 src/conductor/candidate_review/checks.py	python_contracts_candidate_policy
 src/conductor/_native.py	python_contracts_candidate_policy

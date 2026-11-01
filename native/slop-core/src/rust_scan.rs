@@ -95,7 +95,8 @@ impl<'a> Source<'a> {
 
 /// A file whose every item is test code, which `#[cfg(test)]` scoping cannot
 /// see: the `mod` declaration that gates it lives in another file.
-fn is_test_file(relative: &str) -> bool {
+/// Whether the normalized relative path belongs to a Rust test source file.
+pub fn is_test_file(relative: &str) -> bool {
     let name = match relative.rsplit('/').next() {
         Some(name) => name,
         None => relative,

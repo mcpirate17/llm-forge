@@ -235,10 +235,6 @@ name = "python_contracts_candidate_structure_audit"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_candidate_style"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_candidate_verification"
 required-features = ["python-compat-tests"]
 
@@ -348,10 +344,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_guardrail_duplicates"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_hot_loop_scan"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -619,10 +611,6 @@ name = "python_contracts_test_record"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_test_value_scan"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_tooling_boundary"
 required-features = ["python-compat-tests"]
 
@@ -632,10 +620,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_value_gate_scope"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_verbosity_scan"
 required-features = ["python-compat-tests"]
 
 [[test]]

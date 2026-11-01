@@ -16,6 +16,8 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Plan or run native source checks against exact candidate changed lines.
+    Scan(crate::candidate_scan_cli::ScanArgs),
     /// Check exact changed lines using an explicitly provisioned native formatter.
     ClangFormat(crate::candidate_clang_format_cli::FormatArgs),
     /// Analyze captured C/C++ build configurations and exact changed lines.
@@ -82,6 +84,7 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::Scan(args) => return crate::candidate_scan_cli::run(args),
         Action::ClangFormat(args) => return crate::candidate_clang_format_cli::run(args),
         Action::ClangTidy(args) => return crate::candidate_clang_tidy_cli::run(args),
         Action::CargoLint(args) => return crate::candidate_cargo_lint_cli::run(args),

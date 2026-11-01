@@ -1,12 +1,12 @@
 //! Read-only source checks and ablation proposals through existing native algorithms.
-use crate::source_file::{validate_relative, SourceRoot};
-use anyhow::{ensure, Context, Result};
-use clap::{Args, Subcommand, ValueEnum};
-use serde::Serialize;
-use serde_json::{json, Value};
-use slop_core::{
-    ablation, detector_scan, hot_loop_scan, rust_scan, style_scan, test_value_scan, verbosity_scan,
+use crate::{
+    source_checks::{scan as scan_source, Check},
+    source_file::{validate_relative, SourceRoot},
 };
+use anyhow::{ensure, Context, Result};
+use clap::{Args, Subcommand};
+use serde_json::{json, Value};
+use slop_core::{ablation, hot_loop_scan, rust_scan, style_scan, test_value_scan, verbosity_scan};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -30,17 +30,6 @@ enum Action {
     Scan(ScanArgs),
     /// Generate automatic source edits for inspection; does not execute or apply mutants.
     Ablations(AblationArgs),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, ValueEnum)]
-#[serde(rename_all = "kebab-case")]
-enum Check {
-    Style,
-    Fallback,
-    TestValue,
-    Verbosity,
-    HotLoop,
-    Rust,
 }
 
 #[derive(Args)]
@@ -70,27 +59,6 @@ struct AblationArgs {
     qualname: Option<String>,
     #[arg(long, default_value_t = 100)]
     max_results: usize,
-}
-
-#[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
-struct Finding {
-    path: String,
-    line: usize,
-    end_line: usize,
-    rule: &'static str,
-    message: String,
-}
-
-impl From<style_scan::Finding> for Finding {
-    fn from(f: style_scan::Finding) -> Self {
-        Self {
-            path: f.path,
-            line: f.line,
-            end_line: f.line,
-            rule: f.rule,
-            message: f.message,
-        }
-    }
 }
 
 fn registry() -> Value {
@@ -131,77 +99,6 @@ fn checks_for(path: &str, requested: &[Check], hot_paths: &[String]) -> Result<V
     Ok(selected)
 }
 
-fn scan_one(path: &str, source: &str, checks: &[Check]) -> Result<Vec<Finding>> {
-    let parsed = if checks
-        .iter()
-        .any(|c| !matches!(c, Check::Rust | Check::Fallback))
-    {
-        Some(slop_core::source::PythonSource::new(source).map_err(anyhow::Error::msg)?)
-    } else {
-        None
-    };
-    let python = || {
-        parsed
-            .as_ref()
-            .context("Python AST was not selected for this check")
-    };
-    let mut rows = Vec::new();
-    for check in checks {
-        let common = match check {
-            Check::Style => Some(style_scan::scan_parsed(path, python()?)),
-            Check::Fallback => Some(match parsed.as_ref() {
-                Some(p) => detector_scan::scan_parsed(path, p),
-                None => detector_scan::scan_source(path, source).map_err(anyhow::Error::msg)?,
-            }),
-            Check::HotLoop => Some(hot_loop_scan::scan_parsed(path, python()?)),
-            _ => None,
-        };
-        if let Some(result) = common {
-            rows.extend(result.into_iter().map(Finding::from));
-            continue;
-        }
-        match check {
-            Check::Rust => rows.extend(
-                rust_scan::scan_source(source, path)
-                    .map_err(anyhow::Error::msg)?
-                    .into_iter()
-                    .map(|f| Finding {
-                        path: f.path,
-                        line: f.line,
-                        end_line: f.line,
-                        rule: f.rule,
-                        message: f.message,
-                    }),
-            ),
-            Check::TestValue => rows.extend(
-                test_value_scan::scan_parsed(path, python()?)
-                    .into_iter()
-                    .map(|f| Finding {
-                        path: f.path,
-                        line: f.line,
-                        end_line: f.end_line,
-                        rule: f.rule,
-                        message: f.message,
-                    }),
-            ),
-            Check::Verbosity => rows.extend(
-                verbosity_scan::scan_parsed(path, python()?)
-                    .into_iter()
-                    .map(|f| Finding {
-                        path: f.path,
-                        line: f.line,
-                        end_line: f.end_line,
-                        rule: f.rule,
-                        message: f.message,
-                    }),
-            ),
-            _ => unreachable!("common check handled above"),
-        }
-    }
-    rows.sort();
-    Ok(rows)
-}
-
 fn scan(root: &SourceRoot, args: ScanArgs) -> Result<(Value, u8)> {
     ensure!(
         (1..=4096).contains(&args.max_results),
@@ -229,7 +126,7 @@ fn scan(root: &SourceRoot, args: ScanArgs) -> Result<(Value, u8)> {
             bytes <= 16 * 1024 * 1024,
             "analysis exceeds 16 MiB input budget"
         );
-        let rows = scan_one(path, snapshot.content(), &checks)?;
+        let rows = scan_source(path, snapshot.content(), &checks)?;
         total += rows.len();
         findings.extend(rows.into_iter().take(args.max_results - findings.len()));
         sources.push(json!({"path":path,"source_sha256":snapshot.sha256(),"checks":checks}));

@@ -32,6 +32,8 @@ pub mod candidate_execution_result;
 #[cfg(target_os = "linux")]
 mod candidate_execution_workspace;
 #[cfg(target_os = "linux")]
+mod candidate_inputs;
+#[cfg(target_os = "linux")]
 pub mod candidate_plan;
 #[cfg(target_os = "linux")]
 pub mod candidate_policy;
@@ -43,6 +45,8 @@ pub mod candidate_report;
 pub mod candidate_report_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_report_store;
+#[cfg(target_os = "linux")]
+pub mod candidate_scan_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_snapshot;
 #[cfg(target_os = "linux")]
@@ -124,6 +128,7 @@ pub mod pty;
 pub mod recall;
 #[cfg(target_os = "linux")]
 pub mod sandbox;
+pub(crate) mod source_checks;
 pub mod source_file;
 #[cfg(target_os = "linux")]
 pub mod systemd;
