@@ -979,7 +979,12 @@ policy compatibility cases through a private extension overlay. Strict all-targe
 Clippy passed for both crates. Twenty-five runs of eight concurrent assessments
 mixed passing and invalid results without leaving snapshots. Native AST inspection
 found no function above 100 lines in the 13 inspected implementation, test and
-benchmark files. Full committed release validation and publication are pending.
+benchmark files. Assessment was committed and published as
+`ac8d2448d46eef52672b200a22f949c1f4a68fdd`. Full release checks passed 2,351
+tests with 39 intentional ignores, plus two installed-runtime tests, before
+and after publication. The published receipt is
+`.git/forge-checks/run-1793521322933453734-637358/receipt.json`, SHA-256
+`e193da64dc600469d235985ecfbd9e0ba6f055e3984057a88e17f4f6f4553f2c`.
 
 The current Rust 1.98.0 release benchmark measured prepared glob matching at
 0.116 microseconds (p95 batch mean 0.124), versus 0.286 (p95 0.294) for stateless
@@ -998,3 +1003,36 @@ activation, then complete review reporting, attestation
 and caller migration. Python candidate policy wrappers still have callers in
 gate, verification and shared tooling; deleting them before those consumers move
 would break existing workflows. The overall native migration remains incomplete.
+
+The current-work Python guard is now deleted. Native hook input normalization
+closes an empty-object alias bypass in Read calls and makes every downstream
+handler inspect the same selected object. Empty aliases defer to populated
+alternates; nonempty canonical objects keep precedence; malformed populated
+inputs deny. Notebook paths receive the same protected-file check. Canonical
+input selection borrows its payload without cloning large tool arguments.
+Root scalar `input` strings remain available as provider patch/text data.
+Conflicting path fields cannot hide a protected notebook path behind a safe
+file path. Direct guard calls also reject malformed populated tool-name and
+command aliases; dispatch retains its stricter conflict checks.
+The independent Python local-clerk policy remains with its own compatibility
+target. There are 131 Python source files under `src/`; this is another bounded
+retirement, not completion of the native migration.
+
+Focused release validation passed 601 native tests with two intentional ignores,
+including the frozen hook corpus, dispatch, Read, protocol and workdir checks.
+All 34 contract-discovery tests and the two affected optional compatibility cases
+passed using a private extension overlay. Strict Forge all-target Clippy and
+scoped compatibility-target Clippy passed. Six inspected Rust files had complete
+AST results and no function above 52 lines. Full committed checks and publication
+for this guard retirement are pending.
+
+The current-only guard benchmark used Rust 1.98.0 release, 31 batches of 1,000
+operations and 100 warmups on an unisolated host. Canonical normalization of a
+payload carrying 64 KiB of content measured 0.012 microseconds median batch
+mean; alternate-object normalization, including reset and clone, measured
+0.124 microseconds (p95 0.127). Full guard verdicts measured 0.451 microseconds
+for a protected Read (p95 0.454) and 1.540 microseconds for a protected Bash
+command (p95 1.843). These timings exclude JSON parsing, process startup and
+other hook handlers; they are not a historical comparison or model latency.
+Benchmark executable SHA-256:
+`ee1d05b7ce6c62e3a4a989f635e1016f2460185c7c7ddd869d659ee2efaa0306`.

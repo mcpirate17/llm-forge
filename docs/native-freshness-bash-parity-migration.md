@@ -1,5 +1,12 @@
 # Native freshness and Bash hook parity contracts
 
+Current runtime coverage uses
+`native/forge/tests/bash_pretooluse_hooks_parity.rs` and the frozen corpus
+directly in Rust. The Python dispatch adapters and current-work guard are
+retired; this suite needs neither a Python interpreter nor the old baseline
+Forge executable. The following PyO3 results and source-to-target table are
+historical migration evidence.
+
 This bounded cohort moves 28 named Python tests to Rust-owned PyO3 contracts:
 26 cases from `src/tooling/hooks/dispatch/test_native_freshness.py` and two
 from `src/tooling/hooks/claude/test_bash_pretooluse_hooks_parity_corpus.py`.

@@ -324,13 +324,12 @@ fn generic_obsolete_selectors_still_emit_and_consume_the_native_refresh_notice()
 }
 
 #[test]
-fn malformed_adapter_input_surfaces_a_hook_error() {
+fn malformed_input_is_denied_before_read_handlers_run() {
     let project = Project::new();
     let output = project.native(&json!({"tool_name": "Read", "tool_input": ["bad"]}), false);
-    assert!(output["systemMessage"]
-        .as_str()
-        .unwrap()
-        .contains("HOOK ERROR [pre_read_skeleton]"));
+    assert_eq!(output["hookSpecificOutput"]["permissionDecision"], "deny");
+    assert!(reason(&output).contains("Invalid hook payload:"));
+    assert!(reason(&output).contains("must select an object"));
     assert!(pre_read::hook_output(&json!({"tool_input": {"file_path": 123}})).is_err());
     assert!(pre_read::hook_output(&Value::Null).is_ok());
 }

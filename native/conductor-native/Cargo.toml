@@ -275,7 +275,7 @@ name = "python_contracts_crg_seed_worktree"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_current_work_guard"
+name = "python_contracts_local_ai_policy"
 required-features = ["python-compat-tests"]
 
 [[test]]

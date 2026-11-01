@@ -607,13 +607,13 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
     let root = repo_root();
     let gate_rollout = plan(&root, &["src/conductor/gate_rollout.py".to_owned()]).unwrap();
     assert_eq!(gate_rollout.targets, ["python_contracts_gate_rollout"]);
-    let current_work_guard =
-        plan(&root, &["src/conductor/current_work_guard.py".to_owned()]).unwrap();
+    let local_ai_policy = plan(&root, &["src/conductor/local_ai_policy.py".to_owned()]).unwrap();
     assert_eq!(
-        current_work_guard.targets,
-        ["python_contracts_current_work_guard"]
+        local_ai_policy.targets,
+        ["python_contracts_local_ai_policy"]
     );
     for retired in [
+        "current_work_guard.py",
         "active_state.py",
         "session_policy.py",
         "grok_inspect_stub.py",

@@ -87,6 +87,7 @@ fn read_tool_payload() -> Result<Value> {
         .context("tool_name must be a nonempty string")?;
     ensure!(name.len() <= 1024, "tool name exceeds 1024 bytes");
     payload["tool_name"] = Value::String(name.to_owned());
+    crate::current_work_guard::normalize_tool_input(&mut payload).map_err(anyhow::Error::msg)?;
     normalize_shell_payload(&mut payload)?;
     Ok(payload)
 }
@@ -247,5 +248,25 @@ mod tests {
         let original = payload.clone();
         normalize_shell_payload(&mut payload).unwrap();
         assert_eq!(payload, original);
+    }
+
+    #[test]
+    fn normalized_inputs_are_shared_with_the_claim_target_extractor() {
+        for alias in ["toolInput", "arguments", "input"] {
+            let mut payload = json!({"tool_name":"NotebookEdit","tool_input":{},
+                alias:{"notebook_path":".current_work.md"},
+                "patch":"*** Update File: another.rs\n"});
+            crate::current_work_guard::normalize_tool_input(&mut payload).unwrap();
+            assert_eq!(
+                crate::crg_refresh::target_paths(&payload),
+                [".current_work.md", "another.rs"]
+            );
+            assert!(crate::current_work_guard::evaluate_payload(&payload).is_some());
+        }
+        let mut raw = json!({"tool_name":"Edit","input":"*** Update File: native/a.rs\n"});
+        let original = raw.clone();
+        crate::current_work_guard::normalize_tool_input(&mut raw).unwrap();
+        assert_eq!(raw, original);
+        assert_eq!(crate::crg_refresh::target_paths(&raw), ["native/a.rs"]);
     }
 }

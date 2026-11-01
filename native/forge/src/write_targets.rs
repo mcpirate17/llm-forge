@@ -165,7 +165,7 @@ pub mod posix_shlex {
     /// the default most callers in this crate want.
     pub const PUNCTUATION_CHARS_FULL: &str = "();<>|&";
     /// `shlex.shlex(text, punctuation_chars=";&|")` -- the narrower set
-    /// `conductor.current_work_guard` and `conductor.local_ai_policy` pass
+    /// the native current-work and local-AI guards pass
     /// explicitly. With this set, `(`, `)`, `<` and `>` are ordinary word
     /// characters rather than their own punctuation tokens.
     pub const PUNCTUATION_CHARS_NARROW: &str = ";&|";
@@ -214,8 +214,7 @@ pub mod posix_shlex {
     /// `tokenize`, but with `#` an ordinary word character rather than a
     /// comment marker -- `shlex.shlex(command, posix=True,
     /// punctuation_chars=";&|")` followed by `lexer.commenters = ""`, as
-    /// `conductor.current_work_guard._command_segments` and
-    /// `conductor.local_ai_policy._command_segments` both do.
+    /// the native current-work and local-AI guards both do.
     pub fn tokenize_no_comments(
         command: &str,
         punctuation_chars: &str,

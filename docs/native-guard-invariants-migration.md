@@ -1,5 +1,25 @@
 # Native guard and external-invariant contract migration
 
+The current-work guard now runs entirely in Rust through `forge hook`. The
+Python module and its mixed compatibility target have been deleted. Native
+coverage lives in `native/forge/src/current_work_guard.rs`,
+`tests/bash_pretooluse_hooks_parity.rs`, `tests/hook_delegation.rs` and
+`tests/native_read.rs` under `native/forge/`. Input aliases normalize before
+dispatch so access and claim handlers inspect the same object; malformed
+populated inputs fail closed. The guard also recognizes `notebook_path`.
+These remain cooperative tool-policy checks, not OS isolation.
+
+The independent local-clerk policy contract remains in
+`python_contracts_local_ai_policy.rs`, registered against
+`src/conductor/local_ai_policy.py` and the shared compatibility support. Its
+live consumer is `src/conductor/local_clerk.py`. Twenty guard-mediated cases
+were retired after their surviving behavior was covered natively. The old
+Python module's stdin API and unsupported-protocol exceptions are retired;
+native dispatch owns parsing and rejects malformed hook JSON.
+
+The record below describes the earlier PyO3 migration and its historical
+source-to-target mappings, not the current runtime or registry.
+
 This cohort moves the behavior assertions from 21 named cases in
 `src/conductor/test_current_work_guard.py` and 13 in
 `src/conductor/test_external_invariants.py` into two Rust-owned PyO3 test

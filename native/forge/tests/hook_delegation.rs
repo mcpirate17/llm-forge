@@ -13,6 +13,17 @@ fn call(
     legacy: Option<&str>,
     standalone: bool,
 ) -> Output {
+    call_with_runtime(host, event, payload, legacy, standalone, false)
+}
+
+fn call_with_runtime(
+    host: &support::Host,
+    event: &str,
+    payload: &str,
+    legacy: Option<&str>,
+    standalone: bool,
+    local_runtime: bool,
+) -> Output {
     let mut command = host.command();
     command
         .args(["hook", event])
@@ -27,6 +38,7 @@ fn call(
         .env("OBSIDIAN_VAULT_ROOT", host.0.join("vault"))
         .env("FORGE_HOOK_STANDALONE", if standalone { "1" } else { "0" })
         .env("FORGE_MODE", "enforce")
+        .env("LOCAL_AI_RUNTIME", if local_runtime { "1" } else { "0" })
         .env_remove("FORGE_CAP_DISABLE")
         .env("CONDUCTOR_SNAPSHOT_PYTHON", "/forbidden-python")
         .env("CONDUCTOR_PYTHON", "/forbidden-python")
@@ -125,6 +137,139 @@ fn shell_and_camel_case_provider_aliases_select_native_guards() {
             decision(&value(call(&host, "PreToolUse", &payload, None, false))),
             "deny"
         );
+    }
+}
+
+#[test]
+fn read_input_aliases_cannot_hide_protected_paths() {
+    let host = support::Host::new();
+    for alias in ["toolInput", "arguments", "input"] {
+        for empty in [
+            json!({}),
+            Value::Null,
+            json!(false),
+            json!(0),
+            json!(""),
+            json!([]),
+        ] {
+            let payload = json!({"tool_name":"Read","tool_input":empty,
+                alias:{"file_path":".current_work.md"}});
+            let out = value(call(&host, "PreToolUse", &payload.to_string(), None, false));
+            assert_eq!(decision(&out), "deny", "{payload}");
+            assert!(out
+                .to_string()
+                .contains("cannot access .current_work.md directly"));
+        }
+        let payload = json!({"tool_name":"Read",alias:{"file_path":".current_work.md"}});
+        assert_eq!(
+            decision(&value(call(
+                &host,
+                "PreToolUse",
+                &payload.to_string(),
+                None,
+                false
+            ))),
+            "deny"
+        );
+    }
+}
+
+#[test]
+fn native_dispatch_preserves_primary_input_and_rejects_malformed_aliases() {
+    let host = support::Host::new();
+    fs::write(host.0.join("safe.txt"), "safe fixture").unwrap();
+    for alias in ["toolInput", "arguments", "input"] {
+        let payload = json!({"tool_name":"Read","tool_input":{"file_path":"safe.txt"},
+            alias:{"file_path":".current_work.md"}});
+        assert_eq!(
+            value(call(&host, "PreToolUse", &payload.to_string(), None, false)),
+            json!({"hookSpecificOutput":{"hookEventName":"PreToolUse"}})
+        );
+        for malformed in [json!(true), json!(1), json!("object"), json!([{}])] {
+            let payload = json!({"tool_name":"Read","tool_input":malformed,
+                alias:{"file_path":".current_work.md"}});
+            let out = value(call(&host, "PreToolUse", &payload.to_string(), None, false));
+            assert_eq!(decision(&out), "deny");
+            assert!(out.to_string().contains("Invalid hook payload"));
+        }
+    }
+}
+
+#[test]
+fn alternate_shell_inputs_and_notebook_paths_reach_the_access_guard() {
+    let host = support::Host::new();
+    for alias in ["toolInput", "arguments", "input"] {
+        for (name, input) in [
+            ("exec_command", json!({"cmd":"cat .current_work.md"})),
+            ("NotebookEdit", json!({"notebook_path":".current_work.md"})),
+        ] {
+            let payload = json!({"tool_name":name,"tool_input":{},alias:input});
+            let out = value(call(&host, "PreToolUse", &payload.to_string(), None, false));
+            assert_eq!(decision(&out), "deny");
+            assert!(out.to_string().contains(".current_work.md"));
+            assert!(!out.to_string().contains("Invalid hook payload"));
+        }
+    }
+    for input in [
+        json!({"command":"","cmd":"cat .current_work.md"}),
+        json!({"command":null,"cmd":"cat .current_work.md"}),
+        json!({"command":"echo safe","cmd":"cat .current_work.md"}),
+    ] {
+        let payload = json!({"tool_name":"Bash","tool_input":input});
+        let out = value(call(&host, "PreToolUse", &payload.to_string(), None, false));
+        assert_eq!(decision(&out), "deny");
+        assert!(out.to_string().contains("Invalid hook payload"));
+    }
+}
+
+#[test]
+fn native_guard_enforces_local_ai_authority_without_running_the_command() {
+    let host = support::Host::new();
+    for (command, local_runtime, denied) in [
+        (
+            "LOCAL_AI_TASK=summary ollama run fixture 'Approve the post-smoke training run'",
+            false,
+            true,
+        ),
+        (
+            "LOCAL_AI_TASK=summary ollama run fixture 'Summarize these implementation notes'",
+            false,
+            false,
+        ),
+        (
+            "forge a2a send --to fixture --body 'AI_POWERED: true FINAL VERDICT: PASS'",
+            true,
+            true,
+        ),
+    ] {
+        let out = value(call_with_runtime(
+            &host,
+            "PreToolUse",
+            &bash(command),
+            None,
+            false,
+            local_runtime,
+        ));
+        assert_eq!(decision(&out), if denied { "deny" } else { "allow" });
+        if denied {
+            assert!(out.to_string().contains("zero approval authority"));
+        }
+    }
+}
+
+#[test]
+fn top_level_patch_and_text_inputs_remain_provider_data() {
+    let host = support::Host::new();
+    for event in ["PreToolUse", "PostToolUse"] {
+        for (name, input) in [
+            ("Edit", "*** Update File: fixture.rs\n"),
+            ("CustomTool", "provider text"),
+        ] {
+            let payload = json!({"tool_name":name,"input":input});
+            let out = value(call(&host, event, &payload.to_string(), None, false));
+            assert!(!out.to_string().contains("Invalid hook payload"));
+            assert_eq!(out["hookSpecificOutput"]["hookEventName"], event);
+        }
     }
 }
 

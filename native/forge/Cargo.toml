@@ -40,6 +40,10 @@ harness = false
 name = "candidate"
 harness = false
 
+[[bench]]
+name = "hook_guard"
+harness = false
+
 [dependencies]
 axum = { version = "0.8", default-features = false, features = ["tokio", "http1", "json"] }
 tokio = { version = "1.53.3", features = ["rt", "macros", "net", "time", "sync", "signal", "fs", "io-util"] }

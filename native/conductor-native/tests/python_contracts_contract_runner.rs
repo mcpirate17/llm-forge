@@ -370,7 +370,7 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
         let namespace = types.getattr("SimpleNamespace").unwrap();
         let change_args = PyDict::new(py);
         change_args
-            .set_item("path", "src/conductor/current_work_guard.py")
+            .set_item("path", "src/conductor/local_ai_policy.py")
             .unwrap();
         change_args
             .set_item("old_path", "src/conductor/gate_rollout.py")
@@ -421,8 +421,8 @@ fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
                 .extract::<Vec<String>>()
                 .unwrap(),
             vec![
-                "python_contracts_current_work_guard",
                 "python_contracts_gate_rollout",
+                "python_contracts_local_ai_policy",
             ]
         );
         let graph = selection.getattr("graph").unwrap();
