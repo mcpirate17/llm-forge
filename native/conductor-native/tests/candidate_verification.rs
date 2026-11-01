@@ -1,7 +1,151 @@
 #![cfg(feature = "source-analysis")]
 
-use conductor_native::candidate_verification::{decide, python_test_definitions};
+use conductor_native::candidate_verification::{
+    decide, native_rust_file_has_tests, python_test_definitions,
+};
 use serde_json::json;
+
+#[test]
+fn native_module_graph_resolves_external_tests_and_rejects_unexpanded_macros() {
+    use std::fs;
+    let root = std::env::temp_dir().join(format!("native-module-fixture-{}", std::process::id()));
+    fs::create_dir_all(root.join("src/foo")).unwrap();
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname='fixture'\nversion='0.1.0'\n",
+    )
+    .unwrap();
+    fs::write(root.join("src/lib.rs"), "pub mod foo;\n").unwrap();
+    assert_eq!(
+        decide(
+            "native_test_definitions",
+            &json!({"path":"build.rs", "source":"fn main() {}", "repo_root":root})
+        )
+        .unwrap(),
+        json!({})
+    );
+    assert!(native_rust_file_has_tests(
+        "#[cfg(test)] mod tests { macro_rules! helper { () => {} } }"
+    )
+    .unwrap());
+    assert!(native_rust_file_has_tests("#[test] fn external_unit_test() {}").unwrap());
+    assert!(!native_rust_file_has_tests("macro_rules! production { () => {}; }").unwrap());
+    fs::write(root.join("src/foo.rs"), "#[cfg(test)] mod tests;\n").unwrap();
+    assert_eq!(
+        decide(
+            "native_source_role",
+            &json!({"repo_root":root,"path":"src/foo.rs"})
+        )
+        .unwrap()["role"],
+        "production"
+    );
+    let source = "#[test] fn nested() { assert!(true); }";
+    fs::write(root.join("src/foo/tests.rs"), source).unwrap();
+    let batch = decide(
+        "native_source_roles",
+        &json!({"repo_root":root,"paths":["src/foo.rs","src/foo/tests.rs"]}),
+    )
+    .unwrap();
+    assert_eq!(batch["src/foo.rs"]["role"], "production");
+    assert_eq!(batch["src/foo/tests.rs"]["role"], "test-only");
+    assert_eq!(
+        decide(
+            "native_source_role",
+            &json!({"repo_root":root,"path":"src/foo/tests.rs"})
+        )
+        .unwrap()["role"],
+        "test-only"
+    );
+    let wiring = decide(
+        "native_test_definitions",
+        &json!({"path":"src/foo.rs","source":"#[cfg(test)] mod tests;","repo_root":root}),
+    )
+    .unwrap();
+    assert!(decide("gated_nodeids", &json!({"grandfathered":{},"entries":[{"path":"src/foo.rs","classes":["native","source"],"definitions":wiring,"base":{}}]})).unwrap_err().contains("wiring changed"));
+    let definitions = decide(
+        "native_test_definitions",
+        &json!({"path":"src/foo/tests.rs","source":source,"repo_root":root}),
+    )
+    .unwrap();
+    assert_eq!(definitions.as_object().unwrap().len(), 1);
+    assert!(definitions.get("foo::tests::nested").is_some());
+    fs::write(
+        root.join("src/foo.rs"),
+        "#[path=\"foo_tests.rs\"] mod tests;\n",
+    )
+    .unwrap();
+    fs::write(root.join("src/foo_tests.rs"), source).unwrap();
+    let redirected = decide(
+        "native_test_definitions",
+        &json!({"path":"src/foo_tests.rs","source":source,"repo_root":root}),
+    )
+    .unwrap();
+    assert!(redirected.get("foo::tests::nested").is_some());
+    for source in [
+        "#[cfg(test)] mod tests { proptest! { fn generated() {} } }",
+        "#[cfg(test)] proptest! { fn generated() {} }",
+        "proptest! { fn generated() {} }",
+        "#[rstest] fn parameterized() {}",
+    ] {
+        assert!(decide(
+            "native_test_definitions",
+            &json!({"path":"src/lib.rs","source":source,"repo_root":root})
+        )
+        .unwrap_err()
+        .contains("unsupported"));
+    }
+    assert!(decide("native_test_definitions",&json!({"path":"src/lib.rs","source":"macro_rules! production { () => {}; }","repo_root":root})).unwrap().as_object().unwrap().is_empty());
+    assert!(decide("gated_nodeids",&json!({"grandfathered":{},"entries":[{"path":"tests/generated.rs","classes":["native","test"],"definitions":{}}]})).unwrap_err().contains("unsupported"));
+    assert!(decide("gated_nodeids",&json!({"grandfathered":{},"entries":[{"path":"tests/math_test.c","classes":["native","test"],"definitions":{"test_sum":"body"}}]})).unwrap_err().contains("verified CTest"));
+    assert_eq!(decide("gated_nodeids", &json!({"grandfathered":{},"entries":[{"path":"src/native.cpp","classes":["native","source"],"definitions":{"test_helper":"same"},"base":{"test_helper":"same"}}]})).unwrap(), json!({}));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn native_definitions_parse_real_tests_and_gate_changed_inline_tests() {
+    let source = "// #[test] fn fake() {}\nconst TEXT: &str = \"#[test] fn fake() {}\";\n#[cfg(test)] mod tests { #[test] fn nested() { assert!(true); } fn helper() {} }";
+    let definitions = decide(
+        "native_test_definitions",
+        &json!({"path":"src/lib.rs","source":source}),
+    )
+    .unwrap();
+    assert_eq!(definitions.as_object().unwrap().len(), 1);
+    assert!(definitions["tests::nested"]
+        .as_str()
+        .unwrap()
+        .contains("assert!(true)"));
+    let result = decide(
+        "gated_nodeids",
+        &json!({"grandfathered":{},"entries":[{
+        "path":"src/lib.rs","classes":["native","source"],"definitions":definitions,
+        "base":{"tests::nested":"old body"}}]}),
+    )
+    .unwrap();
+    assert_eq!(result["src/lib.rs"], json!(["src/lib.rs::tests::nested"]));
+    let unchanged = decide(
+        "gated_nodeids",
+        &json!({"grandfathered":{},"entries":[{
+        "path":"src/lib.rs","classes":["native","source"],"definitions":definitions,
+        "base":definitions}]}),
+    )
+    .unwrap();
+    assert_eq!(unchanged, json!({}));
+    let c = decide("native_test_definitions", &json!({"path":"tests/math_test.c","source":"/* void test_fake() {} */ void helper() {} void test_sum() { assert(1); }"})).unwrap();
+    assert_eq!(c.as_object().unwrap().len(), 1);
+    assert!(c.get("test_sum").is_some());
+    assert!(decide(
+        "gated_nodeids",
+        &json!({"grandfathered":{},"entries":[{
+        "path":"tests/math_test.cpp","classes":["native","test"],"definitions":{}}]})
+    )
+    .unwrap_err()
+    .contains("unsupported"));
+    assert!(decide(
+        "native_test_definitions",
+        &json!({"path":"src/lib.rs","source":"#[test] fn broken( {"})
+    )
+    .is_err());
+}
 
 #[test]
 fn ast_collects_decorated_top_level_and_test_class_definitions_only() {

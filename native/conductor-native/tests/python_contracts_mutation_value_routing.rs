@@ -47,7 +47,7 @@ fn verdict(py: Python<'_>, report: &Bound<'_, PyAny>, expected: &[&str]) -> Valu
 }
 
 #[test]
-fn cargo_attribution_refuses_ambiguity_and_reports_collateral() {
+fn cargo_raw_output_requires_target_provenance() {
     let _case = Case::new();
     Python::attach(|py| {
         let value = module(py, "conductor.mutation_value");
@@ -57,127 +57,130 @@ fn cargo_attribution_refuses_ambiguity_and_reports_collateral() {
             .unwrap()
             .extract::<bool>()
             .unwrap());
-        assert!(!supports
-            .call1((Vec::<String>::new(),))
-            .unwrap()
-            .extract::<bool>()
-            .unwrap());
-        assert!(!supports
-            .call1((vec!["conductor/test_mutation_value.py::test_alpha"],))
-            .unwrap()
-            .extract::<bool>()
-            .unwrap());
-        let twin = "tooling/native/conductor-native/src/mutation_evidence.rs::test_alpha";
-        assert!(!supports
-            .call1((vec![ALPHA, twin],))
-            .unwrap()
-            .extract::<bool>()
-            .unwrap());
-        let parse = value.getattr("parse_cargo_libtest").unwrap();
-        let error = value.getattr("ValueEvidenceError").unwrap();
-        assert_error(
-            py,
-            parse.call1(("", vec![ALPHA, twin])).unwrap_err(),
-            &error,
-            "share a function",
-        );
-        assert_error(
-            py,
-            parse
-                .call1(("", vec!["src/lib.rs::mods::test_alpha"]))
-                .unwrap_err(),
-            &error,
-            "Rust nodeid",
-        );
-        let stdout = "running 4 tests\n\
-test receipt::tests::test_alpha ... FAILED\n\
-test manifest::tests::test_beta ... ok\n\
-test manifest::tests::test_unranked ... FAILED\n\
-test manifest::tests::test_skipped ... ignored\n\
-test result: FAILED. 1 passed; 2 failed; 1 ignored\n";
-        let parsed = parse.call1((stdout, vec![ALPHA, BETA])).unwrap();
-        let result = from_python(&parsed);
-        assert_eq!(result["status"], "COMPLETE");
-        assert_eq!(
-            result["tests"][ALPHA],
-            json!({"outcome": "FAILED", "cases": 1})
-        );
-        assert_eq!(result["tests"][BETA]["outcome"], "PASSED");
-        assert!(result["tests"][ALPHA].get("duration_seconds").is_none());
-        assert_eq!(
-            result["unranked_failures"],
-            json!(["manifest::tests::test_unranked"])
-        );
-        assert_eq!(result["tests"].as_object().unwrap().len(), 2);
-        let ignored = from_python(
-            &parse
-                .call1(("test receipt::tests::test_alpha ... ignored\n", vec![ALPHA]))
+        let result = from_python(
+            &value
+                .getattr("parse_cargo_libtest")
+                .unwrap()
+                .call1(("test receipt::tests::test_alpha ... FAILED\n", vec![ALPHA]))
                 .unwrap(),
         );
-        assert_eq!(ignored["tests"][ALPHA]["outcome"], "SKIPPED");
-        let missing = from_python(
-            &parse
-                .call1((stdout, vec![ALPHA, BETA, "x.rs::test_x"]))
-                .unwrap(),
-        );
-        assert_eq!(missing["status"], "INCOMPLETE");
-        assert_eq!(missing["missing_nodeids"], json!(["x.rs::test_x"]));
-        let collided = from_python(&parse.call1((
-            "test receipt::tests::test_alpha ... ok\ntest other::tests::test_alpha ... FAILED\n",
-            vec![ALPHA])).unwrap());
-        assert_eq!(collided["ambiguous_nodeids"], json!([ALPHA]));
-        assert!(collided["tests"].get(ALPHA).is_none());
-        assert_eq!(collided["status"], "INCOMPLETE");
+        assert_eq!(result["status"], "INCOMPLETE");
+        assert_eq!(result["tests"], json!({}));
+        assert!(result["error"].as_str().unwrap().contains("provenance"));
     });
 }
 
 #[test]
-fn cargo_verdict_separates_declared_collateral_and_ambiguous_kills() {
-    let _case = Case::new();
+fn cargo_collector_binds_real_single_target_and_rejects_other_target() {
+    let case = Case::new();
+    let root = case.mkdir("cargo-bound");
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::create_dir_all(root.join("tests")).unwrap();
+    std::fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname='fixture'\nversion='0.1.0'\nedition='2021'\n",
+    )
+    .unwrap();
+    std::fs::write(root.join("src/lib.rs"), "#[test] fn shared() {}\n").unwrap();
+    std::fs::write(root.join("tests/other.rs"), "#[test] fn shared() {}\n").unwrap();
+    let run = |target: &[&str]| {
+        let output = std::process::Command::new("cargo")
+            .args(target)
+            .current_dir(&root)
+            .env("CARGO_TARGET_DIR", root.join("target"))
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).unwrap()
+    };
+    let lib_argv = [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "Cargo.toml",
+        "--package",
+        "fixture",
+        "--lib",
+    ];
+    let other_argv = [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "Cargo.toml",
+        "--package",
+        "fixture",
+        "--test",
+        "other",
+    ];
+    let lib_output = run(&lib_argv[1..]);
+    let other_output = run(&other_argv[1..]);
     Python::attach(|py| {
         let value = module(py, "conductor.mutation_value");
-        let parse = value.getattr("parse_cargo_libtest").unwrap();
-        let report = parse
-            .call1((
-                "test receipt::tests::test_alpha ... ok\n\
-test manifest::tests::test_beta ... FAILED\n\
-test manifest::tests::test_blunt ... FAILED\n",
-                vec![ALPHA, BETA],
-            ))
+        let collect = value.getattr("collect_cargo_libtest_batch").unwrap();
+        let check = |argv: &[&str], stdout: &str| {
+            let text = stdout.to_owned();
+            let sink = PyCFunction::new_closure(
+                py,
+                None,
+                None,
+                move |args: &Bound<'_, PyTuple>, _| -> PyResult<&'static str> {
+                    args.get_item(1)?.call1((text.as_str(),))?;
+                    Ok("executed")
+                },
+            )
             .unwrap();
+            let options = PyDict::new(py);
+            options.set_item("argv", argv).unwrap();
+            options
+                .set_item("ranked_nodeids", vec!["src/lib.rs::shared"])
+                .unwrap();
+            options.set_item("snapshot_root", path(py, &root)).unwrap();
+            options.set_item("run_command", sink).unwrap();
+            from_python(
+                &collect
+                    .call((), Some(&options))
+                    .unwrap()
+                    .get_item(1)
+                    .unwrap(),
+            )
+        };
+        let good = check(&lib_argv, &lib_output);
+        assert_eq!(good["status"], "COMPLETE");
+        assert_eq!(good["tests"]["src/lib.rs::shared"]["outcome"], "PASSED");
+        assert!(other_output.contains("test shared ... ok"));
+        assert_eq!(check(&other_argv, &other_output)["status"], "INCOMPLETE");
+    });
+}
+
+#[test]
+fn cargo_verdict_separates_declared_and_collateral_kills() {
+    let _case = Case::new();
+    Python::attach(|py| {
+        let report = to_python(
+            py,
+            &json!({"status":"COMPLETE", "tests":{
+            (ALPHA):{"outcome":"PASSED"}, (BETA):{"outcome":"FAILED"}},
+            "unranked_failures":["other::test_blunt"]}),
+        );
         let result = verdict(py, &report, &[ALPHA]);
         assert_eq!(result["status"], "MISATTRIBUTED");
         assert_eq!(result["observed_failures"], json!([BETA]));
         assert_eq!(result["collateral"], json!([BETA]));
-        assert_eq!(
-            result["unranked_failures"],
-            json!(["manifest::tests::test_blunt"])
+        let declared = to_python(
+            py,
+            &json!({"status":"COMPLETE", "tests":{
+            (ALPHA):{"outcome":"FAILED"}, (BETA):{"outcome":"PASSED"}}, "unranked_failures":[]}),
         );
-        let declared = parse
-            .call1((
-                "test receipt::tests::test_alpha ... FAILED\n\
-test manifest::tests::test_beta ... ok\n",
-                vec![ALPHA, BETA],
-            ))
-            .unwrap();
-        let confirmed = verdict(py, &declared, &[ALPHA]);
-        assert_eq!(confirmed["status"], "CONFIRMED");
-        assert_eq!(confirmed["matched"], json!([ALPHA]));
-        assert!(confirmed.get("unranked_failures").is_none());
-        let ambiguous = parse
-            .call1((
-                "test receipt::tests::test_alpha ... FAILED\n\
-test other::tests::test_alpha ... ok\n\
-test manifest::tests::test_beta ... ok\n",
-                vec![ALPHA, BETA],
-            ))
-            .unwrap();
-        assert_eq!(
-            verdict(py, &ambiguous, &[ALPHA]),
-            json!({
-            "status": "UNATTRIBUTED", "declared": [ALPHA], "reason": "attribution is INCOMPLETE",
-            "missing_nodeids": [ALPHA], "error": null})
+        assert_eq!(verdict(py, &declared, &[ALPHA])["status"], "CONFIRMED");
+        let incomplete = to_python(
+            py,
+            &json!({"status":"INCOMPLETE", "tests":{}, "missing_nodeids":[ALPHA]}),
         );
+        assert_eq!(verdict(py, &incomplete, &[ALPHA])["status"], "UNATTRIBUTED");
     });
 }
 
@@ -234,20 +237,9 @@ fn cargo_collector_reads_full_stdout_and_refuses_python_nodeids() {
             .call((), Some(&options))
             .unwrap();
         assert_eq!(text(&result.get_item(0).unwrap()), "result");
-        assert_eq!(
-            text(
-                &result
-                    .get_item(1)
-                    .unwrap()
-                    .get_item("tests")
-                    .unwrap()
-                    .get_item(ALPHA)
-                    .unwrap()
-                    .get_item("outcome")
-                    .unwrap()
-            ),
-            "FAILED"
-        );
+        let unbound = from_python(&result.get_item(1).unwrap());
+        assert_eq!(unbound["status"], "INCOMPLETE");
+        assert!(unbound["error"].as_str().unwrap().contains("provenance"));
         options
             .set_item(
                 "ranked_nodeids",
@@ -332,11 +324,11 @@ fn command_support_streams_verdict_past_stored_tail_and_on_timeout() {
             &value
                 .getattr("parse_cargo_libtest")
                 .unwrap()
-                .call1((full, vec![ALPHA]))
+                .call1((full.clone(), vec![ALPHA]))
                 .unwrap(),
         );
-        assert_eq!(parsed["status"], "COMPLETE");
-        assert_eq!(parsed["tests"][ALPHA]["outcome"], "FAILED");
+        assert!(full.contains("test receipt::tests::test_alpha ... FAILED"));
+        assert_eq!(parsed["status"], "INCOMPLETE");
         let timed = pyo3::types::PyList::empty(py);
         let script = "import sys, time\nsys.stdout.write('test receipt::tests::test_alpha ... FAILED\\n')\nsys.stdout.flush()\ntime.sleep(120)\n";
         let expired = run(script, 2, &timed);
@@ -355,7 +347,7 @@ fn command_support_streams_verdict_past_stored_tail_and_on_timeout() {
                 ))
                 .unwrap(),
         );
-        assert_eq!(partial["tests"][ALPHA]["outcome"], "FAILED");
+        assert_eq!(partial["status"], "INCOMPLETE");
     });
 }
 
@@ -458,18 +450,8 @@ fn rust_batches_route_to_libtest_and_value_analysis_requires_correct_adapter() {
         let result = execute.call((good,), Some(&options)).unwrap();
         assert_eq!(text(&result.get_item(0).unwrap()), "result");
         assert_eq!(
-            text(
-                &result
-                    .get_item(1)
-                    .unwrap()
-                    .get_item("tests")
-                    .unwrap()
-                    .get_item(rust)
-                    .unwrap()
-                    .get_item("outcome")
-                    .unwrap()
-            ),
-            "FAILED"
+            text(&result.get_item(1).unwrap().get_item("status").unwrap()),
+            "INCOMPLETE"
         );
         assert_eq!(
             calls.lock().unwrap().last().unwrap(),
@@ -483,14 +465,10 @@ fn rust_batches_route_to_libtest_and_value_analysis_requires_correct_adapter() {
                     .unwrap()
                     .get_item(1)
                     .unwrap()
-                    .get_item("tests")
-                    .unwrap()
-                    .get_item(rust)
-                    .unwrap()
-                    .get_item("outcome")
+                    .get_item("status")
                     .unwrap()
             ),
-            "FAILED"
+            "INCOMPLETE"
         );
         let mislabeled = campaign(py, &[rust], &["cargo", "test"], Some("pytest-junit"));
         assert_error(

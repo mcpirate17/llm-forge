@@ -56,7 +56,14 @@ pub fn cargo_identity(nodeid: &str) -> Result<String, String> {
     let (path, function) = nodeid
         .split_once("::")
         .ok_or_else(|| format!("cargo-libtest requires a Rust nodeid: {nodeid}"))?;
-    if !path.ends_with(".rs") || function.is_empty() || function.contains("::") {
+    if !path.ends_with(".rs")
+        || function.split("::").any(|part| {
+            let part = part.strip_prefix("r#").unwrap_or(part);
+            let mut chars = part.chars();
+            !chars.next().is_some_and(|c| c == '_' || c.is_alphabetic())
+                || chars.any(|c| c != '_' && !c.is_alphanumeric())
+        })
+    {
         return Err(format!("cargo-libtest requires a Rust nodeid: {nodeid}"));
     }
     Ok(function.to_owned())
@@ -447,6 +454,7 @@ pub fn parse_junit_file(
     .map_err(|error| format!("{label}: {error}"))
 }
 
+#[cfg(feature = "source-analysis")]
 fn libtest_line(line: &str) -> Option<(String, &'static str)> {
     if line.trim_start().starts_with('{') {
         let row: Value = serde_json::from_str(line).ok()?;
@@ -488,7 +496,175 @@ fn libtest_line(line: &str) -> Option<(String, &'static str)> {
     None
 }
 
-pub fn parse_cargo_libtest(stdout: &str, ranked: &[String]) -> Result<Value, String> {
+pub fn parse_cargo_libtest(_stdout: &str, ranked: &[String]) -> Result<Value, String> {
+    for nodeid in ranked {
+        cargo_identity(nodeid)?;
+    }
+    Ok(
+        json!({"status":"INCOMPLETE", "tests":{}, "missing_nodeids":ranked,
+        "ambiguous_nodeids":[], "unmapped_cases":[], "unranked_failures":[],
+        "error":"Cargo target provenance unavailable for raw libtest output"}),
+    )
+}
+
+#[cfg(feature = "source-analysis")]
+pub fn parse_bound_cargo_libtest(
+    stdout: &str,
+    ranked: &[String],
+    root: &Path,
+    argv: &[String],
+) -> Result<Value, String> {
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let entry = cargo_target(&root, argv)?;
+    for nodeid in ranked {
+        let (path, _) = nodeid.split_once("::").ok_or("invalid Cargo nodeid")?;
+        let source = root.join(path).canonicalize().map_err(|e| e.to_string())?;
+        if !source.starts_with(&root) {
+            return Err("Cargo test source escapes snapshot".into());
+        }
+        let labels = crate::candidate_verification::target_test_labels(&entry, &source)?;
+        if !labels.contains_key(&cargo_identity(nodeid)?) {
+            return Err("Cargo nodeid is not a test in the verified target source".into());
+        }
+    }
+    parse_cargo_cases(stdout, ranked)
+}
+
+#[cfg(feature = "source-analysis")]
+fn cargo_target(root: &Path, argv: &[String]) -> Result<std::path::PathBuf, String> {
+    if argv.len() < 2 || argv[0] != "cargo" || argv[1] != "test" {
+        return Err("Cargo attribution requires a direct cargo test invocation".into());
+    }
+    let (mut manifest, mut package, mut selector): (
+        Option<&str>,
+        Option<&str>,
+        Option<Option<&str>>,
+    ) = (None, None, None);
+    let mut i = 2;
+    while i < argv.len() {
+        match argv[i].as_str() {
+            "--manifest-path" | "--package" | "--test" => {
+                let flag = argv[i].as_str();
+                i += 1;
+                let value = argv.get(i).ok_or("missing Cargo option value")?.as_str();
+                if value.starts_with('-') {
+                    return Err("invalid Cargo option value".into());
+                }
+                match flag {
+                    "--manifest-path" if manifest.is_none() => manifest = Some(value),
+                    "--package" if package.is_none() => package = Some(value),
+                    "--test" if selector.is_none() => selector = Some(Some(value)),
+                    _ => return Err("duplicate Cargo target option".into()),
+                }
+            }
+            "--lib" if selector.is_none() => selector = Some(None),
+            "--locked" | "--offline" | "--release" | "--quiet" | "-q" => {}
+            _ => return Err(format!("unsupported Cargo attribution option: {}", argv[i])),
+        }
+        i += 1;
+    }
+    let manifest = root
+        .join(manifest.ok_or("Cargo attribution requires --manifest-path")?)
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    if !manifest.starts_with(root) || manifest.file_name().is_none_or(|n| n != "Cargo.toml") {
+        return Err("Cargo manifest escapes snapshot or is not Cargo.toml".into());
+    }
+    let crate_root = manifest.parent().ok_or("Cargo manifest has no parent")?;
+    let data: toml::Value =
+        toml::from_str(&std::fs::read_to_string(&manifest).map_err(|e| e.to_string())?)
+            .map_err(|e| format!("{e}"))?;
+    let pkg = data
+        .get("package")
+        .and_then(|v| v.get("name"))
+        .and_then(toml::Value::as_str)
+        .ok_or("Cargo package name unavailable")?;
+    if package != Some(pkg) {
+        return Err("Cargo attribution requires the matching explicit --package".into());
+    }
+    let entry = cargo_target_entry(
+        crate_root,
+        &data,
+        selector.ok_or("Cargo attribution requires one --lib or --test target")?,
+    )?;
+    if !entry.starts_with(root) {
+        return Err("Cargo target escapes snapshot".into());
+    }
+    Ok(entry)
+}
+
+#[cfg(feature = "source-analysis")]
+fn cargo_target_entry(
+    crate_root: &Path,
+    data: &toml::Value,
+    selector: Option<&str>,
+) -> Result<std::path::PathBuf, String> {
+    let entry = match selector {
+        None => crate_root.join(
+            data.get("lib")
+                .and_then(|v| v.get("path"))
+                .and_then(toml::Value::as_str)
+                .unwrap_or("src/lib.rs"),
+        ),
+        Some(name) => {
+            if name.is_empty()
+                || !name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            {
+                return Err("invalid Cargo test target name".into());
+            }
+            let explicit = data
+                .get("test")
+                .and_then(toml::Value::as_array)
+                .and_then(|tests| {
+                    tests
+                        .iter()
+                        .find(|t| t.get("name").and_then(toml::Value::as_str) == Some(name))
+                });
+            if let Some(path) = explicit
+                .and_then(|t| t.get("path"))
+                .and_then(toml::Value::as_str)
+            {
+                crate_root.join(path)
+            } else {
+                if data
+                    .get("package")
+                    .and_then(|v| v.get("autotests"))
+                    .and_then(toml::Value::as_bool)
+                    == Some(false)
+                    && explicit.is_none()
+                {
+                    return Err("Cargo target is not declared".into());
+                }
+                let flat = crate_root.join("tests").join(format!("{name}.rs"));
+                if flat.is_file() {
+                    flat
+                } else {
+                    crate_root.join("tests").join(name).join("main.rs")
+                }
+            }
+        }
+    }
+    .canonicalize()
+    .map_err(|e| format!("Cargo target unavailable: {e}"))?;
+    Ok(entry)
+}
+
+#[cfg(feature = "source-analysis")]
+fn parse_cargo_cases(stdout: &str, ranked: &[String]) -> Result<Value, String> {
+    if stdout
+        .lines()
+        .filter(|line| line.starts_with("test result: "))
+        .count()
+        != 1
+    {
+        return Ok(
+            json!({"status":"INCOMPLETE", "tests":{}, "missing_nodeids":ranked,
+            "ambiguous_nodeids":[], "unmapped_cases":[], "unranked_failures":[],
+            "error":"one completed Cargo target result is required"}),
+        );
+    }
     let mut by_name = HashMap::new();
     for nodeid in ranked {
         by_name.insert(cargo_identity(nodeid)?, nodeid.clone());
@@ -505,8 +681,7 @@ pub fn parse_cargo_libtest(stdout: &str, ranked: &[String]) -> Result<Value, Str
         let Some((printed, outcome)) = libtest_line(line) else {
             continue;
         };
-        let function = printed.rsplit("::").next().unwrap_or(&printed);
-        let Some(nodeid) = by_name.get(function) else {
+        let Some(nodeid) = by_name.get(&printed) else {
             if outcome == "FAILED" {
                 unranked_failures.push(printed);
             }
@@ -515,6 +690,11 @@ pub fn parse_cargo_libtest(stdout: &str, ranked: &[String]) -> Result<Value, Str
         let row = tests
             .entry(nodeid.clone())
             .or_insert_with(|| json!({"outcome": outcome, "cases": 0}));
+        if row["cases"].as_u64().unwrap_or(0) != 0 {
+            return Err(format!(
+                "duplicate libtest case in one Cargo target: {printed}"
+            ));
+        }
         if outcome == "FAILED" {
             row["outcome"] = json!("FAILED");
         }

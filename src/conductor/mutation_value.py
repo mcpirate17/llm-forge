@@ -216,12 +216,23 @@ def cargo_attribution_supported(ranked_nodeids: Sequence[str]) -> bool:
     )
 
 
-def parse_cargo_libtest(stdout: str, ranked_nodeids: Sequence[str]) -> dict[str, Any]:
+def parse_cargo_libtest(
+    stdout: str,
+    ranked_nodeids: Sequence[str],
+    *,
+    repo_root: Path | None = None,
+    argv: Sequence[str] | None = None,
+) -> dict[str, Any]:
     """Map one libtest run's printed outcomes onto the campaign's ranked nodeids."""
 
     try:
         return json.loads(
-            mutation_value_parse_cargo_native(stdout, list(ranked_nodeids))
+            mutation_value_parse_cargo_native(
+                stdout,
+                list(ranked_nodeids),
+                str(repo_root) if repo_root is not None else None,
+                list(argv) if argv is not None else None,
+            )
         )
     except ValueError as exc:
         raise ValueEvidenceError(str(exc)) from exc
@@ -231,14 +242,21 @@ def collect_cargo_libtest_batch[BatchResultT](
     *,
     argv: Sequence[str],
     ranked_nodeids: Sequence[str],
+    snapshot_root: Path | None = None,
     run_command: Callable[[Sequence[str], Callable[[str], None]], BatchResultT],
 ) -> tuple[BatchResultT, Mapping[str, Any]]:
     """Run one cargo batch and return fail-closed attribution from its stdout."""
 
     captured: list[str] = []
-    result = run_command(argv, captured.append)
+    actual_argv = tuple(argv)
+    result = run_command(actual_argv, captured.append)
     try:
-        report = parse_cargo_libtest("".join(captured), ranked_nodeids)
+        report = parse_cargo_libtest(
+            "".join(captured),
+            ranked_nodeids,
+            repo_root=snapshot_root,
+            argv=actual_argv if snapshot_root is not None else None,
+        )
     except ValueEvidenceError as exc:
         report = {
             "status": "INCOMPLETE",

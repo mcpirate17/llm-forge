@@ -1,3 +1,5 @@
+#[cfg(feature = "source-analysis")]
+use conductor_native::mutation_value_inputs::parse_bound_cargo_libtest;
 use conductor_native::mutation_value_inputs::{
     attribution_supported, collect_mutant_evidence, ctest_identity, parse_cargo_libtest,
     parse_junit_file, parse_junit_text, JunitAdapter,
@@ -6,6 +8,136 @@ use serde_json::json;
 
 fn ranked(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()
+}
+
+#[test]
+fn fully_qualified_libtest_names_preserve_real_module_identity() {
+    let node = "src/lib.rs::tests::nested::test_sum";
+    assert!(attribution_supported("cargo-libtest", &ranked(&[node])));
+    let parsed = parse_cargo_libtest(
+        "test tests::nested::test_sum ... ok\ntest other::test_sum ... FAILED\n",
+        &ranked(&[node]),
+    )
+    .unwrap();
+    assert_eq!(parsed["status"], "INCOMPLETE");
+    assert!(parsed["tests"].get(node).is_none());
+    for bad in [
+        "src/lib.rs::tests::::test_sum",
+        "src/lib.rs::tests::",
+        "src/lib.rs::tests::test sum",
+        "src/lib.rs::tests::1bad",
+    ] {
+        assert!(!attribution_supported("cargo-libtest", &ranked(&[bad])));
+    }
+}
+
+#[test]
+#[cfg(feature = "source-analysis")]
+fn cargo_attribution_requires_one_verified_target_and_source() {
+    use std::fs;
+    let root = std::env::temp_dir().join(format!("cargo-bound-fixture-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).unwrap();
+    fs::create_dir_all(root.join("tests")).unwrap();
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname='fixture'\nversion='0.1.0'\n",
+    )
+    .unwrap();
+    fs::write(root.join("src/lib.rs"), "pub mod a;\n").unwrap();
+    fs::write(
+        root.join("src/a.rs"),
+        "#[cfg(test)] mod tests { #[test] fn shared() {} }",
+    )
+    .unwrap();
+    fs::write(
+        root.join("tests/other.rs"),
+        "mod a { mod tests { #[test] fn shared() {} } }\n",
+    )
+    .unwrap();
+    let node = "src/a.rs::a::tests::shared";
+    let args = ranked(&[
+        "cargo",
+        "test",
+        "--manifest-path",
+        "Cargo.toml",
+        "--package",
+        "fixture",
+        "--lib",
+    ]);
+    let executed = std::process::Command::new("cargo")
+        .args(&args[1..])
+        .current_dir(&root)
+        .env("CARGO_TARGET_DIR", root.join("target"))
+        .output()
+        .unwrap();
+    assert!(
+        executed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&executed.stderr)
+    );
+    let output = String::from_utf8(executed.stdout).unwrap();
+    let ok = parse_bound_cargo_libtest(&output, &ranked(&[node]), &root, &args).unwrap();
+    assert_eq!(ok["tests"][node]["outcome"], "PASSED");
+    let partial = parse_bound_cargo_libtest(
+        "test a::tests::shared ... FAILED\n",
+        &ranked(&[node]),
+        &root,
+        &args,
+    )
+    .unwrap();
+    assert_eq!(partial["status"], "INCOMPLETE");
+    let wrong = ranked(&[
+        "cargo",
+        "test",
+        "--manifest-path",
+        "Cargo.toml",
+        "--package",
+        "fixture",
+        "--test",
+        "other",
+    ]);
+    let other = std::process::Command::new("cargo")
+        .args(&wrong[1..])
+        .current_dir(&root)
+        .env("CARGO_TARGET_DIR", root.join("target"))
+        .output()
+        .unwrap();
+    assert!(other.status.success());
+    let collision = String::from_utf8(other.stdout).unwrap();
+    assert!(collision.contains("test a::tests::shared ... ok"));
+    assert!(parse_bound_cargo_libtest(&collision, &ranked(&[node]), &root, &wrong).is_err());
+    assert_eq!(
+        parse_cargo_libtest(&collision, &ranked(&[node])).unwrap()["status"],
+        "INCOMPLETE"
+    );
+    assert!(parse_bound_cargo_libtest(
+        "test a::tests::shared ... FAILED\n",
+        &ranked(&[node]),
+        &root,
+        &ranked(&["sh", "-c", "cargo test"])
+    )
+    .is_err());
+    let multiple = ranked(&[
+        "cargo",
+        "test",
+        "--manifest-path",
+        "Cargo.toml",
+        "--package",
+        "fixture",
+        "--lib",
+        "--test",
+        "other",
+    ]);
+    assert!(parse_bound_cargo_libtest(&collision, &ranked(&[node]), &root, &multiple).is_err());
+    let missing = parse_bound_cargo_libtest(
+        "test other::shared ... FAILED\n",
+        &ranked(&[node]),
+        &root,
+        &args,
+    )
+    .unwrap();
+    assert_eq!(missing["status"], "INCOMPLETE");
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
@@ -217,40 +349,34 @@ fn junit_file_decodes_declared_latin1_attribute_bytes() {
 
 #[test]
 fn libtest_preserves_failure_without_fabricating_time_and_rejects_collision() {
-    let alpha = "src/a.rs::test_alpha";
-    let beta = "src/b.rs::test_beta";
+    let alpha = "src/a.rs::unit::test_alpha";
+    let beta = "src/b.rs::unit::test_beta";
     let output = "test other::test_blunt ... FAILED\n\
                   test unit::test_alpha ... ok\n\
                   test unit::test_alpha ... FAILED\n\
                   test unit::test_beta ... ignored\n";
     let result = parse_cargo_libtest(output, &ranked(&[alpha, beta])).unwrap();
-    assert_eq!(result["status"], "COMPLETE");
-    assert_eq!(
-        result["tests"][alpha],
-        json!({"outcome": "FAILED", "cases": 2})
-    );
-    assert!(result["tests"][alpha].get("duration_seconds").is_none());
-    assert_eq!(result["tests"][beta]["outcome"], "SKIPPED");
-    assert_eq!(result["unranked_failures"], json!(["other::test_blunt"]));
+    assert_eq!(result["status"], "INCOMPLETE");
+    assert!(result["tests"].as_object().unwrap().is_empty());
     let collided = parse_cargo_libtest(
         "test a::test_alpha ... ok\ntest b::test_alpha ... FAILED\n",
         &ranked(&[alpha]),
     )
     .unwrap();
     assert_eq!(collided["status"], "INCOMPLETE");
-    assert_eq!(collided["ambiguous_nodeids"], json!([alpha]));
+    assert_eq!(collided["ambiguous_nodeids"], json!([]));
     assert!(collided["tests"].get(alpha).is_none());
     let retained = parse_cargo_libtest(
         "test unit::test_alpha ... FAILED\ntest unit::test_alpha ... ok\n",
         &ranked(&[alpha]),
     )
     .unwrap();
-    assert_eq!(retained["tests"][alpha]["outcome"], "FAILED");
+    assert_eq!(retained["status"], "INCOMPLETE");
 }
 
 #[test]
 fn libtest_json_lines_preserve_ranked_and_unranked_failure_provenance() {
-    let ranked = ranked(&["src/lib.rs::test_alpha"]);
+    let ranked = ranked(&["src/lib.rs::mod::test_alpha"]);
     let output = r#"{"type":"suite","event":"started","test_count":2}
 {"type":"test","event":"started","name":"mod::test_alpha"}
 {"type":"test","event":"failed","name":"mod::test_alpha"}
@@ -258,14 +384,8 @@ fn libtest_json_lines_preserve_ranked_and_unranked_failure_provenance() {
 {"type":"suite","event":"failed"}
 "#;
     let result = parse_cargo_libtest(output, &ranked).unwrap();
-    assert_eq!(result["status"], "COMPLETE");
-    assert_eq!(
-        result["tests"]["src/lib.rs::test_alpha"],
-        json!({
-            "outcome": "FAILED", "cases": 1
-        })
-    );
-    assert_eq!(result["unranked_failures"], json!(["other::test_blunt"]));
+    assert_eq!(result["status"], "INCOMPLETE");
+    assert!(result["tests"].as_object().unwrap().is_empty());
 }
 
 #[test]

@@ -981,8 +981,21 @@ fn mutation_value_parse_junit_native(
 }
 
 #[pyfunction]
-fn mutation_value_parse_cargo_native(stdout: &str, ranked: Vec<String>) -> PyResult<String> {
-    let result = inputs::parse_cargo_libtest(stdout, &ranked).map_err(value_error)?;
+#[pyo3(signature = (stdout, ranked, repo_root=None, argv=None))]
+fn mutation_value_parse_cargo_native(
+    stdout: &str,
+    ranked: Vec<String>,
+    repo_root: Option<&str>,
+    argv: Option<Vec<String>>,
+) -> PyResult<String> {
+    let result = match (repo_root, argv) {
+        (Some(root), Some(argv)) => {
+            inputs::parse_bound_cargo_libtest(stdout, &ranked, std::path::Path::new(root), &argv)
+        }
+        (None, None) => inputs::parse_cargo_libtest(stdout, &ranked),
+        _ => Err("Cargo attribution requires both root and argv".into()),
+    }
+    .map_err(value_error)?;
     serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
 }
 

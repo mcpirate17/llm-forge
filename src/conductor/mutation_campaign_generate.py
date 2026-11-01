@@ -118,6 +118,7 @@ def plan(
     only_sources: Sequence[str] | None = None,
     include_covered: bool = False,
     extra_tests: Mapping[str, Sequence[str]] | None = None,
+    priority: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """What `write` would emit, plus the subjects it refuses to emit anything for.
 
@@ -151,6 +152,7 @@ def plan(
         "only_sources": only_sources,
         "include_covered": include_covered,
         "extra_tests": extra_tests,
+        "priority": priority,
     }
     return _plan_native(language, repo_root, ctx)
 
@@ -315,6 +317,8 @@ def _summarise(result: Mapping[str, Any], *, verbose: bool) -> dict[str, Any]:
         payload["campaign_ids"] = [m["campaign_id"] for m in manifests]
         payload["unpaired"] = result["unpaired"]
         payload["already_covered_subjects"] = result["already_covered"]
+    if "priority" in result:
+        payload["priority"] = result["priority"]
     return payload
 
 
@@ -396,6 +400,14 @@ def _cli_parser() -> argparse.ArgumentParser:
     )
     shared.add_argument("--run-timeout", type=int, default=1800)
     shared.add_argument("--only", action="append", default=[])
+    shared.add_argument(
+        "--priority-policy", help="rank scoped sources using explicit [risk].high"
+    )
+    shared.add_argument(
+        "--priority-telemetry",
+        help="repository-relative unverified caller-supplied hints",
+    )
+    shared.add_argument("--priority-budget-seconds", type=float)
     shared.add_argument(
         "--extra-test",
         action="append",
@@ -512,6 +524,10 @@ def _run_plan_or_write(args: argparse.Namespace) -> dict[str, Any]:
     except OwnerIdentityError as exc:
         raise CampaignError(f"cannot resolve campaign owner: {exc}") from exc
     scope = _campaign_scope(args, campaign_owner)
+    if (
+        args.priority_telemetry or args.priority_budget_seconds is not None
+    ) and not args.priority_policy:
+        raise CampaignError("priority telemetry/budget requires --priority-policy")
     result = plan(
         args.language,
         owner=campaign_owner,
@@ -521,6 +537,14 @@ def _run_plan_or_write(args: argparse.Namespace) -> dict[str, Any]:
         only_sources=scope,
         include_covered=args.include_covered,
         extra_tests=_extra_tests(args.extra_test),
+        priority={
+            "policy_path": args.priority_policy,
+            "base_ref": args.base,
+            "telemetry_path": args.priority_telemetry,
+            "budget_seconds": args.priority_budget_seconds,
+        }
+        if args.priority_policy
+        else None,
     )
     return {
         **result,

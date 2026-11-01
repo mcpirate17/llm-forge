@@ -23,8 +23,6 @@ from conductor.candidate_review.checks import (
 )
 from conductor.candidate_review.command_runner import _tail
 from conductor.candidate_review.contract_runtime import prepare_contract_runtime
-from conductor.candidate_review.record_reuse import reuse_environment, reuse_metrics
-from conductor.candidate_review.untested_changes import untested_changes
 from conductor.candidate_review.coverage_eval import (  # noqa: F401
     # `_coverage_counts` and `_risk_buckets` are re-exported, not used here:
     # callers and tests reach them through this module's namespace.
@@ -57,6 +55,7 @@ from conductor.candidate_review.policy import (
     W7_TRIDENT_LINEAR_INTEGRATION_MILESTONE,
     CheckPolicy,
 )
+from conductor.candidate_review.record_reuse import reuse_environment, reuse_metrics
 from conductor.candidate_review.sharding import (
     combine_coverage,
     execute_shards,
@@ -65,6 +64,7 @@ from conductor.candidate_review.sharding import (
     shard_tests,
     shard_timeout_findings,
 )
+from conductor.candidate_review.untested_changes import untested_changes
 from conductor.candidate_review.value_waivers import (
     WAIVED_RULE,
     apply_value_waivers,
@@ -315,9 +315,25 @@ def _base_test_definitions(ctx: ReviewContext, change: Change) -> dict[str, str]
         blob = _batch_blobs(ctx.repo, [entry]).get(change.old_oid)
         if blob is None:
             return None
-        return _python_test_definitions(blob.decode("utf-8"), entry.path)
+        return _test_definitions(blob.decode("utf-8"), entry.path, ctx.snapshot)
     except (GitSourceError, UnicodeError, RuntimeError):
         return None
+
+
+def _test_definitions(source: str, path: str, root: Path) -> dict[str, str]:
+    if path.endswith(".py"):
+        return _python_test_definitions(source, path)
+    return _native_decide(
+        "native_test_definitions",
+        {"source": source, "path": path, "repo_root": str(root)},
+    )
+
+
+def _value_test_change(change: Change) -> bool:
+    """Include native source files, which can contain inline test definitions."""
+    return "native" in change.classes or (
+        "test" in change.classes and change.path.endswith(".py")
+    )
 
 
 def _value_gated_nodeids(
@@ -332,14 +348,14 @@ def _value_gated_nodeids(
             "old_mode": change.old_mode,
             "old_oid": change.old_oid,
         }
-        if "test" in change.classes and change.path.endswith(".py"):
+        if _value_test_change(change):
             try:
                 source = (ctx.snapshot / change.path).read_text(encoding="utf-8")
             except (OSError, UnicodeError) as exc:
                 raise RuntimeError(
                     f"cannot read candidate test {change.path}: {exc}"
                 ) from exc
-            row["definitions"] = _python_test_definitions(source, change.path)
+            row["definitions"] = _test_definitions(source, change.path, ctx.snapshot)
             row["base"] = _base_test_definitions(ctx, change)
         entries.append(row)
     result = _native_decide(
@@ -715,9 +731,7 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
 
     started = time.perf_counter()
     test_paths = [
-        change.path
-        for change in ctx.live_changes
-        if "test" in change.classes and change.path.endswith(".py")
+        change.path for change in ctx.live_changes if _value_test_change(change)
     ]
     if not test_paths:
         return CheckResult(
@@ -759,6 +773,17 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
     receipt_paths = _receipt_required_paths(
         test_paths, None if scope_findings else gated_nodeids
     )
+    if (
+        not receipt_paths
+        and not scope_findings
+        and not any(path.endswith(".py") for path in test_paths)
+    ):
+        return CheckResult(
+            check_id="mutation-evidence",
+            status=CheckStatus.SKIPPED,
+            duration_ms=0,
+            skipped_reason="no supported changed native test definitions detected",
+        )
     waiver_states = _waiver_states(ctx)
     exempt = [path for path in test_paths if path not in set(receipt_paths)]
     registry = registry_path(ctx.snapshot)

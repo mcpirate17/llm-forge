@@ -14,8 +14,13 @@ mod runtime;
 #[path = "candidate_verification_selection.rs"]
 mod selection;
 
+pub(crate) use ast::target_test_labels;
+
 pub fn python_test_definitions(source: &str, path: &str) -> Result<Value, String> {
     ast::python_test_definitions(source, path)
+}
+pub fn native_rust_file_has_tests(source: &str) -> Result<bool, String> {
+    ast::rust_has_tests(source)
 }
 
 pub fn decide(operation: &str, request: &Value) -> Result<Value, String> {
@@ -24,6 +29,43 @@ pub fn decide(operation: &str, request: &Value) -> Result<Value, String> {
         "inventory_divergence" => inventory::divergence(request),
         "inventory_path_unsafe" => inventory::path_unsafe(request),
         "gated_nodeids" => selection::gated_nodeids(request),
+        "native_source_role" => ast::native_source_role(
+            std::path::Path::new(
+                request["repo_root"]
+                    .as_str()
+                    .ok_or("repository root is required")?,
+            ),
+            request["path"]
+                .as_str()
+                .ok_or("native source path is required")?,
+        ),
+        "native_source_roles" => {
+            let root = std::path::Path::new(
+                request["repo_root"]
+                    .as_str()
+                    .ok_or("repository root is required")?,
+            );
+            let paths = request["paths"]
+                .as_array()
+                .ok_or("native source paths are required")?
+                .iter()
+                .map(|v| {
+                    v.as_str()
+                        .map(str::to_owned)
+                        .ok_or("native source path must be a string")
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            ast::native_source_roles(root, &paths)
+        }
+        "native_test_definitions" => ast::native_test_definitions(
+            request["source"]
+                .as_str()
+                .ok_or("native test source is required")?,
+            request["path"]
+                .as_str()
+                .ok_or("native test path is required")?,
+            request["repo_root"].as_str().map(std::path::Path::new),
+        ),
         "selection_plan" => selection::plan(request),
         "selection_decide" => selection::decide(request),
         "contract_runtime_plan" => runtime::plan(request),

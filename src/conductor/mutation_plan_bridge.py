@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from conductor.mutation_campaign_model import _native_json_call
+from conductor.mutation_scope import CampaignError
 from conductor.project_paths import campaigns_relative
 
 _MANIFEST_KEY_ORDER = (
@@ -98,8 +99,14 @@ def plan_native(
         else None,
         "include_covered": ctx["include_covered"],
         "extra_tests": {k: list(v) for k, v in (ctx["extra_tests"] or {}).items()},
+        "priority": ctx.get("priority"),
     }
     data = _native_json_call("mutation_plan_native", request)
+    if ctx.get("priority") is not None and "priority" not in data:
+        raise CampaignError(
+            "installed native mutation planner does not support priority; "
+            "rebuild conductor-native before using priority options"
+        )
     # Native emits an alphabetically-keyed JSON object; reconstruct the
     # historical key order rather than trusting the wire order.
     return {
@@ -109,4 +116,5 @@ def plan_native(
         "unpaired_lines": data["unpaired_lines"],
         "already_covered": data["already_covered"],
         "untested": [_reordered(u, _UNTESTED_ORDER) for u in data["untested"]],
+        **({"priority": data["priority"]} if "priority" in data else {}),
     }

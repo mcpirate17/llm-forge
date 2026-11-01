@@ -10,7 +10,7 @@
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
-use conductor_native::mutation_plan::{compute_plan, PlanRequest};
+use conductor_native::mutation_plan::{compute_plan, PlanRequest, PriorityOptions};
 use std::collections::BTreeMap;
 use std::env;
 use std::path::{Path, PathBuf};
@@ -20,6 +20,17 @@ use crate::civil::civil_from_days;
 
 #[derive(Args)]
 pub struct PlanArgs {
+    /// Rank only changed production/validation sources in this policy's [risk].high.
+    #[arg(long, requires = "priority_base")]
+    pub priority_policy: Option<String>,
+    #[arg(long, requires = "priority_policy")]
+    pub priority_base: Option<String>,
+    /// Optional unverified caller-supplied hints bound to tree and source/test hashes.
+    #[arg(long, requires = "priority_policy")]
+    pub priority_telemetry: Option<String>,
+    /// Select using supplied cost hints; this is an estimate, not an execution cap.
+    #[arg(long, requires = "priority_policy")]
+    pub priority_budget_seconds: Option<f64>,
     /// "python" or "rust"
     pub language: String,
 
@@ -82,6 +93,12 @@ pub fn run(args: PlanArgs) -> Result<i32> {
     };
 
     let request = PlanRequest {
+        priority: args.priority_policy.map(|policy_path| PriorityOptions {
+            policy_path,
+            base_ref: args.priority_base.expect("clap requires priority base"),
+            telemetry_path: args.priority_telemetry,
+            budget_seconds: args.priority_budget_seconds,
+        }),
         language: args.language,
         repo_root: repo_root.to_string_lossy().into_owned(),
         owner: args.owner,
