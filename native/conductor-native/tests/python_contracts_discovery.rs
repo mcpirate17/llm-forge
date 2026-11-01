@@ -632,6 +632,7 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
         "cpu_embed.py",
         "embedding_contract.py",
         "http_transport.py",
+        "index_notes.py",
     ] {
         let selected = plan(&root, &[format!("src/conductor/{retired}")]).unwrap();
         assert!(selected.targets.is_empty(), "retired adapter: {retired}");

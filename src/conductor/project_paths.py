@@ -45,15 +45,13 @@ DEFAULT_WORKTREE_PATTERNS: tuple[str, ...] = (
 # host with no `research/` tree at all must be able to repoint via `[tool.conductor]`.
 DEFAULT_MUTATION_RECEIPT_ROOT = PurePosixPath("research/reports/mutation_testing")
 # The knowledge tree: KB cards and durable findings. Every module that reads it
-# (kb_retrieve, memory_index's catalog, the notes guards) resolves through
+# (native card/memory ingestion and the notes guards) resolves through
 # `notes_root` so a host with another layout names its own tree once.
 DEFAULT_NOTES_ROOT = PurePosixPath("research/notes")
-# The prose-search index over the notes tree: `index_notes` writes it and
-# `index_notes search` reads it. Its own file, not the run/experiment database:
-# the two share no key and never join, and a host that splits them (the monorepo
-# did on 2026-09-14) otherwise gets an index written to one file and every
-# documented reader pointed at the other. Rebuildable cache, never a record --
-# repointing it costs one `python -m conductor.index_notes` run.
+# The prose-search index over the notes tree: native `forge notes index` rebuilds
+# it, and `forge notes search` / `forge notes tables` read it. The database file
+# must already exist. This is its own file, separate from the
+# run/experiment database; it is a rebuildable cache, never a record.
 DEFAULT_NOTES_DB = PurePosixPath("research/notes.db")
 # The host allowlist of files/functions permitted to exceed the god-file, god-
 # function and complexity guardrails. Host data, never a packaged copy: a host
@@ -354,7 +352,8 @@ def notes_root(root: Path | str) -> Path:
     Modules that read notes (kb_retrieve, memory_index's catalog, the notes
     guards) resolve through this at call time, never from a module constant: a
     host repoints its notes tree once in ``[tool.conductor]`` and every reader
-    follows. Note the argument is the tree root, not the package directory.
+    follows. Native ``forge notes index`` uses the same configured root. Note
+    the argument is the tree root, not the package directory.
     """
     return project_paths(root).notes_path
 
@@ -362,10 +361,10 @@ def notes_root(root: Path | str) -> Path:
 def notes_db_path(root: Path | str) -> Path:
     """The prose-search index over the notes tree, joined onto ``root``.
 
-    Resolved at call time like :func:`notes_root`, never from a module constant:
-    ``index_notes`` writes this file and ``index_notes search`` reads it, so a host
-    that keeps its prose index apart from its run database names it once in
-    ``[tool.conductor]`` and both ends follow.
+    Resolved at call time like :func:`notes_root`, never from a module constant.
+    Native ``forge notes index``, ``search``, and ``tables`` use this same path.
+    The index file must already exist. A host can keep this prose index
+    apart from its run database by naming its path in ``[tool.conductor]``.
     """
     return project_paths(root).notes_db_path
 

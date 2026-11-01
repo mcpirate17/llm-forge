@@ -1,201 +1,26 @@
-//! `forge notes index|search`: a native port of `conductor.index_notes`'s
-//! FTS5 note index. Byte-identical schema and extraction rules to the
-//! Python (see `src/conductor/index_notes.py`), which stays the reference
-//! implementation. Sources: the host's `research/notes/**.md` and
-//! `tasks/**.md` always, plus the Obsidian vault's `research/`,
-//! `dashboards/`, `runbooks/` trees additionally when present -- neither
-//! tree is a superset of the other, so both are always indexed when both
-//! exist (the bug this whole slice exists to fix).
+//! Bounded, transactional prose and table indexing for host notes and task docs.
+mod db;
+mod extract;
+mod ingest;
+mod tables;
+#[cfg(test)]
+mod tests;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::Args;
+#[cfg(test)]
+use extract::extract_tables;
 use regex::Regex;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+#[cfg(test)]
 use std::time::{SystemTime, UNIX_EPOCH};
-
-const EXCLUDED_REL_PREFIXES: &[&str] = &["tasks/audit/"];
-
-fn sep_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$").unwrap())
-}
-
-fn heading_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$").unwrap())
-}
+pub use tables::{table_notes, TableHit, TablesArgs};
 
 fn search_term_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"\S+").unwrap())
-}
-
-/// A `serde_json::ser::Formatter` matching Python's `json.dumps` default
-/// separators (`", "` between array/object items, `": "` after an object
-/// key) instead of serde_json's compact `","`/`":"` -- `headers_json` and
-/// `rows_json` must be byte-identical to the Python reference, and a bare
-/// `serde_json::to_string` disagrees on every comma.
-struct PySeparatorFormatter;
-
-impl serde_json::ser::Formatter for PySeparatorFormatter {
-    fn begin_array_value<W: ?Sized + std::io::Write>(
-        &mut self,
-        writer: &mut W,
-        first: bool,
-    ) -> std::io::Result<()> {
-        if first {
-            Ok(())
-        } else {
-            writer.write_all(b", ")
-        }
-    }
-
-    fn begin_object_value<W: ?Sized + std::io::Write>(
-        &mut self,
-        writer: &mut W,
-    ) -> std::io::Result<()> {
-        writer.write_all(b": ")
-    }
-}
-
-fn to_python_json<T: serde::Serialize>(value: &T) -> Result<String> {
-    let mut buf = Vec::new();
-    let mut ser = serde_json::Serializer::with_formatter(&mut buf, PySeparatorFormatter);
-    value.serialize(&mut ser)?;
-    Ok(String::from_utf8(buf)?)
-}
-
-/// One markdown table extracted from a note, `serde_json`-encoded the same
-/// shape the Python `note_tables.headers_json`/`rows_json` columns hold.
-struct Table {
-    section: String,
-    table_idx: i64,
-    headers: Vec<String>,
-    rows: Vec<Vec<String>>,
-}
-
-fn clean_cell(cell: &str) -> String {
-    cell.trim()
-        .trim_matches('`')
-        .replace("**", "")
-        .trim()
-        .to_string()
-}
-
-fn split_row(line: &str) -> Vec<String> {
-    let mut s = line.trim();
-    if let Some(rest) = s.strip_prefix('|') {
-        s = rest;
-    }
-    if let Some(rest) = s.strip_suffix('|') {
-        s = rest;
-    }
-    s.split('|').map(clean_cell).collect()
-}
-
-fn is_table_row(line: &str) -> bool {
-    line.trim_start().starts_with('|')
-}
-
-/// Port of `index_notes.extract_tables`: header row, separator row (with a
-/// literal `-`), then zero or more data rows, tracking the last heading seen
-/// as `section`.
-fn extract_tables(text: &str) -> Vec<Table> {
-    let lines: Vec<&str> = text.lines().collect();
-    let mut tables = Vec::new();
-    let mut section = String::new();
-    let mut i = 0usize;
-    let mut tidx = 0i64;
-    while i < lines.len() {
-        if let Some(caps) = heading_re().captures(lines[i]) {
-            section = caps.get(2).unwrap().as_str().trim().to_string();
-            i += 1;
-            continue;
-        }
-        if is_table_row(lines[i])
-            && i + 1 < lines.len()
-            && sep_re().is_match(lines[i + 1])
-            && lines[i + 1].contains('-')
-        {
-            let headers = split_row(lines[i]);
-            let mut j = i + 2;
-            let mut rows = Vec::new();
-            while j < lines.len() && is_table_row(lines[j]) {
-                rows.push(split_row(lines[j]));
-                j += 1;
-            }
-            tables.push(Table {
-                section: section.clone(),
-                table_idx: tidx,
-                headers,
-                rows,
-            });
-            tidx += 1;
-            i = j;
-            continue;
-        }
-        i += 1;
-    }
-    tables
-}
-
-fn title_of(text: &str, path: &Path) -> String {
-    for line in text.lines() {
-        if let Some(caps) = heading_re().captures(line) {
-            return caps.get(2).unwrap().as_str().trim().to_string();
-        }
-    }
-    path.file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default()
-}
-
-fn should_index_path(rel: &str) -> bool {
-    let normalized = rel.replace('\\', "/");
-    !EXCLUDED_REL_PREFIXES
-        .iter()
-        .any(|p| normalized.starts_with(p))
-}
-
-/// One `(source tag, root dir)` pair `rebuild` walks for `**/*.md`.
-struct Source {
-    tag: &'static str,
-    root: PathBuf,
-}
-
-/// Mirrors `index_notes._source_roots()`: the host's own notes + tasks
-/// always, the vault trees additionally when `vault/research` is a dir.
-fn source_roots(host: &Path, vault: Option<&Path>) -> Vec<Source> {
-    let mut roots = vec![
-        Source {
-            tag: "notes",
-            root: host.join("research").join("notes"),
-        },
-        Source {
-            tag: "tasks",
-            root: host.join("tasks"),
-        },
-    ];
-    if let Some(vault) = vault {
-        let vault_research = vault.join("research");
-        if vault_research.is_dir() {
-            roots.push(Source {
-                tag: "vault_research",
-                root: vault_research,
-            });
-            roots.push(Source {
-                tag: "vault_dashboards",
-                root: vault.join("dashboards"),
-            });
-            roots.push(Source {
-                tag: "vault_runbooks",
-                root: vault.join("runbooks"),
-            });
-        }
-    }
-    roots
 }
 
 /// Default vault root: `~/Documents/CodexVault`, matching Python's
@@ -210,12 +35,10 @@ pub fn default_vault_root() -> PathBuf {
     home.join("Documents").join("CodexVault")
 }
 
-fn ddl(conn: &Connection) -> Result<()> {
-    conn.execute_batch(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+const NOTES_FTS_DDL: &str = "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
             path UNINDEXED, source UNINDEXED, title, body, mtime UNINDEXED
-        );
-        CREATE TABLE IF NOT EXISTS note_tables (
+        )";
+const NOTE_TABLES_DDL: &str = "CREATE TABLE IF NOT EXISTS note_tables (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             source TEXT NOT NULL,
             path TEXT NOT NULL,
@@ -227,94 +50,29 @@ fn ddl(conn: &Connection) -> Result<()> {
             headers_json TEXT NOT NULL,
             rows_json TEXT NOT NULL,
             ingested_at REAL NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_note_tables_note ON note_tables(note);",
-    )
-    .context("notes_index: DDL failed (is FTS5 compiled into rusqlite?)")?;
+        )";
+
+fn ddl(conn: &Connection) -> Result<()> {
+    conn.execute_batch(NOTES_FTS_DDL)
+        .context("notes_index: DDL failed (is FTS5 compiled into rusqlite?)")?;
+    conn.execute_batch(NOTE_TABLES_DDL)?;
+    db::validate_schema(conn)?;
+    conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_note_tables_note ON note_tables(note);")?;
     Ok(())
 }
 
-/// Walks `sources`, rel-pathed against `host` (repo-rooted sources) or
-/// `vault` (vault-rooted sources) exactly like the Python
-/// `os.path.relpath(path, REPO) if path.startswith(REPO) else
-/// os.path.relpath(path, VAULT_ROOT)`. Full idempotent rebuild: `DELETE`
-/// both tables, then re-insert inside one transaction.
+/// Rebuild in one SQLite transaction; errors retain all previous index rows.
 pub fn rebuild(conn: &mut Connection, host: &Path, vault: Option<&Path>) -> Result<(u64, u64)> {
-    ddl(conn)?;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs_f64();
-    let tx = conn.transaction()?;
-    tx.execute("DELETE FROM notes_fts", [])?;
-    tx.execute("DELETE FROM note_tables", [])?;
-    let mut n_files = 0u64;
-    let mut n_tables = 0u64;
-    for source in source_roots(host, vault) {
-        if !source.root.is_dir() {
-            continue;
-        }
-        let mut paths: Vec<PathBuf> = walkdir::WalkDir::new(&source.root)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-            .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
-            .map(|e| e.path().to_path_buf())
-            .collect();
-        paths.sort();
-        for path in paths {
-            let rel = if path.starts_with(host) {
-                path.strip_prefix(host).unwrap().to_path_buf()
-            } else if let Some(vault) = vault {
-                path.strip_prefix(vault).unwrap_or(&path).to_path_buf()
-            } else {
-                path.clone()
-            };
-            let rel_str = rel.to_string_lossy().to_string();
-            if !should_index_path(&rel_str) {
-                continue;
-            }
-            let text = std::fs::read_to_string(&path).unwrap_or_default();
-            let note = path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default();
-            let mtime = std::fs::metadata(&path)
-                .and_then(|m| m.modified())
-                .ok()
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs_f64())
-                .unwrap_or(0.0);
-            tx.execute(
-                "INSERT INTO notes_fts (path, source, title, body, mtime) VALUES (?1,?2,?3,?4,?5)",
-                rusqlite::params![rel_str, source.tag, title_of(&text, &path), text, mtime],
-            )?;
-            n_files += 1;
-            for t in extract_tables(&text) {
-                tx.execute(
-                    "INSERT INTO note_tables
-                       (source, path, note, table_idx, section_heading, n_cols,
-                        n_rows, headers_json, rows_json, ingested_at)
-                       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-                    rusqlite::params![
-                        source.tag,
-                        rel_str,
-                        note,
-                        t.table_idx,
-                        t.section,
-                        t.headers.len() as i64,
-                        t.rows.len() as i64,
-                        to_python_json(&t.headers)?,
-                        to_python_json(&t.rows)?,
-                        now,
-                    ],
-                )?;
-                n_tables += 1;
-            }
-        }
-    }
-    tx.commit()?;
-    Ok((n_files, n_tables))
+    rebuild_checked(conn, host, vault, || Ok(()))
+}
+
+pub(super) fn rebuild_checked(
+    conn: &mut Connection,
+    host: &Path,
+    vault: Option<&Path>,
+    before_commit: impl FnOnce() -> Result<()>,
+) -> Result<(u64, u64)> {
+    ingest::rebuild(conn, host, vault, ingest::Limits::default(), before_commit)
 }
 
 /// Port of `index_notes._fts_match_query`: every whitespace-separated term
@@ -347,8 +105,7 @@ pub(crate) fn search_filtered(
     limit: u32,
     source: Option<&str>,
 ) -> Result<Vec<SearchHit>> {
-    anyhow::ensure!((1..=1000).contains(&limit), "limit must be in 1..1000");
-    anyhow::ensure!(query.len() <= 4096, "notes query exceeds 4096 bytes");
+    validate_search(query, limit)?;
     let match_query = fts_match_query(query);
     if match_query.is_empty() {
         return Ok(Vec::new());
@@ -371,33 +128,15 @@ pub(crate) fn search_filtered(
     Ok(rows)
 }
 
-/// An existing bounded, read-only index. Missing files are distinct from corrupt
-/// files; neither search nor brief can create or rebuild a database implicitly.
+fn validate_search(query: &str, limit: u32) -> Result<()> {
+    anyhow::ensure!((1..=1000).contains(&limit), "limit must be in 1..1000");
+    anyhow::ensure!(query.len() <= 4096, "notes query exceeds 4096 bytes");
+    Ok(())
+}
+
+/// Existing bounded read-only index; missing and corrupt indexes stay distinct.
 pub(crate) fn open_search(path: &Path) -> Result<Option<Connection>> {
-    let meta = match std::fs::symlink_metadata(path) {
-        Ok(meta) => meta,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error.into()),
-    };
-    anyhow::ensure!(
-        meta.is_file() && meta.len() <= 4 * 1024 * 1024 * 1024,
-        "notes index must be a regular file at most 4 GiB"
-    );
-    let conn = Connection::open_with_flags(
-        path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
-    )?;
-    conn.busy_timeout(std::time::Duration::from_millis(250))?;
-    conn.set_limit(
-        rusqlite::limits::Limit::SQLITE_LIMIT_LENGTH,
-        4 * 1024 * 1024,
-    );
-    conn.execute_batch(
-        "PRAGMA query_only=ON; PRAGMA trusted_schema=OFF; PRAGMA cache_size=-2048;",
-    )?;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-    conn.progress_handler(1000, Some(move || std::time::Instant::now() >= deadline));
-    Ok(Some(conn))
+    db::open_search(path)
 }
 
 /// The prose-search index, defaulting to `HOST/research/notes.db`.
@@ -444,13 +183,8 @@ pub struct SearchArgs {
 /// -- this command does not create the db file itself, only opens it.
 pub fn run_index(args: &IndexArgs) -> Result<u8> {
     let db_path = resolve_db_path(&args.host, args.db.as_deref())?;
-    if !db_path.exists() {
-        bail!("notes database not found at {}", db_path.display());
-    }
     let vault = args.vault.clone().unwrap_or_else(default_vault_root);
-    let mut conn =
-        Connection::open(&db_path).with_context(|| format!("opening {}", db_path.display()))?;
-    let (n_files, n_tables) = rebuild(&mut conn, &args.host, Some(&vault))?;
+    let (n_files, n_tables) = db::Writer::open(&db_path)?.rebuild(&args.host, Some(&vault))?;
     println!(
         "indexed {n_files} notes, {n_tables} tables into {}",
         db_path.display()
@@ -464,6 +198,7 @@ pub fn run_search(args: &SearchArgs) -> Result<u8> {
     let conn = open_search(&db_path)?
         .with_context(|| format!("notes database not found at {}", db_path.display()))?;
     let query = args.query.join(" ");
+    validate_search(&query, args.limit)?;
     if fts_match_query(&query).is_empty() {
         if args.json {
             println!("[]");
@@ -498,125 +233,14 @@ pub enum NotesCommand {
     Index(IndexArgs),
     /// FTS5 search over an already-built index.
     Search(SearchArgs),
+    /// List structured Markdown tables in an already-built index.
+    Tables(TablesArgs),
 }
 
 pub fn run(action: NotesCommand) -> Result<u8> {
     match action {
         NotesCommand::Index(args) => run_index(&args),
         NotesCommand::Search(args) => run_search(&args),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn read_only_index_enforces_vm_deadline_and_row_size() {
-        let dir = tempfile_dir();
-        let path = dir.join("notes.db");
-        let writer = Connection::open(&path).unwrap();
-        writer
-            .execute_batch("CREATE TABLE data(value TEXT);")
-            .unwrap();
-        drop(writer);
-        let reader = open_search(&path).unwrap().unwrap();
-        assert!(reader
-            .execute("INSERT INTO data VALUES ('forbidden')", [])
-            .is_err());
-        assert!(reader
-            .query_row("SELECT printf('%.*c', 5000000, 'x')", [], |row| row
-                .get::<_, String>(0))
-            .is_err());
-        let start = std::time::Instant::now();
-        let error = reader.query_row("WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n) SELECT sum(x) FROM n", [], |row| row.get::<_, i64>(0)).unwrap_err();
-        assert!(error.to_string().contains("interrupted"), "{error}");
-        assert!(start.elapsed() < std::time::Duration::from_secs(5));
-        drop(reader);
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-
-    fn write(path: &Path, text: &str) {
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, text).unwrap();
-    }
-
-    #[test]
-    fn fts5_is_available() {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch("CREATE VIRTUAL TABLE t USING fts5(body)")
-            .expect("rusqlite must be built with an FTS5-enabled sqlite3");
-    }
-
-    #[test]
-    fn extract_tables_parses_header_sep_rows() {
-        let text = "# Sec\n\n| a | b |\n|---|---|\n| 1 | 2 |\n";
-        let tables = extract_tables(text);
-        assert_eq!(tables.len(), 1);
-        assert_eq!(tables[0].section, "Sec");
-        assert_eq!(tables[0].headers, vec!["a", "b"]);
-        assert_eq!(tables[0].rows, vec![vec!["1".to_string(), "2".to_string()]]);
-    }
-
-    #[test]
-    fn rebuild_indexes_repo_and_vault_together() {
-        let tmp = tempfile_dir();
-        let host = tmp.join("repo");
-        let vault = tmp.join("vault");
-        write(
-            &host.join("research/notes/alpha.md"),
-            "# Alpha\n\ntfwd marker\n",
-        );
-        write(&host.join("tasks/beta.md"), "# Beta\n\nbeta body\n");
-        write(&vault.join("research/gamma.md"), "# Gamma\n\nvault body\n");
-
-        let mut conn = Connection::open_in_memory().unwrap();
-        let (n_files, _n_tables) = rebuild(&mut conn, &host, Some(&vault)).unwrap();
-        assert_eq!(n_files, 3);
-        let mut stmt = conn
-            .prepare("SELECT DISTINCT source FROM notes_fts ORDER BY source")
-            .unwrap();
-        let sources: Vec<String> = stmt
-            .query_map([], |r| r.get(0))
-            .unwrap()
-            .collect::<std::result::Result<_, _>>()
-            .unwrap();
-        assert_eq!(sources, vec!["notes", "tasks", "vault_research"]);
-
-        let hits = search_notes(&conn, "tfwd", 10).unwrap();
-        assert_eq!(hits.len(), 1);
-        assert!(hits[0].path.ends_with("alpha.md"));
-    }
-
-    #[test]
-    fn default_db_is_the_notes_database_not_the_run_database() {
-        // Parity pin with the Python reference's `DEFAULT_NOTES_DB`. Both sides
-        // hardcoded `runs.db` until 2026-09-16, which sent the prose index to the
-        // run database on any host that had split the two.
-        let host = Path::new("/srv/host");
-        assert_eq!(
-            resolve_db_path(host, None).unwrap(),
-            PathBuf::from("/srv/host/research/notes.db")
-        );
-    }
-
-    #[test]
-    fn an_explicit_db_flag_wins_over_the_default() {
-        let host = Path::new("/srv/host");
-        let chosen = PathBuf::from("/tmp/other.db");
-        assert_eq!(resolve_db_path(host, Some(&chosen)).unwrap(), chosen);
-    }
-
-    fn tempfile_dir() -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "forge-notes-index-test-{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+        NotesCommand::Tables(args) => tables::run(&args),
     }
 }

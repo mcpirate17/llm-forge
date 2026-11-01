@@ -802,7 +802,7 @@ passed 2,214 tests with 39 optional tests ignored; publication and the updated
 `.git/forge-checks/run-1793508061255354039-244882/receipt.json`, SHA-256
 `ec3f4c39bf8f4332b44cf6378970c4e716fa168663c99503a6a7ad2a719c4d6d`.
 
-The next milestone replaces the live Python embedding broker with native
+The broker milestone replaces the live Python embedding broker with native
 `forge embedding-broker serve|ensure|status|warm`. It preserves accepted legacy
 route fingerprints and the port-7317 health/model/embedding protocol, including
 quality-bound selection, pinned vector spaces, explicit paid-route enablement,
@@ -819,7 +819,7 @@ The broker, routing and HTTP Python modules and their exclusive compatibility
 fixtures are deleted. Unwired Python project-context and wheel-resource APIs
 are also deleted; native context primitives/tests and embedded runtime assets
 remain. Optional package metadata no longer directly requires Starlette or
-Uvicorn. The working tree now contains 133 Python source files under `src/`;
+Uvicorn. That milestone leaves 133 Python source files under `src/`;
 candidate review, mutation orchestration and other adapters still require migration.
 
 Native fixture tests exercise HTTP/CLI startup with an empty `PATH`, concurrent
@@ -832,5 +832,42 @@ tool-call default and duplicate-key checks; this fixes the card reader's former
 and Forge development suites passed 2,068 tests with 39 optional tests ignored;
 strict all-target Clippy passed for both crates. All 54 selected compatibility
 checks passed. Concurrent ensure and saturated-worker recovery each passed
-25 repeated runs, with no fixture brokers left running. Committed-tree release
-checks and publication evidence for this milestone remain pending.
+25 repeated runs, with no fixture brokers left running. The milestone is pushed
+to `main` as `2dbfa2be139b90f09b8fe727ed8a98638f52d476`. Full release checks
+passed 2,249 tests with 39 optional tests ignored before and after publication.
+The published verification receipt is
+`.git/forge-checks/run-1793511114083464008-324395/receipt.json`, SHA-256
+`7f9c5749469ecac5759fcc1bac02f69897137722d57003cb5a361836770c71b3`.
+
+A current-only Rust 1.98.0 release benchmark measured median batch means of
+153.85 ns for escaped-argument validation, 98.06 ns for a rejected numeric
+range, 317.68 ns for a registered call and 443.80 ns with 256 registered tools.
+The corresponding p95 batch means were 154.39, 115.95, 318.98 and 445.25 ns.
+Each workload used 31 batches of 10,000 operations after 10,000 warmup
+operations. Registration took 23.83 microseconds. These are in-process costs on
+an unisolated host, not HTTP/model latency or a matched improvement claim.
+The benchmark executable SHA-256 was
+`312ba978e8af7af3b99611cb7d29e951d23f3510a8a296cb6dc77b33a064ff9b`.
+
+The notes milestone completes `forge notes index|search|tables`. It honors
+configured roots, bounds file/entry/text work, checks sources through directory
+capabilities and preserves both indexes and unrelated tables on rebuild failure.
+Existing SQLite files and sidecars are checked before use; schema impostors and
+custom index-table triggers are refused. Entire rebuilds, including DDL, use an
+immediate transaction and bounded lock contention. Table queries retain legacy
+dimensions, headings and Unicode JSON content with bounded output. See
+[native notes contracts](docs/native-notes-index.md) for limits and trust boundaries.
+The retained old-versus-native parity target passed its two tests before deletion,
+including the full 18-note fixture and three ordered queries. The Python notes
+implementation and exclusive compatibility target are deleted; shared native and
+compatibility helpers remain. There are 132 Python source files under `src/`.
+This migration remains incomplete; candidate review, mutation orchestration and
+other Python adapters still need native replacements.
+Notes validation passed 15 unit tests and 14 CLI integration tests, including
+rollback, schema/sidecar refusal, WAL compatibility and concurrent snapshots.
+Twenty further concurrency-test repetitions passed (320 competing rebuild
+attempts and 160 read queries, with successful retries and final integrity
+checks). Native core tests passed 406 cases with one optional ignore; strict
+all-target Clippy passed for both crates. The selected contract discovery,
+runner and project-path compatibility targets passed 53 tests. Full committed
+release validation and publication for the notes milestone remain pending.

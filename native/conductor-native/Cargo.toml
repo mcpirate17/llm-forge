@@ -355,10 +355,6 @@ name = "python_contracts_import_ablation"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_index_notes"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_installed_layout"
 required-features = ["python-compat-tests"]
 

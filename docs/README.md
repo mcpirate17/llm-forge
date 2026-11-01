@@ -39,24 +39,51 @@ not exist here.
 
 ## Wiring a host project's own notes
 
-`conductor.kb_retrieve` and `conductor.memory_index` are the tooling this platform ships to
-retrieve knowledge cards and indexed notes at query time (`KB-OPS-CTX-01`, "retrieve before
-re-deriving"). The notes tree resolves through `conductor.project_paths` like every other
-host path: the `CONDUCTOR_NOTES_ROOT` environment variable first, then the
-`[tool.conductor]` `notes_root` key in the host's `pyproject.toml`, then the
-`research/notes` default. Every reader — `kb_retrieve.load_cards`, `memory_index`'s
-catalog (whose `root = "research/notes"` spelling means "the notes root", wherever the
-host put it), the `check_json_in_notes` guard, `dead_tests`'s notes corpus,
-`index_notes`'s fallback source and `snapshot_worktree`'s exclusions — resolves through it
-at call time, never from a module constant.
+Native `forge cards` and `forge memory` provide knowledge-card and source-memory
+indexing and retrieval (`KB-OPS-CTX-01`, "retrieve before re-deriving"). The
+Python `conductor.kb_retrieve`, `conductor.memory_index`, and
+`conductor.index_notes` adapters have been retired. Native notes configuration
+uses `CONDUCTOR_NOTES_ROOT` or `notes_root` in `[conductor]` of `forge.toml`
+(legacy `[tool.conductor]` in `pyproject.toml` is also supported), defaulting
+to `research/notes`. Other Python host tools that still read notes use
+`conductor.project_paths` with the same configured root. Memory source selection
+uses the host's `memory_sources` catalog. See
+[`native-memory-ingestion.md`](native-memory-ingestion.md) for memory and card
+contracts.
 
-Cards are files matching `kb_*.md` or `KB-*.md` in the notes root. This repository
-configures `notes_root = "docs"`, so its own law pages are its knowledge base:
+Cards are complete top-level Markdown files matching `kb_*.md` or `KB-*.md` in
+the notes root. This repository configures `notes_root = "docs"`, so its law
+pages form its card collection. Build and search a card index with an explicitly
+pinned embedding configuration:
 
 ```sh
-uv run python -m conductor.kb_retrieve index        # embed the KB pages
-uv run python -m conductor.kb_retrieve query "mutation campaigns" --top-k 3
+forge cards build --host /path/to/host --output /private/cards.json \
+  --embedding /private/embedding.json
+forge cards search --index /private/cards.json --embedding /private/embedding.json \
+  --task "mutation campaigns" --top-k 3
 ```
+
+For broader source memory, ingest and query an explicit private store:
+
+```sh
+forge memory ingest --host /path/to/host --store /private/memory-store \
+  --embedding /private/embedding.json
+forge memory search --store /private/memory-store --embedding /private/embedding.json \
+  --task "compiler diagnostics" --top-k 8
+```
+
+The separate prose-search index uses the configured `notes_db` path (default
+`research/notes.db`). Its SQLite file must already exist before indexing; then
+it can be rebuilt or queried natively:
+
+```sh
+forge notes index --host .
+forge notes search --host . --json "mutation campaigns" --limit 3
+forge notes tables --host . --json "native memory"
+```
+
+See [`native-notes-index.md`](native-notes-index.md) for index sources, table
+filtering, output fields, and database safety requirements.
 
 A host configured with the monorepo's `research/notes` (or with nothing, which means the
 same thing) keeps resolving there unchanged.
@@ -67,6 +94,7 @@ same thing) keeps resolving there unchanged.
 |---|---|
 | [makefile_targets.md](makefile_targets.md) | Every `conductor.mk` target with its help text (generated — regenerate, do not hand-edit) |
 | [bootstrap.md](bootstrap.md) | Scaffolding a host project with `python -m conductor bootstrap` |
+| [native-notes-index.md](native-notes-index.md) | Native FTS and Markdown-table index commands |
 
 ## Top-level index
 

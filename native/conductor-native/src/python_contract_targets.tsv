@@ -70,7 +70,6 @@ src/conductor/dead_tests.py	python_contracts_dead_tests
 src/conductor/graph_context.py	python_contracts_graph_context
 src/conductor/graph_test_select.py	python_contracts_graph_test_select
 src/conductor/graph_test_select.py	python_contracts_contract_runner
-src/conductor/index_notes.py	python_contracts_index_notes
 src/conductor/local_clerk.py	python_contracts_local_clerk
 src/conductor/mutation_campaign_generate.py	python_contracts_campaign_plan
 src/conductor/mutation_campaign_generate.py	python_contracts_mutation_campaign_model
@@ -151,7 +150,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_gover
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_context
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_selection
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_test_select
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_index_notes
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_local_clerk
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_campaign_model
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_gate_edges
