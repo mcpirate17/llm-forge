@@ -54,7 +54,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const DEFAULT_LEDGER_ROOT: &str = "/mnt/data/llm/ledger/";
+use conductor_native::state_paths::ledger_root as resolve_ledger_root;
 const DEFAULT_WINDOW_DAYS: u32 = 7;
 const DEFAULT_TOLERANCE_PCT: f64 = 5.0;
 
@@ -77,7 +77,7 @@ const CHEAP_TIERS: [&str; 2] = ["haiku", "glm"];
 #[derive(Args)]
 pub struct AuditArgs {
     /// Ledger root directory; defaults to `LEDGER_ROOT`, else
-    /// `/mnt/data/llm/ledger/` (same resolution order as `forge ledger
+    /// the user's XDG state directory (same resolution order as `forge ledger
     /// rollup`).
     #[arg(long)]
     pub ledger_root: Option<PathBuf>,
@@ -190,7 +190,7 @@ struct BaselineFile {
 // ---------------------------------------------------------------------------
 
 pub fn run(args: AuditArgs) -> Result<i32> {
-    let ledger_root = resolve_ledger_root(args.ledger_root);
+    let ledger_root = resolve_ledger_root(args.ledger_root)?;
     let today = today_utc_date();
     let days = window_days(&today, args.window_days);
     let from = days.first().cloned().unwrap_or_else(|| today.clone());
@@ -532,11 +532,6 @@ fn sha256_of_files(paths: &[PathBuf]) -> Result<String> {
         hasher.update(&bytes);
     }
     Ok(format!("{:x}", hasher.finalize()))
-}
-
-fn resolve_ledger_root(out: Option<PathBuf>) -> PathBuf {
-    out.or_else(|| std::env::var("LEDGER_ROOT").ok().map(PathBuf::from))
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_LEDGER_ROOT))
 }
 
 /// Every day string (`YYYY-MM-DD`) in the trailing window ending `today`,

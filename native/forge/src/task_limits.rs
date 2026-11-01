@@ -65,60 +65,6 @@ fn unit_name(host: &Path, task: &str, nonce: u128, sequence: u64, pid: u32) -> S
     format!("forge-task-{}-{pid}.scope", &digest[..32])
 }
 
-#[cfg(unix)]
-fn verified_runtime(runtime: &Path, uid: u32) -> Result<()> {
-    use std::os::unix::fs::{FileTypeExt, MetadataExt};
-    let directory = std::fs::symlink_metadata(runtime).context("user runtime directory")?;
-    ensure!(
-        directory.is_dir() && directory.uid() == uid,
-        "user runtime directory is not owned by this UID"
-    );
-    let socket =
-        std::fs::symlink_metadata(runtime.join("bus")).context("user manager bus socket")?;
-    ensure!(
-        socket.file_type().is_socket() && socket.uid() == uid,
-        "user bus is not a socket owned by this UID"
-    );
-    Ok(())
-}
-
-fn user_environment() -> Result<Vec<(OsString, OsString)>> {
-    #[cfg(unix)]
-    {
-        let uid = unsafe { libc::getuid() };
-        let configured = std::env::var_os("XDG_RUNTIME_DIR");
-        let runtime = configured
-            .clone()
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from(format!("/run/user/{uid}")));
-        let mut environment = Vec::new();
-        if std::env::var_os("DBUS_SESSION_BUS_ADDRESS").is_none() {
-            verified_runtime(&runtime, uid)?;
-            let mut address = OsString::from("unix:path=");
-            address.push(runtime.join("bus"));
-            environment.push(("DBUS_SESSION_BUS_ADDRESS".into(), address));
-            if configured.is_none() {
-                environment.push(("XDG_RUNTIME_DIR".into(), runtime.into_os_string()));
-            }
-        } else if configured.is_none() && verified_runtime(&runtime, uid).is_ok() {
-            environment.push(("XDG_RUNTIME_DIR".into(), runtime.into_os_string()));
-        }
-        Ok(environment)
-    }
-    #[cfg(not(unix))]
-    bail!("systemd process-tree limits require Linux")
-}
-
-fn successful(command: &mut Command) -> Result<std::process::Output> {
-    let output = run_probe(command, PROBE_TIMEOUT)?;
-    ensure!(
-        output.status.success(),
-        "resource backend command failed: {}",
-        String::from_utf8_lossy(&output.stderr).trim()
-    );
-    Ok(output)
-}
-
 /// A new user scope is a sibling of the caller. Carry its observed caps across
 /// that boundary; this does not preserve an aggregate budget shared by siblings.
 fn scope_limits(
@@ -182,21 +128,8 @@ impl LimitScope {
             "invalid scope runtime limit"
         );
         let (cpus, memory_bytes) = scope_limits(request, available)?;
-        let environment = user_environment()?;
-        let mut manager = Command::new("systemctl");
-        manager
-            .args([
-                "--user",
-                "--no-pager",
-                "show",
-                "--property=Version",
-                "--value",
-            ])
-            .envs(environment.iter().cloned());
-        successful(&mut manager)
-            .context("systemd user manager is unavailable; no task was launched")?;
-        successful(Command::new("systemd-run").arg("--version"))
-            .context("systemd-run is unavailable; no task was launched")?;
+        let manager = forge::systemd::Manager::connect(254)?;
+        let environment = manager.environment().to_vec();
         let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
         Ok(Some(Self {
             unit: unit_name(

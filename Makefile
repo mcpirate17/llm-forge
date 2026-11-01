@@ -1,8 +1,7 @@
 # llm-forge Makefile — the mechanical quality routine.
 #
-# Every conductor invocation is `$(UV) run python -m conductor.<module>`: a script
-# path resolves against whatever interpreter the caller's shell happens to carry,
-# which is how the monorepo spent weeks testing against a second, unmaintained venv.
+# Build, install and the default test suite use native Cargo artifacts. Remaining
+# host governance entry points below are being migrated independently.
 #
 # Host data paths are NOT spelled out here. `[tool.conductor]` in pyproject.toml
 # names `candidate_policy.toml` and `campaigns/registry.json`, and every CLI
@@ -49,99 +48,29 @@ BASELINE_EXPIRES ?= $(shell $(UV) run python -c \
   'import tomllib; from conductor.project_paths import project_paths; \
    print(tomllib.loads(project_paths(".").policy_path.read_text(encoding="utf-8"))["baseline_expires"])')
 
-.PHONY: install test native gate candidate-review local-preview local-check local-verify \
+.PHONY: build install test native gate candidate-review local-preview local-check local-verify \
 	mutation-plan mutation-generate mutation-engine-run mutation-evidence \
 	mutation-canary mutation-coverage baselines baseline-jscpd baseline-pmd \
 	baseline-complexity baseline-vulture help
 
-INSTALL_REINSTALL ?=
-INSTALL_SYNC_ARGS ?=
+# Default installation is isolated from shared user environments and binaries.
+# An operator may select a different explicit prefix via INSTALL_ROOT.
+INSTALL_ROOT ?= $(CURDIR)/target/install
+FORGE_TARGET_ROOT = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(CURDIR)/native/forge/target)
+NATIVE_ENV = CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 RUSTUP_TOOLCHAIN=1.98.0 PYO3_PYTHON=/nonexistent/forbidden-python
 
-# The cdylib/rlib pair has an unhashed output, so feature sets need separate
-# directories. Preserve the usual compat cache and isolate a shared override
-# from Forge's Python-free conductor-native dependency.
-CORE_TARGET_ROOT = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(CURDIR)/native/conductor-native/target)
-CORE_COMPAT_TARGET = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR)/variants/compat,$(CORE_TARGET_ROOT))
-CORE_DEFAULT_TARGET = $(CORE_TARGET_ROOT)/variants/default
-CORE_SOURCE_TARGET = $(CORE_TARGET_ROOT)/variants/source-analysis
+build:  ## Build the release executable and its native core libraries
+	$(NATIVE_ENV) cargo +1.98.0 build --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml --bin forge
 
-install:  ## Sync the developer venv and precompile all native test targets
-	@set -eu; \
-	export CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 UV_CONCURRENT_BUILDS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 RUSTUP_TOOLCHAIN=1.98.0; \
-	unset PYO3_CONFIG_FILE PYO3_NO_PYTHON; \
-	$(UV) sync --frozen --extra test $(INSTALL_SYNC_ARGS) $(INSTALL_REINSTALL); \
-	venv=$${UV_PROJECT_ENVIRONMENT:-$(CURDIR)/.venv}; \
-	case "$$venv" in /*) ;; *) venv="$(CURDIR)/$$venv" ;; esac; \
-	test -x "$$venv/bin/python"; \
-	test -x "$$venv/bin/forge"; \
-	export PATH="$$venv/bin:$$PATH"; \
-	export PYO3_PYTHON="$$venv/bin/python" FORGE_BIN="$$venv/bin/forge"; \
-	CARGO_TARGET_DIR="$(CORE_COMPAT_TARGET)" cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml \
-		--locked --jobs 2 --all-targets --features python-compat-tests --no-run; \
-	CARGO_TARGET_DIR="$(CORE_COMPAT_TARGET)" cargo +1.98.0 build --manifest-path native/conductor-native/Cargo.toml \
-		--locked --jobs 2 --bins --features python-compat-tests; \
-	CARGO_TARGET_DIR="$(CORE_DEFAULT_TARGET)" cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml \
-		--locked --jobs 2 --all-targets --no-run; \
-	CARGO_TARGET_DIR="$(CORE_SOURCE_TARGET)" PYO3_NO_PYTHON=1 cargo +1.98.0 test --manifest-path native/conductor-native/Cargo.toml \
-		--locked --jobs 2 --all-targets --no-default-features --features source-analysis --no-run; \
-	cargo +1.98.0 test --manifest-path native/slop-core/Cargo.toml \
-		--locked --jobs 2 --all-targets --no-run; \
-	PYO3_NO_PYTHON=1 cargo +1.98.0 test --manifest-path native/forge/Cargo.toml \
-		--locked --jobs 2 --all-targets --no-run; \
-	target_dir=$${CARGO_TARGET_DIR:-native/forge/target}; \
-	if [ -n "$${CARGO_BUILD_TARGET:-}" ]; then target_dir="$$target_dir/$$CARGO_BUILD_TARGET"; fi; \
-	fixture_dir="$$target_dir/debug/prebuilt-fixtures"; \
-	mkdir -p "$$fixture_dir"; \
-	rm -f "$$fixture_dir/task_worker.sha256"; \
-	sha256sum native/forge/tests/support/task_worker.rs \
-		> "$$fixture_dir/task_worker.inputs"; \
-	rustc +1.98.0 --edition=2021 --crate-name=forge_task_test_worker \
-		-C codegen-units=1 -C debuginfo=0 \
-		native/forge/tests/support/task_worker.rs \
-		-o "$$fixture_dir/task-worker"; \
-	sha256sum -c "$$fixture_dir/task_worker.inputs"; \
-	sha256sum "$$fixture_dir/task-worker" >> "$$fixture_dir/task_worker.inputs"; \
-	awk '{print $$1}' "$$fixture_dir/task_worker.inputs" \
-		> "$$fixture_dir/task_worker.sha256.tmp"; \
-	mv "$$fixture_dir/task_worker.sha256.tmp" "$$fixture_dir/task_worker.sha256"; \
-	rm -f "$$fixture_dir/stub_dispatch.sha256"; \
-	sha256sum native/forge/tests/fixtures/stub_dispatch/Cargo.toml \
-		native/forge/tests/fixtures/stub_dispatch/Cargo.lock \
-		native/forge/tests/fixtures/stub_dispatch/src/main.rs \
-		> "$$fixture_dir/stub_dispatch.inputs"; \
-	cargo +1.98.0 build --manifest-path native/forge/tests/fixtures/stub_dispatch/Cargo.toml \
-		--locked --jobs 2 --target-dir "$$fixture_dir/stub-dispatch-target"; \
-	stub_profile=$${CARGO_BUILD_TARGET:+$$CARGO_BUILD_TARGET/}debug; \
-	sha256sum -c "$$fixture_dir/stub_dispatch.inputs"; \
-	sha256sum \
-		"$$fixture_dir/stub-dispatch-target/$$stub_profile/forge-test-stub-dispatch" \
-		>> "$$fixture_dir/stub_dispatch.inputs"; \
-	awk '{print $$1}' "$$fixture_dir/stub_dispatch.inputs" \
-		> "$$fixture_dir/stub_dispatch.sha256.tmp"; \
-	mv "$$fixture_dir/stub_dispatch.sha256.tmp" "$$fixture_dir/stub_dispatch.sha256"
+install:  ## Install the native executable into INSTALL_ROOT (default target/install)
+	$(NATIVE_ENV) cargo +1.98.0 install --path native/forge --bin forge --locked --jobs 2 --force --root "$(INSTALL_ROOT)" --target-dir "$(FORGE_TARGET_ROOT)"
 
-test:  ## Run the native compatibility and Rust test suites
-	@set -eu; \
-	export CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 RUSTUP_TOOLCHAIN=1.98.0; \
-	unset PYO3_CONFIG_FILE PYO3_NO_PYTHON; \
-	venv=$${UV_PROJECT_ENVIRONMENT:-$(CURDIR)/.venv}; \
-	case "$$venv" in /*) ;; *) venv="$(CURDIR)/$$venv" ;; esac; \
-	test -x "$$venv/bin/python"; \
-	test -x "$$venv/bin/forge"; \
-	export PATH="$$venv/bin:$$PATH"; \
-	export PYO3_PYTHON="$$venv/bin/python" FORGE_BIN="$$venv/bin/forge"; \
-	export PYTHONPATH="$(CURDIR)/src:$$("$$PYO3_PYTHON" -c 'import site; print(site.getsitepackages()[0])')"; \
-	export LD_LIBRARY_PATH="$$("$$PYO3_PYTHON" -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):$${LD_LIBRARY_PATH:-}"; \
-	CARGO_TARGET_DIR="$(CORE_COMPAT_TARGET)" cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml \
-		--features python-compat-tests --test 'python_contracts_*' -- --test-threads=1; \
-	CARGO_TARGET_DIR="$(CORE_DEFAULT_TARGET)" cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml; \
-	CARGO_TARGET_DIR="$(CORE_SOURCE_TARGET)" PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml \
-		--no-default-features --features source-analysis -- --test-threads=1; \
-	PYO3_NO_PYTHON=1 cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml; \
-	cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml
+test:  ## Run all default native release tests without interpreter discovery
+	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite
+	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml
+	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml
 
-native:  ## Force-rebuild all three native runtimes, then precompile test targets
-	$(MAKE) install INSTALL_REINSTALL='--reinstall-package forge-cli --reinstall-package conductor-native --reinstall-package slop-core'
+native: build  ## Build native Forge; test fixtures compile natively on demand
 
 local-preview:  ## Plan dirty-source tests; LOCAL_PREVIEW_ARGS='--execute' runs isolated targets
 	CARGO_BUILD_JOBS=2 cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- preview $(LOCAL_PREVIEW_ARGS)

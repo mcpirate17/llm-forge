@@ -76,6 +76,32 @@ fn receipt(root: &Path) -> PathBuf {
 }
 
 #[test]
+fn native_check_environment_binds_runner_and_isolated_install_without_venv_injection() {
+    let root = fixture(
+        r#"test -x "$FORGE_CHECK_BIN" && "$FORGE_CHECK_BIN" --version && test "$FORGE_BIN" = "$FORGE_INSTALL_ROOT/bin/forge" && test "$PYO3_PYTHON" = /nonexistent/forbidden-python && test -z "${PYTHONPATH+x}" && test -z "${UV_PROJECT_ENVIRONMENT+x}" && test -z "${PYTHONPYCACHEPREFIX+x}""#,
+        2,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_forge"))
+        .args(["check", "--all"])
+        .current_dir(&root)
+        .env_remove("PYTHONPATH")
+        .env_remove("UV_PROJECT_ENVIRONMENT")
+        .env_remove("PYTHONPYCACHEPREFIX")
+        .env("PYO3_PYTHON", "/nonexistent/forbidden-python")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(forge(&root, &["verify", "--require-all"]).status.success());
+    assert!(!root.join(".venv").exists());
+    assert!(!root.join(".git/forge-tools/node_modules").exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn full_pass_is_bound_to_head_and_log_bytes() {
     let root = fixture("echo checked", 2);
     fs::create_dir_all(root.join("research")).unwrap();

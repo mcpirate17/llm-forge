@@ -17,6 +17,13 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use support::{assert_error, module, Case};
 
+fn private_case() -> Case {
+    use std::os::unix::fs::PermissionsExt;
+    let case = Case::new();
+    std::fs::set_permissions(case.root(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    case
+}
+
 fn stderr_text(buffer: &Bound<'_, pyo3::types::PyAny>) -> String {
     buffer.call_method0("getvalue").unwrap().extract().unwrap()
 }
@@ -36,7 +43,7 @@ fn paths(hits: &Value) -> Vec<&str> {
 
 #[test]
 fn query_index_file_streams_with_stable_exact_contract() {
-    let case = Case::new();
+    let case = private_case();
     let file = case.root().join("memory.jsonl");
     let metadata = json!({"fingerprint":"sha256:test-space","dimension":2,"paid":true});
     let schema = schema_version();
@@ -87,7 +94,7 @@ fn query_index_file_streams_with_stable_exact_contract() {
 
 #[test]
 fn first_query_builds_the_sidecar_and_second_query_reuses_it() {
-    let case = Case::new();
+    let case = private_case();
     let file = case.root().join("memory.jsonl");
     write_rows(&file, &sidecar_rows(3, 2, schema_version()));
     Python::attach(|py| {
@@ -111,7 +118,7 @@ fn first_query_builds_the_sidecar_and_second_query_reuses_it() {
 
 #[test]
 fn appending_a_row_rebuilds_the_sidecar_and_ranks_it() {
-    let case = Case::new();
+    let case = private_case();
     let file = case.root().join("memory.jsonl");
     let mut rows = sidecar_rows(3, 2, schema_version());
     for row in &mut rows {
@@ -148,7 +155,7 @@ fn appending_a_row_rebuilds_the_sidecar_and_ranks_it() {
 
 #[test]
 fn sidecar_query_matches_the_full_scan_reference() {
-    let case = Case::new();
+    let case = private_case();
     let file = case.root().join("memory.jsonl");
     let mut rows = sidecar_rows(120, 4, schema_version());
     write_rows(&file, &rows);
@@ -176,5 +183,39 @@ fn sidecar_query_matches_the_full_scan_reference() {
             assert!(delta < 1e-5, "sidecar {actual} vs scan {expected}");
         }
         assert_eq!(sidecar[0]["text"], json!("λ".repeat(500)));
+    });
+}
+
+#[test]
+fn source_replacement_during_embedding_cannot_pair_old_scores_with_new_rows() {
+    let case = private_case();
+    let file = case.root().join("memory.jsonl");
+    let rows = sidecar_rows(3, 2, schema_version());
+    write_rows(&file, &rows);
+    Python::attach(|py| {
+        let index = module(py, "conductor.memory_index");
+        let destination = file.clone();
+        let replacement = case.root().join("replacement.jsonl");
+        let mut reversed = rows.clone();
+        reversed.reverse();
+        write_rows(&replacement, &reversed);
+        let embed = pyo3::types::PyCFunction::new_closure(
+            py,
+            None,
+            None,
+            move |_args: &Bound<'_, pyo3::types::PyTuple>,
+                  _kw: Option<&Bound<'_, pyo3::types::PyDict>>|
+                  -> PyResult<Vec<f64>> {
+                std::fs::rename(&replacement, &destination)?;
+                Ok(vec![1.0, 0.0])
+            },
+        )
+        .unwrap();
+        assert_error(
+            py,
+            query(py, &index, "replacement", &file, Some(1), &embed, false).unwrap_err(),
+            &index.getattr("RetrieveError").unwrap(),
+            "stale",
+        );
     });
 }

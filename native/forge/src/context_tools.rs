@@ -20,12 +20,87 @@ pub struct ContextArgs {
 
 #[derive(Subcommand)]
 enum ContextCommand {
+    /// Record bounded context events, tee hook output, or summarize telemetry.
+    Telemetry(crate::context_telemetry_cli::TelemetryArgs),
     /// Report actual provider usage, request deduplication, and context overhead.
     Report(ReportArgs),
     /// Compose stable instructions and bounded dynamic fragments without an LLM.
     Compose(ComposeArgs),
     /// Search an MCP tools/list snapshot; retrieve only requested definitions.
     Tools(ToolsArgs),
+    /// Count a rendered prompt with an offline, artifact-pinned native BPE.
+    Tokens(TokenArgs),
+    /// Compact ordered context with exact token counts and durable recovery.
+    Compact(CompactArgs),
+    /// Retrieve and verify an exact content-addressed context recovery artifact.
+    Recover(RecoverArgs),
+}
+
+#[derive(Args)]
+struct TokenArgs {
+    #[arg(long)]
+    tokenizer: PathBuf,
+    #[arg(long)]
+    input: PathBuf,
+    /// Include exact token IDs for parity checks.
+    #[arg(long)]
+    ids: bool,
+}
+#[derive(Args)]
+struct CompactArgs {
+    #[arg(long)]
+    tokenizer: PathBuf,
+    #[arg(long)]
+    request: PathBuf,
+    #[arg(long)]
+    spill_dir: PathBuf,
+    #[arg(long, default_value_t = forge::context_store::DEFAULT_QUOTA)]
+    store_bytes: u64,
+}
+#[derive(Args)]
+struct RecoverArgs {
+    #[arg(long)]
+    spill_dir: PathBuf,
+    #[arg(long)]
+    sha256: String,
+}
+
+fn counter(path: &Path) -> Result<forge::tokenizer::Counter> {
+    let config = serde_json::from_slice(&forge::bounded_file::read(path, 65536)?)?;
+    forge::tokenizer::Counter::load(&config)
+}
+fn tokens(args: TokenArgs) -> Result<u8> {
+    let counter = counter(&args.tokenizer)?;
+    let input = String::from_utf8(forge::bounded_file::read(
+        &args.input,
+        forge::tokenizer::MAX_TEXT_BYTES,
+    )?)?;
+    let encoding = counter.encode(&input)?;
+    let mut result = json!({"tokenizer":counter.identity(),"input_bytes":input.len(),"tokens":encoding.len(),
+        "scope":"exact supplied text; external chat template/envelope excluded"});
+    if args.ids {
+        result["ids"] = serde_json::to_value(encoding.get_ids())?;
+    }
+    println!("{}", serde_json::to_string(&result)?);
+    Ok(0)
+}
+fn compact(args: CompactArgs) -> Result<u8> {
+    let counter = counter(&args.tokenizer)?;
+    let request = serde_json::from_slice(&forge::bounded_file::read(
+        &args.request,
+        forge::context_store::MAX_ARTIFACT_BYTES,
+    )?)?;
+    let store = forge::context_store::Store::create(&args.spill_dir, args.store_bytes)?;
+    let result = forge::context_window::compact(&counter, &store, &request)?;
+    println!("{}", serde_json::to_string(&result)?);
+    Ok(if result.protected_overflow { 2 } else { 0 })
+}
+fn recover(args: RecoverArgs) -> Result<u8> {
+    let store =
+        forge::context_store::Store::open(&args.spill_dir, forge::context_store::DEFAULT_QUOTA)?;
+    let artifact: Value = serde_json::from_slice(&store.get(&args.sha256)?)?;
+    println!("{}", serde_json::to_string(&artifact)?);
+    Ok(0)
 }
 
 #[derive(Args)]
@@ -79,6 +154,10 @@ struct ToolsArgs {
 
 pub fn run(args: ContextArgs) -> Result<u8> {
     match args.action {
+        ContextCommand::Telemetry(args) => crate::context_telemetry_cli::run(args),
+        ContextCommand::Tokens(args) => tokens(args),
+        ContextCommand::Compact(args) => compact(args),
+        ContextCommand::Recover(args) => recover(args),
         ContextCommand::Report(args) => {
             let paths = args
                 .paths

@@ -106,8 +106,8 @@ def render_text(
         clipped = summary[:MAX_A2A_CHARS]
         body += (
             f"\nA2A compact ({name}); retrieve only when needed: "
-            f"`python -m conductor.agent_a2a show --as-name {name} <id>`; ack: "
-            f"`python -m conductor.agent_a2a read --as-name {name} <id>`\n"
+            f"`forge mailbox show --as-name {name} <id>`; ack: "
+            f"`forge mailbox read --as-name {name} <id>`\n"
             f"{clipped}"
         )
     if len(body) > max_chars:

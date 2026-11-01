@@ -6,6 +6,7 @@ mod civil;
 #[path = "../src/crg_gate.rs"]
 mod crg_gate;
 #[path = "../src/crg_refresh.rs"]
+#[allow(dead_code)]
 mod crg_refresh;
 #[path = "../src/current_work_guard.rs"]
 mod current_work_guard;
@@ -14,14 +15,14 @@ mod identity;
 #[path = "../src/instant.rs"]
 mod instant;
 #[path = "../src/interpreter.rs"]
+#[allow(dead_code)]
 mod interpreter;
 #[path = "../src/json_canon.rs"]
 #[allow(dead_code)]
 mod json_canon;
 #[path = "../src/local_ai_policy.rs"]
 mod local_ai_policy;
-#[path = "../src/ownership.rs"]
-mod ownership;
+use forge::ownership;
 #[path = "../src/write_targets.rs"]
 mod write_targets;
 

@@ -1,11 +1,9 @@
-//! The remaining specialized `PreToolUse` hooks: Edit/Write/NotebookEdit
-//! claim authorization and graph-tool mark/wait. One native answer per Python
-//! registry name supports partial opt-in; complete coverage merges in forge
-//! without starting the Python dispatcher.
+//! Native edit claim checks and graph-tool mark/wait hooks. Every matching
+//! handler runs and claim-store errors fail closed through the shared merger.
 
 use anyhow::Result;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::{crg_gate, crg_refresh, current_work_guard, identity, merge};
@@ -32,7 +30,19 @@ fn tool_name(payload: &Value) -> &str {
 }
 
 pub fn is_edit_payload(payload: &Value) -> bool {
-    matches!(tool_name(payload), "Edit" | "Write" | "NotebookEdit")
+    is_edit_tool_name(tool_name(payload))
+}
+
+pub fn is_edit_tool_name(name: &str) -> bool {
+    matches!(
+        name,
+        "Edit"
+            | "Write"
+            | "NotebookEdit"
+            | "mcp__forge__code_replace"
+            | "mcp__forge__code_diff"
+            | "mcp__forge__code_restore"
+    )
 }
 
 pub fn is_graph_payload(payload: &Value) -> bool {
@@ -41,17 +51,6 @@ pub fn is_graph_payload(payload: &Value) -> bool {
 
 pub fn is_graph_tool_name(name: &str) -> bool {
     crg_gate::is_graph_tool_name(name)
-}
-
-pub fn fully_native(payload: &Value, native_hooks: &HashSet<String>) -> bool {
-    let names = if is_edit_payload(payload) {
-        &EDIT_PRETOOLUSE_HOOK_NAMES
-    } else if is_graph_payload(payload) {
-        &GRAPH_PRETOOLUSE_HOOK_NAMES
-    } else {
-        return false;
-    };
-    names.iter().all(|name| native_hooks.contains(*name))
 }
 
 fn names_for(payload: &Value) -> &'static [&'static str] {
@@ -95,21 +94,6 @@ fn run_one(name: &str, payload: &Value) -> Result<Value> {
         "current_work_guard_edit" => Ok(current_work_guard::run(payload)),
         _ => unreachable!("only registry names reach the native pre-edit runner"),
     }
-}
-
-/// Only successful native answers are advertised to the Python child. If a
-/// handler fails under partial selection, Python still runs its adapter and
-/// retains that adapter's original error and fail-closed behavior.
-pub fn native_answers(payload: &Value, native_hooks: &HashSet<String>) -> HashMap<String, Value> {
-    let mut answers = HashMap::new();
-    for name in names_for(payload) {
-        if native_hooks.contains(*name) {
-            if let Ok(answer) = run_one(name, payload) {
-                answers.insert((*name).to_string(), answer);
-            }
-        }
-    }
-    answers
 }
 
 /// Complete native path: preserve registry merge order and the edit gate's

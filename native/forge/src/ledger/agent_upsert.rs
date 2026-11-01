@@ -91,7 +91,7 @@ pub fn run(
     args: AgentUpsertArgs,
     resolve: impl Fn(Option<&str>) -> AgentRouteResolution,
 ) -> Result<i32> {
-    let ledger_root = super::resolve_ledger_root(args.out);
+    let ledger_root = super::resolve_ledger_root(args.out)?;
     let summary = super::reader::read_transcript_file(&args.transcript)
         .with_context(|| format!("reading subagent transcript {}", args.transcript.display()))?;
 

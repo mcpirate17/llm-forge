@@ -5,7 +5,9 @@
 //! and the deterministic four-part verdict.
 
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(feature = "python")]
 use std::fs;
+#[cfg(feature = "python")]
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "python")]
@@ -101,6 +103,7 @@ fn load_pin_map(value: Option<&Value>, label: &str) -> Result<BTreeMap<String, S
     Ok(pins)
 }
 
+#[cfg(feature = "python")]
 fn load_receipt(path: &Path) -> Result<TargetTreeReceipt, String> {
     if !path.is_file() {
         return Err(format!("receipt file is missing: {}", path.display()));

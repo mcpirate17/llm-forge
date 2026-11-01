@@ -326,7 +326,7 @@ pub fn run(args: StatusArgs) -> Result<u8> {
     let message_result = messaging(&root, &mut errors);
     let messaging = capture("messaging", message_result, &mut errors);
     let hooks = capture("hooks", hook_configs(&host), &mut errors);
-    let ledger_root = ledger::resolve_ledger_root(args.ledger_root.clone());
+    let ledger_root = ledger::resolve_ledger_root(args.ledger_root.clone())?;
     let ledger = capture(
         "ledger",
         ledger_sessions(&ledger_root, &host, &tasks),

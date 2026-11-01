@@ -1,17 +1,10 @@
 //! Deterministic policy core for bounded A2A message retention.
 //!
-//! Python intentionally retains the explicit filesystem and SQLite transaction
-//! boundaries.  Evidence traversal, content-drift verification, canonical
-//! manifests, receipt hashes, and byte accounting live here.
+//! Native mailbox operations share evidence traversal, content-drift
+//! verification, canonical manifests, receipt hashes, and byte accounting.
 
 use std::collections::{BTreeSet, HashSet};
 
-#[cfg(feature = "python")]
-use pyo3::exceptions::PyValueError;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-#[cfg(feature = "python")]
-use pyo3::types::{PyBytes, PyDict};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
@@ -54,16 +47,6 @@ fn canonical_string(value: &Value) -> Result<String, String> {
     String::from_utf8(canonical_bytes(value)?).map_err(|error| error.to_string())
 }
 
-#[cfg(feature = "python")]
-fn required<'py, T: FromPyObjectOwned<'py>>(row: &Bound<'py, PyDict>, field: &str) -> PyResult<T> {
-    row.get_item(field)?
-        .ok_or_else(|| PyValueError::new_err(format!("retention row is missing field {field:?}")))?
-        .extract::<T>()
-        .map_err(|_| {
-            PyValueError::new_err(format!("retention row field {field:?} has invalid type"))
-        })
-}
-
 #[derive(Debug, Clone)]
 pub struct RetentionRow {
     pub message_id: String,
@@ -86,34 +69,6 @@ pub struct RetentionRow {
     pub body_bytes: u64,
     pub data_sha256: Option<String>,
     pub data_bytes: u64,
-}
-
-#[cfg(feature = "python")]
-impl RetentionRow {
-    fn extract(row: &Bound<'_, PyDict>) -> PyResult<Self> {
-        Ok(Self {
-            message_id: required(row, "message_id")?,
-            direction: required(row, "direction")?,
-            sender: required(row, "sender")?,
-            recipient: required(row, "recipient")?,
-            body: required(row, "body")?,
-            data_json: required(row, "data_json")?,
-            created_at: required(row, "created_at")?,
-            received_at: required(row, "received_at")?,
-            read_at: required(row, "read_at")?,
-            resolved_at: required(row, "resolved_at")?,
-            superseded_at: required(row, "superseded_at")?,
-            thread_id: required(row, "thread_id")?,
-            summary: required(row, "summary")?,
-            protocol_status: required(row, "protocol_status")?,
-            requires_response: required(row, "requires_response")?,
-            retention_class: required(row, "retention_class")?,
-            body_sha256: required(row, "body_sha256")?,
-            body_bytes: required(row, "body_bytes")?,
-            data_sha256: required(row, "data_sha256")?,
-            data_bytes: required(row, "data_bytes")?,
-        })
-    }
 }
 
 fn structured_projection(data_json: Option<&str>) -> Result<Value, String> {
@@ -297,59 +252,4 @@ pub fn manifests(rows: &[RetentionRow], compacted_at: &str) -> Result<ManifestRe
         tombstone_bytes,
         original_content_bytes.saturating_sub(tombstone_bytes),
     ))
-}
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn a2a_retention_evidence_native(
-    py: Python<'_>,
-    candidate_ids: Vec<String>,
-    files: Vec<(String, Py<PyBytes>)>,
-) -> PyResult<EvidenceResult> {
-    if files.len() > MAX_EVIDENCE_FILES {
-        return Err(PyValueError::new_err(format!(
-            "evidence scan found {} files; maximum is {MAX_EVIDENCE_FILES}",
-            files.len()
-        )));
-    }
-    let mut total = 0usize;
-    for (path, raw) in &files {
-        let size = raw.bind(py).as_bytes().len();
-        if size > MAX_EVIDENCE_FILE_BYTES {
-            return Err(PyValueError::new_err(format!(
-                "evidence file exceeds {MAX_EVIDENCE_FILE_BYTES} bytes: {path}"
-            )));
-        }
-        total = total.saturating_add(size);
-        if total > MAX_EVIDENCE_TOTAL_BYTES {
-            return Err(PyValueError::new_err(format!(
-                "evidence scan exceeds {MAX_EVIDENCE_TOTAL_BYTES} total bytes"
-            )));
-        }
-    }
-    let files = files
-        .into_iter()
-        .map(|(path, raw)| (path, raw.bind(py).as_bytes().to_vec()))
-        .collect::<Vec<_>>();
-    evidence(&candidate_ids, &files).map_err(PyValueError::new_err)
-}
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn a2a_retention_manifests_native(
-    rows: Vec<Bound<'_, PyDict>>,
-    compacted_at: &str,
-) -> PyResult<ManifestResult> {
-    let rows = rows
-        .iter()
-        .map(RetentionRow::extract)
-        .collect::<PyResult<Vec<_>>>()?;
-    manifests(&rows, compacted_at).map_err(PyValueError::new_err)
-}
-
-#[cfg(feature = "python")]
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(a2a_retention_evidence_native, module)?)?;
-    module.add_function(wrap_pyfunction!(a2a_retention_manifests_native, module)?)?;
-    Ok(())
 }

@@ -25,7 +25,7 @@ so the hook rolls it up then (2 s bound, best-effort to stderr, escape hatch
 
 ## Tables
 
-`<ledger_root>` (env `LEDGER_ROOT`, else `/mnt/data/llm/ledger/`) holds six
+`<ledger_root>` (env `LEDGER_ROOT`, else `${XDG_STATE_HOME:-$HOME/.local/state}/llm-forge/ledger/`) holds six
 tables plus `archive/`. Day-file names are UTC dates; a session's rows land
 under the day of its own timestamps.
 
@@ -191,7 +191,7 @@ A path may be a file or a directory walked non-recursively for its immediate
 to; 521 of them sat unread under the LLM project on 2026-09-13, and every
 one of them keyed itself into its parent's row before the identity rule).
 `--no-subagents` restores the flat, pre-PR-45 walk exactly.
-`--out` defaults to `$LEDGER_ROOT`, else `/mnt/data/llm/ledger/`.
+`--out` defaults to `$LEDGER_ROOT`, else `${XDG_STATE_HOME:-$HOME/.local/state}/llm-forge/ledger/`.
 `--dry-run` prints the rows as JSONL and writes nothing.
 
 `--repo` scans that repository's `git log --first-parent <branch>` (see
@@ -421,7 +421,7 @@ The hooks' own telemetry (one JSON line per `forge hook` call: `event`,
 `elapsed_ms`, `delegated`, `ts`; plus the PostToolUse context-size records)
 writes to `<ledger_root>/telemetry/context_telemetry/events.jsonl` --
 `CONTEXT_TELEMETRY_PATH` overrides, `LEDGER_ROOT` else
-`/mnt/data/llm/ledger/`, in both the Rust writer and the Python twin, with a
+`${XDG_STATE_HOME:-$HOME/.local/state}/llm-forge/ledger/`, in both the Rust writer and the transitional Python adapter, with a
 byte-identical record format. The default used to live inside the checkout
 (`<root>/src/research/tmp/...`, inherited from PR #36): a read-only checkout
 must never be a hook's write target, and keeping telemetry under the ledger
@@ -444,7 +444,7 @@ verdict as one line per metric with its status, exiting by the same
 `OK_STATUSES` rule as `make cost-budget-audit`.
 
 - `make ledger-rollup` -- the default rollup above (`LEDGER_ROOT` overrides,
-  default `/mnt/data/llm/ledger/`). Idempotence makes reruns free.
+  default `${XDG_STATE_HOME:-$HOME/.local/state}/llm-forge/ledger/`). Idempotence makes reruns free.
 - `make ledger-report` -- the human table.
 - `make cost-budget-audit` -- depends on `ledger-rollup`, so the audit reads
   fresh rows instead of a stale or empty root; same for
@@ -628,24 +628,31 @@ therefore collapses to exactly one row (`write_day_file`'s existing
 supersede-by-key behavior does the merge; no reconciliation pass is
 needed), instead of the two rows the mismatched keys used to produce.
 
-## Index layout: the memory_index sidecar
+## Index layout: native memory snapshots
 
-`research/cache/memory_index.jsonl` is the source of truth for
-`conductor.memory_index` — 16K+ rows, ~400 MB, embeddings written as JSON
-float text. Parsing all of it cost 4-6 s per query, so query builds a binary
-sidecar once next to it and mmaps that instead (`docs/roadmap.md` Phase 4
-item 2d, PR #63):
+Schema-3 JSONL remains the source for workspace memory. Compile it explicitly
+with `forge memory build --source memory.jsonl`; native queries never rebuild
+or fall back to parsing all vectors. The default artifact is `SOURCE.sidecar`.
 
-- **Path**: `<index>.sidecar` (e.g. `memory_index.jsonl.sidecar`, ~67 MB for
-  the current index).
-- **Header** (little-endian): magic `FORGEIDX`, format version, dims, row
-  count, source length + mtime_ns + sha256 of the JSONL's first 64 KB, and
-  the embedding fingerprint. Then an f32 row-major vector matrix and one u64
-  byte offset per row into the JSONL.
-- **Rebuild**: automatic, on the first query after any JSONL change (the
-  freshness check is len + mtime + prefix hash — the writer replaces the
-  file atomically, so every rebuild is one streaming pass, announced by one
-  `memory_index: building sidecar (N rows)` stderr line). To force a rebuild
-  by hand: delete the sidecar. A query only ever seeks the JSONL for its
-  top rows' payloads; the full-parse path survives as
-  `memory_index._query_index_file_scan`, the parity reference.
+Version 2 uses magic `FORGEM02`, a 384-byte little-endian header, a packed f32
+row-major matrix and one u64 JSONL byte offset per row. The header binds the
+vector space, dimensions, row count, complete source SHA-256 and source device,
+inode, length, mtime and ctime. Separate header and payload SHA-256 checksums
+detect corruption. Open validates lengths, finite vectors and ordered offsets.
+
+Compilation requires an owned output directory without group/world write bits.
+A nonblocking writer lease protects publication; a unique temporary inode is
+made read-only, fsynced, atomically renamed, then its directory is fsynced.
+Failed builds preserve the old snapshot. Queries use positional reads on a held
+source descriptor and check its identity before and after ranking. Replacing a
+snapshot does not invalidate readers already holding its mapping.
+
+`forge memory verify` audits the complete source hash. Routine queries use the
+source identity stamp and decode only winning rows. Source edits require an
+explicit rebuild. Old version-1 artifacts require rebuilding; the old full-file
+scan implementation and bindings have been deleted. The transitional Python
+caller still requests explicit native compilation on a stale artifact, but is
+not used by the native CLI or harness. Mapped inodes must remain immutable;
+unconfined same-UID writers and parent directories are operator-trusted.
+
+See [native task briefs](native-session-brief.md) for input limits and usage.

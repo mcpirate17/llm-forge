@@ -6,11 +6,13 @@
 //! previous item there and absent now is fixed; one elsewhere is kept as it was, so a
 //! gate run over two modules cannot erase the backlog of a sweep over two hundred.
 
-use crate::gate::{Measured, Summary};
+use crate::gate_types::{Measured, Summary};
 use crate::ledger::{self, Finding, Item};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyRuntimeError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -306,6 +308,7 @@ pub fn backlog(
 }
 
 /// Fold gate summaries (the JSON files at `summaries`) into the ledger and report.
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (summaries, ledger, report, dry_run=false))]
 pub fn equivalence_backlog(

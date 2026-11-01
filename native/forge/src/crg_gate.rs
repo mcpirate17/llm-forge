@@ -1,9 +1,7 @@
 //! Native graph-use and claim gate for Bash, Edit, Write and NotebookEdit.
 //! The session marker format and claim store are shared with the legacy hook.
 //!
-//! Fail-open, exactly like the Python: a bug in command parsing must not deny
-//! every Bash call in the fleet, so any internal error here resolves to "no
-//! opinion" (an empty targets list), not a denial.
+//! Checkout metadata errors deny writes whose claim scope cannot be verified.
 
 use crate::identity;
 use crate::ownership;
@@ -20,47 +18,7 @@ pub const REMEDY: &str = "Create a narrow governance claim first: \
 make governance-claim CLAIM_PATHS='<paths>' CLAIM_JUSTIFICATION='<why>' \
 (CRG_GATE_ENFORCE_WORKTREES=0 disables worktree enforcement fleet-wide).";
 
-/// `_checkout_of`: `(worktree root, git common dir)` for `path`, or `None`
-/// outside a checkout. Filesystem-only, walking `path` and its ancestors.
-pub fn checkout_of(path: &Path) -> Option<(PathBuf, PathBuf)> {
-    let mut candidate = Some(path.to_path_buf());
-    while let Some(dir) = candidate {
-        let entry = dir.join(".git");
-        if entry.is_dir() {
-            return Some((dir, entry.canonicalize().unwrap_or(entry)));
-        }
-        if entry.is_file() {
-            let Ok(text) = std::fs::read_to_string(&entry) else {
-                return None;
-            };
-            let text = text.trim();
-            let raw = text.strip_prefix("gitdir:")?;
-            let raw = raw.trim();
-            let gitdir = if Path::new(raw).is_absolute() {
-                PathBuf::from(raw)
-            } else {
-                dir.join(raw)
-            };
-            let gitdir = gitdir.canonicalize().unwrap_or(gitdir);
-            let marker = gitdir.join("commondir");
-            if !marker.is_file() {
-                return Some((dir, gitdir));
-            }
-            let Ok(raw_common) = std::fs::read_to_string(&marker) else {
-                return None;
-            };
-            let common = PathBuf::from(raw_common.trim());
-            let common = if common.is_absolute() {
-                common
-            } else {
-                gitdir.join(common)
-            };
-            return Some((dir, common.canonicalize().unwrap_or(common)));
-        }
-        candidate = dir.parent().map(Path::to_path_buf);
-    }
-    None
-}
+pub use forge::repository::checkout_of;
 
 /// `session_checkout`: the checkout the session works in, else `repo_root`.
 /// `repo_common_dir` is `repo_root`'s own common dir (Python's module-level
@@ -252,7 +210,10 @@ pub fn start(payload: &Value) -> std::io::Result<()> {
 /// Record a graph tool call before it queries the graph. `mark` has no
 /// decision of its own; I/O errors become visible hook errors at dispatch.
 pub(crate) fn is_graph_tool_name(name: &str) -> bool {
-    [
+    matches!(
+        name,
+        "mcp__forge__code_inspect" | "mcp__forge__code_fold" | "mcp__forge__code_search"
+    ) || [
         "mcp__code-review-graph__",
         "mcp__code-review_graph__",
         "mcp__code_review-graph__",
@@ -465,7 +426,7 @@ fn bash_target_views(
     cwd: &Path,
     repo_root: &Path,
     repo_common_dir: Option<&Path>,
-) -> Vec<(String, Option<PathBuf>)> {
+) -> anyhow::Result<Vec<(String, Option<PathBuf>)>> {
     let mut targets = Vec::new();
     let mut seen = HashSet::new();
     for raw in absolute_write_targets(command, cwd) {
@@ -484,7 +445,9 @@ fn bash_target_views(
         for absolute in views {
             let classified = if let Ok(relative) = absolute.strip_prefix(repo_root) {
                 Some((relative.to_string_lossy().into_owned(), None))
-            } else if let Some((checkout, common)) = checkout_of(&absolute) {
+            } else if let Some((checkout, common)) =
+                forge::repository::checkout_of_checked(&absolute)?
+            {
                 if Some(common.as_path()) == repo_common_dir {
                     absolute
                         .strip_prefix(&checkout)
@@ -503,7 +466,7 @@ fn bash_target_views(
             }
         }
     }
-    targets
+    Ok(targets)
 }
 
 /// `verify_bash`: `Value::Null` for "no contribution" (allow), else the
@@ -524,11 +487,22 @@ pub fn verify_bash(
         return Value::Null;
     }
     let cwd = command_cwd(payload, repo_root);
-    let targets = bash_target_views(&command, &cwd, repo_root, repo_common_dir);
+    let protocol = crate::current_work_guard::hook_protocol(payload);
+    let targets = match bash_target_views(&command, &cwd, repo_root, repo_common_dir) {
+        Ok(targets) => targets,
+        Err(error) => {
+            return crate::current_work_guard::hook_response(
+                Some(&format!(
+                    "BLOCKED: cannot verify target checkout metadata: {error:#}"
+                )),
+                protocol,
+                None,
+            )
+        }
+    };
     if targets.is_empty() {
         return Value::Null;
     }
-    let protocol = crate::current_work_guard::hook_protocol(payload);
     if targets.iter().any(|(target, _)| target == OPAQUE_WRITE) {
         return crate::current_work_guard::hook_response(
             Some(
@@ -583,6 +557,8 @@ pub fn verify_bash(
     Value::Null
 }
 
+type ClassifiedTargets = (Vec<String>, Vec<(PathBuf, String)>);
+
 /// Resolve Edit/Write/NotebookEdit targets into this checkout or a sibling
 /// worktree sharing the same Git common directory. Scratch and other repos
 /// have no claim in this gate.
@@ -590,7 +566,7 @@ pub(crate) fn classify_targets(
     payload: &Value,
     repo_root: &Path,
     repo_common_dir: Option<&Path>,
-) -> (Vec<String>, Vec<(PathBuf, String)>) {
+) -> anyhow::Result<ClassifiedTargets> {
     let mut local = Vec::new();
     let mut sibling = Vec::new();
     for raw in crate::crg_refresh::target_paths(payload) {
@@ -605,7 +581,7 @@ pub(crate) fn classify_targets(
             local.push(relative.to_string_lossy().into_owned());
             continue;
         }
-        let Some((root, common)) = checkout_of(&target) else {
+        let Some((root, common)) = forge::repository::checkout_of_checked(&target)? else {
             continue;
         };
         if Some(common.as_path()) == repo_common_dir {
@@ -614,7 +590,7 @@ pub(crate) fn classify_targets(
             }
         }
     }
-    (local, sibling)
+    Ok((local, sibling))
 }
 
 /// Edit/Write/NotebookEdit claim gate. Missing graph use or an unverifiable
@@ -645,7 +621,18 @@ pub fn verify(
             None,
         ));
     }
-    let (local, sibling) = classify_targets(payload, repo_root, repo_common_dir);
+    let (local, sibling) = match classify_targets(payload, repo_root, repo_common_dir) {
+        Ok(targets) => targets,
+        Err(error) => {
+            return Ok(crate::current_work_guard::hook_response(
+                Some(&format!(
+                    "BLOCKED: cannot verify target checkout metadata: {error:#}"
+                )),
+                protocol,
+                None,
+            ))
+        }
+    };
     for target in &local {
         let (allowed, detail) = claim_allows(owner, target, repo_root, repo_common_dir, env);
         if !allowed {
@@ -883,7 +870,8 @@ pub(crate) mod tests {
         std::fs::write(linked.join("a.py"), "A = 1\n").unwrap();
         let payload = edit_payload(&linked.join("a.py").to_string_lossy());
         repo.mark_graph_used(&payload);
-        let (local, sibling) = classify_targets(&payload, &repo.root, Some(&repo.common_dir()));
+        let (local, sibling) =
+            classify_targets(&payload, &repo.root, Some(&repo.common_dir())).unwrap();
         assert!(local.is_empty());
         assert_eq!(sibling, vec![(linked.clone(), "a.py".to_string())]);
         let denied = run_edit(&repo, "claude", &payload);
@@ -900,6 +888,49 @@ pub(crate) mod tests {
         assert_eq!(record["path"], "a.py");
         assert_eq!(record["checkout"], linked.to_string_lossy().as_ref());
         let _ = std::fs::remove_dir_all(linked);
+    }
+
+    #[test]
+    fn unsafe_sibling_metadata_denies_edit_and_bash() {
+        let repo = ScratchRepo::new("unsafe-sibling");
+        let linked = repo.root.with_extension("linked");
+        let gitdir = repo.root.join(".git/worktrees/side");
+        std::fs::create_dir_all(&linked).unwrap();
+        std::fs::create_dir_all(&gitdir).unwrap();
+        let target = linked.join("a.py");
+        std::fs::write(&target, "A = 1\n").unwrap();
+        let edit = edit_payload(&target.to_string_lossy());
+        let bash = payload("sibling-bash", &format!("echo x > {}", target.display()));
+        repo.mark_graph_used(&edit);
+        repo.mark_graph_used(&bash);
+        repo.write_claim("claude", &["a.py"]);
+        let marker = linked.join(".git");
+        let common = gitdir.join("commondir");
+        let valid_marker = format!("gitdir: {}\n", gitdir.display());
+        std::fs::write(&marker, &valid_marker).unwrap();
+        std::fs::write(&common, "../..\n").unwrap();
+        assert_eq!(run_edit(&repo, "claude", &edit), Value::Null);
+        assert_eq!(run(&repo, "claude", &bash), Value::Null);
+
+        for (bad_marker, bad_common) in [
+            (Some("invalid".to_string()), None),
+            (Some("x".repeat(4097)), None),
+            (None, Some("missing-directory".to_string())),
+            (None, Some("x".repeat(4097))),
+        ] {
+            std::fs::write(&marker, bad_marker.as_deref().unwrap_or(&valid_marker)).unwrap();
+            std::fs::write(&common, bad_common.as_deref().unwrap_or("../..\n")).unwrap();
+            for denied in [
+                run_edit(&repo, "claude", &edit),
+                run(&repo, "claude", &bash),
+            ] {
+                assert!(denied["hookSpecificOutput"]["permissionDecisionReason"]
+                    .as_str()
+                    .unwrap()
+                    .contains("cannot verify target checkout metadata"));
+            }
+        }
+        std::fs::remove_dir_all(linked).unwrap();
     }
 
     #[test]

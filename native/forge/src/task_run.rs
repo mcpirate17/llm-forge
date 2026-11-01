@@ -2,27 +2,21 @@
 //! process supervision, not a filesystem/network sandbox or approval authority.
 
 use crate::task_limits::{LimitScope, LimitsReport};
-use crate::task_resources::{child_exit_status, ResourceRequest, ResourceSnapshot};
+use crate::task_resources::{ResourceRequest, ResourceSnapshot};
 use crate::task_store::{Completion, State, Store, Task};
 use crate::tasks::{self, RunArgs};
 use anyhow::{ensure, Context, Result};
+use forge::process_capture::{Capture, LogSummary};
+use forge::process_group::ProcessGroup;
+use forge::process_io::ChildExit;
+use forge::process_signals::Interrupts;
 use serde::Serialize;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
-use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
-
-#[derive(Serialize, Default)]
-struct LogSummary {
-    retained_bytes: u64,
-    discarded_bytes: u64,
-}
+use std::process::{Command, Stdio};
+use std::time::Duration;
+use tokio::time::Instant;
 
 #[derive(Serialize)]
 struct ResourceEvidence {
@@ -52,67 +46,16 @@ struct Outcome {
 }
 
 struct ManagedChild {
-    child: Child,
-    group_stopped: bool,
+    group: ProcessGroup,
     scope_stopped: bool,
     scope: Option<LimitScope>,
 }
 
-static INTERRUPTED: AtomicBool = AtomicBool::new(false);
-
-#[cfg(unix)]
-extern "C" fn interrupt(_signal: libc::c_int) {
-    INTERRUPTED.store(true, Ordering::Release);
-}
-
-struct SignalGuard {
-    #[cfg(unix)]
-    previous: Vec<(libc::c_int, libc::sigaction)>,
-}
-
-impl SignalGuard {
-    fn install() -> Result<Self> {
-        INTERRUPTED.store(false, Ordering::Release);
-        #[cfg(unix)]
-        {
-            let mut guard = Self {
-                previous: Vec::new(),
-            };
-            for signal in [libc::SIGINT, libc::SIGTERM] {
-                let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
-                let mut previous: libc::sigaction = unsafe { std::mem::zeroed() };
-                action.sa_sigaction = interrupt as *const () as usize;
-                unsafe {
-                    libc::sigemptyset(&mut action.sa_mask);
-                }
-                ensure!(
-                    unsafe { libc::sigaction(signal, &action, &mut previous) } == 0,
-                    "installing task signal handler: {}",
-                    std::io::Error::last_os_error()
-                );
-                guard.previous.push((signal, previous));
-            }
-            Ok(guard)
-        }
-        #[cfg(not(unix))]
-        {
-            Ok(Self {})
-        }
-    }
-}
-
-impl Drop for SignalGuard {
-    fn drop(&mut self) {
-        #[cfg(unix)]
-        for (signal, previous) in &self.previous {
-            if unsafe { libc::sigaction(*signal, previous, std::ptr::null_mut()) } != 0 {
-                eprintln!(
-                    "forge task: failed restoring signal handler: {}",
-                    std::io::Error::last_os_error()
-                );
-            }
-        }
-    }
+struct Launch<'a> {
+    host: &'a Path,
+    task: &'a Task,
+    args: &'a RunArgs,
+    interrupts: &'a Interrupts,
 }
 
 impl ManagedChild {
@@ -124,7 +67,7 @@ impl ManagedChild {
             self.scope.as_ref().map(LimitScope::stop).transpose()
         };
         self.scope_stopped = scope_result.is_ok();
-        let group_result = self.stop_group();
+        let group_result = self.group.stop().map(|_| ()).map_err(anyhow::Error::from);
         match (scope_result, group_result) {
             (Err(scope), Err(group)) => {
                 anyhow::bail!("scope cleanup: {scope:#}; group cleanup: {group:#}")
@@ -132,31 +75,6 @@ impl ManagedChild {
             (Err(error), _) | (_, Err(error)) => Err(error),
             _ => Ok(()),
         }
-    }
-
-    fn stop_group(&mut self) -> Result<()> {
-        if self.group_stopped {
-            return Ok(());
-        }
-        #[cfg(unix)]
-        {
-            // The child was created in its own process group, so killing its
-            // descendants cannot affect the caller's shell or another task.
-            let result = unsafe { libc::kill(-(self.child.id() as i32), libc::SIGKILL) };
-            if result != 0 {
-                let error = std::io::Error::last_os_error();
-                if error.raw_os_error() != Some(libc::ESRCH) {
-                    return Err(error.into());
-                }
-            }
-        }
-        #[cfg(not(unix))]
-        if self.child.try_wait()?.is_none() {
-            self.child.kill()?;
-        }
-        self.child.wait()?;
-        self.group_stopped = true;
-        Ok(())
     }
 }
 
@@ -168,65 +86,6 @@ impl Drop for ManagedChild {
     }
 }
 
-#[cfg(unix)]
-fn nonblocking<R: std::os::fd::AsRawFd>(input: &R) -> Result<()> {
-    let fd = input.as_raw_fd();
-    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
-    ensure!(
-        flags >= 0,
-        "reading pipe flags: {}",
-        std::io::Error::last_os_error()
-    );
-    ensure!(
-        unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } >= 0,
-        "setting nonblocking pipe: {}",
-        std::io::Error::last_os_error()
-    );
-    Ok(())
-}
-
-fn output_thread<R: Read + Send + 'static>(
-    mut input: R,
-    mut output: File,
-    limit: u64,
-    done: Arc<AtomicBool>,
-) -> JoinHandle<Result<LogSummary>> {
-    std::thread::spawn(move || {
-        let mut summary = LogSummary::default();
-        let mut buffer = [0u8; 8192];
-        let mut stopping = None;
-        loop {
-            if done.load(Ordering::Acquire) {
-                let at = stopping.get_or_insert_with(Instant::now);
-                if at.elapsed() > Duration::from_millis(200) {
-                    break;
-                }
-            }
-            let count = match input.read(&mut buffer) {
-                Ok(count) => count,
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                    if stopping.is_some() {
-                        break;
-                    }
-                    std::thread::sleep(Duration::from_millis(5));
-                    continue;
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-                Err(error) => return Err(error.into()),
-            };
-            if count == 0 {
-                break;
-            }
-            let keep = (limit.saturating_sub(summary.retained_bytes)).min(count as u64) as usize;
-            output.write_all(&buffer[..keep])?;
-            summary.retained_bytes += keep as u64;
-            summary.discarded_bytes += (count - keep) as u64;
-        }
-        output.sync_all()?;
-        Ok(summary)
-    })
-}
-
 fn output_file(directory: &Path, name: &str) -> Result<File> {
     OpenOptions::new()
         .write(true)
@@ -236,13 +95,17 @@ fn output_file(directory: &Path, name: &str) -> Result<File> {
 }
 
 fn spawn(
-    host: &Path,
-    task: &Task,
-    args: &RunArgs,
+    launch: &Launch<'_>,
     directory: &Path,
     available: &ResourceSnapshot,
     mut scope: Option<LimitScope>,
 ) -> Result<ManagedChild> {
+    let Launch {
+        host,
+        task,
+        args,
+        interrupts,
+    } = *launch;
     let (program, arguments) = task
         .command
         .split_first()
@@ -270,7 +133,6 @@ fn spawn(
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
-        command.process_group(0);
         #[cfg(target_os = "linux")]
         {
             let parent = std::process::id() as libc::pid_t;
@@ -290,93 +152,75 @@ fn spawn(
             }
         }
     }
-    ensure!(
-        !INTERRUPTED.load(Ordering::Acquire),
-        "task interrupted before launch"
-    );
+    interrupts.configure_child(&mut command);
+    ensure!(!interrupts.interrupted()?, "task interrupted before launch");
     Ok(ManagedChild {
-        child: command
-            .spawn()
+        group: ProcessGroup::spawn(&mut command)
             .with_context(|| format!("spawning task executable {program:?}"))?,
-        group_stopped: false,
         scope_stopped: false,
         scope,
     })
 }
 
-fn monitor(
-    host: &Path,
+async fn monitor(
+    launch: &Launch<'_>,
     store: &mut Store,
-    task: &Task,
     child: &mut ManagedChild,
-    args: &RunArgs,
 ) -> Result<(Option<i32>, bool)> {
-    let began = Instant::now();
+    let Launch {
+        host,
+        task,
+        args,
+        interrupts,
+    } = *launch;
+    ensure!(!interrupts.interrupted()?, "task interrupted by signal");
+    let exit =
+        ChildExit::new(child.group.child()).context("register Linux child exit notification")?;
+    let signals = interrupts.register_reactor()?;
+    let deadline = Instant::now() + Duration::from_secs(args.timeout_seconds);
     let heartbeat_interval =
         Duration::from_millis((args.lease.lease_seconds as u64 * 1000 / 3).max(100));
-    let mut heartbeat_at = Instant::now();
+    let mut heartbeat =
+        tokio::time::interval_at(Instant::now() + heartbeat_interval, heartbeat_interval);
+    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    let mut signal = [0u8; std::mem::size_of::<libc::signalfd_siginfo>()];
     loop {
-        ensure!(
-            !INTERRUPTED.load(Ordering::Acquire),
-            "task interrupted by signal"
-        );
-        let remaining = Duration::from_secs(args.timeout_seconds).saturating_sub(began.elapsed());
-        if remaining.is_zero() {
-            return Ok((None, true));
+        tokio::select! {
+            biased;
+            _ = tokio::time::sleep_until(deadline) => return Ok((None, true)),
+            received = signals.read(&mut signal) => {
+                received.context("read supervisor interrupt")?;
+                anyhow::bail!("task interrupted by signal");
+            }
+            status = exit.wait() => return Ok((status?.code(), false)),
+            _ = heartbeat.tick() => {
+                tasks::validate_claim(host, task, &args.lease.task.owner)?;
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                store.set_busy_timeout(remaining.min(Duration::from_millis(200)))?;
+                store.heartbeat(&task.id, &args.lease.task.owner, task.attempt,
+                    args.lease.lease_seconds, tasks::now())?;
+            }
         }
-        if heartbeat_at.elapsed() >= heartbeat_interval {
-            tasks::validate_claim(host, task, &args.lease.task.owner)?;
-            // Contention must never hold a running child beyond its deadline.
-            store.set_busy_timeout(remaining.min(Duration::from_millis(200)))?;
-            store.heartbeat(
-                &task.id,
-                &args.lease.task.owner,
-                task.attempt,
-                args.lease.lease_seconds,
-                tasks::now(),
-            )?;
-            heartbeat_at = Instant::now();
-        }
-        if began.elapsed() >= Duration::from_secs(args.timeout_seconds) {
-            return Ok((None, true));
-        }
-        ensure!(
-            !INTERRUPTED.load(Ordering::Acquire),
-            "task interrupted by signal"
-        );
-        // Keep the exited leader unreaped until cleanup, pinning the process
-        // group identity while scope management commands finish.
-        if let Some(status) = child_exit_status(&child.child)? {
-            return Ok((status.code(), false));
-        }
-        std::thread::sleep(Duration::from_millis(50));
     }
 }
 
-fn execute(
-    host: &Path,
+async fn execute(
+    launch: &Launch<'_>,
     store: &mut Store,
-    task: &Task,
-    args: &RunArgs,
     directory: &Path,
     available: &ResourceSnapshot,
     scope: Option<LimitScope>,
 ) -> Result<Outcome> {
+    let Launch { task, args, .. } = *launch;
     let mut outcome = initial_outcome(task, args, available, scope.as_ref());
     let out = output_file(directory, "stdout.log")?;
     let err = output_file(directory, "stderr.log")?;
-    let mut child = spawn(host, task, args, directory, available, scope)?;
-    let stdout_pipe = child.child.stdout.take().context("task stdout pipe")?;
-    let stderr_pipe = child.child.stderr.take().context("task stderr pipe")?;
-    #[cfg(unix)]
-    {
-        nonblocking(&stdout_pipe)?;
-        nonblocking(&stderr_pipe)?;
-    }
-    let done = Arc::new(AtomicBool::new(false));
-    let stdout = output_thread(stdout_pipe, out, args.log_bytes, done.clone());
-    let stderr = output_thread(stderr_pipe, err, args.log_bytes, done.clone());
-    let result = monitor(host, store, task, &mut child, args);
+    let mut child = spawn(launch, directory, available, scope)?;
+    let stdout_pipe = child.group.take_stdout().context("task stdout pipe")?;
+    let stderr_pipe = child.group.take_stderr().context("task stderr pipe")?;
+    let stdout = Capture::start(stdout_pipe.into(), out, args.log_bytes)?;
+    let stderr = Capture::start(stderr_pipe.into(), err, args.log_bytes)?;
+    let result = monitor(launch, store, &mut child).await;
     // Scope teardown uses several bounded management probes. Reserve enough
     // lease time to stop descendants and bind the receipt even with a 2s lease.
     let completion_lease = if child.scope.is_some() {
@@ -397,7 +241,6 @@ fn execute(
     };
     // Also close inherited pipes held by descendants after the leader exits.
     let stopped = child.stop();
-    done.store(true, Ordering::Release);
     match result {
         Ok((exit_code, timed_out)) => {
             outcome.exit_code = exit_code;
@@ -417,6 +260,7 @@ fn execute(
     if let Err(error) = completion_lease {
         record_failure(&mut outcome, "completion lease", error);
     }
+    let (stdout, stderr) = tokio::join!(stdout.finish(), stderr.finish());
     outcome.stdout = join_output(stdout, "stdout", &mut outcome);
     outcome.stderr = join_output(stderr, "stderr", &mut outcome);
     if let Err(error) = stopped {
@@ -440,14 +284,11 @@ fn record_failure(outcome: &mut Outcome, operation: &str, error: anyhow::Error) 
 }
 
 fn join_output(
-    reader: JoinHandle<Result<LogSummary>>,
+    result: Result<LogSummary>,
     name: &str,
     outcome: &mut Outcome,
 ) -> Option<LogSummary> {
-    match reader
-        .join()
-        .unwrap_or_else(|_| Err(anyhow::anyhow!("reader panicked")))
-    {
+    match result {
         Ok(summary) => Some(summary),
         Err(error) => {
             record_failure(outcome, name, error);
@@ -518,7 +359,7 @@ pub fn run(host: &Path, store: &mut Store, args: RunArgs) -> Result<u8> {
         cfg!(target_os = "linux"),
         "supervised task execution currently requires Linux resource admission and process groups"
     );
-    let _signals = SignalGuard::install()?;
+    let signals = Interrupts::install()?;
     ensure!(
         (1..=86400).contains(&args.timeout_seconds),
         "timeout-seconds must be 1..86400"
@@ -544,9 +385,12 @@ pub fn run(host: &Path, store: &mut Store, args: RunArgs) -> Result<u8> {
         args.timeout_seconds,
     )?;
     ensure!(
-        !INTERRUPTED.load(Ordering::Acquire),
+        !signals.interrupted()?,
         "task interrupted during resource preflight"
     );
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
     if args.resume {
         store.retry(&before.id, &args.lease.task.owner, tasks::now())?;
     }
@@ -560,10 +404,17 @@ pub fn run(host: &Path, store: &mut Store, args: RunArgs) -> Result<u8> {
         .join(".agents/forge/runs")
         .join(&task.id)
         .join(task.attempt.to_string());
+    let launch = Launch {
+        host,
+        task: &task,
+        args: &args,
+        interrupts: &signals,
+    };
     let outcome = (|| {
         std::fs::create_dir_all(&directory)?;
         let fallback = initial_outcome(&task, &args, &available, scope.as_ref());
-        let outcome = match execute(host, store, &task, &args, &directory, &available, scope) {
+        let outcome = match runtime.block_on(execute(&launch, store, &directory, &available, scope))
+        {
             Ok(outcome) => outcome,
             Err(error) => Outcome {
                 finished_at: tasks::now(),

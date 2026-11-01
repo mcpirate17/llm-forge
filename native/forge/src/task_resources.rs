@@ -5,10 +5,10 @@ use anyhow::{bail, ensure, Context, Result};
 use clap::Args;
 use serde::Serialize;
 use std::fs;
-use std::io::{ErrorKind, Read};
+use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
-use std::process::{Child, Command, ExitStatus, Output, Stdio};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::process::{Command, Output};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const MIB: u64 = 1024 * 1024;
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -529,97 +529,6 @@ fn validate_visibility(cards: &[GpuSnapshot], selected: &GpuSnapshot) -> Result<
     Ok(())
 }
 
-struct ProbeChild(Child, bool);
-
-/// Observe exit without reaping, keeping the PID pinned for process-group cleanup.
-/// The caller must eventually reap with `Child::wait` after cleaning its group.
-#[cfg(target_os = "linux")]
-pub fn child_exit_status(child: &Child) -> Result<Option<ExitStatus>> {
-    use std::os::unix::process::ExitStatusExt;
-    let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
-    // Child::try_wait would reap the leader and open a PID-reuse window before
-    // the group kill. WNOWAIT preserves that identity until the caller reaps.
-    let result = unsafe {
-        libc::waitid(
-            libc::P_PID,
-            child.id() as libc::id_t,
-            &mut info,
-            libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
-        )
-    };
-    if result != 0 {
-        let error = std::io::Error::last_os_error();
-        if error.kind() == ErrorKind::Interrupted {
-            return Ok(None);
-        }
-        return Err(error).context("observing child exit without reaping");
-    }
-    let pid = unsafe { info.si_pid() };
-    if pid == 0 {
-        return Ok(None);
-    }
-    ensure!(
-        pid == child.id() as libc::pid_t,
-        "exit observer returned another child"
-    );
-    let status = unsafe { info.si_status() };
-    let raw = match info.si_code {
-        libc::CLD_EXITED => {
-            ensure!((0..=255).contains(&status), "invalid observed exit code");
-            status << 8
-        }
-        libc::CLD_KILLED | libc::CLD_DUMPED => {
-            ensure!((1..=127).contains(&status), "invalid observed exit signal");
-            status
-                | if info.si_code == libc::CLD_DUMPED {
-                    0x80
-                } else {
-                    0
-                }
-        }
-        code => bail!("unexpected child exit observation code {code}"),
-    };
-    Ok(Some(ExitStatus::from_raw(raw)))
-}
-
-#[cfg(not(target_os = "linux"))]
-pub fn child_exit_status(_child: &Child) -> Result<Option<ExitStatus>> {
-    bail!("observing child exit without reaping requires Linux")
-}
-
-#[cfg(target_os = "linux")]
-impl ProbeChild {
-    fn finish(&mut self) -> Result<ExitStatus> {
-        // The leader is exited but unreaped, so its identity is still pinned.
-        // Terminate any descendants before reaping, even on normal completion.
-        let result = unsafe { libc::kill(-(self.0.id() as i32), libc::SIGKILL) };
-        if result != 0 {
-            let error = std::io::Error::last_os_error();
-            if error.raw_os_error() != Some(libc::ESRCH) {
-                return Err(error).context("cleaning completed probe process group");
-            }
-        }
-        let status = self.0.wait().context("reaping completed probe")?;
-        self.1 = true;
-        Ok(status)
-    }
-}
-
-impl Drop for ProbeChild {
-    fn drop(&mut self) {
-        if self.1 {
-            return;
-        }
-        // Only this probe's process group; never another task or model process.
-        #[cfg(unix)]
-        unsafe {
-            libc::kill(-(self.0.id() as i32), libc::SIGKILL);
-        }
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
-}
-
 fn probe_nvidia() -> Result<String> {
     let mut command = Command::new("nvidia-smi");
     command.args([
@@ -636,53 +545,10 @@ fn probe_nvidia() -> Result<String> {
     String::from_utf8(output.stdout).context("GPU probe output is not UTF-8")
 }
 
-/// Bounded capture for management probes. Preserves caller-provided environment
-/// and working directory; a nonzero exit is returned for the caller to interpret.
+/// Bounded kernel-readiness capture; retains the caller's environment and cwd.
 #[cfg(target_os = "linux")]
 pub fn run_probe(command: &mut Command, timeout: Duration) -> Result<Output> {
-    use std::os::unix::process::CommandExt;
-    ensure!(!timeout.is_zero(), "probe timeout must be positive");
-    let deadline = Instant::now()
-        .checked_add(timeout)
-        .context("probe timeout is too large")?;
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .process_group(0);
-    let mut child = ProbeChild(
-        command
-            .spawn()
-            .with_context(|| format!("starting probe {:?}", command.get_program()))?,
-        false,
-    );
-    let mut stdout = child.0.stdout.take().context("probe stdout unavailable")?;
-    let mut stderr = child.0.stderr.take().context("probe stderr unavailable")?;
-    nonblocking(&stdout)?;
-    nonblocking(&stderr)?;
-    let mut out = Vec::new();
-    let mut err = Vec::new();
-    loop {
-        drain_probe(&mut stdout, &mut out, err.len())?;
-        drain_probe(&mut stderr, &mut err, out.len())?;
-        if child_exit_status(&child.0)?.is_some() {
-            let status = child.finish()?;
-            drain_probe(&mut stdout, &mut out, err.len())?;
-            drain_probe(&mut stderr, &mut err, out.len())?;
-            return Ok(Output {
-                status,
-                stdout: out,
-                stderr: err,
-            });
-        }
-        ensure!(
-            Instant::now() < deadline,
-            "probe {:?} timed out after {} ms",
-            command.get_program(),
-            timeout.as_millis()
-        );
-        std::thread::sleep(Duration::from_millis(10));
-    }
+    crate::process_probe::run(command, timeout, PROBE_OUTPUT_LIMIT)
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -690,43 +556,10 @@ pub fn run_probe(_command: &mut Command, _timeout: Duration) -> Result<Output> {
     bail!("bounded resource probing requires Linux")
 }
 
-#[cfg(target_os = "linux")]
-fn nonblocking(input: &impl std::os::fd::AsRawFd) -> Result<()> {
-    let fd = input.as_raw_fd();
-    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
-    ensure!(
-        flags >= 0 && unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } >= 0,
-        "setting probe pipe nonblocking: {}",
-        std::io::Error::last_os_error()
-    );
-    Ok(())
-}
-
-fn drain_probe(input: &mut impl Read, output: &mut Vec<u8>, other_bytes: usize) -> Result<()> {
-    let mut buffer = [0u8; 4096];
-    loop {
-        match input.read(&mut buffer) {
-            Ok(0) => return Ok(()),
-            Ok(count) => {
-                ensure!(
-                    output.len() + other_bytes + count <= PROBE_OUTPUT_LIMIT,
-                    "probe output exceeds {PROBE_OUTPUT_LIMIT} bytes"
-                );
-                output.extend_from_slice(&buffer[..count]);
-            }
-            Err(error) if error.kind() == ErrorKind::WouldBlock => return Ok(()),
-            // Return to the outer deadline check even under repeated signals.
-            Err(error) if error.kind() == ErrorKind::Interrupted => return Ok(()),
-            Err(error) => return Err(error).context("reading probe output"),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
-    use std::io::Cursor;
 
     const FIRST: &str = "GPU-aaaaaaaa-1111-2222-3333-444444444444";
     const SECOND: &str = "GPU-bbbbbbbb-1111-2222-3333-444444444444";
@@ -986,14 +819,5 @@ mod tests {
             PathBuf::from("/sys/fs/cgroup")
         );
         assert_eq!(mount_path("/a\\040b").unwrap(), PathBuf::from("/a b"));
-    }
-
-    #[test]
-    fn probe_output_cap_includes_both_streams() {
-        let mut out = Vec::new();
-        drain_probe(&mut Cursor::new(b"ok"), &mut out, 0).unwrap();
-        assert_eq!(out, b"ok");
-        assert!(drain_probe(&mut Cursor::new(vec![0; PROBE_OUTPUT_LIMIT]), &mut out, 1).is_err());
-        assert!(out.len() <= PROBE_OUTPUT_LIMIT);
     }
 }

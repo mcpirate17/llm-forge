@@ -97,6 +97,23 @@ impl Store {
         self.inner.previews(unread, limit, chars)
     }
 
+    pub fn presentation_previews(
+        &self,
+        replay_unread: bool,
+        limit: usize,
+        chars: usize,
+    ) -> Result<(Vec<Preview>, i64, i64)> {
+        self.inner
+            .presentation_previews(replay_unread, limit, chars)
+    }
+
+    pub fn mark_presented(&mut self, ids: &[String]) -> Result<usize> {
+        self.inner.mark_presented(
+            ids,
+            &crate::instant::isoformat_millis_utc(crate::instant::now()),
+        )
+    }
+
     pub fn message(&mut self, id: &str, direction: &str, max_bytes: usize) -> Result<Value> {
         self.inner.message(id, direction, max_bytes)
     }
@@ -110,5 +127,18 @@ impl Store {
 
     pub fn history(&self, id: Option<&str>, limit: usize) -> Result<Value> {
         self.inner.history(id, limit)
+    }
+
+    pub fn resolve(&mut self, id: &str) -> Result<Value> {
+        self.inner.resolve_receipt(
+            id,
+            &crate::instant::isoformat_millis_utc(crate::instant::now()),
+        )
+    }
+
+    pub fn hold(&mut self, id: &str, reason: Option<&str>) -> Result<Value> {
+        self.inner.set_hold(id, reason)?;
+        Ok(serde_json::json!({"schema_version":1,"message_id":id,
+            "hold":reason.map(conductor_native::normalize_a2a_text)}))
     }
 }

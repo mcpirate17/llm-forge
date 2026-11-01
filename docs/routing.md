@@ -218,6 +218,9 @@ over the 150000 token cap for class general (162345 billed): stop, write your fi
 Both interpolate the resolved `cap_tokens`, `class`, and the state's current
 `billed_total` -- never a hardcoded number.
 
+Warnings add context after the matching native guards run; they do not override
+a command denial or skip claim checks. Over-cap denials still stop immediately.
+
 ### `SubagentStop`: finalizing the row
 
 `native/forge/src/subagent_stop.rs` wires a new `SubagentStop` match arm in

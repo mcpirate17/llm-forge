@@ -217,6 +217,60 @@ fn dirty_preview_only_plans_affected_targets_and_does_not_create_gate_state() {
 }
 
 #[test]
+fn preview_reports_excluded_interpreter_contracts_and_keeps_native_dependents() {
+    let root = fixture();
+    let path = "native/conductor-native/tests/python_contracts_candidate_cli.rs";
+    let run = forge(&root, &["preview", "--path", path]);
+    assert!(
+        run.status.success(),
+        "{}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    let plan: Value = serde_json::from_slice(&run.stdout).unwrap();
+    assert_eq!(
+        plan["excluded_compatibility_tests"],
+        serde_json::json!([path])
+    );
+    let targets = plan["targets"].as_array().unwrap();
+    assert_eq!(targets.len(), 2);
+    assert!(targets.iter().any(|row| row["crate_name"] == "forge"));
+    for row in targets {
+        assert!(!row["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "python-compat-tests"));
+        assert!(!row["selector"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "python_contracts_candidate_cli"));
+    }
+    let native = forge(
+        &root,
+        &[
+            "preview",
+            "--path",
+            "native/conductor-native/tests/python_contracts_discovery.rs",
+        ],
+    );
+    assert!(native.status.success());
+    let plan: Value = serde_json::from_slice(&native.stdout).unwrap();
+    assert_eq!(plan["excluded_compatibility_tests"], serde_json::json!([]));
+    assert!(plan["targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["selector"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "python_contracts_discovery")));
+    assert!(!root.join(".git/forge-previews").exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn unavailable_requested_profiler_fails_before_workload() {
     let root = fixture();
     let run = Command::new(env!("CARGO_BIN_EXE_forge"))
@@ -246,10 +300,19 @@ fn unavailable_requested_profiler_fails_before_workload() {
 #[test]
 fn executing_dirty_preview_reuses_exact_configuration_and_invalidates_changed_bytes() {
     let root = fixture();
+    // A stale interpreter in the checkout must not be discovered or executed.
+    fs::create_dir_all(root.join(".venv/bin")).unwrap();
+    fs::write(root.join(".venv/bin/python"), "not an executable\n").unwrap();
+    fs::write(root.join(".gitignore"), ".venv/\n").unwrap();
     fs::create_dir_all(root.join("native/forge/src")).unwrap();
     fs::write(
         root.join("native/forge/Cargo.toml"),
         "[package]\nname='forge'\nversion='0.1.0'\nedition='2021'\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("native/forge/src/lib.rs"),
+        "pub fn native_library() -> u8 { 7 }\n",
     )
     .unwrap();
     let source = root.join("native/forge/src/main.rs");
@@ -287,6 +350,8 @@ fn executing_dirty_preview_reuses_exact_configuration_and_invalidates_changed_by
             String::from_utf8_lossy(&result.stderr)
         );
         let report: Value = serde_json::from_slice(&result.stdout).unwrap();
+        assert_eq!(report["native_only"], true);
+        assert_eq!(report["excluded_compatibility_test_count"], 0);
         serde_json::from_slice::<Value>(&fs::read(report["receipt"].as_str().unwrap()).unwrap())
             .unwrap()
     };

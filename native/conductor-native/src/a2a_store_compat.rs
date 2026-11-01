@@ -83,26 +83,30 @@ impl Store {
     }
 
     pub fn resolve(&mut self, id: &str, now: &str) -> Result<Value> {
+        self.resolve_inner(id, now, false)
+    }
+
+    /// Resolve without transferring bodies or data. Legacy rows without lifecycle
+    /// metadata require at most 1 MiB to construct their pinned provenance record.
+    pub fn resolve_receipt(&mut self, id: &str, now: &str) -> Result<Value> {
+        self.resolve_inner(id, now, true)
+    }
+
+    fn resolve_inner(&mut self, id: &str, now: &str, receipt: bool) -> Result<Value> {
+        super::validate_message_id(id)?;
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let row = transaction
-            .query_row(
-                &format!("SELECT {MESSAGE_COLUMNS} FROM messages WHERE message_id=?1 AND direction='inbound'"),
-                [id],
-                message_row,
-            )
-            .optional()?
-            .with_context(|| format!("unknown message {id:?}"))?;
-        ensure!(
-            !row["read_at"].is_null(),
-            "cannot resolve unread message {id:?}"
-        );
         let has_state: bool = transaction.query_row(
             "SELECT EXISTS(SELECT 1 FROM message_state WHERE direction='inbound' AND message_id=?1)",
             [id],
             |found| found.get(0),
         )?;
+        let row = resolution_row(&transaction, id, receipt, has_state)?;
+        ensure!(
+            !row["read_at"].is_null(),
+            "cannot resolve unread message {id:?}"
+        );
         if !has_state {
             let state = legacy_state(id, &row)?;
             insert_state(&transaction, "inbound", id, &state_fields(&state)?)?;
@@ -111,8 +115,26 @@ impl Store {
             "UPDATE message_state SET resolved_at=COALESCE(resolved_at,?1),protocol_status='resolved' WHERE direction='inbound' AND message_id=?2",
             params![now, id],
         )?;
+        let output = if receipt {
+            let resolved_at: String = transaction.query_row(
+                &format!(
+                    "SELECT {} FROM message_state WHERE direction='inbound' AND message_id=?1",
+                    super::bounded_text("resolved_at")
+                ),
+                [id],
+                |row| row.get(0),
+            )?;
+            ensure!(
+                resolved_at.len() <= 128,
+                "invalid stored resolution timestamp"
+            );
+            json!({"schema_version":1,"message_id":id,"sender":row["sender"],
+                "state":"resolved","resolved_at":resolved_at})
+        } else {
+            row
+        };
         transaction.commit()?;
-        Ok(row)
+        Ok(output)
     }
 
     pub fn set_hold(&mut self, id: &str, reason: Option<&str>) -> Result<()> {
@@ -158,6 +180,39 @@ impl Store {
         }
         Ok(Value::Object(counts))
     }
+}
+
+fn resolution_row(
+    transaction: &rusqlite::Transaction<'_>,
+    id: &str,
+    receipt: bool,
+    has_state: bool,
+) -> Result<Value> {
+    if receipt && has_state {
+        let query = format!(
+            "SELECT {},{} FROM messages WHERE direction='inbound' AND message_id=?1",
+            super::bounded_text("sender"),
+            "read_at IS NOT NULL"
+        );
+        let (sender, read): (String, bool) = transaction
+            .query_row(&query, [id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .optional()?
+            .with_context(|| format!("unknown message {id:?}"))?;
+        ensure!(
+            sender.len() <= super::MAX_METADATA_BYTES as usize,
+            "sender exceeds 4096 bytes"
+        );
+        return Ok(json!({"sender":sender,"read_at":if read { json!(true) } else { Value::Null }}));
+    }
+    if receipt {
+        let size = super::message_size(transaction, id, "inbound")?;
+        ensure!((0..=1_048_576).contains(&size),
+            "legacy resolution requires loading {size} bytes; maximum is 1048576; message unchanged");
+    }
+    transaction.query_row(
+        &format!("SELECT {MESSAGE_COLUMNS} FROM messages WHERE message_id=?1 AND direction='inbound'"),
+        [id], message_row,
+    ).optional()?.with_context(|| format!("unknown message {id:?}"))
 }
 
 fn legacy_state(id: &str, row: &Value) -> Result<Value> {

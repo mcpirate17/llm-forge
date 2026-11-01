@@ -26,22 +26,22 @@ fn policy_rejects_invalid_regex_duplicate_and_unbounded_steps() {
 }
 
 #[test]
-fn shipped_policy_parses_and_keeps_baseline_setup_with_its_check() {
+fn shipped_native_policy_checks_dependents_and_isolated_installed_artifact() {
     let policy = Policy::parse(include_str!("../../../.forge/local-check.toml")).unwrap();
-    let changed = vec!["native/conductor-native/src/lib.rs".to_string()];
-    let tools = policy
-        .setup
-        .iter()
-        .find(|step| step.name == "baseline-tools")
-        .unwrap();
-    let baselines = policy
-        .checks
-        .iter()
-        .find(|step| step.name == "candidate-baselines")
-        .unwrap();
-    assert!(selected(baselines, &changed));
-    assert!(selected(tools, &changed));
-    assert_eq!(policy.checks.len(), 10);
+    for crate_name in ["conductor-native", "slop-core", "forge"] {
+        let changed = vec![format!("native/{crate_name}/src/lib.rs")];
+        for name in ["rust-forge-clippy", "rust-forge-tests", "installed-runtime"] {
+            let check = policy.checks.iter().find(|step| step.name == name).unwrap();
+            assert!(
+                selected(check, &changed),
+                "{crate_name} omits dependent {name}"
+            );
+        }
+        assert!(policy.setup.iter().all(|step| selected(step, &changed)));
+    }
+    assert_eq!(policy.env["PYO3_PYTHON"], "/nonexistent/forbidden-python");
+    let land = crate::land::Config::parse(include_str!("../../../.forge/land.toml")).unwrap();
+    crate::sweep::SweepConfig::parse(include_str!("../../../.forge/sweep.toml"), &land).unwrap();
 }
 
 #[test]
@@ -52,6 +52,7 @@ fn infrastructure_changes_force_full_selection() {
         &["native/forge/src/local_check.rs".into()]
     ));
     assert!(effective_all(false, &[".forge/local-check.toml".into()]));
+    assert!(effective_all(false, &["forge.toml".into()]));
     assert!(effective_all(true, &[]));
 }
 

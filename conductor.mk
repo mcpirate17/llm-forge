@@ -45,7 +45,7 @@ CONDUCTOR_REPORTS_DIR ?= reports
 	mutation-retention mutation-patch-audit mutation-patch-audit-record mutation-reap \
 	ledger-rollup ledger-report route-report cost-budget-audit cost-budget-record \
 	graph-seed-worktree worktree-reap workspace-hygiene branch-policy \
-	branch-policy-audit checkout-sync crg-probe crg-sync crg-check \
+	branch-policy-audit checkout-sync crg-probe crg-check \
 	dead-tests test-graph codex-journal notebooklm-bundle notebooklm-research-bundle \
 	test-conductor-native test-slop-core test-forge forge-build
 
@@ -316,17 +316,11 @@ worktree-reap:  ## Preview finished worktrees; REAP_ARGS=--apply explicitly remo
 	$(PYTHON) -m conductor.worktree_reap --repo "$(CONDUCTOR_HOST_ROOT)" $(REAP_ARGS)
 
 CRG_REPO ?= $(CONDUCTOR_HOST_ROOT)
-CRG_EXPECT_TOOLS ?=
+MCP_SOCKET ?=
 
-crg-probe:  ## Handshake with the code-review-graph MCP server declared in CRG_REPO's .mcp.json
-	$(PYTHON) -m conductor.crg_mcp_probe --repo "$(CRG_REPO)" \
-		$(if $(CRG_EXPECT_TOOLS),--expect-tools $(CRG_EXPECT_TOOLS),)
-
-crg-sync:  ## Install this tree's native crates into the code-review-graph MCP interpreter
-	$(PYTHON) -m conductor.crg_venv_sync --repo "$(CRG_REPO)"
-
-crg-check:  ## Report (never repair) drift between this tree and the MCP interpreter
-	$(PYTHON) -m conductor.crg_venv_sync --repo "$(CRG_REPO)" --check
+crg-probe crg-check:  ## Verify the native MCP binding; MCP_SOCKET must name the running service
+	@test -n "$(MCP_SOCKET)" || { echo "Set MCP_SOCKET to the socket returned by forge harness start" >&2; exit 2; }
+	forge mcp --host "$(CRG_REPO)" check --socket "$(MCP_SOCKET)"
 
 # ── Workspace / branch hygiene ───────────────────────────────────────────
 

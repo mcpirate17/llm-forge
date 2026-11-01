@@ -103,7 +103,7 @@ feeding one output model, not two ledgers.
 
 ### Storage
 
-Append-only JSONL under `/mnt/data/llm/ledger/<table>/<utc-date>.jsonl`,
+Append-only JSONL under `${XDG_STATE_HOME:-$HOME/.local/state}/llm-forge/ledger/<table>/<utc-date>.jsonl`,
 one file per table per day — JSONL, not Parquet, for the first cut: the
 write path is one `serde_json` line per record (matching
 `telemetry.rs::append_line`'s existing pattern exactly, no new dependency),
@@ -112,7 +112,7 @@ compaction is a later step (Section 6, "not the first PR") once the JSONL
 volume itself becomes the cost. Retention: 90 days of daily files, then a
 monthly rollup (`session_rollup`/`agent_rollup` aggregates only — raw
 `turn_attribution` is not worth keeping past the window it was computed to
-support) written to `/mnt/data/llm/ledger/archive/<year-month>.jsonl` and the
+support) written to `<ledger_root>/archive/<year-month>.jsonl` and the
 daily files pruned, mirroring `context_telemetry.py::_prune_rotated`'s
 keep-N-newest pattern (here keep-90-days).
 

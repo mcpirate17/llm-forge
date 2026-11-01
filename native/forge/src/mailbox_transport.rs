@@ -36,6 +36,9 @@ pub struct FlushArgs {
     to: Option<String>,
     #[arg(long, default_value_t = 100)]
     max_messages: usize,
+    /// Return exit 3 without attempting a sender whose delivery lock is busy.
+    #[arg(long)]
+    defer_busy: bool,
 }
 
 struct Peer {
@@ -567,9 +570,16 @@ pub fn flush(args: FlushArgs, state_dir: &Path) -> Result<(Value, u8)> {
     let mut output = Vec::new();
     let mut remaining = false;
     for sender in senders {
+        let _lock = match SenderLock::acquire(state_dir, &sender) {
+            Ok(lock) => lock,
+            Err(error) if args.defer_busy && error.is::<queue::SenderBusy>() => {
+                remaining = true;
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
         let mut store = Store::required(state_dir, &sender, true)?;
         store.require_enqueue_schema()?;
-        let _lock = SenderLock::acquire(state_dir, &sender)?;
         if output.len() < args.max_messages {
             output.extend(flush_store(
                 &transport,

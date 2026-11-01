@@ -18,8 +18,11 @@
 use std::fs;
 use std::path::PathBuf;
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::{PyDict, PyList};
 use tree_sitter::{Node, Parser, Tree};
 
@@ -122,7 +125,9 @@ fn marks_test(attribute: &str) -> bool {
 
 fn parse_rust(source: &str) -> Option<Tree> {
     let mut parser = Parser::new();
-    parser.set_language(&tree_sitter_rust::language()).ok()?;
+    parser
+        .set_language(&tree_sitter_rust::LANGUAGE.into())
+        .ok()?;
     parser.parse(source, None)
 }
 
@@ -220,13 +225,12 @@ fn walk(node: Node, source: &Source, relative: &str, in_test: bool, out: &mut Ve
 /// scanner that silently reports nothing for the file most likely to be broken
 /// is worse than no scanner at all.
 pub fn scan_source(text: &str, relative: &str) -> Result<Vec<RustFinding>, String> {
+    if text.len() > crate::source::MAX_SOURCE_BYTES || text.contains('\0') {
+        return Err("Rust source exceeds size/NUL bound".into());
+    }
     let source = Source::new(text);
     let tree = parse_rust(text).ok_or_else(|| format!("rust scan cannot parse {relative}"))?;
-    if tree.root_node().has_error() {
-        return Err(format!(
-            "rust scan cannot parse {relative}: the grammar reported a syntax error"
-        ));
-    }
+    crate::source::validate_tree(text, &tree).map_err(|e| format!("rust scan {relative}: {e}"))?;
     let mut out = Vec::new();
     walk(tree.root_node(), &source, relative, false, &mut out);
     Ok(out)
@@ -252,6 +256,7 @@ pub fn scan_paths(paths: &[String]) -> Result<Vec<RustFinding>, String> {
 }
 
 /// `scan_paths` as the gate's Rust style check calls it.
+#[cfg(feature = "python")]
 #[pyfunction]
 pub fn rust_scan_files(py: Python<'_>, paths: Vec<String>) -> PyResult<Py<PyList>> {
     let rows = scan_paths(&paths).map_err(PyValueError::new_err)?;
@@ -269,7 +274,7 @@ pub fn rust_scan_files(py: Python<'_>, paths: Vec<String>) -> PyResult<Py<PyList
 
 /// The rule names this scanner can emit, so the caller's published list and the
 /// scanner cannot drift apart unnoticed.
-#[pyfunction]
+#[cfg_attr(feature = "python", pyo3::pyfunction)]
 pub fn rust_scan_rules() -> Vec<String> {
     RULES.iter().map(|rule| (*rule).to_string()).collect()
 }

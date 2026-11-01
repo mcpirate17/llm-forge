@@ -1,9 +1,9 @@
 //! Host project path resolution. All configured choices are made here, at call time.
 
 use std::env;
-use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+use crate::project_config::{self, ProjectConfig};
 use toml::Value;
 
 #[derive(Clone, Copy)]
@@ -83,13 +83,6 @@ fn type_name(value: &Value) -> &'static str {
     }
 }
 
-fn source(root: &Path, key: &str) -> String {
-    format!(
-        "[tool.conductor].{key} in {}",
-        root.join("pyproject.toml").display()
-    )
-}
-
 fn python_repr(text: &str) -> String {
     let quote = if text.contains('\'') && !text.contains('"') {
         '"'
@@ -140,31 +133,9 @@ pub fn relative(raw: &str, source: &str) -> Result<String, String> {
     Ok(parts.join("/"))
 }
 
-fn table(root: &Path) -> Result<toml::map::Map<String, Value>, String> {
-    let manifest = root.join("pyproject.toml");
-    if !manifest.is_file() {
-        return Ok(toml::map::Map::new());
-    }
-    let load_error = || format!("PROJECT_PATHS_MANIFEST_ERROR:{}", root.display());
-    let body = fs::read_to_string(&manifest).map_err(|_| load_error())?;
-    let parsed: Value = body.parse::<Value>().map_err(|_| load_error())?;
-    let conductor = parsed
-        .get("tool")
-        .and_then(Value::as_table)
-        .and_then(|tool| tool.get("conductor"));
-    match conductor {
-        None => Ok(toml::map::Map::new()),
-        Some(Value::Table(table)) => Ok(table.clone()),
-        Some(_) => Err(format!(
-            "[tool.conductor] in {} is not a table",
-            manifest.display()
-        )),
-    }
-}
-
 fn configured(
     root: &Path,
-    config: &mut Option<toml::map::Map<String, Value>>,
+    config: &mut Option<ProjectConfig>,
     spec: PathSpec,
 ) -> Result<(String, bool), String> {
     if let Ok(raw) = env::var(spec.env) {
@@ -173,10 +144,11 @@ fn configured(
         }
     }
     if config.is_none() {
-        *config = Some(table(root)?);
+        *config = Some(project_config::load(root)?);
     }
-    if let Some(value) = config.as_ref().and_then(|table| table.get(spec.key)) {
-        let label = source(root, spec.key);
+    let config = config.as_ref().expect("loaded above");
+    if let Some(value) = config.conductor.get(spec.key) {
+        let label = config.label(spec.key);
         let raw = value
             .as_str()
             .ok_or_else(|| format!("{label} must be a string, got {}", type_name(value)))?;
@@ -194,6 +166,15 @@ pub fn resolve(root: &Path) -> Result<Vec<(String, bool)>, String> {
         .collect()
 }
 
+/// The configured prose index, resolved against the supplied host.
+pub fn notes_db(root: &Path) -> Result<std::path::PathBuf, String> {
+    let spec = PATHS
+        .iter()
+        .find(|spec| spec.key == "notes_db")
+        .expect("declared path");
+    Ok(root.join(configured(root, &mut None, *spec)?.0))
+}
+
 fn nonempty_string(value: &Value, label: &str) -> Result<String, String> {
     let raw = value
         .as_str()
@@ -206,11 +187,15 @@ fn nonempty_string(value: &Value, label: &str) -> Result<String, String> {
 }
 
 fn named_list(root: &Path, key: &str) -> Result<Option<Vec<String>>, String> {
-    let config = table(root)?;
-    let Some(value) = config.get(key) else {
+    let config = project_config::load(root)?;
+    config_list(&config, key)
+}
+
+fn config_list(config: &ProjectConfig, key: &str) -> Result<Option<Vec<String>>, String> {
+    let Some(value) = config.conductor.get(key) else {
         return Ok(None);
     };
-    let label = source(root, key);
+    let label = config.label(key);
     let list = value.as_array().ok_or_else(|| {
         format!(
             "{label} must be a list of strings, got {}",
@@ -224,6 +209,27 @@ fn named_list(root: &Path, key: &str) -> Result<Option<Vec<String>>, String> {
         .map(Some)
 }
 
+/// Validate declared choices from one captured manifest, independent of process
+/// overrides. Provisioning must not persist an invalid choice hidden by an env var.
+pub fn validate_config(config: &ProjectConfig) -> Result<(), String> {
+    for spec in PATHS {
+        if let Some(value) = config.conductor.get(spec.key) {
+            let label = config.label(spec.key);
+            let raw = value
+                .as_str()
+                .ok_or_else(|| format!("{label} must be a string, got {}", type_name(value)))?;
+            relative(raw, &label)?;
+        }
+    }
+    if let Some(value) = config.conductor.get("integration_branch") {
+        nonempty_string(value, &config.label("integration_branch"))?;
+    }
+    for key in ["retired_integration_branches", "worktree_patterns"] {
+        config_list(config, key)?;
+    }
+    Ok(())
+}
+
 pub fn integration_branch(root: &Path) -> Result<String, String> {
     if let Ok(raw) = env::var("CONDUCTOR_INTEGRATION_BRANCH") {
         let value = raw.trim();
@@ -231,9 +237,9 @@ pub fn integration_branch(root: &Path) -> Result<String, String> {
             return Ok(value.to_owned());
         }
     }
-    let config = table(root)?;
-    match config.get("integration_branch") {
-        Some(value) => nonempty_string(value, &source(root, "integration_branch")),
+    let config = project_config::load(root)?;
+    match config.conductor.get("integration_branch") {
+        Some(value) => nonempty_string(value, &config.label("integration_branch")),
         None => Ok("main".to_owned()),
     }
 }

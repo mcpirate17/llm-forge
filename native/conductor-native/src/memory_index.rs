@@ -1,24 +1,18 @@
-//! Streaming validation and retrieval for the workspace memory JSONL index.
-//!
-//! The Python boundary still owns catalog discovery, embedding requests, and
-//! atomic writes. Rust owns the large read-only data path so a query does not
-//! materialize hundreds of megabytes of vectors as Python objects.
+//! Validation and preview decoding for native mapped workspace memory.
+use std::io::BufRead;
 
-use std::cmp::Ordering;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
-
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+#[cfg(feature = "python")]
+use crate::top_k::{Ranked, TopK};
+#[cfg(feature = "python")]
+use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
 use serde_json::{Map, Value};
+pub(crate) const MAX_ROW_BYTES: usize = 1024 * 1024;
 
 const SCHEMA_VERSION: i64 = 3;
 const PINNED_NUM_CTX: i64 = 2_048;
 const MAX_HIT_TEXT_CHARS: usize = 500;
 
-type NativeHit = (f64, String, String, String, String);
+pub type NativeHit = (f64, String, String, String, String);
 
 #[derive(Debug)]
 pub(crate) struct EmbeddingMeta<'a> {
@@ -26,9 +20,9 @@ pub(crate) struct EmbeddingMeta<'a> {
     pub(crate) dimension: usize,
 }
 
+#[cfg(feature = "python")]
 #[derive(Debug)]
 struct Hit {
-    ordinal: usize,
     score: f64,
     source: String,
     path: String,
@@ -133,40 +127,29 @@ pub(crate) fn validate_row(row: &Map<String, Value>) -> Result<EmbeddingMeta<'_>
     })
 }
 
-fn visit_rows(
-    path: &str,
-    mut visit: impl FnMut(&Map<String, Value>, EmbeddingMeta<'_>) -> Result<(), String>,
-) -> Result<usize, String> {
-    if !Path::new(path).is_file() {
-        return Err(format!("memory index missing: {path}"));
-    }
-    let file =
-        File::open(path).map_err(|error| format!("cannot open memory index {path}: {error}"))?;
-    let mut count = 0usize;
-    for line in BufReader::new(file).lines() {
-        let line = line.map_err(|error| format!("cannot read memory index {path}: {error}"))?;
-        if line.trim().is_empty() {
-            continue;
+pub(crate) fn read_line(reader: &mut impl BufRead, line: &mut Vec<u8>) -> Result<usize, String> {
+    crate::bounded_io::read_line(reader, line, MAX_ROW_BYTES).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::InvalidData {
+            "memory index row exceeds 1 MiB".into()
+        } else {
+            format!("memory index read: {error}")
         }
-        let value = serde_json::from_str::<Value>(&line)
-            .map_err(|error| format!("invalid memory index JSON: {error}"))?;
-        let row = row_object(&value)?;
-        let metadata = validate_row(row)?;
-        visit(row, metadata)?;
-        count += 1;
-    }
-    if count == 0 {
-        return Err("memory index is empty".to_owned());
-    }
-    Ok(count)
+    })
 }
 
 // Match the improved Kahan-Babuska/Neumaier loop used by CPython 3.12 sum().
 pub(crate) fn compensated_dot(query: &[f64], vector: impl Iterator<Item = f64>) -> f64 {
+    try_compensated_dot(query, vector.map(Ok)).expect("infallible numeric iterator")
+}
+
+fn try_compensated_dot(
+    query: &[f64],
+    vector: impl Iterator<Item = Result<f64, String>>,
+) -> Result<f64, String> {
     let mut total = 0.0_f64;
     let mut compensation = 0.0_f64;
     for (query_value, value) in query.iter().zip(vector) {
-        let product = *query_value * value;
+        let product = *query_value * value?;
         let next = total + product;
         if total.abs() >= product.abs() {
             compensation += (total - next) + product;
@@ -178,7 +161,7 @@ pub(crate) fn compensated_dot(query: &[f64], vector: impl Iterator<Item = f64>) 
     if compensation != 0.0 && compensation.is_finite() {
         total += compensation;
     }
-    total
+    Ok(total)
 }
 
 fn row_string(row: &Map<String, Value>, field: &str) -> Result<String, String> {
@@ -188,98 +171,49 @@ fn row_string(row: &Map<String, Value>, field: &str) -> Result<String, String> {
         .ok_or_else(|| format!("memory index row field {field:?} must be a string"))
 }
 
-fn score_json_row(row: &Map<String, Value>, query: &[f64]) -> Result<Hit, String> {
-    let vector = row["vector"].as_array().expect("validated vector");
-    if vector.len() != query.len() {
-        return Err(format!("dim mismatch in {}", python_repr(row.get("path"))));
-    }
-    let mut total = 0.0_f64;
-    let mut compensation = 0.0_f64;
-    for (query_value, value) in query.iter().zip(vector) {
-        let value = value
-            .as_f64()
-            .ok_or_else(|| "memory index vector values must be numbers".to_owned())?;
-        let product = *query_value * value;
-        let next = total + product;
-        if total.abs() >= product.abs() {
-            compensation += (total - next) + product;
-        } else {
-            compensation += (product - next) + total;
+pub(crate) fn validate_preview(row: &Map<String, Value>) -> Result<(), String> {
+    for (field, maximum) in [
+        ("source", 256),
+        ("path", 4096),
+        ("title", 4096),
+        ("text", MAX_ROW_BYTES),
+    ] {
+        let value = row
+            .get(field)
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("memory index row field {field:?} must be a string"))?;
+        if value.len() > maximum {
+            return Err(format!("memory index {field} exceeds byte limit"));
         }
-        total = next;
     }
-    if compensation != 0.0 && compensation.is_finite() {
-        total += compensation;
-    }
-    Ok(Hit {
-        ordinal: 0,
-        score: total,
-        source: row_string(row, "source")?,
-        path: row_string(row, "path")?,
-        title: row_string(row, "title")?,
-        text: row_string(row, "text")?
+    Ok(())
+}
+
+pub(crate) fn preview(row: &Map<String, Value>, score: f64) -> Result<NativeHit, String> {
+    validate_preview(row)?;
+    Ok((
+        score,
+        row_string(row, "source")?,
+        row_string(row, "path")?,
+        row_string(row, "title")?,
+        row["text"]
+            .as_str()
+            .expect("validated text")
             .chars()
             .take(MAX_HIT_TEXT_CHARS)
             .collect(),
-    })
+    ))
 }
 
-fn rank(mut hits: Vec<Hit>, top_k: usize) -> Vec<NativeHit> {
-    hits.sort_by(|left, right| {
-        right
-            .score
-            .partial_cmp(&left.score)
-            .unwrap_or(Ordering::Equal)
-            .then_with(|| left.ordinal.cmp(&right.ordinal))
-    });
-    hits.into_iter()
-        .take(top_k)
-        .map(|hit| (hit.score, hit.source, hit.path, hit.title, hit.text))
+#[cfg(feature = "python")]
+fn finish_hits(hits: TopK<Hit>) -> Vec<NativeHit> {
+    hits.sorted()
+        .into_iter()
+        .map(|(_, hit)| (hit.score, hit.source, hit.path, hit.title, hit.text))
         .collect()
 }
 
-#[pyfunction]
-fn memory_index_metadata_native(path: &str) -> PyResult<(String, usize, usize)> {
-    let mut fingerprint: Option<String> = None;
-    let mut dimension = 0usize;
-    let count = visit_rows(path, |_row, metadata| {
-        if fingerprint
-            .as_deref()
-            .is_some_and(|existing| existing != metadata.fingerprint)
-        {
-            return Err("memory index contains mixed embedding fingerprints".to_owned());
-        }
-        fingerprint.get_or_insert_with(|| metadata.fingerprint.to_owned());
-        if dimension == 0 {
-            dimension = metadata.dimension;
-        }
-        Ok(())
-    })
-    .map_err(PyValueError::new_err)?;
-    Ok((fingerprint.expect("nonempty index"), dimension, count))
-}
-
-#[pyfunction]
-fn memory_index_query_file_native(
-    path: &str,
-    query: Vec<f64>,
-    top_k: usize,
-    required_fingerprint: &str,
-) -> PyResult<Vec<NativeHit>> {
-    let mut hits = Vec::new();
-    visit_rows(path, |row, metadata| {
-        if metadata.fingerprint != required_fingerprint {
-            return Err("memory index changed embedding fingerprint during query".to_owned());
-        }
-        let mut hit = score_json_row(row, &query)?;
-        hit.ordinal = hits.len();
-        hits.push(hit);
-        Ok(())
-    })
-    .map_err(PyValueError::new_err)?;
-    Ok(rank(hits, top_k))
-}
-
+#[cfg(feature = "python")]
 fn dict_string(row: &Bound<'_, PyDict>, field: &str) -> PyResult<String> {
     row.get_item(field)?
         .ok_or_else(|| PyValueError::new_err(format!("memory index row is missing {field:?}")))?
@@ -289,13 +223,19 @@ fn dict_string(row: &Bound<'_, PyDict>, field: &str) -> PyResult<String> {
         })
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn memory_index_score_rows_native(
     query: Vec<f64>,
     rows: Vec<Bound<'_, PyDict>>,
     top_k: usize,
 ) -> PyResult<Vec<NativeHit>> {
-    let mut hits = Vec::with_capacity(rows.len());
+    if query.is_empty() || query.iter().any(|v| !v.is_finite()) {
+        return Err(PyValueError::new_err(
+            "query vector must be nonempty and finite",
+        ));
+    }
+    let mut hits = TopK::new(top_k).map_err(PyValueError::new_err)?;
     for (ordinal, row) in rows.into_iter().enumerate() {
         let path = dict_string(&row, "path")?;
         let vector = row
@@ -306,25 +246,32 @@ fn memory_index_score_rows_native(
             return Err(PyValueError::new_err(format!("dim mismatch in {path}")));
         }
         let score = compensated_dot(&query, vector.into_iter());
+        if !score.is_finite() {
+            return Err(PyValueError::new_err("memory index score is non-finite"));
+        }
         let text = dict_string(&row, "text")?
             .chars()
             .take(MAX_HIT_TEXT_CHARS)
             .collect();
-        hits.push(Hit {
-            ordinal,
-            score,
-            source: dict_string(&row, "source")?,
-            path,
-            title: dict_string(&row, "title")?,
-            text,
-        });
+        hits.push(
+            Ranked {
+                score,
+                index: ordinal,
+            },
+            Hit {
+                score,
+                source: dict_string(&row, "source")?,
+                path,
+                title: dict_string(&row, "title")?,
+                text,
+            },
+        );
     }
-    Ok(rank(hits, top_k))
+    Ok(finish_hits(hits))
 }
 
+#[cfg(feature = "python")]
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(memory_index_metadata_native, module)?)?;
-    module.add_function(wrap_pyfunction!(memory_index_query_file_native, module)?)?;
     module.add_function(wrap_pyfunction!(memory_index_score_rows_native, module)?)?;
     Ok(())
 }

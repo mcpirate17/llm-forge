@@ -13,15 +13,20 @@
 //! loop line or the line above it.
 
 use std::collections::BTreeSet;
+#[cfg(feature = "python")]
 use std::fs;
+#[cfg(feature = "python")]
 use std::path::PathBuf;
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::{PyDict, PyList};
 use tree_sitter::Node;
 
-use crate::engine::{named, parse};
+use crate::engine::named;
 use crate::style_scan::Finding;
 
 const RULE: &str = "perf/python-tensor-loop";
@@ -422,11 +427,15 @@ impl<'a> Scan<'a> {
 
 /// Findings for one Python source; `path` is only used to label them.
 pub fn scan_source(path: &str, source_text: &str) -> Result<Vec<Finding>, String> {
-    let tree =
-        parse(source_text).ok_or_else(|| format!("{path}: could not be parsed as Python"))?;
-    if tree.root_node().has_error() {
-        return Err(format!("{path}: is not valid Python"));
-    }
+    let parsed =
+        crate::source::PythonSource::new(source_text).map_err(|e| format!("{path}: {e}"))?;
+    Ok(scan_parsed(path, &parsed))
+}
+
+/// Reuse a source whose native ASTs have already been validated.
+pub fn scan_parsed(path: &str, parsed: &crate::source::PythonSource<'_>) -> Vec<Finding> {
+    let source_text = parsed.text();
+    let tree = parsed.tree();
     let mut scan = Scan {
         src: source_text,
         lines: source_text.lines().collect(),
@@ -437,7 +446,7 @@ pub fn scan_source(path: &str, source_text: &str) -> Result<Vec<Finding>, String
     scan.array_names(tree.root_node(), &mut module_arrays);
     scan.visit(tree.root_node(), &module_arrays);
     scan.out.sort();
-    Ok(scan.out)
+    scan.out
 }
 
 /// True when `path` is a `.py` file under one of the `folders`.
@@ -461,6 +470,7 @@ pub fn in_hot_path(path: &str, folders: &[String]) -> bool {
 ///
 /// `repo`, when given, is stripped from each path so folders and findings are
 /// addressed the way the gate names files. A path outside every folder is not read.
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (paths, hot_paths, repo=None))]
 pub fn hot_loop_scan_files(

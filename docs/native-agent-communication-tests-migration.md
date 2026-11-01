@@ -1,11 +1,19 @@
-# Native agent communication test migration
+# Native agent communication test migration record
 
-The four focused Python suites were moved to Rust-owned PyO3 contract tests.
-The tests call the existing production Python APIs and keep assertions, input
-rows, fake callbacks, local state, and HTTP `TestClient` requests in Rust. No
-live agent endpoint, model, or message is used. The original 35 named tests
-expanded to 43 pytest invocations, all passing before migration in
-`/tmp/forge-cohort-c-python-baseline.log`. The four Rust targets pass 35/35.
+This records the historical migration of four focused Python suites to
+Rust-owned PyO3 compatibility tests. At migration time, those tests called the
+production Python APIs while keeping assertions, input rows, fake callbacks,
+local state, and HTTP `TestClient` requests in Rust. No live agent endpoint,
+model, or message was used. The original 35 named tests expanded to 43 pytest
+invocations, all passing before migration in
+`/tmp/forge-cohort-c-python-baseline.log`; the four Rust targets then passed
+35/35. These results describe the migration-era Python compatibility tests,
+not current coverage. The session-brief adapter and its dedicated compatibility
+target have since been retired.
+
+The table is a historical mapping of the retired Python cases to their former
+Rust compatibility assertions. The agent A2A, handoff, and local-clerk cases
+remain separate from the retired session-brief adapter.
 
 | Retired Python case | Rust case | Contract retained |
 | --- | --- | --- |
@@ -45,15 +53,98 @@ expanded to 43 pytest invocations, all passing before migration in
 | `test_session_brief.py::test_brief_orchestrates_and_main_prints` | `python_contracts_session_brief::brief_orchestrates_and_main_prints` | Mock identity and arguments, CLI brief, stdin compacting, invalid task |
 | `test_session_brief.py::test_compact_inbox_passes_already_compact_input_through` | `python_contracts_session_brief::compact_inbox_passes_already_compact_input_through` | Canonical compact form passes without alteration |
 
-The focused Cargo test command selects the four exact targets with
+At migration time, the focused Cargo test command selected the four exact targets with
 `--features python-compat-tests --offline --locked -- --test-threads=1`.
-Scoped Clippy with `-D warnings` passes. Historical campaign manifests,
+Scoped Clippy with `-D warnings` passed. Historical campaign manifests,
 candidate-review node IDs, duplication baselines, and old documentation refer
 to the retired names as provenance; no active import or test selector depends
 on the Python modules. `src/conductor/conftest.py` remains in use elsewhere.
 
-Review repairs preserve fixed callback signatures, Python list and tuple
-comparisons, exact stored message payloads, and the production store's
-connection context. The final four-target run passed all 35 tests after these
-repairs, followed by scoped Clippy with warnings denied. Validation used two
-Cargo jobs and one test thread after CPU, RAM, VRAM, and process checks.
+The migration-era review repairs preserved fixed callback signatures, Python
+list and tuple comparisons, exact stored message payloads, and the production
+store's connection context. The final four-target run passed all 35 tests after
+those repairs, followed by scoped Clippy with warnings denied. Validation used
+two Cargo jobs and one test thread after CPU, RAM, VRAM, and process checks.
+These commands and results are historical; the retired compatibility target is
+not active coverage.
+
+## Current native surfaces
+
+Forge's persistent MCP service runs through native `harness stdio`. It exposes
+`code_inspect`, `code_fold`, and `code_search` for inspection, plus
+`session_brief` and `workspace_recall` for workspace context. The native CLI
+provides session briefs, including `forge session brief --cards-index`, and
+mailbox operations such as `forge mailbox show`, `read`, `resolve`, and `watch`.
+Native tests now cover these interfaces, including
+`native/forge/tests/native_session_brief.rs` and the mailbox lifecycle/watch
+tests. They do not invoke the retired Python brief adapter.
+
+## Native startup and provider installation
+
+The Python `a2a_session_start` and `hook_installer` adapters, their dedicated
+compatibility targets, and `test_a2a_identity_defaults.py` are retired. Their
+replacement interfaces are `forge mailbox --host HOST startup-hook --provider
+PROVIDER` and `forge providers --host HOST --provider PROVIDER install`. Install
+is a plan until `--apply` is supplied. Existing recognized Python startup hooks
+require explicit `--replace-legacy` when installing their native replacements;
+deleting the adapters does not rewrite an installed host's settings.
+
+Native startup tests cover receiver readiness and reuse, occupied listeners,
+bounded unread previews, identity selection, provider envelopes, and Grok's
+once-per-session behavior. Native provider tests cover settings preservation,
+explicit legacy replacement, and rollback. These live in
+`native/forge/tests/native_mailbox_startup.rs` and `native_providers.rs`.
+
+The CLI transition changes a few installer options: select one provider per
+invocation; the native installer uses a native executable and the host's
+mailbox directory instead of Python's `--interpreter` and custom `--state-dir`.
+Native installation records a rollback snapshot and offers `rollback`; it has
+no separate equivalent of Python's standalone `backup` action. The shared
+native `hook_installer` library and the Python registry compatibility target
+remain in use. The Python session-preamble adapter also remains because the
+workspace-runtime caller still depends on it.
+
+## Native fleet status
+
+The native fleet report is available as:
+
+```sh
+forge mailbox --host HOST [--state-dir PATH] fleet --as-name IDENTITY [--json] [--processes]
+```
+
+This is the native replacement interface for the deleted `conductor.fleet_status`
+CLI. It reads the selected identity's inbox without acknowledging messages,
+regenerates claims and headings through the read-only active-state reader, and
+probes registered Agent Cards without updating mailbox, claim, or liveness
+state. The report is an observation with `bounded-fleet-observation` authority;
+it does not grant permission or represent an entire message history.
+Card observations expose only name, port, status, and optional version/reason
+strings truncated to 200 characters. Skills and arbitrary card fields are
+discarded. JSON and text output both fail if the final report exceeds 512 KiB.
+
+Peer probing is capped at 512 registry identities, 200 ms per card, and two
+seconds total. Identities left after the total budget are reported explicitly
+as `unprobed`. The inbox contributes at most eight compact summaries, each
+limited to 160 characters, within a 10,000-character preview budget. “Latest
+per sender” means latest within those selected summaries, not across the full
+stored history.
+
+Process observations are opt-in with `--processes`. They inspect same-user
+`/proc` entries matched against configured worktree paths, with caps of 65,536
+entries, 32 MiB total command-line data and 4,096 bytes per command line;
+displayed command lines are capped at 140 characters. At most 1,024 matching
+rows and 512 groups are returned. Coverage includes `disappeared`,
+`permission_denied`, `truncated_cmdlines`, `included_rows`, `omitted_rows`, and
+`complete`. Text output also discloses that coverage. The command does not
+launch `ps`, Python, or another interpreter. Seven native aggregation tests and
+three release CLI tests passed, including empty-PATH execution and preservation
+of message acknowledgment, registry and liveness state. Eight transitional
+Python compatibility tests also passed before the Python fleet module, its
+bindings and dedicated target were deleted.
+
+The unused `luna_fleet_launch.py` was also deleted. It depended on fixed historical
+research prompt/shard paths that are absent from the current host and released
+receivers through an unchecked PID file. Operators select an explicit registered
+identity with `forge mailbox start`, or use finite `forge mailbox supervise
+--serve` for owned receiver cleanup. Neither command assumes a research pool or
+stops an existing receiver it does not own.

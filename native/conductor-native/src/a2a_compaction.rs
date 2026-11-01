@@ -1,16 +1,10 @@
 //! Deterministic, bounded A2A message compaction.
 //!
-//! Python owns only conversion of mapping-like rows at the extension boundary.
-//! Validation, normalization, hashing, deduplication, ordering, and thread
-//! compaction live here so the long-lived A2A service does not use Python as a
-//! systems runtime for its receipt state machine.
+//! Native mailbox callers share validation, normalization, hashing,
+//! deduplication, ordering, and thread compaction from this module.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-#[cfg(feature = "python")]
-use pyo3::exceptions::PyValueError;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
@@ -75,11 +69,6 @@ struct Row {
     delivery_status: String,
     status_reason: Option<String>,
     read_at: Option<String>,
-}
-
-#[cfg(feature = "python")]
-fn parse_json(source: &str) -> Result<Value, String> {
-    serde_json::from_str(source).map_err(|error| format!("invalid native JSON input: {error}"))
 }
 
 fn object(value: &Value) -> Result<&Map<String, Value>, String> {
@@ -713,50 +702,6 @@ pub fn compact_threads_value(value: &Value) -> Result<Value, String> {
             Value::String(compaction_sha256),
         );
     Ok(result)
-}
-
-#[cfg(feature = "python")]
-fn run_native(
-    py: Python<'_>,
-    source: &str,
-    operation: fn(&Value) -> Result<Value, String>,
-) -> PyResult<String> {
-    let source = source.to_owned();
-    py.detach(move || {
-        let value = parse_json(&source).and_then(|value| operation(&value));
-        value
-            .and_then(|result| serde_json::to_string(&result).map_err(|error| error.to_string()))
-            .map_err(PyValueError::new_err)
-    })
-}
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn a2a_validate_coordination_v2_native(py: Python<'_>, source: &str) -> PyResult<String> {
-    run_native(py, source, validate_coordination_v2_value)
-}
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn a2a_compact_message_native(py: Python<'_>, source: &str) -> PyResult<String> {
-    run_native(py, source, compact_message_value)
-}
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn a2a_compact_threads_native(py: Python<'_>, source: &str) -> PyResult<String> {
-    run_native(py, source, compact_threads_value)
-}
-
-#[cfg(feature = "python")]
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        a2a_validate_coordination_v2_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(a2a_compact_message_native, module)?)?;
-    module.add_function(wrap_pyfunction!(a2a_compact_threads_native, module)?)?;
-    Ok(())
 }
 
 #[cfg(test)]

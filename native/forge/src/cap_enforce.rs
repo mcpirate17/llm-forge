@@ -15,13 +15,9 @@
 //! within budget and under 80% of cap) falls through completely unchanged,
 //! so the overwhelming majority of calls (anything outside a subagent, and
 //! every call inside one that is nowhere near its cap) pay zero cost beyond
-//! one field lookup. `Warn`/`Deny` fully short-circuit: they print their own
-//! JSON verdict and skip both the native Bash/`Agent` paths and the Python
-//! delegation entirely for that one call. This is an accepted, documented
-//! tradeoff -- only calls already at or past 80% of a subagent's cap ever
-//! lose the other `PreToolUse` hooks' say for that one call, and stopping a
-//! runaway subagent's *next* tool call outweighs one skipped lint-style
-//! hook on that same call.
+//! one field lookup. `Deny` short-circuits. `Warn` adds context after the
+//! matching native guards run, preserving their decisions: a near-cap warning
+//! must never turn a dangerous command into an early allow.
 //!
 //! **Budget**: the whole check (state load, incremental read, route lookup,
 //! state save) is bounded to 200 ms wall clock. On overrun the read-so-far
@@ -81,7 +77,10 @@ struct LiveState {
 /// for every `PreToolUse` payload.
 pub fn check(payload: &Value) -> CapCheck {
     let deadline = Instant::now() + BUDGET;
-    let ledger_root = crate::ledger::resolve_ledger_root(None);
+    let ledger_root = match crate::ledger::resolve_ledger_root(None) {
+        Ok(root) => root,
+        Err(error) => return CapCheck::Deny(format!("Cannot resolve cap state: {error}")),
+    };
     check_with_deadline(payload, deadline, &ledger_root)
 }
 

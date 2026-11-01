@@ -1,425 +1,340 @@
-//! One-pass repository guardrail and silent-fallback scan.
-//!
-//! CPython remains the parser of record. Rust owns file reads, ordered AST
-//! traversal, function-span checks, and exception-handler classification.
+//! Native Python guardrails. Ruff parses source; no CPython AST or runtime is used.
+use crate::style_scan::Finding;
+use ruff_python_ast as ast;
+use ruff_python_ast::visitor::source_order::{
+    walk_except_handler, walk_expr, walk_stmt, SourceOrderVisitor,
+};
+use ruff_text_size::Ranged;
+use serde::Serialize;
+use std::collections::BTreeSet;
+use std::io::Read;
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
 
-use std::collections::{BTreeSet, VecDeque};
-use std::fs;
-use std::path::PathBuf;
-
-use pyo3::exceptions::{PyRuntimeError, PySyntaxError, PyValueError};
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
-
-use crate::python_ast::{ast_children, descendants, list_items, string_attr, type_name};
-
-const ALLOW_GOD_FILE: &str = "# guardrail: allow-god-file";
-const ALLOW_GOD_FUNCTION: &str = "# guardrail: allow-god-function";
+pub const MAX_SOURCE_BYTES: usize = 1024 * 1024;
 const ALLOW_FALLBACK: &str = "guardrail: allow-fallback";
 
-struct LoadedFile {
-    path: PathBuf,
-    relative: String,
-    source: String,
+#[derive(Debug, Serialize)]
+pub struct Fallback {
+    pub relative: String,
+    pub line: usize,
+    pub end_line: usize,
+    pub exception: String,
+    pub severity: &'static str,
+    pub confidence: f64,
+    pub value: usize,
 }
 
-#[derive(Debug)]
-struct Fallback {
-    relative: String,
-    line: usize,
-    end_line: usize,
-    exception: String,
-    severity: &'static str,
-    confidence: f64,
-    value: usize,
+#[derive(Default, Debug, Serialize)]
+pub struct Scan {
+    pub god_files: Vec<String>,
+    pub god_functions: Vec<String>,
+    pub fallbacks: Vec<Fallback>,
+    pub unparsable: Vec<String>,
 }
 
-/// God-file count, god-function count, god files, god functions, fallbacks,
-/// and the files CPython could not parse. The last is not a finding: it is the
-/// part of the scan that did not happen, and the caller has to decide what a
-/// partial audit is worth rather than being handed one that looks complete.
-type ScanOutput = (
-    usize,
-    usize,
-    Vec<String>,
-    Vec<String>,
-    Py<PyList>,
-    Vec<String>,
-);
-
-fn load_files(paths: Vec<String>, repo: Option<String>) -> Result<Vec<LoadedFile>, String> {
-    let repo = repo.map(PathBuf::from);
-    let mut loaded = Vec::with_capacity(paths.len());
-    for raw_path in paths {
-        let path = PathBuf::from(raw_path);
-        let bytes = match fs::read(&path) {
-            Ok(bytes) => bytes,
-            Err(_) => continue,
-        };
-        let relative = match repo.as_ref() {
-            Some(root) => path
-                .strip_prefix(root)
-                .map_err(|_| {
-                    format!(
-                        "detector path {} is outside repository {}",
-                        path.display(),
-                        root.display()
-                    )
-                })?
-                .to_string_lossy()
-                .replace('\\', "/"),
-            None => path.to_string_lossy().replace('\\', "/"),
-        };
-        loaded.push(LoadedFile {
-            path,
-            relative,
-            source: String::from_utf8_lossy(&bytes).into_owned(),
-        });
-    }
-    Ok(loaded)
+pub struct Policy<'a> {
+    pub allowed_files: &'a BTreeSet<String>,
+    pub allowed_functions: &'a BTreeSet<String>,
+    pub god_file_lines: usize,
+    pub god_func_lines: usize,
 }
 
-fn breadth_first<'py>(root: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    let mut output = Vec::new();
-    let mut queue = VecDeque::from([root.clone()]);
-    while let Some(node) = queue.pop_front() {
-        queue.extend(ast_children(&node)?);
-        output.push(node);
-    }
-    Ok(output)
-}
-
-fn direct_route_wrapper(node: &Bound<'_, PyAny>, name: &str) -> PyResult<bool> {
-    if !name.starts_with("register_") {
-        return Ok(false);
-    }
-    for child in ast_children(node)? {
-        if matches!(
-            type_name(&child)?.as_str(),
-            "FunctionDef" | "AsyncFunctionDef"
-        ) {
-            return Ok(true);
+/// Caller-selected regular UTF-8 source, bounded before parsing. Missing files are errors.
+pub fn read_source(path: &Path) -> Result<String, String> {
+    let read = || -> std::io::Result<String> {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+            .open(path)?;
+        let meta = file.metadata()?;
+        if !meta.is_file() || meta.len() > MAX_SOURCE_BYTES as u64 {
+            return Err(std::io::Error::other(
+                "source must be a regular file <= 1 MiB",
+            ));
         }
-    }
-    Ok(false)
-}
-
-fn function_marker(source_lines: &[&str], start: usize, end: usize) -> bool {
-    source_lines
-        .get(start..end.min(source_lines.len()))
-        .is_some_and(|lines| lines.iter().any(|line| line.contains(ALLOW_GOD_FUNCTION)))
-}
-
-fn function_findings(
-    nodes: &[Bound<'_, PyAny>],
-    file: &LoadedFile,
-    allowed_functions: &BTreeSet<String>,
-    threshold: usize,
-) -> PyResult<Vec<String>> {
-    let source_lines: Vec<_> = file.source.split('\n').collect();
-    let mut findings = Vec::new();
-    for node in nodes {
-        if !matches!(
-            type_name(node)?.as_str(),
-            "FunctionDef" | "AsyncFunctionDef"
-        ) {
-            continue;
+        let mut source = String::new();
+        file.take(MAX_SOURCE_BYTES as u64 + 1)
+            .read_to_string(&mut source)?;
+        if source.len() > MAX_SOURCE_BYTES || source.contains('\0') {
+            return Err(std::io::Error::other("source exceeds size/NUL bound"));
         }
-        let line: usize = node.getattr("lineno")?.extract()?;
-        let end: Option<usize> = node.getattr("end_lineno")?.extract()?;
-        let end = end.unwrap_or(line);
-        let span = end - line + 1;
-        let name = string_attr(node, "name")?;
-        let key = format!("{}::{name}", file.relative);
-        if span > threshold
-            && !direct_route_wrapper(node, &name)?
-            && !allowed_functions.contains(&key)
-            && !function_marker(&source_lines, line.saturating_sub(1), end)
-        {
-            findings.push(format!("{}:{line} {name} ({span})", file.path.display()));
-        }
-    }
-    Ok(findings)
-}
-
-/// Every call anywhere in `handler`'s body.
-fn body_facts<'py>(handler: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    let mut calls = Vec::new();
-    for statement in list_items(&handler.getattr("body")?)? {
-        for node in descendants(&statement)? {
-            if type_name(&node)?.as_str() == "Call" {
-                calls.push(node);
-            }
-        }
-    }
-    Ok(calls)
-}
-
-fn handler_is_broad(handler: &Bound<'_, PyAny>) -> PyResult<bool> {
-    let exception_type = handler.getattr("type")?;
-    if exception_type.is_none() {
-        return Ok(true);
-    }
-    for node in descendants(&exception_type)? {
-        if type_name(&node)? == "Name"
-            && matches!(
-                string_attr(&node, "id")?.as_str(),
-                "BaseException" | "Exception"
-            )
-        {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn fallback_rank(bare: bool, broad: bool, control_only: bool) -> (f64, usize, &'static str) {
-    if bare {
-        (0.98, 100, "critical")
-    } else if broad && control_only {
-        (0.90, 80, "high")
-    } else if broad {
-        (0.75, 45, "medium")
-    } else {
-        (0.65, 25, "medium")
-    }
-}
-
-fn fallback_candidate(
-    ast: &Bound<'_, PyModule>,
-    handler: &Bound<'_, PyAny>,
-    relative: &str,
-) -> PyResult<Option<Fallback>> {
-    let body = list_items(&handler.getattr("body")?)?;
-    // A handler that raises, logs or prints is not silent -- and both shapes are
-    // already excluded by the two tests below, so neither needs a guard of its
-    // own. `Raise` is not one of the statement kinds either test accepts, and a
-    // call disqualifies `silent_default` outright while being something no
-    // `Pass`, `Continue` or `Break` can contain.
-    let calls = body_facts(handler)?;
-    let control_only = body.iter().try_fold(true, |all, statement| {
-        Ok::<_, PyErr>(
-            all && matches!(
-                type_name(statement)?.as_str(),
-                "Pass" | "Continue" | "Break"
-            ),
-        )
-    })?;
-    let broad = handler_is_broad(handler)?;
-    let silent_default = broad
-        && calls.is_empty()
-        && body.iter().try_fold(true, |all, statement| {
-            Ok::<_, PyErr>(
-                all && matches!(
-                    type_name(statement)?.as_str(),
-                    "Pass" | "Continue" | "Break" | "Return" | "Assign"
-                ),
-            )
-        })?;
-    if !control_only && !silent_default {
-        return Ok(None);
-    }
-    let exception_type = handler.getattr("type")?;
-    let bare = exception_type.is_none();
-    let exception = if bare {
-        "bare except".to_owned()
-    } else {
-        ast.call_method1("unparse", (&exception_type,))?.extract()?
+        Ok(source)
     };
-    let (confidence, value, severity) = fallback_rank(bare, broad, control_only);
-    let line: usize = handler.getattr("lineno")?.extract()?;
-    let end_line: Option<usize> = handler.getattr("end_lineno")?.extract()?;
-    Ok(Some(Fallback {
-        relative: relative.to_owned(),
-        line,
-        end_line: end_line.unwrap_or(line),
-        exception,
-        severity,
-        confidence,
-        value,
-    }))
+    read().map_err(|e| format!("detector cannot read {}: {e}", path.display()))
 }
 
-fn fallback_findings(
-    ast: &Bound<'_, PyModule>,
-    nodes: &[Bound<'_, PyAny>],
-    relative: &str,
-) -> PyResult<Vec<Fallback>> {
-    let mut findings = Vec::new();
-    for node in nodes {
-        if type_name(node)? == "ExceptHandler" {
-            if let Some(candidate) = fallback_candidate(ast, node, relative)? {
-                findings.push(candidate);
+fn line_starts(source: &str) -> Vec<usize> {
+    let bytes = source.as_bytes();
+    let mut starts = vec![0];
+    starts.extend(bytes.iter().enumerate().filter_map(|(i, &b)| {
+        (b == b'\n' || (b == b'\r' && bytes.get(i + 1) != Some(&b'\n'))).then_some(i + 1)
+    }));
+    starts
+}
+
+fn source_lines(source: &str) -> Vec<&str> {
+    let starts = line_starts(source);
+    starts
+        .iter()
+        .enumerate()
+        .map(|(i, &start)| &source[start..starts.get(i + 1).copied().unwrap_or(source.len())])
+        .collect()
+}
+
+struct Facts<'a> {
+    source: &'a str,
+    relative: &'a str,
+    line_starts: Vec<usize>,
+    functions: Vec<(String, usize, usize, bool)>,
+    fallbacks: Vec<Fallback>,
+}
+
+impl Facts<'_> {
+    fn line(&self, byte: usize) -> usize {
+        self.line_starts.partition_point(|start| *start <= byte)
+    }
+
+    fn end_line(&self, node: &impl Ranged) -> usize {
+        self.line(node.end().to_usize().saturating_sub(1))
+    }
+}
+
+#[derive(Default)]
+struct BodyFacts {
+    calls: bool,
+    broad: bool,
+}
+
+impl<'a> SourceOrderVisitor<'a> for BodyFacts {
+    fn visit_expr(&mut self, expression: &'a ast::Expr) {
+        match expression {
+            ast::Expr::Call(_) => self.calls = true,
+            ast::Expr::Name(name) if matches!(name.id.as_str(), "Exception" | "BaseException") => {
+                self.broad = true;
             }
+            _ => (),
+        }
+        walk_expr(self, expression);
+    }
+}
+
+fn control(statement: &ast::Stmt) -> bool {
+    matches!(
+        statement,
+        ast::Stmt::Pass(_) | ast::Stmt::Break(_) | ast::Stmt::Continue(_)
+    )
+}
+
+fn exception_text(expression: &ast::Expr, source: &str) -> String {
+    match expression {
+        ast::Expr::Name(name) => name.id.to_string(),
+        ast::Expr::Attribute(value) => {
+            format!("{}.{}", exception_text(&value.value, source), value.attr)
+        }
+        ast::Expr::Tuple(tuple) => {
+            let mut text = tuple
+                .elts
+                .iter()
+                .map(|e| exception_text(e, source))
+                .collect::<Vec<_>>()
+                .join(", ");
+            if tuple.elts.len() == 1 {
+                text.push(',');
+            }
+            format!("({text})")
+        }
+        _ => source[expression.range()].to_owned(),
+    }
+}
+
+impl Facts<'_> {
+    fn fallback(&self, handler: &ast::ExceptHandlerExceptHandler) -> Option<Fallback> {
+        let mut facts = BodyFacts::default();
+        if let Some(kind) = &handler.type_ {
+            facts.visit_expr(kind);
+        }
+        let bare = handler.type_.is_none();
+        let broad = bare || facts.broad;
+        facts.calls = false;
+        for statement in &handler.body {
+            facts.visit_stmt(statement);
+        }
+        let control_only = handler.body.iter().all(control);
+        let silent_default = broad
+            && !facts.calls
+            && handler
+                .body
+                .iter()
+                .all(|s| control(s) || matches!(s, ast::Stmt::Return(_) | ast::Stmt::Assign(_)));
+        if !control_only && !silent_default {
+            return None;
+        }
+        let (confidence, value, severity) = match (bare, broad, control_only) {
+            (true, _, _) => (0.98, 100, "critical"),
+            (_, true, true) => (0.90, 80, "high"),
+            (_, true, _) => (0.75, 45, "medium"),
+            _ => (0.65, 25, "medium"),
+        };
+        Some(Fallback {
+            relative: self.relative.to_owned(),
+            line: self.line(handler.start().to_usize()),
+            end_line: self.end_line(handler),
+            exception: handler
+                .type_
+                .as_ref()
+                .map(|e| exception_text(e, self.source))
+                .unwrap_or_else(|| "bare except".to_owned()),
+            severity,
+            confidence,
+            value,
+        })
+    }
+}
+
+impl<'a> SourceOrderVisitor<'a> for Facts<'_> {
+    fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
+        if let ast::Stmt::FunctionDef(function) = statement {
+            let registration = function.name.starts_with("register_")
+                && function
+                    .body
+                    .iter()
+                    .any(|s| matches!(s, ast::Stmt::FunctionDef(_)));
+            self.functions.push((
+                function.name.to_string(),
+                self.line(function.start().to_usize()),
+                self.end_line(function),
+                registration,
+            ));
+        }
+        walk_stmt(self, statement);
+    }
+
+    fn visit_except_handler(&mut self, handler: &'a ast::ExceptHandler) {
+        let ast::ExceptHandler::ExceptHandler(handler_node) = handler;
+        if let Some(finding) = self.fallback(handler_node) {
+            self.fallbacks.push(finding);
+        }
+        walk_except_handler(self, handler);
+    }
+}
+
+fn facts<'a>(relative: &'a str, source: &'a str) -> Result<Facts<'a>, String> {
+    if source.len() > MAX_SOURCE_BYTES || source.contains('\0') {
+        return Err("detector source exceeds size/NUL bound".to_owned());
+    }
+    let module = ruff_python_parser::parse_module(source)
+        .map_err(|e| format!("{relative}: invalid Python: {e}"))?;
+    Ok(facts_from_ast(relative, source, module.syntax()))
+}
+
+fn facts_from_ast<'a>(relative: &'a str, source: &'a str, module: &ast::ModModule) -> Facts<'a> {
+    let mut facts = Facts {
+        source,
+        relative,
+        line_starts: line_starts(source),
+        functions: Vec::new(),
+        fallbacks: Vec::new(),
+    };
+    for statement in &module.body {
+        facts.visit_stmt(statement);
+    }
+    facts
+}
+
+/// Audit syntax failures are explicit coverage gaps; file-level findings remain available.
+pub fn inspect(relative: &str, source: &str, policy: &Policy<'_>) -> Result<Scan, String> {
+    if source.len() > MAX_SOURCE_BYTES || source.contains('\0') {
+        return Err("detector source exceeds size/NUL bound".to_owned());
+    }
+    let mut result = Scan::default();
+    let lines = source_lines(source);
+    if lines.len() > policy.god_file_lines
+        && !policy.allowed_files.contains(relative)
+        && !source.contains("# guardrail: allow-god-file")
+    {
+        result
+            .god_files
+            .push(format!("{relative} ({})", lines.len()));
+    }
+    if !relative.ends_with(".py") {
+        return Ok(result);
+    }
+    let facts = match facts(relative, source) {
+        Ok(facts) => facts,
+        Err(_) => {
+            result.unparsable.push(relative.to_owned());
+            return Ok(result);
+        }
+    };
+    for (name, line, end, registration) in facts.functions {
+        let span = end - line + 1;
+        if span > policy.god_func_lines
+            && !registration
+            && !policy
+                .allowed_functions
+                .contains(&format!("{relative}::{name}"))
+            && !lines[line - 1..end]
+                .iter()
+                .any(|l| l.contains("# guardrail: allow-god-function"))
+        {
+            result
+                .god_functions
+                .push(format!("{relative}:{line} {name} ({span})"));
         }
     }
-    Ok(findings)
+    result.fallbacks = facts.fallbacks;
+    Ok(result)
 }
 
-fn fallback_to_dict<'py>(py: Python<'py>, finding: Fallback) -> PyResult<Bound<'py, PyDict>> {
-    let output = PyDict::new(py);
-    let location = format!("{}:{}", finding.relative, finding.line);
-    output.set_item("id", format!("fallback:{location}"))?;
-    output.set_item("category", "silent_fallbacks")?;
-    output.set_item("severity", finding.severity)?;
-    output.set_item("confidence", finding.confidence)?;
-    output.set_item("value", finding.value)?;
-    output.set_item("files", [finding.relative])?;
-    output.set_item("location", location)?;
-    output.set_item(
-        "evidence",
-        format!(
-            "except {} has no raise, warning, or error log",
-            finding.exception
-        ),
-    )?;
-    Ok(output)
+/// Strict gate scan. A documented waiver covers the handler's own lines only.
+pub fn scan_source(relative: &str, source: &str) -> Result<Vec<Finding>, String> {
+    let facts = facts(relative, source)?;
+    Ok(finding_rows(facts))
 }
 
-/// Return god-file, god-function, and silent-fallback findings in input/AST
-/// order, plus the files CPython could not parse.
-///
-/// The unparsable list is the point of the sixth element. A file with no AST
-/// still has lines, so the god-file check lands on it and dropping the file
-/// outright would lose a real finding; but the two AST-based detectors did not
-/// run on it, and an audit that reports their silence as a clean result is
-/// telling the caller something it never checked. The caller decides what to do
-/// with a partial scan -- it is not this function's to decide, and it is not
-/// nobody's.
-#[pyfunction]
-#[pyo3(signature = (paths, repo, allowed_files, allowed_functions, god_file_lines, god_func_lines))]
-pub(crate) fn audit_detector_scan(
-    py: Python<'_>,
-    paths: Vec<String>,
-    repo: Option<String>,
-    allowed_files: Vec<String>,
-    allowed_functions: Vec<String>,
-    god_file_lines: usize,
-    god_func_lines: usize,
-) -> PyResult<ScanOutput> {
-    let files = py
-        .detach(move || load_files(paths, repo))
-        .map_err(PyValueError::new_err)?;
-    let allowed_files: BTreeSet<_> = allowed_files.into_iter().collect();
-    let allowed_functions: BTreeSet<_> = allowed_functions.into_iter().collect();
-    let ast = py.import("ast")?;
-    let mut god_files = Vec::new();
-    let mut god_functions = Vec::new();
-    let mut fallbacks = Vec::new();
-    let mut unparsable = Vec::new();
-    for file in files {
-        let lines = file.source.matches('\n').count() + 1;
-        if lines > god_file_lines
-            && !allowed_files.contains(&file.relative)
-            && !file.source.contains(ALLOW_GOD_FILE)
+pub fn scan_parsed(relative: &str, parsed: &crate::source::PythonSource<'_>) -> Vec<Finding> {
+    finding_rows(facts_from_ast(relative, parsed.text(), parsed.module()))
+}
+
+fn finding_rows(facts: Facts<'_>) -> Vec<Finding> {
+    let lines = source_lines(facts.source);
+    let mut rows = Vec::new();
+    for finding in facts.fallbacks {
+        if lines[finding.line - 1..finding.end_line]
+            .iter()
+            .any(|line| line.contains(ALLOW_FALLBACK))
         {
-            god_files.push(format!("{} ({lines})", file.path.display()));
-        }
-        if file.path.extension().and_then(|value| value.to_str()) != Some("py") {
             continue;
         }
-        let tree = match ast.call_method1("parse", (&file.source, file.path.to_string_lossy())) {
-            Ok(tree) => tree,
-            // The line-based god-file check above needs no AST, so the file
-            // keeps that finding; only the AST half is missing, and it is
-            // reported as missing rather than dropped.
-            Err(error) if error.is_instance_of::<PySyntaxError>(py) => {
-                unparsable.push(file.relative.clone());
-                continue;
-            }
-            Err(error) => return Err(error),
-        };
-        let nodes = breadth_first(&tree).map_err(|error| {
-            PyRuntimeError::new_err(format!(
-                "native AST traversal failed for {}: {error}",
-                file.relative
-            ))
-        })?;
-        god_functions.extend(
-            function_findings(&nodes, &file, &allowed_functions, god_func_lines).map_err(
-                |error| {
-                    PyRuntimeError::new_err(format!(
-                        "native guardrail scan failed for {}: {error}",
-                        file.relative
-                    ))
-                },
-            )?,
-        );
-        fallbacks.extend(
-            fallback_findings(&ast, &nodes, &file.relative).map_err(|error| {
-                PyRuntimeError::new_err(format!(
-                    "native fallback scan failed for {}: {error}",
-                    file.relative
-                ))
-            })?,
-        );
-    }
-    let output = PyList::empty(py);
-    for fallback in fallbacks {
-        output.append(fallback_to_dict(py, fallback)?)?;
-    }
-    Ok((
-        god_files.len(),
-        god_functions.len(),
-        god_files,
-        god_functions,
-        output.unbind(),
-        unparsable,
-    ))
-}
-
-/// Silent-fallback findings for `paths`, shaped like `style_scan`'s rows so one
-/// gate wrapper can line-scope both lists together.
-///
-/// This is the same classifier the repository audit runs, behind a different
-/// door. Two things differ, and both follow from being a gate rather than a
-/// report. A file CPython cannot parse is an error here, not a skip: an audit
-/// can pass over one broken file among thousands, but a gate that scans the
-/// candidate's own changed files and reports nothing for the one that will not
-/// parse has given a pass it did not earn. And a handler may opt out with
-/// `# guardrail: allow-fallback` anywhere in its body -- a swallow that someone
-/// wrote down a reason for is a decision, and the rule's job is to catch the
-/// ones nobody decided.
-#[pyfunction]
-pub fn fallback_scan_files(py: Python<'_>, paths: Vec<String>) -> PyResult<Py<PyList>> {
-    let ast = py.import("ast")?;
-    let mut rows: Vec<(String, usize, String)> = Vec::new();
-    for raw in paths {
-        let path = PathBuf::from(&raw);
-        let bytes = fs::read(&path).map_err(|error| {
-            PyValueError::new_err(format!(
-                "fallback scan cannot read {}: {error}",
-                path.display()
-            ))
-        })?;
-        let source = String::from_utf8_lossy(&bytes).into_owned();
-        let relative = raw.replace('\\', "/");
-        let tree = ast.call_method1("parse", (&source, &relative))?;
-        let nodes = breadth_first(&tree)?;
-        let lines: Vec<&str> = source.split('\n').collect();
-        for finding in fallback_findings(&ast, &nodes, &relative)? {
-            let span = finding.line.saturating_sub(1)..finding.end_line.min(lines.len());
-            if lines[span].iter().any(|line| line.contains(ALLOW_FALLBACK)) {
-                continue;
-            }
-            rows.push((finding.relative, finding.line, finding.exception));
-        }
+        rows.push(Finding { path: finding.relative, line: finding.line,
+            rule: "failure/silent-fallback", message: format!(
+                "except {} swallows the error: re-raise it, log it at error level, or write down why with `# guardrail: allow-fallback`", finding.exception) });
     }
     rows.sort();
-    let out = PyList::empty(py);
-    for (relative, line, exception) in rows {
-        let row = PyDict::new(py);
-        row.set_item("path", relative)?;
-        row.set_item("line", line)?;
-        row.set_item("rule", "failure/silent-fallback")?;
-        row.set_item(
-            "message",
-            format!(
-                "except {exception} swallows the error: re-raise it, log it at error \
-                 level, or write down why with `# guardrail: allow-fallback`"
-            ),
-        )?;
-        out.append(row)?;
-    }
-    Ok(out.unbind())
+    rows
 }
+
+pub fn scan_paths(paths: &[String]) -> Result<Vec<Finding>, String> {
+    if paths.len() > 256 {
+        return Err("detector accepts at most 256 files".to_owned());
+    }
+    let mut rows = Vec::new();
+    let mut bytes = 0;
+    for path in paths {
+        let source = read_source(Path::new(path))?;
+        bytes += source.len();
+        if bytes > 16 * MAX_SOURCE_BYTES {
+            return Err("detector exceeds 16 MiB input budget".to_owned());
+        }
+        rows.extend(scan_source(&path.replace('\\', "/"), &source)?);
+    }
+    rows.sort();
+    Ok(rows)
+}
+
+#[cfg(feature = "python")]
+#[path = "detector_bindings.rs"]
+mod bindings;
+#[cfg(feature = "python")]
+pub use bindings::{audit_detector_scan, fallback_scan_files};

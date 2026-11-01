@@ -5,6 +5,8 @@
 
 use std::path::Path;
 use std::process::Command;
+#[path = "src/source_fingerprint.rs"]
+mod source_fingerprint;
 
 fn git_text(args: &[&str]) -> Option<String> {
     Command::new("git")
@@ -36,4 +38,26 @@ fn main() {
     }
     let rev = git_text(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "unknown".into());
     println!("cargo:rustc-env=FORGE_GIT_REV={rev}");
+    let manifest = std::path::PathBuf::from(
+        std::env::var_os("CARGO_MANIFEST_DIR").expect("Cargo manifest directory"),
+    );
+    let root = manifest
+        .parent()
+        .and_then(Path::parent)
+        .expect("native repository layout");
+    let files =
+        source_fingerprint::files(root).expect("inventory native source for build fingerprint");
+    for path in &files {
+        println!("cargo:rerun-if-changed={}", root.join(path).display());
+    }
+    // Watching the source directories also detects newly added/deleted modules.
+    for name in ["forge", "conductor-native"] {
+        println!(
+            "cargo:rerun-if-changed={}",
+            root.join("native").join(name).join("src").display()
+        );
+    }
+    let fingerprint = source_fingerprint::fingerprint(root, &files)
+        .expect("hash native source for build fingerprint");
+    println!("cargo:rustc-env=FORGE_SOURCE_SHA256={fingerprint}");
 }

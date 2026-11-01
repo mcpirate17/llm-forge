@@ -1,27 +1,8 @@
-//! Differential parity test for the two `PostToolUse` output-bounding hooks:
-//! `_bash_quiet` (Bash) and `post_tool_quiet` (Read/Grep/MCP), ported to
-//! `native/forge/src/tool_quiet.rs`.
-//!
-//! Unlike a live differential test, this file spawns no Python interpreter
-//! at `cargo test` time: `tests/fixtures/tool_quiet_corpus.json` and
-//! `tool_quiet_expected.json` are a frozen corpus, generated once by running
-//! the REAL, unmodified `_bash_quiet.py`/`post_tool_quiet.py` hook bodies
-//! under a deterministic, injected environment (fixed spill timestamp, a
-//! `repo_root`-relative save dir, per-case cap/limit/output-field overrides)
-//! -- this file loads that frozen ground truth via `include_str!` and
-//! compares Rust's own computation against it directly.
-//!
-//! `src/tooling/hooks/claude/test_tool_quiet_parity_corpus.py` is the
-//! Python-side twin: it loads the SAME two fixtures, independently re-runs
-//! Python's own hook bodies under the same deterministic environment, and
-//! asserts Python still matches the same frozen expected values. Together
-//! the two tests pin both implementations to one shared ground truth instead
-//! of comparing them to each other at test time, following the same shape as
-//! `bash_pretooluse_hooks_parity.rs`/its Python twin.
-//!
-//! This crate has no lib target: `tool_quiet.rs` is pulled in via `#[path]`,
-//! the same way every other parity test in this crate includes its module
-//! under test.
+//! Frozen compatibility corpus for native PostToolUse output bounding.
+//! Historical outputs were captured before retiring the interpreted hooks.
+//! The native test consumes only `tests/fixtures/tool_quiet_{corpus,expected}.json`;
+//! it never launches an interpreter or regenerates expectations from the subject.
+//! The binary-private module is included directly for these contracts.
 
 #[path = "../src/tool_quiet.rs"]
 mod tool_quiet;

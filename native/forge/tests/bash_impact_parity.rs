@@ -1,25 +1,8 @@
-//! Differential parity test: `forge::bash_impact::classify` against a corpus
-//! of commands run against a committed on-disk fixture tree
-//! (`tests/fixtures/bash_impact_tree/`), compared to
-//! `bash_impact_expected.json` -- frozen output captured from the Python
-//! `_bash_impact._classify` at fixture-authoring time (see
-//! `/tmp/gen_bash_impact_expected.py`, a one-off generation script, not
-//! checked in; regenerate by re-running `_bash_impact._classify` over
-//! `bash_impact_corpus.json`'s `{ROOT}`-templated commands, substituting the
-//! real fixture tree path for `{ROOT}` before classifying and substituting it
-//! back out of the result before freezing, exactly as this test does at
-//! its own runtime).
-//!
-//! `{ROOT}` is a template placeholder, not a baked-in path: the fixture tree
-//! is a real, committed directory so both this test and its Python twin
-//! (`src/tooling/hooks/claude/test_bash_impact_parity.py`) can point `rm -rf`,
-//! `find -delete`, `git clean` and `sqlite3` at files that actually exist
-//! (impact analysis is inherently filesystem-dependent, unlike
-//! `guard_parity.rs`'s pure string matching) -- each side substitutes its own
-//! absolute path to the tree at test time.
-//!
-//! This binary crate has no lib target, so `bash_impact` is compiled in via
-//! `#[path]` rather than an external `extern crate forge` import.
+//! Native impact classification against historical frozen expectations.
+//! Commands are classified against `tests/fixtures/bash_impact_tree/`; they are
+//! never executed. `{ROOT}` is replaced with the actual fixture path and then
+//! normalized out of the result for comparison. The JSON corpus and expected
+//! output remain test data after retirement of the interpreted implementation.
 
 #[path = "../src/bash_impact.rs"]
 mod bash_impact;

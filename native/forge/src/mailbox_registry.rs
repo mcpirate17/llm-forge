@@ -75,21 +75,22 @@ impl Drop for RegistryLock {
 }
 
 fn read_json(path: &Path, label: &str) -> Result<Option<Value>> {
-    let file = match File::open(path) {
-        Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+    let bytes = match forge::bounded_file::read(path, MAX_REGISTRY_BYTES as usize) {
+        Ok(bytes) => bytes,
+        Err(error)
+            if error
+                .downcast_ref::<std::io::Error>()
+                .is_some_and(|error| error.kind() == std::io::ErrorKind::NotFound) =>
+        {
+            return Ok(None)
+        }
         Err(error) => {
             return Err(error).with_context(|| format!("opening {label} {}", path.display()))
         }
     };
-    let mut bytes = Vec::new();
-    file.take(MAX_REGISTRY_BYTES + 1).read_to_end(&mut bytes)?;
-    ensure!(
-        bytes.len() as u64 <= MAX_REGISTRY_BYTES,
-        "{label} exceeds 1 MiB"
-    );
     Ok(Some(
-        serde_json::from_slice(&bytes).with_context(|| format!("invalid {label} JSON"))?,
+        forge::tool_schema::parse_document(std::str::from_utf8(&bytes)?)
+            .with_context(|| format!("invalid {label} JSON"))?,
     ))
 }
 
@@ -115,7 +116,7 @@ fn random_hex(bytes: usize) -> Result<String> {
     Ok(data.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
-fn atomic_json(path: &Path, value: &Value) -> Result<()> {
+pub(super) fn atomic_json(path: &Path, value: &Value) -> Result<()> {
     let suffix = random_hex(8)?;
     let temp = path.with_extension(format!("{}.{}.tmp", std::process::id(), suffix));
     let result = (|| {
@@ -283,11 +284,15 @@ pub fn init(
     parse_records(&value, &path)
 }
 
-fn probe(record: &Record) -> Value {
+pub(super) fn probe(record: &Record) -> Value {
+    probe_for(record, Duration::from_secs(1))
+}
+
+pub(super) fn probe_for(record: &Record, timeout: Duration) -> Value {
     let base = json!({"name":record.name,"port":record.port,
         "registration_fingerprint":record.fingerprint()});
     let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(1)))
+        .timeout_global(Some(timeout))
         .max_redirects(0)
         .proxy(None)
         .max_response_header_size(16_384)

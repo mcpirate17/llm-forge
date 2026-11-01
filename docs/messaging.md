@@ -1,6 +1,6 @@
 # Local agent messaging
 
-`agent_a2a` is a durable local mailbox transport. It coordinates agents; receiving
+`forge mailbox` is a durable local mailbox transport. It coordinates agents; receiving
 a message never authorizes an action or supplies a governance approval. Endpoints
 bind to loopback, registry tokens protect recipient writes, and sender names remain
 cooperative identity metadata within the local fleet trust domain.
@@ -12,8 +12,8 @@ registry tokens private. Provision identities explicitly with `init --name NAME
 
 ## Inspect and acknowledge with Rust
 
-`forge mailbox` opens the same SQLite stores directly. It needs no Python
-interpreter and performs no network operations:
+The inspection commands open the existing SQLite stores directly. They need no Python
+interpreter and perform no network operations:
 
 ```sh
 forge mailbox --host /path/to/project inbox --as-name recipient --compact --json
@@ -37,6 +37,29 @@ stores produce errors for inbox, show and read. These commands can inspect a
 retained store after its registry entry is removed. `history` requires a registered
 identity and reports unavailable history when its store or event table is absent.
 Lifecycle and presentation state remain owned by the transport.
+
+## Resolve messages and retain evidence
+
+```sh
+forge mailbox read --as-name recipient MESSAGE_ID
+forge mailbox resolve --as-name recipient MESSAGE_ID
+forge mailbox hold --as-name recipient MESSAGE_ID --reason 'Awaiting review'
+forge mailbox hold --as-name recipient MESSAGE_ID --clear
+```
+
+`resolve` requires an existing read acknowledgment and atomically records the
+resolved state. Repeating it returns the original resolution timestamp. Its
+receipt includes the message ID, sender and timestamp; normal lifecycle rows
+do not load or print message bodies. A legacy row without lifecycle metadata is
+reconstructed with pinned retention and content hashes, subject to a 1 MiB
+materialization limit. Larger legacy rows fail without changes.
+
+`hold` normalizes a 1–240 character reason or clears it explicitly. It requires
+existing lifecycle metadata; legacy messages remain pinned until migrated.
+Both commands affect only the inbound fact, including when a self-send also has
+an outbound row with the same ID. They preserve message content and do not
+create missing stores. Retention eligibility still requires the separate,
+explicit retention policy and operation.
 
 ## Queue an outbound message with Rust
 
@@ -64,8 +87,8 @@ a later successful transport receipt.
 ## Deliver through the transport
 
 ```sh
-python -m conductor.agent_a2a send --from-name sender --to recipient --body-file message.txt
-python -m conductor.agent_a2a flush --as-name sender --max-messages 100
+forge mailbox send --from-name sender --to recipient --body-file message.txt
+forge mailbox flush --as-name sender --max-messages 100
 ```
 
 Structured `coordination-v2` sends can queue while the peer is offline. A reachable
@@ -93,7 +116,7 @@ retry. Delivery is at least once over the wire and stored once by message ID.
 Identical inbound retries succeed; reusing an ID with a different sender, recipient,
 body or data fails without overwriting the original fact.
 
-Both native `send`/`enqueue` and Python `send` accept `--idempotency-key KEY` (1–256
+Native `send`/`enqueue` accept `--idempotency-key KEY` (1–256
 bytes). The key is scoped to sender and recipient. An identical logical send reuses
 its existing ID and receipt; different content under that key fails. Keys should
 identify one operation, not a recurring thread. A new operation needs a new key.
@@ -114,39 +137,72 @@ without exposing bodies, marking inbox messages read, or creating/migrating stor
 ## Bounded retry supervisor
 
 ```sh
-python -m conductor.agent_a2a supervise --as-name sender \
+forge mailbox supervise --as-name sender \
   --duration 300 --interval 5 --max-messages 100
 ```
 
-This explicit foreground command retries for a finite wall-clock budget. Duration
+This native foreground command retries for a finite wall-clock budget. Duration
 is 1–3600 seconds; each flush child has a timeout of at most 15 seconds and at most
 the remaining budget. Queue contents survive timeouts and restarts. It does not run
 automatically when hooks are installed or a session starts.
 
-Idle supervisors reconcile at most once per 60 seconds and wake immediately on
+Idle supervisors reconcile once per 60 seconds and wake on
 mailbox database/WAL changes on Linux. Lifecycle state is written on a changed
 flush result and at most one idle heartbeat per minute, plus startup and final
 state. Active retry queues continue using `--interval` and durable due times.
+Idle cycles launch no flush process. Pending cycles use the same native executable
+with bounded stdout/stderr and a process group owned by the supervisor. A persistent
+read-only SQLite connection avoids self-generated open/close wakeups. The supervisor
+drains its own writes before checking pending work; later enqueues wake the directory
+watch. A lost event is reconciled by the finite timer. Inotify setup or directory
+invalidation errors fail visibly. This supervisor requires Linux.
+
+Supervised flushes explicitly use `--defer-busy`: a sender lock held by another
+enqueue or flush leaves its queue untouched and returns exit 3 for a later retry.
+Ordinary `flush` retains its error on concurrent delivery unless this flag is set.
+SIGINT/SIGTERM cancels readiness waits and flushes through signalfd; pidfds report
+owned receiver exits without PID-reuse races. The bounded Agent Card preflight
+can take up to one second. A termination returns exit 130 with durable
+`interrupted` state. A timed-out delivery might already have reached its peer;
+the retained message ID makes the later retry deduplicable.
 
 ## Notify consumers without idle scans
 
 ```sh
-python -m conductor.agent_a2a watch --as-name recipient --json --interval 120
-python -m conductor.agent_a2a watch --as-name recipient --once --json --replay-unread
+forge mailbox watch --as-name recipient --json --interval 120 --duration 300
+forge mailbox watch --as-name recipient --once --json --replay-unread
 ```
 
-`watch` uses Linux inotify on the mailbox directory, including WAL file replacement,
-and polls at the requested interval as recovery for missed notifications. Platforms
-without inotify and identities without a database use bounded polling. Inotify
-resource failures are reported before falling back. No additional daemon starts.
+Native `watch` uses Linux inotify on the mailbox directory, including WAL file
+replacement, and a finite reconciliation timer for missed notifications. It runs
+in the foreground for 1–3600 seconds (default 300), or emits at most one batch with
+`--once`. It requires an existing initialized store. Inotify failures, invalidated
+directories and unsafe lease paths are errors. One private identity lease prevents
+concurrent presentation consumers. No receiver, daemon or model starts.
 
-By default watch emits each unpresented message once, then marks it presented;
+By default watch drains bounded unpresented batches, then marks emitted IDs presented;
 presentation is distinct from read acknowledgment. `--replay-unread` recovers
 previously presented messages that were never read. Consumers must explicitly
 acknowledge durable processing with `read`, and can use replay after a crash.
+`--replay-unread` re-presents a bounded unread batch on reconciliation; use `--once`
+for one recovery batch. Presentation writes do not trigger a tight replay loop.
 Explicitly superseded informational messages with `requires_response=false` are
 coalesced out of the unpresented watch stream. Actionable requests remain visible;
 full inbox inspection and historical message facts are preserved.
+
+Each JSON batch is bounded by `--max-messages` (1–8), `--preview-chars` (32–320)
+and `--max-chars` (256–10000); the newline is separate. A batch that cannot fit
+fails without consuming messages. Output is nonblocking with a three-second
+backpressure deadline, capped by the remaining lifetime; SIGINT/SIGTERM interrupts
+the stream with exit 130. Broken or stalled output leaves the batch unpresented.
+Emission and SQLite acknowledgment cannot be one transaction: a crash after output
+but before acknowledgment can repeat a batch. Consumers can deduplicate by message ID.
+
+Watch emits mailbox previews. Request source context explicitly with native tools,
+for example `forge graph --host /path/to/project refs --text 'src/example.rs::worker'
+--max-bytes 600`, or inspect the named source through `forge code inspect`.
+The Python watch and its automatic graph-context attachment have been retired;
+source inspection remains an explicit native operation.
 
 ## Supervisor endpoint ownership
 
@@ -155,11 +211,14 @@ An already healthy endpoint is reused and never stopped. An endpoint the supervi
 starts is stopped when the budget ends, a failure occurs, or SIGINT/SIGTERM arrives;
 unexpected exits have a bounded restart budget (`--max-restarts`, default 3).
 An invalid process occupying the port is reported, never displaced. Only one
-supervisor can hold an identity at a time. Forced termination such as SIGKILL cannot
-run cleanup; the next invocation inspects the endpoint instead of assuming ownership.
+supervisor can hold an identity at a time. Permanent private lock files coordinate
+startup and supervision; they are never unlinked while another caller could use them.
+Forced termination such as SIGKILL cannot run cleanup. An owned receiver also has a
+finite lifetime rounded up from the remaining supervisor budget; the next invocation
+inspects any live endpoint instead of assuming ownership.
 
 `<identity>/supervisor.json` records identity, PID, start/end/update timestamps,
-duration, cycle count, endpoint PID, status, and the last flush summary. A
+duration, cycle count, endpoint PID/start count, status, and the last flush summary. A
 `completed` supervisor means its requested time elapsed; it does **not** mean every
 peer recovered or every message was delivered. Inspect pending/queued counts and
 delivery history separately. Terminal rejections remain failed and are not retried.

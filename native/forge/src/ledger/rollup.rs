@@ -49,7 +49,7 @@ pub struct RollupArgs {
     pub paths: Vec<PathBuf>,
 
     /// Ledger root directory; defaults to `LEDGER_ROOT`, else
-    /// `/mnt/data/llm/ledger/`.
+    /// the user's XDG state directory under `llm-forge/ledger`.
     #[arg(long)]
     pub out: Option<PathBuf>,
 
@@ -372,7 +372,7 @@ pub fn run(args: RollupArgs) -> Result<i32> {
         return Ok(0);
     }
 
-    let ledger_root = super::resolve_ledger_root(args.out);
+    let ledger_root = super::resolve_ledger_root(args.out)?;
     write_all(&ledger_root, &output)?;
     Ok(0)
 }

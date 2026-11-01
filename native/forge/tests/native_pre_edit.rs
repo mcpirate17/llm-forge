@@ -1,6 +1,5 @@
-//! End-to-end native PreToolUse coverage. A shell sentinel stands in for the
-//! Python dispatcher: any accidental delegation changes exit status and leaves
-//! a marker in the scratch checkout.
+//! Native PreToolUse coverage with an empty executable search path and invalid
+//! interpreter overrides. Obsolete selectors must never disable native guards.
 
 use serde_json::{json, Value};
 use std::fs;
@@ -23,14 +22,6 @@ impl Project {
         ));
         fs::create_dir_all(path.join(".git")).unwrap();
         fs::write(path.join(".git/HEAD"), "ref: refs/heads/claude-lane\n").unwrap();
-        let sentinel = path.join("dispatcher-sentinel");
-        fs::write(
-            &sentinel,
-            "#!/bin/sh\ncat >/dev/null\nprintf '%s' \"$FORGE_NATIVE_HOOKS\" > \"$CLAUDE_PROJECT_DIR/delegated.names\"\nprintf '{\"delegated\":true}\\n'\nexit 17\n",
-        )
-        .unwrap();
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&sentinel, fs::Permissions::from_mode(0o755)).unwrap();
         Project(path)
     }
 
@@ -49,11 +40,9 @@ impl Project {
             .env("CRG_GATE_STATE_DIR", self.path().join("state"))
             .env("CRG_DATA_DIR", self.path().join("graph"))
             .env("GOVERNANCE_OWNER", "claude-lane")
-            .env(
-                "CONDUCTOR_SNAPSHOT_PYTHON",
-                self.path().join("dispatcher-sentinel"),
-            )
-            .env("CONDUCTOR_PYTHON", "/bin/false")
+            .env("PATH", "")
+            .env("CONDUCTOR_SNAPSHOT_PYTHON", "/nonexistent/forbidden-python")
+            .env("CONDUCTOR_PYTHON", "/nonexistent/forbidden-python")
             .env(
                 "CONTEXT_TELEMETRY_PATH",
                 self.path().join("telemetry.jsonl"),
@@ -83,7 +72,6 @@ impl Project {
     fn native(&self, payload: &Value, standalone: bool) -> Value {
         let output = self.run(payload, None, standalone);
         assert_eq!(output.status.code(), Some(0), "{output:?}");
-        assert!(!self.path().join("delegated.names").exists());
         serde_json::from_slice(&output.stdout).unwrap()
     }
 }
@@ -121,9 +109,52 @@ fn graph_mark_then_edit_uses_the_native_gate_without_delegation() {
 
 #[test]
 fn every_edit_tool_denies_before_graph_use_without_starting_python() {
-    for tool in ["Edit", "Write", "NotebookEdit"] {
+    for tool in [
+        "Edit",
+        "Write",
+        "NotebookEdit",
+        "mcp__forge__code_replace",
+        "mcp__forge__code_diff",
+        "mcp__forge__code_restore",
+    ] {
         let project = Project::new();
         let output = project.native(&edit("new", tool, "target.rs"), false);
+        assert!(output["hookSpecificOutput"]["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .contains("call a code-review-graph MCP tool"));
+    }
+}
+
+#[test]
+fn native_inspection_marks_usage_but_execution_and_edit_tools_cannot_bypass_the_gate() {
+    let project = Project::new();
+    for tool in ["code_inspect", "code_fold", "code_search"] {
+        let session = format!("inspect-{tool}");
+        project.native(
+            &json!({"session_id":session,"tool_name":format!("mcp__forge__{tool}")}),
+            false,
+        );
+        for edit in ["code_replace", "code_diff", "code_restore"] {
+            let output = project.native(&json!({"session_id":session,
+                "tool_name":format!("mcp__forge__{edit}"), "tool_input":{"path":"unclaimed.rs","apply":true}}), false);
+            assert!(output["hookSpecificOutput"]["permissionDecisionReason"]
+                .as_str()
+                .unwrap()
+                .contains("no live exact claim"));
+        }
+    }
+    for tool in [
+        "code_replace",
+        "code_diff",
+        "code_restore",
+        "terminal_start",
+        "context_count",
+        "code_inspect_extra",
+    ] {
+        let session = format!("not-inspect-{tool}");
+        project.native(&json!({"session_id":session,"tool_name":format!("mcp__forge__{tool}"),"tool_input":{"path":"unclaimed.rs"}}), false);
+        let output = project.native(&edit(&session, "Edit", "unclaimed.rs"), false);
         assert!(output["hookSpecificOutput"]["permissionDecisionReason"]
             .as_str()
             .unwrap()
@@ -143,17 +174,19 @@ fn standalone_edit_and_graph_tools_keep_the_same_gate() {
 }
 
 #[test]
-fn partial_native_selection_delegates_and_names_only_answered_hooks() {
+fn obsolete_selectors_cannot_disable_the_gate_or_enable_interpreter_delegation() {
     let project = Project::new();
-    let output = project.run(
-        &edit("partial", "Edit", "unclaimed.rs"),
-        Some("crg_refresh_report_pre,current_work_guard_edit"),
-        false,
-    );
-    assert_eq!(output.status.code(), Some(17), "{output:?}");
-    let names = fs::read_to_string(project.path().join("delegated.names")).unwrap();
-    assert!(names.contains("current_work_guard_edit"));
-    assert!(!names.contains("crg_gate_verify"));
+    for hooks in ["", "none", "crg_refresh_report_pre,current_work_guard_edit"] {
+        let output = project.run(&edit("partial", "Edit", "unclaimed.rs"), Some(hooks), false);
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+        let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(response["hookSpecificOutput"]["permissionDecision"], "deny");
+        assert!(response["hookSpecificOutput"]["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .contains("call a code-review-graph MCP tool"));
+        assert!(String::from_utf8_lossy(&output.stderr).contains("FORGE_NATIVE_HOOKS is obsolete"));
+    }
 }
 
 #[test]

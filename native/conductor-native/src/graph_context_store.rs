@@ -363,7 +363,8 @@ impl GraphStore {
                OR length(CAST({name} AS BLOB))>256 \
                OR length(CAST({kind} AS BLOB))>64 \
                {signature_long} {hash_long} THEN 1 ELSE 0 END \
-             FROM nodes WHERE file_path IN (?1,?2) AND (?3 IS NULL OR {name}=?3) \
+             FROM nodes WHERE file_path IN (?1,?2) AND (?3 IS NULL OR {name}=?3 \
+               OR qualified_name=?3 OR qualified_name=file_path||'::'||?3) \
              AND lower({kind}) != 'file' \
              ORDER BY {start}, qualified_name LIMIT 41"
         )
@@ -483,7 +484,8 @@ impl GraphStore {
              FROM nodes AS {owner} \
              JOIN edges AS edge ON edge.{owner_qualified}={owner}.qualified_name \
              JOIN nodes AS {peer} ON {peer}.qualified_name=edge.{peer_qualified} \
-             WHERE {owner}.file_path IN (?1,?2) AND (?3 IS NULL OR {owner}.{name}=?3) \
+             WHERE {owner}.file_path IN (?1,?2) AND (?3 IS NULL OR {owner}.{name}=?3 \
+               OR {owner}.qualified_name=?3 OR {owner}.qualified_name={owner}.file_path||'::'||?3) \
              AND lower({kind}) != 'contains' \
              ORDER BY {test_priority} DESC, {peer}.qualified_name, {kind}, {peer}.file_path \
              LIMIT ?4"

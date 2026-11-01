@@ -602,24 +602,14 @@ fn benchmark_native_and_python_providers_select_its_contract() {
 fn production_sources_select_nonconvention_and_reexport_contracts() {
     let root = repo_root();
     let memory = plan(&root, &["src/conductor/memory_vectors.py".to_owned()]).unwrap();
-    assert_eq!(
-        memory.targets,
-        [
-            "python_contracts_crg_workspace_tools",
-            "python_contracts_memory_vectors"
-        ]
-    );
+    assert_eq!(memory.targets, ["python_contracts_memory_vectors"]);
     let active = plan(&root, &["src/conductor/active_state.py".to_owned()]).unwrap();
     assert_eq!(
         active.targets,
         [
             "python_contracts_active_state",
-            "python_contracts_inplace_handoff",
             "python_contracts_installed_layout",
-            "python_contracts_local_ai_policy",
             "python_contracts_session_preamble",
-            "python_contracts_workspace_eval",
-            "python_contracts_workspace_runtime_reconcile"
         ]
     );
     let close = plan(&root, &["src/conductor/session_close.py".to_owned()]).unwrap();
@@ -628,27 +618,11 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
     assert!(graph
         .targets
         .contains(&"python_contracts_graph_context".to_owned()));
-    assert!(graph
+    assert!(!graph
         .targets
         .contains(&"python_contracts_agent_a2a_graph_context".to_owned()));
-    let agent = plan(&root, &["src/conductor/agent_a2a.py".to_owned()]).unwrap();
-    for target in [
-        "python_contracts_agent_a2a",
-        "python_contracts_a2a_store",
-        "python_contracts_a2a_delivery",
-    ] {
-        assert!(
-            agent.targets.contains(&target.to_owned()),
-            "missing {target}"
-        );
-    }
     let hook = plan(&root, &["src/tooling/hooks/agent/crg_gate.py".to_owned()]).unwrap();
-    assert!(hook
-        .targets
-        .contains(&"python_contracts_crg_gate_session".to_owned()));
-    assert!(hook
-        .targets
-        .contains(&"python_contracts_crg_gate_worktrees".to_owned()));
+    assert!(hook.targets.is_empty());
 }
 
 #[test]
@@ -729,29 +703,12 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
     assert_eq!(
         helper.targets,
         [
-            "python_contracts_agent_a2a",
             "python_contracts_baseline_merge",
-            "python_contracts_bash_pretooluse_parity",
-            "python_contracts_bash_quiet_legacy",
             "python_contracts_branch_policy_native",
             "python_contracts_cost_budget_audit",
             "python_contracts_cost_ledger",
             "python_contracts_crg_mcp_probe",
-            "python_contracts_crg_response_shim",
-            "python_contracts_crg_server",
-            "python_contracts_crg_server_wiring",
-            "python_contracts_crg_venv_sync_core",
-            "python_contracts_crg_venv_sync_session",
-            "python_contracts_crg_workspace_tools",
-            "python_contracts_dispatch_doctor",
-            "python_contracts_dispatch_main",
-            "python_contracts_dispatch_merge",
-            "python_contracts_dispatch_runner_execution",
-            "python_contracts_dispatch_runner_protocol",
-            "python_contracts_dispatch_shell_aliases",
-            "python_contracts_doctor",
             "python_contracts_handoff",
-            "python_contracts_harness_provisioning",
             "python_contracts_import_ablation",
             "python_contracts_ledger_calibrate",
             "python_contracts_local_clerk",
@@ -769,12 +726,6 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_mutation_testing_core",
             "python_contracts_mutation_testing_evidence",
             "python_contracts_native_test_selection",
-            "python_contracts_post_tool_parity",
-            "python_contracts_post_tool_quiet",
-            "python_contracts_project_init_binary",
-            "python_contracts_project_init_manifest",
-            "python_contracts_project_init_merge",
-            "python_contracts_project_init_run",
             "python_contracts_receipt_scope",
             "python_contracts_reuse_audit_inventory",
             "python_contracts_reuse_consolidation",
@@ -783,7 +734,6 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_reuse_inventory",
             "python_contracts_reuse_roi",
             "python_contracts_sandbox",
-            "python_contracts_session_brief",
         ]
     );
     let generic = plan(&root, &[format!("{TEST_DIR}/python_contracts/support.rs")]).unwrap();
@@ -876,18 +826,15 @@ fn selected_helper_must_exist_be_registered_and_stay_inside_snapshot() {
 }
 
 #[test]
-fn registry_selects_non_python_hook_dependencies_and_rejects_unsafe_rows() {
+fn retired_hook_paths_are_unmapped_and_unsafe_registry_rows_fail() {
     let root = repo_root();
     for changed in [
-        ".claude/hooks/dispatch.py",
         "src/tooling/hooks/claude/settings.dispatcher.json",
         "src/tooling/hooks/claude/session-start.sh",
         "src/tooling/hooks/claude/session-handoff.sh",
     ] {
         let selected = plan(&root, &[changed.to_owned()]).unwrap();
-        assert!(selected
-            .targets
-            .contains(&"python_contracts_dispatch_registry".to_owned()));
+        assert!(selected.targets.is_empty());
     }
     let fixture = Fixture::new();
     for unsafe_path in [
@@ -899,7 +846,7 @@ fn registry_selects_non_python_hook_dependencies_and_rejects_unsafe_rows() {
     ] {
         fs::write(
             fixture.root.join(REGISTRY_PATH),
-            format!("{unsafe_path}\tpython_contracts_dispatch_registry\n"),
+            format!("{unsafe_path}\tpython_contracts_memory_vectors\n"),
         )
         .unwrap();
         assert!(
@@ -1197,13 +1144,7 @@ fn absolute_changed_path_accepts_the_given_symlinked_repo_root() {
     let selected = plan(&alias, &[changed.display().to_string()]).unwrap();
     fs::remove_file(alias).unwrap();
     assert_eq!(selected.source_paths, ["src/conductor/memory_vectors.py"]);
-    assert_eq!(
-        selected.targets,
-        [
-            "python_contracts_crg_workspace_tools",
-            "python_contracts_memory_vectors"
-        ]
-    );
+    assert_eq!(selected.targets, ["python_contracts_memory_vectors"]);
 }
 
 #[test]
@@ -1271,17 +1212,11 @@ fn python_binding_returns_targets_paths_and_argv_as_data() {
         let value: serde_json::Value = serde_json::from_str(&response).unwrap();
         assert_eq!(
             value["targets"],
-            serde_json::json!([
-                "python_contracts_crg_workspace_tools",
-                "python_contracts_memory_vectors"
-            ])
+            serde_json::json!(["python_contracts_memory_vectors"])
         );
         assert_eq!(
             value["test_paths"],
-            serde_json::json!([
-                "native/conductor-native/tests/python_contracts_crg_workspace_tools.rs",
-                "native/conductor-native/tests/python_contracts_memory_vectors.rs"
-            ])
+            serde_json::json!(["native/conductor-native/tests/python_contracts_memory_vectors.rs"])
         );
         assert_eq!(value["commands"][0]["argv"][0], "cargo");
         assert_eq!(

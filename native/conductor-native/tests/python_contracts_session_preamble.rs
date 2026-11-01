@@ -195,8 +195,8 @@ fn a2a_summary_requires_explicit_show_for_full_message() {
         .unwrap();
         for expected in [
             "A2A compact (codex-efficiency); retrieve only when needed",
-            "`python -m conductor.agent_a2a show --as-name codex-efficiency <id>`",
-            "`python -m conductor.agent_a2a read --as-name codex-efficiency <id>`",
+            "`forge mailbox show --as-name codex-efficiency <id>`",
+            "`forge mailbox read --as-name codex-efficiency <id>`",
             "bounded summary",
         ] {
             assert!(output.contains(expected), "missing {expected:?}");

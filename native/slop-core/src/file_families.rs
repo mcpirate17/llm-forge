@@ -1,4 +1,6 @@
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::PyList;
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -16,25 +18,28 @@ const COMPONENTS: [(&str, f64); 6] = [
 ];
 
 #[derive(Clone, Debug)]
-pub(crate) struct Profile {
-    pub(crate) sets: [HashSet<String>; 6],
-    pub(crate) lsh_features: HashSet<String>,
+pub struct Profile {
+    pub sets: [HashSet<String>; 6],
+    pub lsh_features: HashSet<String>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Similarity {
-    pub(crate) score: f64,
-    pub(crate) containment: f64,
-    pub(crate) shared_features: usize,
-    pub(crate) components: Vec<(String, f64)>,
+pub struct Similarity {
+    pub score: f64,
+    pub containment: f64,
+    pub shared_features: usize,
+    pub components: Vec<(String, f64)>,
 }
 
+#[cfg(feature = "python")]
 type PythonSimilarity = (f64, f64, usize, Vec<(String, f64)>);
 
+#[cfg(feature = "python")]
 fn set_attr(value: &Bound<'_, PyAny>, name: &str) -> PyResult<HashSet<String>> {
     value.getattr(name)?.extract()
 }
 
+#[cfg(feature = "python")]
 fn profile_from(value: &Bound<'_, PyAny>) -> PyResult<Profile> {
     let structure = set_attr(value, "structure")?;
     let api = set_attr(value, "api")?;
@@ -53,6 +58,7 @@ fn profile_from(value: &Bound<'_, PyAny>) -> PyResult<Profile> {
     })
 }
 
+#[cfg(feature = "python")]
 fn profiles_from(values: &Bound<'_, PyList>) -> PyResult<Vec<Profile>> {
     values.iter().map(|value| profile_from(&value)).collect()
 }
@@ -75,7 +81,7 @@ fn jaccard_upper_bound(left: &HashSet<String>, right: &HashSet<String>) -> Optio
     Some(left.len().min(right.len()) as f64 / larger as f64)
 }
 
-pub(crate) fn compare(left: &Profile, right: &Profile) -> Similarity {
+pub fn compare(left: &Profile, right: &Profile) -> Similarity {
     let mut components = Vec::with_capacity(COMPONENTS.len());
     let mut weighted_sum = 0.0;
     let mut weight_sum = 0.0;
@@ -104,7 +110,7 @@ pub(crate) fn compare(left: &Profile, right: &Profile) -> Similarity {
     }
 }
 
-pub(crate) fn safe_bound(left: &Profile, right: &Profile) -> Option<f64> {
+pub fn safe_bound(left: &Profile, right: &Profile) -> Option<f64> {
     let mut weighted = 0.0;
     let mut weight_sum = 0.0;
     for (index, (_, weight)) in COMPONENTS.iter().enumerate() {
@@ -119,7 +125,7 @@ pub(crate) fn safe_bound(left: &Profile, right: &Profile) -> Option<f64> {
 
 /// Conservatively bound the rounded score without intersecting the large structure set.
 /// The other five feature sets are small enough to compare exactly during retrieval.
-pub(crate) fn abstraction_upper_bound(left: &Profile, right: &Profile) -> Option<f64> {
+pub fn abstraction_upper_bound(left: &Profile, right: &Profile) -> Option<f64> {
     let mut weighted = 0.0;
     let mut weight_sum = 0.0;
     for (index, (_, weight)) in COMPONENTS.iter().enumerate() {
@@ -138,7 +144,7 @@ pub(crate) fn abstraction_upper_bound(left: &Profile, right: &Profile) -> Option
     (weight_sum != 0.0).then(|| decimal_round(weighted / weight_sum, 4))
 }
 
-fn exact_pairs(
+pub fn exact_pairs(
     profiles: &[Profile],
     min_similarity: f64,
     min_shared_features: usize,
@@ -179,7 +185,7 @@ fn all_pairs(profile_count: usize) -> Vec<(usize, usize)> {
     pairs
 }
 
-pub(crate) fn minhash_signature(values: &[u64], permutations: usize) -> Vec<u64> {
+pub fn minhash_signature(values: &[u64], permutations: usize) -> Vec<u64> {
     (0..permutations)
         .map(|index| {
             let multiplier =
@@ -197,7 +203,7 @@ pub(crate) fn minhash_signature(values: &[u64], permutations: usize) -> Vec<u64>
         .collect()
 }
 
-fn lsh_pairs(
+pub fn lsh_pairs(
     feature_hashes: Vec<Vec<u64>>,
     permutations: i64,
     band_size: i64,
@@ -262,9 +268,9 @@ fn cached_similarity<'a>(
         .or_insert_with(|| compare(&profiles[key.0], &profiles[key.1]))
 }
 
-type GroupResult = (Vec<usize>, Vec<(f64, f64, usize)>);
+pub type GroupResult = (Vec<usize>, Vec<(f64, f64, usize)>);
 
-fn build_groups(
+pub fn build_groups(
     profiles: &[Profile],
     pairs: Vec<(usize, usize)>,
     min_similarity: f64,
@@ -350,8 +356,9 @@ fn build_groups(
     (results, cache.len())
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
-pub(crate) fn audit_file_family_compare(
+pub fn audit_file_family_compare(
     left: &Bound<'_, PyAny>,
     right: &Bound<'_, PyAny>,
 ) -> PyResult<PythonSimilarity> {
@@ -364,8 +371,9 @@ pub(crate) fn audit_file_family_compare(
     ))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
-pub(crate) fn audit_file_family_exact_pairs(
+pub fn audit_file_family_exact_pairs(
     py: Python<'_>,
     values: &Bound<'_, PyList>,
     min_similarity: f64,
@@ -375,8 +383,9 @@ pub(crate) fn audit_file_family_exact_pairs(
     Ok(py.detach(move || exact_pairs(&profiles, min_similarity, min_shared_features)))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
-pub(crate) fn audit_file_family_lsh_pairs(
+pub fn audit_file_family_lsh_pairs(
     py: Python<'_>,
     feature_hashes: Vec<Vec<u64>>,
     permutations: i64,
@@ -386,8 +395,9 @@ pub(crate) fn audit_file_family_lsh_pairs(
         .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
-pub(crate) fn audit_file_family_groups(
+pub fn audit_file_family_groups(
     py: Python<'_>,
     values: &Bound<'_, PyList>,
     pairs: Vec<(usize, usize)>,

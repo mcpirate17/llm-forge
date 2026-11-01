@@ -1,22 +1,17 @@
-//! Native port of `crg_graph_refresh`'s PostToolUse surface:
-//! `failure_output` (via `crg_refresh_state.take_notices`) for
-//! `crg_refresh_report_post`, `_queue([FULL_UPDATE])` /
-//! `full_update_output` for `post_bash_graph` -- queue a whole-tree refresh
-//! by appending to the graph store's `refresh.pending` marker and spawning
-//! one detached worker when none is running, then return at once -- and
-//! `hook_output` (`edit_hook_output`) for the `crg_graph_refresh` hook
-//! itself: PostToolUse on Edit/Write/NotebookEdit queues the edited
-//! graph-suffix files the same way and never waits.
-//!
-//! The worker itself stays Python (`crg_graph_refresh.py --worker`): it owns
-//! the debounce/coalesce loop, the bounded refresh child and the embedding
-//! bridge, none of which belongs on a sub-2ms hook path. What is ported is
-//! the queueing half exactly -- the `refresh.pending` append and the
-//! worker-alive probe under `refresh.queue.lock`, the detached spawn, and
-//! the marker read/clear -- so a native `post_bash_graph` and a Python one
-//! leave the same store state and speak to the same worker.
+//! Native durable graph refresh queue and hook notices. The bounded supervisor
+//! rebuilds `.forge/graph.db` through this same binary, reusing cached syntax
+//! facts. No interpreter, embedding provider or external graph executable starts.
+//! Marker names retain compatibility with existing hook state; the external
+//! `.code-review-graph/graph.db` itself is never modified.
 
 use std::path::{Path, PathBuf};
+#[path = "crg_refresh_watch.rs"]
+mod watch;
+#[path = "crg_refresh_worker.rs"]
+mod worker;
+pub fn run_worker(host: &Path, inherited: Option<i32>) -> anyhow::Result<u8> {
+    worker::run(host, inherited)
+}
 
 use serde_json::{json, Value};
 
@@ -25,27 +20,8 @@ use serde_json::{json, Value};
 pub const GIT_TREE_REWRITE: &str =
     r"git\s+(checkout|switch|merge|rebase|stash|pull|reset|cherry-pick|revert|apply|am)\b";
 
-/// `crg_refresh_state.FULL_UPDATE`: the `*` marker line meaning "whole-tree
-/// `code-review-graph update`, not a file list".
+/// Full native syntax-tree refresh; unchanged file facts are reused.
 pub const FULL_UPDATE: &str = "*";
-
-/// `shutil.which("code-review-graph")`: the first PATH entry holding an
-/// executable file of that name.
-fn which_code_review_graph() -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&path) {
-        let candidate = dir.join("code-review-graph");
-        if candidate.is_file() {
-            use std::os::unix::fs::PermissionsExt;
-            if let Ok(meta) = candidate.metadata() {
-                if meta.permissions().mode() & 0o111 != 0 {
-                    return Some(candidate);
-                }
-            }
-        }
-    }
-    None
-}
 
 /// True when `command` rewrites the git working tree (`GIT_TREE_REWRITE`).
 pub fn git_tree_rewrite_matches(command: &str) -> bool {
@@ -82,32 +58,47 @@ fn expand_home(path: PathBuf) -> PathBuf {
 
 /// `store_for`'s mkdir+resolve: the store directory exists and is canonical
 /// before any marker is written, exactly as the Python helper guarantees.
-fn ensure_store(repo_root: &Path) -> PathBuf {
+fn ensure_store(repo_root: &Path) -> std::io::Result<PathBuf> {
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt};
     let dir = store_dir(repo_root);
-    if std::fs::create_dir_all(&dir).is_ok() {
-        if let Ok(canonical) = std::fs::canonicalize(&dir) {
-            return canonical;
-        }
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&dir)?;
+    let meta = std::fs::symlink_metadata(&dir)?;
+    if !meta.is_dir() || meta.uid() != unsafe { libc::geteuid() } || meta.mode() & 0o022 != 0 {
+        return Err(std::io::Error::other(
+            "graph refresh store must be an owned, non-writable-by-others directory",
+        ));
     }
-    dir
+    dir.canonicalize()
 }
 
 fn marker_path(store: &Path, name: &str) -> PathBuf {
     store.join(name)
 }
 
-/// `crg_refresh_state._flock`'s opener: `os.open(path, O_RDWR | O_CREAT,
-/// 0o644)` -- no truncation, ever, because these files exist to be flock
-/// targets, not to be read or rewritten through this handle. The `read`+
-/// `write` pair is what `O_RDWR` means; clippy's truncate heuristic cannot
-/// know that, hence the targeted allow.
-#[allow(clippy::suspicious_open_options)]
+/// Open an owned regular state file without following a final symlink. Lock
+/// inodes are never truncated or replaced. Only explicit data writes truncate.
 fn open_flock_target(path: &Path) -> std::io::Result<std::fs::File> {
-    OpenOptions::new()
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+    let file = OpenOptions::new()
         .create(true)
+        .truncate(false)
         .read(true)
         .write(true)
-        .open(path)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)?;
+    let meta = file.metadata()?;
+    if !meta.is_file()
+        || meta.uid() != unsafe { libc::geteuid() }
+        || meta.nlink() != 1
+        || meta.mode() & 0o022 != 0
+    {
+        return Err(std::io::Error::other("invalid graph refresh file"));
+    }
+    Ok(file)
 }
 
 /// `crg_refresh_state.request`: append `paths` to `refresh.pending` under
@@ -123,17 +114,34 @@ pub fn request(
     let queue_lock = open_flock_target(&marker_path(store, "refresh.queue.lock"))?;
     flock_exclusive(&queue_lock, false)?;
     let outcome = (|| {
-        let mut pending = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(marker_path(store, "refresh.pending"))?;
-        for path in paths {
-            writeln!(pending, "{path}")?;
+        use std::io::{Seek, SeekFrom};
+        if paths.len() > 4096
+            || paths
+                .iter()
+                .any(|p| p.len() > 4096 || p.contains(['\n', '\r', '\0']))
+        {
+            return Err(std::io::Error::other("invalid graph refresh path bounds"));
         }
-        if worker_alive(store)? {
+        let mut pending = open_flock_target(&marker_path(store, "refresh.pending"))?;
+        let addition: usize = paths.iter().map(|p| p.len() + 1).sum();
+        if pending.metadata()?.len() + addition as u64 > 262144 {
+            // Every native batch rescans the whole source tree, reusing unchanged
+            // facts. Collapse a flood to one full-update marker without losing work.
+            pending.set_len(0)?;
+            writeln!(pending, "{FULL_UPDATE}")?;
+        } else {
+            pending.seek(SeekFrom::End(0))?;
+            for path in paths {
+                writeln!(pending, "{path}")?;
+            }
+        }
+        pending.sync_all()?;
+        std::fs::File::open(store)?.sync_all()?;
+        let worker_lock = open_flock_target(&marker_path(store, "refresh.lock"))?;
+        if !flock_exclusive(&worker_lock, true)? {
             return Ok("queued".to_string());
         }
-        spawn_worker(store, worker_argv, cwd)?;
+        spawn_worker(store, worker_argv, cwd, &worker_lock)?;
         Ok("spawned".to_string())
     })();
     flock_unlock(&queue_lock);
@@ -142,58 +150,76 @@ pub fn request(
 
 /// `worker_alive`: true while some process holds the worker lock.
 fn worker_alive(store: &Path) -> std::io::Result<bool> {
-    let lock = open_flock_target(&marker_path(store, "refresh.lock"))?;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+    // Read-only probes do not emit IN_CLOSE_WRITE and wake their own watcher.
+    let lock = match OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(marker_path(store, "refresh.lock"))
+    {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e),
+    };
+    let meta = lock.metadata()?;
+    if !meta.is_file()
+        || meta.uid() != unsafe { libc::geteuid() }
+        || meta.nlink() != 1
+        || meta.mode() & 0o022 != 0
+    {
+        return Err(std::io::Error::other("invalid graph worker lock"));
+    }
     Ok(!flock_exclusive(&lock, true)?)
 }
 
-/// `_spawn`: the detached worker -- new session, stdin/stdout dropped,
-/// stderr appended to `refresh.log`, in `cwd`. A spawn failure is the
-/// caller's `request` outcome, not a hook failure: Python's `Popen` raises
-/// the same way.
-fn spawn_worker(store: &Path, worker_argv: &[String], cwd: &Path) -> std::io::Result<()> {
+/// One detached native worker, inheriting its already-held lock. A failed spawn
+/// leaves pending work durable and returns an error to the caller.
+fn spawn_worker(
+    store: &Path,
+    worker_argv: &[String],
+    cwd: &Path,
+    lock: &std::fs::File,
+) -> std::io::Result<()> {
     use std::os::unix::process::CommandExt;
     use std::process::{Command, Stdio};
-    let log = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(marker_path(store, "refresh.log"))?;
-    Command::new(&worker_argv[0])
+    if worker_argv.is_empty() {
+        return Err(std::io::Error::other("missing native refresh worker"));
+    }
+    let log = open_flock_target(&marker_path(store, "refresh.log"))?;
+    log.set_len(0)?;
+    let fd = lock.as_raw_fd();
+    let mut command = Command::new(&worker_argv[0]);
+    command
         .args(&worker_argv[1..])
+        .arg("--lock-fd")
+        .arg(fd.to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::from(log))
-        .current_dir(cwd)
-        .process_group(0) // start_new_session: survive the hook's exit
-        .spawn()?;
+        .env("CRG_DATA_DIR", store)
+        .current_dir(cwd);
+    // SAFETY: only async-signal-safe syscalls run in the child. Inherit precisely
+    // the already-held worker lock so concurrent hooks never spawn duplicates.
+    unsafe {
+        command.pre_exec(move || {
+            if libc::fcntl(fd, libc::F_SETFD, 0) < 0 || libc::setsid() < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    command.spawn()?;
     Ok(())
 }
 
-/// `crg_refresh_state.worker_command` + `dispatch.paths.body_path`:
-/// `[interpreter, <checkout's crg_graph_refresh.py>, "--worker", "--repo",
-/// <root>]`. `sys.executable` from the dispatcher's seat is the interpreter
-/// forge would have exec'd (`interpreter::resolve_python`), and the body
-/// lives at the project copy of `tooling/hooks/agent/` when one exists, else
-/// inside the package tree under `src/`.
-pub fn worker_command(repo_root: &Path) -> Vec<String> {
-    let python = crate::interpreter::resolve_python(repo_root);
-    let body = body_path(repo_root, "tooling/hooks/agent/crg_graph_refresh.py");
-    vec![
-        python.to_string_lossy().into_owned(),
-        body.to_string_lossy().into_owned(),
-        "--worker".to_string(),
-        "--repo".to_string(),
+/// Resolve this native executable independently of PATH and installed wrappers.
+pub fn worker_command(repo_root: &Path) -> std::io::Result<Vec<String>> {
+    Ok(vec![
+        std::env::current_exe()?.to_string_lossy().into_owned(),
+        "graph-refresh-worker".to_string(),
+        "--host".to_string(),
         repo_root.to_string_lossy().into_owned(),
-    ]
-}
-
-/// `dispatch.paths.body_path`: the project's copy of `relative` when one
-/// exists (the monorepo layout), else the package tree's under `src/`.
-pub fn body_path(root: &Path, relative: &str) -> PathBuf {
-    let project = root.join(relative);
-    if project.is_file() {
-        return project;
-    }
-    root.join("src").join(relative)
+    ])
 }
 
 /// `_queue([FULL_UPDATE])`: the whole-tree queue append (empty string = no
@@ -223,7 +249,7 @@ pub fn gate_repo_root() -> PathBuf {
 /// `crg_graph_refresh.GRAPH_SUFFIXES`: the suffixes whose edits touch the
 /// graph (prose and config files do not).
 pub const GRAPH_SUFFIXES: &[&str] = &[
-    ".py", ".rs", ".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".sh", ".bash",
+    ".py", ".rs", ".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".js", ".jsx", ".mjs", ".ts", ".tsx",
 ];
 
 /// `crg_gate._target_paths`: the write targets a payload names -- the five
@@ -326,8 +352,7 @@ fn repo_relative_targets(payload: &Value, repo_root: &Path) -> Vec<String> {
     out
 }
 
-/// `crg_graph_refresh._graph_files`: the queued subset of the payload's
-/// targets -- a known graph suffix that exists as a file under the checkout.
+/// Source targets including deletions; directories and prose do not need refresh.
 pub fn graph_files(payload: &Value, repo_root: &Path) -> Vec<String> {
     repo_relative_targets(payload, repo_root)
         .into_iter()
@@ -336,25 +361,18 @@ pub fn graph_files(payload: &Value, repo_root: &Path) -> Vec<String> {
                 .extension()
                 .map(|ext| format!(".{}", ext.to_string_lossy()));
             suffix.is_some_and(|suffix| GRAPH_SUFFIXES.contains(&suffix.as_str()))
-                && repo_root.join(target).is_file()
+                && !repo_root.join(target).is_dir()
         })
         .collect()
 }
 
-/// `_queue(paths)`: the warning when `code-review-graph` is not installed,
-/// else the queue append + detached worker spawn (empty string = no warning).
+/// Queue source changes for this binary's native indexer.
 fn queue_paths(repo_root: &Path, paths: &[String]) -> std::io::Result<String> {
-    if which_code_review_graph().is_none() {
-        return Ok(format!(
-            "WARNING: code-review-graph is not installed; graph NOT refreshed for {}",
-            paths.join(", ")
-        ));
-    }
     let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
     request(
-        &ensure_store(repo_root),
+        &ensure_store(repo_root)?,
         &refs,
-        &worker_command(repo_root),
+        &worker_command(repo_root)?,
         repo_root,
     )?;
     Ok(String::new())
@@ -391,7 +409,7 @@ pub fn edit_hook_output(payload: &Value, repo_root: &Path) -> std::io::Result<Va
 pub fn full_update_output(repo_root: &Path) -> std::io::Result<Value> {
     let warning = queue_full_update(repo_root)?;
     let context = if warning.is_empty() {
-        "code-review-graph refresh queued after a git working-tree change.".to_string()
+        "Native syntax graph refresh queued after a git working-tree change.".to_string()
     } else {
         warning
     };
@@ -437,12 +455,37 @@ struct Notice {
 /// parsing each line as one JSON notice. A line that isn't valid JSON is kept
 /// verbatim as a "failure" notice (mirrors Python's `except ValueError`
 /// fallback). Absence of the file is not an error: `[]`.
-fn take_notices(store: &Path) -> Vec<Notice> {
+fn consume_notice_file(store: &Path) -> anyhow::Result<Option<String>> {
     let failed_path = store.join("refresh.failed");
-    let Ok(text) = std::fs::read_to_string(&failed_path) else {
-        return Vec::new();
+    match std::fs::symlink_metadata(&failed_path) {
+        Ok(_) => (),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    }
+    let queue = open_flock_target(&store.join("refresh.queue.lock"))?;
+    flock_exclusive(&queue, false)?;
+    match std::fs::symlink_metadata(&failed_path) {
+        Ok(_) => (),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    }
+    let text = String::from_utf8(forge::bounded_file::read(&failed_path, 65536)?)?;
+    std::fs::remove_file(&failed_path)?;
+    std::fs::File::open(store)?.sync_all()?;
+    Ok(Some(text))
+}
+
+fn take_notices(store: &Path) -> Vec<Notice> {
+    let text = match consume_notice_file(store) {
+        Ok(Some(text)) => text,
+        Ok(None) => return Vec::new(),
+        Err(error) => {
+            return vec![Notice {
+                kind: "failure".into(),
+                text: format!("cannot consume graph refresh notices: {error:#}"),
+            }]
+        }
     };
-    let _ = std::fs::remove_file(&failed_path);
     let mut notices = Vec::new();
     for raw in text.lines() {
         if raw.is_empty() {
@@ -516,7 +559,7 @@ pub fn failure_output(event: &str, repo_root: &Path) -> Value {
     if !failures.is_empty() {
         parts.push(format!(
             "WARNING: background graph refresh FAILED: {}. Graph reads are STALE until \
-             `code-review-graph update` succeeds.",
+             `forge graph refresh` succeeds.",
             failures.join("; ")
         ));
     }
@@ -533,6 +576,46 @@ pub fn failure_output(event: &str, repo_root: &Path) -> Value {
     })
 }
 
+/// Persistent failure state survives consumption of the one-shot notice.
+pub fn stale_reason(repo_root: &Path) -> std::io::Result<Option<String>> {
+    let path = store_dir(repo_root).join("refresh.stale");
+    match std::fs::symlink_metadata(&path) {
+        Ok(_) => forge::bounded_file::read(&path, 8192)
+            .map_err(|e| std::io::Error::other(format!("{e:#}")))
+            .and_then(|bytes| {
+                String::from_utf8(bytes)
+                    .map(Some)
+                    .map_err(std::io::Error::other)
+            }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+pub fn ensure_native_fresh(repo_root: &Path) -> anyhow::Result<()> {
+    let store = store_dir(repo_root);
+    if ![
+        "refresh.pending",
+        "refresh.inflight",
+        "refresh.stale",
+        "refresh.lock",
+    ]
+    .iter()
+    .any(|name| store.join(name).exists())
+    {
+        return Ok(());
+    }
+    let waiting = wait_output(repo_root, std::time::Duration::from_secs(3))?;
+    anyhow::ensure!(
+        waiting.is_null(),
+        "native graph refresh is still running; retry query"
+    );
+    if let Some(reason) = stale_reason(repo_root)? {
+        anyhow::bail!("native graph is stale: {reason}; run `forge graph refresh`");
+    }
+    Ok(())
+}
+
 /// `crg_refresh_state.wait_for_fresh`: a graph query waits until neither a
 /// pending marker nor a worker lock remains. An orphaned pending marker gets
 /// one respawn attempt; a live worker is never interrupted. The default hook
@@ -540,16 +623,17 @@ pub fn failure_output(event: &str, repo_root: &Path) -> Value {
 fn wait_for_fresh<F>(
     store: &Path,
     timeout: std::time::Duration,
-    poll: std::time::Duration,
     mut respawn: F,
 ) -> std::io::Result<bool>
 where
     F: FnMut() -> std::io::Result<()>,
 {
     let deadline = std::time::Instant::now() + timeout;
+    let mut watch = watch::Directory::new(store)?;
     let mut respawned = false;
     loop {
-        let pending = marker_path(store, "refresh.pending").exists();
+        let pending = marker_path(store, "refresh.pending").exists()
+            || marker_path(store, "refresh.inflight").exists();
         let alive = worker_alive(store)?;
         if !pending && !alive {
             return Ok(true);
@@ -561,21 +645,14 @@ where
         if std::time::Instant::now() >= deadline {
             return Ok(false);
         }
-        std::thread::sleep(poll);
+        watch.wait(deadline)?;
     }
 }
 
 pub fn wait_output(repo_root: &Path, timeout: std::time::Duration) -> std::io::Result<Value> {
-    use std::time::Duration;
-
-    let store = store_dir(repo_root);
-    std::fs::create_dir_all(&store)?;
-    let store = store.canonicalize()?;
-    let fresh = wait_for_fresh(&store, timeout, Duration::from_millis(20), || {
-        // `_queue([])` checks availability before trying to restart a worker.
-        if which_code_review_graph().is_some() {
-            request(&store, &[], &worker_command(repo_root), repo_root)?;
-        }
+    let store = ensure_store(repo_root)?;
+    let fresh = wait_for_fresh(&store, timeout, || {
+        request(&store, &[], &worker_command(repo_root)?, repo_root)?;
         Ok(())
     })?;
     if fresh {
@@ -659,13 +736,8 @@ pub(crate) mod tests {
         let lock = open_flock_target(&tmp.path().join("refresh.lock")).unwrap();
         assert_eq!(unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) }, 0);
         let started = std::time::Instant::now();
-        let fresh = wait_for_fresh(
-            tmp.path(),
-            std::time::Duration::from_millis(35),
-            std::time::Duration::from_millis(5),
-            || Ok(()),
-        )
-        .unwrap();
+        let fresh =
+            wait_for_fresh(tmp.path(), std::time::Duration::from_millis(35), || Ok(())).unwrap();
         assert!(!fresh);
         assert!(started.elapsed() < std::time::Duration::from_secs(1));
     }
@@ -676,15 +748,10 @@ pub(crate) mod tests {
         let pending = tmp.path().join("refresh.pending");
         fs::write(&pending, "a.py\n").unwrap();
         let mut calls = 0;
-        let fresh = wait_for_fresh(
-            tmp.path(),
-            std::time::Duration::from_millis(100),
-            std::time::Duration::from_millis(1),
-            || {
-                calls += 1;
-                fs::remove_file(&pending)
-            },
-        )
+        let fresh = wait_for_fresh(tmp.path(), std::time::Duration::from_millis(100), || {
+            calls += 1;
+            fs::remove_file(&pending)
+        })
         .unwrap();
         assert!(fresh);
         assert_eq!(calls, 1);
@@ -699,6 +766,8 @@ pub(crate) mod tests {
         let tmp = ScratchDir::new("wait-output");
         let store = tmp.path().join("store");
         fs::create_dir_all(&store).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&store, fs::Permissions::from_mode(0o700)).unwrap();
         let saved = std::env::var_os("CRG_DATA_DIR");
         std::env::set_var("CRG_DATA_DIR", &store);
         let lock = open_flock_target(&store.join("refresh.lock")).unwrap();
@@ -801,14 +870,6 @@ pub(crate) mod tests {
             .contains('x'));
     }
 
-    /// A sleeper standing in for the worker: spawning it exercises the real
-    /// detach (process group, refresh.log stderr) without running any
-    /// refresh, and holding `refresh.lock` lets the queued-vs-spawned branch
-    /// be pinned deterministically.
-    fn sleeper_argv() -> Vec<String> {
-        vec!["/bin/sleep".to_string(), "30".to_string()]
-    }
-
     #[test]
     fn git_tree_rewrite_matches_the_python_regex_surface() {
         assert!(git_tree_rewrite_matches("git pull --rebase"));
@@ -824,56 +885,50 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn request_appends_the_marker_and_spawns_when_no_worker_holds_the_lock() {
+    fn requests_coalesce_without_spawning_while_worker_owns_lock() {
         let _guard = ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let tmp = ScratchDir::new("request");
         let store = tmp.path().join(".code-review-graph");
         fs::create_dir_all(&store).unwrap();
-        let outcome = request(&store, &[FULL_UPDATE], &sleeper_argv(), tmp.path()).unwrap();
-        assert_eq!(outcome, "spawned");
-        assert_eq!(
-            fs::read_to_string(store.join("refresh.pending")).unwrap(),
-            "*\n"
-        );
-        // The detached worker's stderr file exists (spawn really happened).
-        assert!(store.join("refresh.log").is_file());
-        // Hold refresh.lock the way a live worker would (the sleeper does not
-        // take it itself): a second request must then queue, not spawn.
         let worker_lock = open_flock_target(&store.join("refresh.lock")).unwrap();
         assert!(flock_exclusive(&worker_lock, true).unwrap());
-        let second = request(&store, &[FULL_UPDATE], &sleeper_argv(), tmp.path()).unwrap();
-        assert_eq!(second, "queued");
+        for _ in 0..2 {
+            assert_eq!(
+                request(&store, &[FULL_UPDATE], &[], tmp.path()).unwrap(),
+                "queued"
+            );
+        }
         assert_eq!(
             fs::read_to_string(store.join("refresh.pending")).unwrap(),
             "*\n*\n"
         );
         flock_unlock(&worker_lock);
+        assert!(!store.join("refresh.log").exists());
     }
 
     #[test]
-    fn full_update_output_warns_when_the_tool_is_absent() {
+    fn full_update_queues_without_an_external_graph_executable() {
         let _guard = ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let tmp = ScratchDir::new("no-tool");
-        // A PATH with exactly one writable directory and no
-        // code-review-graph in it: `which` cannot find the tool.
-        let empty_bin = tmp.path().join("bin");
-        fs::create_dir_all(&empty_bin).unwrap();
-        std::env::set_var("PATH", empty_bin.display().to_string());
+        let store = ensure_store(tmp.path()).unwrap();
+        let worker_lock = open_flock_target(&store.join("refresh.lock")).unwrap();
+        assert!(flock_exclusive(&worker_lock, true).unwrap());
         let out = full_update_output(tmp.path()).unwrap();
-        std::env::remove_var("PATH");
         let context = out["hookSpecificOutput"]["additionalContext"]
             .as_str()
             .unwrap();
         assert_eq!(
             context,
-            "WARNING: code-review-graph is not installed; graph NOT refreshed for *"
+            "Native syntax graph refresh queued after a git working-tree change."
         );
-        // Nothing was queued while the tool is absent.
-        assert!(!tmp.path().join(".code-review-graph").exists());
+        assert_eq!(
+            fs::read_to_string(store.join("refresh.pending")).unwrap(),
+            "*\n"
+        );
     }
 
     #[test]
@@ -916,9 +971,12 @@ pub(crate) mod tests {
             graph_files(&json!({"tool_input": {"file_path": "a.py"}}), &root),
             vec!["a.py".to_string()]
         );
-        // Prose suffixes and missing files are dropped even when named.
+        // Deletions must refresh the graph too; prose remains irrelevant.
         assert!(graph_files(&json!({"tool_input": {"file_path": "b.md"}}), &root).is_empty());
-        assert!(graph_files(&json!({"tool_input": {"file_path": "ghost.py"}}), &root).is_empty());
+        assert_eq!(
+            graph_files(&json!({"tool_input": {"file_path": "ghost.py"}}), &root),
+            vec!["ghost.py"]
+        );
         // An absolute path inside the checkout is repo-relative first.
         assert_eq!(
             graph_files(
@@ -939,7 +997,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn edit_hook_output_is_quiet_or_warns_like_the_python_body() {
+    fn edits_and_deletions_queue_native_refresh_while_prose_is_quiet() {
         let _guard = ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -952,17 +1010,14 @@ pub(crate) mod tests {
             edit_hook_output(&json!({"tool_input": {"file_path": "b.md"}}), &root).unwrap(),
             quiet
         );
-        // Tool absent: the not-installed warning is the only context the
-        // edit path ever adds, and nothing is queued behind it.
-        let empty_bin = tmp.path().join("bin");
-        fs::create_dir_all(&empty_bin).unwrap();
-        std::env::set_var("PATH", empty_bin.display().to_string());
+        let store = ensure_store(&root).unwrap();
+        let worker_lock = open_flock_target(&store.join("refresh.lock")).unwrap();
+        assert!(flock_exclusive(&worker_lock, true).unwrap());
         let out = edit_hook_output(&json!({"tool_input": {"file_path": "a.py"}}), &root).unwrap();
-        std::env::remove_var("PATH");
+        assert_eq!(out, quiet);
         assert_eq!(
-            out["hookSpecificOutput"]["additionalContext"],
-            json!("WARNING: code-review-graph is not installed; graph NOT refreshed for a.py")
+            fs::read_to_string(store.join("refresh.pending")).unwrap(),
+            "a.py\n"
         );
-        assert!(!root.join(".code-review-graph").exists());
     }
 }

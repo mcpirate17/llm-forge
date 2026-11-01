@@ -19,8 +19,17 @@ fn fire(src: &str, rule: &str) -> Vec<String> {
         .filter(|(n, _)| *n == rule)
         .collect();
     collect(src, &chosen)
+        .unwrap()
         .iter()
-        .map(|a| apply(src, a))
+        .map(|a| {
+            apply(src, a).unwrap_or_else(|e| {
+                panic!(
+                    "{e}; source={src}; edits={:?}; tree={}",
+                    a.edits,
+                    parse(src).unwrap().root_node().to_sexp()
+                )
+            })
+        })
         .collect()
 }
 
@@ -201,7 +210,7 @@ fn qualname_carries_the_class() {
         .into_iter()
         .filter(|(n, _)| *n == "drop_clamp")
         .collect();
-    let found = collect(src, &chosen);
+    let found = collect(src, &chosen).unwrap();
     assert_eq!(found[0].qualname, "Mix.score");
 }
 
@@ -239,14 +248,14 @@ class Lane(nn.Module):
             raise RuntimeError("empty")
         return t.detach()
 "#;
-    let found = collect(src, &all_rules());
+    let found = collect(src, &all_rules()).unwrap();
     assert!(
         found.len() > 30,
         "expected a rich harvest, got {}",
         found.len()
     );
     for a in &found {
-        let mutated = apply(src, a);
+        let mutated = apply(src, a).unwrap();
         let tree = parse(&mutated).expect("parser returned nothing");
         assert!(
             !tree.root_node().has_error(),
@@ -285,7 +294,7 @@ def top(x, y=1):
     e = call(d, key=3)
     return e + y
 "#;
-    let found = collect(src, &all_rules());
+    let found = collect(src, &all_rules()).unwrap();
     let seen: std::collections::HashSet<_> = found.iter().map(|a| a.rule.as_str()).collect();
     let missing: Vec<_> = all_rules()
         .iter()
@@ -296,14 +305,8 @@ def top(x, y=1):
 }
 
 #[test]
-fn syntax_errors_yield_nothing_rather_than_garbage() {
-    // Must not panic on unparseable input; whatever it emits is checked below.
-    let _ = collect("def f(:\n  ???\n", &all_rules());
-    // The contract that matters: nothing emitted can be unparseable.
-    for a in collect("def f(:\n  ???\n", &all_rules()) {
-        let m = apply("def f(:\n  ???\n", &a);
-        assert!(!m.is_empty());
-    }
+fn syntax_errors_are_reported_instead_of_appearing_clean() {
+    assert!(collect("def f(:\n  ???\n", &all_rules()).is_err());
 }
 
 // ---- regressions found by compiling 40,051 ablations of the real corpus ----
@@ -316,6 +319,8 @@ fn pinning_never_rewrites_a_binding_site() {
         "    a, scale = f()\n    return x * a\n",
         "    for scale in items:\n        pass\n    return x\n",
         "    with open(p) as scale:\n        pass\n    return x\n",
+        "    with open(p) as (a, scale):\n        pass\n    return x\n",
+        "    try:\n        risky()\n    except Exception as scale:\n        pass\n    return x\n",
         "    scale += 1\n    return x\n",
     ] {
         let src = format!("def f(x, scale=1.0):\n{body}");
@@ -399,6 +404,7 @@ fn quals(src: &str, rule: &str) -> Vec<String> {
         .filter(|(n, _)| *n == rule)
         .collect();
     collect(src, &chosen)
+        .unwrap()
         .iter()
         .map(|a| a.qualname.clone())
         .collect()

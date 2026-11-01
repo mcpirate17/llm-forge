@@ -1,15 +1,11 @@
-//! Port of `tooling/hooks/claude/obsidian_sync.py`'s **post-edit path only**
-//! (`cmd_post_edit`): the SessionEnd half (`cmd_session_end`) stays in
-//! Python -- it reads the accumulator this path writes, sums a session, and
-//! has no latency budget to justify a port.
+//! Native post-edit memory mirroring and bounded SessionEnd journal publication.
 //!
 //! PostToolUse on Edit/Write: if the edited file is a memory entry under the
 //! session's memory root, mirror it into the Obsidian vault as a thin
 //! backlink note (the repo memory file stays the source of truth), and
 //! always append one accumulator line (`<utc-iso>\t<kind>\t<path>`) so
 //! session-end can summarize. The hook's own answer is always the quiet ok
-//! JSON the body prints; a broken vault or accumulator degrades silently to
-//! stderr-free best effort, exactly like the Python body's bare `except`.
+//! JSON the body prints; a broken vault or accumulator reports on stderr.
 //!
 //! Path resolutions port verbatim (`_env_dir` honours `~`, a relative value
 //! resolves against the checkout). One divergence, documented: Python's
@@ -20,8 +16,9 @@
 //! same authority every other native hook already uses.
 
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
+#[path = "obsidian_journal.rs"]
+mod journal;
 
 use serde_json::{json, Value};
 
@@ -170,8 +167,8 @@ fn parse_frontmatter(text: &str) -> (Vec<(String, String)>, String) {
 }
 
 /// `_mirror_memory`: one thin backlink note under `VAULT_ROOT/memory/`,
-/// dated today, pointing at the canonical memory file. Best effort like the
-/// Python body: a failure is the caller's `except Exception: pass`.
+/// dated today, pointing at the canonical memory file. Failures are reported by
+/// the caller without denying the already-completed edit.
 fn mirror_memory(memory_path: &Path, vault: &Path, today: &str) -> std::io::Result<()> {
     let text = fs::read_to_string(memory_path)?;
     let (fields, body) = parse_frontmatter(&text);
@@ -265,7 +262,9 @@ pub fn post_edit_output(payload: &Value) -> Value {
             // `datetime.now().strftime("%Y-%m-%d")`: the first ten chars of
             // the ISO stamp are exactly that date.
             let today = instant::isoformat_utc(instant::now())[..10].to_string();
-            let _ = mirror_memory(&fp, &vault_root(&root), &today);
+            if let Err(error) = mirror_memory(&fp, &vault_root(&root), &today) {
+                eprintln!("obsidian post-edit: memory mirror unavailable: {error}");
+            }
         }
     }
 
@@ -280,14 +279,22 @@ pub fn post_edit_output(payload: &Value) -> Value {
 /// on demand. Python swallows the OSError; the caller only wants the line on
 /// disk when the disk allows it, so the error returns to be logged.
 fn append_accumulator(sid: &str, line: &str) -> std::io::Result<()> {
-    let dir = PathBuf::from("/tmp/claude-session-journal");
-    fs::create_dir_all(&dir)?;
-    let path = dir.join(format!("{sid}.tsv"));
-    let mut file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
-    write!(file, "{line}")
+    journal::append(&repo_root(), sid, line).map_err(|e| std::io::Error::other(format!("{e:#}")))
+}
+
+pub fn run_journal(host: &Path) -> anyhow::Result<u8> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::io::stdin()
+        .take(1024 * 1024 + 1)
+        .read_to_end(&mut bytes)?;
+    anyhow::ensure!(
+        bytes.len() <= 1024 * 1024,
+        "session journal payload exceeds 1 MiB"
+    );
+    let payload = forge::tool_schema::parse_document(std::str::from_utf8(&bytes)?)?;
+    journal::run(&host.canonicalize()?, &payload)?;
+    Ok(0)
 }
 
 fn quiet_ok() -> Value {

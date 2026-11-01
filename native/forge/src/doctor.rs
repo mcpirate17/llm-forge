@@ -1,44 +1,12 @@
-//! `forge doctor --host DIR`: verify a host install end to end
-//! (`docs/roadmap.md` Phase 4, item 2c). `forge hooks status` proves the
-//! settings entries exist and their binary answers `--version`; it says
-//! nothing about the other half of an install -- that the Python package
-//! forge delegates to is importable from the host, that the ledger root is
-//! writable, that the routing policy parses, and that a real hook call
-//! answers at all. One command, one line per check, exit 1 on any FAIL:
-//! Tim runs it on a host and either sees green or the exact broken piece.
-//!
-//! Checks, in order (all of them always run and always print):
-//!
-//! * `settings` -- forge's entries in `DIR/.claude/settings.json`, reusing
-//!   `hooks_install`'s loader and command parser.
-//! * `binary` -- every installed entry's binary exists, is executable, and
-//!   its `--version` rev matches this running binary.
-//! * `python` -- the interpreter `interpreter::resolve_python` would pick
-//!   for `DIR` can `import conductor, tooling.hooks.dispatch` with `cwd` at
-//!   `DIR` (what `dispatch::delegate` spawns on every non-standalone call).
-//!   SKIP when every installed entry is standalone: forge never delegates.
-//! * `ledger` -- the ledger root `ledger::resolve_ledger_root` picks
-//!   (`LEDGER_ROOT` env override honoured) is writable, proven by
-//!   creating and deleting a probe file under `live/` (where `cap_enforce`
-//!   keeps its per-agent state).
-//! * `policy` -- the routing policy this binary actually answers from
-//!   (embedded at build time by `route.rs`) parses; report the class count.
-//! * `hook-roundtrip` -- this binary re-invoked as a child exactly as the
-//!   standalone install wires it (`FORGE_MODE=warn FORGE_HOOK_STANDALONE=1
-//!   <self> hook PreToolUse`), fed a synthetic Bash payload on stdin. PASS
-//!   is exit 0 with empty or JSON stdout. The probe writes nothing:
-//!   `FORGE_LEDGER_DISABLE=1` for the rollup paths and an explicitly empty
-//!   `CONTEXT_TELEMETRY_PATH` (telemetry's default lives under the ledger
-//!   root; the empty path is its documented no-write state).
+//! Verify native settings, installed binary versions, ledger storage, embedded
+//! policy and a real bounded hook roundtrip. No interpreter probe is required.
 
-use crate::{hooks_install, interpreter, ledger, route};
+use crate::{hooks_install, ledger, route};
 use anyhow::{Context, Result};
 use clap::Args;
 use serde_json::{json, Value};
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
-use std::sync::mpsc;
+use std::process::{Command, Output};
 use std::time::{Duration, Instant};
 
 #[derive(Args)]
@@ -108,7 +76,6 @@ pub fn run(args: &DoctorArgs) -> Result<u8> {
     let checks = vec![
         settings,
         check_binaries(&entries),
-        check_python(host, &entries),
         check_ledger(),
         check_policy(),
         check_roundtrip(&self_path, host),
@@ -262,69 +229,13 @@ fn is_executable(_path: &Path) -> bool {
 
 // ── python ────────────────────────────────────────────────────────────────
 
-fn check_python(host: &Path, entries: &[hooks_install::ParsedHook]) -> Check {
-    if entries.is_empty() {
-        return Check::skip(
-            "python",
-            "no forge entries installed (settings FAILED above)".to_string(),
-        );
-    }
-    if entries.iter().all(|e| e.standalone) {
-        return Check::skip(
-            "python",
-            "every installed entry is standalone; forge never delegates to Python".to_string(),
-        );
-    }
-    let interpreters: std::collections::BTreeSet<_> = entries
-        .iter()
-        .filter(|entry| !entry.standalone)
-        .map(|entry| interpreter::resolve_python_binding(host, entry.python.as_deref()))
-        .collect();
-    let mut details = Vec::new();
-    for python in interpreters {
-        let result = check_interpreter(host, &python);
-        if result.status == Status::Fail {
-            return result;
-        }
-        details.push(result.detail);
-    }
-    Check::pass("python", details.join("; "))
-}
-
-fn check_interpreter(host: &Path, python: &Path) -> Check {
-    let mut cmd = Command::new(python);
-    cmd.arg("-c")
-        .arg("import conductor, conductor_native, tooling.hooks.dispatch")
-        .current_dir(host);
-    match run_capture_bounded(cmd, None, PYTHON_IMPORT_TIMEOUT) {
-        Ok(output) if output.status.success() => Check::pass(
-            "python",
-            format!(
-                "{} imports conductor, conductor_native and tooling.hooks.dispatch from {}",
-                python.display(),
-                host.display()
-            ),
-        ),
-        Ok(output) => Check::fail(
-            "python",
-            format!(
-                "{} -c 'import conductor, conductor_native, tooling.hooks.dispatch' (cwd {}) failed: {}",
-                python.display(),
-                host.display(),
-                tail(&String::from_utf8_lossy(&output.stderr), 200)
-            ),
-        ),
-        Err(err) => Check::fail(
-            "python",
-            format!("could not run {}: {err:#}", python.display()),
-        ),
-    }
-}
-
 // ── ledger ────────────────────────────────────────────────────────────────
 
 fn check_ledger() -> Check {
-    let root = ledger::resolve_ledger_root(None);
+    let root = match ledger::resolve_ledger_root(None) {
+        Ok(root) => root,
+        Err(error) => return Check::fail("ledger", error.to_string()),
+    };
     let live = root.join("live");
     if let Err(err) = std::fs::create_dir_all(&live) {
         return Check::fail(
@@ -383,7 +294,6 @@ fn policy_check(parsed: Result<route::Policy>, source: &str) -> Check {
 
 const ROUNDTRIP_TIMEOUT: Duration = Duration::from_secs(30);
 const BINARY_VERSION_TIMEOUT: Duration = Duration::from_secs(15);
-const PYTHON_IMPORT_TIMEOUT: Duration = Duration::from_secs(60);
 
 fn check_roundtrip(self_path: &Path, host: &Path) -> Check {
     let payload = json!({
@@ -396,6 +306,8 @@ fn check_roundtrip(self_path: &Path, host: &Path) -> Check {
     let mut cmd = Command::new(self_path);
     cmd.arg("hook")
         .arg("PreToolUse")
+        .current_dir(host)
+        .env("CLAUDE_PROJECT_DIR", host)
         .env("FORGE_MODE", "warn")
         .env("FORGE_HOOK_STANDALONE", "1")
         .env("FORGE_LEDGER_DISABLE", "1")
@@ -473,71 +385,17 @@ fn render_json(checks: &[Check]) -> String {
 
 // ── shared process plumbing ───────────────────────────────────────────────
 
-/// Runs `command` to completion, capturing stdout/stderr, feeding `stdin`
-/// when given, and killing the child by pid when it outlives `timeout` --
-/// the same deadline-by-thread pattern as `bounded_child::run_bounded`,
-/// which cannot be reused here because it fixes the executable to
-/// `current_exe`, nulls stdout, and takes no stdin or env.
 fn run_capture_bounded(
     mut command: Command,
     stdin: Option<&[u8]>,
     timeout: Duration,
 ) -> Result<Output> {
-    command.stdout(Stdio::piped()).stderr(Stdio::piped());
     match stdin {
         Some(bytes) => {
-            command.stdin(Stdio::piped());
-            let mut child = command.spawn().context("spawning the probe child")?;
-            {
-                let mut stdin = child.stdin.take().expect("piped stdin");
-                // A child that exits before reading its payload (a broken
-                // binary -- exactly what the roundtrip check exists to
-                // catch) closes the pipe and turns this write into EPIPE.
-                // That is the child's verdict to report, not a probe
-                // failure: swallow BrokenPipe and let the wait below judge
-                // by exit status and stdout. Every other write error is a
-                // real feeding failure and fails the check.
-                if let Err(err) = stdin.write_all(bytes) {
-                    if err.kind() != std::io::ErrorKind::BrokenPipe {
-                        return Err(err).context("feeding the probe child its stdin payload");
-                    }
-                }
-            }
-            wait_bounded(child, timeout)
+            forge::process_probe::run_with_input(&mut command, bytes, timeout, 256 * 1024)
         }
-        None => {
-            command.stdin(Stdio::null());
-            let child = command.spawn().context("spawning the probe child")?;
-            wait_bounded(child, timeout)
-        }
+        None => forge::process_probe::run(&mut command, timeout, 256 * 1024),
     }
-}
-
-/// The deadline half of `run_capture_bounded`: the blocking wait happens on
-/// a thread, and the main thread kills the child by pid if the deadline
-/// passes first (`Child::wait` blocks with no deadline of its own).
-fn wait_bounded(child: std::process::Child, timeout: Duration) -> Result<Output> {
-    let pid = child.id();
-    let (tx, rx) = mpsc::channel();
-    let handle = std::thread::spawn(move || {
-        let _ = tx.send(child.wait_with_output());
-    });
-    let outcome = match rx.recv_timeout(timeout) {
-        Ok(received) => received.context("waiting for the probe child"),
-        Err(_) => {
-            let _ = Command::new("kill")
-                .arg(pid.to_string())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-            Err(anyhow::anyhow!(
-                "timed out after {} ms (child killed)",
-                timeout.as_millis()
-            ))
-        }
-    };
-    let _ = handle.join();
-    outcome
 }
 
 /// The last `max` characters of `text`, trimmed -- the readable tail of an
@@ -583,17 +441,6 @@ mod tests {
         }
     }
 
-    fn stub_script(path: &Path, body: &str) {
-        std::fs::write(path, body).unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(path).unwrap().permissions();
-            perms.set_mode(0o755);
-            std::fs::set_permissions(path, perms).unwrap();
-        }
-    }
-
     #[test]
     fn no_settings_file_means_settings_fail_and_exit_one() {
         let scratch = ScratchDir::new("no-settings");
@@ -622,7 +469,6 @@ mod tests {
             mode: "warn".to_string(),
             standalone: true,
             binary: Some(PathBuf::from("/opt/forge/bin/forge")),
-            python: None,
             dry_run: false,
             takeover: false,
         })
@@ -666,7 +512,6 @@ mod tests {
         let checks = vec![
             settings,
             check_binaries(&entries),
-            check_python(scratch.path(), &entries),
             check_ledger(),
             check_policy(),
         ];
@@ -689,31 +534,25 @@ mod tests {
         assert_eq!(parsed["ok"], json!(false), "the settings FAIL must flip ok");
     }
 
-    /// One roundtrip-shape sanity check on the shared plumbing: a stub child
-    /// that exits 0 with empty stdout is the exact PASS shape, one that
-    /// writes garbage is the FAIL shape. The real-binary roundtrip is
-    /// exercised live in item 5 of the slice (the LLM-host run).
+    /// Native child processes exercise quiet success, invalid-output success,
+    /// and a nonzero exit without creating executable fixtures.
     #[test]
     fn roundtrip_check_passes_a_quiet_child_and_fails_a_noisy_one() {
         let scratch = ScratchDir::new("roundtrip");
-        let quiet = scratch.path().join("forge-quiet");
-        stub_script(&quiet, "#!/bin/sh\n");
-        let pass = check_roundtrip(&quiet, scratch.path());
+        let pass = check_roundtrip(Path::new("/bin/true"), scratch.path());
         assert_eq!(pass.status, Status::Pass, "{}", pass.detail);
         assert!(pass.detail.contains("ms"), "{}", pass.detail);
-        let noisy = scratch.path().join("forge-noisy");
-        stub_script(&noisy, "#!/bin/sh\necho 'not json'\n");
-        let fail = check_roundtrip(&noisy, scratch.path());
+        // check_roundtrip supplies "hook PreToolUse", which echo emits as
+        // nonempty text that cannot parse as JSON.
+        let fail = check_roundtrip(Path::new("/bin/echo"), scratch.path());
         assert_eq!(fail.status, Status::Fail);
         assert!(
             fail.detail.contains("neither empty nor JSON"),
             "{}",
             fail.detail
         );
-        let dead = scratch.path().join("forge-dead");
-        stub_script(&dead, "#!/bin/sh\nexit 3\n");
-        let failed = check_roundtrip(&dead, scratch.path());
+        let failed = check_roundtrip(Path::new("/bin/false"), scratch.path());
         assert_eq!(failed.status, Status::Fail);
-        assert!(failed.detail.contains("exited 3"), "{}", failed.detail);
+        assert!(failed.detail.contains("exited 1"), "{}", failed.detail);
     }
 }

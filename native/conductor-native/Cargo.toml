@@ -8,17 +8,15 @@ description = "Native core of the conductor agent tooling: mutation campaigns, r
 name = "conductor_native"
 crate-type = ["cdylib", "rlib"]
 
+[[bench]]
+name = "vector_index"
+harness = false
+required-features = ["vector-search"]
+
 [[bin]]
 name = "dead-code-audit"
 path = "src/bin/dead_code_audit.rs"
 required-features = ["source-analysis"]
-
-[[bin]]
-name = "crg_refresh_child"
-path = "tests/fixtures/crg_refresh_child.rs"
-required-features = ["python-compat-tests"]
-test = false
-bench = false
 
 [[bin]]
 name = "crg_mcp_probe_child"
@@ -28,29 +26,8 @@ test = false
 bench = false
 
 [[bin]]
-name = "crg_venv_sync_child"
-path = "tests/fixtures/crg_venv_sync_child.rs"
-required-features = ["python-compat-tests"]
-test = false
-bench = false
-
-[[bin]]
 name = "mutation_support_child"
 path = "tests/fixtures/mutation_support_child.rs"
-required-features = ["python-compat-tests"]
-test = false
-bench = false
-
-[[bin]]
-name = "hook_project_seam_child"
-path = "tests/fixtures/hook_project_seam_child.rs"
-required-features = ["python-compat-tests"]
-test = false
-bench = false
-
-[[bin]]
-name = "hook_matrix_child"
-path = "tests/fixtures/hook_matrix_child.rs"
 required-features = ["python-compat-tests"]
 test = false
 bench = false
@@ -86,22 +63,29 @@ sha2 = "0.10"
 syn = { version = "2", features = ["full", "visit", "parsing"] }
 toml = "0.8"
 tree-sitter = { version = "0.27", optional = true }
+tree-sitter-c = { version = "0.24", optional = true }
 tree-sitter-cpp = { version = "0.23", optional = true }
+tree-sitter-javascript = { version = "0.25", optional = true }
+tree-sitter-python = { version = "0.25", optional = true }
+tree-sitter-rust = { version = "0.24", optional = true }
+tree-sitter-typescript = { version = "0.23", optional = true }
 unicode-general-category = { version = "0.6", optional = true }
-zstd = "0.13"
+zstd = "0.14.3"
 
 # `extension-module` tells pyo3 not to link libpython, which is right for the
 # shipped wheel and wrong for `cargo test` -- a test binary must link it to run.
 # Left on unconditionally, the unit tests in this crate cannot even build: they
 # fail at link with `undefined symbol: PyObject_CallNoArgs`. The wheel turns it
 # back on via `features` in pyproject.toml, so the shipped artifact is unchanged.
-# Native consumers disable default features to build the shared core without
-# Python bindings or a Python interpreter available during the build.
+# Default builds have no Python dependency. Legacy bindings are explicit while
+# their callers are migrated. Keep Python's shared SQLite runtime separate from
+# the standalone Forge binary's bundled SQLite selection.
 [features]
-default = ["python"]
+default = ["source-analysis", "vector-search"]
 bundled-sqlite = ["rusqlite/bundled"]
-source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:unicode-general-category", "dep:tree-sitter", "dep:tree-sitter-cpp"]
-python = ["dep:pyo3", "source-analysis", "dep:memmap2", "dep:libloading", "dep:sha1"]
+source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:unicode-general-category", "dep:tree-sitter", "dep:tree-sitter-c", "dep:tree-sitter-cpp", "dep:tree-sitter-javascript", "dep:tree-sitter-python", "dep:tree-sitter-rust", "dep:tree-sitter-typescript"]
+vector-search = ["dep:memmap2"]
+python = ["dep:pyo3", "source-analysis", "vector-search", "dep:libloading", "dep:sha1"]
 python-compat-tests = ["python"]
 extension-module = ["python", "pyo3/extension-module"]
 
@@ -112,3 +96,667 @@ codegen-units = 1
 
 [package.metadata.maturin]
 bindings = "pyo3"
+
+
+# Do not compile compatibility executables in native-only builds.
+# These adapters remain explicitly opt-in until their interpreted callers retire.
+
+[[test]]
+name = "python_contracts_active_state"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_audit_root"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_avo_workflows"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_baseline_merge"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_branch_policy"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_branch_policy_native"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_bytecode_isolation"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_campaign_plan"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_benchmark"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_call_evidence"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_cargo_audit"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_cargo_lint"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_cli"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_crate_version"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_engine"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_files"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_import_declaration_core"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_import_declaration_integration"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_performance"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_policy"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_policy_regressions"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_review_claims_view"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_review_evidence"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_review_flow_a"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_review_flow_b"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_review_hardening"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_review_isolation"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_review_scan"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_review_waivers"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_runtime_a"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_runtime_b"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_structure_audit"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_style"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_tools"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_verification"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_candidate_vulture"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_check_protected_deletes"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_checkout_sync"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_ci_history_fetch"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_codex_journal"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_commit_snapshot"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_complete_scope_drift"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_contextual_mutation_evidence"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_contract_runner"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_cost_budget_audit"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_cost_ledger"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_cpu_embed"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_crg_mcp_probe"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_crg_seed_worktree"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_current_work_guard"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_dead_tests"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_duplicate_bodies_native"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_embedding_contract"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_equivalence_gate"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_equivalence_probe"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_external_invariants"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_finding_attribution"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_gate"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_gate_policy_provenance"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_gate_rollout"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_governance_identity"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_governance_lock"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_graph_context"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_graph_selection"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_graph_test_select"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_guardrail_ast_native"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_guardrail_audit"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_guardrail_duplicates"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_handoff"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_hot_loop_scan"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_import_ablation"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_index_notes"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_installed_layout"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_kb_retrieve"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_killer_attribution"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_ledger_calibrate"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_local_clerk"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_memory_auto_index"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_memory_chunking"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_memory_index"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_memory_index_streaming"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_memory_vectors"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_attribution"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_campaign_generate"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_campaign_model"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_coverage"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_engine_cargo"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_engine_fest"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_engine_mull_args"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_engine_mull_rows"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_engine_mull_run"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_gate_edges"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_generated_core"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_generated_manifest"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_generated_receipt"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_guard"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_patch_apply"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_patch_audit_a"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_patch_audit_b"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_patch_audit_c"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_pycache_evict"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_receipt_encoding"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_receipt_paths"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_receipt_slim"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_refresh_cli"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_registry_rows"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_registry_split"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_retention"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_run_scope"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_support_host"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_support_process"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_testing_core"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_testing_evidence"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_value"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_value_core"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_value_routing"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_mutation_verdicts"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_native_ablations"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_native_test_selection"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_ownership_claim_expiry"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_package_resources"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_policy_engine_crash"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_policy_path"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_probe_budget"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_project_context"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_project_paths"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_radon_complexity"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_receipt_scope"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_receipt_verify"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_ref_aware_governance"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_repo_utilities"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_audit_inventory"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_consolidation"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_consolidation_collect"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_detector_scan"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_file_families"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_file_family_lsh"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_file_family_profiles"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_inventory"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_roi"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_reuse_sweep"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_run_duplicate_audit"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_runner_lineage"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_sandbox"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_session_close"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_session_policy"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_session_preamble"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_snapshot_worktree"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_test_record"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_test_value_scan"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_tooling_boundary"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_uncurated_kill_rate"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_value_gate_scope"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_verbosity_scan"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_vulture_audit"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_workspace_exposure_corpus"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_workspace_hygiene"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_workspace_runtime_clerk"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_workspace_runtime_cli"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_workspace_runtime_core"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_workspace_runtime_matrix"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_workspace_runtime_support"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_worktree_lease"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_worktree_reap"
+required-features = ["python-compat-tests"]
+
+[[test]]
+name = "python_contracts_worktree_runtime"
+required-features = ["python-compat-tests"]

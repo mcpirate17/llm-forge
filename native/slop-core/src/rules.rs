@@ -36,6 +36,17 @@ fn emit(
     if edits.is_empty() {
         return;
     }
+    let bytes = rule.len()
+        + qual.len()
+        + desc.len()
+        + std::mem::size_of::<Ablation>()
+        + edits
+            .iter()
+            .map(|e| std::mem::size_of::<Edit>() + e.replacement.len())
+            .sum::<usize>();
+    if !ctx.admit(out.len(), bytes) {
+        return;
+    }
     out.push(Ablation {
         rule: rule.to_string(),
         qualname: qual.to_string(),
@@ -418,7 +429,7 @@ fn is_reference(n: Node) -> bool {
     let mut cur = n;
     while let Some(p) = cur.parent() {
         match p.kind() {
-            "pattern_list" | "tuple_pattern" | "list_pattern" => cur = p,
+            "pattern_list" | "tuple_pattern" | "list_pattern" | "as_pattern_target" => cur = p,
             _ => break,
         }
     }
@@ -427,7 +438,7 @@ fn is_reference(n: Node) -> bool {
     let mut up = Some(cur);
     while let Some(a) = up {
         match a.kind() {
-            "delete_statement" => return false,
+            "delete_statement" | "as_pattern_target" => return false,
             "block" | "function_definition" | "module" => break,
             _ => up = a.parent(),
         }
@@ -496,6 +507,14 @@ pub fn r_pin_parameter(ctx: &Ctx, n: Node, q: &str, out: &mut Vec<Ablation>) {
         let uses = find_uses(ctx, body, &p.name);
         if uses.is_empty() {
             continue;
+        }
+        if uses
+            .len()
+            .saturating_mul(default.len() + std::mem::size_of::<Edit>())
+            > 2 * 1024 * 1024
+        {
+            ctx.fail_budget();
+            return;
         }
         let edits = uses
             .iter()

@@ -1,18 +1,13 @@
 //! Language-aware syntax projections shared by CLI and Python graph adapters.
 
 use super::store::Symbol;
-use crate::graph_index::{extract_python, extract_rust};
+use crate::graph_index::extract;
 use serde_json::{json, Value};
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 
 pub fn symbols(source: &str, language: &str) -> Result<Vec<Symbol>, String> {
-    let facts = match language {
-        "python" => extract_python(source),
-        "rust" => extract_rust(source),
-        _ => return Err(format!("unsupported skeleton language: {language}")),
-    }
-    .map_err(|error| error.to_string())?;
+    let facts = extract(source, language).map_err(|error| error.to_string())?;
     Ok(facts
         .definitions
         .into_iter()

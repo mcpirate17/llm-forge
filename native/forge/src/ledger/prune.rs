@@ -24,12 +24,12 @@ const ARCHIVED_TABLES: [(&str, &str); 2] = [
 /// Tables whose day files are deleted without archiving (raw detail).
 const DROPPED_TABLES: [&str; 2] = ["turn_attribution", "hook_rollup"];
 
-const DEFAULT_LEDGER_ROOT: &str = "/mnt/data/llm/ledger/";
+use conductor_native::state_paths::ledger_root as resolve_ledger_root;
 
 #[derive(Args)]
 pub struct PruneArgs {
     /// Ledger root directory; defaults to `LEDGER_ROOT`, else
-    /// `/mnt/data/llm/ledger/`.
+    /// the user's XDG state directory under `llm-forge/ledger`.
     #[arg(long)]
     pub ledger_root: Option<PathBuf>,
 
@@ -53,7 +53,7 @@ pub fn run(args: PruneArgs) -> Result<i32> {
     if args.keep_days < 0 {
         bail!("forge ledger prune: --keep-days must not be negative");
     }
-    let root = resolve_ledger_root(args.ledger_root);
+    let root = resolve_ledger_root(args.ledger_root)?;
     let today = today_epoch_day();
 
     let mut archives: Vec<Plan> = Vec::new();
@@ -246,11 +246,6 @@ fn today_epoch_day() -> i64 {
         .unwrap_or_default()
         .as_secs() as i64
         / 86_400
-}
-
-fn resolve_ledger_root(out: Option<PathBuf>) -> PathBuf {
-    out.or_else(|| std::env::var("LEDGER_ROOT").ok().map(PathBuf::from))
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_LEDGER_ROOT))
 }
 
 #[cfg(test)]

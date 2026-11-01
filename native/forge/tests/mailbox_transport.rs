@@ -658,6 +658,16 @@ fn sender_lock_rejects_concurrent_flush_without_consuming_queue() {
     let refused = fixture.flush(1);
     assert_eq!(refused.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&refused.stderr).contains("active delivery"));
+    let deferred = fixture
+        .command("flush")
+        .args(["--as-name", "sender", "--defer-busy"])
+        .output()
+        .unwrap();
+    assert_eq!(deferred.status.code(), Some(3));
+    assert_eq!(
+        serde_json::from_slice::<Value>(&deferred.stdout).unwrap(),
+        json!([])
+    );
     let pending: i64 = fixture
         .store()
         .query_row(

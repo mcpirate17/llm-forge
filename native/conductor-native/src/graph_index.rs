@@ -59,6 +59,12 @@ pub struct FileFacts {
     /// Reads of files as data: `ast.parse`, `inspect.getsource*`, `read_text`, `read_bytes`, `glob`.
     #[serde(default)]
     pub file_reads: usize,
+    /// Literal include/import paths from the native multi-language syntax registry.
+    #[serde(default)]
+    pub path_imports: Vec<String>,
+    /// Syntax facts are useful, but do not close linker/bundler/type-checker dependencies.
+    #[serde(default)]
+    pub cross_file_incomplete: bool,
 }
 
 #[derive(Debug)]
@@ -453,4 +459,17 @@ pub fn extract_rust(source: &str) -> Result<FileFacts, ParseError> {
     let mut collector = RustCollector::default();
     collector.visit_file(&file);
     Ok(collector.facts)
+}
+
+/// Keep the mature Python/Rust analyzers and share the multi-language registry
+/// with interactive inspection and patch validation.
+pub fn extract(source: &str, language: &str) -> Result<FileFacts, ParseError> {
+    match language {
+        "python" => extract_python(source),
+        "rust" => extract_rust(source),
+        _ => crate::syntax::Language::from_name(language)
+            .and_then(|language| crate::syntax::inspect(source, language))
+            .map(|inspection| inspection.graph_facts())
+            .map_err(|error| ParseError(error.to_string())),
+    }
 }

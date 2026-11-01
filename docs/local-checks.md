@@ -1,102 +1,102 @@
-# Local checks for Forge pull requests
+# Native local verification
 
-Forge keeps pull requests as the only route to `main`. Routine checks run on the
-developer's machine against a **clean, committed** checkout. There is no hosted
-CI. The clean-host proof is the nightly `forge sweep` ([`sweep.md`](sweep.md)).
-
-After committing the branch, run:
+Routine verification runs against a **clean, committed** checkout. There is no
+hosted CI. Delivery authorization and branch policy are separate from these
+checks; a receipt does not authorize a push or merge.
 
 ```sh
 make local-check
 make local-verify
 ```
 
-`local-check` runs every step in [`.forge/local-check.toml`](../.forge/local-check.toml):
-resource preflight, the cached `make install` with fresh native extensions,
-Python compilation, inventory-aware legacy Python suites, Rust compatibility
-contracts, installed runtime smoke, pinned duplicate/complexity/dead-code baselines, mutation
-tooling canary and retention dry-run, and fmt/Clippy/tests for all three Rust
-crates including the Python-free native core. It masks CUDA, caps Cargo at
-two jobs, and limits each Rust harness to two concurrent tests (the Python
-contracts run one at a time). jscpd 4.2.1 and PMD 7.27.0 are installed once under
-`.git/forge-tools` when their checks are selected. The initial run may need
-network access and the system SQLite library required by the native crates.
-The core's feature configurations use separate Cargo output directories because
-their `cdylib`/`rlib` artifacts would otherwise overwrite each other. Install and
-test select the same directories and Python interpreter so prebuilt tests remain
-usable; a shared `CARGO_TARGET_DIR` override also isolates the compatibility build
-from Forge's Python-free core dependency.
+`local-check` runs the native inventory in
+[`.forge/local-check.toml`](../.forge/local-check.toml): CPU and memory admission,
+an isolated native installation, relocated/installed executable smoke tests,
+and formatting, strict Clippy and release tests for all three Rust crates.
+Rust 1.98.0 is selected explicitly. CUDA is masked, Cargo uses at most two jobs,
+and each Rust test harness uses at most two concurrent tests. SQLite is bundled
+for the conductor and Forge builds. The initial install can fetch Cargo
+dependencies; subsequent checks use `--offline --locked`.
 
-The Python stages inspect tracked pytest suite paths before invoking pytest;
-the conductor inventory excludes its `testdata/` inputs. A stage with no
-remaining Python suites reports that inventory and leaves the Rust contracts
-to their separate stage. Once the final suites are retired, both stages skip.
-While Python suites remain, every pytest exit status is preserved, including
-a failure to collect any cases. `make test` runs the native compatibility
-contracts and all three crates' default tests, including the core's Python-free
-source-analysis configuration. It uses the installed venv, masks CUDA, caps
-Cargo at two jobs, and runs Python compatibility contracts serially.
+`make build` builds the native Forge executable. `make install` installs it to
+`target/install` by default; `INSTALL_ROOT=/absolute/prefix` selects another
+destination. The check runner uses `.git/forge-tools/native-install`, prepends
+its `bin` to `PATH`, and supplies `FORGE_BIN` and `FORGE_INSTALL_ROOT` to checks.
+`FORGE_CHECK_BIN` identifies the running check executable for resource admission.
+It neither installs nor discovers a Python environment. `PYO3_PYTHON` points to
+an intentionally invalid path so accidental binding activation fails visibly.
+The installed-runtime tests start Forge with an empty executable search path
+and isolated home/configuration directories. They exercise native hook guards,
+AST analysis and provider configuration without a compiler or interpreter in
+the runtime environment.
 
-The receipt and step logs are under `.git/forge-checks/run-*/`. `forge verify`
+`make test` runs the default release test inventory for conductor-native,
+slop-core and Forge. Explicit Python compatibility features remain outside this
+native gate while their adapters are being retired; a native PASS does not
+attest those adapters. Existing ignored tests retain their stated prerequisites.
+
+Receipts and step logs live under `.git/forge-checks/run-*/`. `forge verify`
 requires the latest attempt to have passed and rechecks log hashes, committed
-HEAD/tree, the `origin/main` tip and merge base, changed paths, and the policy
-from the target branch. The first policy commit uses its own committed copy;
-after it lands, `origin/main` governs. A failed or interrupted newer attempt
-cannot be hidden by verifying an older PASS. Untracked research drafts are
-allowed; other untracked files and any tracked changes block the check. A
-per-run Python bytecode cache prevents an older checkout's bytecode from
-contaminating the result.
-The receipt excludes untracked `research/` files, on the assumption that the
-declared checks do not read them; it does not attest those drafts.
+HEAD/tree, `origin/main`, the merge base, changed paths and the target branch's
+policy. The first policy commit uses its own committed copy; once a policy
+exists on the target branch, that policy governs. Updating a working-tree policy
+alone does not change the authoritative gate. A failed or interrupted newer
+attempt cannot be hidden by verifying an older PASS. Untracked `research/`
+drafts are excluded, on the assumption that checks do not read them; the receipt
+does not attest those drafts. Other untracked files and tracked changes block
+the committed check.
 
-For a fast edit loop, `make local-check LOCAL_CHECK_ARGS=` selects checks from
-the changed paths. Changes to the runner, policy, Makefile, or hosted workflow
-force every check even in that mode. The full default command and
-`local-verify` are the pre-PR and pre-merge gate. If `origin/main` advances,
-fetch/rebase as needed, rerun the full check, and verify its new receipt.
-Then push the branch, open the PR, and merge through the PR. The local receipt
-is cooperative evidence on this trusted machine; GitHub does not attest it
-or enforce it as a required status check.
+`make local-check LOCAL_CHECK_ARGS=` selects checks from changed paths. Runner,
+policy, Makefile and hosted workflow changes force the full inventory even in
+that mode. Changes in either native dependency also select Forge's Clippy,
+tests and installed-runtime checks. The default full invocation and
+`local-verify` are the publication checks. If committed inputs or `origin/main`
+change, rerun and verify the new receipt.
 
-For uncommitted edits, use `make local-preview` or `forge preview --path
-native/forge/src/example.rs`. This prints an advisory plan and does not write a
-landing receipt. `make local-preview LOCAL_PREVIEW_ARGS='--execute --path
-native/forge/src/example.rs'` copies versioned and nonignored source inputs into
-a disposable directory under `.git/forge-previews`, then builds only the
-selected crate/test configuration. Graph-selected integration targets are used
-when available; unavailable or incomplete graph evidence is reported explicitly
-and affected crates remain selected. An optional `--filter test_name` limits the
-preview test names; it never alters the full committed gate.
-Default plan output reports graph metadata and selected-test counts; `--details`
-expands the full graph path inventory. Tests sharing a crate and feature set are
-grouped into one Cargo invocation and share one artifact cache.
+For uncommitted edits, `make local-preview` or `forge preview --path
+native/forge/src/example.rs` prints an advisory plan. Add `--execute` to copy
+versioned and nonignored source inputs into a disposable file snapshot under
+`.git/forge-previews` and build the selected crate/test configuration. This is
+neither a Git worktree nor a branch. It never writes a landing receipt.
+Graph-selected integration targets are used when available; missing or
+incomplete graph evidence is reported and affected crates remain selected.
+Conductor and slop-core changes include the dependent Forge library and binary.
+An optional `--filter test_name` limits preview tests only.
 
-Preview Cargo caches are private, locked and keyed by target, features, toolchain,
-host and environment. An unchanged input manifest reuses the stable cached
-workspace; source hash drift invalidates package artifacts even for edits that
-preserved timestamps. Tests still rerun. Python compatibility builds import their
-newly built extension through a private overlay and read the existing interpreter;
-they never install a snapshot into the shared environment. Source changes during
-execution invalidate the current-source preview receipt. Preview files never
-update `.git/forge-checks/latest` and cannot pass `forge verify`.
+Preview plans list `excluded_compatibility_tests` for selected
+`python_contracts_*` adapter targets; the native discovery-planner target remains
+selectable despite its historical prefix. They never enable Python bindings, execute an
+existing `.venv/bin/python`, or build an extension overlay. Execution output
+reports `native_only` and the excluded count; the receipt preserves the complete
+plan. Default output summarizes graph selection; `--details` expands its path
+inventory. Tests sharing a crate and feature set use one Cargo invocation.
 
-Local check receipt schema 2 persists wall time, child CPU time, Linux `wait4`
-maximum process RSS and retained/discarded log bytes for every executed step.
-Logs are drained with a 16 MiB retention cap, hashed incrementally, and failure
-tails read at most 64 KiB. Maximum RSS describes the largest measured process,
-not the sum of simultaneous process-tree memory. Numerical benchmark receipts
-and optional profilers are documented in [performance.md](performance.md).
+Preview caches are locked and keyed by crate/features, native preview version,
+toolchain, host and environment. An unchanged input manifest reuses the stable
+cached workspace; source hash drift invalidates package artifacts even when an
+edit preserved timestamps. Tests still rerun. Source changes during execution
+invalidate the current-source preview receipt. Preview files never update
+`.git/forge-checks/latest` and cannot pass `forge verify`.
 
-The full check remains serial by default. `forge check --all --jobs 2` permits
-policy-declared independent checks to overlap within a two-CPU budget. A
-`[schedule.<check-name>]` table declares `cpus`, `resources` and `depends_on`.
-Unspecified checks reserve both CPUs and `shared-environment`; setup always runs
-serially before checks. Resource-name overlaps prohibit concurrent execution.
-Unknown dependencies, cycles and impossible CPU requests fail before execution;
-a failed prerequisite skips its dependent check and prevents a blocking PASS.
-The same full check inventory, source binding and verification rules apply.
+Receipt schema 2 records wall time, child CPU time, Linux `wait4` maximum process
+RSS and retained/discarded log bytes per step. Logs have a 16 MiB retention cap
+and incremental hashes; failure tails read at most 64 KiB. Maximum RSS is the
+largest measured process, not simultaneous process-tree memory. See
+[performance.md](performance.md) for numerical benchmarks and optional profilers.
 
-The clean-venv install runs nightly in `forge sweep` (`.forge/sweep.toml`), with
-results in `research/reports/sweep/latest.md`. To run it on demand:
-`systemctl --user start forge-sweep-llm-forge.service`. It covers `main`, not a
-branch.
+Checks run serially by default. `forge check --all --jobs 2` allows independent
+checks to overlap within a two-CPU budget. Policy `[schedule.<check-name>]`
+entries declare `cpus`, `resources` and `depends_on`. Unspecified checks reserve
+both CPUs and `shared-environment`; setup always runs serially. Overlapping
+resource names prevent concurrency. Unknown dependencies, cycles and impossible
+CPU requests fail before execution. A failed prerequisite skips dependents and
+prevents a blocking PASS.
+
+The optional [sweep policy](../.forge/sweep.toml) runs native checks, installs
+into a fresh prefix, exercises the installed binary, and audits all three Cargo
+lockfiles with native `cargo-audit`. It requires that development tool to be
+installed; unavailable tools or advisory-database failures are errors. A fresh
+prefix proves relocation, not a clean-host compilation when Cargo caches are
+reused. Editing the policy does not install or start a timer. Existing sweep
+reports are under `research/reports/sweep/`; see [sweep.md](sweep.md) for lifecycle
+commands and their effects.

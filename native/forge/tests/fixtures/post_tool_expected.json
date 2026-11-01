@@ -7,9 +7,9 @@
   "output": {
    "hookSpecificOutput": {
     "hookEventName": "PostToolUse",
-    "additionalContext": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['a.py', 'b.rs']. Graph reads are STALE until `code-review-graph update` succeeds."
+    "additionalContext": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['a.py', 'b.rs']. Graph reads are STALE until `forge graph refresh` succeeds."
    },
-   "systemMessage": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['a.py', 'b.rs']. Graph reads are STALE until `code-review-graph update` succeeds."
+   "systemMessage": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['a.py', 'b.rs']. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "failed_after": null
  },
@@ -27,9 +27,9 @@
   "output": {
    "hookSpecificOutput": {
     "hookEventName": "PostToolUse",
-    "additionalContext": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `code-review-graph update` succeeds."
+    "additionalContext": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `forge graph refresh` succeeds."
    },
-   "systemMessage": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `code-review-graph update` succeeds."
+   "systemMessage": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "failed_after": null
  },
@@ -53,16 +53,16 @@
   "output": {
    "hookSpecificOutput": {
     "hookEventName": "PostToolUse",
-    "additionalContext": "WARNING: code-review-graph is not installed; graph NOT refreshed for *"
+    "additionalContext": "Native syntax graph refresh queued after a git working-tree change."
    }
   },
-  "pending": null
+  "pending": "*\n"
  },
  "pt-graph-checkout-queued": {
   "output": {
    "hookSpecificOutput": {
     "hookEventName": "PostToolUse",
-    "additionalContext": "code-review-graph refresh queued after a git working-tree change."
+    "additionalContext": "Native syntax graph refresh queued after a git working-tree change."
    }
   },
   "pending": "*\n"
@@ -238,7 +238,7 @@
     "hookEventName": "PostToolUse"
    }
   },
-  "pending": null
+  "pending": "ghost.py\n"
  },
  "ge-outside-repo": {
   "output": {
@@ -251,11 +251,10 @@
  "ge-no-tool": {
   "output": {
    "hookSpecificOutput": {
-    "hookEventName": "PostToolUse",
-    "additionalContext": "WARNING: code-review-graph is not installed; graph NOT refreshed for a.py"
+    "hookEventName": "PostToolUse"
    }
   },
-  "pending": null
+  "pending": "a.py\n"
  },
  "oe-plain-edit": {
   "output": {

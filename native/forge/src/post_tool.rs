@@ -1,22 +1,6 @@
-//! The `PostToolUse` half of `handlers`: the two output-bounding bodies
-//! (`post_bash_quiet`, `post_tool_quiet`), the four zero-interpreter-start
-//! bodies of the first slice (`crg_refresh_report_post`, `read_budget`,
-//! `post_bash_graph`, `context_telemetry`) and the three edit-family bodies
-//! of the second (`crg_graph_refresh`, `post_edit`, `obsidian_post_edit`,
-//! with their logic in `crate::crg_refresh`, `crate::post_edit_audit` and
-//! `crate::obsidian_sync`), plus the matcher table and both dispatch modes
-//! over them -- `native_answers_for_post_tool_use` (partial splice) and
-//! `post_tool_use_fully_native`/`run_post_tooluse_fully_native` (answer the
-//! whole event without starting Python, merged with `crate::merge` exactly as
-//! Python's own `merge()` would). The nine names are every `PostToolUse`
-//! hook the Python registry has, so with the native default every tool --
-//! the edit family included -- takes the fully-native path.
-//! `handlers::registry()` still lists every
-//! handler across both modules; see `handlers`'s own docs for the PreToolUse
-//! and SessionStart halves and the env-var contract
-//! (`FORGE_NATIVE_HOOKS`/`FORGE_NATIVE_ANSWERS`) shared by all of them.
+//! Native PostToolUse handlers, bounded output projections and deterministic
+//! matcher order. Errors are reported without denying an already-completed tool.
 
-use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
 
@@ -217,9 +201,19 @@ impl NativeHandler for CrgGraphRefresh {
     }
 
     fn run(&self, payload: &Value) -> Result<Value> {
+        if native_edit_is_preview_or_failure(payload) {
+            return Ok(Value::Null);
+        }
         let root = crg_refresh::gate_repo_root();
         Ok(crg_refresh::edit_hook_output(payload, &root)?)
     }
+}
+
+fn native_edit_is_preview_or_failure(payload: &Value) -> bool {
+    let name = payload["tool_name"].as_str().unwrap_or("");
+    name.starts_with("mcp__forge__")
+        && crate::pre_edit::is_edit_tool_name(name)
+        && (payload["tool_input"]["apply"] != true || payload["tool_response"]["isError"] == true)
 }
 
 /// `post_edit`: format the edited file, then the structural audit
@@ -350,55 +344,12 @@ fn post_tool_use_matches(name: &str, tool_name: &str) -> bool {
         "post_tool_quiet" => {
             tool_name == "Read" || tool_name == "Grep" || tool_name.starts_with("mcp__")
         }
-        "crg_graph_refresh" => matches!(tool_name, "Edit" | "Write" | "NotebookEdit"),
+        "crg_graph_refresh" => crate::pre_edit::is_edit_tool_name(tool_name),
+        // Transactional native edits already validate syntax and return exact
+        // resulting hashes. A subsequent formatter would invalidate that result.
         "post_edit" | "obsidian_post_edit" => matches!(tool_name, "Edit" | "Write"),
         _ => false,
     }
-}
-
-/// Computes each opted-in, matcher-eligible native `PostToolUse` hook's own
-/// answer, keyed by its Python-recognized name -- the `PostToolUse` twin of
-/// `native_answers_for_bash`. Used when the event is *not* fully native
-/// (an Edit-family tool, or some matching name not opted in): Python still
-/// starts and runs its remaining hooks, splicing these answers in at their
-/// registry position so no ported body runs twice.
-pub fn native_answers_for_post_tool_use(
-    payload: &Value,
-    native_hooks: &HashSet<String>,
-) -> HashMap<String, Value> {
-    let mut answers = HashMap::new();
-    let Some(tool_name) = payload.get("tool_name").and_then(Value::as_str) else {
-        return answers;
-    };
-    let handlers = registry();
-    for name in POST_TOOL_USE_HOOK_NAMES {
-        if !native_hooks.contains(name) || !post_tool_use_matches(name, tool_name) {
-            continue;
-        }
-        let Some(handler) = find_handler(&handlers, name, "PostToolUse") else {
-            continue;
-        };
-        if let Ok(value) = handler.run(payload) {
-            answers.insert(name.to_string(), value);
-        }
-    }
-    answers
-}
-
-/// True when every `PostToolUse` hook Python's registry matches for
-/// `tool_name` is ported and opted in, so `dispatch::run_hook` can answer the
-/// whole event without starting Python. Since the edit family
-/// (`crg_graph_refresh`, `post_edit`, `obsidian_post_edit`) is ported too,
-/// the matching names are exactly the subset of `POST_TOOL_USE_HOOK_NAMES`
-/// whose matcher fires, all of which must be opted in
-/// (`bash_pretooluse_fully_native`'s all-of-four logic restricted to the
-/// matcher-eligible names, since e.g. a `Grep` call matches neither
-/// `read_budget` nor either Bash hook).
-pub fn post_tool_use_fully_native(tool_name: &str, native_hooks: &HashSet<String>) -> bool {
-    POST_TOOL_USE_HOOK_NAMES
-        .iter()
-        .filter(|name| post_tool_use_matches(name, tool_name))
-        .all(|name| native_hooks.contains(*name))
 }
 
 /// The final, fully-merged answer for a `PostToolUse` call once
@@ -453,7 +404,6 @@ pub(crate) mod tests {
     // `handlers::tests::ENV_LOCK` rather than declaring a second mutex: two
     // different mutexes guarding the same env var provide no mutual exclusion
     // at all (the same convention `crg_refresh`'s `pub(crate)` lock documents).
-    use crate::handlers::native_hook_names_from_env;
     use crate::handlers::tests::ENV_LOCK;
 
     #[test]
@@ -490,54 +440,15 @@ pub(crate) mod tests {
         assert!(!post_tool_use_matches("post_edit", "NotebookEdit"));
         assert!(post_tool_use_matches("obsidian_post_edit", "Write"));
         assert!(!post_tool_use_matches("obsidian_post_edit", "Read"));
-    }
-
-    #[test]
-    fn post_tool_fully_native_needs_every_matcher_eligible_name_in() {
-        let _guard = ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        std::env::remove_var("FORGE_NATIVE_HOOKS");
-        let defaults = native_hook_names_from_env();
-        // Every tool -- the edit family included now that its three hooks are
-        // ported -- is fully native under the defaults, and dropping any one
-        // matcher-eligible name breaks it for exactly the tools that name
-        // matches.
         for tool in [
-            "Bash",
-            "Read",
-            "Grep",
-            "mcp__x__y",
-            "Glob",
-            "Edit",
-            "Write",
-            "NotebookEdit",
+            "mcp__forge__code_replace",
+            "mcp__forge__code_diff",
+            "mcp__forge__code_restore",
         ] {
-            assert!(
-                post_tool_use_fully_native(tool, &defaults),
-                "{tool} should be fully native by default"
-            );
+            assert!(post_tool_use_matches("crg_graph_refresh", tool));
+            assert!(!post_tool_use_matches("post_edit", tool));
+            assert!(!post_tool_use_matches("obsidian_post_edit", tool));
         }
-        let mut missing_telemetry = defaults.clone();
-        missing_telemetry.remove("context_telemetry");
-        for tool in ["Bash", "Glob", "Edit"] {
-            assert!(!post_tool_use_fully_native(tool, &missing_telemetry));
-        }
-        let mut missing_budget = defaults.clone();
-        missing_budget.remove("read_budget");
-        assert!(post_tool_use_fully_native("Bash", &missing_budget)); // Read-only matcher
-        assert!(!post_tool_use_fully_native("Read", &missing_budget));
-        let mut missing_post_edit = defaults.clone();
-        missing_post_edit.remove("post_edit");
-        assert!(!post_tool_use_fully_native("Edit", &missing_post_edit));
-        assert!(post_tool_use_fully_native(
-            "NotebookEdit",
-            &missing_post_edit
-        ));
-        assert!(post_tool_use_fully_native("Read", &missing_post_edit));
-        drop(missing_post_edit);
-        drop(missing_budget);
-        drop(missing_telemetry);
     }
 
     #[test]
@@ -624,22 +535,5 @@ pub(crate) mod tests {
         );
         // The small response stays under TOOL_OUTPUT_QUIET_BYTES: no rewrite.
         assert!(out["hookSpecificOutput"].get("updatedToolOutput").is_none());
-    }
-
-    #[test]
-    fn post_tool_answers_cover_only_the_opted_in_matcher_eligible_hooks() {
-        let payload = serde_json::json!({"tool_name": "Bash"});
-        let mut hooks = HashSet::new();
-        hooks.insert("post_bash_quiet".to_string());
-        let answers = native_answers_for_post_tool_use(&payload, &hooks);
-        assert!(
-            answers.contains_key("post_bash_quiet"),
-            "the opted-in, matcher-eligible hook must be answered: {answers:?}"
-        );
-        // `post_tool_quiet` opted in but its matcher excludes Bash: no answer
-        // may be claimed for a hook Python would not have run.
-        hooks.insert("post_tool_quiet".to_string());
-        let answers = native_answers_for_post_tool_use(&payload, &hooks);
-        assert!(!answers.contains_key("post_tool_quiet"));
     }
 }

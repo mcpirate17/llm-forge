@@ -17,7 +17,7 @@ use serde_json::Value;
 /// separators. Arrays keep their order (Python `sort_keys` sorts keys, not
 /// array elements); scalars serialize exactly as `serde_json::to_string`
 /// renders them.
-pub(crate) fn canonical_json(value: &Value) -> String {
+pub fn canonical_json(value: &Value) -> String {
     fn write(value: &Value, out: &mut String) {
         match value {
             Value::Object(map) => {

@@ -167,6 +167,31 @@ fn gpu_probe() -> io::Result<Option<i32>> {
 }
 
 fn run() -> io::Result<i32> {
+    if program_name().as_deref() == Some("session-start") {
+        use std::io::Read;
+        let mut input = String::new();
+        io::stdin().read_to_string(&mut input)?;
+        let dir = std::env::current_exe()?.parent().unwrap().to_owned();
+        std::fs::write(dir.join("received.json"), input)?;
+        return match std::fs::read_to_string(dir.join("mode"))?.as_str() {
+            "fail" => {
+                eprintln!("fixture extension failure");
+                Ok(7)
+            }
+            "sleep" => {
+                std::thread::sleep(Duration::from_secs(10));
+                Ok(0)
+            }
+            "flood" => {
+                print!("{}", "x".repeat(32768));
+                Ok(0)
+            }
+            _ => {
+                println!("Project extension context 🦀");
+                Ok(0)
+            }
+        };
+    }
     #[cfg(unix)]
     slow_cleanup_probe()?;
     if let Some(code) = preflight_probe()? {
@@ -190,7 +215,24 @@ fn run() -> io::Result<i32> {
                 writeln!(io::stdout(), "{argument}")?;
             }
         }
+        "stdin-duplex" => {
+            use std::io::Read;
+            io::stdout().write_all(&vec![b'p'; 256 * 1024])?;
+            io::stdout().flush()?;
+            let mut input = Vec::new();
+            io::stdin().take(1024 * 1024 + 1).read_to_end(&mut input)?;
+            io::stderr().write_all(b"stdin consumed\n")?;
+            io::stdout().write_all(&input)?;
+        }
+        "stdin-echo" => {
+            io::copy(&mut io::stdin(), &mut io::stdout())?;
+        }
         "allocate" => allocate(args)?,
+        "process-limit" => process_limit()?,
+        #[cfg(target_os = "linux")]
+        "terminal" => return terminal(),
+        #[cfg(target_os = "linux")]
+        "close-terminal" => return close_terminal(),
         "exit" => {
             return args
                 .first()
@@ -199,6 +241,12 @@ fn run() -> io::Result<i32> {
                 .map_err(|_| argument_error("invalid exit code"));
         }
         "sleep" => std::thread::sleep(duration(args)?),
+        "burn" => {
+            let until = std::time::Instant::now() + duration(args)?;
+            while std::time::Instant::now() < until {
+                std::hint::spin_loop();
+            }
+        }
         "pid-sleep" => {
             let sleep = duration(args)?;
             let path = args.get(1).map(String::as_str).unwrap_or("child.pid");
@@ -223,6 +271,88 @@ fn run() -> io::Result<i32> {
     }
     io::stdout().flush()?;
     io::stderr().flush()?;
+    Ok(0)
+}
+
+fn process_limit() -> io::Result<()> {
+    match std::process::Command::new(std::env::current_exe()?)
+        .args(["exit", "0"])
+        .spawn()
+    {
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(()),
+        Err(error) => Err(error),
+        Ok(mut child) => {
+            child.wait()?;
+            Err(io::Error::other(
+                "process-count limit did not prevent child creation",
+            ))
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn close_terminal() -> io::Result<i32> {
+    extern "C" {
+        fn close(fd: i32) -> i32;
+    }
+    println!("STDIO-CLOSING");
+    io::stdout().flush()?;
+    for fd in 0..3 {
+        // SAFETY: the fixture relinquishes its own standard descriptors only.
+        if unsafe { close(fd) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    std::thread::sleep(Duration::from_millis(200));
+    Ok(0)
+}
+
+#[cfg(target_os = "linux")]
+fn terminal() -> io::Result<i32> {
+    use std::io::IsTerminal;
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() || !io::stderr().is_terminal() {
+        return Err(io::Error::other("all standard streams must be terminals"));
+    }
+    extern "C" {
+        fn tcgetsid(fd: i32) -> i32;
+        fn tcgetpgrp(fd: i32) -> i32;
+        fn ioctl(fd: i32, request: std::ffi::c_ulong, ...) -> i32;
+    }
+    #[repr(C)]
+    #[derive(Default)]
+    struct Size {
+        rows: u16,
+        columns: u16,
+        x: u16,
+        y: u16,
+    }
+    // SAFETY: these calls only inspect the fixture's own standard terminal.
+    if unsafe { tcgetsid(0) } != std::process::id() as i32
+        || unsafe { tcgetpgrp(0) } != std::process::id() as i32
+    {
+        return Err(io::Error::other(
+            "worker does not own its controlling terminal",
+        ));
+    }
+    println!("READY");
+    io::stdout().flush()?;
+    let mut line = String::new();
+    while io::stdin().read_line(&mut line)? != 0 {
+        match line.trim() {
+            "exit" => return Ok(0),
+            "size" => {
+                let mut size = Size::default();
+                // SAFETY: Linux TIOCGWINSZ writes a repr(C) four-u16 winsize.
+                if unsafe { ioctl(0, 0x5413, &mut size) } < 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                println!("SIZE {} {}", size.rows, size.columns);
+            }
+            _ => println!("ECHO {}", line.trim_end()),
+        }
+        io::stdout().flush()?;
+        line.clear();
+    }
     Ok(0)
 }
 

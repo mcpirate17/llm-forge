@@ -9,8 +9,11 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::{PyKeyError, PyValueError};
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::{PyDict, PyList};
 
 #[derive(Debug)]
@@ -390,278 +393,290 @@ pub fn rank_key(left: (i64, f64), right: (i64, f64)) -> Ordering {
         .then_with(|| right.1.partial_cmp(&left.1).unwrap_or(Ordering::Equal))
 }
 
-fn string_attr(obj: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
-    Ok(obj.getattr(name)?.str()?.to_string_lossy().into_owned())
-}
-
-fn optional_truthy_string_attr(obj: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<String>> {
-    let value = obj.getattr(name)?;
-    if value.is_truthy()? {
-        Ok(Some(value.str()?.to_string_lossy().into_owned()))
-    } else {
-        Ok(None)
+#[cfg(feature = "python")]
+mod bindings {
+    use super::*;
+    fn string_attr(obj: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
+        Ok(obj.getattr(name)?.str()?.to_string_lossy().into_owned())
     }
-}
 
-fn percentage_attr(obj: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
-    obj.getattr(name)?
-        .call_method1("__format__", (".1%",))?
-        .extract()
-}
+    fn optional_truthy_string_attr(obj: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<String>> {
+        let value = obj.getattr(name)?;
+        if value.is_truthy()? {
+            Ok(Some(value.str()?.to_string_lossy().into_owned()))
+        } else {
+            Ok(None)
+        }
+    }
 
-fn clone_clusters(raw: &Bound<'_, PyList>) -> PyResult<Vec<CloneCluster>> {
-    raw.iter()
-        .map(|obj| {
-            let sites = obj.getattr("sites")?;
-            let sites = sites.cast::<PyList>()?;
-            let sites = sites
-                .iter()
-                .map(|site| {
-                    Ok(CloneSite {
-                        file: string_attr(&site, "file")?,
-                        line_start: site.getattr("line_start")?.extract()?,
-                        line_end: site.getattr("line_end")?.extract()?,
-                        name: string_attr(&site, "name")?,
+    fn percentage_attr(obj: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
+        obj.getattr(name)?
+            .call_method1("__format__", (".1%",))?
+            .extract()
+    }
+
+    fn clone_clusters(raw: &Bound<'_, PyList>) -> PyResult<Vec<CloneCluster>> {
+        raw.iter()
+            .map(|obj| {
+                let sites = obj.getattr("sites")?;
+                let sites = sites.cast::<PyList>()?;
+                let sites = sites
+                    .iter()
+                    .map(|site| {
+                        Ok(CloneSite {
+                            file: string_attr(&site, "file")?,
+                            line_start: site.getattr("line_start")?.extract()?,
+                            line_end: site.getattr("line_end")?.extract()?,
+                            name: string_attr(&site, "name")?,
+                        })
                     })
+                    .collect::<PyResult<_>>()?;
+                Ok(CloneCluster {
+                    kind: string_attr(&obj, "kind")?,
+                    n_sites: obj.getattr("n_sites")?.extract()?,
+                    est_bytes: obj.getattr("est_bytes")?.extract()?,
+                    confidence: obj.getattr("confidence")?.extract()?,
+                    value_score: obj.getattr("value_score")?.extract()?,
+                    disposition: string_attr(&obj, "disposition")?,
+                    rationale: string_attr(&obj, "rationale")?,
+                    sites,
                 })
-                .collect::<PyResult<_>>()?;
-            Ok(CloneCluster {
-                kind: string_attr(&obj, "kind")?,
-                n_sites: obj.getattr("n_sites")?.extract()?,
-                est_bytes: obj.getattr("est_bytes")?.extract()?,
-                confidence: obj.getattr("confidence")?.extract()?,
-                value_score: obj.getattr("value_score")?.extract()?,
-                disposition: string_attr(&obj, "disposition")?,
-                rationale: string_attr(&obj, "rationale")?,
-                sites,
             })
-        })
-        .collect()
-}
+            .collect()
+    }
 
-fn file_families(raw: &Bound<'_, PyList>) -> PyResult<Vec<FileFamily>> {
-    raw.iter()
-        .map(|obj| {
-            let shared_methods = obj.getattr("shared_methods")?;
-            let variable_methods = obj.getattr("variable_methods")?;
-            Ok(FileFamily {
-                files: obj.getattr("files")?.extract()?,
-                similarity_min_display: percentage_attr(&obj, "similarity_min")?,
-                similarity_avg_display: percentage_attr(&obj, "similarity_avg")?,
-                containment_min_display: percentage_attr(&obj, "containment_min")?,
-                band: string_attr(&obj, "band")?,
-                recommended_abstraction: string_attr(&obj, "recommended_abstraction")?,
-                suggested_home: optional_truthy_string_attr(&obj, "suggested_home")?,
-                estimated_net_deleted_loc: obj.getattr("estimated_net_deleted_loc")?.extract()?,
-                confidence: obj.getattr("confidence")?.extract()?,
-                before_loc: obj.getattr("before_loc")?.extract()?,
-                after_loc: obj.getattr("after_loc")?.extract()?,
-                target_shape: optional_truthy_string_attr(&obj, "target_shape")?
-                    .unwrap_or_default(),
-                shared_methods_repr: shared_methods.repr()?.to_string_lossy().into_owned(),
-                variable_methods_repr: variable_methods.repr()?.to_string_lossy().into_owned(),
+    fn file_families(raw: &Bound<'_, PyList>) -> PyResult<Vec<FileFamily>> {
+        raw.iter()
+            .map(|obj| {
+                let shared_methods = obj.getattr("shared_methods")?;
+                let variable_methods = obj.getattr("variable_methods")?;
+                Ok(FileFamily {
+                    files: obj.getattr("files")?.extract()?,
+                    similarity_min_display: percentage_attr(&obj, "similarity_min")?,
+                    similarity_avg_display: percentage_attr(&obj, "similarity_avg")?,
+                    containment_min_display: percentage_attr(&obj, "containment_min")?,
+                    band: string_attr(&obj, "band")?,
+                    recommended_abstraction: string_attr(&obj, "recommended_abstraction")?,
+                    suggested_home: optional_truthy_string_attr(&obj, "suggested_home")?,
+                    estimated_net_deleted_loc: obj
+                        .getattr("estimated_net_deleted_loc")?
+                        .extract()?,
+                    confidence: obj.getattr("confidence")?.extract()?,
+                    before_loc: obj.getattr("before_loc")?.extract()?,
+                    after_loc: obj.getattr("after_loc")?.extract()?,
+                    target_shape: optional_truthy_string_attr(&obj, "target_shape")?
+                        .unwrap_or_default(),
+                    shared_methods_repr: shared_methods.repr()?.to_string_lossy().into_owned(),
+                    variable_methods_repr: variable_methods.repr()?.to_string_lossy().into_owned(),
+                })
             })
-        })
-        .collect()
-}
+            .collect()
+    }
 
-fn ruff_findings(py: Python<'_>, raw: &Bound<'_, PyList>) -> PyResult<Vec<RuffFinding>> {
-    raw.iter()
-        .map(|obj| {
-            let get = |key: &str, fallback: &str| -> PyResult<String> {
-                Ok(obj
-                    .call_method1("get", (key, fallback))?
+    fn ruff_findings(py: Python<'_>, raw: &Bound<'_, PyList>) -> PyResult<Vec<RuffFinding>> {
+        raw.iter()
+            .map(|obj| {
+                let get = |key: &str, fallback: &str| -> PyResult<String> {
+                    Ok(obj
+                        .call_method1("get", (key, fallback))?
+                        .str()?
+                        .to_string_lossy()
+                        .into_owned())
+                };
+                let empty = PyDict::new(py);
+                let location = obj.call_method1("get", ("location", empty))?;
+                let row = location
+                    .call_method1("get", ("row", 1))?
                     .str()?
                     .to_string_lossy()
-                    .into_owned())
-            };
-            let empty = PyDict::new(py);
-            let location = obj.call_method1("get", ("location", empty))?;
-            let row = location
-                .call_method1("get", ("row", 1))?
-                .str()?
-                .to_string_lossy()
-                .into_owned();
-            Ok(RuffFinding {
-                filename: get("filename", "")?,
-                row,
-                code: get("code", "F")?,
-                message: get("message", "")?,
+                    .into_owned();
+                Ok(RuffFinding {
+                    filename: get("filename", "")?,
+                    row,
+                    code: get("code", "F")?,
+                    message: get("message", "")?,
+                })
             })
-        })
-        .collect()
-}
-
-fn candidate_dict<'py>(py: Python<'py>, candidate: Candidate) -> PyResult<Bound<'py, PyDict>> {
-    let out = PyDict::new(py);
-    out.set_item("id", candidate.id)?;
-    out.set_item("category", candidate.category)?;
-    out.set_item("severity", candidate.severity)?;
-    out.set_item("confidence", candidate.confidence)?;
-    out.set_item("value", candidate.value)?;
-    out.set_item("files", candidate.files)?;
-    out.set_item("location", candidate.location)?;
-    out.set_item("evidence", candidate.evidence)?;
-    if let Some(shape) = candidate.family_shape {
-        out.set_item("before_loc", shape.before_loc)?;
-        out.set_item("after_loc", shape.after_loc)?;
-        out.set_item("target_shape", shape.target_shape)?;
+            .collect()
     }
-    Ok(out)
-}
 
-fn candidate_objects(py: Python<'_>, candidates: Vec<Candidate>) -> PyResult<Vec<Py<PyAny>>> {
-    candidates
-        .into_iter()
-        .map(|candidate| Ok(candidate_dict(py, candidate)?.unbind().into_any()))
-        .collect()
-}
+    fn candidate_dict<'py>(py: Python<'py>, candidate: Candidate) -> PyResult<Bound<'py, PyDict>> {
+        let out = PyDict::new(py);
+        out.set_item("id", candidate.id)?;
+        out.set_item("category", candidate.category)?;
+        out.set_item("severity", candidate.severity)?;
+        out.set_item("confidence", candidate.confidence)?;
+        out.set_item("value", candidate.value)?;
+        out.set_item("files", candidate.files)?;
+        out.set_item("location", candidate.location)?;
+        out.set_item("evidence", candidate.evidence)?;
+        if let Some(shape) = candidate.family_shape {
+            out.set_item("before_loc", shape.before_loc)?;
+            out.set_item("after_loc", shape.after_loc)?;
+            out.set_item("target_shape", shape.target_shape)?;
+        }
+        Ok(out)
+    }
 
-fn list_objects(raw: &Bound<'_, PyList>) -> Vec<Py<PyAny>> {
-    raw.iter().map(Bound::unbind).collect()
-}
+    fn candidate_objects(py: Python<'_>, candidates: Vec<Candidate>) -> PyResult<Vec<Py<PyAny>>> {
+        candidates
+            .into_iter()
+            .map(|candidate| Ok(candidate_dict(py, candidate)?.unbind().into_any()))
+            .collect()
+    }
 
-struct Ranked {
-    value: i64,
-    confidence: f64,
-    object: Py<PyAny>,
-}
+    fn list_objects(raw: &Bound<'_, PyList>) -> Vec<Py<PyAny>> {
+        raw.iter().map(Bound::unbind).collect()
+    }
 
-fn rank(py: Python<'_>, objects: Vec<Py<PyAny>>) -> PyResult<Vec<Py<PyAny>>> {
-    let mut ranked = objects
-        .into_iter()
-        .map(|object| {
-            let candidate = object.bind(py).cast::<PyDict>()?;
-            let value = candidate
-                .get_item("value")?
-                .ok_or_else(|| PyKeyError::new_err("value"))?
-                .extract()?;
-            let confidence = candidate
-                .get_item("confidence")?
-                .ok_or_else(|| PyKeyError::new_err("confidence"))?
-                .extract()?;
-            Ok(Ranked {
-                value,
-                confidence,
-                object,
+    struct Ranked {
+        value: i64,
+        confidence: f64,
+        object: Py<PyAny>,
+    }
+
+    fn rank(py: Python<'_>, objects: Vec<Py<PyAny>>) -> PyResult<Vec<Py<PyAny>>> {
+        let mut ranked = objects
+            .into_iter()
+            .map(|object| {
+                let candidate = object.bind(py).cast::<PyDict>()?;
+                let value = candidate
+                    .get_item("value")?
+                    .ok_or_else(|| PyKeyError::new_err("value"))?
+                    .extract()?;
+                let confidence = candidate
+                    .get_item("confidence")?
+                    .ok_or_else(|| PyKeyError::new_err("confidence"))?
+                    .extract()?;
+                Ok(Ranked {
+                    value,
+                    confidence,
+                    object,
+                })
             })
-        })
-        .collect::<PyResult<Vec<_>>>()?;
-    ranked.sort_by(|left, right| {
-        rank_key(
-            (left.value, left.confidence),
-            (right.value, right.confidence),
-        )
-    });
-    Ok(ranked.into_iter().map(|item| item.object).collect())
-}
-
-fn slice_end(len: usize, limit: isize) -> usize {
-    if limit >= 0 {
-        len.min(limit as usize)
-    } else {
-        len.saturating_sub(limit.unsigned_abs())
-    }
-}
-
-fn as_list<'py>(
-    py: Python<'py>,
-    objects: &[Py<PyAny>],
-    limit: isize,
-) -> PyResult<Bound<'py, PyList>> {
-    let end = slice_end(objects.len(), limit);
-    PyList::new(py, objects[..end].iter().map(|item| item.bind(py)))
-}
-
-fn replace_list(py: Python<'_>, target: &Bound<'_, PyList>, objects: &[Py<PyAny>]) -> PyResult<()> {
-    let replacement = PyList::new(py, objects.iter().map(|item| item.bind(py)))?;
-    target.set_slice(0, target.len(), replacement.as_any())
-}
-
-#[pyfunction]
-#[pyo3(signature = (*, repo, god_file_lines, god_func_lines, god_files, god_functions, clusters, families, vulture, ruff, fallbacks, token_clones, native_reuse, dependencies, limit))]
-#[allow(clippy::too_many_arguments)]
-pub fn audit_inventory_candidates(
-    py: Python<'_>,
-    repo: String,
-    god_file_lines: i64,
-    god_func_lines: i64,
-    god_files: Vec<String>,
-    god_functions: Vec<String>,
-    clusters: &Bound<'_, PyList>,
-    families: &Bound<'_, PyList>,
-    vulture: Vec<String>,
-    ruff: &Bound<'_, PyList>,
-    fallbacks: &Bound<'_, PyList>,
-    token_clones: &Bound<'_, PyList>,
-    native_reuse: &Bound<'_, PyList>,
-    dependencies: &Bound<'_, PyList>,
-    limit: isize,
-) -> PyResult<Py<PyDict>> {
-    let clusters = clone_clusters(clusters)?;
-    let families = file_families(families)?;
-    let ruff = ruff_findings(py, ruff)?;
-    let repo_path = PathBuf::from(repo);
-    let built = py
-        .detach(move || {
-            build(
-                &repo_path,
-                god_file_lines,
-                god_func_lines,
-                god_files,
-                god_functions,
-                clusters,
-                families,
-                vulture,
-                ruff,
+            .collect::<PyResult<Vec<_>>>()?;
+        ranked.sort_by(|left, right| {
+            rank_key(
+                (left.value, left.confidence),
+                (right.value, right.confidence),
             )
-        })
-        .map_err(PyValueError::new_err)?;
+        });
+        Ok(ranked.into_iter().map(|item| item.object).collect())
+    }
 
-    let dead_code = rank(py, candidate_objects(py, built.dead_code)?)?;
-    let god_files = rank(py, candidate_objects(py, built.god_files)?)?;
-    let god_functions = rank(py, candidate_objects(py, built.god_functions)?)?;
+    fn slice_end(len: usize, limit: isize) -> usize {
+        if limit >= 0 {
+            len.min(limit as usize)
+        } else {
+            len.saturating_sub(limit.unsigned_abs())
+        }
+    }
 
-    let mut duplication = candidate_objects(py, built.duplication)?;
-    duplication.extend(list_objects(token_clones));
-    let duplication = rank(py, duplication)?;
+    fn as_list<'py>(
+        py: Python<'py>,
+        objects: &[Py<PyAny>],
+        limit: isize,
+    ) -> PyResult<Bound<'py, PyList>> {
+        let end = slice_end(objects.len(), limit);
+        PyList::new(py, objects[..end].iter().map(|item| item.bind(py)))
+    }
 
-    let file_families = rank(py, candidate_objects(py, built.file_families)?)?;
+    fn replace_list(
+        py: Python<'_>,
+        target: &Bound<'_, PyList>,
+        objects: &[Py<PyAny>],
+    ) -> PyResult<()> {
+        let replacement = PyList::new(py, objects.iter().map(|item| item.bind(py)))?;
+        target.set_slice(0, target.len(), replacement.as_any())
+    }
 
-    let fallback_objects = list_objects(fallbacks);
-    let fallbacks_ranked = rank(py, fallback_objects)?;
-    replace_list(py, fallbacks, &fallbacks_ranked)?;
+    #[pyfunction]
+    #[pyo3(signature = (*, repo, god_file_lines, god_func_lines, god_files, god_functions, clusters, families, vulture, ruff, fallbacks, token_clones, native_reuse, dependencies, limit))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn audit_inventory_candidates(
+        py: Python<'_>,
+        repo: String,
+        god_file_lines: i64,
+        god_func_lines: i64,
+        god_files: Vec<String>,
+        god_functions: Vec<String>,
+        clusters: &Bound<'_, PyList>,
+        families: &Bound<'_, PyList>,
+        vulture: Vec<String>,
+        ruff: &Bound<'_, PyList>,
+        fallbacks: &Bound<'_, PyList>,
+        token_clones: &Bound<'_, PyList>,
+        native_reuse: &Bound<'_, PyList>,
+        dependencies: &Bound<'_, PyList>,
+        limit: isize,
+    ) -> PyResult<Py<PyDict>> {
+        let clusters = clone_clusters(clusters)?;
+        let families = file_families(families)?;
+        let ruff = ruff_findings(py, ruff)?;
+        let repo_path = PathBuf::from(repo);
+        let built = py
+            .detach(move || {
+                build(
+                    &repo_path,
+                    god_file_lines,
+                    god_func_lines,
+                    god_files,
+                    god_functions,
+                    clusters,
+                    families,
+                    vulture,
+                    ruff,
+                )
+            })
+            .map_err(PyValueError::new_err)?;
 
-    let native_objects = list_objects(native_reuse);
-    let perf_objects = native_objects
-        .iter()
-        .filter_map(|object| {
-            let candidate = object.bind(py).cast::<PyDict>().ok()?;
-            let complete = candidate.get_item("evidence_complete").ok()??;
-            complete
-                .is_truthy()
-                .ok()
-                .filter(|truthy| *truthy)
-                .map(|_| object.clone_ref(py))
-        })
-        .collect();
-    let perf_hotspots = rank(py, perf_objects)?;
-    let native_ranked = rank(py, native_objects)?;
-    replace_list(py, native_reuse, &native_ranked)?;
+        let dead_code = rank(py, candidate_objects(py, built.dead_code)?)?;
+        let god_files = rank(py, candidate_objects(py, built.god_files)?)?;
+        let god_functions = rank(py, candidate_objects(py, built.god_functions)?)?;
 
-    let mut imports_deps = candidate_objects(py, built.imports_deps)?;
-    imports_deps.extend(list_objects(dependencies));
-    let imports_deps = rank(py, imports_deps)?;
+        let mut duplication = candidate_objects(py, built.duplication)?;
+        duplication.extend(list_objects(token_clones));
+        let duplication = rank(py, duplication)?;
 
-    let out = PyDict::new(py);
-    out.set_item("dead_code", as_list(py, &dead_code, limit)?)?;
-    out.set_item("god_files", as_list(py, &god_files, limit)?)?;
-    out.set_item("god_functions", as_list(py, &god_functions, limit)?)?;
-    out.set_item("duplication", as_list(py, &duplication, limit)?)?;
-    out.set_item("file_families", as_list(py, &file_families, limit)?)?;
-    out.set_item("silent_fallbacks", as_list(py, &fallbacks_ranked, limit)?)?;
-    out.set_item("perf_hotspots", as_list(py, &perf_hotspots, limit)?)?;
-    out.set_item("imports_deps", as_list(py, &imports_deps, limit)?)?;
-    out.set_item("native_reuse", as_list(py, &native_ranked, limit)?)?;
-    Ok(out.unbind())
+        let file_families = rank(py, candidate_objects(py, built.file_families)?)?;
+
+        let fallback_objects = list_objects(fallbacks);
+        let fallbacks_ranked = rank(py, fallback_objects)?;
+        replace_list(py, fallbacks, &fallbacks_ranked)?;
+
+        let native_objects = list_objects(native_reuse);
+        let perf_objects = native_objects
+            .iter()
+            .filter_map(|object| {
+                let candidate = object.bind(py).cast::<PyDict>().ok()?;
+                let complete = candidate.get_item("evidence_complete").ok()??;
+                complete
+                    .is_truthy()
+                    .ok()
+                    .filter(|truthy| *truthy)
+                    .map(|_| object.clone_ref(py))
+            })
+            .collect();
+        let perf_hotspots = rank(py, perf_objects)?;
+        let native_ranked = rank(py, native_objects)?;
+        replace_list(py, native_reuse, &native_ranked)?;
+
+        let mut imports_deps = candidate_objects(py, built.imports_deps)?;
+        imports_deps.extend(list_objects(dependencies));
+        let imports_deps = rank(py, imports_deps)?;
+
+        let out = PyDict::new(py);
+        out.set_item("dead_code", as_list(py, &dead_code, limit)?)?;
+        out.set_item("god_files", as_list(py, &god_files, limit)?)?;
+        out.set_item("god_functions", as_list(py, &god_functions, limit)?)?;
+        out.set_item("duplication", as_list(py, &duplication, limit)?)?;
+        out.set_item("file_families", as_list(py, &file_families, limit)?)?;
+        out.set_item("silent_fallbacks", as_list(py, &fallbacks_ranked, limit)?)?;
+        out.set_item("perf_hotspots", as_list(py, &perf_hotspots, limit)?)?;
+        out.set_item("imports_deps", as_list(py, &imports_deps, limit)?)?;
+        out.set_item("native_reuse", as_list(py, &native_ranked, limit)?)?;
+        Ok(out.unbind())
+    }
 }
+#[cfg(feature = "python")]
+pub use bindings::audit_inventory_candidates;

@@ -101,6 +101,12 @@ impl Store {
 
     pub fn open(host: &Path, write: bool) -> Result<Option<Self>> {
         let path = path(host);
+        Self::open_path(&path, write)
+    }
+
+    /// The caller owns and protects the directory. The harness uses a private
+    /// state directory outside source and child-readable capabilities.
+    pub fn open_path(path: &Path, write: bool) -> Result<Option<Self>> {
         if !write && !path.exists() {
             return Ok(None);
         }
@@ -112,7 +118,7 @@ impl Store {
         } else {
             OpenFlags::SQLITE_OPEN_READ_ONLY
         };
-        let connection = Connection::open_with_flags(&path, flags)
+        let connection = Connection::open_with_flags(path, flags)
             .with_context(|| format!("opening task database {}", path.display()))?;
         connection.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = connection.query_row("PRAGMA user_version", [], |r| r.get(0))?;

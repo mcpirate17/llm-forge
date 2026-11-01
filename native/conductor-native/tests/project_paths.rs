@@ -77,10 +77,9 @@ fn eleven_paths_resolve_independently_with_configured_flags() {
 fn invalid_host_table_and_values_fail_with_source() {
     let case = Case::new();
     case.write("[tool.conductor\n");
-    assert_eq!(
-        resolve(case.root()).unwrap_err(),
-        format!("PROJECT_PATHS_MANIFEST_ERROR:{}", case.root().display())
-    );
+    let error = resolve(case.root()).unwrap_err();
+    assert!(error.contains("pyproject.toml"), "{error}");
+    assert!(error.contains("invalid TOML configuration"), "{error}");
     case.write("[tool]\nconductor = 'nope'\n");
     assert!(resolve(case.root()).unwrap_err().contains("is not a table"));
     case.write("[tool.conductor]\nnotes_root = 3\n");

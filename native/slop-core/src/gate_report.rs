@@ -5,10 +5,12 @@
 //! measured is a MEDIUM finding, so a pass is read against how much of the change was
 //! measured; the rest is counted.
 
-use crate::gate::Summary;
+use crate::gate_types::Summary;
 use anyhow::Context;
 use chrono::{DateTime, Utc};
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyRuntimeError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -379,6 +381,7 @@ fn parse(summary: &str) -> anyhow::Result<Summary> {
 }
 
 /// The report of a summary `equivalence_gate` returned.
+#[cfg(feature = "python")]
 #[pyfunction]
 pub fn equivalence_report(summary: &str) -> PyResult<String> {
     parse(summary)
@@ -411,6 +414,7 @@ pub fn findings(summary: &str, run_artifacts: Option<&Path>) -> anyhow::Result<(
     ))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (summary, run_artifacts=None))]
 pub fn equivalence_findings(

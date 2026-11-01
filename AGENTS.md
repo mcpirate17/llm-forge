@@ -6,6 +6,28 @@ does not require governance claims, candidate-gate receipts, or mutation evidenc
 land changes. Its ordinary tests, code-quality checks, and contribution rules below
 still apply to work on `src/conductor/`, `src/tooling/` and `native/`.
 
+## Agent delegation
+
+Use sub-agents at natural task boundaries within the user's authorized scope.
+Do not request separate approval merely to delegate that work. Match task
+difficulty to the most appropriate available model and avoid spending expensive
+tokens on work a smaller model can handle reliably:
+
+- **Luna:** bounded inventories, mechanical checks, summaries and documentation.
+- **Sol:** scoped implementation, tests and routine debugging.
+- **Terra:** complex native refactors, concurrency, security-sensitive reviews
+  and difficult debugging.
+
+Use low reasoning effort for mechanical tasks and medium for bounded
+implementation or review. Raise effort only for difficult unresolved issues.
+
+Give each agent a narrow task, only the necessary context, exact file ownership,
+and concrete acceptance criteria. Request concise findings with evidence. Avoid
+duplicating delegated work, overlapping edits or editing compiler inputs while
+validation is running. The coordinating agent owns integration and verifies the
+results. Escalate task difficulty when evidence warrants it; do not spawn agents
+when coordination would cost more than completing the task directly.
+
 ## Open work
 
 Known defects live in the GitHub issue tracker, and nothing else in this repository

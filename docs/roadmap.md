@@ -1,5 +1,9 @@
 # llm-forge roadmap: mostly Rust, built to cut agent cost and raise code quality
 
+The [2026-10-31 native orchestration blueprint](../ARCHITECTURE.md) records the
+current substrate audit and the next independently buildable capability milestones.
+The historical baseline and delivery phases below remain as provenance.
+
 Status as of 2026-09-13; source of truth for llm-forge direction
 
 Synthesized 2026-09-13 from three measured reports in this directory:

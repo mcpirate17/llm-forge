@@ -97,6 +97,66 @@ fn python_imports_and_local_calls_have_directed_edges() {
 }
 
 #[test]
+fn native_languages_have_local_calls_literal_dependencies_and_conservative_coverage() {
+    let fixture = Fixture::new();
+    fixture.write("src/shared.h", "int helper(void);\n");
+    fixture.write("src/sample.c", "#include \"shared.h\"\nint helper(void) { return 1; } int caller(void) { return helper(); }\n");
+    fixture.write(
+        "src/sample.cpp",
+        "namespace sample { int helper() { return 1; } int caller() { return helper(); } }\n",
+    );
+    fixture.write(
+        "web/dependency.ts",
+        "export function target() { return 1; }\n",
+    );
+    fixture.write("web/caller.ts", "import { target } from './dependency.js';\nfunction helper() { return 1; } function caller() { return helper(); }\n");
+    fixture.write(
+        "web/sample.js",
+        "function helper() { return 1; } function caller() { return helper(); }\n",
+    );
+    let report = fixture.run(&["index"]);
+    assert_eq!(report["files"], 6);
+    assert_eq!(report["resolved_calls"], 4);
+    let db = rusqlite::Connection::open(fixture.db()).unwrap();
+    let edges: Vec<(String,String)> = db.prepare("SELECT source_qualified,target_qualified FROM edges WHERE kind='IMPORTS' ORDER BY source_qualified")
+        .unwrap().query_map([], |row| Ok((row.get(0)?,row.get(1)?))).unwrap().collect::<Result<_,_>>().unwrap();
+    assert_eq!(
+        edges,
+        vec![
+            (
+                "src/sample.c::<module>".into(),
+                "src/shared.h::<module>".into()
+            ),
+            (
+                "web/caller.ts::<module>".into(),
+                "web/dependency.ts::<module>".into()
+            )
+        ]
+    );
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM files WHERE unresolved=1", [], |row| {
+            row.get::<_, usize>(0)
+        })
+        .unwrap(),
+        6
+    );
+    assert_eq!(
+        db.query_row(
+            "SELECT value FROM index_meta WHERE key='coverage_complete'",
+            [],
+            |row| row.get::<_, String>(0)
+        )
+        .unwrap(),
+        "false"
+    );
+    let context = fixture.run(&["context", "src/sample.cpp", "--symbol", "sample::helper"]);
+    assert_eq!(
+        names(&context["callers"]),
+        vec!["src/sample.cpp::sample::caller"]
+    );
+}
+
+#[test]
 fn rust_crate_path_resolves_and_ambiguous_bare_name_stays_unresolved() {
     let fixture = Fixture::new();
     fixture.write("src/util.rs", "pub fn target() -> i32 { 1 }\n");

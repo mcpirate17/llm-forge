@@ -69,8 +69,8 @@ pub fn render_text(
         let clipped: String = summary.chars().take(MAX_A2A_CHARS).collect();
         body.push_str(&format!(
             "\nA2A compact ({name}); retrieve only when needed: \
-             `python -m conductor.agent_a2a show --as-name {name} <id>`; ack: \
-             `python -m conductor.agent_a2a read --as-name {name} <id>`\n{clipped}"
+             `forge mailbox show --as-name {name} <id>`; ack: \
+             `forge mailbox read --as-name {name} <id>`\n{clipped}"
         ));
     }
     if body.chars().count() > MAX_INJECT_CHARS {

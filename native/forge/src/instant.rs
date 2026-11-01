@@ -25,6 +25,9 @@ pub fn now() -> f64 {
 /// for anything unparseable or offset-free.
 pub fn parse(raw: &str) -> Option<f64> {
     let raw = raw.trim();
+    if !raw.is_ascii() {
+        return None;
+    }
     let bytes = raw.as_bytes();
     if bytes.len() < 19 {
         return None;

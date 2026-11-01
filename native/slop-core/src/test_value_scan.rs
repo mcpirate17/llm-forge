@@ -9,15 +9,19 @@
 //! Findings carry the function's line span (`line`..=`end_line`), so the CLI can
 //! hold a candidate to a test it edited anywhere inside, not only on its `def`.
 
+#[cfg(feature = "python")]
 use std::fs;
+#[cfg(feature = "python")]
 use std::path::PathBuf;
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::{PyDict, PyList};
 use tree_sitter::Node;
 
-use crate::engine::parse;
 use crate::style_scan::is_test_path;
 
 /// Escape hatches, spelled like the `guardrail: allow-*` ones style_scan honours.
@@ -296,14 +300,17 @@ fn collect_tests<'t>(
 
 /// Scan one file. Non-test paths produce no findings.
 pub fn scan_source(path: &str, source_text: &str) -> Result<Vec<Finding>, String> {
+    let parsed =
+        crate::source::PythonSource::new(source_text).map_err(|e| format!("{path}: {e}"))?;
+    Ok(scan_parsed(path, &parsed))
+}
+
+/// Reuse a source whose native ASTs have already been validated.
+pub fn scan_parsed(path: &str, parsed: &crate::source::PythonSource<'_>) -> Vec<Finding> {
+    let source_text = parsed.text();
+    let tree = parsed.tree();
     if !is_test_path(path) {
-        return Ok(Vec::new());
-    }
-    let tree =
-        parse(source_text).ok_or_else(|| format!("{path}: could not be parsed as Python"))?;
-    // An error-tolerant tree would report nothing for the file most likely broken.
-    if tree.root_node().has_error() {
-        return Err(format!("{path}: is not valid Python"));
+        return Vec::new();
     }
     let source = Source::new(source_text);
     let mut findings = Vec::new();
@@ -322,13 +329,14 @@ pub fn scan_source(path: &str, source_text: &str) -> Result<Vec<Finding>, String
         stack.extend(kids(node));
     }
     findings.sort();
-    Ok(findings)
+    findings
 }
 
 /// Scan Python files and return one dict per finding, with `end_line`.
 ///
 /// `repo`, when given, is stripped from each path so findings are addressed the
 /// way the gate and a reviewer both name files.
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (paths, repo=None))]
 pub fn test_value_scan_files(
@@ -376,7 +384,7 @@ pub fn test_value_scan_files(
 }
 
 /// Every rule this module can emit.
-#[pyfunction]
+#[cfg_attr(feature = "python", pyo3::pyfunction)]
 pub fn test_value_scan_rules() -> Vec<&'static str> {
     vec!["test/always-true-assert", "test/no-assertion"]
 }

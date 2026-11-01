@@ -46,6 +46,7 @@ mod civil;
 #[path = "../src/context_telemetry.rs"]
 mod context_telemetry;
 #[path = "../src/crg_refresh.rs"]
+#[allow(dead_code, unused_imports)]
 mod crg_refresh;
 #[path = "../src/instant.rs"]
 mod instant;
@@ -53,8 +54,10 @@ mod instant;
 // `crate::interpreter`; the module is self-contained (same note as
 // `bash_pretooluse_hooks_parity.rs`).
 #[path = "../src/interpreter.rs"]
+#[allow(dead_code)]
 mod interpreter;
 #[path = "../src/obsidian_sync.rs"]
+#[allow(dead_code)]
 mod obsidian_sync;
 #[path = "../src/post_edit_audit.rs"]
 mod post_edit_audit;
@@ -107,6 +110,7 @@ impl Drop for ScratchDir {
 /// the case's `env`/kind-specific state, removed otherwise -- a stray
 /// inherited value must never leak into a case that does not set it.
 const MANAGED: &[&str] = &[
+    "FORGE_JOURNAL_DIR",
     "CRG_GATE_REPO_ROOT",
     "CRG_DATA_DIR",
     "CRG_GATE_STATE_DIR",
@@ -137,21 +141,20 @@ fn apply_case_env(case: &Value) {
     }
 }
 
-/// `#!/bin/sh` + `exec /bin/sleep 30`, executable -- the generator's inert
-/// stand-in for the refresh worker.
-fn install_sleeper(repo: &Path) {
-    let bin = repo.join(".venv/bin");
-    std::fs::create_dir_all(&bin).unwrap();
-    let stub = bin.join("python");
-    std::fs::write(&stub, "#!/bin/sh\nexec /bin/sleep 30\n").unwrap();
-    make_executable(&stub);
-}
-
-fn install_stub_tool(bin_dir: &Path) {
-    std::fs::create_dir_all(bin_dir).unwrap();
-    let stub = bin_dir.join("code-review-graph");
-    std::fs::write(&stub, "#!/bin/sh\nexit 0\n").unwrap();
-    make_executable(&stub);
+/// Deterministically hold the native worker lock; these queue assertions never
+/// launch a fixture interpreter or a detached sleeper.
+fn hold_worker(store: &Path) -> std::fs::File {
+    use std::os::fd::AsRawFd;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(store, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let lock = std::fs::File::create(store.join("refresh.lock")).unwrap();
+    lock.set_permissions(std::fs::Permissions::from_mode(0o600))
+        .unwrap();
+    assert_eq!(
+        unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+        0
+    );
+    lock
 }
 
 fn make_executable(path: &Path) {
@@ -188,19 +191,15 @@ fn ledger_key(session_id: &str) -> String {
 fn run_graph_case(
     id: &str,
     payload: &Value,
-    seed: &Value,
+    _seed: &Value,
     tmp_root: &Path,
 ) -> Vec<(&'static str, Value)> {
     let repo = make_repo(id);
     let bin_dir = tmp_root.join(format!("{id}-bin"));
-    if seed.get("stub_tool").and_then(Value::as_bool) == Some(true) {
-        install_stub_tool(&bin_dir);
-        install_sleeper(repo.path());
-    } else {
-        std::fs::create_dir_all(&bin_dir).unwrap();
-    }
+    std::fs::create_dir_all(&bin_dir).unwrap();
     let store = tmp_root.join(format!("{id}-crgdata"));
     std::fs::create_dir_all(&store).unwrap();
+    let _worker = hold_worker(&store);
     // The scratch bin dir alone (never the host's PATH) decides whether
     // `code-review-graph` is installed, exactly as the generator pinned it.
     std::env::set_var("PATH", bin_dir.display().to_string());
@@ -358,14 +357,10 @@ fn run_graph_edit_case(
     std::fs::create_dir_all(&outside).unwrap();
     std::fs::write(outside.join("x.py"), "y = 2\n").unwrap();
     let bin_dir = tmp_root.join(format!("{id}-bin"));
-    if seed.get("stub_tool").and_then(Value::as_bool) == Some(true) {
-        install_stub_tool(&bin_dir);
-        install_sleeper(repo.path());
-    } else {
-        std::fs::create_dir_all(&bin_dir).unwrap();
-    }
+    std::fs::create_dir_all(&bin_dir).unwrap();
     let store = tmp_root.join(format!("{id}-crgdata"));
     std::fs::create_dir_all(&store).unwrap();
+    let _worker = hold_worker(&store);
     let payload_run = substitute(
         payload,
         &[("<OUTSIDE>", outside.join("x.py").display().to_string())],
@@ -429,7 +424,9 @@ fn run_obsidian_case(case: &Value, tmp_root: &Path) -> Vec<(&'static str, Value)
         std::env::set_var("CLAUDE_PROJECT_DIR", repo.display().to_string());
     }
     let sid = payload["session_id"].as_str().unwrap_or("unknown");
-    let accum_path = std::path::Path::new("/tmp/claude-session-journal").join(format!("{sid}.tsv"));
+    let journal = tmp_root.join(format!("{id}-journal"));
+    std::env::set_var("FORGE_JOURNAL_DIR", &journal);
+    let accum_path = journal.join(format!("{sid}.tsv"));
     let _ = std::fs::remove_file(&accum_path);
     let output = obsidian_sync::post_edit_output(&payload_run);
 
@@ -535,7 +532,7 @@ fn run_case(case: &Value, tmp_root: &Path) -> Vec<(&'static str, Value)> {
             vec![("line", Value::String(line))]
         }
         "telemetry_path" => {
-            let path = context_telemetry::telemetry_path();
+            let path = context_telemetry::telemetry_path().unwrap();
             if case
                 .get("env")
                 .is_some_and(|env| env.get("CONTEXT_TELEMETRY_PATH").is_some())
@@ -544,7 +541,7 @@ fn run_case(case: &Value, tmp_root: &Path) -> Vec<(&'static str, Value)> {
                 vec![("path", Value::String(path.display().to_string()))]
             } else {
                 // The default case pins the suffix under the ledger root:
-                // `LEDGER_ROOT`, else `/mnt/data/llm/ledger`, both per
+                // `LEDGER_ROOT`, else the XDG state directory, both per
                 // machine -- so the last three components (telemetry/
                 // context_telemetry/events.jsonl) are what is frozen, the
                 // same shape the Python twin pins with its own parts[-3:].

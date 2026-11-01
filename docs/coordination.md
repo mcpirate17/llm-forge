@@ -38,7 +38,18 @@ Logs and an execution receipt live under `.agents/forge/runs/ID/ATTEMPT/`.
 The journal binds the receipt's path and SHA-256. A successful command exits zero;
 nonzero exit, timeout, interruption, or lost lease fails the attempt.
 
-Execution currently requires Linux for resource admission. Child processes run
+Execution currently requires Linux 5.4 or later for resource admission and pidfd
+exit observation. A Tokio reactor waits on output pipes, child exit, interrupt
+signals and deadlines. It does not poll child completion or dedicate sleeping
+reader threads to output streams. Log writes use bounded buffers and native
+asynchronous file tasks. After group cleanup, inherited output descriptors receive
+a bounded 200 ms drain window; output errors fail the attempt.
+
+The supervisor owns SIGINT/SIGTERM through signalfd and restores its previous
+thread mask on exit. Spawned payloads receive the original mask. Child reaping
+must remain exclusively owned by the supervisor (default SIGCHLD disposition).
+The exited leader remains unreaped until group teardown, preventing PID reuse
+from redirecting a cleanup signal to an unrelated process. Child processes run
 in an isolated process group. Timeout, cancellation,
 SIGINT, and SIGTERM stop that group; cancellation is observed at the next heartbeat.
 On Linux, parent death also kills the direct child. This is process supervision,

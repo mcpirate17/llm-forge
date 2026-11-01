@@ -123,6 +123,7 @@ impl CampaignContract {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg(feature = "python")]
 struct CampaignLoadRequest {
     repo_root: String,
     manifest_path: String,
@@ -133,6 +134,7 @@ struct CampaignLoadRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg(feature = "python")]
 struct RegistryLoadRequest {
     repo_root: String,
     registry_path: String,
@@ -140,6 +142,7 @@ struct RegistryLoadRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg(feature = "python")]
 struct SourceDriftRequest {
     repo_root: String,
     source_sha256: Map<String, Value>,
@@ -148,6 +151,7 @@ struct SourceDriftRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg(feature = "python")]
 struct InspectRequest {
     campaign: CampaignContract,
     source_drift: Vec<Value>,

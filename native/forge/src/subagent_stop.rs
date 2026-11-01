@@ -3,9 +3,8 @@
 //! ideal moment to finalize its `task_dispatch` row (`billed_tokens`,
 //! `tier`, `over_cap`) rather than waiting for the next full `forge ledger
 //! rollup --repo` sweep. Mirrors `session_end.rs`'s shape exactly: a
-//! best-effort, 2 s-bounded child re-invocation of this same binary, then
-//! the event still delegates to the Python dispatcher unchanged --
-//! `SubagentStop` owns no verdict of its own.
+//! best-effort, 2 s-bounded child re-invocation of this same binary.
+//! `SubagentStop` owns no verdict and delegates to no interpreter.
 //!
 //! `FORGE_LEDGER_DISABLE=1` skips the rollup entirely, same escape hatch as
 //! `SessionEnd`. On success this also deletes item 2's live cap-enforcement
@@ -97,9 +96,14 @@ fn run_rollup_agent_child(
 /// tool call that triggered cap enforcement); any other failure is one
 /// stderr line.
 fn delete_live_state(agent_id: &str) {
-    let path = resolve_ledger_root(None)
-        .join("live")
-        .join(format!("{agent_id}.json"));
+    let root = match resolve_ledger_root(None) {
+        Ok(root) => root,
+        Err(error) => {
+            eprintln!("forge: cannot resolve live cap state for cleanup: {error}");
+            return;
+        }
+    };
+    let path = root.join("live").join(format!("{agent_id}.json"));
     match std::fs::remove_file(&path) {
         Ok(()) => {}
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}

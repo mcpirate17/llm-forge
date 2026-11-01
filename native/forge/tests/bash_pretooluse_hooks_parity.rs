@@ -33,6 +33,7 @@ mod civil;
 #[path = "../src/crg_gate.rs"]
 mod crg_gate;
 #[path = "../src/crg_refresh.rs"]
+#[allow(dead_code)]
 mod crg_refresh;
 #[path = "../src/current_work_guard.rs"]
 mod current_work_guard;
@@ -47,11 +48,11 @@ mod json_canon;
 // resolves the worker interpreter through `crate::interpreter`; the module
 // is self-contained, so closing this binary's include set is just this line.
 #[path = "../src/interpreter.rs"]
+#[allow(dead_code)]
 mod interpreter;
 #[path = "../src/local_ai_policy.rs"]
 mod local_ai_policy;
-#[path = "../src/ownership.rs"]
-mod ownership;
+use forge::ownership;
 #[path = "../src/write_targets.rs"]
 mod write_targets;
 

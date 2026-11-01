@@ -1,1017 +1,211 @@
-//! Integration tests for `forge hook <Event>`'s delegation to a Python dispatcher.
-//!
-//! The Rust-only `tests/fixtures/stub_dispatch` crate stands in for the real
-//! `tooling.hooks.dispatch` module -- installed as a fake project's
-//! `.venv/bin/python` so `interpreter::resolve_python` finds it exactly the way it
-//! would find a real venv. This proves the forwarding contract (stdin passthrough,
-//! stdout/stderr passthrough, exit codes 0/2/nonzero, telemetry) without needing a
-//! real Python interpreter or the actual `tooling` package installed.
-
+//! Native dispatch regression coverage after removal of interpreter delegation.
+#[allow(dead_code)]
+mod support;
+use serde_json::{json, Value};
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::OnceLock;
-use std::time::{Duration, Instant};
+use std::process::{Output, Stdio};
 
-#[path = "support/prebuilt.rs"]
-mod prebuilt;
-
-static NEXT: AtomicU64 = AtomicU64::new(0);
-static STUB_BIN: OnceLock<PathBuf> = OnceLock::new();
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
-fn tempdir() -> TempDir {
-    let base = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
-    let unique = format!(
-        "forge-hook-test-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    );
-    let path = base.join(unique);
-    fs::create_dir_all(&path).expect("create tempdir");
-    TempDir(path)
-}
-
-/// Compile the Rust-only fixture once into Cargo's ignored test output tree.
-/// This keeps the normal `cargo test` coverage without adding a shipping bin.
-fn stub_binary() -> &'static Path {
-    STUB_BIN.get_or_init(|| {
-        let fixture =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/stub_dispatch/Cargo.toml");
-        let fixture_root = fixture.parent().expect("fixture manifest parent");
-        let build_target = std::env::var("CARGO_BUILD_TARGET")
-            .ok()
-            .or_else(|| option_env!("CARGO_BUILD_TARGET").map(str::to_owned));
-        let stub_profile =
-            build_target.map_or_else(|| "debug".to_owned(), |target| format!("{target}/debug"));
-        if let Some(binary) = prebuilt::verified_prebuilt(
-            &format!(
-                "stub-dispatch-target/{stub_profile}/forge-test-stub-dispatch{}",
-                std::env::consts::EXE_SUFFIX
-            ),
-            "stub_dispatch.sha256",
-            &[
-                fixture.clone(),
-                fixture_root.join("Cargo.lock"),
-                fixture_root.join("src/main.rs"),
-            ],
-        ) {
-            return binary;
-        }
-        let target = Path::new(env!("CARGO_TARGET_TMPDIR")).join("stub-dispatch-target");
-        fs::create_dir_all(&target).expect("create fixture build target");
-        let stdout_path = target.join(format!("build-{}-stdout.log", std::process::id()));
-        let stderr_path = target.join(format!("build-{}-stderr.log", std::process::id()));
-        let stdout = fs::File::create(&stdout_path).expect("create fixture build stdout log");
-        let stderr = fs::File::create(&stderr_path).expect("create fixture build stderr log");
-        let mut child = Command::new(option_env!("CARGO").unwrap_or("cargo"))
-            .arg("build")
-            .arg("--offline")
-            .arg("--locked")
-            .arg("--jobs")
-            .arg("2")
-            .arg("--manifest-path")
-            .arg(&fixture)
-            .env("CARGO_TARGET_DIR", &target)
-            .env("CARGO_BUILD_JOBS", "2")
-            .stdout(Stdio::from(stdout))
-            .stderr(Stdio::from(stderr))
-            .spawn()
-            .expect("spawn Rust dispatcher fixture build");
-        let start = Instant::now();
-        let status = loop {
-            match child.try_wait() {
-                Ok(Some(status)) => break status,
-                Ok(None) => {}
-                Err(error) => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    panic!("poll Rust dispatcher fixture build failed: {error}; stdout:\n{}\nstderr:\n{}", fs::read_to_string(&stdout_path).unwrap_or_default(), fs::read_to_string(&stderr_path).unwrap_or_default());
-                }
-            }
-            if start.elapsed() > Duration::from_secs(180) {
-                let _ = child.kill(); // The child may have exited since try_wait returned None.
-                let _ = child.wait(); // Always reap before reporting the timeout.
-                panic!(
-                    "Rust dispatcher fixture build timed out after 180 s; stdout:\n{}\nstderr:\n{}",
-                    fs::read_to_string(&stdout_path).unwrap_or_default(),
-                    fs::read_to_string(&stderr_path).unwrap_or_default()
-                );
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        };
-        assert!(
-            status.success(),
-            "Rust dispatcher fixture build failed ({status}); stdout:\n{}\nstderr:\n{}",
-            fs::read_to_string(&stdout_path).unwrap_or_default(),
-            fs::read_to_string(&stderr_path).unwrap_or_default()
-        );
-        let binary = target.join("debug").join(format!(
-            "forge-test-stub-dispatch{}",
-            std::env::consts::EXE_SUFFIX
-        ));
-        assert!(
-            binary.is_file(),
-            "Rust dispatcher fixture binary missing: {}",
-            binary.display()
-        );
-        binary
-    })
-}
-
-/// Install the executable test double as `<project>/.venv/bin/python`.
-fn stub_project(project: &Path) {
-    let venv_bin = project.join(".venv").join("bin");
-    fs::create_dir_all(&venv_bin).expect("create fake .venv/bin");
-    let dest = venv_bin.join("python");
-    fs::copy(stub_binary(), &dest).expect("install stub dispatcher");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&dest).unwrap().permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&dest, perms).unwrap();
-    }
-}
-
-fn run_stub(event: &str, input: &str) -> std::process::Output {
-    let mut child = Command::new(stub_binary())
-        .arg("-m")
-        .arg("tooling.hooks.dispatch")
-        .arg(event)
-        .env_remove("FORGE_NATIVE_HOOKS")
-        .env_remove("FORGE_NATIVE_ANSWERS")
-        .env_remove("CLAUDE_PROJECT_DIR")
+fn call(
+    host: &support::Host,
+    event: &str,
+    payload: &str,
+    legacy: Option<&str>,
+    standalone: bool,
+) -> Output {
+    let mut command = host.command();
+    command
+        .args(["hook", event])
+        .env("PATH", "")
+        .env("CLAUDE_PROJECT_DIR", &host.0)
+        .env("HOME", host.0.join("home"))
+        .env("XDG_STATE_HOME", host.0.join("state"))
+        .env("CONTEXT_TELEMETRY_PATH", host.0.join("telemetry.jsonl"))
+        .env("CRG_DATA_DIR", host.0.join("graph"))
+        .env("CRG_GATE_STATE_DIR", host.0.join("gate"))
+        .env("FORGE_JOURNAL_DIR", host.0.join("journal"))
+        .env("OBSIDIAN_VAULT_ROOT", host.0.join("vault"))
+        .env("FORGE_HOOK_STANDALONE", if standalone { "1" } else { "0" })
+        .env("FORGE_MODE", "enforce")
+        .env_remove("FORGE_CAP_DISABLE")
+        .env("CONDUCTOR_SNAPSHOT_PYTHON", "/forbidden-python")
+        .env("CONDUCTOR_PYTHON", "/forbidden-python")
+        .env_remove("A2A_AGENT_NAME")
+        .env_remove("PROJECT_HOOK_DIR")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn Rust dispatcher fixture");
-    child
-        .stdin
-        .take()
+        .stderr(Stdio::piped());
+    match legacy {
+        Some(value) => {
+            command.env("FORGE_NATIVE_HOOKS", value);
+        }
+        None => {
+            command.env_remove("FORGE_NATIVE_HOOKS");
+        }
+    }
+    let mut child = command.spawn().unwrap();
+    if let Err(error) = child.stdin.take().unwrap().write_all(payload.as_bytes()) {
+        assert_eq!(error.kind(), std::io::ErrorKind::BrokenPipe);
+    }
+    child.wait_with_output().unwrap()
+}
+fn value(output: Output) -> Value {
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+fn decision(value: &Value) -> &str {
+    value["hookSpecificOutput"]["permissionDecision"]
+        .as_str()
         .unwrap()
-        .write_all(input.as_bytes())
-        .expect("write fixture stdin");
-    child.wait_with_output().expect("wait for Rust fixture")
+}
+fn bash(command: &str) -> String {
+    json!({"tool_name":"Bash","tool_input":{"command":command}}).to_string()
 }
 
 #[test]
-fn rust_dispatcher_fixture_preserves_process_protocol() {
-    let pre = run_stub(
-        "PreToolUse",
-        "{\"z\":\"é\",\"a\":[1,true],\"esc\":\"\\u007f\"}",
-    );
-    assert_eq!(pre.status.code(), Some(0));
-    assert_eq!(pre.stderr, b"");
-    assert_eq!(
-        pre.stdout,
-        br#"{"echoed": {"z": "\u00e9", "a": [1, true], "esc": "\u007f"}, "forge_native_hooks": null, "forge_native_answers": null}"#
-    );
-
-    let numbers = run_stub(
-        "PreToolUse",
-        r#"{"zero":-0,"small":1e-7,"small5":1e-5,"small6":1e-6,"int20":100000000000000000000,"beyond_u64":18446744073709551616,"below_i64":-9223372036854775809,"big":123456789012345678901234567890}"#,
-    );
-    assert_eq!(numbers.status.code(), Some(0));
-    assert_eq!(
-        numbers.stdout,
-        br#"{"echoed": {"zero": 0, "small": 1e-07, "small5": 1e-05, "small6": 1e-06, "int20": 100000000000000000000, "beyond_u64": 18446744073709551616, "below_i64": -9223372036854775809, "big": 123456789012345678901234567890}, "forge_native_hooks": null, "forge_native_answers": null}"#
-    );
-
-    let session = run_stub("SessionStart", "");
-    assert_eq!(session.status.code(), Some(0));
-    assert_eq!(session.stderr, b"");
-    assert_eq!(
-        session.stdout,
-        br#"{"event": "SessionStart", "claude_project_dir": null, "echoed": {}, "forge_native_hooks": null, "forge_native_answers": null}"#
-    );
-
-    let post = run_stub("PostToolUse", "ignored");
-    assert_eq!(post.status.code(), Some(0));
-    assert_eq!(
-        post.stdout,
-        br#"{"ok": true, "forge_native_hooks": null, "forge_native_answers": null}"#
-    );
-    assert_eq!(post.stderr, b"stub dispatcher: soft warning on stderr\n");
-
-    let deny = run_stub("Deny", "{}");
-    assert_eq!(deny.status.code(), Some(2));
-    assert_eq!(
-        deny.stdout,
-        br#"{"decision": "block", "reason": "stub deny"}"#
-    );
-    assert_eq!(deny.stderr, b"");
-
-    let explode = run_stub("Explode", "{}");
-    assert_eq!(explode.status.code(), Some(7));
-    assert_eq!(explode.stdout, b"");
-    assert_eq!(explode.stderr, b"stub dispatcher: fatal\n");
-
-    let unexpected = run_stub("Unexpected", "{}");
-    assert_eq!(unexpected.status.code(), Some(1));
-    assert_eq!(unexpected.stdout, b"");
-    assert_eq!(
-        unexpected.stderr,
-        b"stub_dispatch.py: unhandled test event 'Unexpected'\n"
-    );
-    let apostrophe = run_stub("It's", "{}");
-    assert_eq!(apostrophe.status.code(), Some(1));
-    assert_eq!(
-        apostrophe.stderr,
-        b"stub_dispatch.py: unhandled test event \"It's\"\n"
-    );
-
-    let invalid = run_stub("PreToolUse", "{");
-    assert_eq!(invalid.status.code(), Some(1));
-    assert_eq!(invalid.stdout, b"");
-    assert!(String::from_utf8_lossy(&invalid.stderr).contains("invalid stdin JSON"));
-}
-
-fn run_forge(
-    project: &Path,
-    event: &str,
-    stdin: &str,
-    telemetry_path: Option<&Path>,
-) -> std::process::Output {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
-    cmd.arg("hook")
-        .arg(event)
-        .env("CLAUDE_PROJECT_DIR", project)
-        // The stub venv below is the interpreter this test is about; a snapshot
-        // export leaking in from the mutation engine's environment would rank
-        // above it and run the host's python instead of the stub.
-        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    match telemetry_path {
-        Some(p) => {
-            cmd.env("CONTEXT_TELEMETRY_PATH", p);
-        }
-        None => {
-            cmd.env_remove("CONTEXT_TELEMETRY_PATH");
+fn native_guards_run_with_empty_path_and_obsolete_partial_selection() {
+    let host = support::Host::new();
+    for legacy in [None, Some(""), Some("crg_refresh_report_pre")] {
+        for standalone in [false, true] {
+            let output = call(
+                &host,
+                "PreToolUse",
+                &bash("git reset --hard"),
+                legacy,
+                standalone,
+            );
+            if legacy.is_some() {
+                assert!(String::from_utf8_lossy(&output.stderr).contains("obsolete"));
+            }
+            assert_eq!(decision(&value(output)), "deny");
+            assert_eq!(
+                decision(&value(call(
+                    &host,
+                    "PreToolUse",
+                    &bash("echo fixture"),
+                    legacy,
+                    standalone
+                ))),
+                "allow"
+            );
         }
     }
-    let mut child = cmd.spawn().expect("spawn forge");
-    child
-        .stdin
-        .take()
-        .expect("piped stdin")
-        .write_all(stdin.as_bytes())
-        .expect("write stdin");
-    child.wait_with_output().expect("wait for forge")
 }
 
-/// Like `run_forge`, but also controls `FORGE_NATIVE_HOOKS` on forge's own
-/// process: `Some(v)` sets it to `v` (use `Some("")` for the escape hatch),
-/// `None` removes it from the child's environment entirely so no leftover
-/// value from the test runner's own shell can leak in.
-fn run_forge_with_native_hooks(
-    project: &Path,
-    event: &str,
-    stdin: &str,
-    native_hooks: Option<&str>,
-) -> std::process::Output {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
-    cmd.arg("hook")
-        .arg(event)
-        .env("CLAUDE_PROJECT_DIR", project)
-        .env_remove("CONTEXT_TELEMETRY_PATH")
-        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    match native_hooks {
-        Some(v) => {
-            cmd.env("FORGE_NATIVE_HOOKS", v);
-        }
-        None => {
-            cmd.env_remove("FORGE_NATIVE_HOOKS");
-        }
+#[test]
+fn ambiguous_malformed_and_oversized_pretool_payloads_fail_closed() {
+    let host = support::Host::new();
+    for payload in [
+        "{}".into(),
+        "[]".into(),
+        "{".into(),
+        r#"{"tool_name":"Bash","tool_name":"Read","tool_input":{"command":"echo hi"}}"#.into(),
+        r#"{"tool_name":"Read","toolName":"Bash"}"#.into(),
+        r#"{"tool_name":"exec_command","tool_input":{"cmd":["sh","-c","echo hi"]}}"#.into(),
+        format!("{{\"data\":\"{}\"}}", "x".repeat(1024 * 1024)),
+    ] {
+        assert_eq!(
+            decision(&value(call(&host, "PreToolUse", &payload, None, false))),
+            "deny"
+        );
     }
-    let mut child = cmd.spawn().expect("spawn forge");
-    child
-        .stdin
-        .take()
-        .expect("piped stdin")
-        .write_all(stdin.as_bytes())
-        .expect("write stdin");
-    child.wait_with_output().expect("wait for forge")
 }
 
-/// State 1 of 3 required by the port: **all-native**. `FORGE_NATIVE_HOOKS`
-/// unset entirely defaults to every Bash `PreToolUse` hook the Python
-/// registry lists (`handlers::BASH_PRETOOLUSE_HOOK_NAMES`) plus
-/// `bash_write_targets`, so `bash_pretooluse_fully_native` is true and
-/// `dispatch::run_hook` must answer the merged verdict itself and never
-/// start Python for this event -- proven here by the stub dispatcher never
-/// running at all: were it invoked, stdout would carry its `"echoed"` /
-/// `"forge_native_hooks"` shape instead of forge's own
-/// `hookSpecificOutput` shape.
 #[test]
-fn default_native_coverage_answers_bash_pretooluse_without_starting_python() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}"#;
-
-    let out = run_forge_with_native_hooks(project.path(), "PreToolUse", payload, None);
-
-    assert_eq!(out.status.code(), Some(0), "a deny verdict still exits 0");
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert!(
-        stdout.get("echoed").is_none(),
-        "the stub dispatcher must never have run: {stdout}"
-    );
-    assert_eq!(
-        stdout["hookSpecificOutput"]["permissionDecision"], "deny",
-        "forge's own merged verdict: {stdout}"
-    );
+fn shell_and_camel_case_provider_aliases_select_native_guards() {
+    let host = support::Host::new();
+    for name in ["functions.exec_command", "shell", "run_terminal_command"] {
+        let payload = json!({"toolName":name,"tool_input":{"cmd":"git push --force origin main"}})
+            .to_string();
+        assert_eq!(
+            decision(&value(call(&host, "PreToolUse", &payload, None, false))),
+            "deny"
+        );
+    }
 }
 
-/// State 2 of 3: **partial coverage** -- one of the four Bash `PreToolUse`
-/// hooks the Python registry lists (`current_work_guard_bash` here) is *not*
-/// in the opted-in native set, whether because forge does not know it or the
-/// operator excluded it. `bash_pretooluse_fully_native` must be false, so
-/// Python still starts, but only for the hooks forge did not already answer
-/// -- the three it did answer are spliced in via `FORGE_NATIVE_HOOKS` /
-/// `FORGE_NATIVE_ANSWERS` rather than re-run.
 #[test]
-fn partial_native_coverage_still_starts_python_for_the_remaining_hook() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"echo hi"}}"#;
-
-    let out = run_forge_with_native_hooks(
-        project.path(),
-        "PreToolUse",
-        payload,
-        Some("crg_refresh_report_pre,crg_gate_verify_bash,pre_bash"),
-    );
-
-    assert_eq!(out.status.code(), Some(0), "Python still runs and allows");
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert_eq!(
-        stdout["echoed"]["tool_name"], "Bash",
-        "the stub dispatcher must have run: {stdout}"
-    );
-    let served: std::collections::HashSet<&str> = stdout["forge_native_hooks"]
+fn budget_warning_does_not_bypass_command_denial() {
+    let host = support::Host::new();
+    let route = host.ok(&["route", "--subagent-type", "general-purpose", "--json"]);
+    let cap = route["cap_tokens"].as_u64().expect("route cap");
+    let dir = host.0.join("sess/subagents");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("agent-budget.jsonl"), format!("{}\n", json!({"type":"assistant","message":{"model":"fixture","usage":{"input_tokens":cap * 85 / 100,"output_tokens":0}}}))).unwrap();
+    let payload = json!({"session_id":"sess","agent_id":"budget","agent_type":"general-purpose",
+        "transcript_path":host.0.join("sess.jsonl"),"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}).to_string();
+    let answer = value(call(&host, "PreToolUse", &payload, None, false));
+    assert_eq!(decision(&answer), "deny");
+    assert!(answer["hookSpecificOutput"]["additionalContext"]
         .as_str()
-        .expect("forge_native_hooks is a string")
-        .split(',')
-        .collect();
-    assert_eq!(
-        served,
-        std::collections::HashSet::from([
-            "crg_refresh_report_pre",
-            "crg_gate_verify_bash",
-            "pre_bash"
-        ]),
-        "current_work_guard_bash was left for Python to answer itself"
+        .unwrap()
+        .contains("cap"));
+}
+
+#[test]
+fn native_posttool_records_telemetry_and_journal_without_fallback() {
+    let host = support::Host::new();
+    let file = host.0.join("fixture.txt");
+    fs::write(&file, "fixture").unwrap();
+    let payload =
+        json!({"session_id":"edit","tool_name":"Edit","tool_input":{"file_path":file}}).to_string();
+    let answer = value(call(&host, "PostToolUse", &payload, Some(""), false));
+    assert_eq!(answer["hookSpecificOutput"]["hookEventName"], "PostToolUse");
+    assert!(host.0.join("journal/edit.tsv").is_file());
+    let rows = fs::read_to_string(host.0.join("telemetry.jsonl")).unwrap();
+    let native: Value = rows
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .find(|row| row.get("delegated").is_some())
+        .unwrap();
+    assert_eq!(native["delegated"], false);
+    assert!(native["elapsed_ms"].as_f64().unwrap() >= 0.0);
+}
+
+#[test]
+fn session_end_rolls_transcript_into_native_ledger_and_journal() {
+    let host = support::Host::new();
+    let transcript = host.0.join("transcript.jsonl");
+    fs::write(&transcript, concat!(r#"{"uuid":"u1","session_id":"native-end","timestamp":"2026-09-13T00:00:00Z","type":"assistant","message":{"role":"assistant","model":"m","usage":{"input_tokens":1,"output_tokens":1,"cache_read_input_tokens":0,"cache_creation_input_tokens":0},"content":[{"type":"text","text":"x"}]}}"#, "\n")).unwrap();
+    let out = call(
+        &host,
+        "SessionEnd",
+        &json!({"session_id":"native-end","reason":"finished","transcript_path":transcript})
+            .to_string(),
+        None,
+        false,
     );
-    let answers: serde_json::Value = serde_json::from_str(
-        stdout["forge_native_answers"]
-            .as_str()
-            .expect("answers json"),
-    )
-    .expect("valid json");
-    assert_eq!(
-        answers["pre_bash"]["hookSpecificOutput"]["permissionDecision"],
-        "allow"
-    );
-    assert!(answers.get("current_work_guard_bash").is_none());
-}
-
-/// State 3 of 3: `FORGE_NATIVE_HOOKS=""` is the documented escape hatch back
-/// to the pre-port, all-Python behaviour.
-#[test]
-fn empty_native_hooks_is_the_escape_hatch_back_to_all_python() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}"#;
-
-    let out = run_forge_with_native_hooks(project.path(), "PreToolUse", payload, Some(""));
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert_eq!(stdout["forge_native_hooks"], "");
-    assert_eq!(stdout["forge_native_answers"], "");
-}
-
-#[test]
-fn a_stale_env_native_hooks_value_never_leaks_past_a_non_bash_payload() {
-    let project = tempdir();
-    stub_project(project.path());
-    // Simulates a caller whose shell still has FORGE_NATIVE_HOOKS from an
-    // earlier Bash call set when this call is for a different tool: forge
-    // must still override it to "" for the child rather than let Python
-    // believe `pre_bash` was served when no answer exists for it.
-    let payload = r#"{"tool_name":"Write","tool_input":{"file_path":"x","content":"y"}}"#;
-
-    let out = run_forge_with_native_hooks(project.path(), "PreToolUse", payload, Some("pre_bash"));
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert_eq!(stdout["forge_native_hooks"], "");
-    assert_eq!(stdout["forge_native_answers"], "");
-}
-
-#[test]
-fn forwards_stdin_to_the_dispatcher_and_its_allow_exit_code() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"echo hi"}}"#;
-
-    // Forces the escape hatch: this test's purpose is the generic
-    // stdin/exit-code forwarding contract, not nativity, and the default
-    // native coverage would otherwise answer `echo hi` itself and never
-    // start the stub dispatcher this test inspects.
-    let out = run_forge_with_native_hooks(project.path(), "PreToolUse", payload, Some(""));
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert_eq!(stdout["echoed"]["tool_name"], "Bash");
-}
-
-#[test]
-fn forwards_stderr_output_unchanged() {
-    let project = tempdir();
-    stub_project(project.path());
-
-    // The escape hatch keeps this test about the generic stderr-forwarding
-    // contract: with defaults, a PostToolUse payload without a `tool_name`
-    // is fully native now (both matcher-`.*` names ported) and never starts
-    // the stub dispatcher at all.
-    let out = run_forge_with_native_hooks(project.path(), "PostToolUse", "{}", Some(""));
-
-    assert_eq!(out.status.code(), Some(0));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("soft warning on stderr"));
-}
-
-/// The PostToolUse twin of
-/// `default_native_coverage_answers_bash_pretooluse_without_starting_python`:
-/// a Read call's every registry-matched hook is native by default, so the
-/// stub dispatcher must never run -- proven by its `"ok"` stdout shape never
-/// appearing.
-#[test]
-fn default_native_coverage_answers_post_tooluse_without_starting_python() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"session_id":"s-1","tool_name":"Read","tool_input":{"file_path":"a.py"},"tool_response":{"type":"text","text":"one line"}}"#;
-
-    let out = run_forge_with_native_hooks(project.path(), "PostToolUse", payload, None);
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
     assert!(
-        stdout.get("ok").is_none(),
-        "the stub dispatcher must never have run: {stdout}"
-    );
-    assert_eq!(stdout["hookSpecificOutput"]["hookEventName"], "PostToolUse");
-    // A short response crosses no budget step and bounds nothing: bare.
-    assert!(stdout["hookSpecificOutput"]
-        .get("additionalContext")
-        .is_none());
-}
-
-/// An Edit call's every registry-matched hook (`crg_refresh_report_post`,
-/// `crg_graph_refresh`, `post_edit`, `obsidian_post_edit`,
-/// `context_telemetry`) is native by default now, so the stub dispatcher
-/// must never run -- the edit-family twin of the Read test above. The
-/// obsidian body appends its accumulator line for the session id, so the
-/// payload uses a dedicated id and the line is cleaned up after.
-#[test]
-fn an_edit_tool_post_tooluse_is_fully_native_by_default() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"session_id":"s-edit-native","tool_name":"Edit","tool_input":{"file_path":"a.py","old_string":"x","new_string":"y"},"tool_response":{"filePath":"a.py"}}"#;
-
-    let out = run_forge_with_native_hooks(project.path(), "PostToolUse", payload, None);
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert!(
-        stdout.get("ok").is_none(),
-        "the stub dispatcher must never have run: {stdout}"
-    );
-    assert_eq!(stdout["hookSpecificOutput"]["hookEventName"], "PostToolUse");
-    let _ = std::fs::remove_file("/tmp/claude-session-journal/s-edit-native.tsv");
-}
-
-/// With a partial opt-in, an Edit call delegates the names not opted in and
-/// gets the opted-in, matcher-eligible ones' precomputed answers spliced
-/// back in via the env pair, exactly like a partially-native Bash
-/// `PreToolUse` call -- here the two matcher-`.*` names
-/// (`crg_refresh_report_post`, `context_telemetry`), with the three
-/// edit-family names left to Python.
-#[test]
-fn an_edit_tool_post_tooluse_splices_the_wildcard_names_on_partial_opt_in() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"session_id":"s-2","tool_name":"Edit","tool_input":{"file_path":"a.py","old_string":"x","new_string":"y"},"tool_response":{"filePath":"a.py"}}"#;
-
-    let out = run_forge_with_native_hooks(
-        project.path(),
-        "PostToolUse",
-        payload,
-        Some("crg_refresh_report_post,context_telemetry"),
-    );
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert_eq!(
-        stdout["ok"],
-        serde_json::json!(true),
-        "the stub ran: {stdout}"
-    );
-    let served: std::collections::HashSet<&str> = stdout["forge_native_hooks"]
-        .as_str()
-        .expect("forge_native_hooks is a string")
-        .split(',')
-        .collect();
-    assert_eq!(
-        served,
-        std::collections::HashSet::from(["crg_refresh_report_post", "context_telemetry"]),
-        "exactly the matcher-.* names were answered natively"
-    );
-}
-
-#[test]
-fn forwards_the_deny_exit_code() {
-    let project = tempdir();
-    stub_project(project.path());
-
-    let out = run_forge(project.path(), "Deny", "{}", None);
-
-    assert_eq!(out.status.code(), Some(2));
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert_eq!(stdout["decision"], "block");
-}
-
-#[test]
-fn forwards_a_nonzero_non_deny_exit_code() {
-    let project = tempdir();
-    stub_project(project.path());
-
-    let out = run_forge(project.path(), "Explode", "{}", None);
-
-    assert_eq!(out.status.code(), Some(7));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("fatal"));
-}
-
-#[test]
-fn writes_one_telemetry_line_when_the_env_var_is_set() {
-    let project = tempdir();
-    stub_project(project.path());
-    let telemetry = project.path().join("telemetry/events.jsonl");
-
-    let out = run_forge(project.path(), "PreToolUse", "{}", Some(&telemetry));
-
-    assert_eq!(out.status.code(), Some(0));
-    let contents = fs::read_to_string(&telemetry).expect("telemetry file written");
-    let mut lines = contents.lines();
-    let line = lines.next().expect("one telemetry line");
-    assert!(
-        lines.next().is_none(),
-        "expected exactly one line, got: {contents:?}"
-    );
-    let record: serde_json::Value = serde_json::from_str(line).expect("telemetry line is json");
-    assert_eq!(record["event"], "PreToolUse");
-    assert_eq!(record["delegated"], true);
-    assert!(
-        record["elapsed_ms"]
-            .as_f64()
-            .expect("elapsed_ms is a number")
-            >= 0.0
-    );
-    assert!(record["ts"].as_str().expect("ts is a string").contains('T'));
-}
-
-#[test]
-fn skips_telemetry_entirely_when_the_env_var_is_unset() {
-    let project = tempdir();
-    stub_project(project.path());
-    let telemetry = project.path().join("telemetry/events.jsonl");
-
-    let out = run_forge(project.path(), "PreToolUse", "{}", None);
-
-    assert_eq!(out.status.code(), Some(0));
-    assert!(!telemetry.exists());
-}
-
-/// `SessionStart` has no fully-native path: `forge` must read the payload,
-/// compute the opted-in `workspace_exposure_session` answer and hand it to the
-/// Python dispatcher as splice env, then propagate the dispatcher's exit code.
-#[test]
-fn session_start_delegates_and_carries_the_exposure_answer() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"session_id":"stub-session"}"#;
-
-    let out = run_forge(project.path(), "SessionStart", payload, None);
-
-    assert_eq!(out.status.code(), Some(0), "delegation exits 0");
-    let stdout: serde_json::Value =
-        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran");
-    assert_eq!(stdout["event"], "SessionStart");
-    let answers = stdout["forge_native_answers"].as_str().unwrap_or("");
-    let parsed: serde_json::Value = serde_json::from_str(answers)
-        .unwrap_or_else(|err| panic!("answers must be JSON ({err}): {answers}"));
-    assert!(
-        parsed.get("workspace_exposure_session").is_some(),
-        "the exposure answer must be spliced in: {answers}"
-    );
-}
-
-/// Events with no native handlers at all (`SessionEnd` today) take the bare
-/// delegation arm: payload forwarded, no native env claimed beyond the
-/// documented empty escape hatch. Since design step 6 the native SessionEnd
-/// handler runs its ledger rollup first -- this payload carries no
-/// `transcript_path`, so the rollup is a stderr note and nothing else.
-#[test]
-fn events_without_native_handlers_still_delegate() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"reason":"clear"}"#;
-
-    let out = run_forge(project.path(), "SessionEnd", payload, None);
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value =
-        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran");
-    assert_eq!(stdout["event"], "SessionEnd");
-    assert_eq!(
-        stdout["forge_native_hooks"].as_str(),
-        Some(""),
-        "no native hooks are claimed for an event forge does not answer"
-    );
-    assert_eq!(stdout["echoed"]["reason"], "clear");
-}
-
-/// Design step 6, end to end: `forge hook SessionEnd` rolls the ending
-/// session's own transcript (the payload's `transcript_path`) into the ledger
-/// via a 2 s-bounded `forge ledger rollup` child, then still delegates the
-/// event -- the rollup writes under `LEDGER_ROOT` and the stub dispatcher's
-/// echo proves both halves ran, in that order, with one process exit code 0.
-#[test]
-fn session_end_rolls_the_ending_session_into_the_ledger() {
-    let project = tempdir();
-    stub_project(project.path());
-    let transcript = project.path().join("transcript.jsonl");
-    std::fs::write(
-        &transcript,
-        concat!(
-            r#"{"uuid":"u1","session_id":"sess-end-1","timestamp":"2026-09-13T00:00:00Z","type":"assistant","message":{"role":"assistant","model":"m","usage":{"input_tokens":1,"output_tokens":1,"cache_read_input_tokens":0,"cache_creation_input_tokens":0},"content":[{"type":"text","text":"x"}]}}"#,
-            "\n"
-        ),
-    )
-    .expect("write transcript");
-    let ledger_root = tempdir();
-
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
-    cmd.arg("hook")
-        .arg("SessionEnd")
-        .env("CLAUDE_PROJECT_DIR", project.path())
-        .env("LEDGER_ROOT", ledger_root.path())
-        .env_remove("CONTEXT_TELEMETRY_PATH")
-        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
-        .env_remove("FORGE_NATIVE_HOOKS")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let payload = format!(
-        r#"{{"session_id":"s","reason":"clear","transcript_path":"{}"}}"#,
-        transcript.display()
-    );
-    let mut child = cmd.spawn().expect("spawn forge");
-    child
-        .stdin
-        .take()
-        .expect("piped stdin")
-        .write_all(payload.as_bytes())
-        .expect("write stdin");
-    let out = child.wait_with_output().expect("wait for forge");
-
-    assert_eq!(
-        out.status.code(),
-        Some(0),
-        "the hook still exits 0 whatever the rollup did: stderr={}",
+        out.status.success(),
+        "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let rollup = ledger_root
-        .path()
-        .join("session_rollup")
-        .join("2026-09-13.jsonl");
-    let text = std::fs::read_to_string(&rollup)
-        .unwrap_or_else(|err| panic!("SessionEnd rollup missing ({err}): {}", rollup.display()));
+    assert!(out.stdout.is_empty());
     assert!(
-        text.contains(r#""session_id":"sess-end-1""#),
-        "the ending session's own row: {text}"
+        fs::read_to_string(host.0.join("ledger/session_rollup/2026-09-13.jsonl"))
+            .unwrap()
+            .contains("native-end")
     );
-    let stdout: serde_json::Value =
-        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran after the rollup");
-    assert_eq!(stdout["event"], "SessionEnd");
-    assert_eq!(stdout["echoed"]["session_id"], "s");
+    assert!(host.0.join("vault/claude").is_dir());
 }
 
-/// An empty `CLAUDE_PROJECT_DIR` must fall back to the working directory (the
-/// `Path::cwd` arm of `interpreter::project_root`), not to an empty path that
-/// resolves no venv: run forge from inside the stub project with the variable
-/// set but empty and the stub must still be the dispatcher that answers.
 #[test]
-fn an_empty_project_dir_falls_back_to_the_working_directory() {
-    let project = tempdir();
-    stub_project(project.path());
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
-    cmd.arg("hook")
-        .arg("SessionEnd")
-        .env("CLAUDE_PROJECT_DIR", "")
-        .current_dir(project.path())
-        .env_remove("CONTEXT_TELEMETRY_PATH")
-        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
-        .env_remove("FORGE_NATIVE_HOOKS")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().expect("spawn forge");
-    child
-        .stdin
-        .take()
-        .expect("piped stdin")
-        .write_all(br#"{}"#)
-        .expect("write stdin");
-    let out = child.wait_with_output().expect("wait for forge");
-
-    assert_eq!(out.status.code(), Some(0), "cwd-rooted delegation exits 0");
-    let stdout: serde_json::Value =
-        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran");
-    assert_eq!(stdout["event"], "SessionEnd");
-    // The dispatcher must also see the fallback root: forge re-exports
-    // CLAUDE_PROJECT_DIR from project_root(), so an empty-variable bug would
-    // arrive here as the empty string.
-    let echoed = stdout["claude_project_dir"].as_str().unwrap_or_default();
-    assert_eq!(
-        std::fs::canonicalize(echoed).ok(),
-        std::fs::canonicalize(project.path()).ok(),
-        "project_root must fall back to the working directory"
-    );
-}
-
-/// A set-but-empty `CONDUCTOR_SNAPSHOT_PYTHON` is not an export: the filter in
-/// `interpreter::resolve_python` must drop it and let the project venv (the
-/// stub) win.
-#[test]
-fn an_empty_snapshot_export_still_lets_the_project_venv_win() {
-    let project = tempdir();
-    stub_project(project.path());
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
-    cmd.arg("hook")
-        .arg("SessionEnd")
-        .env("CLAUDE_PROJECT_DIR", project.path())
-        .env("CONDUCTOR_SNAPSHOT_PYTHON", "")
-        .env_remove("CONTEXT_TELEMETRY_PATH")
-        .env_remove("FORGE_NATIVE_HOOKS")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().expect("spawn forge");
-    child
-        .stdin
-        .take()
-        .expect("piped stdin")
-        .write_all(br#"{}"#)
-        .expect("write stdin");
-    let out = child.wait_with_output().expect("wait for forge");
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value =
-        serde_json::from_slice(&out.stdout).expect("stub dispatcher ran");
-    assert_eq!(stdout["event"], "SessionEnd");
-}
-
-/// `FORGE_HOOK_STANDALONE=1` (`docs/routing.md`'s "Warn-only mode and
-/// standalone install" section): a `PreToolUse` `Bash` payload now runs the
-/// same fully-native guard path the non-standalone default does --
-/// `dispatch::run_pre_tool_use_standalone` special-cases `tool_name ==
-/// "Bash"` before falling through to the bare `Ok(0)` allow, so a denying
-/// command is denied under standalone too, with no Python dispatcher ever
-/// started (proven by construction: the stub dispatcher's distinctive
-/// `"echoed"` shape never appears in stdout).
-#[test]
-fn standalone_mode_denies_a_bash_payload_via_the_native_guard() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}"#;
-
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
-    cmd.arg("hook")
-        .arg("PreToolUse")
-        .env("CLAUDE_PROJECT_DIR", project.path())
-        .env("FORGE_HOOK_STANDALONE", "1")
-        .env_remove("CONTEXT_TELEMETRY_PATH")
-        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
-        .env_remove("FORGE_NATIVE_HOOKS")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().expect("spawn forge");
-    child
-        .stdin
-        .take()
-        .expect("piped stdin")
-        .write_all(payload.as_bytes())
-        .expect("write stdin");
-    let out = child.wait_with_output().expect("wait for forge");
-
-    assert_eq!(out.status.code(), Some(0), "a deny verdict still exits 0");
-    let stdout: serde_json::Value =
-        serde_json::from_slice(&out.stdout).expect("json stdout from forge's own guard");
-    assert!(
-        stdout.get("echoed").is_none(),
-        "the stub dispatcher must never have run: {stdout}"
-    );
-    assert_eq!(
-        stdout["hookSpecificOutput"]["permissionDecision"], "deny",
-        "standalone must deny exactly like the non-standalone native path: {stdout}"
-    );
-}
-
-/// The other half of the same contract: a benign `Bash` payload under
-/// standalone must not be denied -- it gets whatever the fully-native path
-/// prints for an allow (`hookSpecificOutput.permissionDecision == "allow"`),
-/// matching `handlers::run_bash_pretooluse_fully_native`'s own
-/// `fully_native_merges_all_four_outcomes_in_registry_order` unit test.
-#[test]
-fn standalone_mode_allows_a_benign_bash_payload_via_the_native_guard() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"tool_name":"Bash","tool_input":{"command":"echo hi"}}"#;
-
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
-    cmd.arg("hook")
-        .arg("PreToolUse")
-        .env("CLAUDE_PROJECT_DIR", project.path())
-        .env("FORGE_HOOK_STANDALONE", "1")
-        .env_remove("CONTEXT_TELEMETRY_PATH")
-        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
-        .env_remove("FORGE_NATIVE_HOOKS")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().expect("spawn forge");
-    child
-        .stdin
-        .take()
-        .expect("piped stdin")
-        .write_all(payload.as_bytes())
-        .expect("write stdin");
-    let out = child.wait_with_output().expect("wait for forge");
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value =
-        serde_json::from_slice(&out.stdout).expect("json stdout from forge's own guard");
-    assert_eq!(
-        stdout["hookSpecificOutput"]["permissionDecision"], "allow",
-        "a benign command must not be denied: {stdout}"
-    );
-}
-
-/// The `Agent` half of standalone mode: routing still runs and answers on
-/// its own, with no `crg_refresh_report_pre` branch merged in (standalone
-/// never runs the native Bash-guard/report-refresh branches).
-#[test]
-fn standalone_mode_still_answers_an_agent_payload_with_routing() {
-    let project = tempdir();
-    stub_project(project.path());
-    let payload = r#"{"tool_name":"Agent","tool_input":{"subagent_type":"Explore"}}"#;
-
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
-    cmd.arg("hook")
-        .arg("PreToolUse")
-        .env("CLAUDE_PROJECT_DIR", project.path())
-        .env("FORGE_HOOK_STANDALONE", "1")
-        .env_remove("FORGE_MODE")
-        .env_remove("CONTEXT_TELEMETRY_PATH")
-        .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
-        .env_remove("FORGE_NATIVE_HOOKS")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().expect("spawn forge");
-    child
-        .stdin
-        .take()
-        .expect("piped stdin")
-        .write_all(payload.as_bytes())
-        .expect("write stdin");
-    let out = child.wait_with_output().expect("wait for forge");
-
-    assert_eq!(out.status.code(), Some(0));
-    let stdout: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json stdout");
-    assert_eq!(
-        stdout["hookSpecificOutput"]["permissionDecision"], "allow",
-        "Explore routes to an allow with a model: {stdout}"
-    );
-    assert!(
-        stdout.get("echoed").is_none(),
-        "the stub dispatcher must never have run: {stdout}"
-    );
-}
-
-/// Every `tool_name` that is neither `Bash` nor `Agent` (Grep here) still
-/// gets `crg_refresh_report_pre` alone under standalone: `--takeover`
-/// narrows the host's Python `PreToolUse` entry away from `.*`, so without
-/// this branch a staged refresh-failure marker would go unreported for
-/// exactly the tools the narrowed entry no longer covers. Runs the same
-/// payload twice against one project: first with a staged marker (must
-/// report and consume it), then again with the marker already gone (must
-/// answer a bare, hook-only allow) -- `take_notices` deletes the marker file
-/// it reads, so the second call naturally covers the "nothing staged" case.
-#[test]
-fn standalone_mode_reports_a_staged_refresh_failure_for_any_other_tool() {
-    let project = tempdir();
-    stub_project(project.path());
-    let store = project.path().join(".code-review-graph");
-    fs::create_dir_all(&store).expect("create crg store dir");
-    fs::write(
-        store.join("refresh.failed"),
-        "{\"kind\":\"failure\",\"text\":\"embedding server unreachable\"}\n",
-    )
-    .expect("stage a refresh-failure marker");
-    let payload = r#"{"tool_name":"Grep","tool_input":{"pattern":"TODO"}}"#;
-
-    let run = || {
-        let mut cmd = Command::new(env!("CARGO_BIN_EXE_forge"));
-        cmd.arg("hook")
-            .arg("PreToolUse")
-            .env("CLAUDE_PROJECT_DIR", project.path())
-            .env("FORGE_HOOK_STANDALONE", "1")
-            .env_remove("FORGE_MODE")
-            .env_remove("CONTEXT_TELEMETRY_PATH")
-            .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
-            .env_remove("FORGE_NATIVE_HOOKS")
-            .env_remove("CRG_DATA_DIR")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let mut child = cmd.spawn().expect("spawn forge");
-        child
-            .stdin
-            .take()
-            .expect("piped stdin")
-            .write_all(payload.as_bytes())
-            .expect("write stdin");
-        child.wait_with_output().expect("wait for forge")
-    };
-
-    let with_marker = run();
-    assert_eq!(with_marker.status.code(), Some(0));
-    let stdout: serde_json::Value =
-        serde_json::from_slice(&with_marker.stdout).expect("json stdout from the report");
-    assert!(
-        stdout.get("echoed").is_none(),
-        "the stub dispatcher must never have run: {stdout}"
-    );
-    let context = stdout["hookSpecificOutput"]["additionalContext"]
-        .as_str()
-        .expect("a staged failure surfaces as additionalContext");
-    assert!(
-        context.contains("background graph refresh FAILED")
-            && context.contains("embedding server unreachable"),
-        "unexpected report: {stdout}"
-    );
-    assert!(
-        !store.join("refresh.failed").exists(),
-        "the marker must be consumed once reported"
-    );
-
-    let without_marker = run();
-    assert_eq!(without_marker.status.code(), Some(0));
-    let stdout: serde_json::Value =
-        serde_json::from_slice(&without_marker.stdout).expect("json stdout from the bare allow");
-    assert!(
-        stdout.get("echoed").is_none(),
-        "the stub dispatcher must never have run: {stdout}"
-    );
-    assert!(
-        stdout["hookSpecificOutput"]
-            .get("additionalContext")
-            .is_none(),
-        "nothing staged means nothing to report: {stdout}"
-    );
+fn explicit_noop_events_and_unknown_events_never_start_interpreters() {
+    let host = support::Host::new();
+    for event in ["Stop", "Notification", "PreCompact"] {
+        let out = call(&host, event, "{}", None, false);
+        assert!(out.status.success());
+        assert!(out.stdout.is_empty());
+    }
+    let out = call(&host, "Unknown", "{}", None, false);
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("unsupported hook event"));
+    let out = call(&host, "SessionStart", "{}", None, true);
+    assert!(out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(!host.0.join("conductor").exists());
 }

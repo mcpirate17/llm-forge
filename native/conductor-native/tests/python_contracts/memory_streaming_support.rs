@@ -136,14 +136,19 @@ pub fn query<'py>(
     if let Some(top_k) = top_k {
         pairs.push(("top_k", top_k.into_pyobject(py).unwrap().into_any()));
     }
-    let name = if scan {
-        "_query_index_file_scan"
+    let (name, data) = if scan {
+        // The numerical oracle uses the existing in-memory scoring boundary;
+        // production file retrieval has no legacy full-scan implementation.
+        (
+            "query_index",
+            index.getattr("load_index")?.call1((path(py, file),))?,
+        )
     } else {
-        "query_index_file"
+        ("query_index_file", path(py, file))
     };
     index
         .getattr(name)?
-        .call((query_text, path(py, file)), Some(&kwargs(py, &pairs)))
+        .call((query_text, data), Some(&kwargs(py, &pairs)))
 }
 
 pub fn write_rows(file: &Path, rows: &[Value]) {

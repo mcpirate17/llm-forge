@@ -2,6 +2,9 @@
 
 Runs the host's scheduled checks on a timer: the whole-repository audits and the
 range reviews that are too slow for every landing. No CI service is involved.
+The runner uses a separate persistent clone. Do not launch it in a session that
+forbids extra checkouts; run the native check commands in the authorized checkout
+instead. Editing a policy does not install or start its timer.
 
 ```
 forge sweep run
@@ -56,7 +59,7 @@ timer refuses to start. `--print` shows both units and writes nothing.
   resolves against the checkout. systemd never starts a second sweep while one is
   active.
 - The service records the installing shell's `PATH`. The user manager's own `PATH`
-  usually lacks per-user toolchains such as nvm's node.
+  may lack the user's Cargo toolchain and native audit executables.
 - The timer fires on `calendar`, a systemd `OnCalendar=` expression that
   `systemd-analyze calendar` validates before anything is written. It uses
   `Persistent=false`, so a fire missed while the machine was off is skipped.
@@ -73,12 +76,12 @@ Reinstall after changing `calendar`, `launcher` or the forge binary path.
 # clone_dir = "/data/sweep/repo"    # optional override; never the land clone
 report_dir = "reports/sweep"        # relative to the checkout
 calendar = "*-*-* 00:30:00"
-launcher = ["tools/run_capped.sh", "-m", "48G", "-t", "10800", "--"]
-land_checks = ["cargo", "contracts"] # run with every path selected
+launcher = ["/usr/bin/timeout", "--kill-after=30", "5400"]
+land_checks = ["native-tests"]     # names from the host's land policy
 
 [[step]]
 name = "dependency-audit"
-run = "pip-audit --progress-spinner off"
+run = "cargo audit --file native/forge/Cargo.lock"
 timeout_s = 600
 blocking = false                    # advisory: reported, never holds the ref
 ```

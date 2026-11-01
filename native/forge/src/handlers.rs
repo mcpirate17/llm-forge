@@ -1,66 +1,12 @@
-//! Extension point for native hook bodies.
-//!
-//! Every hook the Python registry matches for a Bash `PreToolUse` call
-//! (`src/tooling/hooks/dispatch/registry.py`) is wired into `registry()`:
-//! `crg_refresh_report_pre` (matcher `.*`, so it also fires for every other
-//! tool -- out of scope here, only its Bash contribution matters),
-//! `crg_gate_verify_bash`, `pre_bash` (command-position deny rules plus the
-//! impact-summary analyzer, `crate::bash_guard` and `crate::bash_impact` --
-//! `bash_impact` runs directly inside `PreBashGuard`, not as its own registry
-//! entry, mirroring how `adapters.pre_bash` calls `_bash_impact.main()` itself
-//! rather than through a separate `HookSpec`) and `current_work_guard_bash`.
-//! Plus `bash_write_targets`, an informational write-target extractor
-//! (`crate::write_targets`) with no Python-recognized name of its own --
-//! see `BashWriteTargets`'s own docs for why it folds into `pre_bash` instead.
-//!
-//! `bash_pretooluse_fully_native` is true once every one of the four real
-//! names above is opted in; `dispatch::run_hook` uses it to decide whether a
-//! Bash `PreToolUse` call can be answered without starting Python at all
-//! (`run_bash_pretooluse_fully_native`, which folds every handler's outcome
-//! together with `crate::merge`, exactly as Python's own `merge()` would).
-//! Short of that, `native_answers_for_bash` computes just the opted-in
-//! subset, each hook's own unmerged answer, for `dispatch::run_hook` to pass
-//! to the Python dispatcher via `FORGE_NATIVE_HOOKS`/`FORGE_NATIVE_ANSWERS` so
-//! it can splice them into its own per-hook outcome list at their normal
-//! registry position (`registry.native_answers`, `runner.dispatch`) instead of
-//! re-running their adapters -- so a hook body never runs twice, and Python's
-//! `merge()` still decides the final response whenever it still has hooks of
-//! its own left to run. This is opt-in only in the sense that
-//! `FORGE_NATIVE_HOOKS=""` (set to the empty string) is a documented escape
-//! hatch back to the pre-port, all-Python behaviour; unset means "use the
-//! native default", not "opt out" -- see `native_hook_names_from_env`.
-//!
-//! Read has the same full/partial contract with `READ_PRETOOLUSE_HOOK_NAMES`:
-//! the refresh report, current-work guard and whole-file read-size guard.
-//! Other tools without specialized registry gates need only the native
-//! refresh report; edit and graph tools are served by `crate::pre_edit`.
-//!
-//! `PostToolUse` lives in `crate::post_tool` (same registry, same
-//! env-var contract): the nine ported names splice partially like the Bash
-//! set above, and together they are *every* hook Python's registry matches
-//! for any `PostToolUse` call (the edit family included --
-//! `crg_graph_refresh`/`post_edit`/`obsidian_post_edit` are ported too), so
-//! `post_tool_use_fully_native` turns true for every tool and
-//! `dispatch::run_hook` answers the whole event without starting Python.
-//!
-//! `SessionStart` gets only the partial-splice treatment:
-//! `workspace_exposure_session` (the EXPOSED one-liner,
-//! `crate::workspace_hygiene`) is the only ported name, and there is
-//! deliberately no fully-native fast path for the event --
-//! `crg_refresh_report_session`, the legacy `session_start`/`session_handoff`
-//! shell bodies and `native_freshness` all still run in Python for every
-//! session start, so Python always starts and only this one body is skipped
-//! when forge has answered it.
+//! Native tool-hook registry and deterministic guard composition.
+//! Every matching guard runs; there is no interpreter delegation or partial opt-in.
 
 use anyhow::Result;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::env;
 
-pub use crate::post_tool::{
-    native_answers_for_post_tool_use, post_tool_use_fully_native, run_post_tooluse_fully_native,
-    POST_TOOL_USE_HOOK_NAMES,
-};
+pub use crate::post_tool::{run_post_tooluse_fully_native, POST_TOOL_USE_HOOK_NAMES};
 
 use crate::bash_guard;
 use crate::bash_impact;
@@ -370,22 +316,6 @@ pub const READ_PRETOOLUSE_HOOK_NAMES: [&str; 3] = [
     "pre_read_skeleton",
 ];
 
-pub fn read_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
-    READ_PRETOOLUSE_HOOK_NAMES
-        .iter()
-        .all(|name| native_hooks.contains(*name))
-}
-
-/// Preserve the dispatcher's camel-case alias without expanding other ports.
-pub fn is_read_payload(payload: &Value) -> bool {
-    payload
-        .get("tool_name")
-        .filter(|value| crate::pre_read::truthy(value))
-        .or_else(|| payload.get("toolName"))
-        .and_then(Value::as_str)
-        == Some("Read")
-}
-
 /// Conservative generic matcher: edit and graph tools have separate handlers.
 pub fn generic_pretooluse_tool(tool_name: &str) -> bool {
     !tool_name.is_empty()
@@ -393,41 +323,8 @@ pub fn generic_pretooluse_tool(tool_name: &str) -> bool {
             tool_name,
             "Bash" | "Agent" | "Read" | "Edit" | "Write" | "NotebookEdit"
         )
-        && ![
-            "mcp__code-review-graph__",
-            "mcp__code-review_graph__",
-            "mcp__code_review-graph__",
-            "mcp__code_review_graph__",
-        ]
-        .iter()
-        .any(|prefix| tool_name.starts_with(prefix))
-}
-
-pub fn generic_pretooluse_fully_native(tool_name: &str, native_hooks: &HashSet<String>) -> bool {
-    generic_pretooluse_tool(tool_name) && native_hooks.contains("crg_refresh_report_pre")
-}
-
-/// Failed native adapters remain for Python to execute on partial coverage,
-/// matching the existing Bash splice contract.
-pub fn native_answers_for_read(
-    payload: &Value,
-    native_hooks: &HashSet<String>,
-) -> HashMap<String, Value> {
-    let mut answers = HashMap::new();
-    if !is_read_payload(payload) {
-        return answers;
-    }
-    let handlers = registry();
-    for name in READ_PRETOOLUSE_HOOK_NAMES {
-        if native_hooks.contains(name) {
-            let handler =
-                find_handler(&handlers, name, "PreToolUse").expect("every Read hook is registered");
-            if let Ok(output) = handler.run(payload) {
-                answers.insert(name.to_string(), output);
-            }
-        }
-    }
-    answers
+        && !crate::pre_edit::is_edit_tool_name(tool_name)
+        && !crate::pre_edit::is_graph_tool_name(tool_name)
 }
 
 pub fn run_read_pretooluse_fully_native(payload: &Value) -> Value {
@@ -452,44 +349,9 @@ pub fn run_read_pretooluse_fully_native(payload: &Value) -> Value {
     merge::merge("PreToolUse", &outcomes)
 }
 
-/// The exact hook name, in the Python registry's own order, that a
-/// `SessionStart` call matches and this crate serves: the EXPOSED summary
-/// line. The event's other names (`crg_refresh_report_session`,
-/// `session_start`, `session_handoff`, `native_freshness`) are not ported;
-/// Python still runs them for every session start.
+/// Exposure handler retained for registry inspection; the native SessionStart
+/// composer includes the same line once through its preamble.
 pub const SESSIONSTART_HOOK_NAMES: [&str; 1] = ["workspace_exposure_session"];
-
-/// The `SessionStart` twin of `native_answers_for_post_tool_use`: the
-/// opted-in subset of `SESSIONSTART_HOOK_NAMES`, each hook's own unmerged
-/// answer. There is no "fully native" fast path for this event (see module
-/// docs); this only lets the Python dispatcher skip the one body this crate
-/// already answered. Unlike the tool events the answer needs no payload --
-/// the line depends on the checkout, not on the hook input.
-pub fn native_answers_for_session_start(native_hooks: &HashSet<String>) -> HashMap<String, Value> {
-    let mut answers = HashMap::new();
-    let handlers = registry();
-    for name in SESSIONSTART_HOOK_NAMES {
-        if !native_hooks.contains(name) {
-            continue;
-        }
-        let Some(handler) = find_handler(&handlers, name, "SessionStart") else {
-            continue;
-        };
-        if let Ok(value) = handler.run(&Value::Null) {
-            answers.insert(name.to_string(), value);
-        }
-    }
-    answers
-}
-
-/// True once every name in `BASH_PRETOOLUSE_HOOK_NAMES` is opted in: forge has
-/// full native coverage for a Bash `PreToolUse` call and `dispatch::run_hook`
-/// can answer it without starting Python at all.
-pub fn bash_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
-    BASH_PRETOOLUSE_HOOK_NAMES
-        .iter()
-        .all(|name| native_hooks.contains(*name))
-}
 
 /// The exact hook name, in the Python registry's own order, that an `Agent`
 /// `PreToolUse` call matches: `crg_refresh_report_pre` (matcher `.*`, which
@@ -498,15 +360,6 @@ pub fn bash_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
 /// its own, exactly like `bash_write_targets` above (see
 /// `route::AGENT_ROUTE_HOOK_NAME`'s docs).
 pub const AGENT_PRETOOLUSE_HOOK_NAMES: [&str; 1] = ["crg_refresh_report_pre"];
-
-/// True once `crg_refresh_report_pre` is opted in: forge has full native
-/// coverage for an `Agent` `PreToolUse` call and `dispatch::run_hook` can
-/// answer it -- routing decision included -- without starting Python at all.
-pub fn agent_pretooluse_fully_native(native_hooks: &HashSet<String>) -> bool {
-    AGENT_PRETOOLUSE_HOOK_NAMES
-        .iter()
-        .all(|name| native_hooks.contains(*name))
-}
 
 /// The final, fully-merged answer for an `Agent` `PreToolUse` call once
 /// `agent_pretooluse_fully_native` is true: `crate::route::hook_outcome_for_agent`
@@ -567,7 +420,7 @@ pub fn run_generic_pretooluse_fully_native(payload: &Value) -> Value {
 /// Python's registry actually recognizes; `"bash_write_targets"` gates
 /// forge's own additive telemetry handler and is a no-op name on the Python
 /// side (there is no such `HookSpec`).
-fn default_native_hook_names() -> HashSet<String> {
+pub fn default_native_hook_names() -> HashSet<String> {
     let mut names: HashSet<String> = BASH_PRETOOLUSE_HOOK_NAMES
         .iter()
         .map(|s| s.to_string())
@@ -579,25 +432,6 @@ fn default_native_hook_names() -> HashSet<String> {
     names.extend(POST_TOOL_USE_HOOK_NAMES.iter().map(|s| s.to_string()));
     names.extend(SESSIONSTART_HOOK_NAMES.iter().map(|s| s.to_string()));
     names
-}
-
-/// Parses `FORGE_NATIVE_HOOKS` (a comma-separated list of hook names, e.g.
-/// `"pre_bash"`) into the set of hook names forge should answer natively.
-/// Unset means "use the default" (`default_native_hook_names`) -- the native
-/// path is on by default. Set to the empty string is a deliberate escape
-/// hatch back to full, pre-port Python delegation (documented in the PR body
-/// and in `dispatch::run_hook`); set to any other value uses exactly the
-/// names given, trimmed, empties dropped -- mainly useful for tests that want
-/// to exercise one native handler without the other.
-pub fn native_hook_names_from_env() -> HashSet<String> {
-    match env::var("FORGE_NATIVE_HOOKS") {
-        Err(_) => default_native_hook_names(),
-        Ok(raw) => raw
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect(),
-    }
 }
 
 /// Folds `extra`'s `hookSpecificOutput.additionalContext` (if any) into
@@ -661,40 +495,6 @@ fn pre_bash_answer(
         }
     }
     Ok(answer)
-}
-
-/// Computes each opted-in native hook's own, unmerged answer for a Bash
-/// `PreToolUse` payload, keyed by its Python-recognized name -- for splicing
-/// into Python's own per-hook outcome list via `FORGE_NATIVE_ANSWERS`
-/// (`dispatch::run_hook`), one entry per name in `BASH_PRETOOLUSE_HOOK_NAMES`
-/// that `native_hooks` opts into. Empty for anything that isn't a Bash
-/// `PreToolUse` call, or when `native_hooks` opts into none of the four names
-/// (the `FORGE_NATIVE_HOOKS=""` escape hatch passes an empty set here).
-pub fn native_answers_for_bash(
-    payload: &Value,
-    native_hooks: &HashSet<String>,
-) -> HashMap<String, Value> {
-    let mut answers = HashMap::new();
-    if payload.get("tool_name").and_then(Value::as_str) != Some("Bash") {
-        return answers;
-    }
-    let handlers = registry();
-    for name in BASH_PRETOOLUSE_HOOK_NAMES {
-        if !native_hooks.contains(name) {
-            continue;
-        }
-        let computed = if name == "pre_bash" {
-            pre_bash_answer(&handlers, payload, native_hooks)
-        } else {
-            find_handler(&handlers, name, "PreToolUse")
-                .expect("every BASH_PRETOOLUSE_HOOK_NAMES entry is registered")
-                .run(payload)
-        };
-        if let Ok(value) = computed {
-            answers.insert(name.to_string(), value);
-        }
-    }
-    answers
 }
 
 /// The final, fully-merged answer for a Bash `PreToolUse` call once
@@ -763,24 +563,6 @@ pub(crate) mod tests {
         // Five Bash handlers, two additional Read handlers, nine PostToolUse
         // handlers and the SessionStart exposure line.
         assert_eq!(registry().len(), 17);
-        assert!(bash_pretooluse_fully_native(&all_four()));
-        let mut missing_one = all_four();
-        missing_one.remove("current_work_guard_bash");
-        assert!(!bash_pretooluse_fully_native(&missing_one));
-        assert!(!bash_pretooluse_fully_native(&HashSet::new()));
-    }
-
-    #[test]
-    fn env_parsing_trims_and_drops_empties() {
-        let _guard = ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        std::env::set_var("FORGE_NATIVE_HOOKS", " pre_bash ,, bash_write_targets");
-        let names = native_hook_names_from_env();
-        assert!(names.contains("pre_bash"));
-        assert!(names.contains("bash_write_targets"));
-        assert_eq!(names.len(), 2);
-        std::env::remove_var("FORGE_NATIVE_HOOKS");
     }
 
     #[test]
@@ -789,7 +571,7 @@ pub(crate) mod tests {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::env::remove_var("FORGE_NATIVE_HOOKS");
-        let names = native_hook_names_from_env();
+        let names = default_native_hook_names();
         for name in BASH_PRETOOLUSE_HOOK_NAMES {
             assert!(names.contains(name), "{name} missing from the default set");
         }
@@ -800,11 +582,10 @@ pub(crate) mod tests {
             assert!(names.contains(name), "{name} missing from the default set");
         }
         assert!(names.contains("bash_write_targets"));
-        assert!(bash_pretooluse_fully_native(&names));
     }
 
     #[test]
-    fn session_start_answers_carry_the_exposure_line_once_opted_in() {
+    fn session_exposure_handler_reports_local_state() {
         use std::process::Command;
 
         let _guard = ENV_LOCK
@@ -851,15 +632,12 @@ pub(crate) mod tests {
             .expect("git commit");
         std::env::set_var("CLAUDE_PROJECT_DIR", &dir);
 
-        let empty = HashSet::new();
-        assert!(native_answers_for_session_start(&empty).is_empty());
-        let mut opted_in = HashSet::new();
-        opted_in.insert("workspace_exposure_session".to_string());
-        let answers = native_answers_for_session_start(&opted_in);
+        let out = WorkspaceExposureSession
+            .run(&Value::Null)
+            .expect("exposure answer");
 
         std::env::remove_var("CLAUDE_PROJECT_DIR");
         std::fs::remove_dir_all(&dir).ok();
-        let out = answers.get("workspace_exposure_session").expect("answered");
         assert_eq!(
             out["hookSpecificOutput"]["hookEventName"],
             json!("SessionStart")
@@ -875,137 +653,6 @@ pub(crate) mod tests {
             ),
             "{line}"
         );
-    }
-
-    #[test]
-    fn env_set_empty_is_the_documented_escape_hatch() {
-        let _guard = ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        std::env::set_var("FORGE_NATIVE_HOOKS", "");
-        let names = native_hook_names_from_env();
-        assert!(names.is_empty());
-        assert!(!bash_pretooluse_fully_native(&names));
-        std::env::remove_var("FORGE_NATIVE_HOOKS");
-    }
-
-    #[test]
-    fn native_answers_denies_natively_only_when_opted_in() {
-        let payload =
-            json!({"tool_name": "Bash", "tool_input": {"command": "git push --force origin main"}});
-        let empty = HashSet::new();
-        assert!(native_answers_for_bash(&payload, &empty).is_empty());
-
-        let mut opted_in = HashSet::new();
-        opted_in.insert("pre_bash".to_string());
-        let answers = native_answers_for_bash(&payload, &opted_in);
-        let out = answers.get("pre_bash").expect("pre_bash answered");
-        assert_eq!(
-            out["hookSpecificOutput"]["permissionDecision"],
-            json!("deny")
-        );
-    }
-
-    #[test]
-    fn native_answers_answers_a_bare_allow_verdict_too() {
-        let payload = json!({"tool_name": "Bash", "tool_input": {"command": "echo hi"}});
-        let mut opted_in = HashSet::new();
-        opted_in.insert("pre_bash".to_string());
-        let answers = native_answers_for_bash(&payload, &opted_in);
-        let out = answers.get("pre_bash").expect("pre_bash answered");
-        assert_eq!(
-            out["hookSpecificOutput"]["permissionDecision"],
-            json!("allow")
-        );
-        assert!(out["hookSpecificOutput"]["additionalContext"].is_null());
-    }
-
-    #[test]
-    fn native_answers_answers_an_allow_with_impact_context() {
-        // `find ... -delete` (unlike `rm -rf`) isn't a bash_guard deny target,
-        // so a real directory here reaches `_bash_impact`'s soft_warn path --
-        // an allow verdict that also carries additionalContext.
-        let dir = std::env::temp_dir().join("forge_precheck_impact_test");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("f.txt"), b"data").unwrap();
-        let payload = json!({
-            "tool_name": "Bash",
-            "tool_input": {"command": format!("find {} -delete", dir.display())}
-        });
-        let mut opted_in = HashSet::new();
-        opted_in.insert("pre_bash".to_string());
-        let answers = native_answers_for_bash(&payload, &opted_in);
-        std::fs::remove_dir_all(&dir).ok();
-        let out = answers.get("pre_bash").expect("pre_bash answered");
-        assert_eq!(
-            out["hookSpecificOutput"]["permissionDecision"],
-            json!("allow")
-        );
-        assert!(out["hookSpecificOutput"]["additionalContext"]
-            .as_str()
-            .expect("impact context")
-            .contains("find -delete"));
-    }
-
-    #[test]
-    fn native_answers_ignores_non_bash_tools() {
-        let payload =
-            json!({"tool_name": "Write", "tool_input": {"file_path": "x", "content": "y"}});
-        let mut opted_in = HashSet::new();
-        opted_in.insert("pre_bash".to_string());
-        assert!(native_answers_for_bash(&payload, &opted_in).is_empty());
-    }
-
-    /// `rm`'s "dangerous target" deny rule only fires for targets outside the
-    /// invocation's own directory tree (absolute paths, `~`, `..`), so a denied
-    /// `rm` never has a repo-relative write target under the *real* project
-    /// root. To exercise the merge with a target that lands inside some repo
-    /// root, these two tests point `CLAUDE_PROJECT_DIR` (what
-    /// `interpreter::project_root` reads) at the command's own absolute
-    /// prefix. Mutates a process-wide env var like the pre-existing
-    /// `env_parsing_trims_and_drops_empties` test does; restored before return.
-    #[test]
-    fn native_answers_folds_write_targets_into_a_native_deny_when_both_opted_in() {
-        let _guard = ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        std::env::set_var("CLAUDE_PROJECT_DIR", "/home/tim");
-        let payload = json!({
-            "tool_name": "Bash",
-            "tool_input": {"command": "rm -rf /home/tim/stuff"}
-        });
-        let mut opted_in = HashSet::new();
-        opted_in.insert("pre_bash".to_string());
-        opted_in.insert("bash_write_targets".to_string());
-        let answers = native_answers_for_bash(&payload, &opted_in);
-        std::env::remove_var("CLAUDE_PROJECT_DIR");
-        let out = answers.get("pre_bash").expect("pre_bash answered");
-        assert_eq!(
-            out["hookSpecificOutput"]["permissionDecision"],
-            json!("deny")
-        );
-        let context = out["hookSpecificOutput"]["additionalContext"]
-            .as_str()
-            .expect("bash_write_targets context should be folded in");
-        assert!(context.contains("stuff"));
-    }
-
-    #[test]
-    fn native_answers_omits_write_targets_context_when_only_pre_bash_is_opted_in() {
-        let _guard = ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        std::env::set_var("CLAUDE_PROJECT_DIR", "/home/tim");
-        let payload = json!({
-            "tool_name": "Bash",
-            "tool_input": {"command": "rm -rf /home/tim/stuff"}
-        });
-        let mut opted_in = HashSet::new();
-        opted_in.insert("pre_bash".to_string());
-        let answers = native_answers_for_bash(&payload, &opted_in);
-        std::env::remove_var("CLAUDE_PROJECT_DIR");
-        let out = answers.get("pre_bash").expect("pre_bash answered");
-        assert!(out["hookSpecificOutput"]["additionalContext"].is_null());
     }
 
     #[test]

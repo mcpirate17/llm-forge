@@ -9,15 +9,18 @@
 //! argv and printing.
 
 use std::collections::BTreeSet;
+#[cfg(feature = "python")]
 use std::fs;
+#[cfg(feature = "python")]
 use std::path::PathBuf;
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::{PyDict, PyList};
 use tree_sitter::Node;
-
-use crate::engine::parse;
 
 /// A line-addressed rule violation, ordered the way the gate prints it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -712,15 +715,15 @@ fn scan_literal(source: &Source, node: Node, path: &str, out: &mut Vec<Finding>)
 
 /// Walk the tree once, dispatching each node to the rules that care about it.
 pub fn scan_source(path: &str, source_text: &str) -> Result<Vec<Finding>, String> {
-    let tree =
-        parse(source_text).ok_or_else(|| format!("{path}: could not be parsed as Python"))?;
-    // tree-sitter is error-tolerant: it hands back a tree with ERROR nodes
-    // rather than refusing. Walking that tree would report no findings for the
-    // one file most likely to be broken, which is a pass this check must never
-    // give.
-    if tree.root_node().has_error() {
-        return Err(format!("{path}: is not valid Python"));
-    }
+    let parsed =
+        crate::source::PythonSource::new(source_text).map_err(|e| format!("{path}: {e}"))?;
+    Ok(scan_parsed(path, &parsed))
+}
+
+/// Reuse a source whose native ASTs have already been validated.
+pub fn scan_parsed(path: &str, parsed: &crate::source::PythonSource<'_>) -> Vec<Finding> {
+    let source_text = parsed.text();
+    let tree = parsed.tree();
     let source = Source::new(source_text);
     let mut findings = Vec::new();
     let mut comments = Vec::new();
@@ -747,13 +750,14 @@ pub fn scan_source(path: &str, source_text: &str) -> Result<Vec<Finding>, String
     comments.sort_by_key(|n| n.start_byte());
     scan_comments(&source, &comments, path, &mut findings);
     findings.sort();
-    Ok(findings)
+    findings
 }
 
 /// Scan Python files and return one dict per finding.
 ///
 /// `repo`, when given, is stripped from each path so findings are addressed the
 /// way the gate and a reviewer both name files.
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (paths, repo=None))]
 pub fn style_scan_files(
@@ -804,7 +808,7 @@ pub fn style_scan_files(
 
 /// Every rule this module can emit, so the CLI can document itself and a test
 /// can prove the list and the implementation have not drifted apart.
-#[pyfunction]
+#[cfg_attr(feature = "python", pyo3::pyfunction)]
 pub fn style_scan_rules() -> Vec<&'static str> {
     vec![
         "comment/change-meta",

@@ -10,7 +10,8 @@ use crate::ownership::{self, OwnershipClaim};
 use crate::session_policy::load_session_policy;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+use std::io::{BufReader, Read};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 /// Python's dataclass field order is the JSON key order; serde_json's
@@ -35,15 +36,34 @@ pub struct ActiveState {
 
 /// First `limit` `## ` headings of `.current_work.md`, skipping "Active
 /// Coordination" (case-insensitive) -- the always-present section header is
-/// noise in a token-conscious inject. A missing or unreadable file is an
-/// empty list, never an error: the inject must survive a half-cloned repo.
-pub fn parse_top_headings(current_work: &Path, limit: usize) -> Vec<String> {
-    let Ok(text) = std::fs::read_to_string(current_work) else {
-        return Vec::new();
+/// noise in a token-conscious inject. Missing is empty; invalid input fails
+/// explicitly. Stop at the requested heading count without loading the body.
+pub fn parse_top_headings(current_work: &Path, limit: usize) -> Result<Vec<String>> {
+    anyhow::ensure!(limit <= 4, "at most four active headings may be read");
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+    let file = match std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(current_work)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error.into()),
     };
+    anyhow::ensure!(
+        file.metadata()?.is_file(),
+        "heading source must be a regular file"
+    );
+    let mut reader = BufReader::new(file.take(1024 * 1024 + 1));
+    let mut line = Vec::new();
+    let mut consumed = 0;
     let mut headings = Vec::new();
-    for line in text.lines() {
-        let line = line.trim();
+    while conductor_native::bounded_io::read_line(&mut reader, &mut line, 8192)? != 0 {
+        consumed += line.len();
+        anyhow::ensure!(consumed <= 1024 * 1024, "heading scan exceeds 1 MiB");
+        let line = std::str::from_utf8(&line)?.trim();
         let Some(rest) = line.strip_prefix("##") else {
             continue;
         };
@@ -52,7 +72,7 @@ pub fn parse_top_headings(current_work: &Path, limit: usize) -> Vec<String> {
             continue;
         }
         let heading = rest.trim();
-        if heading.to_lowercase() == "active coordination" {
+        if heading.is_empty() || heading.eq_ignore_ascii_case("active coordination") {
             continue;
         }
         headings.push(heading.to_owned());
@@ -60,7 +80,7 @@ pub fn parse_top_headings(current_work: &Path, limit: usize) -> Vec<String> {
             break;
         }
     }
-    headings
+    Ok(headings)
 }
 
 /// Unexpired claims from the governance ownership store, as the state JSON
@@ -88,7 +108,7 @@ fn active_claim(claim: &OwnershipClaim) -> ActiveClaim {
 }
 
 pub fn generate_active_state(repo: &Path) -> Result<ActiveState> {
-    let headings = parse_top_headings(&repo.join(".current_work.md"), 4);
+    let headings = parse_top_headings(&repo.join(".current_work.md"), 4)?;
     let active_claims = parse_active_claims(repo).map_err(anyhow::Error::from)?;
     let policy = load_session_policy(repo).map_err(|err| anyhow::anyhow!("{err}"))?;
     Ok(ActiveState {
@@ -142,35 +162,12 @@ pub fn validate_active_state(state: &ActiveState, now: f64) -> Result<(), String
 /// `tempfile.mkstemp` + `os.replace` in the Python. Readers either see the
 /// previous snapshot or the new one, never a torn write.
 pub fn write_state_atomic(path: &Path, state: &ActiveState) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         std::fs::create_dir_all(parent)?;
     }
     let mut payload = serde_json::to_string_pretty(state).expect("plain data always serializes");
     payload.push('\n');
-    let temp = path.parent().unwrap_or(Path::new(".")).join(format!(
-        ".{}.{}.tmp",
-        path.file_name()
-            .map(|name| name.to_string_lossy())
-            .unwrap_or_default(),
-        std::process::id()
-    ));
-    let outcome = (|| -> std::io::Result<()> {
-        let mut file = std::fs::File::create(&temp)?;
-        file.write_all(payload.as_bytes())?;
-        file.sync_all()?;
-        drop(file);
-        std::fs::rename(&temp, path)?;
-        if let Some(parent) = path.parent() {
-            if let Ok(dir) = std::fs::File::open(parent) {
-                dir.sync_all()?;
-            }
-        }
-        Ok(())
-    })();
-    if outcome.is_err() {
-        let _ = std::fs::remove_file(&temp);
-    }
-    outcome
+    crate::state_publish::publish(path, payload.as_bytes())
 }
 
 /// Generate, validate, and atomically write `conductor/active_state.json`.
@@ -254,11 +251,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            parse_top_headings(&work, 4),
+            parse_top_headings(&work, 4).unwrap(),
             vec!["First", "Second", "Third", "Fourth"],
             "both casings of the coordination header are skipped and the limit holds"
         );
-        assert!(parse_top_headings(&scratch.path().join("missing.md"), 4).is_empty());
+        assert!(parse_top_headings(&scratch.path().join("missing.md"), 4)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

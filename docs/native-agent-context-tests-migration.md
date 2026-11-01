@@ -88,30 +88,30 @@ The retention eligibility and transaction logic has separate Forge native
 coverage in `native/forge/tests/mailbox_retention.rs`. This Python boundary
 target passed 4/4 tests with the pinned offline Cargo and PyO3 environment.
 
-## Completed: A2A supervisor lifecycle
+## Native A2A supervisor lifecycle
 
-| Retired Python case | Rust contract | Preserved behavior |
-| --- | --- | --- |
-| `test_a2a_supervisor.py::test_supervisor_finishes_at_budget_with_durable_state` | `python_contracts_agent_a2a_supervisor::supervisor_finishes_at_budget_with_durable_state` | Two bounded cycles, exact remaining budgets, durable final JSON state |
-| `test_a2a_supervisor.py::test_supervisor_does_not_stop_existing_endpoint` | `python_contracts_agent_a2a_supervisor::supervisor_never_stops_an_existing_endpoint` | A healthy existing endpoint is not stopped during finite supervision |
-| `test_a2a_supervisor.py::test_supervisor_stops_owned_endpoint_even_when_flush_fails` | `python_contracts_agent_a2a_supervisor::owned_endpoint_is_stopped_and_failure_state_is_durable` | Owned child stopped after flush error, typed error preserved, failure state written |
-| `test_a2a_supervisor.py::test_flush_timeout_is_bounded_and_preserves_retry_evidence` | `python_contracts_agent_a2a_supervisor::flush_timeout_is_bounded_and_preserves_retry_evidence` | Subprocess timeout bounded by remaining budget, max message flag, retry status |
-| `test_a2a_supervisor.py::test_supervisor_rejects_duplicate_owner_and_invalid_budget` | `python_contracts_agent_a2a_supervisor::duplicate_lease_and_invalid_duration_fail_before_work` | Duplicate lease and NaN duration rejected before work |
+`forge mailbox supervise` replaces the interpreted supervisor. Its former
+PyO3 contract target and Python implementation have been deleted. Ten integration
+tests in `native/forge/tests/native_mailbox_supervisor.rs` exercise real native
+children and disposable local endpoints: finite expiry, private durable state,
+lease exclusion, argument validation, existing versus owned receiver lifetimes,
+SIGINT/SIGTERM during flush and receiver readiness, restart budgets, deadline
+cancellation under SQLite contention, inotify delivery after an idle period,
+queue preservation and unsafe state-path refusal. The transport suite separately
+checks explicit sender-lock deferral without consuming queued work. These tests
+need no interpreter and send no messages to registered external agents.
 
-The focused supervisor target passed 5/5 tests with the pinned offline Cargo
-and PyO3 environment; no endpoint was launched.
+## Native presentation and explicit source context
 
-## Completed: A2A graph context
+The Python watch, Linux wait wrapper, automatic graph attachment and their two
+compatibility targets have been deleted. Eight integration tests in
+`native/forge/tests/native_mailbox_watch.rs` verify bounded batches, presentation
+versus read state, supersession, explicit replay, signal cancellation, consumer
+leases, backpressure, regular-file output and unsafe input refusal using native
+processes. Two mixed wrapper tests in `python_contracts_agent_a2a.rs` were
+retired after those behaviors moved to the native suite.
 
-| Retired Python case | Rust contract | Preserved behavior |
-| --- | --- | --- |
-| `test_a2a_graph_context.py::test_extract_context_refs_is_repo_bounded_deduplicated_and_limited` | `python_contracts_agent_a2a_graph_context::refs_are_repo_bounded_deduplicated_and_limited` | Reject outside path, retain first two file references, deduplicate message IDs |
-| `test_a2a_graph_context.py::test_bounded_context_requests_graph_and_includes_ast_relationships` | `python_contracts_agent_a2a_graph_context::bounded_context_requests_graph_and_includes_ast_relationships` | Graph lookup arguments, AST text, callers and callees in context envelope |
-| `test_a2a_graph_context.py::test_bounded_context_enforces_serialized_budget_and_omits_raw_body` | `python_contracts_agent_a2a_graph_context::serialized_budget_excludes_raw_message_and_bounds_large_graph` | Large graph and AST fit compact JSON within 320 characters; raw body absent |
-| `test_a2a_graph_context.py::test_store_context_fragments_are_scan_bounded` | `python_contracts_agent_a2a_graph_context::store_fragments_scan_only_bounded_prefixes` | Native-backed inbound store yields only 256-character body/data prefixes |
-| `test_a2a_graph_context.py::test_watch_once_attaches_code_context_and_marks_presentation` | `python_contracts_agent_a2a_graph_context::watch_once_attaches_context_and_marks_presentation` | CLI emits AST context once and marks the message presented |
-| `test_a2a_graph_context.py::test_no_reference_avoids_graph_lookup` | `python_contracts_agent_a2a_graph_context::no_reference_avoids_graph_lookup` | Empty context without a graph request when no concrete reference exists |
-
-The focused Rust target passed 6/6 with the pinned offline Cargo and PyO3
-environment. The original Python watch case also passed during investigation of
-the Rust output-capture fixture; the fixture now truncates its buffer correctly.
+Source-context retrieval is an explicit operation through `forge graph refs`
+or `forge code inspect`. `native/forge/tests/graph_context.rs` covers contained
+references, deduplication, output bounds, symbol context, directed graph edges
+and invalid source handling. Watch no longer reads referenced source implicitly.

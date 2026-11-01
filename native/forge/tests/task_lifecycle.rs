@@ -2,8 +2,7 @@
 
 mod support;
 
-#[path = "../src/task_store.rs"]
-mod task_store;
+use forge::task_store;
 
 use serde_json::{json, Value};
 use std::path::Path;

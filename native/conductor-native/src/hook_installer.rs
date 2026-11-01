@@ -1,8 +1,7 @@
 //! Provider-hook config merge rules for the portable A2A session-start installer.
 //!
-//! The Python boundary owns the filesystem, atomic writes and the CLI. Rust owns
-//! the pure decision core: POSIX-ish shlex tokenizing/quoting, managed-hook
-//! detection, the hook-tree transform, and the install merge.
+//! Rust exposes the pure hook-tree transform to the native installer. Optional
+//! Python bindings retain the earlier package entry points during migration.
 
 #[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
@@ -10,7 +9,6 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use serde_json::Map;
-#[cfg(any(feature = "python", test))]
 use serde_json::Value;
 
 fn shlex_whitespace(c: char) -> bool {
@@ -118,6 +116,15 @@ fn is_managed_hook(value: &Value, managed_module: &str) -> bool {
 /// Mirror ``hook_installer._without_managed_hooks``.
 #[cfg(any(feature = "python", test))]
 fn without_managed_hooks(config: &mut Value, managed_module: &str) -> Result<(), String> {
+    retain_hook_commands(config, |command| !is_managed_hook(command, managed_module))
+}
+
+/// Remove selected commands while preserving unrelated commands and group metadata.
+/// This performs no I/O and never interprets command text as executable code.
+pub fn retain_hook_commands(
+    config: &mut Value,
+    keep: impl Fn(&Value) -> bool,
+) -> Result<(), String> {
     let root_is_object = config.is_object();
     if !root_is_object {
         return Err("provider config root must be a JSON object".to_owned());
@@ -129,12 +136,16 @@ fn without_managed_hooks(config: &mut Value, managed_module: &str) -> Result<(),
         return Err("top-level 'hooks' must be a JSON object".to_owned());
     }
     let hooks_object = hooks.as_object_mut().expect("checked object");
+    let mut changed = false;
     let events: Vec<String> = hooks_object.keys().cloned().collect();
     for event in events {
         let groups = hooks_object.get_mut(&event).expect("key from keys()");
         let Some(groups_list) = groups.as_array_mut() else {
             return Err(format!("hooks.{event} must be a JSON array"));
         };
+        if groups_list.is_empty() {
+            continue;
+        }
         let mut kept_groups: Vec<Value> = Vec::new();
         for group in groups_list.iter() {
             let Some(group_object) = group.as_object() else {
@@ -147,9 +158,14 @@ fn without_managed_hooks(config: &mut Value, managed_module: &str) -> Result<(),
             };
             let kept_commands: Vec<Value> = commands
                 .iter()
-                .filter(|command| !is_managed_hook(command, managed_module))
+                .filter(|command| keep(command))
                 .cloned()
                 .collect();
+            if kept_commands.len() == commands.len() {
+                kept_groups.push(group.clone());
+                continue;
+            }
+            changed = true;
             if !kept_commands.is_empty() {
                 let mut new_group = group.clone();
                 if let Some(slot) = new_group
@@ -179,7 +195,7 @@ fn without_managed_hooks(config: &mut Value, managed_module: &str) -> Result<(),
             hooks_object.insert(event, Value::Array(kept_groups));
         }
     }
-    if hooks_object.is_empty() {
+    if changed && hooks_object.is_empty() {
         if let Some(root) = config.as_object_mut() {
             root.remove("hooks");
         }
@@ -315,6 +331,18 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_transform_preserves_unrelated_empty_groups_and_metadata() {
+        for mut config in [
+            serde_json::json!({"hooks":{}}),
+            serde_json::json!({"hooks":{"Custom":[],"SessionStart":[{"hooks":[],"custom":1}]}}),
+        ] {
+            let before = config.clone();
+            retain_hook_commands(&mut config, |_| true).unwrap();
+            assert_eq!(config, before);
+        }
+    }
 
     #[test]
     fn split_matches_posix_quoting_rules() {

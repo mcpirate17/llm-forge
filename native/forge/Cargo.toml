@@ -8,30 +8,69 @@ description = "Native hooks, resource-aware task execution, audit and cost tooli
 name = "forge"
 path = "src/main.rs"
 
+[[bench]]
+name = "tool_schema"
+harness = false
+
+[[bench]]
+name = "code_tools"
+harness = false
+
+[[bench]]
+name = "process_io"
+harness = false
+
+[[bench]]
+name = "harness"
+harness = false
+
+[[bench]]
+name = "context"
+harness = false
+
+[[bench]]
+name = "lifecycle"
+harness = false
+
+[[bench]]
+name = "code_index"
+harness = false
+
 [dependencies]
 axum = { version = "0.8", default-features = false, features = ["tokio", "http1", "json"] }
-tokio = { version = "1", features = ["rt", "macros", "net", "time", "sync", "signal"] }
+tokio = { version = "1.53.3", features = ["rt", "macros", "net", "time", "sync", "signal", "fs", "io-util"] }
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+# Schema bounds must retain exact decimals independently of transitive features.
+serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order", "float_roundtrip", "raw_value"] }
 anyhow = "1"
+base64 = "0.22"
+cap-std = "4"
+slop-core = { path = "../slop-core", default-features = false }
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 regex = "1"
 walkdir = "2"
 ureq = { version = "3", default-features = false }
 sha2 = "0.10"
 libc = "0.2"
+landlock = "0.4.7"
 toml = "0.8"
+# Native, offline tokenization only; no HTTP client, Python binding or trainer UI.
+tokenizers = { version = "=0.23.2", default-features = false, features = ["fancy-regex"] }
 # `bundled` vendors and builds sqlite3 (no system libsqlite3 dependency);
 # `bundled` alone compiles FTS5 in on modern rusqlite/libsqlite3-sys, but
 # `fts5` is pinned explicitly so a future rusqlite bump can't silently drop
 # it -- `forge notes index|search` (notes_index.rs) needs FTS5 and its own
 # `fts5_is_available` test fails loud if it is ever missing.
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled", "hooks", "limits"] }
 # Share the native plan, receipt and shell-argument algorithms without building
 # Python bindings or requiring interpreter discovery during a Forge build.
-conductor-native = { path = "../conductor-native", default-features = false, features = ["source-analysis", "bundled-sqlite"] }
+conductor-native = { path = "../conductor-native", default-features = false, features = ["source-analysis", "vector-search", "bundled-sqlite"] }
 
 [profile.release]
 opt-level = 3
 lto = "thin"
 codegen-units = 1
+
+[build-dependencies]
+sha2 = "0.10"

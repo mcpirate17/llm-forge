@@ -4,16 +4,16 @@
 //! the ideal moment to roll it up into the ledger. This module runs
 //! `forge ledger rollup` (this same binary, re-invoked as a child so the 2 s
 //! bound is a real kill, not a hope) over the ending session's transcript
-//! path plus the telemetry directory `hook_rollup` reads, then hands the
-//! event to the Python dispatcher exactly as before -- SessionEnd owns no
-//! verdict, so the rollup is best-effort: every failure goes to stderr and
-//! the hook's exit code stays whatever the dispatcher says.
+//! path plus the telemetry directory `hook_rollup` reads. A separate bounded
+//! native child publishes the journal. SessionEnd owns no verdict: failures
+//! are reported on stderr and incomplete journal records remain for retry.
 //!
 //! `FORGE_LEDGER_DISABLE=1` skips the rollup entirely (the escape hatch for
 //! a broken ledger root or a machine where the write must not happen); the
 //! hook itself still runs unchanged.
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -28,9 +28,14 @@ const ROLLOUP_TIMEOUT: Duration = Duration::from_secs(2);
 /// The PostToolUse telemetry file's directory (`hook_rollup`'s input), or
 /// `None` when no telemetry directory exists -- nothing to roll up.
 fn telemetry_dir() -> Option<PathBuf> {
-    let dir = crate::context_telemetry::telemetry_path()
-        .parent()?
-        .to_path_buf();
+    let path = match crate::context_telemetry::telemetry_path() {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("forge: session telemetry storage unavailable: {error}");
+            return None;
+        }
+    };
+    let dir = path.parent()?.to_path_buf();
     dir.is_dir().then_some(dir)
 }
 
@@ -70,6 +75,33 @@ fn run_rollup_child(transcript: &Path) -> Result<()> {
         args.push(dir.display().to_string());
     }
     run_bounded(&args, ROLLOUP_TIMEOUT, "forge ledger rollup")
+}
+
+/// Journal I/O and libgit2 status scanning cannot delay shutdown indefinitely.
+/// The child receives the original validated JSON through a bounded pipe pump.
+pub fn journal_ending_session(payload: &str) {
+    if let Err(error) = run_journal_child(payload) {
+        eprintln!("forge: session-end journal failed: {error:#}");
+    }
+}
+
+fn run_journal_child(payload: &str) -> Result<()> {
+    let mut command = Command::new(std::env::current_exe()?);
+    command.args(["session", "journal", "--host"]);
+    command.arg(crate::interpreter::project_root());
+    let output = forge::process_probe::run_with_input(
+        &mut command,
+        payload.as_bytes(),
+        Duration::from_secs(3),
+        64 * 1024,
+    )?;
+    anyhow::ensure!(
+        output.status.success(),
+        "journal exited {}: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1,16 +1,24 @@
 //! The gate's contract: every target is measured or says why not, a finding is filed
 //! by what it means, and the report and check read the same summary.
 
-use crate::gate::{gate, Measured, Summary, Target};
+#[cfg(feature = "python")]
+use crate::gate::{gate, Target};
 use crate::gate_report::{check_findings, findings, metrics, render, sci, write_artifact};
+#[cfg(feature = "python")]
+use crate::gate_types::Measured;
+use crate::gate_types::Summary;
 use crate::index_tests::Tree;
 use serde_json::{json, Value};
+#[cfg(feature = "python")]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(feature = "python")]
 use std::path::Path;
+#[cfg(feature = "python")]
 use std::time::Duration;
 
 /// A stand-in interpreter: `<module>.report` is the report it writes, and a few
 /// module names misbehave the ways a real child can.
+#[cfg(feature = "python")]
 const FAKE_PYTHON: &str = r#"#!/bin/sh
 module=$3
 report=
@@ -29,6 +37,7 @@ case "$module" in
 esac
 "#;
 
+#[cfg(feature = "python")]
 fn tree(tag: &str) -> (Tree, String) {
     let tree = Tree::new(&format!("gate-{tag}"));
     tree.write("fake-python", FAKE_PYTHON);
@@ -51,6 +60,7 @@ fn finding(qualname: &str, verdict: &str, line: usize) -> Value {
     })
 }
 
+#[cfg(feature = "python")]
 fn report(tree: &Tree, module: &str, findings: &[Value]) {
     tree.write(
         &format!("{module}.report"),
@@ -58,11 +68,13 @@ fn report(tree: &Tree, module: &str, findings: &[Value]) {
     );
 }
 
+#[cfg(feature = "python")]
 fn unit(qualname: &str, line: usize, tests: &[&str]) -> (String, usize, Vec<String>) {
     let tests = tests.iter().map(|test| test.to_string()).collect();
     (qualname.to_owned(), line, tests)
 }
 
+#[cfg(feature = "python")]
 fn run(tree: &Tree, python: &str, targets: &[Target]) -> Summary {
     gate(
         tree.path(),
@@ -75,6 +87,7 @@ fn run(tree: &Tree, python: &str, targets: &[Target]) -> Summary {
     .unwrap()
 }
 
+#[cfg(feature = "python")]
 fn verdicts(findings: &[Value]) -> Vec<(&str, &str)> {
     findings
         .iter()
@@ -87,6 +100,7 @@ fn verdicts(findings: &[Value]) -> Vec<(&str, &str)> {
         .collect()
 }
 
+#[cfg(feature = "python")]
 fn leftovers(root: &Path) -> Vec<String> {
     std::fs::read_dir(root)
         .unwrap()
@@ -95,6 +109,7 @@ fn leftovers(root: &Path) -> Vec<String> {
         .collect()
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn a_module_is_probed_with_its_units_drivers_and_only_its_units() {
     let (tree, python) = tree("record");
@@ -137,6 +152,7 @@ fn a_module_is_probed_with_its_units_drivers_and_only_its_units() {
     assert!(leftovers(tree.path()).is_empty());
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn a_unit_no_recorded_test_ran_is_a_hole_in_the_record() {
     // Its module's other units bring the drivers, so it is probed, but nothing recorded
@@ -161,6 +177,7 @@ fn a_unit_no_recorded_test_ran_is_a_hole_in_the_record() {
     assert_eq!(metrics(&summary)["untested_unrecorded"], 1);
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn a_unit_refused_for_its_drivers_time_is_incomplete_and_the_rest_is_probed() {
     let (tree, python) = tree("refused");
@@ -197,6 +214,7 @@ fn a_unit_refused_for_its_drivers_time_is_incomplete_and_the_rest_is_probed() {
         .contains("INCOMPLETE [over_budget] good.py::g  its driver takes 140.0s\n"));
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn a_whole_module_is_measured_whole() {
     let (tree, python) = tree("whole");
@@ -221,6 +239,7 @@ fn a_whole_module_is_measured_whole() {
     assert_eq!(summary.live, 1);
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn a_child_that_times_out_fails_or_writes_no_report_is_incomplete_not_clean() {
     let (tree, python) = tree("broken");
@@ -272,6 +291,7 @@ fn a_child_that_times_out_fails_or_writes_no_report_is_incomplete_not_clean() {
     assert!(leftovers(tree.path()).is_empty());
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn a_unit_with_ablations_the_report_never_mentions_is_unreported() {
     let (tree, python) = tree("unreported");
@@ -292,6 +312,7 @@ fn a_unit_with_ablations_the_report_never_mentions_is_unreported() {
     assert_eq!(summary.modules_probed, 1);
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn a_module_no_recorded_test_ran_is_driven_by_the_test_files_importing_it() {
     let (tree, python) = tree("index");
@@ -338,6 +359,7 @@ fn a_module_no_recorded_test_ran_is_driven_by_the_test_files_importing_it() {
     assert_eq!(summary.unreached[0]["drivers_source"], "index");
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn a_module_nothing_drives_is_reported_without_drivers() {
     let (tree, python) = tree("undriven");
@@ -350,6 +372,7 @@ fn a_module_nothing_drives_is_reported_without_drivers() {
     assert_eq!(summary.modules_probed, 0);
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn a_waiver_moves_a_blocking_finding_to_advisory_and_says_so() {
     let (tree, python) = tree("waived");
@@ -392,6 +415,7 @@ fn a_waiver_moves_a_blocking_finding_to_advisory_and_says_so() {
     .is_err());
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn an_unknown_verdict_fails_the_run() {
     let (tree, python) = tree("unknown");
@@ -414,6 +438,7 @@ fn an_unknown_verdict_fails_the_run() {
     assert!(format!("{error:#}").contains("SOMETHING_NEW"), "{error:#}");
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn zero_jobs_is_an_error_not_a_hang() {
     let (tree, python) = tree("zero");
@@ -533,6 +558,7 @@ fn a_blocking_finding_without_its_measurement_fails_loud() {
     assert!(render(&summary).is_err());
 }
 
+#[cfg(feature = "python")]
 #[test]
 fn an_incomparable_difference_is_measured_and_reported_as_inf() {
     // The probe names a difference it cannot compare "inf": JSON has no infinity.

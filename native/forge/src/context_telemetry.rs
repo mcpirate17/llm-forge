@@ -16,18 +16,20 @@
 //!
 //! `record()`'s failure discipline ports with it: an unwritable sink never
 //! raises into hook dispatch and never writes to stdout -- it prints one
-//! stderr line and best-effort records a `telemetry_disabled` event. Python
+//! stderr line without recursively writing another event to the failing sink. Python
 //! additionally latches a process-global `_disabled` flag after the first
 //! failure; each forge invocation is one short-lived process answering one
 //! hook, so the latch would never be observed and is not carried over.
 
-use std::fs::{self, OpenOptions};
-use std::io::{self, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
+use std::io;
+use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::os::unix::io::AsRawFd;
+#[path = "context_telemetry_store.rs"]
+mod store;
 
 use crate::instant;
 
@@ -43,35 +45,8 @@ pub const MAX_LOG_BYTES: u64 = 10 * 1024 * 1024;
 /// `MAX_ROTATED_LOGS`: rotations pruned back to the newest five.
 pub const MAX_ROTATED_LOGS: usize = 5;
 
-/// `adapters._telemetry_path`: `CONTEXT_TELEMETRY_PATH` when set, else the
-/// module's `DEFAULT_PATH`. The default used to live inside the checkout
-/// (`<root>/src/research/tmp/...`, an inherited defect from PR #36's port)
-/// -- it now lives under the ledger root (`<ledger_root>/telemetry/...`,
-/// `LEDGER_ROOT` env var else `/mnt/data/llm/ledger/`), the same root
-/// `forge ledger rollup` writes to, so the SessionEnd rollup finds the
-/// telemetry beside the tables it feeds (`hook_rollup`) and no hook ever
-/// writes inside a read-only checkout. Native and Python records still land
-/// in one file: both twins resolve this exact shape.
-pub fn telemetry_path() -> PathBuf {
-    if let Ok(raw) = std::env::var("CONTEXT_TELEMETRY_PATH") {
-        return PathBuf::from(raw);
-    }
-    ledger_root()
-        .join("telemetry")
-        .join("context_telemetry")
-        .join("events.jsonl")
-}
-
-/// `LEDGER_ROOT` env var else the same default `forge ledger rollup`
-/// (`ledger::rollup::DEFAULT_LEDGER_ROOT`) uses -- duplicated rather than
-/// imported for the same reason the civil-calendar helpers are: this module
-/// is compiled standalone via `#[path]` in the integration tests.
-fn ledger_root() -> PathBuf {
-    std::env::var("LEDGER_ROOT")
-        .ok()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/mnt/data/llm/ledger"))
-}
+/// Share persistent state resolution across CLI, telemetry and context recovery.
+pub use conductor_native::state_paths::telemetry_path;
 
 /// `context_telemetry.provider()`: which harness family is recording, by
 /// signature env vars, checked in the extension's fixed order.
@@ -653,190 +628,18 @@ pub fn hook_context_line(
 
 // ── The writer ────────────────────────────────────────────────────────────
 
-fn flock_exclusive(file: &std::fs::File, nonblocking: bool) -> io::Result<bool> {
-    let mode = if nonblocking {
-        libc::LOCK_EX | libc::LOCK_NB
-    } else {
-        libc::LOCK_EX
-    };
-    let rc = unsafe { libc::flock(file.as_raw_fd(), mode) };
-    if rc == 0 {
-        return Ok(true);
-    }
-    let err = io::Error::last_os_error();
-    if nonblocking && err.raw_os_error() == Some(libc::EWOULDBLOCK) {
-        return Ok(false); // held elsewhere: an answer, not a failure
-    }
-    Err(err)
+/// Write one record or return a storage error to the caller.
+pub fn record_encoded_result(path: &Path, encoded: &[u8]) -> io::Result<()> {
+    store::record(path, encoded, MAX_LOG_BYTES, MAX_ROTATED_LOGS)
 }
 
-fn flock_unlock(file: &std::fs::File) {
-    unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_UN) };
-}
-
-/// `append_bytes`: create the parent, open for append, and under an exclusive
-/// `flock` either append (true) or refuse past `MAX_LOG_BYTES` (false).
-fn append_bytes(path: &Path, encoded: &[u8]) -> io::Result<bool> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let mut file = OpenOptions::new()
-        .create(true)
-        .read(true)
-        .append(true)
-        .open(path)?;
-    flock_exclusive(&file, false)?;
-    let result: io::Result<bool> = (|| {
-        let length = file.seek(SeekFrom::End(0))?;
-        if length.saturating_add(encoded.len() as u64) > MAX_LOG_BYTES {
-            return Ok(false);
-        }
-        let mut writer = &file;
-        writer.write_all(encoded)?;
-        writer.flush()?;
-        Ok(true)
-    })();
-    flock_unlock(&file);
-    result
-}
-
-/// `_rotated_name`: `events.jsonl` at `stamp` becomes `events.<stamp>.jsonl`.
-fn rotated_name(path: &Path, stamp: &str) -> PathBuf {
-    let suffix = path
-        .extension()
-        .map(|e| format!(".{}", e.to_string_lossy()))
-        .unwrap_or_default();
-    let stem = path
-        .file_stem()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let name = if suffix.is_empty() {
-        format!("{stem}.{stamp}")
-    } else {
-        format!("{stem}.{stamp}{suffix}")
-    };
-    path.with_file_name(name)
-}
-
-/// `_unique_target`: a same-second collision disambiguates with `-2`, `-3`...
-fn unique_target(target: PathBuf) -> PathBuf {
-    if !target.exists() {
-        return target;
-    }
-    let stem = target
-        .file_stem()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let suffix = target
-        .extension()
-        .map(|e| format!(".{}", e.to_string_lossy()))
-        .unwrap_or_default();
-    let parent = target.parent().map(Path::to_path_buf).unwrap_or_default();
-    let mut counter = 2u32;
-    loop {
-        let candidate = parent.join(format!("{stem}-{counter}{suffix}"));
-        if !candidate.exists() {
-            return candidate;
-        }
-        counter += 1;
-    }
-}
-
-/// `_prune_rotated`: delete the oldest rotations beyond the newest `keep`
-/// (by mtime, so a same-second rotation stays ordered).
-fn prune_rotated(path: &Path, keep: usize) {
-    let suffix = path
-        .extension()
-        .map(|e| format!(".{}", e.to_string_lossy()))
-        .unwrap_or_default();
-    let stem = path
-        .file_stem()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let Ok(entries) = fs::read_dir(path.parent().unwrap_or(path)) else {
-        return;
-    };
-    let mut rotated: Vec<(std::time::SystemTime, PathBuf)> = entries
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|candidate| candidate != path)
-        .filter(|candidate| {
-            candidate
-                .file_name()
-                .map(|n| {
-                    let name = n.to_string_lossy();
-                    name.starts_with(&format!("{stem}."))
-                        && (suffix.is_empty() || name.ends_with(&suffix))
-                })
-                .unwrap_or(false)
-        })
-        .filter_map(|candidate| {
-            let mtime = candidate.metadata().and_then(|meta| meta.modified()).ok()?;
-            Some((mtime, candidate))
-        })
-        .collect();
-    if rotated.len() <= keep {
-        return;
-    }
-    rotated.sort_by_key(|(mtime, _)| *mtime);
-    for (_, stale) in rotated.iter().take(rotated.len() - keep) {
-        let _ = fs::remove_file(stale);
-    }
-}
-
-/// `_mark_disabled`'s two stderr signals, without the process latch (see
-/// module docs). Never raises, never writes to stdout.
-fn mark_disabled(path: &Path, exc: &dyn std::fmt::Display) {
-    eprintln!(
-        "context telemetry disabled for this process: {} unwritable ({exc})",
-        path.display()
-    );
-    let mut line = LineBuilder::new();
-    let stamp = instant::isoformat_millis_utc(instant::now());
-    line.str_field("timestamp", &stamp);
-    line.int_field("pid", std::process::id() as u64);
-    line.str_field("provider", &provider());
-    line.str_field("event", "telemetry_disabled");
-    line.str_field("tool", "context_telemetry");
-    line.int_field("output_bytes", 0);
-    line.str_field("reason", &exc.to_string());
-    let mut encoded = line.finish();
-    encoded.push('\n');
-    if append_bytes(path, encoded.as_bytes()).is_err() {
-        eprintln!("context telemetry: could not record telemetry_disabled either: {exc}");
-    }
-}
-
-/// `record`: append while the log is under budget, else rotate (stamp-named
-/// sibling, pruned to `MAX_ROTATED_LOGS`) and append to the fresh log; any
-/// I/O failure degrades to `mark_disabled` instead of raising into the hook.
+/// Hook writes remain best-effort and report failure on stderr.
 pub fn record_encoded(path: &Path, encoded: &[u8]) {
-    match append_bytes(path, encoded) {
-        Ok(true) => {}
-        Ok(false) => {
-            let stamp = format!("{}Z", instant::format_compact_utc(instant::now()));
-            let target = unique_target(rotated_name(path, &stamp));
-            if let Err(err) = fs::rename(path, &target) {
-                mark_disabled(path, &err);
-                return;
-            }
-            prune_rotated(path, MAX_ROTATED_LOGS);
-            eprintln!(
-                "context telemetry log rotated to {}",
-                target
-                    .file_name()
-                    .map(|n| n.to_string_lossy())
-                    .unwrap_or_default()
-            );
-            if !append_bytes(path, encoded).unwrap_or(false) {
-                let err = io::Error::other(format!(
-                    "record exceeds the log budget even after rotation ({})",
-                    path.display()
-                ));
-                mark_disabled(path, &err);
-            }
-        }
-        Err(err) => mark_disabled(path, &err),
+    if let Err(error) = record_encoded_result(path, encoded) {
+        eprintln!(
+            "context telemetry disabled for this process: {} unwritable ({error})",
+            path.display()
+        );
     }
 }
 
@@ -848,7 +651,10 @@ pub fn record_encoded(path: &Path, encoded: &[u8]) {
 /// the same pattern `instant.rs`'s `isoformat_millis_utc` established.
 #[allow(dead_code)]
 pub fn record_event(payload: &Value) {
-    record_encoded(&telemetry_path(), &event_line(payload));
+    match telemetry_path() {
+        Ok(path) => record_encoded(&path, &event_line(payload)),
+        Err(error) => eprintln!("forge: telemetry storage unavailable: {error}"),
+    }
 }
 
 /// `adapters._telemetry`'s hook-context variant: record only when the hook
@@ -861,10 +667,10 @@ pub fn record_hook_context(hook: &str, hook_json: &Value, session_id: &str) {
     if injected_context_text(hook_json).is_empty() {
         return;
     }
-    record_encoded(
-        &telemetry_path(),
-        &hook_context_line(hook, hook_json, "", session_id),
-    );
+    match telemetry_path() {
+        Ok(path) => record_encoded(&path, &hook_context_line(hook, hook_json, "", session_id)),
+        Err(error) => eprintln!("forge: telemetry storage unavailable: {error}"),
+    }
 }
 
 #[cfg(test)]
@@ -1033,60 +839,17 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn append_respects_the_cap_and_rotates_with_prune() {
-        let dir = std::env::temp_dir().join(format!("forge-ctx-tele-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("events.jsonl");
-        // Fill to exactly one byte under the cap, then refuse the overflow...
-        assert!(append_bytes(&path, b"{\"a\":1}\n").unwrap());
-        // (7 bytes written; the real 10 MiB cap is not worth filling here --
-        // rotate-on-full is exercised through `record_encoded` below with a
-        // tiny pre-seeded file plus the cap check asserted separately.)
-        assert!(append_bytes(&path, b"{\"b\":2}\n").unwrap());
-        let text = fs::read_to_string(&path).unwrap();
-        assert_eq!(text, "{\"a\":1}\n{\"b\":2}\n");
-        // Rotation naming and pruning:
-        fs::write(dir.join("events.20260101T000000Z.jsonl"), b"old1\n").unwrap();
-        fs::write(dir.join("events.20260102T000000Z.jsonl"), b"old2\n").unwrap();
-        let stamp = "20260913T000000Z";
-        let target = unique_target(rotated_name(&path, stamp));
-        assert_eq!(
-            target.file_name().unwrap().to_string_lossy(),
-            "events.20260913T000000Z.jsonl"
-        );
-        fs::rename(&path, &target).unwrap();
-        prune_rotated(&path, MAX_ROTATED_LOGS);
-        assert!(dir.join("events.20260101T000000Z.jsonl").is_file()); // 3 kept
-        assert!(path.read_link().is_err() && !path.exists());
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn record_encoded_writes_and_degrades_loudly_on_a_dead_sink() {
-        let dir = std::env::temp_dir().join(format!("forge-ctx-tele-dead-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("events.jsonl");
-        record_encoded(&path, b"{\"ok\":1}\n");
-        assert_eq!(fs::read_to_string(&path).unwrap(), "{\"ok\":1}\n");
-        // A directory where the log path should be is unwritable:
-        let dead = dir.join("dead");
-        fs::create_dir_all(dead.join("events.jsonl")).unwrap();
-        record_encoded(&dead.join("events.jsonl"), b"{\"ok\":2}\n"); // stderr only
-        assert!(dead.join("events.jsonl").is_dir());
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
     fn telemetry_path_honours_the_env_override() {
         let _guard = pin_qwen();
         std::env::set_var("CONTEXT_TELEMETRY_PATH", "/tmp/alt-events.jsonl");
-        assert_eq!(telemetry_path(), PathBuf::from("/tmp/alt-events.jsonl"));
+        assert_eq!(
+            telemetry_path().unwrap(),
+            PathBuf::from("/tmp/alt-events.jsonl")
+        );
         std::env::remove_var("CONTEXT_TELEMETRY_PATH");
         std::env::set_var("LEDGER_ROOT", "/tmp/ledger-a");
         assert_eq!(
-            telemetry_path(),
+            telemetry_path().unwrap(),
             PathBuf::from("/tmp/ledger-a/telemetry/context_telemetry/events.jsonl")
         );
         std::env::remove_var("LEDGER_ROOT");

@@ -1,25 +1,11 @@
 //! Deterministic aggregation and presentation for the fleet-status CLI.
 //!
-//! Python owns the intentionally small process and filesystem boundary.  This
-//! module owns the data-only join, ordering, and human-readable rendering so
-//! operational state is represented with Rust collections rather than loose
-//! Python loops.
+//! Public data-only APIs join observed seats, claims, headings and processes.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::*;
+use chrono::{DateTime, Utc};
 use serde_json::{json, Map, Value};
-
-fn parse_object(raw: &str, label: &str) -> PyResult<Map<String, Value>> {
-    serde_json::from_str::<Value>(raw)
-        .map_err(|error| {
-            PyValueError::new_err(format!("fleet status {label} is invalid JSON: {error}"))
-        })?
-        .as_object()
-        .cloned()
-        .ok_or_else(|| PyValueError::new_err(format!("fleet status {label} must be a JSON object")))
-}
 
 fn string_field(value: &Value, field: &str) -> Option<String> {
     value
@@ -55,19 +41,17 @@ fn heading_seat(heading: &str) -> String {
         .to_owned()
 }
 
-#[pyfunction]
-fn fleet_status_build_report_native(
-    peers_json: &str,
-    heard_json: &str,
-    state_json: &str,
-    worktree_processes_json: &str,
+/// Join only supplied observations; absent peers are reported as NO IDENTITY.
+/// Earliest expiry compares RFC 3339 instants and retains the original string.
+/// Malformed or empty expiries do not participate; their claims remain counted.
+pub fn build_report(
+    peers: &Map<String, Value>,
+    heard: &Map<String, Value>,
+    state: &Map<String, Value>,
+    worktree_processes: &Map<String, Value>,
     generated_at: &str,
     root: &str,
-) -> PyResult<String> {
-    let peers = parse_object(peers_json, "peers")?;
-    let heard = parse_object(heard_json, "heard")?;
-    let state = parse_object(state_json, "state")?;
-    let worktree_processes = parse_object(worktree_processes_json, "worktree processes")?;
+) -> Value {
     let claims = state
         .get("active_claims")
         .and_then(Value::as_array)
@@ -100,70 +84,81 @@ fn fleet_status_build_report_native(
 
     let mut seats = BTreeMap::new();
     for name in names {
-        let peer = peers.get(&name);
-        let a2a = match peer.and_then(|value| value.as_object()) {
-            Some(peer) if peer.get("status").and_then(Value::as_str) == Some("up") => {
-                format!("up:{}", display_value(peer.get("port")))
-            }
-            Some(_) => "down".to_owned(),
-            None => "NO IDENTITY".to_owned(),
-        };
-        let seat_claims = claims
-            .iter()
-            .filter(|claim| string_field(claim, "owner").as_deref() == Some(name.as_str()))
-            .collect::<Vec<_>>();
-        let mut claim_paths = BTreeSet::new();
-        let mut expiries = Vec::new();
-        for claim in &seat_claims {
-            if let Some(paths) = claim
-                .as_object()
-                .and_then(|object| object.get("paths"))
-                .and_then(Value::as_array)
-            {
-                claim_paths.extend(
-                    paths
-                        .iter()
-                        .filter_map(Value::as_str)
-                        .map(ToOwned::to_owned),
-                );
-            }
-            if let Some(expiry) = string_field(claim, "expires_at") {
-                if !expiry.is_empty() {
-                    expiries.push(expiry);
-                }
-            }
-        }
-        expiries.sort();
-        let seat_headings = headings
-            .iter()
-            .filter_map(Value::as_str)
-            .filter(|heading| heading_seat(heading) == name)
-            .map(ToOwned::to_owned)
-            .collect::<Vec<_>>();
         seats.insert(
             name.clone(),
-            json!({
-                "a2a": a2a,
-                "last_heard": heard.get(&name),
-                "headings": seat_headings,
-                "claims": seat_claims.len(),
-                "claim_paths": claim_paths.into_iter().collect::<Vec<_>>(),
-                "soonest_expiry": expiries.first(),
-            }),
+            seat_report(&name, peers, heard, &claims, &headings),
         );
     }
-    serde_json::to_string(&json!({
+    json!({
         "generated_at": generated_at,
         "root": root,
         "seats": seats,
         "worktree_processes": worktree_processes,
-    }))
-    .map_err(|error| PyValueError::new_err(format!("fleet status serialization failed: {error}")))
+    })
 }
 
-#[pyfunction]
-fn fleet_status_render_native(report_json: &str) -> PyResult<String> {
-    let report = parse_object(report_json, "report")?;
+fn seat_report(
+    name: &str,
+    peers: &Map<String, Value>,
+    heard: &Map<String, Value>,
+    claims: &[Value],
+    headings: &[Value],
+) -> Value {
+    let peer = peers.get(name);
+    let a2a = match peer.and_then(|value| value.as_object()) {
+        Some(peer) if peer.get("status").and_then(Value::as_str) == Some("up") => {
+            format!("up:{}", display_value(peer.get("port")))
+        }
+        Some(peer) if peer.get("status").and_then(Value::as_str) == Some("unprobed") => {
+            "unprobed".to_owned()
+        }
+        Some(_) => "down".to_owned(),
+        None => "NO IDENTITY".to_owned(),
+    };
+    let seat_claims = claims
+        .iter()
+        .filter(|claim| string_field(claim, "owner").as_deref() == Some(name))
+        .collect::<Vec<_>>();
+    let mut claim_paths = BTreeSet::new();
+    let mut expiries = Vec::new();
+    for claim in &seat_claims {
+        if let Some(paths) = claim
+            .as_object()
+            .and_then(|object| object.get("paths"))
+            .and_then(Value::as_array)
+        {
+            claim_paths.extend(
+                paths
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(ToOwned::to_owned),
+            );
+        }
+        if let Some(expiry) = string_field(claim, "expires_at") {
+            if let Ok(instant) = DateTime::parse_from_rfc3339(&expiry) {
+                expiries.push((instant.with_timezone(&Utc), expiry));
+            }
+        }
+    }
+    expiries.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    let seat_headings = headings
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|heading| heading_seat(heading) == name)
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    json!({
+        "a2a": a2a,
+        "last_heard": heard.get(name),
+        "headings": seat_headings,
+        "claims": seat_claims.len(),
+        "claim_paths": claim_paths.into_iter().collect::<Vec<_>>(),
+        "soonest_expiry": expiries.first().map(|(_, original)| original),
+    })
+}
+
+/// Render a report, rejecting malformed seat records explicitly.
+pub fn render(report: &Map<String, Value>) -> Result<String, String> {
     let generated_at = report
         .get("generated_at")
         .and_then(Value::as_str)
@@ -179,59 +174,7 @@ fn fleet_status_render_native(report_json: &str) -> PyResult<String> {
         .cloned()
         .unwrap_or_default();
     for (name, seat) in seats {
-        let seat = seat.as_object().ok_or_else(|| {
-            PyValueError::new_err(format!("fleet status seat {name:?} must be an object"))
-        })?;
-        let expiry = seat
-            .get("soonest_expiry")
-            .and_then(Value::as_str)
-            .map(|value| format!("  soonest-expiry={}Z", prefix(value, 16)))
-            .unwrap_or_default();
-        let a2a = seat.get("a2a").and_then(Value::as_str).unwrap_or_default();
-        let claims = seat.get("claims").map(Value::to_string).unwrap_or_default();
-        lines.push(format!("\n● {name}  [{a2a}]  claims={claims}{expiry}"));
-        for heading in seat
-            .get("headings")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-        {
-            lines.push(format!("    heading: {heading}"));
-        }
-        if let Some(last_heard) = seat.get("last_heard").and_then(Value::as_object) {
-            let at = last_heard
-                .get("at")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            let said = last_heard
-                .get("said")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            lines.push(format!("    last heard {}: {said}", prefix(at, 19)));
-        }
-        let paths = seat
-            .get("claim_paths")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        if !paths.is_empty() {
-            let shown = paths
-                .iter()
-                .take(4)
-                .filter_map(Value::as_str)
-                .collect::<Vec<_>>();
-            let extra = paths.len().saturating_sub(shown.len());
-            lines.push(format!(
-                "    owns: {}{}",
-                shown.join(", "),
-                if extra == 0 {
-                    String::new()
-                } else {
-                    format!(" (+{extra} more)")
-                }
-            ));
-        }
+        render_seat(&mut lines, &name, &seat)?;
     }
     let worktree_processes = report
         .get("worktree_processes")
@@ -257,8 +200,59 @@ fn fleet_status_render_native(report_json: &str) -> PyResult<String> {
     Ok(lines.join("\n"))
 }
 
-pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(fleet_status_build_report_native, module)?)?;
-    module.add_function(wrap_pyfunction!(fleet_status_render_native, module)?)?;
+fn render_seat(lines: &mut Vec<String>, name: &str, seat: &Value) -> Result<(), String> {
+    let seat = seat
+        .as_object()
+        .ok_or_else(|| format!("fleet status seat {name:?} must be an object"))?;
+    let expiry = seat
+        .get("soonest_expiry")
+        .and_then(Value::as_str)
+        .map(|value| format!("  soonest-expiry={value}"))
+        .unwrap_or_default();
+    let a2a = seat.get("a2a").and_then(Value::as_str).unwrap_or_default();
+    let claims = seat.get("claims").map(Value::to_string).unwrap_or_default();
+    lines.push(format!("\n● {name}  [{a2a}]  claims={claims}{expiry}"));
+    for heading in seat
+        .get("headings")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+    {
+        lines.push(format!("    heading: {heading}"));
+    }
+    if let Some(last_heard) = seat.get("last_heard").and_then(Value::as_object) {
+        let at = last_heard
+            .get("at")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let said = last_heard
+            .get("said")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        lines.push(format!("    last heard {}: {said}", prefix(at, 19)));
+    }
+    let paths = seat
+        .get("claim_paths")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    if !paths.is_empty() {
+        let shown = paths
+            .iter()
+            .take(4)
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>();
+        let extra = paths.len().saturating_sub(shown.len());
+        lines.push(format!(
+            "    owns: {}{}",
+            shown.join(", "),
+            if extra == 0 {
+                String::new()
+            } else {
+                format!(" (+{extra} more)")
+            }
+        ));
+    }
     Ok(())
 }

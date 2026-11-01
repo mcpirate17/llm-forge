@@ -177,7 +177,7 @@ fn format_g(value: f64) -> String {
 /// module docstring for why this diverges from Python's subprocess-based
 /// `git_common_dir`. `None` outside any checkout.
 pub fn common_dir(repo_root: &Path) -> Option<PathBuf> {
-    crate::crg_gate::checkout_of(repo_root).map(|(_root, common)| common)
+    crate::repository::checkout_of(repo_root).map(|(_root, common)| common)
 }
 
 pub fn claim_store_path(repo_root: &Path) -> Option<PathBuf> {
@@ -188,17 +188,34 @@ pub fn claim_activity_path(repo_root: &Path) -> Option<PathBuf> {
     common_dir(repo_root).map(|d| d.join("governance").join("claim-activity.json"))
 }
 
+fn checked_claim_path(repo: &Path, filename: &str) -> Result<Option<PathBuf>, OwnershipError> {
+    crate::repository::checkout_of_checked(repo)
+        .map(|checkout| checkout.map(|(_, common)| common.join("governance").join(filename)))
+        .map_err(|error| OwnershipError(format!("claim repository metadata: {error:#}")))
+}
+
+fn read_store(path: &Path, label: &str) -> Result<Option<Value>, OwnershipError> {
+    match std::fs::symlink_metadata(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return err(format!("{label} is unreadable: {error}")),
+        Ok(_) => (),
+    }
+    let load = || -> anyhow::Result<Value> {
+        let bytes = crate::bounded_file::read(path, 1024 * 1024)?;
+        crate::tool_schema::parse_document(std::str::from_utf8(&bytes)?)
+    };
+    load()
+        .map(Some)
+        .map_err(|error| OwnershipError(format!("{label} is unreadable: {error:#}")))
+}
+
 pub fn load_activity(repo_root: &Path) -> Result<HashMap<String, String>, OwnershipError> {
-    let Some(path) = claim_activity_path(repo_root) else {
+    let Some(path) = checked_claim_path(repo_root, "claim-activity.json")? else {
         return Ok(HashMap::new());
     };
-    if !path.is_file() {
+    let Some(payload) = read_store(&path, "claim activity log")? else {
         return Ok(HashMap::new());
-    }
-    let text = std::fs::read_to_string(&path)
-        .map_err(|exc| OwnershipError(format!("claim activity log is unreadable: {exc}")))?;
-    let payload: Value = serde_json::from_str(&text)
-        .map_err(|exc| OwnershipError(format!("claim activity log is unreadable: {exc}")))?;
+    };
     let obj = payload
         .as_object()
         .filter(|o| {
@@ -225,7 +242,7 @@ pub fn load_activity(repo_root: &Path) -> Result<HashMap<String, String>, Owners
 }
 
 fn write_activity(repo_root: &Path, seen: &HashMap<String, String>) -> Result<(), OwnershipError> {
-    let Some(path) = claim_activity_path(repo_root) else {
+    let Some(path) = checked_claim_path(repo_root, "claim-activity.json")? else {
         return err("claim activity log: repository has no resolvable common directory");
     };
     if let Some(parent) = path.parent() {
@@ -242,10 +259,7 @@ fn write_activity(repo_root: &Path, seen: &HashMap<String, String>) -> Result<()
     );
     let payload =
         serde_json::json!({"schema_version": ACTIVITY_SCHEMA_VERSION, "seen": seen_value});
-    let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, serde_json::to_vec_pretty(&payload).unwrap())
-        .map_err(|exc| OwnershipError(format!("claim activity log is unwritable: {exc}")))?;
-    std::fs::rename(&tmp, &path)
+    crate::state_publish::publish(&path, &serde_json::to_vec_pretty(&payload).unwrap())
         .map_err(|exc| OwnershipError(format!("claim activity log is unwritable: {exc}")))?;
     Ok(())
 }
@@ -253,6 +267,8 @@ fn write_activity(repo_root: &Path, seen: &HashMap<String, String>) -> Result<()
 /// `touch_claim`: record a write under `claim_id`, resetting its idle timer.
 /// Debounced. Returns whether the stamp was persisted.
 pub fn touch_claim(repo_root: &Path, claim_id: &str, now: f64) -> Result<bool, OwnershipError> {
+    // Atomic publication prevents torn JSON, but does not serialize this
+    // read-modify-write transaction with other native or Python writers.
     let mut seen = load_activity(repo_root)?;
     if let Some(previous) = seen.get(claim_id) {
         let last = instant::parse(previous);
@@ -274,6 +290,39 @@ pub fn paths_overlap(first: &str, second: &str) -> bool {
         || second.starts_with(&format!("{first}/"))
 }
 
+/// Normalize POSIX separators before matching or verifying the claim identity.
+fn normalize_claim_path(raw: &str) -> Result<String, OwnershipError> {
+    let value = raw.trim().trim_end_matches('/');
+    let components: Vec<&str> = value
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect();
+    let normalized = components.join("/");
+    let broad = [
+        ".",
+        ".github",
+        "aria_core",
+        "aria_designer",
+        "component_fab",
+        "conductor",
+        "research",
+    ];
+    if value.is_empty()
+        || value.starts_with('/')
+        || components.contains(&"..")
+        || normalized.is_empty()
+        || broad.contains(&normalized.as_str())
+        || value
+            .chars()
+            .any(|ch| ch.is_whitespace() || "*?[,;:".contains(ch))
+    {
+        return err(format!(
+            "claim path must be narrow and repository-relative: {raw:?}"
+        ));
+    }
+    Ok(normalized)
+}
+
 const REQUIRED_CLAIM_FIELDS: &[&str] = &[
     "claim_id",
     "owner",
@@ -287,7 +336,7 @@ const REQUIRED_CLAIM_FIELDS: &[&str] = &[
 /// separators=(",",":"), ensure_ascii=False))` -- the digest runs over
 /// `json_canon::canonical_json`'s bytes, so it stays independent of
 /// serde_json's `preserve_order` feature (see `json_canon.rs`).
-pub(crate) fn sha256_json(value: &Value) -> String {
+pub fn sha256_json(value: &Value) -> String {
     let digest = Sha256::digest(crate::json_canon::canonical_json(value).as_bytes());
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }
@@ -312,7 +361,7 @@ fn claim_from_payload(payload: &Value) -> Result<OwnershipClaim, OwnershipError>
     }
     let mut normalized = Vec::with_capacity(paths_raw.len());
     for p in paths_raw {
-        normalized.push(value_as_display_string(p));
+        normalized.push(normalize_claim_path(&value_as_display_string(p))?);
     }
     let unique: std::collections::BTreeSet<&String> = normalized.iter().collect();
     if unique.len() != normalized.len() {
@@ -392,18 +441,14 @@ fn value_as_display_string(value: &Value) -> String {
 /// JSON alone (never activity stamps), matching `sha256_json(payload)` in
 /// Python exactly.
 pub fn load_claims(repo_root: &Path) -> Result<(Vec<OwnershipClaim>, String), OwnershipError> {
-    let Some(path) = claim_store_path(repo_root) else {
+    let Some(path) = checked_claim_path(repo_root, "ownership-claims.json")? else {
         let empty = serde_json::json!({"schema_version": CLAIM_SCHEMA_VERSION, "claims": []});
         return Ok((Vec::new(), sha256_json(&empty)));
     };
-    if !path.is_file() {
+    let Some(payload) = read_store(&path, "ownership claim store")? else {
         let empty = serde_json::json!({"schema_version": CLAIM_SCHEMA_VERSION, "claims": []});
         return Ok((Vec::new(), sha256_json(&empty)));
-    }
-    let text = std::fs::read_to_string(&path)
-        .map_err(|exc| OwnershipError(format!("ownership claim store is unreadable: {exc}")))?;
-    let payload: Value = serde_json::from_str(&text)
-        .map_err(|exc| OwnershipError(format!("ownership claim store is unreadable: {exc}")))?;
+    };
     let obj = payload.as_object().ok_or_else(|| {
         OwnershipError("ownership claim store has an invalid top-level schema".into())
     })?;
@@ -536,6 +581,60 @@ mod tests {
         assert_eq!(claims.len(), 1);
         assert_eq!(claims[0].owner, "llm-b0");
         assert!(claims[0].active(now).unwrap());
+    }
+
+    #[test]
+    fn stored_paths_are_normalized_before_identity_and_overlap_checks() {
+        let repo = ScratchRepo::new("normalized-path");
+        let now = instant::now();
+        let created = instant::isoformat_utc(now - 60.0);
+        let expires = instant::isoformat_utc(now + 3600.0);
+        let mut claim = claim_json("llm-b0", &["src/foo.py"], &created, &expires);
+        claim["paths"] = serde_json::json!(["  ./src//foo.py/  "]);
+        repo.write_claims(&[claim]);
+        let (claims, _) = load_claims(&repo.0).unwrap();
+        assert_eq!(claims[0].paths, ["src/foo.py"]);
+        assert!(paths_overlap(&claims[0].paths[0], "src/foo.py"));
+
+        let mut duplicate = claim_json("llm-b0", &["src/foo.py", "src/foo.py"], &created, &expires);
+        duplicate["paths"] = serde_json::json!(["src/foo.py", "src//foo.py"]);
+        repo.write_claims(&[duplicate]);
+        assert!(load_claims(&repo.0)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate paths"));
+    }
+
+    #[test]
+    fn correctly_hashed_unsafe_stored_paths_fail_closed() {
+        let repo = ScratchRepo::new("unsafe-path");
+        let now = instant::now();
+        let created = instant::isoformat_utc(now - 60.0);
+        let expires = instant::isoformat_utc(now + 3600.0);
+        for path in [
+            "",
+            ".",
+            "/tmp/file",
+            "../src/file",
+            "src/../file",
+            "conductor",
+            "./conductor",
+            "research/./",
+            "src/*",
+            "src/a?",
+            "src/[ab]",
+            "src/a,b",
+            "src/a;b",
+            "src/a:b",
+            "src/a b",
+        ] {
+            repo.write_claims(&[claim_json("llm-b0", &[path], &created, &expires)]);
+            let error = load_claims(&repo.0).unwrap_err();
+            assert!(
+                error.to_string().contains("narrow and repository-relative"),
+                "{path:?}: {error}"
+            );
+        }
     }
 
     #[test]

@@ -1,5 +1,5 @@
-//! Native Read and generic PreToolUse contracts. The delegation sentinel is
-//! a shell script: these tests never execute a Python interpreter.
+//! Native Read and generic PreToolUse contracts with an empty executable search
+//! path and invalid interpreter overrides. Old selectors cannot bypass guards.
 
 #[path = "../src/pre_read.rs"]
 mod pre_read;
@@ -25,23 +25,6 @@ impl Project {
         ));
         fs::create_dir_all(&path).unwrap();
         let path = fs::canonicalize(path).unwrap();
-        let sentinel = path.join("dispatcher-sentinel");
-        fs::write(
-            &sentinel,
-            concat!(
-            "#!/bin/sh\n",
-            "cat > \"$CLAUDE_PROJECT_DIR/delegated.input\"\n",
-            "printf '%s' \"$FORGE_NATIVE_HOOKS\" > \"$CLAUDE_PROJECT_DIR/delegated.names\"\n",
-            "printf '%s' \"$FORGE_NATIVE_ANSWERS\" > \"$CLAUDE_PROJECT_DIR/delegated.answers\"\n",
-            "printf '{\"delegated\":true}\\n'\nexit 17\n",
-        ),
-        )
-        .unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(sentinel, fs::Permissions::from_mode(0o755)).unwrap();
-        }
         Self(path)
     }
 
@@ -56,11 +39,9 @@ impl Project {
         cmd.args(["hook", "PreToolUse"])
             .current_dir(&self.0)
             .env("CLAUDE_PROJECT_DIR", &self.0)
-            .env(
-                "CONDUCTOR_SNAPSHOT_PYTHON",
-                self.0.join("dispatcher-sentinel"),
-            )
-            .env("CONDUCTOR_PYTHON", "/bin/false")
+            .env("PATH", "")
+            .env("CONDUCTOR_SNAPSHOT_PYTHON", "/nonexistent/forbidden-python")
+            .env("CONDUCTOR_PYTHON", "/nonexistent/forbidden-python")
             .env("CONTEXT_TELEMETRY_PATH", self.0.join("telemetry.jsonl"))
             .env("CRG_DATA_DIR", self.0.join(".code-review-graph"))
             .env_remove("FORGE_MODE")
@@ -93,10 +74,6 @@ impl Project {
             Some(0),
             "{}",
             String::from_utf8_lossy(&out.stderr)
-        );
-        assert!(
-            !self.0.join("delegated.input").exists(),
-            "dispatcher unexpectedly started"
         );
         serde_json::from_slice(&out.stdout).unwrap()
     }
@@ -296,15 +273,19 @@ fn edit_and_graph_tools_use_native_pretool_dispatch() {
 }
 
 #[test]
-fn malformed_payloads_keep_delegating() {
+fn malformed_payloads_fail_closed_without_interpreter_delegation() {
     for raw in ["not json", "[]", "null", "{\"tool_name\":17}"] {
         let project = Project::new();
-        assert_eq!(project.run(raw, None, false).status.code(), Some(17));
+        let output = project.run(raw, None, false);
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+        let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(response["hookSpecificOutput"]["permissionDecision"], "deny");
+        assert!(reason(&response).contains("Invalid hook payload:"));
     }
 }
 
 #[test]
-fn empty_opt_out_and_incomplete_read_selection_preserve_delegation_and_splices() {
+fn obsolete_selectors_cannot_disable_read_guards() {
     for selected in [
         "",
         "crg_refresh_report_pre",
@@ -314,49 +295,31 @@ fn empty_opt_out_and_incomplete_read_selection_preserve_delegation_and_splices()
         let path = project.file("large.rs", "x\n".repeat(400));
         let raw = read(&path).to_string();
         let output = project.run(&raw, Some(selected), false);
-        assert_eq!(output.status.code(), Some(17), "{selected}");
-        assert_eq!(
-            fs::read_to_string(project.0.join("delegated.input")).unwrap(),
-            raw
-        );
-        let names = fs::read_to_string(project.0.join("delegated.names")).unwrap();
-        let answers = fs::read_to_string(project.0.join("delegated.answers")).unwrap();
-        if selected.is_empty() {
-            assert!(names.is_empty() && answers.is_empty());
-        } else {
-            let answers: Value = serde_json::from_str(&answers).unwrap();
-            let expected: Vec<_> = selected.split(',').collect();
-            assert_eq!(answers.as_object().unwrap().len(), expected.len());
-            for name in expected {
-                assert!(names.split(',').any(|actual| actual == name));
-                assert!(answers.get(name).is_some());
-            }
-            if selected.contains("pre_read_skeleton") {
-                assert_eq!(
-                    answers["pre_read_skeleton"]["hookSpecificOutput"]["permissionDecision"],
-                    "deny"
-                );
-            }
-        }
+        assert_eq!(output.status.code(), Some(0), "{selected}: {output:?}");
+        let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(response["hookSpecificOutput"]["permissionDecision"], "deny");
+        assert!(reason(&response).contains("PRE-READ DENIED:"));
+        assert!(String::from_utf8_lossy(&output.stderr).contains("FORGE_NATIVE_HOOKS is obsolete"));
     }
 }
 
 #[test]
-fn generic_opt_out_preserves_the_refresh_notice_for_the_dispatcher() {
+fn generic_obsolete_selectors_still_emit_and_consume_the_native_refresh_notice() {
     let project = Project::new();
-    project.stage_failure();
     for names in ["", "pre_read_skeleton"] {
-        assert_eq!(
-            project
-                .run("{\"tool_name\":\"Grep\"}", Some(names), false)
-                .status
-                .code(),
-            Some(17)
-        );
-        assert!(project.0.join(".code-review-graph/refresh.failed").exists());
-        assert!(fs::read_to_string(project.0.join("delegated.names"))
+        project.stage_failure();
+        let output = project.run("{\"tool_name\":\"Grep\"}", Some(names), false);
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+        let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert!(response["systemMessage"]
+            .as_str()
             .unwrap()
-            .is_empty());
+            .contains("offline"));
+        assert!(!project.0.join(".code-review-graph/refresh.failed").exists());
+        let repeated = project.run("{\"tool_name\":\"Grep\"}", Some(names), false);
+        assert!(repeated.status.success());
+        let repeated: Value = serde_json::from_slice(&repeated.stdout).unwrap();
+        assert!(repeated.get("systemMessage").is_none());
     }
 }
 

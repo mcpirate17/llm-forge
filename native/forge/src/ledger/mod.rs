@@ -24,14 +24,9 @@ use anyhow::{Context, Result};
 
 /// Ledger root directory, shared by every subcommand that reads or writes
 /// the ledger tables: `--out`/`--ledger-root` when given, else `LEDGER_ROOT`,
-/// else the default. One function so `rollup.rs`, `subagent_stop.rs` and
+/// else the XDG state directory. One function so `rollup.rs`, `subagent_stop.rs` and
 /// `cap_enforce.rs` can never disagree about where "the ledger" lives.
-pub const DEFAULT_LEDGER_ROOT: &str = "/mnt/data/llm/ledger/";
-
-pub fn resolve_ledger_root(out: Option<PathBuf>) -> PathBuf {
-    out.or_else(|| std::env::var("LEDGER_ROOT").ok().map(PathBuf::from))
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_LEDGER_ROOT))
-}
+pub use conductor_native::state_paths::ledger_root as resolve_ledger_root;
 
 /// The crate-wide mutex serializing tests that mutate process-wide env
 /// vars (`FORGE_MODE` today). Lives here -- not in `route` or

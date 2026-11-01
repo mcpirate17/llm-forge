@@ -218,6 +218,15 @@ pub(super) fn prepare(input: ValidatedMessage) -> Result<PreparedMessage> {
 
 pub(super) struct SenderLock(File);
 
+#[derive(Debug)]
+pub(super) struct SenderBusy(String);
+impl std::fmt::Display for SenderBusy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "sender {:?} has an active delivery", self.0)
+    }
+}
+impl std::error::Error for SenderBusy {}
+
 impl SenderLock {
     pub(super) fn acquire(state_dir: &Path, sender: &str) -> Result<Self> {
         let path = state_dir.join(sender).join(".delivery.lock");
@@ -235,7 +244,7 @@ impl SenderLock {
         if result != 0 {
             let error = std::io::Error::last_os_error();
             if error.kind() == std::io::ErrorKind::WouldBlock {
-                bail!("sender {sender:?} has an active delivery");
+                return Err(SenderBusy(sender.to_owned()).into());
             }
             return Err(error).with_context(|| format!("locking sender {sender:?}"));
         }

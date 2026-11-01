@@ -250,6 +250,25 @@ pub fn summarize(paths: &[String], bound_bytes: i128) -> io::Result<Value> {
     Ok(summary.finish(paths, bound_bytes))
 }
 
+/// Aggregate immutable caller-bounded JSONL buffers without reopening paths.
+/// Labels are report provenance only. Invalid JSON, non-object records and
+/// invalid UTF-8 are skipped exactly as in the basic file summary.
+pub fn summarize_bytes(inputs: &[(&str, &[u8])], bound_bytes: i128) -> Value {
+    let mut summary = Summary::default();
+    for (_, bytes) in inputs {
+        for line in bytes.split(|byte| *byte == b'\n') {
+            if let Ok(Value::Object(item)) = serde_json::from_slice::<Value>(line) {
+                summary.add(&item, bound_bytes);
+            }
+        }
+    }
+    let paths = inputs
+        .iter()
+        .map(|(path, _)| (*path).to_owned())
+        .collect::<Vec<_>>();
+    summary.finish(&paths, bound_bytes)
+}
+
 fn parse_stamp(stamp: &str) -> Option<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(stamp)
         .map(|value| value.with_timezone(&Utc))

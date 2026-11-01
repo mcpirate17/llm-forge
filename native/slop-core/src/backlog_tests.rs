@@ -2,7 +2,7 @@
 //! measure is neither fixed nor lost.
 
 use crate::backlog::backlog;
-use crate::gate::{Measured, Summary};
+use crate::gate_types::{Measured, Summary};
 use crate::index_tests::Tree;
 use serde_json::{json, Value};
 use std::path::PathBuf;

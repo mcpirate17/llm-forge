@@ -12,7 +12,7 @@ whitespace and case, places stable instructions first, and orders other fragment
 priority. A duplicate optional fragment cannot hide a required copy. Whole
 optional fragments are omitted rather than cutting sentences in half. Their full
 JSON records are written atomically under `CONTEXT_FRAGMENT_DIR`, or
-`$LEDGER_ROOT/context_fragments` (default `/mnt/data/llm/ledger/context_fragments`).
+`$LEDGER_ROOT/context_fragments` (default `${XDG_STATE_HOME:-$HOME/.local/state}/llm-forge/ledger/context_fragments`).
 The injected marker names an ordered recovery manifest listing every omitted
 fragment's content hash, so multiple omissions can be recovered together.
 
@@ -136,3 +136,28 @@ agent.
 
 Related controls: [graph context](graph-context.md), [messaging](messaging.md),
 [local checks](local-checks.md), and [performance receipts](performance.md).
+## Native telemetry commands
+
+`forge context telemetry record` consumes one JSON object from stdin and records
+event metadata. `forge context telemetry hook-context --hook NAME` writes the
+input bytes unchanged to stdout, then records injected-context metadata; optional
+`--event` and `--category` labels are bounded. Neither command records message or
+tool-response bodies. They run without an interpreter. Malformed tee input is
+still emitted, followed by an error exit; input above 1 MiB is rejected before
+emission. Storage failures produce a nonzero CLI exit. Installed hook dispatch
+retains its best-effort stderr reporting so a telemetry failure cannot prevent
+the hook response.
+
+`forge context telemetry summary [PATH ...] [--json]` summarizes immutable bounded
+reads: at most 32 regular files, 10 MiB per file and 64 MiB total. With no paths it
+uses the configured active telemetry log. Pass retained rotation paths explicitly
+when they should contribute. `forge context report` remains the detailed usage
+report.
+
+Native writers hold a bounded adjacent lock through append and rotation, create
+private files, and reject symlink, FIFO and hardlinked sinks. Existing files must
+be owned by the current user and not writable by another user or group. Rotation
+uses unique `FILENAME.forge-rotation-PID-NONCE` names; pruning affects only that
+validated format. Historical and unrelated files are preserved. A write error
+can follow a partial kernel write; the log is telemetry, not an exactly-once
+transaction journal. The parent directory must be controlled by the operator.

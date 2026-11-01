@@ -1,60 +1,41 @@
-# `forge land <branch>` policy for llm-forge (native/forge/src/land.rs).
-# Checks run in a persistent clone whose .venv and cargo target/ survive
-# between landings, so setup is incremental. The copy on `main` governs.
+# Native landing policy. This configuration does not create or authorize
+# branches or publication by itself.
 target = "main"
 required_trailers = ["Agent"]
-path_prepend = [".venv/bin"]
+path_prepend = ["target/install/bin"]
 
 [env]
 CUDA_VISIBLE_DEVICES = ""
 CARGO_BUILD_JOBS = "2"
 RUST_TEST_THREADS = "2"
 RUSTUP_TOOLCHAIN = "1.98.0"
-OMP_NUM_THREADS = "1"
-OPENBLAS_NUM_THREADS = "1"
+PYO3_PYTHON = "/nonexistent/forbidden-python"
 
 [[setup]]
 name = "install"
 run = "make install"
 timeout_s = 1800
 
-# Refresh changed path-source wheels after the incremental install prebuild.
-[[check]]
-name = "native-reinstall"
-run = '''
-set -eu
-set --
-if grep -Eq '^native/(conductor-native|slop-core)/|^(pyproject[.]toml|uv[.]lock)$' "$FORGE_LAND_CHANGED"; then
-  set -- "$@" --reinstall-package conductor-native --reinstall-package slop-core
-fi
-if grep -Eq '^native/(conductor-native|forge)/|^(pyproject[.]toml|uv[.]lock)$' "$FORGE_LAND_CHANGED"; then
-  set -- "$@" --reinstall-package forge-cli
-fi
-uv sync --frozen --extra test "$@"
-'''
-paths = ['^native/(conductor-native|slop-core|forge)/', '^pyproject\.toml$', '^uv\.lock$']
-timeout_s = 1200
-
 [[check]]
 name = "native-tests"
 run = "make test"
-paths = ['^src/', '^native/(conductor-native|slop-core)/', '^pyproject\.toml$', '^uv\.lock$', '^campaigns/', '^candidate_policy\.toml$']
-timeout_s = 2400
+paths = ['^native/', '^Makefile$', '^\.forge/', '^ledger/']
+timeout_s = 3600
 
 [[check]]
 name = "rust-forge"
-run = "cd native/forge && cargo fmt --check && cargo clippy --quiet --all-targets -- -D warnings && cargo test --quiet"
-paths = ['^native/forge/', '^native/conductor-native/', '^docs/routing\.md$', '^ledger/']
+run = "cargo +1.98.0 fmt --manifest-path native/forge/Cargo.toml --check && cargo +1.98.0 clippy --locked --jobs 2 --manifest-path native/forge/Cargo.toml --all-targets -- -D warnings"
+paths = ['^native/', '^\.forge/']
 timeout_s = 1800
 
 [[check]]
 name = "rust-conductor-native"
-run = "cd native/conductor-native && cargo fmt --check && cargo clippy --quiet --all-targets -- -D warnings && cargo test --quiet"
-paths = ['^native/conductor-native/']
+run = "cargo +1.98.0 fmt --manifest-path native/conductor-native/Cargo.toml --check && cargo +1.98.0 clippy --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --all-targets --features bundled-sqlite -- -D warnings"
+paths = ['^native/conductor-native/', '^\.forge/']
 timeout_s = 1800
 
 [[check]]
 name = "rust-slop-core"
-run = "cd native/slop-core && cargo fmt --check && cargo clippy --quiet --all-targets -- -D warnings && cargo test --quiet"
-paths = ['^native/slop-core/']
+run = "cargo +1.98.0 fmt --manifest-path native/slop-core/Cargo.toml --check && cargo +1.98.0 clippy --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml --all-targets -- -D warnings"
+paths = ['^native/slop-core/', '^\.forge/']
 timeout_s = 1800

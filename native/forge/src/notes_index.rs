@@ -338,21 +338,29 @@ pub struct SearchHit {
 
 /// Port of `index_notes.search_notes`.
 pub fn search_notes(conn: &Connection, query: &str, limit: u32) -> Result<Vec<SearchHit>> {
-    if limit < 1 {
-        bail!("limit must be positive");
-    }
+    search_filtered(conn, query, limit, None)
+}
+
+pub(crate) fn search_filtered(
+    conn: &Connection,
+    query: &str,
+    limit: u32,
+    source: Option<&str>,
+) -> Result<Vec<SearchHit>> {
+    anyhow::ensure!((1..=1000).contains(&limit), "limit must be in 1..1000");
+    anyhow::ensure!(query.len() <= 4096, "notes query exceeds 4096 bytes");
     let match_query = fts_match_query(query);
     if match_query.is_empty() {
         return Ok(Vec::new());
     }
     let mut stmt = conn.prepare(
-        "SELECT path, title, snippet(notes_fts, 3, '[', ']', ' … ', 12) AS snip
+        "SELECT substr(path,1,1024), substr(title,1,240), substr(snippet(notes_fts, 3, '[', ']', ' … ', 12),1,480) AS snip
            FROM notes_fts
-          WHERE notes_fts MATCH ?1
-          ORDER BY rank LIMIT ?2",
+          WHERE notes_fts MATCH ?1 AND (?3 IS NULL OR source=?3)
+          ORDER BY rank, rowid LIMIT ?2",
     )?;
     let rows = stmt
-        .query_map(rusqlite::params![match_query, limit], |row| {
+        .query_map(rusqlite::params![match_query, limit, source], |row| {
             Ok(SearchHit {
                 path: row.get(0)?,
                 title: row.get(1)?,
@@ -363,15 +371,46 @@ pub fn search_notes(conn: &Connection, query: &str, limit: u32) -> Result<Vec<Se
     Ok(rows)
 }
 
+/// An existing bounded, read-only index. Missing files are distinct from corrupt
+/// files; neither search nor brief can create or rebuild a database implicitly.
+pub(crate) fn open_search(path: &Path) -> Result<Option<Connection>> {
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    anyhow::ensure!(
+        meta.is_file() && meta.len() <= 4 * 1024 * 1024 * 1024,
+        "notes index must be a regular file at most 4 GiB"
+    );
+    let conn = Connection::open_with_flags(
+        path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
+    conn.busy_timeout(std::time::Duration::from_millis(250))?;
+    conn.set_limit(
+        rusqlite::limits::Limit::SQLITE_LIMIT_LENGTH,
+        4 * 1024 * 1024,
+    );
+    conn.execute_batch(
+        "PRAGMA query_only=ON; PRAGMA trusted_schema=OFF; PRAGMA cache_size=-2048;",
+    )?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    conn.progress_handler(1000, Some(move || std::time::Instant::now() >= deadline));
+    Ok(Some(conn))
+}
+
 /// The prose-search index, defaulting to `HOST/research/notes.db`.
 ///
 /// Kept byte-identical to the Python reference's `notes_db_path` default:
 /// both hardcoded `runs.db` until 2026-09-16, so after the monorepo split
 /// the index landed in the run database while every documented reader
 /// looked in `notes.db`. A host that keeps the two together passes `--db`.
-fn resolve_db_path(host: &Path, db: Option<&Path>) -> PathBuf {
-    db.map(PathBuf::from)
-        .unwrap_or_else(|| host.join("research").join("notes.db"))
+fn resolve_db_path(host: &Path, db: Option<&Path>) -> Result<PathBuf> {
+    match db {
+        Some(path) => Ok(path.to_owned()),
+        None => conductor_native::project_paths::notes_db(host).map_err(anyhow::Error::msg),
+    }
 }
 
 #[derive(Args)]
@@ -404,7 +443,7 @@ pub struct SearchArgs {
 /// `forge notes index`: same "notes database not found" refusal as the Python CLI
 /// -- this command does not create the db file itself, only opens it.
 pub fn run_index(args: &IndexArgs) -> Result<u8> {
-    let db_path = resolve_db_path(&args.host, args.db.as_deref());
+    let db_path = resolve_db_path(&args.host, args.db.as_deref())?;
     if !db_path.exists() {
         bail!("notes database not found at {}", db_path.display());
     }
@@ -421,12 +460,9 @@ pub fn run_index(args: &IndexArgs) -> Result<u8> {
 
 /// `forge notes search`.
 pub fn run_search(args: &SearchArgs) -> Result<u8> {
-    let db_path = resolve_db_path(&args.host, args.db.as_deref());
-    if !db_path.exists() {
-        bail!("notes database not found at {}", db_path.display());
-    }
-    let conn =
-        Connection::open(&db_path).with_context(|| format!("opening {}", db_path.display()))?;
+    let db_path = resolve_db_path(&args.host, args.db.as_deref())?;
+    let conn = open_search(&db_path)?
+        .with_context(|| format!("notes database not found at {}", db_path.display()))?;
     let query = args.query.join(" ");
     if fts_match_query(&query).is_empty() {
         if args.json {
@@ -474,6 +510,31 @@ pub fn run(action: NotesCommand) -> Result<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_only_index_enforces_vm_deadline_and_row_size() {
+        let dir = tempfile_dir();
+        let path = dir.join("notes.db");
+        let writer = Connection::open(&path).unwrap();
+        writer
+            .execute_batch("CREATE TABLE data(value TEXT);")
+            .unwrap();
+        drop(writer);
+        let reader = open_search(&path).unwrap().unwrap();
+        assert!(reader
+            .execute("INSERT INTO data VALUES ('forbidden')", [])
+            .is_err());
+        assert!(reader
+            .query_row("SELECT printf('%.*c', 5000000, 'x')", [], |row| row
+                .get::<_, String>(0))
+            .is_err());
+        let start = std::time::Instant::now();
+        let error = reader.query_row("WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n) SELECT sum(x) FROM n", [], |row| row.get::<_, i64>(0)).unwrap_err();
+        assert!(error.to_string().contains("interrupted"), "{error}");
+        assert!(start.elapsed() < std::time::Duration::from_secs(5));
+        drop(reader);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     fn write(path: &Path, text: &str) {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -534,7 +595,7 @@ mod tests {
         // run database on any host that had split the two.
         let host = Path::new("/srv/host");
         assert_eq!(
-            resolve_db_path(host, None),
+            resolve_db_path(host, None).unwrap(),
             PathBuf::from("/srv/host/research/notes.db")
         );
     }
@@ -543,7 +604,7 @@ mod tests {
     fn an_explicit_db_flag_wins_over_the_default() {
         let host = Path::new("/srv/host");
         let chosen = PathBuf::from("/tmp/other.db");
-        assert_eq!(resolve_db_path(host, Some(&chosen)), chosen);
+        assert_eq!(resolve_db_path(host, Some(&chosen)).unwrap(), chosen);
     }
 
     fn tempfile_dir() -> PathBuf {

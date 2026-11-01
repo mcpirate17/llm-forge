@@ -240,7 +240,7 @@ fn environment(
     changed: &Path,
     changed_py: &Path,
     all: bool,
-) -> Vec<(String, String)> {
+) -> Result<Vec<(String, String)>> {
     let mut env: Vec<(String, String)> = policy.env.clone().into_iter().collect();
     let mut path: Vec<String> = policy
         .path_prepend
@@ -249,19 +249,19 @@ fn environment(
         .collect();
     path.push(std::env::var("PATH").unwrap_or_default());
     let tools = root.join(".git/forge-tools");
-    path.insert(0, tools.join("node_modules/.bin").display().to_string());
-    path.insert(0, tools.join("pmd-bin-7.27.0/bin").display().to_string());
+    let prefix = tools.join("native-install");
+    path.insert(0, prefix.join("bin").display().to_string());
     env.push(("PATH".into(), path.join(":")));
     env.push(("FORGE_CHECK_TOOLS".into(), tools.display().to_string()));
     env.push((
         "FORGE_BIN".into(),
-        root.join(".venv/bin/forge").display().to_string(),
+        prefix.join("bin/forge").display().to_string(),
     ));
+    env.push(("FORGE_INSTALL_ROOT".into(), prefix.display().to_string()));
     env.push((
-        "UV_PROJECT_ENVIRONMENT".into(),
-        root.join(".venv").display().to_string(),
+        "FORGE_CHECK_BIN".into(),
+        std::env::current_exe()?.display().to_string(),
     ));
-    env.push(("PYTHONPATH".into(), root.join("src").display().to_string()));
     env.push(("FORGE_CHECK_BASE".into(), source.merge_base.clone()));
     env.push(("FORGE_CHECK_HEAD".into(), source.head.clone()));
     env.push(("FORGE_CHECK_CHANGED".into(), changed.display().to_string()));
@@ -270,20 +270,11 @@ fn environment(
         changed_py.display().to_string(),
     ));
     env.push(("FORGE_CHECK_ALL".into(), if all { "1" } else { "0" }.into()));
-    let run_dir = changed.parent().expect("changed file has parent");
-    env.push((
-        "PYTHONPYCACHEPREFIX".into(),
-        run_dir.join("pycache").display().to_string(),
-    ));
-    env
+    Ok(env)
 }
 
 fn clean_command(command: &str) -> String {
-    let mut names = vec![
-        "PYO3_NO_PYTHON".to_string(),
-        "PYO3_CONFIG_FILE".to_string(),
-        "PYO3_PYTHON".to_string(),
-    ];
+    let mut names = vec!["PYO3_CONFIG_FILE".to_string()];
     for (key, _) in std::env::vars_os() {
         let key = key.to_string_lossy();
         if key.starts_with("GIT_") && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
@@ -417,7 +408,7 @@ fn execute(
     let changed_py = dir.join("changed-python.txt");
     let python_bytes = changed_python(root, &source.merge_base)?;
     fs::write(&changed_py, &python_bytes)?;
-    let env = environment(root, policy, source, &changed, &changed_py, all);
+    let env = environment(root, policy, source, &changed, &changed_py, all)?;
     let mut records = Vec::new();
     let mut setup_ok = true;
     for step in &policy.setup {
@@ -483,6 +474,7 @@ fn effective_all(requested: bool, changed: &[String]) -> bool {
     requested
         || changed.iter().any(|path| {
             path == "Makefile"
+                || path == "forge.toml"
                 || path == "conductor.mk"
                 || path == "AGENTS.md"
                 || path.starts_with(".forge/")

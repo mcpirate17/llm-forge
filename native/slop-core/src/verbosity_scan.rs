@@ -8,15 +8,19 @@
 //! Nested functions are measured on their own and excluded from the enclosing one.
 
 use std::collections::BTreeSet;
+#[cfg(feature = "python")]
 use std::fs;
+#[cfg(feature = "python")]
 use std::path::PathBuf;
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::{PyDict, PyList};
 use tree_sitter::Node;
 
-use crate::engine::parse;
 use crate::style_scan::{comment_body, DIRECTIVES};
 
 const RULE: &str = "comment/comment-heavy-function";
@@ -128,10 +132,14 @@ fn scan_function(func: Node, source: &str, path: &str, out: &mut Vec<Finding>) {
 }
 
 pub fn scan_source(path: &str, source: &str) -> Result<Vec<Finding>, String> {
-    let tree = parse(source).ok_or_else(|| format!("{path}: could not be parsed as Python"))?;
-    if tree.root_node().has_error() {
-        return Err(format!("{path}: is not valid Python"));
-    }
+    let parsed = crate::source::PythonSource::new(source).map_err(|e| format!("{path}: {e}"))?;
+    Ok(scan_parsed(path, &parsed))
+}
+
+/// Reuse a source whose native ASTs have already been validated.
+pub fn scan_parsed(path: &str, parsed: &crate::source::PythonSource<'_>) -> Vec<Finding> {
+    let source = parsed.text();
+    let tree = parsed.tree();
     let mut findings = Vec::new();
     let mut stack = vec![tree.root_node()];
     while let Some(node) = stack.pop() {
@@ -141,10 +149,11 @@ pub fn scan_source(path: &str, source: &str) -> Result<Vec<Finding>, String> {
         stack.extend(named(node));
     }
     findings.sort();
-    Ok(findings)
+    findings
 }
 
 /// Scan Python files and return one dict per finding, with the function's span.
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (paths, repo=None))]
 pub fn verbosity_scan_files(
@@ -194,7 +203,7 @@ pub fn verbosity_scan_files(
     Ok(out.unbind())
 }
 
-#[pyfunction]
+#[cfg_attr(feature = "python", pyo3::pyfunction)]
 pub fn verbosity_scan_rules() -> Vec<&'static str> {
     vec![RULE]
 }

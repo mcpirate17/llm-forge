@@ -1,18 +1,17 @@
 //! `conductor_native`: the Rust core of the agent tooling under `conductor/`.
 //!
-//! `conductor/_native.py` is the only importer. Everything here used to live in
-//! research-runtime; it moved so the tooling can be built, tested and shipped without
-//! the project's research crate (tooling boundary step 2a).
+//! Forge consumes the native interfaces directly. Transitional adapters also use
+//! this library while the remaining interpreted entry points are migrated.
 //!
-//! Default builds include the Python extension API. Native executables can disable
-//! default features to use the shared planning, receipt and shell parsing cores
-//! without compiling Python bindings or linking an interpreter.
+//! Default builds expose native source analysis, vector retrieval and shared
+//! planning without compiling bindings or linking an interpreter. Transitional
+//! Python adapters require the explicit `python` feature until their callers are
+//! migrated; the standalone Forge binary selects bundled SQLite separately.
 
 mod a2a_compaction;
 pub mod a2a_retention;
 pub mod a2a_store;
-#[cfg(feature = "python")]
-mod a2a_store_py;
+pub mod bounded_io;
 #[cfg(feature = "python")]
 mod branch_policy;
 #[cfg(feature = "python")]
@@ -24,8 +23,6 @@ pub mod candidate_structure;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_verification;
 pub mod context_projection;
-#[cfg(feature = "python")]
-mod context_telemetry;
 pub mod context_telemetry_aggregate;
 pub mod context_telemetry_usage;
 #[cfg(feature = "source-analysis")]
@@ -36,8 +33,7 @@ mod dead_tests;
 mod duplicate_bodies;
 #[cfg(feature = "python")]
 mod equivalence_targets;
-#[cfg(feature = "python")]
-mod fleet_status;
+pub mod fleet_status;
 pub mod forge_binary;
 #[cfg(feature = "python")]
 mod git_source;
@@ -54,10 +50,10 @@ mod hook_merge;
 pub mod hook_response;
 pub mod kb_retrieve;
 pub mod memory_chunking;
-#[cfg(feature = "python")]
-mod memory_index;
-#[cfg(feature = "python")]
-mod memory_index_sidecar;
+#[cfg(feature = "vector-search")]
+pub mod memory_index;
+#[cfg(feature = "vector-search")]
+pub mod memory_index_sidecar;
 pub mod mutation_coverage;
 #[cfg(feature = "python")]
 mod mutation_evidence;
@@ -69,18 +65,29 @@ mod mutation_receipt;
 #[cfg(feature = "python")]
 mod mutation_value;
 pub mod mutation_value_inputs;
+#[cfg(target_os = "linux")]
+pub mod native_id;
 #[cfg(feature = "python")]
 mod native_reuse;
 pub mod performance_receipt;
+pub mod project_config;
 pub mod project_context;
 pub mod project_paths;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod receipt_auth;
 pub mod receipt_slim;
 pub mod reuse_consolidation;
+pub mod sha256_hex;
+pub mod state_paths;
+#[cfg(feature = "source-analysis")]
+pub mod syntax;
 pub mod test_contracts;
 #[cfg(feature = "python")]
 mod test_record;
+#[cfg(feature = "vector-search")]
+mod top_k;
+#[cfg(feature = "vector-search")]
+pub mod vector_index;
 // Test selection reads the record, so these two build without Python too; the rest of
 // each serves the Python recorder.
 #[cfg_attr(not(feature = "python"), allow(dead_code))]
@@ -120,17 +127,13 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 #[pymodule]
 fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    a2a_compaction::register(module)?;
-    a2a_retention::register(module)?;
     branch_policy::register(module)?;
     candidate_benchmark::register(module)?;
     candidate_checks::register(module)?;
     candidate_structure::register(module)?;
     candidate_verification::register(module)?;
-    context_telemetry::register(module)?;
     dead_tests::register(module)?;
     duplicate_bodies::register(module)?;
-    fleet_status::register(module)?;
     forge_binary::register(module)?;
     graph_context::register(module)?;
     guardrail_ast::register(module)?;
@@ -150,7 +153,6 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     project_context::register(module)?;
     project_paths::register_py(module)?;
     candidate_policy::register(module)?;
-    a2a_store_py::register(module)?;
     receipt_auth::register(module)?;
     receipt_slim::register(module)?;
     reuse_consolidation::register(module)?;

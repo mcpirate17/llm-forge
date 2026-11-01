@@ -656,21 +656,56 @@ impl Store {
         limit: usize,
         chars: usize,
     ) -> Result<(Vec<Preview>, i64, i64)> {
-        let filter = if unread {
+        self.preview_snapshot(unread, false, limit, chars)
+    }
+
+    /// Bounded presentation selection. Superseded informational updates are
+    /// omitted only in the unpresented view; actionable requests remain visible.
+    pub fn presentation_previews(
+        &self,
+        replay_unread: bool,
+        limit: usize,
+        chars: usize,
+    ) -> Result<(Vec<Preview>, i64, i64)> {
+        ensure!((1..=8).contains(&limit), "presentation limit must be 1..8");
+        ensure!(
+            (32..=320).contains(&chars),
+            "presentation preview must be 32..320 characters"
+        );
+        self.preview_snapshot(true, !replay_unread, limit, chars)
+    }
+
+    fn preview_snapshot(
+        &self,
+        unread: bool,
+        unpresented: bool,
+        limit: usize,
+        chars: usize,
+    ) -> Result<(Vec<Preview>, i64, i64)> {
+        // One read transaction binds counts, lifecycle and previews to a snapshot.
+        let transaction = self.connection.unchecked_transaction()?;
+        let lifecycle = table_exists(&transaction, "message_state")?;
+        let mut filter = if unread {
             "m.direction='inbound' AND m.read_at IS NULL"
         } else {
             "m.direction='inbound'"
-        };
+        }
+        .to_owned();
+        if unpresented {
+            ensure!(
+                lifecycle && table_exists(&transaction, "message_presentations")?,
+                "presentation requires an initialized lifecycle store"
+            );
+            filter.push_str(" AND NOT EXISTS(SELECT 1 FROM message_presentations p WHERE p.direction=m.direction AND p.message_id=m.message_id)");
+            filter.push_str(" AND NOT EXISTS(SELECT 1 FROM message_state s WHERE s.direction=m.direction AND s.message_id=m.message_id AND s.superseded_at IS NOT NULL AND s.requires_response=0)");
+        }
         let totals = format!("SELECT count(*),COALESCE(sum(length(CAST(m.body AS BLOB))+COALESCE(length(CAST(m.data_json AS BLOB)),0)),0),COALESCE(sum(typeof(m.body)!='text' OR (m.data_json IS NOT NULL AND typeof(m.data_json)!='text')),0) FROM messages m WHERE {filter}");
-        // A read transaction makes counts and previews describe the same snapshot.
-        let transaction = self.connection.unchecked_transaction()?;
         let (count, bytes, invalid): (i64, i64, i64) =
             transaction.query_row(&totals, [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
         ensure!(
             invalid == 0,
             "mailbox contains {invalid} messages with invalid body/data types"
         );
-        let lifecycle = table_exists(&transaction, "message_state")?;
         // SQLite TEXT substr stops at embedded NUL. A byte prefix preserves it
         // and bounds transferred content; Rust performs UTF-8/character slicing.
         let (summary, summary_bytes) = if lifecycle {
@@ -738,19 +773,7 @@ impl Store {
 
     pub fn message(&mut self, id: &str, direction: &str, max_bytes: usize) -> Result<Value> {
         let transaction = self.connection.transaction()?;
-        let size_sql = MESSAGE_COLUMNS
-            .split(',')
-            .map(|name| format!("COALESCE(length(CAST({name} AS BLOB)),0)"))
-            .collect::<Vec<_>>()
-            .join("+");
-        let size: Option<i64> = transaction
-            .query_row(
-                &format!("SELECT {size_sql} FROM messages WHERE message_id=?1 AND direction=?2"),
-                params![id, direction],
-                |r| r.get(0),
-            )
-            .optional()?;
-        let size = size.with_context(|| format!("unknown {direction} message {id:?}"))?;
+        let size = message_size(&transaction, id, direction)?;
         ensure!(size >= 0 && size <= max_bytes as i64, "stored message is {size} bytes, exceeding --max-bytes {max_bytes}; content was not loaded or printed");
         let row = transaction.query_row(
             &format!("SELECT {MESSAGE_COLUMNS} FROM messages WHERE message_id=?1 AND direction=?2"),
@@ -902,6 +925,22 @@ fn preview_summary(row: &rusqlite::Row<'_>, chars: usize) -> rusqlite::Result<St
 
 fn preview_utf8_error(error: std::str::Utf8Error) -> rusqlite::Error {
     rusqlite::Error::FromSqlConversionFailure(7, rusqlite::types::Type::Blob, Box::new(error))
+}
+
+fn message_size(connection: &Connection, id: &str, direction: &str) -> Result<i64> {
+    let expression = MESSAGE_COLUMNS
+        .split(',')
+        .map(|name| format!("COALESCE(length(CAST({name} AS BLOB)),0)"))
+        .collect::<Vec<_>>()
+        .join("+");
+    let size = connection
+        .query_row(
+            &format!("SELECT {expression} FROM messages WHERE message_id=?1 AND direction=?2"),
+            params![id, direction],
+            |row| row.get(0),
+        )
+        .optional()?;
+    size.with_context(|| format!("unknown {direction} message {id:?}"))
 }
 
 fn message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {

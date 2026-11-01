@@ -43,6 +43,7 @@ struct Plan {
     advisory: bool,
     changed_paths: Vec<String>,
     targets: Vec<Target>,
+    excluded_compatibility_tests: Vec<String>,
     selection: serde_json::Value,
     filter: Option<String>,
 }
@@ -72,14 +73,14 @@ fn crate_for(path: &str) -> Vec<&'static str> {
     } else if path.starts_with("native/conductor-native/") {
         vec!["conductor-native", "forge"]
     } else if path.starts_with("native/slop-core/") {
-        vec!["slop-core"]
+        vec!["slop-core", "forge"]
     } else if path.starts_with("src/conductor/") {
         vec!["conductor-native"]
     } else if path.starts_with("src/tooling/") {
         vec!["conductor-native", "forge"]
     } else if matches!(
         path,
-        "Makefile" | "pyproject.toml" | "uv.lock" | "candidate_policy.toml"
+        "Makefile" | "forge.toml" | "pyproject.toml" | "uv.lock" | "candidate_policy.toml"
     ) || path.starts_with(".forge/")
     {
         vec!["forge", "conductor-native", "slop-core"]
@@ -88,19 +89,17 @@ fn crate_for(path: &str) -> Vec<&'static str> {
     }
 }
 
-fn target(crate_name: &str, test: Option<&str>, compat: bool) -> Target {
+fn target(crate_name: &str, test: Option<&str>) -> Target {
     let selector = match test {
         Some(test) => vec!["--test".into(), test.into()],
-        None if crate_name == "forge" => vec!["--bin".into(), "forge".into()],
+        None if crate_name == "forge" => vec!["--lib".into(), "--bin".into(), "forge".into()],
         None => vec!["--lib".into()],
     };
     Target {
         crate_name: crate_name.into(),
         manifest: format!("native/{crate_name}/Cargo.toml"),
-        features: if compat && crate_name == "conductor-native" {
-            vec!["python-compat-tests".into()]
-        } else if crate_name == "conductor-native" {
-            vec!["source-analysis".into()]
+        features: if crate_name == "conductor-native" {
+            vec!["bundled-sqlite".into()]
         } else {
             vec![]
         },
@@ -116,13 +115,10 @@ fn plan(root: &Path, paths: Vec<String>, filter: Option<String>, details: bool) 
         );
     }
     let crates: BTreeSet<_> = paths.iter().flat_map(|path| crate_for(path)).collect();
-    let compat = paths.iter().any(|p| p.starts_with("src/"));
     let selection = conductor_native::graph_context::dispatch("test_selection", &json!({"repo":root,"paths":paths}))
         .unwrap_or_else(|error| json!({"complete":false,"scope":"affected-crates","reasons":[format!("graph unavailable: {error}")],"paths":[]}));
-    let mut targets: Vec<_> = crates
-        .iter()
-        .map(|name| target(name, None, compat))
-        .collect();
+    let mut targets: Vec<_> = crates.iter().map(|name| target(name, None)).collect();
+    let mut excluded_compatibility_tests = BTreeSet::new();
     let selected = selection["paths"].as_array().cloned().unwrap_or_default();
     for path in selected
         .iter()
@@ -134,11 +130,14 @@ fn plan(root: &Path, paths: Vec<String>, filter: Option<String>, details: bool) 
             if let Some(relative) = path.strip_prefix(&prefix) {
                 if !relative.contains('/') && relative.ends_with(".rs") {
                     let test = relative.trim_end_matches(".rs");
-                    let row = target(
-                        name,
-                        Some(test),
-                        compat || test.starts_with("python_contracts_"),
-                    );
+                    // The discovery planner tests are native despite their
+                    // historical prefix; only adapter contracts require Python.
+                    if test.starts_with("python_contracts_") && test != "python_contracts_discovery"
+                    {
+                        excluded_compatibility_tests.insert(path.to_owned());
+                        continue;
+                    }
+                    let row = target(name, Some(test));
                     if let Some(existing) = targets
                         .iter_mut()
                         .find(|t| t.crate_name == row.crate_name && t.features == row.features)
@@ -157,28 +156,12 @@ fn plan(root: &Path, paths: Vec<String>, filter: Option<String>, details: bool) 
             }
         }
     }
-    if compat
-        && !targets.iter().any(|t| {
-            t.selector
-                .iter()
-                .any(|s| s.starts_with("python_contracts_"))
-        })
-    {
-        let row = target("conductor-native", Some("python_contracts_*"), true);
-        if let Some(existing) = targets
-            .iter_mut()
-            .find(|t| t.crate_name == row.crate_name && t.features == row.features)
-        {
-            existing.selector.extend(row.selector);
-        } else {
-            targets.push(row);
-        }
-    }
     Ok(Plan {
         schema: "forge.preview-plan.v1",
         advisory: true,
         changed_paths: paths,
         targets,
+        excluded_compatibility_tests: excluded_compatibility_tests.into_iter().collect(),
         selection: if details {
             selection
         } else {
@@ -244,9 +227,6 @@ fn commands(row: &Target, cache: &Path, no_run: bool, filter: &Option<String>) -
         "--target-dir".into(),
         cache.display().to_string(),
     ];
-    if row.features == ["source-analysis"] {
-        argv.push("--no-default-features".into());
-    }
     if !row.features.is_empty() {
         argv.extend(["--features".into(), row.features.join(",")]);
     }
@@ -269,14 +249,11 @@ fn invoke(
     log: &Path,
     timeout: u64,
 ) -> Result<crate::land_exec::Usage> {
-    let mut command = argv
+    let command = argv
         .iter()
         .map(|s| identity::quote(s))
         .collect::<Vec<_>>()
         .join(" ");
-    if let Some((_, python)) = env.iter().find(|(name, _)| name == "PYO3_PYTHON") {
-        command = format!("export PYO3_PYTHON={}; {command}", identity::quote(python));
-    }
     let command = super::clean_command(&command);
     let measured = run_measured(
         &ShellRun {
@@ -338,78 +315,24 @@ fn cache_workspace(
     Ok(directory)
 }
 
-fn cache_lock(cache: &Path) -> Result<std::fs::File> {
-    use std::os::fd::AsRawFd;
+fn cache_lock(cache: &Path) -> Result<forge::file_lock::Exclusive> {
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
     let file = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(false)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(cache.join("lock"))?;
-    // SAFETY: owned descriptor with a kernel lease released on drop.
+    let meta = file.metadata()?;
     ensure!(
-        unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "another preview is using cache {}",
-        cache.display()
+        meta.is_file()
+            && meta.uid() == unsafe { libc::geteuid() }
+            && meta.nlink() == 1
+            && meta.mode() & 0o077 == 0,
+        "preview lock must be private, owned and singly linked"
     );
-    Ok(file)
-}
-
-fn python_overlay(
-    snap: &Path,
-    artifacts: &Path,
-    row: &Target,
-    env: &[(String, String)],
-    dir: &Path,
-    timeout: u64,
-) -> Result<()> {
-    if !row.features.iter().any(|f| f == "python-compat-tests") {
-        return Ok(());
-    }
-    std::fs::create_dir_all(snap.join(".preview-python"))?;
-    for (name, features, output, target_dir) in [
-        (
-            "conductor-native",
-            vec!["--features", "python-compat-tests"],
-            "conductor_native",
-            artifacts.to_path_buf(),
-        ),
-        (
-            "slop-core",
-            vec![],
-            "slop_core",
-            artifacts.with_file_name("slop-artifacts"),
-        ),
-    ] {
-        let mut argv = vec![
-            "cargo".into(),
-            "build".into(),
-            "--offline".into(),
-            "--locked".into(),
-            "--jobs".into(),
-            "2".into(),
-            "--manifest-path".into(),
-            format!("native/{name}/Cargo.toml"),
-            "--lib".into(),
-            "--target-dir".into(),
-            target_dir.display().to_string(),
-        ];
-        argv.extend(features.into_iter().map(str::to_string));
-        invoke(
-            snap,
-            &argv,
-            env,
-            &dir.join(format!("{name}-extension.log")),
-            timeout,
-        )?;
-        let library = target_dir.join(format!("debug/lib{output}.so"));
-        ensure!(
-            library.is_file(),
-            "preview build did not emit local Python extension {}",
-            library.display()
-        );
-        std::fs::copy(library, snap.join(format!(".preview-python/{output}.so")))?;
-    }
-    Ok(())
+    forge::file_lock::Exclusive::try_new(file, "preview cache")
 }
 
 fn run_target(
@@ -420,6 +343,7 @@ fn run_target(
     args: &PreviewArgs,
 ) -> Result<serde_json::Value> {
     let config = serde_json::to_vec(&(
+        "native-preview-v2",
         (&row.crate_name, &row.manifest, &row.features),
         identity::toolchain()?,
         identity::environment(&[])?,
@@ -452,7 +376,7 @@ fn run_target(
     };
     let reused = source_same && target_digest.as_deref() == Some(digest.as_str());
     let snap = cache_workspace(&cache, &dir.join("snapshot"), inputs)?;
-    let env = preview_env(root, &snap, &cache)?;
+    let env = preview_env()?;
     // Source hashes invalidate package artifacts even if a same-size edit kept mtime.
     if !source_same && previous.is_some() {
         invoke(
@@ -479,7 +403,6 @@ fn run_target(
         &dir.join("build.log"),
         args.timeout_seconds,
     )?;
-    python_overlay(&snap, &artifacts, row, &env, dir, args.timeout_seconds)?;
     let tests = invoke(
         &snap,
         &commands(row, &artifacts, false, &args.filter),
@@ -500,63 +423,19 @@ fn run_target(
     )
 }
 
-fn preview_env(root: &Path, snapshot: &Path, cache: &Path) -> Result<Vec<(String, String)>> {
-    let python = root.join(".venv/bin/python");
-    let mut env = vec![
+fn preview_env() -> Result<Vec<(String, String)>> {
+    Ok(vec![
         ("CUDA_VISIBLE_DEVICES".into(), "".into()),
         ("CARGO_BUILD_JOBS".into(), "2".into()),
         ("RUST_TEST_THREADS".into(), "2".into()),
         ("OMP_NUM_THREADS".into(), "1".into()),
         ("OPENBLAS_NUM_THREADS".into(), "1".into()),
+        ("PYO3_PYTHON".into(), "/nonexistent/forbidden-python".into()),
         (
-            "PYTHONPYCACHEPREFIX".into(),
-            cache.join("pycache").display().to_string(),
+            "FORGE_BIN".into(),
+            std::env::current_exe()?.display().to_string(),
         ),
-    ];
-    if python.is_file() {
-        env.push(("PYO3_PYTHON".into(), python.display().to_string()));
-        let output = std::process::Command::new(&python)
-            .args([
-                "-c",
-                "import json, site, sysconfig; print(json.dumps({'libdir':sysconfig.get_config_var('LIBDIR'),'site':site.getsitepackages()}))",
-            ])
-            .output()?;
-        ensure!(
-            output.status.success(),
-            "preview cannot identify Python library directory"
-        );
-        let config: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-        let sites = config["site"]
-            .as_array()
-            .context("Python site inventory is missing")?
-            .iter()
-            .map(|path| path.as_str().context("invalid Python site path"))
-            .collect::<Result<Vec<_>>>()?
-            .join(":");
-        env.push((
-            "PYTHONPATH".into(),
-            format!(
-                "{}:{}:{sites}",
-                snapshot.join(".preview-python").display(),
-                snapshot.join("src").display()
-            ),
-        ));
-        env.push((
-            "LD_LIBRARY_PATH".into(),
-            format!(
-                "{}:{}",
-                config["libdir"]
-                    .as_str()
-                    .context("Python library directory is missing")?,
-                std::env::var("LD_LIBRARY_PATH").unwrap_or_default()
-            ),
-        ));
-    }
-    env.push((
-        "FORGE_BIN".into(),
-        std::env::current_exe()?.display().to_string(),
-    ));
-    Ok(env)
+    ])
 }
 
 pub fn preview(args: PreviewArgs) -> Result<u8> {
@@ -606,7 +485,8 @@ pub fn preview(args: PreviewArgs) -> Result<u8> {
     // Intentionally never writes .git/forge-checks/latest or a landing receipt.
     println!(
         "{}",
-        json!({"advisory":true,"passed":true,"receipt":receipt})
+        json!({"advisory":true,"passed":true,"native_only":true,
+            "excluded_compatibility_test_count":plan.excluded_compatibility_tests.len(),"receipt":receipt})
     );
     Ok(0)
 }
@@ -615,25 +495,27 @@ pub fn preview(args: PreviewArgs) -> Result<u8> {
 mod tests {
     use super::*;
     #[test]
-    fn crate_dependencies_and_feature_target_keys_are_distinct() {
+    fn native_dependencies_and_library_targets_are_covered_without_bindings() {
         assert_eq!(
             crate_for("native/conductor-native/src/a.rs"),
             ["conductor-native", "forge"]
         );
-        assert_ne!(
-            target("conductor-native", None, true),
-            target("conductor-native", None, false)
+        assert_eq!(
+            crate_for("native/slop-core/src/engine.rs"),
+            ["slop-core", "forge"]
         );
         assert_eq!(
-            target("forge", Some("local_check"), false).selector,
+            target("conductor-native", None).features,
+            ["bundled-sqlite"]
+        );
+        assert_eq!(target("forge", None).selector, ["--lib", "--bin", "forge"]);
+        assert_eq!(
+            target("forge", Some("local_check")).selector,
             ["--test", "local_check"]
         );
-        assert!(!commands(
-            &target("forge", None, false),
-            Path::new("cache"),
-            true,
-            &None
-        )
-        .contains(&"--all-targets".into()));
+        assert!(
+            !commands(&target("forge", None), Path::new("cache"), true, &None)
+                .contains(&"--all-targets".into())
+        );
     }
 }

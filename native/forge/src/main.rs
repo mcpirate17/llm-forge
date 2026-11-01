@@ -1,12 +1,14 @@
 //! Native agent platform: hooks, governance evidence, coordination and costs.
 
-mod active_state;
+use forge::active_state;
 mod bash_guard;
 mod bash_impact;
 mod bounded_child;
 mod cap_enforce;
-mod civil;
+use forge::civil;
+mod config_store;
 mod context_telemetry;
+mod context_telemetry_cli;
 mod context_tools;
 mod crg_gate;
 mod crg_refresh;
@@ -15,11 +17,13 @@ mod dispatch;
 mod doctor;
 mod graph_context;
 mod handlers;
+mod handoff;
+mod hook_protocol;
 mod hooks_install;
 mod identity;
-mod instant;
+use forge::instant;
 mod interpreter;
-mod json_canon;
+use forge::json_canon;
 mod land;
 mod land_exec;
 mod ledger;
@@ -28,32 +32,36 @@ mod local_ai_policy;
 mod local_check;
 mod local_check_receipt;
 mod mailbox;
+mod mcp_setup;
 mod merge;
 mod mutation_plan;
 mod mutation_results;
-mod notes_index;
+use forge::notes_index;
 mod obsidian_sync;
-mod ownership;
+use forge::ownership;
 mod performance;
 mod post_edit_audit;
 mod post_tool;
 mod pre_edit;
 mod pre_read;
+mod project;
+mod provider;
+mod providers;
 mod read_budget;
 mod receipt_show;
 mod route;
+use forge::session_brief;
 mod session_end;
-mod session_policy;
+use forge::session_policy;
 mod session_preamble;
+mod session_start;
 mod status;
 mod subagent_stop;
 mod subagent_transcript;
 mod sweep;
 mod takeover;
 mod task_limits;
-mod task_resources;
 mod task_run;
-mod task_store;
 mod tasks;
 mod telemetry;
 mod tool_quiet;
@@ -61,6 +69,8 @@ mod workspace_hygiene;
 mod write_targets;
 
 use clap::{Parser, Subcommand};
+use forge::tool_schema;
+use forge::{task_resources, task_store};
 use std::process::ExitCode;
 
 #[derive(Parser)]
@@ -78,6 +88,33 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Compile and query immutable native workspace-memory snapshots.
+    Memory(forge::recall::cli::MemoryArgs),
+    /// Bind, check or remove a project MCP connection to an existing native harness.
+    Mcp(mcp_setup::McpArgs),
+    /// Plan, initialize, inspect or roll back native host configuration.
+    Project(project::ProjectArgs),
+    /// Plan, install, check or roll back native provider hooks.
+    Providers(providers::ProvidersArgs),
+    #[command(hide = true)]
+    GraphRefreshWorker {
+        #[arg(long)]
+        host: std::path::PathBuf,
+        #[arg(long)]
+        lock_fd: Option<i32>,
+    },
+    /// Prepare, stage and activate verified native session handoffs.
+    Handoff(handoff::HandoffArgs),
+    /// Persistent native tools with operator capabilities and confined terminals.
+    Harness(forge::harness::cli::HarnessArgs),
+    /// Build and query native immutable BM25 and vector code indexes.
+    CodeIndex(forge::code_index::cli::CodeIndexArgs),
+    /// Native source definitions, references, scopes and body folding.
+    Code(forge::code_tools::CodeArgs),
+    /// Native source guardrails and read-only ablation proposals.
+    Analyze(forge::analysis::AnalysisArgs),
+    /// Native structured-output validation, GBNF and persistent call checking.
+    Schema(tool_schema::cli::SchemaArgs),
     /// Internal compatibility boundary for installed legacy hook entrypoints.
     #[command(hide = true)]
     LegacyHook { operation: String },
@@ -108,11 +145,15 @@ enum Command {
     Context(context_tools::ContextArgs),
     /// Validate a local check receipt against the current checkout and policy.
     Verify(local_check::VerifyArgs),
-    /// Run a hook event with native handlers and delegate remaining hooks to the
-    /// configured host dispatcher.
+    /// Run a hook event with native guards, context and lifecycle handlers.
     Hook {
         /// The event name, e.g. PreToolUse, PostToolUse, SessionStart, SessionEnd.
         event: String,
+        #[arg(long, value_enum, default_value = "claude")]
+        protocol: hook_protocol::Protocol,
+        /// Pin the working directory and hook project environment before dispatch.
+        #[arg(long, alias = "project-dir")]
+        host: Option<std::path::PathBuf>,
     },
     /// Mutation-campaign commands that run natively, no Python interpreter.
     Mutation {
@@ -138,7 +179,7 @@ enum Command {
         #[command(subcommand)]
         action: hooks_install::HooksCommand,
     },
-    /// Verify a host install end to end: settings, binaries, Python,
+    /// Verify a native host install end to end: settings, binaries,
     /// ledger, policy, and a live hook roundtrip (`docs/roadmap.md`
     /// Phase 4 item 2c).
     Doctor(doctor::DoctorArgs),
@@ -158,6 +199,13 @@ enum Command {
 
 #[derive(Subcommand)]
 enum SessionCommand {
+    /// Read a bounded task brief from policy, claims, inbox and explicit indexes.
+    Brief(session_brief::BriefArgs),
+    /// Append a native journal from a SessionEnd JSON payload on stdin.
+    Journal {
+        #[arg(long, default_value = ".")]
+        host: std::path::PathBuf,
+    },
     /// Write (or with --dump, print) conductor/active_state.json: standing
     /// mandates, the top .current_work.md headings, active claims.
     State(session_preamble::SessionStateArgs),
@@ -202,7 +250,7 @@ enum MutationCommand {
     /// Report what `conductor.mutation_campaign_generate write` would emit,
     /// without writing anything. Same computation as the public Python
     /// `plan()` wrapper, which delegates to the native planner.
-    Plan(mutation_plan::PlanArgs),
+    Plan(Box<mutation_plan::PlanArgs>),
     /// Parse a test report into ordered attribution JSON without running tests.
     Results(mutation_results::ResultsArgs),
 }
@@ -266,6 +314,21 @@ fn command_exit(label: &str, result: anyhow::Result<u8>, failure: u8) -> ExitCod
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
+        Command::Memory(args) => command_exit("memory", forge::recall::cli::run(args), 2),
+        Command::Mcp(args) => command_exit("MCP configuration", mcp_setup::run(args), 2),
+        Command::Project(args) => command_exit("project", project::run(args), 2),
+        Command::Providers(args) => command_exit("providers", providers::run(args), 2),
+        Command::GraphRefreshWorker { host, lock_fd } => {
+            command_exit("graph refresh", crg_refresh::run_worker(&host, lock_fd), 2)
+        }
+        Command::Handoff(args) => command_exit("handoff", handoff::run(args), 2),
+        Command::Analyze(args) => command_exit("analyze", forge::analysis::run(args), 2),
+        Command::Code(args) => command_exit("code", forge::code_tools::run(args), 2),
+        Command::Harness(args) => command_exit("harness", forge::harness::cli::run(args), 2),
+        Command::CodeIndex(args) => {
+            command_exit("code-index", forge::code_index::cli::run(args), 2)
+        }
+        Command::Schema(args) => command_exit("schema", tool_schema::cli::run(args), 2),
         Command::LegacyHook { operation } => {
             command_exit("legacy-hook", legacy_hook_api::run(&operation), 2)
         }
@@ -283,7 +346,11 @@ fn main() -> ExitCode {
         Command::Status(args) => command_exit("status", status::run(args), 1),
         Command::Mailbox(args) => command_exit("mailbox", mailbox::run(args), 2),
         Command::Graph(args) => command_exit("graph", graph_context::run(args), 2),
-        Command::Hook { event } => match dispatch::run_hook(&event) {
+        Command::Hook {
+            event,
+            protocol,
+            host,
+        } => match dispatch::run_hook(&event, protocol, host.as_deref()) {
             Ok(code) => ExitCode::from(code),
             Err(err) => {
                 eprintln!("forge hook {event}: {err:#}");
@@ -294,7 +361,7 @@ fn main() -> ExitCode {
             MutationCommand::Results(args) => {
                 command_exit("mutation results", mutation_results::run(args), 2)
             }
-            MutationCommand::Plan(args) => match mutation_plan::run(args) {
+            MutationCommand::Plan(args) => match mutation_plan::run(*args) {
                 Ok(code) => ExitCode::from(code as u8),
                 Err(err) => {
                     eprintln!("forge mutation plan: {err:#}");
@@ -326,6 +393,12 @@ fn main() -> ExitCode {
             }
         },
         Command::Session { action } => match action {
+            SessionCommand::Brief(args) => {
+                command_exit("session brief", session_brief::run(args), 2)
+            }
+            SessionCommand::Journal { host } => {
+                command_exit("session journal", obsidian_sync::run_journal(&host), 2)
+            }
             SessionCommand::State(args) => match session_preamble::run_state(&args) {
                 Ok(code) => ExitCode::from(code),
                 Err(err) => {

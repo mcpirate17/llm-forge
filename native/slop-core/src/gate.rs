@@ -17,7 +17,7 @@ use crate::{engine, index, rules};
 use anyhow::{bail, Context};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs::File;
@@ -32,46 +32,7 @@ const STDERR_TAIL_CHARS: usize = 2000;
 const MAX_AUTO_JOBS: usize = 8;
 const THREAD_VARS: [&str; 3] = ["OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"];
 
-/// A unit to ablate: `(qualname, def line, driver nodeids)`.
-pub type Unit = (String, usize, Vec<String>);
-/// A unit no driver fit the timeout of: `(qualname, def line, why)`.
-pub type Refused = (String, usize, String);
-/// A target module: `(path, whole file, units, refused units)`.
-pub type Target = (String, bool, Vec<Unit>, Vec<Refused>);
-
-/// What a run measured: a whole module (`units` is `None`) or some of its units.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Measured {
-    pub module: String,
-    pub units: Option<Vec<String>>,
-}
-
-impl Measured {
-    pub fn covers(&self, module: &str, qualname: &str) -> bool {
-        self.module == module
-            && self
-                .units
-                .as_ref()
-                .is_none_or(|units| units.iter().any(|unit| unit == qualname))
-    }
-}
-
-/// A run's findings by what they mean for the change.
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct Summary {
-    pub modules_probed: usize,
-    pub measured: Vec<Measured>,
-    pub modules_without_drivers: Vec<String>,
-    /// Modules no recorded test drove, probed with the test files importing them.
-    pub modules_index_driven: Vec<String>,
-    pub blocking: Vec<Value>,
-    pub advisory: Vec<Value>,
-    pub untested: Vec<Value>,
-    pub unreached: Vec<Value>,
-    pub incomplete: Vec<Value>,
-    pub unmeasured: Vec<Value>,
-    pub live: usize,
-}
+pub use crate::gate_types::{Measured, Refused, Summary, Target, Unit};
 
 #[derive(Deserialize)]
 struct Waiver {
@@ -382,7 +343,7 @@ fn unreported(root: &Path, plan: &Plan, findings: &[Value]) -> anyhow::Result<Ve
     let path = root.join(plan.module);
     let source = std::fs::read_to_string(&path).with_context(|| path.display().to_string())?;
     let mut ablations: HashMap<String, usize> = HashMap::new();
-    for ablation in engine::collect(&source, rules::DEFAULT) {
+    for ablation in engine::collect(&source, rules::DEFAULT).map_err(anyhow::Error::msg)? {
         *ablations.entry(ablation.qualname).or_default() += 1;
     }
     Ok(missing

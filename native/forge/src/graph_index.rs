@@ -2,13 +2,13 @@
 //! the destination and atomically replaced only after every source parses.
 
 use anyhow::{ensure, Context, Result};
-use conductor_native::graph_index::{extract_python, extract_rust, Call, Definition, FileFacts};
+use conductor_native::graph_index::{extract, Call, Definition, FileFacts};
+use conductor_native::syntax::Language;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, File};
-use std::io::Read;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use walkdir::{DirEntry, WalkDir};
@@ -17,9 +17,10 @@ use walkdir::{DirEntry, WalkDir};
 mod cache;
 #[path = "graph_index_crates.rs"]
 mod crates;
+#[path = "graph_index_paths.rs"]
+mod paths;
 
 pub const DEFAULT_DB: &str = ".forge/graph.db";
-const MAX_SOURCE_BYTES: u64 = 1 << 20;
 const MAX_TOTAL_SOURCE_BYTES: usize = 128 << 20;
 const MAX_FILES: usize = 30_000;
 const MAX_DEFINITIONS: usize = 100_000;
@@ -49,10 +50,7 @@ pub struct IndexReport {
 }
 
 fn is_source(entry: &DirEntry) -> bool {
-    matches!(
-        entry.path().extension().and_then(|s| s.to_str()),
-        Some("py" | "rs")
-    )
+    Language::from_path(entry.path()).is_some()
 }
 
 fn may_enter(entry: &DirEntry) -> bool {
@@ -68,6 +66,7 @@ fn may_enter(entry: &DirEntry) -> bool {
 }
 
 fn scan(host: &Path, cached: &cache::FactCache) -> Result<(Vec<IndexedFile>, usize)> {
+    let root = forge::source_file::SourceRoot::open(host)?;
     let mut files = Vec::new();
     let mut total_bytes = 0usize;
     let mut total_definitions = 0usize;
@@ -96,44 +95,24 @@ fn scan(host: &Path, cached: &cache::FactCache) -> Result<(Vec<IndexedFile>, usi
             relative.len() <= 400 && !relative.contains('\0'),
             "indexed path exceeds 400 bytes or contains NUL: {relative}"
         );
-        let metadata = entry.metadata()?;
-        ensure!(
-            metadata.len() <= MAX_SOURCE_BYTES,
-            "source exceeds {MAX_SOURCE_BYTES} bytes: {relative}"
-        );
-        let mut bytes = Vec::with_capacity(metadata.len() as usize);
-        File::open(path)
-            .with_context(|| format!("open source: {relative}"))?
-            .take(MAX_SOURCE_BYTES + 1)
-            .read_to_end(&mut bytes)
+        let snapshot = root
+            .read(Path::new(&relative))
             .with_context(|| format!("read source: {relative}"))?;
-        ensure!(
-            bytes.len() as u64 <= MAX_SOURCE_BYTES && !bytes.contains(&0),
-            "source grew too large or contains NUL: {relative}"
-        );
-        total_bytes += bytes.len();
+        total_bytes += snapshot.content().len();
         ensure!(
             total_bytes <= MAX_TOTAL_SOURCE_BYTES,
             "source byte budget exceeded ({MAX_TOTAL_SOURCE_BYTES}): {relative}"
         );
-        let hash = format!("{:x}", Sha256::digest(&bytes));
-        let source =
-            String::from_utf8(bytes).with_context(|| format!("source is not UTF-8: {relative}"))?;
-        let language = if relative.ends_with(".py") {
-            "python"
-        } else {
-            "rust"
-        };
+        let hash = snapshot.sha256().to_owned();
+        let source = snapshot.content();
+        let language = Language::from_path(path)
+            .context("source language disappeared")?
+            .name();
         let facts = match cached.get(&relative) {
             Some((previous, facts)) if previous == &hash => facts.clone(),
             _ => {
                 parsed_files += 1;
-                if language == "python" {
-                    extract_python(&source)
-                } else {
-                    extract_rust(&source)
-                }
-                .with_context(|| format!("parse source: {relative}"))?
+                extract(source, language).with_context(|| format!("parse source: {relative}"))?
             }
         };
         total_definitions += facts.definitions.len();
@@ -323,12 +302,14 @@ fn resolve(
     lookup: &ModuleLookup,
     ids: &Definitions,
 ) -> Option<String> {
-    let separator = if file.language == "python" { "." } else { "::" };
+    let separator = Language::from_name(file.language).ok()?.scope_separator();
     lexical_target(&file.path, call, ids, separator).or_else(|| {
         if file.language == "python" {
             imported_python_target(file, call, lookup, ids)
-        } else {
+        } else if file.language == "rust" {
             explicit_rust_target(call, lookup, ids)
+        } else {
+            None
         }
     })
 }
@@ -442,8 +423,11 @@ fn write_call_edges(
     let mut distinct = BTreeSet::new();
     let mut unresolved_files = BTreeSet::new();
     for file in files {
+        if file.facts.cross_file_incomplete {
+            unresolved_files.insert(file.path.clone());
+        }
         // A file of a closed crate already reaches every consumer through its root.
-        let unlinked_rust = file.language != "python" && !crates.linked(&file.path);
+        let unlinked_rust = file.language == "rust" && !crates.linked(&file.path);
         for call in &file.facts.calls {
             let source = ids.get(&(file.path.clone(), call.caller.clone()));
             let target = resolve(file, call, lookup, ids);
@@ -538,6 +522,9 @@ fn write_import_edges(
     names: &BTreeSet<String>,
     crates: &crates::Crates,
 ) -> Result<bool> {
+    if !matches!(file.language, "python" | "rust") {
+        return paths::write_edges(tx, file, lookup);
+    }
     let mut unresolved = false;
     let literals = file
         .facts
@@ -654,20 +641,25 @@ fn write_metadata(
 }
 
 fn git_head(host: &Path) -> Result<String> {
-    let output = std::process::Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .current_dir(host)
-        .output()
-        .context("read graph build revision")?;
-    if output.status.success() {
-        return Ok(String::from_utf8(output.stdout)?.trim().to_owned());
-    }
-    ensure!(
-        output.status.code() == Some(128),
-        "git rev-parse failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    Ok(String::new())
+    let repository = match git2::Repository::open(host) {
+        Ok(repository) => repository,
+        Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(String::new()),
+        Err(error) => return Err(error).context("read graph repository"),
+    };
+    let head = match repository.head() {
+        Ok(head) => head,
+        Err(error)
+            if matches!(
+                error.code(),
+                git2::ErrorCode::NotFound | git2::ErrorCode::UnbornBranch
+            ) =>
+        {
+            return Ok(String::new())
+        }
+        Err(error) => return Err(error).context("read graph build revision"),
+    };
+    let commit = head.peel_to_commit()?;
+    Ok(commit.id().to_string())
 }
 
 fn existing_counts(db: &Path, head: &str, manifests: &str) -> Result<Option<(usize, usize)>> {
@@ -770,8 +762,12 @@ pub fn index(host: &Path, explicit_db: Option<&Path>) -> Result<IndexReport> {
     let (resolved_calls, unresolved_calls) = write_snapshot(&mut conn, &files, &crates)?;
     conn.execute("INSERT INTO index_meta VALUES ('git_head_sha',?1)", [head])?;
     conn.close().map_err(|(_, error)| error)?;
+    fs::File::open(&temporary.0)?.sync_all()?;
     fs::rename(&temporary.0, &db)
         .with_context(|| format!("publish graph snapshot: {}", db.display()))?;
+    fs::File::open(parent)?
+        .sync_all()
+        .context("graph published, directory sync failed")?;
     Ok(report(
         &db,
         &files,

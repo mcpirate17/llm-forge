@@ -191,75 +191,75 @@
   },
   "refresh-combined-multiple-failures-and-warnings": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow"
   },
   "refresh-default-kind-is-failure": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-empty-marker": null,
   "refresh-failure-and-warning-shared-path": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['shared.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['shared.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['shared.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['shared.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow"
   },
   "refresh-failure-empty-paths": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing []. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing []. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing []. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing []. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-failure-real-writer-shape": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['z.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['z.py']. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['z.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: RuntimeError: boom while refreshing ['z.py']. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-failure-then-warning": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow"
   },
   "refresh-failure-with-multiple-paths": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py', 'b.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py', 'b.py']. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py', 'b.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py', 'b.py']. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-malformed-line-falls-back-to-failure": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: not json at all. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-many-failures-preserves-order": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: first while refreshing ['a.py']; second while refreshing ['b.py']; third while refreshing ['c.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: first while refreshing ['a.py']; second while refreshing ['b.py']; third while refreshing ['c.py']. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: first while refreshing ['a.py']; second while refreshing ['b.py']; third while refreshing ['c.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: first while refreshing ['a.py']; second while refreshing ['b.py']; third while refreshing ['c.py']. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-no-marker": null,
   "refresh-one-failure": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-one-warning": {
     "hookSpecificOutput": {
@@ -270,24 +270,24 @@
   },
   "refresh-single-failure-with-long-text": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: TimeoutError: refresh exceeded 30s while walking the dependency graph while refreshing ['deep/nested/module.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: TimeoutError: refresh exceeded 30s while walking the dependency graph while refreshing ['deep/nested/module.py']. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: TimeoutError: refresh exceeded 30s while walking the dependency graph while refreshing ['deep/nested/module.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: TimeoutError: refresh exceeded 30s while walking the dependency graph while refreshing ['deep/nested/module.py']. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-text-field-preferred-over-error": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: t while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: t while refreshing ['a.py']. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: t while refreshing ['a.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: t while refreshing ['a.py']. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-two-failures": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py', 'd.py']. Graph reads are STALE until `code-review-graph update` succeeds.",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py', 'd.py']. Graph reads are STALE until `forge graph refresh` succeeds.",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py', 'd.py']. Graph reads are STALE until `code-review-graph update` succeeds."
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['c.py', 'd.py']. Graph reads are STALE until `forge graph refresh` succeeds."
   },
   "refresh-two-warnings": {
     "hookSpecificOutput": {
@@ -305,16 +305,16 @@
   },
   "refresh-warning-then-failure": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['b.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['b.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['b.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['b.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow"
   },
   "refresh-warning-then-two-failures": {
     "hookSpecificOutput": {
-      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['b.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow",
+      "additionalContext": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['b.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow",
       "hookEventName": "PreToolUse"
     },
-    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['b.py']. Graph reads are STALE until `code-review-graph update` succeeds. WARNING: background graph refresh: slow"
+    "systemMessage": "WARNING: background graph refresh FAILED: boom while refreshing ['a.py']; bang while refreshing ['b.py']. Graph reads are STALE until `forge graph refresh` succeeds. WARNING: background graph refresh: slow"
   }
 }

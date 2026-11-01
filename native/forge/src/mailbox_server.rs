@@ -33,6 +33,9 @@ pub struct ServeArgs {
     pub name: String,
     #[arg(long)]
     pub port: Option<u16>,
+    /// Optional bounded lifetime for an automatically started endpoint.
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=86400))]
+    pub lifetime_seconds: Option<u64>,
 }
 
 #[derive(Clone)]
@@ -362,8 +365,15 @@ pub fn serve(args: ServeArgs, state_dir: PathBuf) -> Result<()> {
     );
     runtime.block_on(async move {
         let listener = tokio::net::TcpListener::from_std(listener)?;
-        axum::serve(io::BoundedListener::new(listener), app)
-            .await
-            .context("A2A HTTP server stopped")
+        let serving = async { axum::serve(io::BoundedListener::new(listener), app).await };
+        match args.lifetime_seconds {
+            Some(seconds) => {
+                match tokio::time::timeout(Duration::from_secs(seconds), serving).await {
+                    Ok(result) => result.context("A2A HTTP server stopped"),
+                    Err(_) => Ok(()), // Expiry drops connections; SQLite commits remain atomic.
+                }
+            }
+            None => serving.await.context("A2A HTTP server stopped"),
+        }
     })
 }

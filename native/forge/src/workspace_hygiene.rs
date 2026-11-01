@@ -86,55 +86,10 @@ fn host_root(start: &Path) -> PathBuf {
     enclosing_repo(&resolved).unwrap_or(resolved)
 }
 
-/// The configured integration branch: `CONDUCTOR_INTEGRATION_BRANCH`, else
-/// `[tool.conductor].integration_branch` in the host root's pyproject.toml,
-/// else `main` -- mirroring `project_paths._configured_integration_branch`
-/// and `conductor_table` exactly: a missing manifest or a manifest without
-/// the key is simply "unnamed" (the default), a non-table `[tool.conductor]`
-/// or a non-string/empty value is a loud error, and an unparseable manifest
-/// fails as-is.
+/// Shared bounded native configuration, with the explicit environment override
+/// and legacy host-data fallback implemented centrally in project_paths.
 fn configured_integration_branch(root: &Path) -> Result<String> {
-    if let Ok(raw) = std::env::var("CONDUCTOR_INTEGRATION_BRANCH") {
-        let trimmed = raw.trim();
-        if !trimmed.is_empty() {
-            return Ok(trimmed.to_string());
-        }
-    }
-    let manifest = root.join("pyproject.toml");
-    if !manifest.is_file() {
-        return Ok("main".to_string());
-    }
-    let text = std::fs::read_to_string(&manifest)
-        .map_err(|err| anyhow!("cannot read {}: {err}", manifest.display()))?;
-    let payload: toml::Table = text.parse().map_err(|err| anyhow!("{err}"))?;
-    let tool = payload.get("tool");
-    let table = match tool.and_then(|tool| tool.get("conductor")) {
-        None => return Ok("main".to_string()),
-        Some(table) => table,
-    };
-    if !table.is_table() {
-        return Err(anyhow!(
-            "[tool.conductor] in {} is not a table",
-            manifest.display()
-        ));
-    }
-    let Some(raw) = table.get("integration_branch") else {
-        return Ok("main".to_string());
-    };
-    let Some(branch) = raw.as_str() else {
-        return Err(anyhow!(
-            "integration_branch in [tool.conductor] ({}) must be a string, got {raw}",
-            manifest.display()
-        ));
-    };
-    let trimmed = branch.trim();
-    if trimmed.is_empty() {
-        return Err(anyhow!(
-            "integration_branch in [tool.conductor] ({}) must not be empty",
-            manifest.display()
-        ));
-    }
-    Ok(trimmed.to_string())
+    conductor_native::project_paths::integration_branch(root).map_err(anyhow::Error::msg)
 }
 
 /// The line containment is judged against, resolved exactly as

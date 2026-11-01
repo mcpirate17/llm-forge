@@ -278,14 +278,17 @@ pub fn compose_hook(fragments: &[Fragment]) -> String {
         }
         Err(_) => DEFAULT_MAX_BYTES,
     };
-    let root = std::env::var_os("CONTEXT_FRAGMENT_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| {
-            std::env::var_os("LEDGER_ROOT")
-                .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| "/mnt/data/llm/ledger".into())
-                .join("context_fragments")
-        });
+    let root = match crate::state_paths::fragments_root() {
+        Ok(root) => root,
+        Err(error) => {
+            eprintln!("forge: context storage unavailable; retaining full context: {error}");
+            return fragments
+                .iter()
+                .map(|fragment| fragment.content.as_str())
+                .collect::<Vec<_>>()
+                .join("\n\n");
+        }
+    };
     compose(fragments, max_bytes, Some(&root)).text
 }
 

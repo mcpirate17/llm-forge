@@ -17,22 +17,6 @@ struct DelegationEvent<'a> {
     ts: String,
 }
 
-/// Appends one JSON line recording that `event` was delegated to the Python
-/// dispatcher, iff `CONTEXT_TELEMETRY_PATH` names where to append it -- the same
-/// env var `tooling.hooks.dispatch.adapters._telemetry_path` reads to override
-/// `conductor.context_telemetry.DEFAULT_PATH`. No env var, no write: forge does not
-/// invent a default path of its own, since that default lives under the `conductor`
-/// package's own directory, which is a Python-package-layout fact this binary has
-/// no reason to know and every reason not to hardcode.
-///
-/// Best-effort like the Python telemetry adapter it mirrors
-/// (`adapters._telemetry` catches its own write errors to stderr rather than
-/// failing the hook): a telemetry write must never turn a working hook into a
-/// broken one.
-pub fn record_delegation(event: &str, elapsed_ms: f64) {
-    record(event, elapsed_ms, true);
-}
-
 /// Appends one JSON line recording that `event` was answered fully natively
 /// -- forge never started Python for this call at all -- so telemetry can
 /// distinguish "delegated" and "fully native" calls the same way `dispatch.py`
@@ -49,10 +33,13 @@ fn record(event: &str, elapsed_ms: f64, delegated: bool) {
     // lives under the ledger root, outside every checkout, so the native
     // hook-ms records land by default and `forge ledger audit`'s
     // `median_hook_ms` stops being NO_DATA on a default install.
-    let path = crate::context_telemetry::telemetry_path();
-    if path.as_os_str().is_empty() {
-        return;
-    }
+    let path = match crate::context_telemetry::telemetry_path() {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("forge: telemetry storage unavailable: {error}");
+            return;
+        }
+    };
     let record = DelegationEvent {
         event,
         elapsed_ms,

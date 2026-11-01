@@ -1,23 +1,23 @@
 # Session preamble and in-place handoff contract migration
 
-The 18 tests in `src/conductor/test_session_preamble.py` and the 8 tests in
-`src/conductor/test_inplace_handoff.py` are ported to Rust-owned PyO3 integration
-targets. Their assertions, fixture state, policy text, file setup, and output
-checks live in:
+Handoff now runs directly through `forge handoff`. Six `native_handoff` integration
+tests cover activation/idempotency/lineage, stale and corrupt data, locking and
+hostile file types, malformed metadata and input bounds, preparation/identity/
+Unicode clipping, and resource IDs. `native_session_brief` additionally verifies
+default brief composition and explicit context preservation. The Python handoff
+module, its PyO3 target and dedicated helper have been deleted, not archived.
+
+The 18 original session-preamble cases retain transitional PyO3 coverage in:
 
 - `native/conductor-native/tests/python_contracts_session_preamble.rs`
-- `native/conductor-native/tests/python_contracts_inplace_handoff.rs`
 - `native/conductor-native/tests/python_contracts/session_preamble_support.rs`
-- `native/conductor-native/tests/python_contracts/inplace_handoff_support.rs`
 
-The targets call the shipped Python APIs through PyO3. They do not invoke the
+This target calls the shipped Python API through PyO3. It does not invoke the
 retired pytest files. The shared `python_contracts/support.rs` fixture restores
 process state between cases, and the preamble helper restores its temporary
 `sys.modules` replacement after refresh tests.
 
-Before retirement, the exact Python baseline passed 26/26. The Rust targets
-passed 18/18 and 8/8 with `--features python-compat-tests --test-threads=1`;
-scoped Clippy passed with `-D warnings`. The fixture keeps claims, policy,
-identity, CLI output, and file paths local to each test. The registry maps the
-relevant Python providers and Rust helpers to both targets so source changes
-select these contracts in candidate and graph test runs.
+The earlier 26-case Python/PyO3 baseline is historical evidence, not current
+native acceptance. Native startup and brief tests run with an empty PATH and
+invalid interpreter selection. See [native task briefs](native-session-brief.md)
+and [native lifecycle](native-lifecycle.md) for current interfaces and bounds.

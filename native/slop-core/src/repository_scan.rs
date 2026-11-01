@@ -8,7 +8,9 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 
 fn is_line_break(ch: char) -> bool {
@@ -113,7 +115,7 @@ fn collect_files(
     }
 }
 
-fn scan(
+pub fn scan(
     repo: &Path,
     targets: &[String],
     suffixes: &[String],
@@ -157,6 +159,7 @@ fn scan(
 }
 
 /// Scan code files under `targets`, returning sorted repository-relative path/LOC pairs.
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (repo, targets, suffixes, skip_parts, comment_prefixes))]
 pub fn audit_repository_scan(

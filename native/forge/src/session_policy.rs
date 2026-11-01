@@ -1,13 +1,10 @@
-//! The optional project-owned SessionStart policy, ported from
-//! `conductor.session_preamble`'s Python twin: a host opts in by putting
-//! complete `[tool.conductor.session]` text in its root `pyproject.toml`.
-//! This module selects and validates those strings without interpreting
-//! them as authority -- every rule and message mirrors the Python.
+//! Optional project-owned SessionStart text from the shared native manifest
+//! reader. These strings provide context; they do not authorize actions.
 
 use std::fmt;
-use std::path::{Path, PathBuf};
-
-const CONFIG_LIMIT: u64 = 64 * 1024;
+use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 
 #[derive(Debug, Default, Clone)]
 pub struct SessionPolicy {
@@ -28,49 +25,6 @@ impl std::error::Error for SessionPolicyError {}
 
 fn error(path: &Path, message: impl fmt::Display) -> SessionPolicyError {
     SessionPolicyError(format!("{}: {}", path.display(), message))
-}
-
-/// `pyproject.toml` as a parsed table, `None` when the file is absent --
-/// a package install has no project policy. Every other failure is loud,
-/// with the path in the message, like the Python.
-fn read_config(path: &Path) -> Result<Option<toml::Value>, SessionPolicyError> {
-    let metadata = match std::fs::metadata(path) {
-        Ok(metadata) => metadata,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => return Err(error(path, format!("cannot inspect configuration: {err}"))),
-    };
-    if !metadata.is_file() {
-        return Err(error(path, "configuration must be a regular file"));
-    }
-    if metadata.len() > CONFIG_LIMIT {
-        return Err(error(path, "configuration exceeds 64 KiB"));
-    }
-    let raw = std::fs::read(path)
-        .map_err(|err| error(path, format!("cannot read configuration: {err}")))?;
-    if raw.len() as u64 > CONFIG_LIMIT {
-        return Err(error(path, "configuration exceeds 64 KiB"));
-    }
-    let text = String::from_utf8(raw)
-        .map_err(|_| error(path, "invalid TOML configuration: invalid utf-8"))?;
-    text.parse::<toml::Value>()
-        .map(Some)
-        .map_err(|err| error(path, format!("invalid TOML configuration: {err}")))
-}
-
-/// `None` when the key is absent, an error when it is present but not a
-/// table -- `[tool]` in a pyproject always is, so in practice only a
-/// hand-mangled file hits the error arm.
-fn table<'a>(
-    parent: Option<&'a toml::Value>,
-    key: &str,
-    path: &Path,
-    label: &str,
-) -> Result<Option<&'a toml::Value>, SessionPolicyError> {
-    match parent.and_then(|value| value.get(key)) {
-        None => Ok(None),
-        Some(value) if value.is_table() => Ok(Some(value)),
-        Some(_) => Err(error(path, format!("{label} must be a table"))),
-    }
 }
 
 fn strings(
@@ -109,31 +63,33 @@ pub fn load_session_policy(repo: &Path) -> Result<SessionPolicy, SessionPolicyEr
             repo.display()
         )));
     }
-    let path: PathBuf = repo.join("pyproject.toml");
-    let Some(payload) = read_config(&path)? else {
+    let config = conductor_native::project_config::load(repo).map_err(SessionPolicyError)?;
+    from_config(&config)
+}
+
+pub fn from_config(
+    config: &conductor_native::project_config::ProjectConfig,
+) -> Result<SessionPolicy, SessionPolicyError> {
+    let path = &config.path;
+    let Some(value) = config.conductor.get("session") else {
         return Ok(SessionPolicy::default());
     };
-    let tool = table(Some(&payload), "tool", &path, "[tool]")?;
-    let conductor = table(tool, "conductor", &path, "[tool.conductor]")?;
-    let session = table(conductor, "session", &path, "[tool.conductor.session]")?;
-    let Some(session) = session else {
-        return Ok(SessionPolicy::default());
-    };
-    let keys: std::collections::BTreeSet<&str> = session
+    let session = value
         .as_table()
-        .expect("table() only returns table values")
-        .keys()
-        .map(String::as_str)
-        .collect();
+        .ok_or_else(|| error(path, "session must be a table"))?;
+    let keys: std::collections::BTreeSet<&str> = session.keys().map(String::as_str).collect();
     if keys != ["preamble", "standing_mandates"].into_iter().collect() {
         return Err(error(
-            &path,
-            "[tool.conductor.session] must contain exactly preamble and standing_mandates",
+            path,
+            format!(
+                "[{}.session] must contain exactly preamble and standing_mandates",
+                config.namespace
+            ),
         ));
     }
     Ok(SessionPolicy {
-        preamble: strings(session.get("preamble"), &path, "preamble")?,
-        standing_mandates: strings(session.get("standing_mandates"), &path, "standing_mandates")?,
+        preamble: strings(session.get("preamble"), path, "preamble")?,
+        standing_mandates: strings(session.get("standing_mandates"), path, "standing_mandates")?,
     })
 }
 

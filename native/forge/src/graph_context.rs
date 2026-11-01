@@ -14,7 +14,6 @@ use anyhow::{bail, ensure, Context, Result};
 use clap::{Args, Subcommand};
 use regex::Regex;
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
@@ -42,8 +41,15 @@ pub struct GraphArgs {
 
 #[derive(Subcommand)]
 enum GraphCommand {
-    /// Build a syntax-only Python/Rust graph in Forge-owned SQLite.
+    /// Build a native multi-language syntax graph in Forge-owned SQLite.
     Index,
+    /// Queue a durable native index refresh and return without waiting.
+    Refresh,
+    /// Wait for the native refresh worker, bounded by a deadline.
+    Wait {
+        #[arg(long, default_value_t=3, value_parser=clap::value_parser!(u64).range(1..=300))]
+        timeout_seconds: u64,
+    },
     /// Bounded source and indexed callers/callees for one file or symbol.
     Context(ContextArgs),
     /// Discover concrete code references in a bounded message prefix.
@@ -158,12 +164,53 @@ pub fn run(args: GraphArgs) -> Result<u8> {
     let host = host.canonicalize().context("host directory not found")?;
     ensure!(host.is_dir(), "host is not a directory: {}", host.display());
     match action {
+        GraphCommand::Refresh => {
+            ensure!(
+                db.is_none(),
+                "background refresh owns the default native graph database"
+            );
+            crate::crg_refresh::queue_full_update(&host)?;
+            println!(
+                "{}",
+                serde_json::json!({"queued":true,"database":host.join(indexer::DEFAULT_DB)})
+            );
+        }
+        GraphCommand::Wait { timeout_seconds } => {
+            ensure!(
+                db.is_none(),
+                "background refresh owns the default native graph database"
+            );
+            let waiting = crate::crg_refresh::wait_output(
+                &host,
+                std::time::Duration::from_secs(timeout_seconds),
+            )?;
+            let failures = crate::crg_refresh::failure_output("PreToolUse", &host);
+            let stale = crate::crg_refresh::stale_reason(&host)?;
+            let fresh = waiting.is_null() && stale.is_none();
+            println!(
+                "{}",
+                serde_json::json!({"fresh":fresh,"wait":waiting,"notices":failures,"stale":stale})
+            );
+            if !fresh {
+                return Ok(1);
+            }
+        }
         GraphCommand::Index => {
             let report = indexer::index(&host, db.as_deref())?;
             println!("{}", serde_json::to_string(&report)?);
         }
-        GraphCommand::Context(args) => run_context(&host, db.as_deref(), args)?,
-        GraphCommand::Refs(args) => run_refs(&host, db.as_deref(), args)?,
+        GraphCommand::Context(args) => {
+            if db.is_none() {
+                crate::crg_refresh::ensure_native_fresh(&host)?;
+            }
+            run_context(&host, db.as_deref(), args)?;
+        }
+        GraphCommand::Refs(args) => {
+            if db.is_none() {
+                crate::crg_refresh::ensure_native_fresh(&host)?;
+            }
+            run_refs(&host, db.as_deref(), args)?;
+        }
     }
     Ok(0)
 }
@@ -250,7 +297,7 @@ fn run_refs(host: &Path, db: Option<&Path>, args: RefsArgs) -> Result<()> {
         if !seen_raw.insert((path.to_string(), symbol.map(str::to_string))) {
             continue;
         }
-        let (canonical, relative) = match resolve_code_path(host, path) {
+        let (_, relative) = match resolve_code_path(host, path) {
             Ok(found) => found,
             Err(_) => {
                 output.rejected_refs += 1;
@@ -264,7 +311,7 @@ fn run_refs(host: &Path, db: Option<&Path>, args: RefsArgs) -> Result<()> {
             output.omitted_refs += 1;
             continue;
         }
-        let file = match read_source_resolved(&canonical, relative) {
+        let file = match read_source_resolved(host, relative) {
             Ok(file) => file,
             Err(_) => {
                 output.rejected_refs += 1;
@@ -300,8 +347,8 @@ fn validate_symbol(symbol: Option<&str>) -> Result<Option<&str>> {
 }
 
 fn read_source(host: &Path, raw: &str) -> Result<SourceFile> {
-    let (canonical, relative) = resolve_code_path(host, raw)?;
-    read_source_resolved(&canonical, relative)
+    let (_, relative) = resolve_code_path(host, raw)?;
+    read_source_resolved(host, relative)
 }
 
 fn resolve_code_path(host: &Path, raw: &str) -> Result<(PathBuf, String)> {
@@ -331,30 +378,14 @@ fn resolve_code_path(host: &Path, raw: &str) -> Result<(PathBuf, String)> {
     Ok((canonical, relative))
 }
 
-fn read_source_resolved(canonical: &Path, relative: String) -> Result<SourceFile> {
-    let metadata = canonical
-        .metadata()
-        .with_context(|| format!("stat code file: {}", canonical.display()))?;
-    ensure!(metadata.is_file(), "code path is not a file: {relative}");
+fn read_source_resolved(host: &Path, relative: String) -> Result<SourceFile> {
+    let snapshot = forge::source_file::SourceRoot::open(host)?.read(Path::new(&relative))?;
     ensure!(
-        metadata.len() <= MAX_SOURCE_BYTES as u64,
+        snapshot.content().len() <= MAX_SOURCE_BYTES,
         "code file exceeds {MAX_SOURCE_BYTES} bytes: {relative}"
     );
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    File::open(canonical)?
-        .take((MAX_SOURCE_BYTES + 1) as u64)
-        .read_to_end(&mut bytes)?;
-    ensure!(
-        bytes.len() <= MAX_SOURCE_BYTES,
-        "code file grew beyond {MAX_SOURCE_BYTES} bytes: {relative}"
-    );
-    ensure!(
-        !bytes.contains(&0),
-        "code file contains NUL bytes: {relative}"
-    );
-    let digest = format!("{:x}", Sha256::digest(&bytes));
-    let text =
-        String::from_utf8(bytes).with_context(|| format!("code file is not UTF-8: {relative}"))?;
+    let digest = snapshot.sha256().to_owned();
+    let text = snapshot.into_content();
     Ok(SourceFile {
         relative,
         text,
@@ -389,11 +420,9 @@ fn project_context(
         projection.symbols.clear();
     }
     if projection.graph_status.starts_with("stale") || projection.symbols.is_empty() {
-        let language = if file.relative.ends_with(".rs") {
-            "rust"
-        } else {
-            "python"
-        };
+        let language = conductor_native::syntax::Language::from_path(Path::new(&file.relative))
+            .context("unsupported source language")?
+            .name();
         let current = conductor_native::graph_context::current_symbols(&file.text, language)
             .map_err(anyhow::Error::msg)?;
         projection.symbols = current

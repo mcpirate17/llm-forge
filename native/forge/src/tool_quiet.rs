@@ -1,26 +1,19 @@
-//! `PostToolUse` output bounding: the native port of
-//! `src/tooling/hooks/claude/_bash_quiet.py` and `.../post_tool_quiet.py`.
+//! Native PostToolUse output bounding for Bash, Read, Grep and MCP.
 //!
-//! Both Python hooks share one contract: a `tool_response` field over a byte
+//! The handlers share one contract: a `tool_response` field over a byte
 //! cap is rewritten to head + an elision marker + tail, and the elided middle
 //! either names a spill file (Bash `stdout`/`stderr`/`output`, Grep strings,
 //! MCP text blocks) or a `Read(offset=..., limit=...)` resume point (Read's
 //! `file.content`, never spilled -- the file is already on disk). This module
 //! is that one bounding core; `handlers::PostBashQuiet` and
 //! `handlers::PostToolQuiet` each wire it to their own response shape and
-//! byte cap, exactly as `_bash_quiet.bound_response` and
-//! `post_tool_quiet.bound_response` do today.
+//! byte cap.
 //!
-//! Byte-for-byte parity with Python (including the spill filename, which
+//! Historical compatibility (including the spill filename, which
 //! embeds a caller-supplied timestamp) is pinned by
 //! `native/forge/tests/tool_quiet_parity.rs` against the frozen fixtures
-//! under `src/tooling/hooks/claude/fixtures/`. Known gap: Python's
-//! `str.encode("utf-8", "surrogateescape")` lets a lone UTF-16 surrogate from
-//! a malformed `\uXXXX` JSON escape round-trip through the byte-length check;
-//! `serde_json` replaces such an escape with U+FFFD during parsing, so a
-//! payload built entirely around that edge case can disagree on byte counts.
-//! No case in the corpus exercises it, and it is reported here rather than
-//! hand-patched.
+//! under `native/forge/tests/fixtures/`. Native hook ingress requires valid
+//! UTF-8 JSON and rejects lone surrogate escapes before dispatch.
 
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};

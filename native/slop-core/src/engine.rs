@@ -5,16 +5,17 @@
 //! a one-span representation cannot express that and the Python version could not
 //! carry those rules at all.
 
+use std::cell::Cell;
 use tree_sitter::{Node, Parser};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Edit {
     pub start: usize,
     pub end: usize,
     pub replacement: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Ablation {
     pub rule: String,
     pub qualname: String,
@@ -43,9 +44,25 @@ pub struct Ctx<'a> {
     pub funcs: std::collections::HashMap<String, FuncInfo>,
     /// Lines carrying a `# noqa` suppression, for the import rule.
     pub silenced: std::collections::HashSet<usize>,
+    proposal_bytes: Cell<usize>,
+    exhausted: Cell<bool>,
 }
 
 impl<'a> Ctx<'a> {
+    pub(crate) fn fail_budget(&self) {
+        self.exhausted.set(true);
+    }
+
+    pub(crate) fn admit(&self, count: usize, bytes: usize) -> bool {
+        let next = self.proposal_bytes.get().saturating_add(bytes);
+        if count >= 4096 || next > 8 * 1024 * 1024 {
+            self.fail_budget();
+            return false;
+        }
+        self.proposal_bytes.set(next);
+        true
+    }
+
     pub fn text(&self, n: Node) -> String {
         String::from_utf8_lossy(&self.src[n.byte_range()]).into_owned()
     }
@@ -59,7 +76,7 @@ impl<'a> Ctx<'a> {
 
 pub fn parse(source: &str) -> Option<tree_sitter::Tree> {
     let mut p = Parser::new();
-    p.set_language(&tree_sitter_python::language()).ok()?;
+    p.set_language(&tree_sitter_python::LANGUAGE.into()).ok()?;
     p.parse(source, None)
 }
 
@@ -107,6 +124,8 @@ fn index_funcs(src: &[u8], root: Node) -> std::collections::HashMap<String, Func
         src,
         funcs: Default::default(),
         silenced: Default::default(),
+        proposal_bytes: Cell::new(0),
+        exhausted: Cell::new(false),
     };
     let mut out = std::collections::HashMap::new();
     let mut stack = vec![root];
@@ -137,23 +156,29 @@ fn silenced_lines(source: &str) -> std::collections::HashSet<usize> {
 
 pub type Rule = fn(&Ctx, Node, &str, &mut Vec<Ablation>);
 
-/// Walk once, offering every node to every enabled rule. One traversal for the
-/// whole rule set is the point: the Python version re-walked per rule.
-pub fn collect(source: &str, rules: &[(&str, Rule)]) -> Vec<Ablation> {
-    let Some(tree) = parse(source) else {
-        return Vec::new();
-    };
+pub use crate::ablation::{apply, collect};
+
+pub(crate) fn collect_tree(
+    source: &str,
+    tree: &tree_sitter::Tree,
+    rules: &[(&str, Rule)],
+) -> Result<Vec<Ablation>, String> {
     let root = tree.root_node();
     let src = source.as_bytes();
     let ctx = Ctx {
         src,
         funcs: index_funcs(src, root),
         silenced: silenced_lines(source),
+        proposal_bytes: Cell::new(0),
+        exhausted: Cell::new(false),
     };
     let mut out = Vec::new();
     walk(&ctx, root, &mut Vec::new(), rules, &mut out);
+    if ctx.exhausted.get() {
+        return Err("ablation proposal budget exceeded".into());
+    }
     out.sort_by_key(|a| (a.line, a.rule.clone()));
-    out
+    Ok(out)
 }
 
 fn walk(
@@ -163,6 +188,9 @@ fn walk(
     rules: &[(&str, Rule)],
     out: &mut Vec<Ablation>,
 ) {
+    if ctx.exhausted.get() {
+        return;
+    }
     let pushed = match n.kind() {
         "function_definition" | "class_definition" => n
             .child_by_field_name("name")
@@ -176,6 +204,9 @@ fn walk(
     let qual = scope.join(".");
     for (_, rule) in rules {
         rule(ctx, n, &qual, out);
+        if ctx.exhausted.get() {
+            break;
+        }
     }
     for child in named(n) {
         walk(ctx, child, scope, rules, out);
@@ -183,17 +214,4 @@ fn walk(
     if pushed {
         scope.pop();
     }
-}
-
-/// Apply edits back-to-front so earlier offsets stay valid.
-pub fn apply(source: &str, ablation: &Ablation) -> String {
-    let mut edits = ablation.edits.clone();
-    edits.sort_by_key(|e| std::cmp::Reverse(e.start));
-    let mut s = source.to_string();
-    for e in edits {
-        if e.start <= e.end && e.end <= s.len() {
-            s.replace_range(e.start..e.end, &e.replacement);
-        }
-    }
-    s
 }

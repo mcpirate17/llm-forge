@@ -11,7 +11,6 @@ requires-python = ">=3.12"
 # every scope against the host's dependency list, 2026-09-02). Host-only crates are
 # extras below; nothing here resolves to the host repository.
 dependencies = [
-  "a2a-sdk[http-server]>=1.1.2",
   "conductor-native",
   "slop-core",
   "forge-cli",
@@ -68,7 +67,6 @@ graph = ["code-review-graph==2.3.8"]
 # conductor/_native.py, which decides its absence once at import time.
 
 [project.scripts]
-conductor = "conductor.__main__:main"
 kb_retrieve = "conductor.kb_retrieve:main"
 memory_index = "conductor.memory_index:main"
 candidate_review = "conductor.candidate_review.cli:main"
@@ -77,7 +75,6 @@ candidate_review = "conductor.candidate_review.cli:main"
 mutation_testing = "conductor.mutation_testing:main"
 mutation_generate = "conductor.mutation_campaign_generate:main"
 mutation_engine = "conductor.mutation_engine_generated:main"
-agent_a2a = "conductor.agent_a2a:main"
 handoff = "conductor.handoff:main"
 
 # Loaded by pytest itself, so it needs no pytest dependency of its own; it records
