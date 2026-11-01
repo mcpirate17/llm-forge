@@ -14,6 +14,8 @@ use std::path::{Component, Path, PathBuf};
 
 const BASE: &str = "research/tmp/local_clerk";
 const MAX_PATH: usize = 4096;
+// Conservative Linux component limit; individual filesystems may be stricter.
+const MAX_COMPONENT_BYTES: usize = 255;
 
 /// Verify source provenance then exclusively publish a normalized, private draft.
 pub fn write_document(settings: &Settings, path: &Path, document: &Value) -> Result<Value> {
@@ -57,6 +59,17 @@ fn output_path(settings: &Settings, path: &Path) -> Result<(PathBuf, PathBuf)> {
     ensure!(
         path.to_str().is_some() && path.as_os_str().len() <= MAX_PATH,
         "clerk output path must be UTF-8 and at most 4096 bytes"
+    );
+    ensure!(
+        !path.as_os_str().as_encoded_bytes().contains(&0),
+        "clerk output path must not contain NUL"
+    );
+    ensure!(
+        path.components().all(|part| match part {
+            Component::Normal(name) => name.len() <= MAX_COMPONENT_BYTES,
+            _ => true,
+        }),
+        "clerk output path component exceeds 255 bytes"
     );
     ensure!(
         path.components().all(|part| matches!(

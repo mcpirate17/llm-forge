@@ -21,6 +21,9 @@ paths are relative to that directory, and
 publication uses exclusive creation so an existing file is never replaced.
 Absolute outputs must also stay below that directory. A read-only destination
 preflight runs before inference; publication repeats its checks afterward.
+Output paths reject NUL and components over 255 bytes before filesystem access,
+including when parent directories do not exist. Individual filesystems may
+impose stricter limits; preflight does not reserve a destination.
 `validate` re-reads and verifies the saved document and its source provenance.
 Verification tests use native HTTP fixtures and do not load a model.
 

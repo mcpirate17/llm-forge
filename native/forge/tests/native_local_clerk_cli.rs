@@ -334,3 +334,23 @@ fn invalid_destinations_never_contact_the_model() {
     assert_eq!(fs::read(base.join("existing.json")).unwrap(), b"unchanged");
     assert!(!home.0.join("draft.json").exists());
 }
+
+#[test]
+fn oversized_output_components_do_not_create_directories_or_contact_model() {
+    let host = support::Host::new();
+    let home = support::Host::new();
+    file(&host.0, "note.md", "facts");
+    let server = Server::new();
+    for path in [
+        format!("{}.json", "x".repeat(251)),
+        format!("{}/draft.json", "x".repeat(256)),
+    ] {
+        let mut cmd = command(&host, &home.0);
+        cmd.env("OLLAMA_HOST", &server.endpoint)
+            .env("LOCAL_AI_TASK", "compaction")
+            .args(["draft", "note.md", "--output", &path]);
+        failure(&run(cmd), "component exceeds 255 bytes");
+    }
+    assert!(server.finish().is_empty());
+    assert!(!host.0.join("research/tmp/local_clerk").exists());
+}

@@ -302,3 +302,21 @@ fn preflight_refuses_a_replaced_host_root_without_creating_output() {
     assert!(entries(&outside).is_empty());
     assert!(!host.join(BASE).exists());
 }
+
+#[test]
+fn preflight_rejects_invalid_component_bytes_before_missing_parent() {
+    let fixture = Fixture::new();
+    let settings = fixture.settings();
+    let long_name = format!("{}.json", "x".repeat(251));
+    let long_parent = format!("{}/draft.json", "x".repeat(256));
+    let unicode_parent = format!("{}/draft.json", "é".repeat(128));
+    for path in [&long_name, &long_parent, &unicode_parent] {
+        let error = preflight_output(&settings, Path::new(path)).unwrap_err();
+        assert!(format!("{error:#}").contains("component exceeds 255 bytes"));
+    }
+    let error = preflight_output(&settings, Path::new("nested/bad\0.json")).unwrap_err();
+    assert!(format!("{error:#}").contains("NUL"));
+    let max_name = format!("{}.json", "x".repeat(250));
+    assert!(preflight_output(&settings, Path::new(&max_name)).is_ok());
+    assert!(!fixture.0.join(BASE).exists());
+}
