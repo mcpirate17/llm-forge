@@ -23,7 +23,7 @@ pub enum Profile {
     Nightly,
 }
 impl Profile {
-    fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Self::Fast => "fast",
             Self::Full => "full",
@@ -54,7 +54,7 @@ pub struct PlanArgs {
     scratch_parent: Option<PathBuf>,
 }
 
-fn today() -> Result<String> {
+pub(crate) fn today() -> Result<String> {
     let seconds = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let days = i64::try_from(seconds / 86_400)?;
     let (year, month, day) = crate::civil::civil_from_days(days);

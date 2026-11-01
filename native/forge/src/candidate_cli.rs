@@ -16,6 +16,8 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Prepare or execute one isolated external check using operator grants.
+    Execute(crate::candidate_execute::ExecuteArgs),
     /// Assess supplied findings against the candidate policy; does not verify execution.
     Assess(crate::candidate_assess_cli::AssessArgs),
     /// Classify an exact candidate and plan ordered policy checks without executing them.
@@ -70,6 +72,12 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::Execute(args) => {
+            let report = crate::candidate_execute::run(args)?;
+            let failed = report["result"]["status"] == "failed";
+            print_json(&report)?;
+            return Ok(u8::from(failed));
+        }
         Action::Assess(args) => {
             let report = crate::candidate_assess_cli::run(args)?;
             let failed = report["assessment"]["decision"] == "fail";

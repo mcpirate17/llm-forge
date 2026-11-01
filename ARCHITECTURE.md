@@ -1142,3 +1142,37 @@ at 1.719 ms and 1.192 ms median batch means, respectively. A 32-file native
 syntactic scan measured 298.137 microseconds. The benchmark records hashes,
 workload sizes, included operations and limits in [graph context](docs/graph-context.md);
 these are costs, not a measured speedup against the deleted adapter.
+
+Native `forge candidate execute` now prepares or runs one external policy check
+using a separate operator grants file. Default operation validates and reports
+both stages without launching them; `--execute` runs a version probe followed
+by the analyzer only when version evidence is usable. Every stage has its own
+candidate snapshot, private detached Git metadata and index, empty executable
+search path, filesystem/network sandbox and newly owned delegated cgroup.
+Neither source refs nor the source index are rewritten. Candidate policy cannot
+expand operator capabilities. This is an execution result, not a full review,
+an attestation, or approval to land.
+
+The resource owner survives client cancellation and owns launch failures that
+occur after a child exists. It observes both pipes through bounded readiness
+work, kills the cgroup before reaping the process group, and removes the private
+workspace only after cleanup succeeds. Otherwise it retains recovery paths and
+returns failure. CPU time, virtual address space, cgroup memory, CPU quota,
+process count, wall time and Unicode output tails remain separate limits. Both
+version and analyzer stages obey operator CPU/address-space ceilings. SIGINT
+and SIGTERM request cleanup before the CLI runtime exits. Runtime destruction,
+supervisor SIGKILL and uninterruptible kernel I/O remain outside this guarantee.
+
+Focused validation exercised 11 delegated-cgroup supervisor cases and 10 CLI
+cases, including detached descendants, flooding, dropped clients, finalizer
+errors, real Git index behavior, SIGTERM, source preservation and observed
+version-process rlimits. Existing process probes retain their strict aggregate
+byte cap; candidate capture instead retains separate bounded Unicode tails
+while continuing to drain. Details and operator configuration are in
+[native candidate review](docs/native-candidate-review.md).
+
+Full review orchestration, cache integration, evidence and waiver verification,
+test-engine migration, reporting and attestation remain. The existing Python
+command runner still has these callers and has not been deleted prematurely;
+128 Python source files remain under `src/`. The native migration goal stays
+active until those consumers are replaced and their interpreted code is removed.

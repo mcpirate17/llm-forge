@@ -8,11 +8,61 @@ pub struct ProcessGroup {
     stopped: Option<ExitStatus>,
 }
 
+/// A spawned child whose process-group identity has not been validated.
+/// Cleanup signals only this still-owned, unreaped child, never its group.
+pub struct OwnedChild {
+    child: Child,
+    stopped: Option<ExitStatus>,
+}
+pub(crate) struct SpawnFailure {
+    pub error: io::Error,
+    pub child: Option<OwnedChild>,
+}
+impl OwnedChild {
+    pub fn id(&self) -> u32 {
+        self.child.id()
+    }
+    pub fn child(&self) -> &Child {
+        &self.child
+    }
+    pub fn stop(&mut self) -> io::Result<ExitStatus> {
+        if let Some(status) = self.stopped {
+            return Ok(status);
+        }
+        if let Err(error) = self.child.kill() {
+            if error.raw_os_error() != Some(libc::ESRCH) {
+                return Err(error);
+            }
+        }
+        let status = self.child.wait()?;
+        self.stopped = Some(status);
+        Ok(status)
+    }
+}
+impl Drop for OwnedChild {
+    fn drop(&mut self) {
+        if let Err(error) = self.stop() {
+            eprintln!("forge: ungrouped child cleanup failed: {error}");
+        }
+    }
+}
+
 impl ProcessGroup {
     pub fn spawn(command: &mut Command) -> io::Result<Self> {
-        Self::verify_reaper()?;
+        Self::spawn_owned(command).map_err(|failure| {
+            let SpawnFailure { error, child } = failure;
+            drop(child);
+            error
+        })
+    }
+    /// Returns a still-owned child on post-spawn isolation validation failure.
+    pub(crate) fn spawn_owned(command: &mut Command) -> Result<Self, SpawnFailure> {
+        Self::verify_reaper().map_err(|error| SpawnFailure { error, child: None })?;
         command.process_group(0);
-        Self::from_child(command.spawn()?)
+        let child = command
+            .spawn()
+            .map_err(|error| SpawnFailure { error, child: None })?;
+        Self::from_child_owned(child)
     }
 
     pub(crate) fn verify_reaper() -> io::Result<()> {
@@ -30,8 +80,15 @@ impl ProcessGroup {
     }
 
     /// Internal terminal constructor: setsid must have completed before exec.
-    pub(crate) fn from_child(mut child: Child) -> io::Result<Self> {
-        // SAFETY: getpgid observes the live, unreaped child owned by this function.
+    pub(crate) fn from_child(child: Child) -> io::Result<Self> {
+        Self::from_child_owned(child).map_err(|failure| {
+            let SpawnFailure { error, child } = failure;
+            drop(child);
+            error
+        })
+    }
+    pub(crate) fn from_child_owned(child: Child) -> Result<Self, SpawnFailure> {
+        // SAFETY: getpgid observes the live, unreaped child owned here.
         let group = unsafe { libc::getpgid(child.id() as libc::pid_t) };
         if group != child.id() as libc::pid_t {
             let error = if group < 0 {
@@ -39,17 +96,13 @@ impl ProcessGroup {
             } else {
                 io::Error::other("child must own an isolated process group")
             };
-            match child.kill() {
-                Ok(()) => {
-                    if let Err(cleanup) = child.wait() {
-                        eprintln!("forge: invalid group reaping failed: {cleanup}");
-                    }
-                }
-                Err(cleanup) => {
-                    eprintln!("forge: invalid group child termination failed: {cleanup}")
-                }
-            }
-            return Err(error);
+            return Err(SpawnFailure {
+                error,
+                child: Some(OwnedChild {
+                    child,
+                    stopped: None,
+                }),
+            });
         }
         Ok(Self {
             child: Some(child),
@@ -105,5 +158,59 @@ impl Drop for ProcessGroup {
         if let Err(error) = self.stop() {
             eprintln!("forge: process group {} cleanup failed: {error}", self.id());
         }
+    }
+}
+
+#[cfg(test)]
+mod owned_launch_tests {
+    use super::*;
+    use std::process::Stdio;
+
+    #[test]
+    fn invalid_group_retains_live_child_until_explicit_cleanup() {
+        let child = Command::new("/bin/sleep")
+            .arg("30")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        let failure = match ProcessGroup::from_child_owned(child) {
+            Ok(_) => panic!("child unexpectedly owned a new process group"),
+            Err(failure) => failure,
+        };
+        let mut child = failure.child.expect("post-spawn child retained");
+        assert_eq!(child.id(), pid);
+        assert_eq!(unsafe { libc::kill(pid as i32, 0) }, 0);
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            unsafe {
+                libc::waitid(
+                    libc::P_PID,
+                    pid,
+                    &mut info,
+                    libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+                )
+            },
+            0
+        );
+        assert_eq!(
+            unsafe { info.si_pid() },
+            0,
+            "child exited before explicit cleanup"
+        );
+        child.stop().unwrap();
+        assert_eq!(child.stop().unwrap(), child.stopped.unwrap());
+    }
+
+    #[test]
+    fn failed_program_spawn_has_no_child() {
+        let mut command = Command::new("/definitely-missing-forge-test-executable");
+        let failure = match ProcessGroup::spawn_owned(&mut command) {
+            Ok(_) => panic!("missing executable unexpectedly ran"),
+            Err(failure) => failure,
+        };
+        assert!(failure.child.is_none());
     }
 }

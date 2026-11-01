@@ -166,31 +166,34 @@ fn gpu_probe() -> io::Result<Option<i32>> {
     Ok(Some(0))
 }
 
+fn session_start_extension() -> io::Result<i32> {
+    use std::io::Read;
+    let mut input = String::new();
+    io::stdin().read_to_string(&mut input)?;
+    let dir = std::env::current_exe()?.parent().unwrap().to_owned();
+    std::fs::write(dir.join("received.json"), input)?;
+    match std::fs::read_to_string(dir.join("mode"))?.as_str() {
+        "fail" => {
+            eprintln!("fixture extension failure");
+            Ok(7)
+        }
+        "sleep" => {
+            std::thread::sleep(Duration::from_secs(10));
+            Ok(0)
+        }
+        "flood" => {
+            print!("{}", "x".repeat(32768));
+            Ok(0)
+        }
+        _ => {
+            println!("Project extension context 🦀");
+            Ok(0)
+        }
+    }
+}
 fn run() -> io::Result<i32> {
     if program_name().as_deref() == Some("session-start") {
-        use std::io::Read;
-        let mut input = String::new();
-        io::stdin().read_to_string(&mut input)?;
-        let dir = std::env::current_exe()?.parent().unwrap().to_owned();
-        std::fs::write(dir.join("received.json"), input)?;
-        return match std::fs::read_to_string(dir.join("mode"))?.as_str() {
-            "fail" => {
-                eprintln!("fixture extension failure");
-                Ok(7)
-            }
-            "sleep" => {
-                std::thread::sleep(Duration::from_secs(10));
-                Ok(0)
-            }
-            "flood" => {
-                print!("{}", "x".repeat(32768));
-                Ok(0)
-            }
-            _ => {
-                println!("Project extension context 🦀");
-                Ok(0)
-            }
-        };
+        return session_start_extension();
     }
     #[cfg(unix)]
     slow_cleanup_probe()?;
@@ -228,6 +231,12 @@ fn run() -> io::Result<i32> {
             io::copy(&mut io::stdin(), &mut io::stdout())?;
         }
         "allocate" => allocate(args)?,
+        #[cfg(target_os = "linux")]
+        "flood-both" => flood_both(args)?,
+        #[cfg(target_os = "linux")]
+        "map-probe" => map_probe(args)?,
+        #[cfg(target_os = "linux")]
+        "resource-limits" => resource_limits()?,
         "process-limit" => process_limit()?,
         #[cfg(target_os = "linux")]
         "terminal" => return terminal(),
@@ -272,6 +281,88 @@ fn run() -> io::Result<i32> {
     io::stdout().flush()?;
     io::stderr().flush()?;
     Ok(0)
+}
+
+#[cfg(target_os = "linux")]
+fn flood_both(args: &[String]) -> io::Result<()> {
+    let until = std::time::Instant::now() + duration(args)?;
+    let writer = std::thread::spawn(move || -> io::Result<()> {
+        let mut stdout = io::stdout().lock();
+        while std::time::Instant::now() < until {
+            stdout.write_all(&[b'o'; 8192])?;
+        }
+        Ok(())
+    });
+    let mut stderr = io::stderr().lock();
+    while std::time::Instant::now() < until {
+        stderr.write_all(&[b'e'; 8192])?;
+    }
+    writer
+        .join()
+        .map_err(|_| io::Error::other("stdout writer panicked"))??;
+    Ok(())
+}
+#[cfg(target_os = "linux")]
+fn map_probe(args: &[String]) -> io::Result<()> {
+    use std::ffi::c_void;
+    extern "C" {
+        fn mmap(
+            addr: *mut c_void,
+            len: usize,
+            prot: i32,
+            flags: i32,
+            fd: i32,
+            offset: i64,
+        ) -> *mut c_void;
+        fn munmap(addr: *mut c_void, len: usize) -> i32;
+    }
+    let mib: usize = args
+        .first()
+        .ok_or_else(|| argument_error("missing mapping size"))?
+        .parse()
+        .map_err(|_| argument_error("invalid mapping size"))?;
+    if mib > 128 {
+        return Err(argument_error("mapping exceeds fixture limit"));
+    }
+    let bytes = mib * 1024 * 1024;
+    // Anonymous private mapping is reserved but never touched: it tests address
+    // space without charging 96 MiB of physical cgroup memory.
+    let address = unsafe { mmap(std::ptr::null_mut(), bytes, 3, 0x22, -1, 0) };
+    if address as isize == -1 {
+        println!("mapping denied");
+    } else {
+        println!("mapping granted");
+        if unsafe { munmap(address, bytes) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn resource_limits() -> io::Result<()> {
+    #[repr(C)]
+    struct Rlimit {
+        current: std::os::raw::c_ulong,
+        maximum: std::os::raw::c_ulong,
+    }
+    extern "C" {
+        fn getrlimit(resource: i32, limit: *mut Rlimit) -> i32;
+    }
+    let mut cpu = Rlimit {
+        current: 0,
+        maximum: 0,
+    };
+    let mut address = Rlimit {
+        current: 0,
+        maximum: 0,
+    };
+    // Linux resource IDs RLIMIT_CPU=0 and RLIMIT_AS=9; the fixture uses libc ABI.
+    if unsafe { getrlimit(0, &mut cpu) } != 0 || unsafe { getrlimit(9, &mut address) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    println!("cpu={} as={}", cpu.current, address.current);
+    Ok(())
 }
 
 fn process_limit() -> io::Result<()> {

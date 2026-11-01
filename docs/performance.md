@@ -76,3 +76,36 @@ On Linux it also requires `perf`, as described in the [upstream README](https://
 Linux pidfd waits remove fixed completion polling from measured check workloads;
 older or restricted kernels use a documented bounded 5 ms waitid fallback while
 keeping the process-group leader unreaped until descendant cleanup.
+
+## Candidate execution preparation and capture
+
+`cargo +1.98.0 bench --manifest-path native/forge/Cargo.toml --bench candidate_execution`
+measures pure native argument preparation and bounded output capture. The
+2026-11-01 release run used an unisolated warm host, 10 warmups and 31 batches.
+It excludes executable lookup, snapshots, sandbox setup, process startup and
+analyzer work. It is current-only evidence, not a matched speedup or a full
+tool-dispatch latency measurement.
+
+| Operation | Iterations per batch | Median batch mean | p95 batch mean |
+| --- | ---: | ---: | ---: |
+| Prepare argv for 32 selected files | 100 | 1.793 µs | 1.833 µs |
+| Same, with eight repetitions of dense placeholders | 100 | 4.231 µs | 4.775 µs |
+| Push 4 KiB into a preallocated 12,000-character tail | 1,000 | 30.001 ns | 30.760 ns |
+| Finish a full mixed UTF-8/CRLF tail, setup excluded | 10 | 65.132 µs | 67.113 µs |
+
+The benchmark checks expected output before measuring. Each tail keeps a fixed
+raw-byte ring during ingestion; decoding, newline normalization and final
+Unicode-scalar selection occur at finish. The steady push timing reuses hot
+buffers and is not a cold-memory bandwidth claim.
+
+Benchmark executable SHA-256:
+`61647deb7945432b6833a5905a2812dec38d18cb1f0b087e2625ac86df490a1a`.
+Result JSON SHA-256:
+`17484d9601100888564a1025827f628d074eda2587b56a5411b3d9f5bc16f6c4`.
+Measured source SHA-256 bindings:
+
+| File | SHA-256 |
+| --- | --- |
+| `native/forge/benches/candidate_execution.rs` | `51cc5ffadb399f992d726454c972a5ff6cd37e7b79da3f287a81126f77105fd5` |
+| `native/forge/src/candidate_command.rs` | `6d5d6e080523059412cb002b77ee3306f42e79bde26ab6c320273bbb8d983860` |
+| `native/forge/src/process_capture_tail.rs` | `d5392281bfa1c0b12bd5443c06f3d22e4712ae616a1ed5de935e4724a14f19a6` |

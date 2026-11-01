@@ -2,8 +2,9 @@
 
 The native candidate foundation exposes exact Git candidate metadata, safe
 materialization of a candidate tree, candidate policy classification, check
-planning, and candidate receipt digest verification. These commands provide
-inputs for review; they are not an end-to-end review gate. Check execution,
+planning, isolated execution of one external check, and candidate receipt digest
+verification. These commands provide inputs for review; they are not an
+end-to-end review gate. Full check orchestration,
 mutation evidence, attestation, claims, reporting, and approval workflows
 remain in the Python `conductor.candidate_review` package until their later
 native slices land.
@@ -19,6 +20,11 @@ forge candidate assess [--repo PATH] --kind index|commit|range
     [--target-ref HEAD] [--base-ref REF] [--policy CANDIDATE_RELATIVE]
     [--profile fast|full|nightly] [--today YYYY-MM-DD]
     [--scratch-parent DIRECTORY] --results PATH
+forge candidate execute [--repo PATH] --kind index|commit|range
+    [--target-ref HEAD] [--base-ref REF] [--policy CANDIDATE_RELATIVE]
+    [--profile fast|full|nightly] [--today YYYY-MM-DD]
+    --check ID --grants ABSOLUTE_JSON_PATH [--expected-tree FULL_TREE_OID]
+    [--execute]
 forge candidate inspect [--repo PATH] --kind index|commit|range
     [--target-ref HEAD] [--base-ref REF]
 forge candidate materialize [--repo PATH] --tree FULL_TREE_OID
@@ -123,9 +129,120 @@ limited to depth 32, 1 million nodes, and 64 MiB including accounting overhead.
 Normalized policy is limited to 4 MiB, grouped exception matching to 2 million
 pairs, and pattern/path matching to 100 million estimated work units.
 
-This remains an assessment of supplied data, not a complete review. Check
-execution, cache provenance, evidence, attestation, and full review
-orchestration remain in the existing workflow pending their native migrations.
+This remains an assessment of supplied data, not a complete review. Full check
+orchestration, cache provenance, evidence, and attestation remain in the existing
+workflow pending their native migrations.
+
+### Prepare or execute one external check
+
+`execute` selects one active external command check from candidate policy using
+the same policy precedence, classification, profile, date, and Git candidate
+selection as planning. It requires a separate operator-owned version-1 grants
+file outside the source repository. Candidate policy cannot grant executables,
+environment variables, filesystem access, or resource ceilings. The default is
+a dry-run: prepare both stages, validate sandbox admission and argument
+expansion, remove their private workspaces, and return their plans without
+launching a child or creating a cgroup. `--execute` explicitly launches them.
+
+For example, adapt these absolute paths and limits to the host. The source and
+its common Git directory must be readable; executable and runtime-library
+directories need explicit read grants. An executable alias such as `analyzer`
+must match the first argument of the policy's command and version command.
+Existing scratch and delegated cgroup parents are operator-provided; Forge
+does not enable controllers or modify the parent's limits.
+
+```json
+{
+  "version": 1,
+  "source_root": "/home/operator/project",
+  "read_only": [
+    "/home/operator/project", "/opt/analyzers/bin", "/usr", "/lib", "/lib64"
+  ],
+  "programs": {"analyzer": "/opt/analyzers/bin/analyzer"},
+  "environment": {},
+  "scratch_parent": "/home/operator/private-candidate-scratch",
+  "cgroup_parent": "/sys/fs/cgroup/operator-delegated",
+  "resources": {"cpu_millis": 1000, "memory_mib": 256, "processes": 16},
+  "max_wall_seconds": 30,
+  "max_cpu_seconds": 30,
+  "max_address_space_mib": 512,
+  "python": null
+}
+```
+
+Keep the operator grants file mode `0600`. It must be a regular, single-link
+file owned by the current user, without group/world write permission, at most
+1 MiB; its final path cannot be a symlink. Unknown fields and duplicate
+JSON keys are refused. All granted paths are absolute and must exist. For a
+repository with its Git common directory elsewhere, add that directory to
+`read_only`. Runtime paths above are examples, not implicit grants. The
+`resources` fields are cgroup millicpus, MiB of memory, and process count;
+these are separate from per-process CPU-time and address-space limits.
+`max_*` fields cap policy wall seconds, CPU seconds, and address-space MiB.
+Policy limits exceeding these ceilings fail preparation. Reserved workspace
+environment names, including `PATH`, `HOME`, `TMPDIR`, `GIT_*`, `XDG_*`, and
+`PYTHON*`, cannot be supplied through `environment`. `python`, when non-null,
+names an explicitly granted program alias for `{python}`; the native core
+never discovers or depends on an interpreter.
+
+```text
+PATH= /absolute/path/to/forge candidate execute --repo /home/operator/project --kind index \
+  --check lint --grants /home/operator/candidate-grants.json
+PATH= /absolute/path/to/forge candidate execute --repo /home/operator/project --kind index \
+  --check lint --grants /home/operator/candidate-grants.json \
+  --expected-tree FULL_TREE_OID --execute
+```
+
+Replace `/absolute/path/to/forge` with the native executable. Child `PATH` is
+always empty. Argument expansion uses vectors, never a shell. A whole
+`{files}` argument expands to separate selected paths; embedded `{files}` stays
+literal. Version probes receive no changed-file arguments. Other replacements
+are `{repo}`, `{snapshot}`, `{base}`, `{tree}`, `{python}`, and
+`{changed_files_file}`; unknown placeholders remain literal.
+
+Each version or analyzer stage gets a separate candidate snapshot, private
+HOME/TMP/XDG cache, index, and detached Git metadata built with libgit2. This is
+not a linked worktree or clone; source refs and source index are not rewritten.
+The original source object directory is explicitly readable via private Git
+alternates. `{repo}` intentionally still names the original source repository:
+operator read permission permits an analyzer to inspect it, so sandboxing and
+successful execution do not prove that the analyzer covered only the snapshot
+or examined every selected file. Version success is required before the main
+command; a failed or potentially truncated version capture blocks that launch.
+Version probes have a maximum 30-second wall timeout, the same cgroup and
+address-space limits, and a CPU-time limit capped at 30 seconds. Both stages
+remain within the operator's ceilings; neither can run with unlimited rlimits.
+
+The supervisor uses the shipped filesystem/process/network sandbox and an
+explicit delegated cgroup. It owns child observation, bounded Unicode output
+tails, cancellation, resource cleanup, and final reaping. Resource evidence,
+cleanup failures, timeout, and infrastructure failures cannot map to a pass.
+SIGINT/SIGTERM request cancellation through the existing interrupt handler; the
+CLI waits for the resource-owning actor before exiting its runtime.
+Cleanup guarantees apply while the runtime can execute its cleanup path; they
+do not cover supervisor SIGKILL, machine failure, or uninterruptible kernel I/O.
+When cleanup cannot safely complete, the private workspace is retained for
+recovery instead of deleting potentially live process resources.
+
+Output has `schema_version: 1`, `executed`, `skipped`, candidate and policy
+identity, `grants_sha256`, normalized `check`, selected `files`, ordered
+`stages`, and `result`. Each stage contains its expanded `command`, sandbox and
+resource admission, limits, and observed `report` (null during dry-run).
+Dry-run and no-matching-file skips leave `result` null; skips have no stages.
+A failed version produces only its version stage. Actual execution returns a
+`CheckResult`, not an assessment or receipt. Exit 0 means dry-run, skip, or
+passed execution; exit 1 means a failed execution result. Invalid input or
+preparation failures are command errors. Neither result means approval, full
+review completion, or permission to land.
+
+Native integration validation commands (not a claim of results):
+
+```text
+cargo +1.98.0 test --manifest-path native/forge/Cargo.toml --test native_candidate_execute_cli
+FORGE_TEST_CGROUP_PARENT=/sys/fs/cgroup/operator-delegated \
+  cargo +1.98.0 test --manifest-path native/forge/Cargo.toml --test native_candidate_execute_cli \
+  -- --ignored --test-threads=1
+```
 
 ### Inspect
 
@@ -203,13 +320,16 @@ does not replace them.
 
 ## Current boundary
 
-The native commands can apply candidate policy to classify changes and plan
-checks, but they do not run analyzers or tests, admit or authenticate mutation
+The native commands can apply candidate policy, plan checks, and explicitly run
+one granted external check. They do not orchestrate all analyzers or tests,
+admit or authenticate mutation
 evidence, issue attestations, acquire claims, produce a complete review, or
 decide whether work may land. Continue to use the existing candidate-review
 workflow for those decisions. The interdependent Python candidate-review
-package remains in place while the native execution and review slices are
-completed.
+package remains in place: its CLI and engine still call the Python command
+runner for the legacy complete-review workflow. The native single-check path
+does not silently replace those callers. Full orchestration, mutation evidence,
+attestation, claims, reporting, and approval remain separate migration work.
 
 This page records the native command contract only. It makes no build, test,
 parity, approval, or release-readiness claim.

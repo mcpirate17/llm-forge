@@ -193,6 +193,15 @@ impl Snapshot {
         Ok(())
     }
 
+    /// Preserve an unpublished private snapshot after incomplete process cleanup.
+    /// The retained path is recovery evidence; it is never a successful result.
+    pub(crate) fn retain_for_recovery(mut self) -> Result<Report> {
+        self.keep = true;
+        self.verify_staging()?;
+        self.report.output = self.path();
+        Ok(self.report.clone())
+    }
+
     fn populate(&mut self, source: &Source, plan: &Plan) -> Result<()> {
         for entry in &plan.entries {
             if entry.mode == "160000" {

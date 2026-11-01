@@ -10,6 +10,14 @@ pub mod candidate_assessment;
 #[cfg(target_os = "linux")]
 pub mod candidate_cli;
 #[cfg(target_os = "linux")]
+pub mod candidate_command;
+#[cfg(target_os = "linux")]
+pub mod candidate_execute;
+#[cfg(target_os = "linux")]
+pub mod candidate_execution_result;
+#[cfg(target_os = "linux")]
+mod candidate_execution_workspace;
+#[cfg(target_os = "linux")]
 pub mod candidate_plan;
 #[cfg(target_os = "linux")]
 pub mod candidate_policy;
@@ -71,6 +79,8 @@ pub(crate) use conductor_native::native_id;
 #[cfg(target_os = "linux")]
 pub use native_id::new as resource_id;
 #[cfg(target_os = "linux")]
+pub mod confined_execution;
+#[cfg(target_os = "linux")]
 pub mod context_diagnostics;
 #[cfg(target_os = "linux")]
 pub mod context_store;
@@ -79,6 +89,7 @@ pub mod context_window;
 pub mod patch;
 #[cfg(target_os = "linux")]
 pub mod process_capture;
+pub mod process_capture_tail;
 #[cfg(target_os = "linux")]
 pub mod process_group;
 #[cfg(target_os = "linux")]

@@ -13,7 +13,7 @@ mod metadata;
 mod process;
 #[path = "sandbox_transport.rs"]
 mod transport;
-pub use process::{CommandPlan, ConfinedProcess};
+pub use process::{CommandPlan, ConfinedProcess, LaunchFailure, OwnedLaunch};
 
 use anyhow::{ensure, Context, Result};
 use landlock::{
