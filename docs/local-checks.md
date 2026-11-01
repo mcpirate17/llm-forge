@@ -52,10 +52,13 @@ FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
 ```
 
 Use the selected target directory in that path if overriding `CARGO_TARGET_DIR`.
-The committed check runner resolves the policy setting, then the inherited
-setting, then `native/forge/target`, and passes an absolute target directory to
-installation and tests. `FORGE_TEST_BIN` and `FORGE_BIN` name the isolated
-installed executable. Automated checks never guess a compiler output path:
+The committed check runner resolves an explicit policy setting before an
+inherited setting and passes its absolute path to installation and tests.
+Without either setting, it leaves `CARGO_TARGET_DIR` unset so independent Cargo
+manifests keep their separate default caches. The `cdylib`/`rlib` dependencies emit
+unqualified library filenames, so their independent checks must not implicitly
+share Forge's cache. `FORGE_TEST_BIN` and `FORGE_BIN` name the isolated installed
+executable. Automated checks never guess a compiler output path:
 Cargo target-triple configuration can change that layout. Path admission is an operator-owned test handoff,
 not binary authentication; the source-bound gate builds and verifies the artifact.
 

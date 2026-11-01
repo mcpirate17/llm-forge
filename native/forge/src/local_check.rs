@@ -249,10 +249,12 @@ fn environment(
         inherited,
     )?;
     env.retain(|(key, _)| key != "CARGO_TARGET_DIR" && key != "FORGE_TEST_BIN");
-    env.push((
-        "CARGO_TARGET_DIR".into(),
-        target.to_string_lossy().into_owned(),
-    ));
+    if let Some(target) = target {
+        env.push((
+            "CARGO_TARGET_DIR".into(),
+            target.to_string_lossy().into_owned(),
+        ));
+    }
     let mut path: Vec<String> = policy
         .path_prepend
         .iter()
@@ -294,7 +296,7 @@ fn target_dir(
     root: &Path,
     configured: Option<&str>,
     inherited: Option<std::ffi::OsString>,
-) -> Result<std::path::PathBuf> {
+) -> Result<Option<std::path::PathBuf>> {
     ensure!(root.is_absolute(), "checkout root must be absolute");
     let raw = match configured {
         Some(value) => value.to_owned(),
@@ -302,7 +304,9 @@ fn target_dir(
             Some(value) => value
                 .into_string()
                 .map_err(|_| anyhow::anyhow!("CARGO_TARGET_DIR must be UTF-8"))?,
-            None => "native/forge/target".into(),
+            // Separate manifests own separate default caches. Inventing a
+            // global target here mixes their independently resolved graphs.
+            None => return Ok(None),
         },
     };
     ensure!(!raw.is_empty(), "CARGO_TARGET_DIR must not be empty");
@@ -316,7 +320,7 @@ fn target_dir(
         absolute.to_str().is_some(),
         "CARGO_TARGET_DIR must be UTF-8"
     );
-    Ok(absolute)
+    Ok(Some(absolute))
 }
 
 fn clean_command(command: &str, child_env: &[(String, String)]) -> String {
@@ -715,16 +719,13 @@ mod target_dir_tests {
         let root = Path::new("/checkout");
         assert_eq!(
             target_dir(root, Some("custom"), Some("ignored".into())).unwrap(),
-            root.join("custom")
+            Some(root.join("custom"))
         );
         assert_eq!(
             target_dir(root, None, Some("/inherited".into())).unwrap(),
-            Path::new("/inherited")
+            Some(Path::new("/inherited").to_path_buf())
         );
-        assert_eq!(
-            target_dir(root, None, None).unwrap(),
-            root.join("native/forge/target")
-        );
+        assert_eq!(target_dir(root, None, None).unwrap(), None);
         assert!(target_dir(root, Some(""), None).is_err());
         assert!(target_dir(root, None, Some(OsString::from_vec(vec![0xff]))).is_err());
     }

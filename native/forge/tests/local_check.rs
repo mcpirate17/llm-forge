@@ -106,6 +106,27 @@ fn native_check_environment_binds_runner_and_isolated_install_without_venv_injec
 }
 
 #[test]
+fn native_check_keeps_default_cargo_caches_independent() {
+    let root = fixture(
+        r#"test -z "${CARGO_TARGET_DIR+x}" && test "$FORGE_TEST_BIN" = "$FORGE_INSTALL_ROOT/bin/forge""#,
+        2,
+    );
+    let output = Command::new(forge_binary::path())
+        .args(["check", "--all"])
+        .current_dir(&root)
+        .env_remove("CARGO_TARGET_DIR")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(forge(&root, &["verify", "--require-all"]).status.success());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn full_pass_is_bound_to_head_and_log_bytes() {
     let root = fixture("echo checked", 2);
     fs::create_dir_all(root.join("research")).unwrap();
