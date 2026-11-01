@@ -18,6 +18,10 @@ name = "vector_index"
 harness = false
 required-features = ["vector-search"]
 
+[[bench]]
+name = "candidate_scan"
+harness = false
+
 [[bin]]
 name = "dead-code-audit"
 path = "src/bin/dead_code_audit.rs"

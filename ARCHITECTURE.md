@@ -1173,12 +1173,17 @@ while continuing to drain. Details and operator configuration are in
 
 Native `forge candidate execute-batch` runs selected regular checks under a
 separate aggregate operator budget. In addition to external commands, the native
-batch currently evaluates `candidate-integrity` and `dependency-integrity`
-in-process. Candidate integrity requires explicit `--surface` when scheduled,
+batch currently evaluates `candidate-integrity`, `dependency-integrity`,
+`secret-scan`, and `native-source` in-process. Candidate integrity requires
+explicit `--surface` when scheduled,
 even in dry-run; dry-run validates and prepares its private snapshot without
 evaluating the check. These builtins require source grants and a batch budget,
 but no analyzer program grants. Results remain in policy order and identify
 `forge-builtin/1`; integrity reports its Unicode 15.0.0 compatibility version.
+Secret scanning preserves explicit legacy skip cases; native-source treats
+unexpected missing regular files as incomplete, with sanitized ledger findings
+appended after core matches. Scan reads and findings have finite byte/count caps;
+their host-process memory and elapsed time remain outside per-stage cgroup limits.
 Other scheduled unsupported checks remain visibly unexecuted and make the
 selected scope incomplete. Execution is fresh, without result-cache reuse. The
 independent batch owner cancels queued work and joins builtin workers through
@@ -1187,13 +1192,14 @@ CPU operation before cancellation returns. The same runtime/SIGKILL/kernel-I/O
 boundary applies. This adds no approval or complete-review authority. Operator
 contracts are in
 [native candidate review](docs/native-candidate-review.md#execute-a-selected-batch).
-Focused builtin release validation passed 575 existing and new tests, including
-nine builtin CLI cases, Unicode compatibility and generator refusal tests.
-Twenty-two explicitly delegated cgroup regressions passed, including overlapping
-checks, failed-version isolation, SIGTERM, worker panic and dropped batch cleanup.
-Unicode regeneration reproduced the frozen table byte-for-byte. The scheduling
-and builtin benchmarks record their measured scopes and source bindings in
-[performance](docs/performance.md#native-candidate-builtins).
+Focused scan validation passed 590 release cases, including eight scan CLI
+cases and four private reader regressions. These exercise scope, redaction,
+strict decoding, symlinks, incomplete findings, resource refusal, cancellation,
+size drift, retained read credit, multiple admitted checks and source preservation.
+Exact JSON input boundaries are checked against serde serialization for ASCII
+controls, Unicode, empty inputs and multiple files. Component benchmarks record
+their measured scopes and source bindings in
+[performance](docs/performance.md#native-scan-admission-and-line-lookup).
 
 Full review orchestration, cache integration, evidence and waiver verification,
 test-engine migration, reporting and attestation remain. The existing Python

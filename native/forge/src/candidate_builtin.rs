@@ -3,6 +3,8 @@
 mod integrity;
 #[path = "candidate_builtin_result.rs"]
 mod result;
+#[path = "candidate_builtin_scan.rs"]
+mod scan;
 use crate::{
     candidate_execution_plan::{CheckPlan, Selection},
     candidate_execution_workspace::Workspace,
@@ -26,7 +28,7 @@ pub(crate) fn supports(plan: &CheckPlan) -> bool {
     plan.normalized["kind"] == "builtin"
         && matches!(
             plan.id.as_str(),
-            "candidate-integrity" | "dependency-integrity"
+            "candidate-integrity" | "dependency-integrity" | "secret-scan" | "native-source"
         )
 }
 pub(crate) fn metadata(plan: &CheckPlan) -> Value {
@@ -81,9 +83,15 @@ fn owned(
     let workspace = Workspace::new(&source, &selection.candidate.tree_oid, &selection.grants)?;
     let attempt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<Value> {
         let directory = workspace.directory()?;
-        let prepared = match plan.id.as_str() {
-            "candidate-integrity" => integrity::prepare(selection, &source, &directory, cancel)?,
-            "dependency-integrity" => dependency(selection, cancel)?,
+        let (prepared, ledger) = match plan.id.as_str() {
+            "candidate-integrity" => (
+                integrity::prepare(selection, &source, &directory, cancel)?,
+                None,
+            ),
+            "dependency-integrity" => (dependency(selection, cancel)?, None),
+            "secret-scan" | "native-source" => {
+                scan::prepare(selection, &directory, &plan.id, cancel)?
+            }
             _ => anyhow::bail!("unsupported native builtin"),
         };
         crate::json_canon::encoded_size(&prepared.payload, MAX_INPUT_BYTES)?;
@@ -91,7 +99,7 @@ fn owned(
         if !execute {
             return Ok(Value::Null);
         }
-        let evaluated = if plan.id == "dependency-integrity" {
+        let mut evaluated = if plan.id == "dependency-integrity" {
             conductor_native::candidate_checks::dependency_integrity_with(
                 &prepared.payload,
                 |path| match directory.metadata(path) {
@@ -104,6 +112,7 @@ fn owned(
             conductor_native::candidate_checks::evaluate(&plan.id, &prepared.payload)
         }
         .map_err(anyhow::Error::msg)?;
+        scan::complete(&mut evaluated, ledger)?;
         live(cancel)?;
         crate::json_canon::encoded_size(&evaluated, MAX_RESULT_BYTES)?;
         result::finish(&plan.id, prepared.files, evaluated, started)

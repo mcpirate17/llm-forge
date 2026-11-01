@@ -290,9 +290,10 @@ PATH= /absolute/path/to/forge candidate execute-batch --repo /home/operator/proj
 
 A check without selected files and with `always=false` is an explicit skipped
 row, including a builtin check. It has no stages or result and does not make
-the batch incomplete. Native batch builtins currently cover `candidate-integrity`
-and `dependency-integrity`; other scheduled unsupported checks remain in
-`unexecuted` and as error rows, making `success=false` and exit 1 even in dry-run.
+the batch incomplete. Native batch builtins currently cover `candidate-integrity`,
+`dependency-integrity`, `secret-scan`, and `native-source`; other scheduled
+unsupported checks remain in `unexecuted` and as error rows, making
+`success=false` and exit 1 even in dry-run.
 
 The supported builtins run inside Forge without a shell, external process, or
 per-check cgroup. They still require the candidate source grants and operator
@@ -312,6 +313,40 @@ Supported rows include `builtin.implementation: "forge-builtin/1"`; the
 version matches Python 3.12 for valid UTF-8 case folding and representation; it
 does not normalize text, accept lone surrogates, or claim Unicode versions newer
 than 15.0.0. The compatibility boundary is UTF-8 candidate paths.
+
+`secret-scan` considers all live changes independently of the scheduling row's
+file filter. It preserves deliberate skip behavior for materialized symlinks,
+nonregular files, files above the policy size limit, invalid UTF-8, and explicit
+Git gitlinks. A skipped file is not evidence that its contents were scanned.
+Valid UTF-8 containing NUL remains scan text. Reads use strict UTF-8 decoding and
+normalize CRLF and lone CR to LF. An unexpectedly missing regular candidate file
+is an explicit read error, not a clean skip.
+
+`native-source` includes every live native-class candidate path in its result
+scope, even if the policy-selected row scope is narrower. It follows only
+capability-confined internal symlinks and records missing or unreadable expected
+files, nonregular endpoints, and invalid UTF-8 as critical incomplete-ledger
+findings, including unmaterialized changed gitlinks. Core regex findings keep
+their file/rule/match order; sanitized ledger findings append afterward in sorted
+path order. Its `files_expected`, `files_read`, `files_skipped`, and `skipped_files`
+metrics are always present, including zero counts for an empty native source
+scope. The scan core preserves regex messages, help, redaction, and finding
+semantics, but incomplete-read diagnostics intentionally
+do not reproduce Python exception prose.
+
+Each scan file read is capped at 1 MiB, and an attempt consumes aggregate read
+credit up to 32 MiB, including the extra byte used to detect growth; failed UTF-8
+or I/O attempts still consume credit. The reader polls cancellation between
+64 KiB chunks, verifies descriptor and current confined endpoint identity, and
+uses nonblocking regular-file reads. Secret reads reject final symlinks; native
+source may follow only safe links inside the snapshot. Limits are 100,000
+candidate changes/files and 4,096-byte paths. The prepared payload is capped at
+32 MiB. The scan core admits at most 100,000 findings and 32 MiB of exact
+serialized findings; after the first match in a file, it indexes LF offsets
+once and uses binary search for finding line numbers. Resource refusals return
+an error row with no partial result. These are bounded-admission and
+cooperative-cancellation controls, not
+hard host RSS, wall-time, or uninterruptible-I/O limits.
 
 Builtin preparation and results are each capped at 32 MiB. Candidate integrity
 admits at most 100,000 tree entries and changes, 4,096-byte paths, 4,096

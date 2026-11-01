@@ -1,4 +1,4 @@
-# llm-forge roadmap: mostly Rust, built to cut agent cost and raise code quality
+# llm-forge roadmap: native execution and agent productivity
 
 The [2026-10-31 native orchestration blueprint](../ARCHITECTURE.md) records the
 current substrate audit and the next independently buildable capability milestones.
@@ -7,16 +7,25 @@ The historical baseline and delivery phases below remain as provenance.
 The current native candidate slice includes single-check execution and bounded
 `forge candidate execute-batch`, with default dry-run, explicit operator
 aggregate budgets, policy-ordered results and interruption-owned cleanup. Batch
-now executes `candidate-integrity` and `dependency-integrity` builtins in-process;
-other scheduled unsupported checks remain visibly incomplete. Builtin execution
-uses a private capability-rooted snapshot, bounded inputs/results and no analyzer
-process. Execution is fresh and does not reuse a result cache. Full review
+now executes `candidate-integrity`, `dependency-integrity`, `secret-scan`, and
+`native-source` builtins in-process. Other scheduled unsupported checks remain
+visibly incomplete. Builtin execution uses a private capability-rooted snapshot,
+bounded inputs/results and no analyzer process; scan reads are strict UTF-8,
+finite and cooperatively cancellable, with sanitized incomplete-read findings.
+Execution is fresh and does not reuse a result cache. Full review
 orchestration, remaining builtins, evidence and waiver verification, test-engine
 migration, reporting, attestation and legacy caller retirement remain. There are
 still 128 Python source files under `src/`; the native migration is incomplete.
 See the
 [execution contract](native-candidate-review.md#execute-a-selected-batch) and
-[builtin measurements](performance.md#native-candidate-builtins).
+[scan measurements](performance.md#native-scan-admission-and-line-lookup).
+
+An independent build milestone will isolate executable identity stamping from
+reusable library and test compilation. It must preserve Git/source identities,
+installed-artifact checks and source-bound verification receipts, while proving
+that identity-only changes refresh the executable without rebuilding unrelated
+library tests. This reduces iteration cost while the remaining runtime callers
+move into native code.
 
 Status as of 2026-09-13; source of truth for llm-forge direction
 

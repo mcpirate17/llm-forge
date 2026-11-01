@@ -195,3 +195,49 @@ Measured source bindings:
 | `native/conductor-native/src/candidate_unicode.rs` (final) | `ce3b258c4bc1b6e3671d0c36dd37120079eafb8124aae00de2c1afb06f3fd070` |
 | `native/conductor-native/src/candidate_unicode.rs` (baseline) | `aba654cfa4b78bc4f91c481970a7bcba22b05ec08b0967702db07ae4246d2a02` |
 | `native/conductor-native/src/candidate_unicode_table.rs` | `9c4b4f9a4ab3f7dfc3d7c46d789d5020b6a152307d19434a7cdb75ca39edf007` |
+
+## Native scan admission and line lookup
+
+`cargo +1.98.0 bench --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite --bench candidate_scan`
+compares the pure secret/native scan APIs before and after bounded admission,
+producer output limits and indexed line lookup. Both 2026-11-01 release runs
+used Rust 1.98.0, the same benchmark source and an unisolated warm host. Every
+workload contains one file with 4,000 lines. Clean inputs are 64,000 bytes; dense
+secret/native inputs are 84,000/52,000 bytes and each produces 4,000 findings.
+The independent output oracle verifies count, order, line numbers, messages,
+severity and secret redaction. Input and output hashes match across both runs.
+
+| Scan | Baseline median | Final median | Final p95 |
+| --- | ---: | ---: | ---: |
+| Secret, clean | 5.689 µs | 5.591 µs | 5.995 µs |
+| Secret, dense findings | 30.597 ms | 2.111 ms | 2.370 ms |
+| Native, clean | 2.750 µs | 2.808 µs | 3.082 µs |
+| Native, dense findings | 19.449 ms | 1.865 ms | 1.904 ms |
+
+Each run uses five warmup calls and 31 samples; clean samples average ten
+evaluations and dense samples time one evaluation. Dense-case median ratios
+are 14.49× and 10.43×. Clean-case differences are small in this single run pair;
+these measurements do not establish an application-wide speedup.
+
+Previously each finding rescanned the source prefix to count LF bytes. Now the
+first match builds an LF index reused by subsequent findings; clean files build
+none. Input admission checks a minimum and worst-case JSON size from byte
+lengths, using exact serialization accounting only when those bounds cannot
+decide admission. This preserves the exact accepted byte boundary without
+rescanning ordinary small payloads. Output admission counts each finding before
+retention. Those checks and output Value allocation/drop are included in the
+final timings. Source/snapshot reads, payload JSON parsing, final JSON text
+encoding, hashing, fingerprints and full review remain outside the measurement.
+
+Baseline/final executable SHA-256:
+`62353038d87f89a151ed416508e986393626822bc8ce2dcd8d6f864c44ba6920` /
+`8d9bb8c6e9982de00989ec175fd7d00b1e022c76796808ef323673f8a76c859e`.
+Baseline/final result JSON SHA-256:
+`76413aba2e13b9ee3919f595108ed9cbf7994a8174371a9e8daf991a0b980417` /
+`f2f469931014a66eb977baca635e6c0afcdd1db8bc5ad7c16bf811cb851f3e1b`.
+
+| Measured source | SHA-256 |
+| --- | --- |
+| `native/conductor-native/benches/candidate_scan.rs` (both) | `38dcc773efb0e9669b011601a44889b9c4920a9aad782a1ea5d5b80906c04840` |
+| `native/conductor-native/src/candidate_checks_scan.rs` (baseline) | `461d82a167d3b89b17d71bea35898ef2ac0b661ab4e8ee0fb9391482796ed019` |
+| `native/conductor-native/src/candidate_checks_scan.rs` (final) | `838ea3e828e0ff99acce13101f70e307e6d15e6ae51aba78a38d96eec164c312` |
