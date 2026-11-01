@@ -281,3 +281,35 @@ fn classification_covers_shell_web_dependency_and_symlink_paths() {
         }
     }
 }
+
+#[test]
+fn builtin_cargo_audit_cannot_bypass_evidence_validation_with_result_cache() {
+    let error =
+        "checks.cargo-audit.cache must be false: pinned evidence must be revalidated on every run";
+    let mut raw = policy();
+    raw["checks"] = json!({"cargo-audit":{"kind":"builtin","profiles":["full"]}});
+    assert_eq!(
+        parse_policy(&raw, "2026-09-27").unwrap_err(),
+        error,
+        "default true must not silently bypass pinning"
+    );
+    raw["checks"]["cargo-audit"]["cache"] = json!(true);
+    assert_eq!(parse_policy(&raw, "2026-09-27").unwrap_err(), error);
+    raw["checks"]["cargo-audit"]["cache"] = json!(false);
+    assert_eq!(
+        parse_policy(&raw, "2026-09-27").unwrap()["checks"][0]["cache"],
+        false
+    );
+    // Other builtins and explicitly configured external command checks retain existing caching.
+    raw["checks"] = json!({"secret-scan":{"kind":"builtin","profiles":["full"],"cache":true}});
+    assert_eq!(
+        parse_policy(&raw, "2026-09-27").unwrap()["checks"][0]["cache"],
+        true
+    );
+    raw["checks"] = json!({"cargo-audit":{"kind":"command","profiles":["full"],"cache":true,
+        "command":["tool"],"version_command":["tool","--version"]}});
+    assert_eq!(
+        parse_policy(&raw, "2026-09-27").unwrap()["checks"][0]["cache"],
+        true
+    );
+}

@@ -575,22 +575,10 @@ memory_mb = 8192
 max_output_chars = 30000
 
 [checks.cargo-audit]
-kind = "command"
+kind = "builtin"
 profiles = ["full"]
 classes = ["rust_dependency"]
-command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.cargo_audit_files",
-  "{files}",
-]
-version_command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.cargo_audit_files",
-  "--version",
-]
-cache = true
+cache = false
 severity = "critical"
 timeout_seconds = 600
 memory_mb = 8192

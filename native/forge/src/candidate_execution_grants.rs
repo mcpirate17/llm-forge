@@ -26,6 +26,7 @@ pub(crate) struct Grants {
     pub max_address_space_mib: u64,
     pub python: Option<String>,
     pub batch: Option<BatchBudget>,
+    pub cargo_audit_evidence: Option<conductor_native::candidate_cargo_evidence::EvidenceSpec>,
     #[serde(skip)]
     digest: String,
 }

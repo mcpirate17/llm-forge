@@ -1,0 +1,51 @@
+{
+  "scope": "synthetic, no end-to-end or baseline speedup claim",
+  "timing": "in-process API calls incl returned object destruction; excludes semantic checks, dataset and output serialization, evidence authentication/freshness, filesystem, network, sandbox and CLI",
+  "build_profile": "release-like",
+  "rustsec_version": "0.33.0",
+  "bundle_bytes": 4565,
+  "bundle_sha256": "8ea46585d0499e1419740f6bd33917e8265cb815dd2f1c53bd5423e4b5980a60",
+  "lock_full_bytes": 6146,
+  "lock_full_sha256": "b2c9b4ced6dcdacdf723e4b4f21958dac1780d9464235a5d807a0a9024aa8e2f",
+  "lock_clean_bytes": 3084,
+  "lock_clean_sha256": "c12f2d7ccbdfa0e888c851df14e0fe4db5b6309f0c4be2760f654f2adffedbd9",
+  "positive_observation_sha256": "a7b0446a8d0173015950223a6141e6c3b7e2aa4e0317ecc7eef8acf9002254ce",
+  "negative_observation_sha256": "a37a82ca40a49751f4f5320418d5dc6dd2b1606b0fcccbadfe86a4fc189ff26f",
+  "measurements": [
+    {
+      "name": "bundle_parse_1_advisory_32_registry",
+      "samples": 31,
+      "iterations_per_sample": 20,
+      "warmup_calls": 5,
+      "timed_calls": 620,
+      "timed_elapsed_seconds": 0.007016205000000001,
+      "mean_us_per_iteration": 11.316459677419356,
+      "median_us_per_iteration": 11.22255,
+      "p95_us_per_iteration": 11.72205
+    },
+    {
+      "name": "warm_audit_32_versions_16_vulnerable_1_yanked",
+      "samples": 31,
+      "iterations_per_sample": 20,
+      "warmup_calls": 5,
+      "timed_calls": 620,
+      "timed_elapsed_seconds": 0.037632334,
+      "mean_us_per_iteration": 60.69731290322581,
+      "median_us_per_iteration": 60.64725,
+      "p95_us_per_iteration": 61.202299999999994
+    },
+    {
+      "name": "warm_audit_16_patched_versions",
+      "samples": 31,
+      "iterations_per_sample": 20,
+      "warmup_calls": 5,
+      "timed_calls": 620,
+      "timed_elapsed_seconds": 0.017848388000000003,
+      "mean_us_per_iteration": 28.787722580645166,
+      "median_us_per_iteration": 28.67915,
+      "p95_us_per_iteration": 29.949149999999996
+    }
+  ],
+  "elapsed_seconds": 0.063354161,
+  "deadline_seconds": 30
+}

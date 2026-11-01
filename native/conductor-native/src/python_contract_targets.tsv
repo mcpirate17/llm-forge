@@ -9,7 +9,6 @@ src/conductor/avo_supervisor.py	python_contracts_avo_workflows
 src/conductor/branch_policy.py	python_contracts_branch_policy
 src/conductor/bytecode_isolation.py	python_contracts_mutation_pycache_evict
 src/conductor/candidate_review/benchmark.py	python_contracts_candidate_benchmark
-src/conductor/candidate_review/cargo_audit_files.py	python_contracts_candidate_cargo_audit
 src/conductor/candidate_review/cargo_lint_files.py	python_contracts_candidate_cargo_lint
 src/conductor/candidate_review/checks.py	python_contracts_candidate_cli
 src/conductor/candidate_review/checks.py	python_contracts_candidate_policy_regressions
@@ -124,7 +123,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_avo_w
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_branch_policy
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_campaign_plan
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_benchmark
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_cargo_audit
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_cargo_lint
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_cli
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_crate_version
@@ -805,3 +803,18 @@ native/slop-core/src/verbosity_scan.rs	python_contracts_verbosity_scan
 native/slop-core/src/lib.rs	python_contracts_verbosity_scan
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_verbosity_scan
 # include: python_contract_targets_extra.tsv
+src/conductor/candidate_review/checks.py	python_contracts_candidate_policy
+src/conductor/candidate_review/checks.py	python_contracts_candidate_cargo_lint
+src/conductor/_native.py	python_contracts_candidate_policy
+src/conductor/_native.py	python_contracts_candidate_cargo_lint
+native/conductor-native/src/candidate_checks.rs	python_contracts_candidate_policy
+native/conductor-native/src/candidate_checks.rs	python_contracts_candidate_cargo_lint
+native/conductor-native/src/candidate_cargo_toolchain.rs	python_contracts_candidate_cargo_lint
+native/conductor-native/src/candidate_cargo_audit.rs	python_contracts_candidate_policy
+native/conductor-native/src/candidate_cargo_engine.rs	python_contracts_candidate_policy
+native/conductor-native/src/candidate_cargo_evidence.rs	python_contracts_candidate_policy
+native/conductor-native/src/candidate_cargo_run.rs	python_contracts_candidate_policy
+native/conductor-native/src/candidate_policy_parse.rs	python_contracts_candidate_policy
+native/conductor-native/src/candidate_checks_integrity.rs	python_contracts_candidate_policy
+native/conductor-native/src/candidate_path_suffixes.rs	python_contracts_candidate_policy
+native/conductor-native/src/candidate_file_inputs.rs	python_contracts_candidate_policy

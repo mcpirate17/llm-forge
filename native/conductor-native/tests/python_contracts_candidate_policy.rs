@@ -416,3 +416,137 @@ fn cppcheck_dataclass_metadata_and_snapshot_reach_real_native_selector() {
         std::path::Path::new("yes.CPP")
     );
 }
+
+fn cargo_compat_evidence(case: &Case) -> (std::path::PathBuf, std::path::PathBuf, String) {
+    use sha2::{Digest, Sha256};
+    use std::os::unix::fs::PermissionsExt;
+    let captured = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let bundle = json!({"schema_version":1,"captured_at":captured,"advisory_commit":"a".repeat(40),
+        "advisories":[{"path":"crates/example/RUSTSEC-2021-0001.md","text":
+            "```toml\n[advisory]\nid = \"RUSTSEC-2021-0001\"\npackage = \"example\"\ndate = \"2021-01-01\"\n[versions]\npatched = [\">= 2.0.0\"]\n```\n\n# Owned vulnerability 雪\n\nNative compatibility fixture.\n"}],
+        "registry":[{"name":"example","version":"1.0.0","checksum":"1".repeat(64),"yanked":false}]});
+    let bytes = serde_json::to_vec(&bundle).unwrap();
+    let digest = format!("{:x}", Sha256::digest(&bytes));
+    let path = case.root().join("operator-bundle.json");
+    std::fs::write(&path, &bytes).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let spec = case.root().join("operator-evidence.json");
+    std::fs::write(
+        &spec,
+        serde_json::to_vec(&json!({"path":path,"sha256":digest,"max_age_seconds":3600})).unwrap(),
+    )
+    .unwrap();
+    std::fs::set_permissions(&spec, std::fs::Permissions::from_mode(0o600)).unwrap();
+    (spec, path, digest)
+}
+
+#[test]
+fn cargo_audit_metadata_bridge_uses_real_native_engine_and_pinned_operator_evidence() {
+    let mut case = Case::new();
+    let repo = case.mkdir("repo");
+    let snapshot = case.mkdir("snapshot");
+    let policy_path=case.write("snapshot/policy.toml",&format!("{POLICY}\n[checks.cargo-audit]\nkind='builtin'\ncache=false\nprofiles=['full']\nclasses=['native']\npath_suffixes=['.lock']\nseverity='critical'\n"));
+    case.write("snapshot/Cargo.lock",&format!("version = 3\n\n[[package]]\nname = \"example\"\nversion = \"1.0.0\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"{}\"\n","1".repeat(64)));
+    case.write("snapshot/no.rs", "fn excluded() {}\n");
+    let (spec, bundle, digest) = cargo_compat_evidence(&case);
+    case.set_env("FORGE_CARGO_AUDIT_EVIDENCE", spec.to_str().unwrap());
+    Python::attach(|py| {
+        let policy = module(py, "conductor.candidate_review.policy")
+            .getattr("load_policy")
+            .unwrap()
+            .call1((path(py, &policy_path),))
+            .unwrap();
+        let context = cppcheck_compat_context(
+            py,
+            &snapshot,
+            &[("Cargo.lock", "100644"), ("no.rs", "100644")],
+        );
+        context.setattr("repo", path(py, &repo)).unwrap();
+        context.setattr("policy", policy).unwrap();
+        let checks = module(py, "conductor.candidate_review.checks");
+        let builtin = checks
+            .getattr("BUILTIN_CHECKS")
+            .unwrap()
+            .get_item("cargo-audit")
+            .unwrap();
+        let result = builtin.call1((&context,)).unwrap();
+        assert_eq!(attr_text(&result, "status"), "failed");
+        assert_eq!(
+            result
+                .getattr("files")
+                .unwrap()
+                .extract::<Vec<String>>()
+                .unwrap(),
+            ["Cargo.lock"]
+        );
+        let findings = result.getattr("findings").unwrap();
+        assert_eq!(findings.len().unwrap(), 1);
+        let finding = findings.get_item(0).unwrap();
+        assert_eq!(attr_text(&finding, "check_id"), "cargo-audit");
+        assert_eq!(attr_text(&finding, "rule_id"), "vulnerable-dependency");
+        assert_eq!(attr_text(&finding, "severity"), "critical");
+        assert_eq!(attr_text(&finding, "path"), "Cargo.lock");
+        let metrics = result.getattr("metrics").unwrap();
+        assert_eq!(text(&metrics.get_item("evidence_sha256").unwrap()), digest);
+        assert_eq!(
+            metrics
+                .get_item("owner_plan")
+                .unwrap()
+                .get_item("lockfiles")
+                .unwrap()
+                .extract::<Vec<String>>()
+                .unwrap(),
+            ["Cargo.lock"]
+        );
+        std::fs::write(&bundle, b"corrupted after operator pin").unwrap();
+        let error = builtin.call1((&context,)).unwrap_err();
+        assert_error(
+            py,
+            error,
+            &module(py, "builtins").getattr("ValueError").unwrap(),
+            "SHA-256 mismatch",
+        );
+    });
+    assert!(std::fs::read_to_string(snapshot.join("Cargo.lock"))
+        .unwrap()
+        .contains("version = \"1.0.0\""));
+}
+
+#[test]
+fn loaded_builtin_cargo_audit_requires_explicit_noncacheable_policy() {
+    let case = Case::new();
+    Python::attach(|py| {
+        let policy_module = module(py, "conductor.candidate_review.policy");
+        let load = policy_module.getattr("load_policy").unwrap();
+        for setting in ["", "cache=true\n"] {
+            let fixture = case.write(
+                "audit-cache-policy.toml",
+                &format!(
+                    "{POLICY}\n[checks.cargo-audit]\nkind='builtin'\nprofiles=['full']\n{setting}"
+                ),
+            );
+            let error = load.call1((path(py, &fixture),)).unwrap_err();
+            assert_error(py,error,&policy_module.getattr("PolicyError").unwrap(),
+                "checks.cargo-audit.cache must be false: pinned evidence must be revalidated on every run");
+        }
+        let fixture = case.write(
+            "audit-cache-policy.toml",
+            &format!(
+                "{POLICY}\n[checks.cargo-audit]\nkind='builtin'\nprofiles=['full']\ncache=false\n"
+            ),
+        );
+        let loaded = load.call1((path(py, &fixture),)).unwrap();
+        let check = loaded
+            .getattr("checks")
+            .unwrap()
+            .try_iter()
+            .unwrap()
+            .map(|c| c.unwrap())
+            .find(|c| attr_text(c, "check_id") == "cargo-audit")
+            .unwrap();
+        assert!(!check.getattr("cache").unwrap().extract::<bool>().unwrap());
+    });
+}

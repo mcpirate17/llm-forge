@@ -477,3 +477,52 @@ fn configured_missing_roster_error_names_resolved_path() {
         assert!(message.contains(expected.to_str().unwrap()));
     });
 }
+
+#[test]
+fn toolchain_metadata_shim_uses_real_native_home_recovery_and_preserves_explicit_values() {
+    let case = Case::new();
+    case.write(
+        "home/.rustup/settings.toml",
+        "default_toolchain='fixture'\n",
+    );
+    case.write("home/.rustup/toolchains/fixture/marker", "owned fixture\n");
+    case.mkdir("home/.cargo/bin");
+    Python::attach(|py| {
+        let environment = PyDict::new(py);
+        let home = case.root().join("home");
+        environment
+            .set_item("HOME", home.to_str().unwrap())
+            .unwrap();
+        environment.set_item("UNCHANGED", "kept").unwrap();
+        let shim = lint(py).getattr("rust_toolchain_env").unwrap();
+        let recovered = shim
+            .call1((&environment,))
+            .unwrap()
+            .extract::<std::collections::BTreeMap<String, String>>()
+            .unwrap();
+        assert_eq!(
+            recovered["RUSTUP_HOME"],
+            home.join(".rustup").to_str().unwrap()
+        );
+        assert_eq!(
+            recovered["CARGO_HOME"],
+            home.join(".cargo").to_str().unwrap()
+        );
+        assert_eq!(recovered["UNCHANGED"], "kept");
+        environment
+            .set_item("RUSTUP_HOME", "/explicit-not-present-rustup")
+            .unwrap();
+        environment
+            .set_item("CARGO_HOME", "/explicit-not-present-cargo")
+            .unwrap();
+        let explicit = shim
+            .call1((&environment,))
+            .unwrap()
+            .extract::<std::collections::BTreeMap<String, String>>()
+            .unwrap();
+        assert_eq!(explicit["RUSTUP_HOME"], "/explicit-not-present-rustup");
+        assert_eq!(explicit["CARGO_HOME"], "/explicit-not-present-cargo");
+        assert_eq!(explicit["HOME"], home.to_str().unwrap());
+        assert_eq!(explicit["UNCHANGED"], "kept");
+    });
+}

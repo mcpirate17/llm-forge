@@ -118,6 +118,13 @@ usable version evidence and sandbox resources. Input preflight proves those
 files exist in the snapshot; it does not attest to an external analyzer's
 behavior or completeness of analysis.
 
+### Native Cargo audit
+
+`execute-batch --check cargo-audit` also supports the native offline RustSec
+builtin. It requires separately pinned operator evidence; see the
+[Cargo audit contract](native-cargo-audit.md) for its bundle, grants, scope,
+bounds and remaining legacy bridge.
+
 ### Assess supplied candidate results
 
 `assess` uses the same candidate selection, policy, profile, date, and scratch
@@ -334,7 +341,7 @@ PATH= /absolute/path/to/forge candidate execute-batch --repo /home/operator/proj
 A check without selected files and with `always=false` is an explicit skipped
 row, including a builtin check. It has no stages or result and does not make
 the batch incomplete. Native batch builtins currently cover `candidate-integrity`,
-`dependency-integrity`, `secret-scan`, and `native-source`; other scheduled
+`dependency-integrity`, `secret-scan`, `native-source`, and `cargo-audit`; other scheduled
 unsupported checks remain in `unexecuted` and as error rows, making
 `success=false` and exit 1 even in dry-run.
 

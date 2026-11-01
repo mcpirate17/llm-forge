@@ -1,4 +1,6 @@
 //! Snapshot-backed native checks. No analyzer process, result cache or approval.
+#[path = "candidate_builtin_cargo.rs"]
+mod cargo;
 #[path = "candidate_builtin_integrity.rs"]
 mod integrity;
 #[path = "candidate_builtin_result.rs"]
@@ -28,7 +30,11 @@ pub(crate) fn supports(plan: &CheckPlan) -> bool {
     plan.normalized["kind"] == "builtin"
         && matches!(
             plan.id.as_str(),
-            "candidate-integrity" | "dependency-integrity" | "secret-scan" | "native-source"
+            "candidate-integrity"
+                | "dependency-integrity"
+                | "secret-scan"
+                | "native-source"
+                | "cargo-audit"
         )
 }
 pub(crate) fn metadata(plan: &CheckPlan) -> Value {
@@ -82,6 +88,11 @@ fn owned(
     let source = selection.source()?;
     let workspace = Workspace::new(&source, &selection.candidate.tree_oid, &selection.grants)?;
     let attempt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<Value> {
+        if plan.id == "cargo-audit" {
+            return cargo::run(
+                selection, plan, &workspace, &source, cancel, execute, started,
+            );
+        }
         let directory = workspace.directory()?;
         let (prepared, ledger) = match plan.id.as_str() {
             "candidate-integrity" => (

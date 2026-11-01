@@ -22,6 +22,10 @@ required-features = ["vector-search"]
 name = "candidate_scan"
 harness = false
 
+[[bench]]
+name = "candidate_cargo_audit"
+harness = false
+
 [[bin]]
 name = "dead-code-audit"
 path = "src/bin/dead_code_audit.rs"
@@ -54,6 +58,7 @@ regex = "1"
 # The Python binding shares CPython's dynamic SQLite library; Forge opts into
 # bundled-sqlite because its standalone process has no Python SQLite connection.
 rusqlite = { version = "0.32", features = ["modern_sqlite", "hooks", "limits"] }
+rustsec = { version = "=0.33.0", default-features = false }
 libloading = { version = "0.8", optional = true }
 libc = "0.2"
 ruff_python_ast = { package = "rustpython-ruff_python_ast", version = "0.15.8", optional = true }
@@ -139,10 +144,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_candidate_call_evidence"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_cargo_audit"
 required-features = ["python-compat-tests"]
 
 [[test]]

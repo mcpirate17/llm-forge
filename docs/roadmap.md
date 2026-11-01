@@ -7,25 +7,26 @@ The historical baseline and delivery phases below remain as provenance.
 The current native candidate slice includes single-check execution and bounded
 `forge candidate execute-batch`, with default dry-run, explicit operator
 aggregate budgets, policy-ordered results and interruption-owned cleanup. Batch
-now executes `candidate-integrity`, `dependency-integrity`, `secret-scan`, and
-`native-source` builtins in-process. Other scheduled unsupported checks remain
+now executes `candidate-integrity`, `dependency-integrity`, `secret-scan`,
+`native-source`, and `cargo-audit` builtins in-process. Cargo audit consumes
+operator-pinned offline evidence with native RustSec and exact crates.io
+checksum/yanked coverage. Other scheduled unsupported checks remain
 visibly incomplete. Builtin execution uses a private capability-rooted snapshot,
 bounded inputs/results and no analyzer process; scan reads are strict UTF-8,
 finite and cooperatively cancellable, with sanitized incomplete-read findings.
 Execution is fresh and does not reuse a result cache. Full review
 orchestration, remaining builtins, evidence and waiver verification, test-engine
 migration, reporting, attestation and legacy caller retirement remain. There are
-still 128 Python source files under `src/`; the native migration is incomplete.
+still 126 Python source files under `src/`; the native migration is incomplete.
 See the
 [execution contract](native-candidate-review.md#execute-a-selected-batch) and
 [scan measurements](performance.md#native-scan-admission-and-line-lookup).
 
-An independent build milestone will isolate executable identity stamping from
-reusable library and test compilation. It must preserve Git/source identities,
-installed-artifact checks and source-bound verification receipts, while proving
-that identity-only changes refresh the executable without rebuilding unrelated
-library tests. This reduces iteration cost while the remaining runtime callers
-move into native code.
+Executable identity stamping now belongs to the separate `forge-cli` workspace
+package. Git/source identities, installed-artifact checks and source-bound
+receipts remain enforced while reusable library and test builds retain their
+caches. See [native local verification](local-checks.md). Native receipt export
+is available, and direct cppcheck execution replaces its deleted Python wrapper.
 
 Status as of 2026-09-13; source of truth for llm-forge direction
 

@@ -13,13 +13,14 @@ too, so a crate cannot be linted in one place and not the other.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
 
 from conductor import project_paths
-from conductor.candidate_review.cargo_audit_files import rust_toolchain_env
+from conductor.candidate_review.checks import _native_eval
 
 # Kept for callers and tests that still resolve the roster the old way: the
 # unconfigured default, repo-root-relative. ``Roster.load`` itself resolves
@@ -40,6 +41,13 @@ MODES = {
         "warnings",
     ),
 }
+
+
+def rust_toolchain_env(environ: dict[str, str] | None = None) -> dict[str, str]:
+    return _native_eval(
+        "cargo-toolchain-env",
+        {"environment": dict(os.environ if environ is None else environ)},
+    )
 
 
 class RosterError(RuntimeError):

@@ -1175,7 +1175,7 @@ while continuing to drain. Details and operator configuration are in
 Native `forge candidate execute-batch` runs selected regular checks under a
 separate aggregate operator budget. In addition to external commands, the native
 batch currently evaluates `candidate-integrity`, `dependency-integrity`,
-`secret-scan`, and `native-source` in-process. Candidate integrity requires
+`secret-scan`, `native-source`, and `cargo-audit` in-process. Candidate integrity requires
 explicit `--surface` when scheduled,
 even in dry-run; dry-run validates and prepares its private snapshot without
 evaluating the check. These builtins require source grants and a batch budget,
@@ -1217,8 +1217,15 @@ defines the remaining legacy metadata bridge and explicit no-file skip.
 Full review orchestration, cache integration, evidence and waiver verification,
 test-engine migration, review-integrated reporting and attestation remain. The existing Python
 command runner still has these callers and has not been deleted prematurely;
-127 Python source files remain under `src/`. The native migration goal stays
+126 Python source files remain under `src/`. The native migration goal stays
 active until those consumers are replaced and their interpreted code is removed.
+
+Cargo audit now evaluates pinned offline evidence directly with native RustSec,
+including exact crates.io checksum and yanked-state coverage. Its Python command
+wrapper is deleted; the legacy dispatcher forwards metadata to the same native
+evaluator. Missing, stale or inconsistent evidence fails. The
+[audit contract](docs/native-cargo-audit.md) documents operator provenance and
+scope limits; cargo-lint execution and evidence production still need migration.
 
 ## Executable identity and reusable builds
 

@@ -147,6 +147,13 @@ fn check(id: &str, entry: &Value) -> Result<Value> {
         &default(raw, "severity", json!("high")),
         &format!("{field}.severity is invalid"),
     )?;
+    let cache = boolean(
+        &default(raw, "cache", json!(true)),
+        &format!("{field}.cache"),
+    )?;
+    if id == "cargo-audit" && kind == "builtin" && cache {
+        return Err("checks.cargo-audit.cache must be false: pinned evidence must be revalidated on every run".into());
+    }
     let attribution = default(raw, "attribution", json!("candidate"));
     if !matches!(attribution.as_str(), Some("candidate" | "diff")) {
         return Err(format!(
@@ -159,7 +166,7 @@ fn check(id: &str, entry: &Value) -> Result<Value> {
         "severity": sev, "timeout_seconds": positive(&default(raw,"timeout_seconds",json!(60)), &format!("{field}.timeout_seconds"), Some(3600))?,
         "memory_mb": positive(&default(raw,"memory_mb",json!(2048)), &format!("{field}.memory_mb"), Some(65536))?,
         "attribution": attribution, "always": boolean(&default(raw,"always",json!(false)), &format!("{field}.always"))?,
-        "cache": boolean(&default(raw,"cache",json!(true)), &format!("{field}.cache"))?,
+        "cache": cache,
         "run_on_deletions": boolean(&default(raw,"run_on_deletions",json!(false)), &format!("{field}.run_on_deletions"))?,
         "max_output_chars": positive(&default(raw,"max_output_chars",json!(12000)), &format!("{field}.max_output_chars"), None)?,
         "shard_max_files": nonnegative(&default(raw,"shard_max_files",json!(0)), &format!("{field}.shard_max_files"), None)?,

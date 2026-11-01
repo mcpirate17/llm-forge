@@ -475,7 +475,30 @@ def check_mutation_evidence(ctx: ReviewContext) -> CheckResult:
     return verify_mutation_receipts(ctx)
 
 
+def check_cargo_audit(ctx: ReviewContext) -> CheckResult:
+    started = time.perf_counter()
+    check = next(item for item in ctx.policy.checks if item.check_id == "cargo-audit")
+    files = files_for_policy(ctx, check)
+    native = _native_eval(
+        "cargo-audit",
+        {
+            "source_root": str(ctx.repo),
+            "snapshot": str(ctx.snapshot),
+            "evidence_spec": os.environ["FORGE_CARGO_AUDIT_EVIDENCE"],
+            "files": files,
+        },
+    )
+    return _result(
+        "cargo-audit",
+        started,
+        _native_findings(native),
+        files=files,
+        metrics=native["metrics"],
+    )
+
+
 BUILTIN_CHECKS: dict[str, Callable[[ReviewContext], CheckResult]] = {
+    "cargo-audit": check_cargo_audit,
     "candidate-integrity": check_candidate_integrity,
     "config-parse": check_config_and_notebooks,
     "dependency-integrity": check_dependency_integrity,
