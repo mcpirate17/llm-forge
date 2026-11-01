@@ -85,6 +85,8 @@ sha1 = { version = "0.10", optional = true }
 sha2 = "0.10"
 syn = { version = "2", features = ["full", "visit", "parsing"] }
 toml = "0.8"
+tree-sitter = { version = "0.27", optional = true }
+tree-sitter-cpp = { version = "0.23", optional = true }
 unicode-general-category = { version = "0.6", optional = true }
 zstd = "0.13"
 
@@ -98,7 +100,7 @@ zstd = "0.13"
 [features]
 default = ["python"]
 bundled-sqlite = ["rusqlite/bundled"]
-source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:unicode-general-category"]
+source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:unicode-general-category", "dep:tree-sitter", "dep:tree-sitter-cpp"]
 python = ["dep:pyo3", "source-analysis", "dep:memmap2", "dep:libloading", "dep:sha1"]
 python-compat-tests = ["python"]
 extension-module = ["python", "pyo3/extension-module"]
