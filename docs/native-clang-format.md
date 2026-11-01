@@ -67,9 +67,9 @@ supervised product execution. Each selected file runs sequentially and the
 latest nonzero tool exit is retained. Spawn, signal, config and drift errors
 fail explicitly rather than being reported as clean skips.
 
-The Python formatter mode has been deleted from `clang_files.py`. Its remaining
-clang-tidy path still needs native compile-database capture and path rebasing;
-shared Python diff-range consumers remain until their own migrations finish.
+The Python `clang_files.py` wrapper is deleted. Its tidy path is replaced by
+[native clang-tidy](native-clang-tidy.md); shared Python diff-range consumers
+remain until their own migrations finish.
 The policy's previous claim that `uv.lock` pinned Clang was false. Validation
 uses an explicitly provisioned native clang-format 23.1.0 artifact; it does not
 install or import its Python wheel wrappers.

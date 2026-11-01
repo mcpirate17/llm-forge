@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-11-01T20:51:48Z",
+  "base_commit": "2c831ca6d818ab134d46f5bd43acc8ff33be98a8",
+  "source_state": "dirty native clang-tidy milestone; exact compiled inputs bound below",
+  "host": {
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "architecture": "x86_64",
+    "kernel": "7.0.0-38-generic",
+    "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+    "isolation": "unisolated host; no concurrent owned build during timed region"
+  },
+  "command": "cargo +1.98.0 bench --offline --locked --manifest-path native/conductor-native/Cargo.toml --bench candidate_clang",
+  "sha256": {
+    "native/conductor-native/src/candidate_clang_args.rs": "886697e20c89fc3ff0bf76c0cffdd8328b025c71962bde0027cdfc9dfd6bfa50",
+    "native/conductor-native/src/candidate_clang_db.rs": "0d0aedea7f5b702ff78bb29ed56ff37928e8954b068098e10e2ecfcb06a39906",
+    "native/conductor-native/src/command_lex.rs": "521d7398cd01d764483e90a062937e1e889507d9d62b5013b76c119b99822912",
+    "native/conductor-native/benches/candidate_clang.rs": "a461757b000effa10724798717d470f8fcd9a75db681a00a0c46ad75a5640071",
+    "native/conductor-native/Cargo.toml": "18d3be44438d982b6e33c9878ea630531620260dc8bb295d8888bf079ab2227f",
+    "native/conductor-native/Cargo.lock": "5301ab10b78b9fcece7035d1f54c07d0124eb10c8f175067c7c2b682d217b14b",
+    "native/conductor-native/target/release/deps/candidate_clang-82765f76cc90b564": "0593e1a6964b9fa8c159b2647059a6d70e3ad798ecae078da57a50a8e8ff6635"
+  },
+  "result": {
+    "scope": "current-only synthetic pure API; no inferred baseline improvement or CLI latency claim",
+    "timing": "API including Result handling and object destruction; parse includes UTF8/JSON decoding/tokenization; excludes fixture/oracle/serialization/hash/filesystem/process/sandbox/CLI costs",
+    "database": {
+      "records": 1000,
+      "translation_units": 500,
+      "configs_per_tu": 2,
+      "arguments_records": 500,
+      "command_records": 500,
+      "input_bytes": 267501,
+      "input_sha256": "1d60849a3e0df356e675dcf2524e127ac9326a8e59d6bce748cf9ba109ccfbd0",
+      "normalized_sha256": "721a6ae655ff2fde097faa64e738f49c79651852f7c081e3facbb4c7f8ceaa44"
+    },
+    "rebase": {
+      "arguments": 17,
+      "mappings": 2,
+      "input_sha256": "51dc2a99b28ed55e1587f7b6b9c0974826b4eea165a976fe76c704d14e0ea055",
+      "output_sha256": "45844d5984aba8345b18c8c7da716003d8228592263b0377dec32169aaf76872"
+    },
+    "build_profile": "release-like",
+    "measurements": [
+      {
+        "name": "parse_1000_records_500_translation_units",
+        "warmup_calls": 5,
+        "samples": 31,
+        "iterations_per_sample": 20,
+        "timed_calls": 620,
+        "median_sample_mean_ns": 963581.75,
+        "p95_sample_mean_ns": 981484.35,
+        "mean_ns": 964367.6951612906
+      },
+      {
+        "name": "rebase_17_argument_compile_record",
+        "warmup_calls": 5,
+        "samples": 31,
+        "iterations_per_sample": 20,
+        "timed_calls": 620,
+        "median_sample_mean_ns": 2775,
+        "p95_sample_mean_ns": 2878,
+        "mean_ns": 2782.0483870967746
+      }
+    ],
+    "elapsed_seconds": 0.607465833,
+    "deadline_seconds": 30
+  }
+}

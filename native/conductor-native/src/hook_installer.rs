@@ -11,62 +11,10 @@ use pyo3::prelude::*;
 use serde_json::Map;
 use serde_json::Value;
 
-fn shlex_whitespace(c: char) -> bool {
-    matches!(c, ' ' | '\t' | '\r' | '\n')
-}
-
 /// Python ``shlex.split(command, posix=True)``: quotes abut, backslash escapes
 /// outside quotes, inside double quotes it escapes only ``"`` and ``\``.
 pub fn shlex_split(command: &str) -> Result<Vec<String>, String> {
-    let mut parts: Vec<String> = Vec::new();
-    let mut token = String::new();
-    let mut have_token = false;
-    let mut chars = command.chars().peekable();
-    let mut quote: Option<char> = None;
-    while let Some(ch) = chars.next() {
-        if let Some(q) = quote {
-            if ch == q {
-                quote = None;
-            } else if q == '"' && ch == '\\' {
-                match chars.peek() {
-                    Some(next) if matches!(*next, '"' | '\\') => {
-                        token.push(chars.next().unwrap());
-                    }
-                    _ => token.push(ch),
-                }
-            } else {
-                token.push(ch);
-            }
-            have_token = true;
-        } else if shlex_whitespace(ch) {
-            if have_token {
-                parts.push(std::mem::take(&mut token));
-                have_token = false;
-            }
-        } else if ch == '\'' {
-            quote = Some('\'');
-            have_token = true;
-        } else if ch == '"' {
-            quote = Some('"');
-            have_token = true;
-        } else if ch == '\\' {
-            match chars.next() {
-                Some(escaped) => token.push(escaped),
-                None => return Err("No escaped character".to_owned()),
-            }
-            have_token = true;
-        } else {
-            token.push(ch);
-            have_token = true;
-        }
-    }
-    if quote.is_some() {
-        return Err("No closing quotation".to_owned());
-    }
-    if have_token {
-        parts.push(token);
-    }
-    Ok(parts)
+    crate::command_lex::split(command, crate::command_lex::Dialect::HookShlex, None)
 }
 
 /// Python ``shlex.join``: ``shlex.quote`` each part, space-join. A character

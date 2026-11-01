@@ -2,7 +2,7 @@
 #[path = "candidate_clang_style.rs"]
 mod style;
 #[path = "candidate_clang_tool.rs"]
-mod tool;
+pub(crate) mod tool;
 use crate::candidate_source::{
     lines::{FileRanges, RangeScope},
     Source,
@@ -110,7 +110,7 @@ pub fn run(args: FormatArgs) -> Result<u8> {
     Ok(code)
 }
 
-fn verify_file(root: &Dir, file: &FileRanges) -> Result<usize> {
+pub(crate) fn verify_file(root: &Dir, file: &FileRanges) -> Result<usize> {
     let bytes = read_optional(root, &file.path, 8 * 1024 * 1024).map_err(anyhow::Error::msg)?;
     match (bytes, &file.blob_oid) {
         (None, None) if file.scope == RangeScope::Deleted => Ok(0),
@@ -129,7 +129,7 @@ fn verify_file(root: &Dir, file: &FileRanges) -> Result<usize> {
     }
 }
 
-fn verify_files(root: &Dir, files: &[FileRanges]) -> Result<()> {
+pub(crate) fn verify_files(root: &Dir, files: &[FileRanges]) -> Result<()> {
     let mut bytes = 0usize;
     for file in files {
         bytes = bytes

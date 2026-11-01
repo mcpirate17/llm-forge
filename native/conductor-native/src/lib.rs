@@ -22,12 +22,15 @@ pub mod candidate_cargo_evidence;
 pub mod candidate_cargo_lint;
 pub mod candidate_cargo_run;
 pub mod candidate_checks;
+pub mod candidate_clang_args;
+pub mod candidate_clang_db;
 pub mod candidate_policy;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_structure;
 pub mod candidate_unicode;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_verification;
+mod command_lex;
 pub mod context_projection;
 pub mod context_telemetry_aggregate;
 pub mod context_telemetry_usage;

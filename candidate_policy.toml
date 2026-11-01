@@ -681,33 +681,13 @@ memory_mb = 4096
 max_output_chars = 20000
 
 [checks.clang-tidy]
-# Line-scoped the same way, via -line-filter. No CMake build in this tree emits
-# a compile_commands.json yet, so today every file is skipped with that reason
-# on stderr -- a linter that reports missing headers as errors is noise, and
-# guessing include paths is how you get it. Configure any build with
-# -DCMAKE_EXPORT_COMPILE_COMMANDS=ON and this starts reporting with no edit here.
+# The native worker runs in the captured snapshot with pinned operator context.
 kind = "command"
 profiles = ["full"]
 classes = ["cfamily_host"]
-command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.clang_files",
-  "--mode",
-  "tidy",
-  "--base",
-  "{base}",
-  "{files}",
-]
-version_command = [
-  "{python}",
-  "-m",
-  "conductor.candidate_review.clang_files",
-  "--mode",
-  "tidy",
-  "--version",
-]
-cache = true
+command = ["forge", "candidate", "clang-tidy", "--repo", "{snapshot}", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "clang-tidy", "--tool-version"]
+cache = false
 severity = "high"
 timeout_seconds = 900
 memory_mb = 8192
@@ -1137,18 +1117,12 @@ provided_by = "operator-provisioned native clang-format 23.1.0, granted as FORGE
 rationale = "The native Forge stage resolves changed lines and invokes an explicitly granted ELF; the test wheel is operator-provisioned and is not pinned by uv.lock."
 
 [tools.clang-tidy]
-executable = "clang-tidy"
-version_command = ["clang-tidy", "--version"]
-# Unpinned, and not by choice: clang-tidy leads its --version output with
-# "LLVM (http://llvm.org/):" and prints the number on the next line, while the
-# preflight compares against the first line only. Pinning 22.1.8 here refuses
-# every gate run. uv.lock is the pin that actually binds -- clang-tidy is a
-# dev-group dependency, so `uv sync` gives every lane the same build. Debt:
-# teach probe_tool to match the whole version output, then pin here too.
-expected_version = ""
+executable = "forge"
+version_command = ["forge", "candidate", "clang-tidy", "--tool-version"]
+expected_version = "LLVM version 22.1.8"
 required_profiles = ["full"]
-provided_by = "uv sync --group dev (clang-tidy>=20.1.0)"
-rationale = "checks.clang-tidy; same PyPI provenance as clang-format, shipped as a separate distribution so the two versions differ"
+provided_by = "operator-provisioned native clang-tidy 22.1.8, granted as FORGE_CLANG_TIDY"
+rationale = "Native Forge candidate execution uses an explicitly provisioned clang-tidy ELF and captured build context; no Python wrapper or uv.lock pin is involved."
 
 [tools.radon]
 executable = "radon"

@@ -6,6 +6,12 @@ Rust owns the assertions in the `python_contracts_candidate_*` integration targe
 
 All rows below passed in their corresponding `python_contracts_candidate_files`, `python_contracts_candidate_tools`, `python_contracts_candidate_verification`, or `python_contracts_candidate_engine` Rust target with the Forge PyO3 build environment before their Python files were removed.
 
+The Clang rows are historical provenance: `python_contracts_candidate_tools`
+and `clang_files.py` have since been deleted. Native formatter/tidy unit and CLI
+tests now cover those surfaces; their stricter context and refusal semantics are
+described in [native clang-format](native-clang-format.md) and
+[native clang-tidy](native-clang-tidy.md).
+
 | Retired Python case | Rust replacement |
 | --- | --- |
 | `test_diff_ranges::test_hunk_without_a_count_is_a_single_line` | `diff_hunks_keep_counts_deletions_anchoring_and_all_hunks` |

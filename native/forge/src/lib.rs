@@ -18,6 +18,8 @@ pub mod candidate_cargo_lint_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_clang_format_cli;
 #[cfg(target_os = "linux")]
+pub mod candidate_clang_tidy_cli;
+#[cfg(target_os = "linux")]
 pub mod candidate_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_command;

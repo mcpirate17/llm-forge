@@ -12,7 +12,6 @@ src/conductor/candidate_review/benchmark.py	python_contracts_candidate_benchmark
 src/conductor/candidate_review/checks.py	python_contracts_candidate_cli
 src/conductor/candidate_review/checks.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/checks.py	python_contracts_contract_runner
-src/conductor/candidate_review/clang_files.py	python_contracts_candidate_tools
 src/conductor/candidate_review/cli.py	python_contracts_candidate_cli
 src/conductor/candidate_review/command_runner.py	python_contracts_candidate_cli
 src/conductor/candidate_review/command_runner.py	python_contracts_candidate_files
@@ -49,7 +48,6 @@ src/conductor/candidate_review/quality_checks.py	python_contracts_candidate_stru
 src/conductor/candidate_review/reporters.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/sharding.py	python_contracts_contract_runner
 src/conductor/candidate_review/style_scan.py	python_contracts_candidate_style
-src/conductor/candidate_review/style_scan.py	python_contracts_candidate_tools
 src/conductor/candidate_review/style_scan.py	python_contracts_test_value_scan
 src/conductor/candidate_review/style_scan.py	python_contracts_verbosity_scan
 src/conductor/candidate_review/test_value_scan.py	python_contracts_test_value_scan
@@ -131,7 +129,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_candi
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_structure_audit
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_style
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_hot_loop_scan
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_tools
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_verification
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_vulture
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_codex_journal

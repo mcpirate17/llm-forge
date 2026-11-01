@@ -4,7 +4,7 @@ use std::io::Read;
 
 /// Strict descriptor-relative optional read. None means only an initially missing
 /// component; changes after admission are errors. No elapsed I/O deadline claim.
-/// Maximum must be1..=8MiB. Cargo config/manifest callers retain their 1MiB cap;
+/// Maximum must be 1..=32MiB. Cargo config/manifest callers retain their 1MiB cap;
 /// native snapshot consumers may request the larger bound. Decoding/schema
 /// validation belong to the caller.
 pub fn read_optional(root: &Dir, path: &str, maximum: usize) -> Result<Option<Vec<u8>>, String> {
@@ -54,8 +54,8 @@ fn read_checked(
     budget: &mut Budget,
     before_finish: impl FnOnce(),
 ) -> Result<Option<Vec<u8>>, String> {
-    if !(1..=8 * 1024 * 1024).contains(&maximum) {
-        return Err("lint read maximum must be 1..8388608 bytes".into());
+    if !(1..=32 * 1024 * 1024).contains(&maximum) {
+        return Err("lint read maximum must be 1..33554432 bytes".into());
     }
     let parts = path_parts(path, false)?;
     let name = parts.last().expect("validated nonempty path");
@@ -116,14 +116,15 @@ mod tests {
         std::fs::create_dir(&path).unwrap();
         let _cleanup = Cleanup(path.clone());
         let root = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
-        let bytes = vec![b'x'; 2 * 1024 * 1024];
+        let bytes = vec![b'x'; 9 * 1024 * 1024];
         std::fs::write(path.join("source.cpp"), &bytes).unwrap();
         assert!(read_optional(&root, "source.cpp", 1024 * 1024).is_err());
+        assert!(read_optional(&root, "source.cpp", 8 * 1024 * 1024).is_err());
         assert_eq!(
-            read_optional(&root, "source.cpp", 8 * 1024 * 1024).unwrap(),
+            read_optional(&root, "source.cpp", 32 * 1024 * 1024).unwrap(),
             Some(bytes)
         );
-        assert!(read_optional(&root, "source.cpp", 8 * 1024 * 1024 + 1).is_err());
+        assert!(read_optional(&root, "source.cpp", 32 * 1024 * 1024 + 1).is_err());
     }
     #[test]
     fn read_identity_rechecks_confined_path_without_timing_race() {
