@@ -16,6 +16,8 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Assess supplied findings against the candidate policy; does not verify execution.
+    Assess(crate::candidate_assess_cli::AssessArgs),
     /// Classify an exact candidate and plan ordered policy checks without executing them.
     Plan(crate::candidate_plan::PlanArgs),
     /// Resolve staged/committed objects and unclassified changes, without executing checks.
@@ -68,6 +70,12 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::Assess(args) => {
+            let report = crate::candidate_assess_cli::run(args)?;
+            let failed = report["assessment"]["decision"] == "fail";
+            print_json(&report)?;
+            return Ok(u8::from(failed));
+        }
         Action::Plan(args) => print_json(&crate::candidate_plan::run(args)?)?,
         Action::Inspect {
             repo,

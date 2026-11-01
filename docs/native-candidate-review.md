@@ -15,6 +15,10 @@ forge candidate plan [--repo PATH] --kind index|commit|range
     [--target-ref HEAD] [--base-ref REF] [--policy CANDIDATE_RELATIVE]
     [--profile fast|full|nightly] [--today YYYY-MM-DD]
     [--scratch-parent DIRECTORY]
+forge candidate assess [--repo PATH] --kind index|commit|range
+    [--target-ref HEAD] [--base-ref REF] [--policy CANDIDATE_RELATIVE]
+    [--profile fast|full|nightly] [--today YYYY-MM-DD]
+    [--scratch-parent DIRECTORY] --results PATH
 forge candidate inspect [--repo PATH] --kind index|commit|range
     [--target-ref HEAD] [--base-ref REF]
 forge candidate materialize [--repo PATH] --tree FULL_TREE_OID
@@ -61,6 +65,67 @@ active policy and retained in its expired-entry fields; active exceptions and
 mutation waivers may expire no more than 90 days after `today`. The planner
 returns inputs and schedule flags only: it does not execute checks, create
 review findings, or approve a candidate.
+
+### Assess supplied candidate results
+
+`assess` uses the same candidate selection, policy, profile, date, and scratch
+options as `plan`; `--results` names a JSON array of supplied check results.
+For example, an empty supplied set is:
+
+```text
+forge candidate assess --repo . --kind index --results results.json
+```
+
+```json
+[]
+```
+
+The results file must be a regular UTF-8 file no larger than 16 MiB. Its final
+path cannot be a symlink or FIFO. Duplicate JSON keys and unknown result fields
+are rejected. The command plans the candidate using its private snapshot,
+assesses the supplied findings against that candidate's policy, and removes
+the snapshot before returning. Output has `schema_version: 1`,
+`assessment_only: true`, the complete `plan` report, and `assessment` with
+`decision`, `findings`, `stale_exceptions`, `scope: "supplied_results"`,
+`review_complete: false`, and `execution_verified: false`.
+
+Exit 0 means the supplied scope evaluated to `pass`; exit 1 means it evaluated
+to `fail`. Malformed or unsafe inputs are command errors. An empty results
+array can pass because the command evaluates only supplied results. It does
+not execute checks, verify cache provenance or result completeness, or issue a
+receipt or approval.
+
+Exception matching and inherited-finding detection are recomputed separately.
+The current policy's exception matching the finding's check and rule determines
+the `exception_id`; a configured fingerprint match takes precedence, otherwise
+the exception path pattern is matched against the finding path. Inherited status
+is recomputed from finding attribution and the candidate's changed old and new
+paths, including both paths for a rename. A supplied nonempty finding
+fingerprint is preserved; if empty, it is computed from the check, rule, path,
+line, and message.
+
+The `error` check result status (`Error` in the native enum) always blocks; it
+is a status, not finding severity. An `engine-integrity` result containing
+findings and fixed native infrastructure-failure rule IDs also block without
+inheritance or exception suppression. These failure rules are native semantics
+and cannot be changed by candidate policy. This prevents the legacy
+crash-suppression case.
+
+Policy cannot redefine the reserved `engine-integrity` or `attestation` checks.
+A result's finding IDs must match its check ID; failed results need findings,
+skipped results cannot contain them, and high or critical findings cannot carry
+a passed status. Diagnostic identifiers cannot contain control characters.
+
+Admission limits include 20,000 result rows; 100,000 findings, files, command
+arguments, and candidate changes each; 1 MiB per string field; 256-byte IDs;
+and safe candidate-relative paths up to 4096 bytes. Parsed assessment data is
+limited to depth 32, 1 million nodes, and 64 MiB including accounting overhead.
+Normalized policy is limited to 4 MiB, grouped exception matching to 2 million
+pairs, and pattern/path matching to 100 million estimated work units.
+
+This remains an assessment of supplied data, not a complete review. Check
+execution, cache provenance, evidence, attestation, and full review
+orchestration remain in the existing workflow pending their native migrations.
 
 ### Inspect
 

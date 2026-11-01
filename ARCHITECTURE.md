@@ -940,8 +940,17 @@ cases using a private extension overlay. Strict all-target Clippy passed for
 both crates. Twenty-five further runs of eight concurrent plans completed with
 no private snapshots left behind. Non-UTF-8 environment overrides now fail
 explicitly instead of falling through to another policy; CLI and core
-regressions preserve higher-priority override semantics. Full committed release
-validation and publication of this policy milestone remain pending.
+regressions preserve higher-priority override semantics. The policy milestone
+was pushed as `79bb6ac70a8a3c3aa25b1da41f5b1f46612f5444`. Its published-head
+gate exposed a doctor test whose native child could exit without consuming its
+input. `26b18e55379882a37c012471a352ceb526fa3f2b` replaces those children with
+Rust fixtures that require input and drain it before returning each outcome;
+production probe behavior is unchanged. The focused test passed 100 consecutive
+runs. Full release checks then passed 2,326 tests with 39 optional ignores,
+plus two installed-runtime tests, before and after publishing the fix. The
+published verification receipt is
+`.git/forge-checks/run-1793519625028255297-588061/receipt.json`, SHA-256
+`815d2445911a2c597f092c36f3493e7575f241595f82862713cae54d4dbe5e47`.
 
 The final policy benchmark used the same 128 renamed-path inputs, glob rules,
 Rust 1.98.0 executable and measurement loop for both classification APIs.
@@ -953,8 +962,39 @@ not a historical-version or end-to-end planning comparison. The host was not
 isolated. Benchmark executable SHA-256:
 `14492324d575ab6d4d13a2abc3d5083837403f31d047e919feb0b301c53ed867`.
 
+Native `forge candidate assess` now evaluates supplied results against the same
+candidate policy and snapshot preparation as planning. It recomputes exceptions
+and attribution, preserves stable finding fingerprints, and reports stale
+exceptions only when their own check examined matching paths. Results remain
+explicitly unverified and incomplete; the command does not run checks or issue
+approval. Execution errors and reserved engine-integrity failures cannot become
+inherited debt or be suppressed by an exception. This closes a legacy assessment
+case where a pathless crash from a diff-attributed check could cease to block.
+Exceptions are grouped by check and use shared compiled glob programs. Glob
+compilation now avoids repeated suffix scans for unmatched opening brackets.
+Input counts, structural size, paths and matching work are bounded. Targeted
+validation passed 17 assessment tests, seven new CLI tests, seven existing policy
+CLI tests, four native glob tests, ten native policy contracts and 19 optional
+policy compatibility cases through a private extension overlay. Strict all-target
+Clippy passed for both crates. Twenty-five runs of eight concurrent assessments
+mixed passing and invalid results without leaving snapshots. Native AST inspection
+found no function above 100 lines in the 13 inspected implementation, test and
+benchmark files. Full committed release validation and publication are pending.
+
+The current Rust 1.98.0 release benchmark measured prepared glob matching at
+0.116 microseconds (p95 batch mean 0.124), versus 0.286 (p95 0.294) for stateless
+matching on the same six cyclic Unicode/bracket inputs. Each used 31 batches of
+1,000 operations after 100 warmups. A complete supplied-results assessment of
+32 findings, with diff/rename attribution, matching and stale exceptions, measured
+36.700 microseconds (p95 batch mean 37.367) over 31 batches of 100 operations.
+Preparation of the benchmark inputs is outside the timed loop; assessment's
+validation, matching, hashing and output allocation are inside it. These are
+unisolated-host, in-process measurements, not end-to-end review latency or a
+historical-version improvement claim. Benchmark executable SHA-256:
+`191a5983dad8f4e3e3ca4b33b3f5344a5224586f6c2690b9eeea94c748aaafb2`.
+
 The remaining candidate work is bounded check execution, evidence and waiver
-activation, findings/exception application, then review reporting, attestation
+activation, then complete review reporting, attestation
 and caller migration. Python candidate policy wrappers still have callers in
 gate, verification and shared tooling; deleting them before those consumers move
 would break existing workflows. The overall native migration remains incomplete.

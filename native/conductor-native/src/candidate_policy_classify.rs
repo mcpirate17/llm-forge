@@ -3,7 +3,7 @@
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 
-fn class_end(pattern: &[char], start: usize) -> Option<usize> {
+fn class_end(pattern: &[char], start: usize, last_close: Option<usize>) -> Option<usize> {
     let mut end = start + 1;
     if pattern.get(end) == Some(&'!') {
         end += 1;
@@ -11,6 +11,11 @@ fn class_end(pattern: &[char], start: usize) -> Option<usize> {
     // As in fnmatchcase, the first ']' is a class member, not its terminator.
     if pattern.get(end) == Some(&']') {
         end += 1;
+    }
+    // A failed search must not rescan a suffix for every unmatched '['.
+    // If a closer exists at or after `end`, the search succeeds and consumes it.
+    if last_close.is_none_or(|last| end > last) {
+        return None;
     }
     (end..pattern.len()).find(|&index| pattern[index] == ']')
 }
@@ -31,6 +36,7 @@ struct Pattern {
 impl Pattern {
     fn new(pattern: &str) -> Self {
         let chars: Vec<char> = pattern.chars().collect();
+        let last_close = chars.iter().rposition(|ch| *ch == ']');
         let mut tokens = Vec::new();
         let mut index = 0;
         while index < chars.len() {
@@ -45,7 +51,7 @@ impl Pattern {
                     tokens.push(Token::Any);
                     index += 1;
                 }
-                '[' => match class_end(&chars, index) {
+                '[' => match class_end(&chars, index, last_close) {
                     Some(end) => {
                         tokens.push(compile_class(&chars[index + 1..end]));
                         index = end + 1;
@@ -124,6 +130,30 @@ fn token_matches(token: &Token, ch: char) -> bool {
             ranges.iter().any(|(start, end)| *start <= ch && ch <= *end) != *negative
         }
         Token::Star => unreachable!("star handled separately"),
+    }
+}
+/// A compiled fnmatch pattern for repeated matching without recompilation.
+pub struct PreparedGlob {
+    pattern: Pattern,
+}
+impl PreparedGlob {
+    pub fn new(pattern: &str) -> Self {
+        Self {
+            pattern: Pattern::new(pattern),
+        }
+    }
+}
+/// Reusable path and dynamic-programming storage for compiled globs.
+#[derive(Default)]
+pub struct GlobWorkspace {
+    path: Vec<char>,
+    workspace: Workspace,
+}
+impl GlobWorkspace {
+    pub fn matches(&mut self, path: &str, pattern: &PreparedGlob) -> bool {
+        self.path.clear();
+        self.path.extend(path.chars());
+        self.workspace.matches(&self.path, &pattern.pattern)
     }
 }
 pub fn glob_match(path: &str, pattern: &str) -> bool {
@@ -369,5 +399,26 @@ mod tests {
             classifier.classify(&renamed).unwrap(),
             classify(&renamed, &globs).unwrap()
         );
+    }
+    #[test]
+    fn compiled_glob_handles_long_unclosed_classes_and_reuses_workspace() {
+        let pattern = "[".repeat(20_000);
+        let compiled = PreparedGlob::new(&pattern);
+        let mut work = GlobWorkspace::default();
+        assert_eq!(compiled.pattern.tokens.len(), 20_000);
+        assert!(!work.matches("[", &compiled));
+        for (path, pattern, expected) in [
+            ("]", "[]]", true),
+            ("x", "[!]]", true),
+            ("]", "[!]]", false),
+            ("[!", "[!", true),
+            ("[]", "[]", true),
+            ("a", "[z-a]", false),
+            ("🦀/文", "?/?.", false),
+            ("🦀/文", "?/?", true),
+        ] {
+            let glob = PreparedGlob::new(pattern);
+            assert_eq!(work.matches(path, &glob), expected, "{path:?} {pattern:?}");
+        }
     }
 }

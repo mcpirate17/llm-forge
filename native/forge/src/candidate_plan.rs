@@ -2,7 +2,7 @@
 use crate::{
     candidate_policy,
     candidate_snapshot::{Limits, Snapshot},
-    candidate_source::{Kind, Source},
+    candidate_source::{Candidate, Kind, Source},
 };
 use anyhow::{ensure, Context, Result};
 use cap_std::fs::{Dir, OpenOptions, OpenOptionsExt};
@@ -66,6 +66,16 @@ fn today() -> Result<String> {
 }
 
 pub fn run(args: PlanArgs) -> Result<Value> {
+    Ok(prepare(args)?.report)
+}
+
+pub(crate) struct Prepared {
+    pub candidate: Candidate,
+    pub policy: candidate_policy::Policy,
+    pub report: Value,
+}
+
+pub(crate) fn prepare(args: PlanArgs) -> Result<Prepared> {
     let date = args.today.map(Ok).unwrap_or_else(today)?;
     candidate_policy::validate_today(&date)?;
     let source = Source::open(&args.repo)?;
@@ -96,7 +106,11 @@ pub fn run(args: PlanArgs) -> Result<Value> {
         "candidate":candidate,"policy":{"path":policy.path,"sha256":policy.digest,"configuration":policy.document},
         "checks":planned,"baselines":baselines});
     snapshot.discard()?;
-    Ok(report)
+    Ok(Prepared {
+        candidate,
+        policy,
+        report,
+    })
 }
 
 fn plan_checks(changes: &[Value], checks: &[Value]) -> Result<Vec<Value>> {

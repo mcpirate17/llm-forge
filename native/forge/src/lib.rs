@@ -4,6 +4,10 @@ pub mod analysis;
 #[cfg(target_os = "linux")]
 pub mod bounded_file;
 #[cfg(target_os = "linux")]
+pub mod candidate_assess_cli;
+#[cfg(target_os = "linux")]
+pub mod candidate_assessment;
+#[cfg(target_os = "linux")]
 pub mod candidate_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_plan;
