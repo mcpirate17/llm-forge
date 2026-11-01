@@ -8,6 +8,11 @@ description = "Native core of the conductor agent tooling: mutation campaigns, r
 name = "conductor_native"
 crate-type = ["cdylib", "rlib"]
 
+[[example]]
+name = "generate_candidate_casefold"
+path = "tools/generate_candidate_casefold.rs"
+test = true
+
 [[bench]]
 name = "vector_index"
 harness = false
@@ -64,7 +69,7 @@ tree-sitter-javascript = { version = "0.25", optional = true }
 tree-sitter-python = { version = "0.25", optional = true }
 tree-sitter-rust = { version = "0.24", optional = true }
 tree-sitter-typescript = { version = "0.23", optional = true }
-unicode-general-category = { version = "0.6", optional = true }
+unicode-general-category = "=0.6.0"
 zstd = "0.14.3"
 
 # `extension-module` tells pyo3 not to link libpython, which is right for the
@@ -78,7 +83,7 @@ zstd = "0.14.3"
 [features]
 default = ["source-analysis", "vector-search"]
 bundled-sqlite = ["rusqlite/bundled"]
-source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:unicode-general-category", "dep:tree-sitter", "dep:tree-sitter-c", "dep:tree-sitter-cpp", "dep:tree-sitter-javascript", "dep:tree-sitter-python", "dep:tree-sitter-rust", "dep:tree-sitter-typescript"]
+source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:tree-sitter", "dep:tree-sitter-c", "dep:tree-sitter-cpp", "dep:tree-sitter-javascript", "dep:tree-sitter-python", "dep:tree-sitter-rust", "dep:tree-sitter-typescript"]
 vector-search = ["dep:memmap2"]
 python = ["dep:pyo3", "source-analysis", "vector-search", "dep:libloading", "dep:sha1"]
 python-compat-tests = ["python"]

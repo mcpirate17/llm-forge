@@ -6,14 +6,17 @@ The historical baseline and delivery phases below remain as provenance.
 
 The current native candidate slice includes single-check execution and bounded
 `forge candidate execute-batch`, with default dry-run, explicit operator
-aggregate budgets, policy-ordered results and interruption-owned cleanup.
-Scheduled unsupported checks remain visibly incomplete; execution is fresh and
-does not reuse a result cache. Full review orchestration, evidence and waiver
-verification, test-engine migration, reporting, attestation and legacy caller
-retirement remain. There are still 128 Python source files under `src/`; the
-native migration is incomplete. See the
+aggregate budgets, policy-ordered results and interruption-owned cleanup. Batch
+now executes `candidate-integrity` and `dependency-integrity` builtins in-process;
+other scheduled unsupported checks remain visibly incomplete. Builtin execution
+uses a private capability-rooted snapshot, bounded inputs/results and no analyzer
+process. Execution is fresh and does not reuse a result cache. Full review
+orchestration, remaining builtins, evidence and waiver verification, test-engine
+migration, reporting, attestation and legacy caller retirement remain. There are
+still 128 Python source files under `src/`; the native migration is incomplete.
+See the
 [execution contract](native-candidate-review.md#execute-a-selected-batch) and
-[scheduling measurements](performance.md#native-batch-scheduling).
+[builtin measurements](performance.md#native-candidate-builtins).
 
 Status as of 2026-09-13; source of truth for llm-forge direction
 

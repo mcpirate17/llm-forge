@@ -141,6 +141,13 @@ impl Workspace {
     pub(crate) fn runtime(&self) -> PathBuf {
         self.runtime.clone()
     }
+    pub(crate) fn directory(&self) -> Result<Dir> {
+        self.scratch.verify()?;
+        self.snapshot
+            .as_ref()
+            .context("workspace snapshot missing")?
+            .directory()
+    }
     pub(crate) fn sandbox_report(&self) -> Result<Value> {
         let mut report = serde_json::to_value(self.sandbox.report())?;
         // Admission starts with an empty scratch; the actual command enters the

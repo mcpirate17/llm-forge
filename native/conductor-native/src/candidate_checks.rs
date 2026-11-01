@@ -1,4 +1,4 @@
-//! Candidate-review built-in decisions. Python supplies snapshot I/O and receipt types.
+//! Candidate-review built-in decisions with caller-supplied snapshot I/O and receipt types.
 
 #[cfg(feature = "source-analysis")]
 #[path = "candidate_checks_ast.rs"]
@@ -10,6 +10,7 @@ mod integrity;
 #[path = "candidate_checks_scan.rs"]
 mod scan;
 
+pub use integrity::dependency_integrity_with;
 /// Select paths from a captured change inventory without cloning it per check.
 pub use integrity::select_files;
 

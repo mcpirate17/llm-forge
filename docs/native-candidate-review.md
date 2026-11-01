@@ -28,6 +28,7 @@ forge candidate execute [--repo PATH] --kind index|commit|range
 forge candidate execute-batch [--repo PATH] --kind index|commit|range
     [--target-ref HEAD] [--base-ref REF] [--policy CANDIDATE_RELATIVE]
     [--profile fast|full|nightly] [--today YYYY-MM-DD]
+    [--surface pre-commit|post-commit|ci|manual]
     --grants ABSOLUTE_JSON_PATH [--expected-tree FULL_TREE_OID]
     [--check ID ...] [--execute]
 forge candidate inspect [--repo PATH] --kind index|commit|range
@@ -289,10 +290,37 @@ PATH= /absolute/path/to/forge candidate execute-batch --repo /home/operator/proj
 
 A check without selected files and with `always=false` is an explicit skipped
 row, including a builtin check. It has no stages or result and does not make
-the batch incomplete. A scheduled builtin has no native implementation in
-this command: it appears in `unexecuted` and as an error row, making
-`success=false` and exit 1 even in dry-run. Explicitly selecting supported
-external checks avoids implying that unselected builtins ran.
+the batch incomplete. Native batch builtins currently cover `candidate-integrity`
+and `dependency-integrity`; other scheduled unsupported checks remain in
+`unexecuted` and as error rows, making `success=false` and exit 1 even in dry-run.
+
+The supported builtins run inside Forge without a shell, external process, or
+per-check cgroup. They still require the candidate source grants and operator
+`batch` budget; the grants file may contain an empty `programs` map. A scheduled
+worker consumes a batch concurrency slot. Per-stage CPU and memory grants do
+not impose kernel limits on these in-process evaluators; their input and work
+ceilings bound admitted work, rather than host-process RSS or elapsed time. A scheduled
+`candidate-integrity` check requires explicit `--surface`, including in dry-run.
+Dry-run prepares the private capability-rooted candidate snapshot and validates
+bounded inputs, but does not evaluate the builtin or return a result. Executed
+checks use that actual snapshot; dependency integrity verifies the changed
+manifest's corresponding lockfile there, so a deleted or absent changed lockfile
+produces a blocking finding.
+
+Supported rows include `builtin.implementation: "forge-builtin/1"`; the
+`candidate-integrity` row also reports `unicode_version: "15.0.0"`. That Unicode
+version matches Python 3.12 for valid UTF-8 case folding and representation; it
+does not normalize text, accept lone surrogates, or claim Unicode versions newer
+than 15.0.0. The compatibility boundary is UTF-8 candidate paths.
+
+Builtin preparation and results are each capped at 32 MiB. Candidate integrity
+admits at most 100,000 tree entries and changes, 4,096-byte paths, 4,096
+protected globs of at most 4,096 characters each, and 100,000,000 units of
+estimated glob-match work. Deserialization borrows input metadata and globs are
+prepared once. `checks[].files` remains the policy-selected file list;
+`checks[].result.files` reports each handler's full scope and can differ.
+Builtin workers are joined through cancellation and snapshot cleanup; a running
+bounded evaluator may finish its current CPU work before cancellation returns.
 
 Each command check requires usable version evidence before its analyzer
 stage, in separate private workspaces as described above. A failed version
@@ -306,7 +334,7 @@ cleanup ownership. The same SIGKILL/runtime-destruction/uninterruptible-I/O
 limits and unsafe-workspace retention rules apply as for single execution.
 
 The report has `schema_version: 1`,
-`execution_scope: "selected_regular_commands"`, `review_complete: false`,
+`execution_scope: "selected_regular_checks"`, `review_complete: false`,
 `cache: "disabled_fresh_execution"`, `executed`, `success`, `cancelled`, common
 candidate/policy/grants identities, and `budget` with `admitted_parallelism`.
 `checks` contains policy-ordered rows with `check_id`, normalized `check`,

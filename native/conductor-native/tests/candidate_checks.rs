@@ -80,10 +80,14 @@ fn dependency_pairing_and_file_selection_preserve_path_scope() {
         }),
     )
     .unwrap();
-    assert_eq!(rules(&dep), ["missing-lockfile"]);
+    assert_eq!(rules(&dep), ["missing-lockfile", "missing-lockfile"]);
     assert_eq!(
         dep["findings"][0]["message"],
         "dependency manifest has no candidate lockfile: pkg/uv.lock"
+    );
+    assert_eq!(
+        dep["findings"][1]["message"],
+        "dependency manifest has no candidate lockfile: other/Cargo.lock"
     );
     let selected = evaluate(
         "files-for-policy",

@@ -25,7 +25,7 @@ fn infrastructure(rule: &str) -> bool {
             | "slop-core-unavailable"
     )
 }
-fn fingerprint(finding: &Finding) -> String {
+pub(super) fn fingerprint(finding: &Finding) -> String {
     let stable = json!({"check_id": finding.check_id, "rule_id": finding.rule_id,
         "path": finding.path, "line": finding.line, "message": finding.message});
     let text = crate::json_canon::canonical_json(&stable);

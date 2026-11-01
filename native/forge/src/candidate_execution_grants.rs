@@ -87,7 +87,6 @@ impl Grants {
         );
         ensure!(
             self.read_only.len() <= 120
-                && !self.programs.is_empty()
                 && self.programs.len() <= 128
                 && self.environment.len() <= 40,
             "grants collection limit exceeded"

@@ -184,6 +184,10 @@ impl Snapshot {
     pub fn report(&self) -> &Report {
         &self.report
     }
+    pub(crate) fn directory(&self) -> Result<Dir> {
+        self.verify_staging()?;
+        Ok(self.directory.try_clone()?)
+    }
 
     /// Explicit cleanup lets callers refuse success when a private snapshot remains.
     pub fn discard(mut self) -> Result<()> {

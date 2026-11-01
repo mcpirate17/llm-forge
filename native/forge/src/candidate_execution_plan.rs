@@ -16,6 +16,15 @@ use serde_json::{json, Value};
 pub(crate) use stage::Stage;
 use std::{path::PathBuf, time::Duration};
 
+#[derive(Clone, Copy, clap::ValueEnum, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Surface {
+    PreCommit,
+    PostCommit,
+    Ci,
+    Manual,
+}
+
 #[derive(Args)]
 pub(crate) struct SelectionArgs {
     #[arg(long, default_value = ".")]
@@ -37,6 +46,9 @@ pub(crate) struct SelectionArgs {
     grants: PathBuf,
     #[arg(long)]
     expected_tree: Option<String>,
+    /// Explicit review surface; required by scheduled candidate-integrity checks.
+    #[arg(long, value_enum)]
+    surface: Option<Surface>,
 }
 
 pub(crate) struct Selection {
@@ -45,6 +57,7 @@ pub(crate) struct Selection {
     pub candidate: Candidate,
     pub policy: Policy,
     pub grants: Grants,
+    pub surface: Option<Surface>,
     changes: Vec<Value>,
     date: String,
     profile: &'static str,
@@ -89,6 +102,7 @@ impl Selection {
             candidate,
             policy,
             grants,
+            surface: args.surface,
             changes,
             date,
             profile: args.profile.name(),
@@ -100,7 +114,15 @@ impl Selection {
     pub(crate) fn output(&self) -> Value {
         json!({"schema_version":1,"today":self.date,"profile":self.profile,
             "candidate":self.candidate,"policy":{"path":self.policy.path,"sha256":self.policy.digest},
-            "grants_sha256":self.grants.digest()})
+            "grants_sha256":self.grants.digest(),"surface":self.surface})
+    }
+    pub(crate) fn source(&self) -> Result<Source> {
+        let source = Source::open(&self.root)?;
+        ensure!(
+            source.root() == self.root && source.common_dir() == self.common,
+            "candidate source identity changed after selection"
+        );
+        Ok(source)
     }
     pub(crate) fn plan(&self, normalized: Value) -> Result<CheckPlan> {
         let id = normalized["check_id"]
@@ -177,6 +199,9 @@ fn limits(check: &Value, grants: &Grants) -> Result<Limits> {
     })
 }
 impl CheckPlan {
+    pub(crate) fn supported(&self) -> bool {
+        self.external.is_some() || crate::candidate_builtin::supports(self)
+    }
     pub(crate) fn version_limits(&self, selection: &Selection) -> Result<Limits> {
         let limits = self.limits.context("command limits missing")?;
         let cpu = limits
@@ -198,11 +223,7 @@ impl CheckPlan {
             .external
             .as_ref()
             .context("stage requires external command")?;
-        let source = Source::open(&selection.root)?;
-        ensure!(
-            source.root() == selection.root && source.common_dir() == selection.common,
-            "candidate source identity changed after selection"
-        );
+        let source = selection.source()?;
         let workspace = Workspace::new(&source, &selection.candidate.tree_oid, &selection.grants)?;
         let path = workspace.path();
         let runtime = workspace.runtime();

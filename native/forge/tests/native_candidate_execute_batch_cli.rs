@@ -64,7 +64,7 @@ fn default_dry_run_reports_unexecuted_builtin_instead_of_complete_success() {
     let before = case.source_state();
     let report = value(bounded(&case, &[]), 1);
     assert_eq!(report["schema_version"], 1);
-    assert_eq!(report["execution_scope"], "selected_regular_commands");
+    assert_eq!(report["execution_scope"], "selected_regular_checks");
     assert_eq!(report["review_complete"], false);
     assert_eq!(report["success"], false);
     assert_eq!(ids(&report), ["zeta", "alpha", "beta"]);

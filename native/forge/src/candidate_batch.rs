@@ -1,4 +1,4 @@
-//! Ordered regular command execution with explicit aggregate operator admission.
+//! Ordered regular check execution with explicit aggregate operator admission.
 //! This produces fresh observations, never full-review or approval evidence.
 #[path = "candidate_batch_run.rs"]
 mod execution;
@@ -20,7 +20,7 @@ pub struct BatchArgs {
     /// Repeat exact active check IDs; omission selects the active profile.
     #[arg(long)]
     check: Vec<String>,
-    /// Launch commands; otherwise prepare stages and report missing implementations.
+    /// Execute selected checks; otherwise prepare inputs and report missing implementations.
     #[arg(long)]
     execute: bool,
 }
@@ -42,7 +42,7 @@ pub fn run(args: BatchArgs) -> Result<Value> {
     let parallelism = budget.parallelism(workers, selection.grants.resources)?;
     let plans = select(&selection, &args.check)?;
     let mut report = selection.output();
-    report["execution_scope"] = json!("selected_regular_commands");
+    report["execution_scope"] = json!("selected_regular_checks");
     report["review_complete"] = json!(false);
     report["cache"] = json!("disabled_fresh_execution");
     report["executed"] = json!(args.execute);
@@ -50,7 +50,7 @@ pub fn run(args: BatchArgs) -> Result<Value> {
     report["budget"]["admitted_parallelism"] = json!(parallelism);
     report["unexecuted"] = json!(plans
         .iter()
-        .filter(|p| p.scheduled && p.external.is_none())
+        .filter(|p| p.scheduled && !p.supported())
         .map(|p| json!({"check_id":p.id,"kind":p.normalized["kind"],
             "reason":"scheduled check has no native batch implementation"}))
         .collect::<Vec<_>>());
@@ -112,6 +112,7 @@ fn select(selection: &Selection, requested: &[String]) -> Result<Vec<Arc<CheckPl
     let mut bytes = 0usize;
     for normalized in selected {
         let plan = selection.plan(normalized)?;
+        crate::candidate_builtin::validate(selection, &plan)?;
         for file in &plan.files {
             bytes = bytes
                 .checked_add(file.len() + 8)
@@ -142,6 +143,8 @@ fn dry_run(
                         plan.stage(selection, false)?.dry_run()?
                     ]))
                 })()
+            } else if plan.scheduled && crate::candidate_builtin::supports(plan) {
+                crate::candidate_builtin::prepare(selection, plan).map(|()| json!([]))
             } else {
                 Ok(json!([]))
             };

@@ -143,3 +143,55 @@ Measured source SHA-256 bindings:
 | `native/forge/src/batch_execution.rs` | `1c3fe4fb6396bdb53420ea6b3e124d4929902a1555848308b3b56670a7b2e3b7` |
 | `native/forge/src/confined_execution_cancel.rs` | `e830f7660c36c86507273829f226d422cf51a60b800c15e406b4b4ed56670f80` |
 | `native/forge/src/confined_execution.rs` | `5fa31aedfeb950bb9a6544ab17282a5cc23a23920e718fa81bf591b960247db6` |
+
+## Native candidate builtins
+
+`cargo +1.98.0 bench --manifest-path native/forge/Cargo.toml --bench candidate_builtin`
+measures Unicode path conversion and the pure candidate-integrity evaluator.
+The 2026-11-01 release run used an unisolated warm host, 10 warmups and 31
+samples. Each conversion operation processes its entire corpus, including
+allocation and output drop; each sample repeats it 100 times. The integrity
+sample repeats 20 times, checking 1,024 entries and 128 changes against eight
+protected globs and producing 128 findings. Expected outputs are checked first.
+
+| Operation | Corpus | Median batch mean | p95 batch mean |
+| --- | --- | ---: | ---: |
+| Full casefold | Four ASCII paths, 75 bytes | 62.600 ns | 63.200 ns |
+| Python-compatible repr | Same ASCII paths | 133.300 ns | 133.400 ns |
+| Full casefold | Four mixed Unicode/control paths, 59 bytes | 148.800 ns | 172.400 ns |
+| Python-compatible repr | Same mixed paths | 191.600 ns | 212.600 ns |
+| Full casefold | Two paths of 4,096 and 4,093 bytes | 13.630 µs | 14.674 µs |
+| Python-compatible repr | Same near-limit paths | 9.555 µs | 9.855 µs |
+| Candidate integrity | 1,024 entries / 128 changes | 174.247 µs | 176.694 µs |
+
+Integrity timing includes borrowed payload decoding, admission, tree lookup,
+glob preparation/matching, findings and JSON Value allocation/drop. It excludes
+payload construction, Unicode metadata preparation, JSON text encoding, source
+and snapshot I/O, sandbox/process setup, fingerprints and assessment. These are
+component costs, not end-to-end tool latency.
+
+An immediately preceding run of the same benchmark and workloads, before adding
+the ASCII casefold fast path, measured casefold medians of 577.610 ns, 445.800 ns
+and 61.970 µs for the three corpora. The fast-path run measured lower component
+costs by factors of 9.23, 3.00 and 4.55 respectively. This single before/after
+pair used an unisolated host; it does not establish an application-wide speedup.
+The integrity workload does not include casefold preparation and stayed near
+173–174 µs. Both runs record identical workload metadata and input/output hashes.
+
+Final benchmark executable SHA-256:
+`13eddc76552a6dfc702e4abdd4e9776bd1ce081e47302e176d8507495752c51d`.
+Final result JSON SHA-256:
+`5baae2ef0f3e5f3891bef72beab6d3dc342529a126207d5d1f289eefe672aa35`.
+Baseline executable SHA-256:
+`ce297b7fad12819df252ec535de422727023ed2a5cf8e822dd835c7391a6e5e8`.
+Baseline result JSON SHA-256:
+`351f41939730929abeb2f0ca97fdae56cc1dffc41846529d00dfbdb63f88861c`.
+Measured source bindings:
+
+| File | SHA-256 |
+| --- | --- |
+| `native/forge/benches/candidate_builtin.rs` | `d19dad9f6e478969d861f1a9a8070beada5eb5114499735f29b1ea696a817dab` |
+| `native/conductor-native/src/candidate_checks_integrity.rs` | `034ade32b7232778612f0e1e1b764612f6f90488fbbe5c54c46cf5be18092956` |
+| `native/conductor-native/src/candidate_unicode.rs` (final) | `ce3b258c4bc1b6e3671d0c36dd37120079eafb8124aae00de2c1afb06f3fd070` |
+| `native/conductor-native/src/candidate_unicode.rs` (baseline) | `aba654cfa4b78bc4f91c481970a7bcba22b05ec08b0967702db07ae4246d2a02` |
+| `native/conductor-native/src/candidate_unicode_table.rs` | `9c4b4f9a4ab3f7dfc3d7c46d789d5020b6a152307d19434a7cdb75ca39edf007` |

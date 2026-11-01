@@ -13,6 +13,30 @@
 
 use serde_json::Value;
 
+/// Count actual JSON escaping without allocating a serialized copy.
+pub(crate) fn encoded_size(value: &Value, limit: usize) -> anyhow::Result<usize> {
+    struct Counter {
+        count: usize,
+        limit: usize,
+    }
+    impl std::io::Write for Counter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.count = self
+                .count
+                .checked_add(bytes.len())
+                .filter(|n| *n <= self.limit)
+                .ok_or_else(|| std::io::Error::other("JSON output exceeds byte limit"))?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut counter = Counter { count: 0, limit };
+    serde_json::to_writer(&mut counter, value)?;
+    Ok(counter.count)
+}
+
 /// Serializes `value` with recursively sorted object keys and compact
 /// separators. Arrays keep their order (Python `sort_keys` sorts keys, not
 /// array elements); scalars serialize exactly as `serde_json::to_string`

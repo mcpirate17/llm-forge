@@ -81,6 +81,10 @@ async fn check(
     owners: Arc<Owners>,
 ) -> Result<Value> {
     let mut row = output::row(&plan, true);
+    if plan.scheduled && crate::candidate_builtin::supports(&plan) {
+        row["result"] = crate::candidate_builtin::execute(selection, plan, cancel).await?;
+        return Ok(row);
+    }
     if !plan.scheduled || plan.external.is_none() {
         return Ok(row);
     }

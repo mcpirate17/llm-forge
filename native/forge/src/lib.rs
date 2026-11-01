@@ -12,6 +12,8 @@ pub mod candidate_assessment;
 #[cfg(target_os = "linux")]
 pub mod candidate_batch;
 #[cfg(target_os = "linux")]
+mod candidate_builtin;
+#[cfg(target_os = "linux")]
 pub mod candidate_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_command;

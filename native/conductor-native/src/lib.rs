@@ -20,6 +20,7 @@ pub mod candidate_checks;
 pub mod candidate_policy;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_structure;
+pub mod candidate_unicode;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_verification;
 pub mod context_projection;

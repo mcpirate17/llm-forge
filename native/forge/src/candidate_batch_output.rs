@@ -1,8 +1,6 @@
 use super::*;
-use std::{
-    io,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+pub(super) use crate::json_canon::encoded_size as bytes;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub(super) const MAX_BYTES: usize = 128 * 1024 * 1024;
 const ERROR_RESERVE: usize = 64 * 1024;
@@ -10,28 +8,6 @@ pub(super) struct Quota {
     remaining: AtomicUsize,
 }
 
-struct Counter {
-    count: usize,
-    limit: usize,
-}
-impl io::Write for Counter {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.count = self
-            .count
-            .checked_add(bytes.len())
-            .filter(|n| *n <= self.limit)
-            .ok_or_else(|| io::Error::other("batch JSON output exceeds limit"))?;
-        Ok(bytes.len())
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-pub(super) fn bytes(value: &Value, limit: usize) -> Result<usize> {
-    let mut counter = Counter { count: 0, limit };
-    serde_json::to_writer(&mut counter, value)?;
-    Ok(counter.count)
-}
 impl Quota {
     pub(super) fn new(common: &Value, plans: &[Arc<CheckPlan>], execute: bool) -> Result<Self> {
         // Reserve every error row in advance so an oversized successful result
@@ -71,11 +47,14 @@ impl Quota {
 pub(super) fn row(plan: &CheckPlan, execute: bool) -> Value {
     let mut row = plan.output(execute);
     row["check_id"] = json!(plan.id);
-    row["error"] = if plan.scheduled && plan.external.is_none() {
+    row["error"] = if plan.scheduled && !plan.supported() {
         json!("scheduled check has no native batch implementation")
     } else {
         Value::Null
     };
+    if crate::candidate_builtin::supports(plan) {
+        row["builtin"] = crate::candidate_builtin::metadata(plan);
+    }
     row
 }
 
